@@ -229,6 +229,14 @@ export default function QuoteGenerator() {
             <Button variant="ghost" size="icon" data-testid="button-history">
               <History className="h-4 w-4" />
             </Button>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => window.location.href = '/settings'}
+              data-testid="button-settings"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </header>

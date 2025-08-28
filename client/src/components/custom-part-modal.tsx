@@ -40,16 +40,30 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPa
     warranty: undefined,
   });
 
-  // Suggested parts from common inventory
+  // Load suggested parts from localStorage or use defaults
+  const getStoredParts = () => {
+    const stored = localStorage.getItem('hvac-suggested-parts');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return [];
+      }
+    }
+    return [
+      { id: "contactor-30a", name: "30A Contactor", price: "45.00", category: "Electrical" },
+      { id: "capacitor-dual", name: "Dual Run Capacitor", price: "25.00", category: "Electrical" },
+      { id: "disconnect-60a", name: "60A Disconnect Switch", price: "35.00", category: "Electrical" },
+      { id: "fuse-30a", name: "30A Time Delay Fuse", price: "8.50", category: "Electrical" },
+      { id: "thermostat-digital", name: "Digital Thermostat", price: "125.00", category: "Controls" },
+      { id: "filter-16x25", name: "16x25x1 Air Filter", price: "12.00", category: "Filters" },
+      { id: "belt-4l", name: "4L Blower Belt", price: "15.00", category: "Parts" },
+      { id: "motor-condenser", name: "Condenser Fan Motor", price: "185.00", category: "Motors" },
+    ];
+  };
+
   const suggestedParts = [
-    { id: "contactor-30a", name: "30A Contactor", price: "45.00", category: "Electrical" },
-    { id: "capacitor-dual", name: "Dual Run Capacitor", price: "25.00", category: "Electrical" },
-    { id: "disconnect-60a", name: "60A Disconnect Switch", price: "35.00", category: "Electrical" },
-    { id: "fuse-30a", name: "30A Time Delay Fuse", price: "8.50", category: "Electrical" },
-    { id: "thermostat-digital", name: "Digital Thermostat", price: "125.00", category: "Controls" },
-    { id: "filter-16x25", name: "16x25x1 Air Filter", price: "12.00", category: "Filters" },
-    { id: "belt-4l", name: "4L Blower Belt", price: "15.00", category: "Parts" },
-    { id: "motor-condenser", name: "Condenser Fan Motor", price: "185.00", category: "Motors" },
+    ...getStoredParts(),
     { id: "custom", name: "Custom Part (Enter Details)", price: "", category: "Custom" }
   ];
 
