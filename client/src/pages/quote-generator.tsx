@@ -14,6 +14,7 @@ import QuotePreview from "@/components/quote-preview";
 import CustomPartModal from "@/components/custom-part-modal";
 import VoiceNotes from "@/components/voice-notes";
 import JobNotesDisplay from "@/components/job-notes-display";
+import ConditionalRequirements from "@/components/conditional-requirements";
 import { apiRequest } from "@/lib/queryClient";
 import type { QuotePart } from "@shared/schema";
 
@@ -154,6 +155,18 @@ export default function QuoteGenerator() {
     setQuoteData(prev => ({ ...prev, ...updates }));
   };
 
+  const handleAddRequiredParts = (newParts: QuotePart[]) => {
+    setQuoteData(prev => {
+      // Merge new parts with existing, avoiding duplicates
+      const existingIds = prev.parts.map(p => p.id);
+      const partsToAdd = newParts.filter(p => !existingIds.includes(p.id));
+      return {
+        ...prev,
+        parts: [...prev.parts, ...partsToAdd]
+      };
+    });
+  };
+
   const handleCopyQuote = async () => {
     if (!generatedQuote) return;
 
@@ -227,6 +240,10 @@ export default function QuoteGenerator() {
             technician={quoteData.technician}
             technicians={technicians}
             onUpdate={handleUpdateQuoteData}
+          />
+
+          <ConditionalRequirements
+            onAddParts={handleAddRequiredParts}
           />
 
           <PartsSelection
