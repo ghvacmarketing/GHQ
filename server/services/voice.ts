@@ -27,27 +27,18 @@ export class VoiceService {
 
       const transcribedText = transcription.text;
 
-      // Simple cleanup only - no analysis or recommendations
-      const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo", // Fast model for text cleanup
-        messages: [
-          {
-            role: "user",
-            content: `Fix grammar and format as bullet points. Do NOT add recommendations. Only clean up what was said:
+      // Skip AI entirely - just format the raw transcription
+      // Split by periods, semicolons, and "and" to create bullet points
+      const sentences = transcribedText
+        .split(/[.;]|(?:\s+and\s+)/)
+        .map(s => s.trim())
+        .filter(s => s.length > 3) // Remove very short fragments
+        .map(s => `• ${s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()}`);
 
-"${transcribedText}"
-
-Return only bullet points of what was stated.`
-          },
-        ],
-        max_tokens: 100, // Short and fast
-        temperature: 0, // No creativity, just cleanup
-      });
-
-      const cleanedText = response.choices[0]?.message?.content || `• ${transcribedText}`;
+      const formattedText = sentences.length > 0 ? sentences.join('\n') : `• ${transcribedText}`;
       
       return {
-        summary: cleanedText.includes('•') ? cleanedText : `• ${cleanedText}`
+        summary: formattedText
       };
 
     } catch (error) {
