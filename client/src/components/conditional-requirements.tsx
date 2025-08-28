@@ -10,7 +10,7 @@ import type { QuotePart } from "@shared/schema";
 interface ConditionalRequirementsProps {
   selectedParts: QuotePart[];
   onAddParts: (parts: QuotePart[]) => void;
-  onAddCustomPart: () => void;
+  onAddCustomPart: (prefillData?: any) => void;
 }
 
 interface ServiceRequirement {
@@ -128,9 +128,37 @@ export default function ConditionalRequirements({ selectedParts, onAddParts, onA
   };
 
   const markAsCompleted = (partId: string) => {
+    const req = requirements.find(r => r.partId === partId);
+    if (!req) return;
+
     updateRequirement(partId, { completed: true });
-    // Open custom part modal for user to add required parts
-    onAddCustomPart();
+    
+    // Generate required parts based on the requirement
+    const requiredPartsInfo = getRequiredPartsInfo(req);
+    const requiredParts = requiredPartsInfo.map((partInfo, index) => {
+      // Parse part info to extract name and quantity/unit
+      let partName = partInfo;
+      let unitInfo = '';
+      
+      // Handle refrigerant with pounds
+      if (partInfo.includes('Refrigerant (') && partInfo.includes(' lbs)')) {
+        const match = partInfo.match(/Refrigerant \((\d+(?:\.\d+)?)\s*lbs?\)/);
+        if (match) {
+          partName = 'Refrigerant';
+          unitInfo = `${match[1]} lbs`;
+        }
+      }
+      
+      return {
+        description: partName,
+        price: '0',
+        quantity: unitInfo || '1',
+        category: 'Materials'
+      };
+    });
+
+    // Open custom part modal with pre-filled parts
+    onAddCustomPart({ requiredParts });
   };
 
   const removeRequirement = (partId: string) => {

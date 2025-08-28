@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ interface CustomPartModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddPart: (part: QuotePart) => void;
+  prefillData?: any;
 }
 
 interface CustomPartForm {
@@ -23,12 +24,17 @@ interface CustomPartForm {
   availability: string;
   vendor: string;
   warranty?: boolean;
+  quantity: string;
+  category: string;
 }
 
-export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPartModalProps) {
+export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillData }: CustomPartModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [multiplePartsMode, setMultiplePartsMode] = useState(false);
+  const [multiplePartsList, setMultiplePartsList] = useState<CustomPartForm[]>([]);
+  
   const [formData, setFormData] = useState<CustomPartForm>({
     partNumber: "",
     description: "",
@@ -36,7 +42,26 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPa
     availability: "In Stock",
     vendor: "",
     warranty: undefined,
+    quantity: "1",
+    category: "Custom",
   });
+
+  // Handle prefilled data from conditional requirements
+  useEffect(() => {
+    if (prefillData?.requiredParts && prefillData.requiredParts.length > 0) {
+      setMultiplePartsMode(true);
+      setMultiplePartsList(prefillData.requiredParts.map((part: any, index: number) => ({
+        partNumber: `REQ-${Date.now()}-${index}`,
+        description: part.description,
+        price: part.price || "0",
+        availability: "Required",
+        vendor: "GHVAC",
+        warranty: false,
+        quantity: part.quantity || "1",
+        category: part.category || "Materials",
+      })));
+    }
+  }, [prefillData]);
 
   const createCustomPartMutation = useMutation({
     mutationFn: async (partData: any) => {
@@ -84,12 +109,48 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPa
       availability: "In Stock",
       vendor: "",
       warranty: undefined,
+      quantity: "1",
+      category: "Custom",
     });
+    setMultiplePartsMode(false);
+    setMultiplePartsList([]);
     onClose();
+  };
+
+  const handleMultiplePartsSubmit = () => {
+    // Add all multiple parts at once
+    multiplePartsList.forEach((part, index) => {
+      const quotePart: QuotePart = {
+        id: `custom-${Date.now()}-${index}`,
+        partNumber: part.partNumber,
+        description: part.description,
+        category: part.category,
+        price: part.price,
+        availability: part.availability,
+        vendor: part.vendor,
+        warranty: part.warranty || false,
+        isCustom: true,
+        quantity: parseFloat(part.quantity) || 1,
+      };
+      onAddPart(quotePart);
+    });
+
+    toast({
+      title: "Parts Added",
+      description: `${multiplePartsList.length} required parts added to your quote.`,
+    });
+
+    handleClose();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Handle multiple parts mode
+    if (multiplePartsMode) {
+      handleMultiplePartsSubmit();
+      return;
+    }
 
     if (!formData.description.trim()) {
       toast({
@@ -130,8 +191,53 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPa
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="w-[95vw] max-w-md mx-auto my-8 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Other Part</DialogTitle>
+          <DialogTitle>
+            {multiplePartsMode ? "Add Required Parts" : "Add Other Part"}
+          </DialogTitle>
         </DialogHeader>
+        
+        {multiplePartsMode ? (
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              The following parts are required for your service:
+            </div>
+            
+            {multiplePartsList.map((part, index) => (
+              <div key={index} className="border rounded-lg p-3 bg-muted/50">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-medium">{part.description}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Quantity: {part.quantity} | Category: {part.category}
+                    </div>
+                  </div>
+                  <div className="text-sm font-medium">
+                    ${part.price}
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            <div className="flex gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleMultiplePartsSubmit}
+                className="flex-1"
+                data-testid="button-add-required-parts"
+              >
+                Add All Parts
+              </Button>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="partNumber" className="block text-sm font-medium text-card-foreground mb-2">
@@ -249,6 +355,7 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPa
             </Button>
           </div>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

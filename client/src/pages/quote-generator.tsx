@@ -43,6 +43,7 @@ export default function QuoteGenerator() {
   });
 
   const [isCustomPartModalOpen, setIsCustomPartModalOpen] = useState(false);
+  const [customPartPrefillData, setCustomPartPrefillData] = useState<any>(null);
   const [generatedQuote, setGeneratedQuote] = useState<any>(null);
 
   // Fetch technicians
@@ -326,13 +327,19 @@ export default function QuoteGenerator() {
           <ConditionalRequirements
             selectedParts={quoteData.parts}
             onAddParts={handleAddRequiredParts}
-            onAddCustomPart={() => setIsCustomPartModalOpen(true)}
+            onAddCustomPart={(prefillData) => {
+              setCustomPartPrefillData(prefillData);
+              setIsCustomPartModalOpen(true);
+            }}
           />
 
           <PartsSelection
             selectedParts={quoteData.parts}
             onUpdate={handleUpdateQuoteData}
-            onAddCustomPart={() => setIsCustomPartModalOpen(true)}
+            onAddCustomPart={(prefillData) => {
+              setCustomPartPrefillData(prefillData);
+              setIsCustomPartModalOpen(true);
+            }}
           />
 
           {quoteData.parts.length > 0 && totals && (
@@ -381,13 +388,18 @@ export default function QuoteGenerator() {
 
       <CustomPartModal
         isOpen={isCustomPartModalOpen}
-        onClose={() => setIsCustomPartModalOpen(false)}
+        onClose={() => {
+          setIsCustomPartModalOpen(false);
+          setCustomPartPrefillData(null);
+        }}
         onAddPart={(part) => {
           handleUpdateQuoteData({
             parts: [...quoteData.parts, { ...part, quantity: 1 }],
           });
           setIsCustomPartModalOpen(false);
+          setCustomPartPrefillData(null);
         }}
+        prefillData={customPartPrefillData}
       />
     </div>
   );
