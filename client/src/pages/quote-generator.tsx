@@ -24,6 +24,7 @@ interface QuoteData {
   parts: QuotePart[];
   ghvacInstalled?: boolean;
   yearsSinceInstallation?: string;
+  laborHours?: string;
   jobNotes?: string;
 }
 
@@ -37,6 +38,7 @@ export default function QuoteGenerator() {
     parts: [],
     ghvacInstalled: undefined,
     yearsSinceInstallation: "",
+    laborHours: "1",
     jobNotes: "",
   });
 
@@ -107,7 +109,8 @@ export default function QuoteGenerator() {
       laborRate = laborRate * discountFactor;
     }
 
-    const labor = laborRate;
+    const hours = parseFloat(quoteData.laborHours || "1");
+    const labor = laborRate * hours;
     const tax = (subtotal + labor) * settings.taxRate;
     const total = subtotal + labor + tax;
 
@@ -272,6 +275,7 @@ export default function QuoteGenerator() {
           <WarrantySection
             ghvacInstalled={quoteData.ghvacInstalled}
             yearsSinceInstallation={quoteData.yearsSinceInstallation}
+            laborHours={quoteData.laborHours}
             onUpdate={handleUpdateQuoteData}
           />
 

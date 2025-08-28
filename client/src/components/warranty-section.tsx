@@ -7,12 +7,14 @@ import { Shield } from "lucide-react";
 interface WarrantySectionProps {
   ghvacInstalled?: boolean;
   yearsSinceInstallation?: string;
-  onUpdate: (updates: { ghvacInstalled?: boolean; yearsSinceInstallation?: string }) => void;
+  laborHours?: string;
+  onUpdate: (updates: { ghvacInstalled?: boolean; yearsSinceInstallation?: string; laborHours?: string }) => void;
 }
 
 export default function WarrantySection({
   ghvacInstalled,
   yearsSinceInstallation,
+  laborHours,
   onUpdate,
 }: WarrantySectionProps) {
   return (
@@ -54,6 +56,27 @@ export default function WarrantySection({
             )}
           </div>
           
+          <div className="space-y-3">
+            <Label htmlFor="laborHours" className="block text-sm font-medium text-card-foreground">
+              Labor Hours *
+            </Label>
+            <Input
+              id="laborHours"
+              type="number"
+              placeholder="1"
+              min="0.25"
+              step="0.25"
+              max="24"
+              value={laborHours}
+              onChange={(e) => onUpdate({ laborHours: e.target.value })}
+              className="w-full"
+              data-testid="input-labor-hours"
+            />
+            <p className="text-xs text-muted-foreground">
+              Hours of labor to charge (increments of 0.25)
+            </p>
+          </div>
+
           {ghvacInstalled === true && (
             <div className="p-3 bg-accent/20 rounded-lg slide-in">
               <Label htmlFor="yearsSince" className="block text-sm font-medium text-card-foreground mb-2">
