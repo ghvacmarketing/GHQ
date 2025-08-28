@@ -27,20 +27,20 @@ export class VoiceService {
 
       const transcribedText = transcription.text;
 
-      // Step 2: Summarize transcription into bullet points
+      // Step 2: Summarize transcription into bullet points using faster model
       const response = await openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o-mini", // Faster, cheaper model for simple summarization
         messages: [
           {
             role: "system",
-            content: `You are an HVAC technician assistant. Convert the following voice notes into clear, concise bullet points about the job findings, issues, and recommendations. 
+            content: `Convert HVAC technician voice notes to bullet points. Only include what the technician actually observed or said - no assumptions, recommendations, or additions unless specifically mentioned.
 
-Format the response as JSON with a 'summary' field containing bullet points using markdown format like this:
-• Finding 1
-• Issue 2
-• Recommendation 3
+Format as JSON with 'summary' field containing bullet points:
+• What was found/observed
+• Issues mentioned
+• Only include recommendations if technician specifically stated them
 
-Focus on technical details, part conditions, system performance, and any repairs or replacements needed.`
+Keep it brief and factual.`
           },
           {
             role: "user",
@@ -48,6 +48,8 @@ Focus on technical details, part conditions, system performance, and any repairs
           },
         ],
         response_format: { type: "json_object" },
+        max_tokens: 150, // Reduced for faster processing
+        temperature: 0.1, // Very low for factual accuracy
       });
 
       const result = JSON.parse(response.choices[0].message.content || '{"summary": "Unable to process voice notes"}');
