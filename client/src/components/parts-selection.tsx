@@ -31,6 +31,7 @@ export default function PartsSelection({
 }: PartsSelectionProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [partQuantities, setPartQuantities] = useState<{ [key: string]: number }>({});
+  const [partPrices, setPartPrices] = useState<{ [key: string]: number }>({});
 
   const { data: parts = [], isLoading } = useQuery<Part[]>({
     queryKey: ["/api/parts"],
@@ -48,12 +49,13 @@ export default function PartsSelection({
 
   const addPart = (part: Part) => {
     const quantity = partQuantities[part.partNumber] || 1;
+    const price = partPrices[part.partNumber] || Number(part.price);
     const partWithQuantity: QuotePart = {
       id: part.partNumber,
       partNumber: part.partNumber,
       description: part.description,
       category: part.category,
-      price: part.price.toString(),
+      price: price.toString(),
       availability: part.availability,
       vendor: part.vendor,
       warranty: part.warranty,
@@ -73,10 +75,14 @@ export default function PartsSelection({
       onUpdate({ parts: [...selectedParts, partWithQuantity] });
     }
     
-    // Reset quantity after adding
+    // Reset quantity and price after adding
     setPartQuantities(prev => ({
       ...prev,
       [part.partNumber]: 1,
+    }));
+    setPartPrices(prev => ({
+      ...prev,
+      [part.partNumber]: Number(part.price),
     }));
   };
 
@@ -174,11 +180,28 @@ export default function PartsSelection({
                           <p className="text-xs text-muted-foreground">Model: {part.partNumber}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-semibold text-primary">
-                            ${Number(part.price).toFixed(2)}
-                            {part.category.toLowerCase() === 'refrigerants' && '/lb'}
-                            {part.category.toLowerCase() !== 'refrigerants' && '/ea'}
-                          </p>
+                          <div className="flex items-center space-x-1 mb-1">
+                            <span className="text-xs text-muted-foreground">$</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={partPrices[part.partNumber] || Number(part.price) || ''}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value) || 0;
+                                setPartPrices(prev => ({
+                                  ...prev,
+                                  [part.partNumber]: value,
+                                }));
+                              }}
+                              className="w-20 h-6 text-xs text-right"
+                              data-testid={`input-price-${part.partNumber}`}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              {part.description.toLowerCase().includes('copper') || part.description.toLowerCase().includes('insulation') ? '/ft' :
+                               part.description.toLowerCase().includes('refrigerant') ? '/lb' : '/ea'}
+                            </span>
+                          </div>
                           <Badge 
                             variant={
                               part.availability === 'In Stock' ? 'default' : 
@@ -194,10 +217,15 @@ export default function PartsSelection({
                       <div className="flex items-center space-x-2">
                         <Input
                           type="number"
-                          placeholder={part.category.toLowerCase() === 'refrigerants' ? 'lbs' : 'qty'}
+                          placeholder={
+                            part.description.toLowerCase().includes('copper') || part.description.toLowerCase().includes('insulation') ? 'feet' :
+                            part.description.toLowerCase().includes('refrigerant') ? 'lbs' : 'qty'
+                          }
                           min="1"
-                          step={part.category.toLowerCase() === 'refrigerants' ? '0.1' : '1'}
-                          value={partQuantities[part.partNumber] || ''}
+                          step={
+                            part.description.toLowerCase().includes('refrigerant') ? '0.1' : '1'
+                          }
+                          value={partQuantities[part.partNumber] || 1}
                           onChange={(e) => {
                             const value = parseFloat(e.target.value) || 1;
                             setPartQuantities(prev => ({
