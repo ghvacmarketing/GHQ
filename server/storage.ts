@@ -36,9 +36,9 @@ export class MemStorage implements IStorage {
 
   private async initializeDefaultData() {
     const defaultTechnicians = [
-      { name: "John Smith", email: "john@ghvac.com" },
-      { name: "Mike Johnson", email: "mike@ghvac.com" },
-      { name: "Sarah Davis", email: "sarah@ghvac.com" },
+      { name: "Brian", email: "brian@ghvac.com" },
+      { name: "Zack", email: "zack@ghvac.com" },
+      { name: "Sutton", email: "sutton@ghvac.com" },
     ];
 
     for (const tech of defaultTechnicians) {
