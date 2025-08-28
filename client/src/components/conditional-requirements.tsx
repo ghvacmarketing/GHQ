@@ -33,7 +33,7 @@ export default function ConditionalRequirements({ selectedParts, onAddParts }: C
     const triggerKeywords = ['compressor', 'evaporator', 'condenser coil', 'evap coil'];
     return selectedParts.some(part => 
       triggerKeywords.some(keyword => 
-        part.name.toLowerCase().includes(keyword)
+        part.description.toLowerCase().includes(keyword)
       )
     );
   };
@@ -42,11 +42,11 @@ export default function ConditionalRequirements({ selectedParts, onAddParts }: C
   const getDetectedServiceType = () => {
     if (!selectedParts || selectedParts.length === 0) return '';
     const compressorParts = selectedParts.filter(part => 
-      part.name.toLowerCase().includes('compressor')
+      part.description.toLowerCase().includes('compressor')
     );
     const evaporatorParts = selectedParts.filter(part => 
-      part.name.toLowerCase().includes('evaporator') || 
-      part.name.toLowerCase().includes('evap coil')
+      part.description.toLowerCase().includes('evaporator') || 
+      part.description.toLowerCase().includes('evap coil')
     );
     
     if (compressorParts.length > 0) return 'compressor';
