@@ -27,35 +27,34 @@ export class VoiceService {
 
       const transcribedText = transcription.text;
 
-      // Step 2: Summarize transcription into bullet points using faster model
+      // Option 1: Just return transcribed text formatted as bullet points (fastest)
+      const sentences = transcribedText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      const simpleBullets = sentences.map(s => `• ${s.trim()}`).join('\n');
+      
+      // If transcription is short and clear, return it directly
+      if (transcribedText.length < 300) {
+        return {
+          summary: simpleBullets || `• ${transcribedText}`
+        };
+      }
+
+      // Option 2: Only use AI for longer, complex transcriptions
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini", // Faster, cheaper model for simple summarization
+        model: "gpt-3.5-turbo", // Even faster model for basic text formatting
         messages: [
           {
-            role: "system",
-            content: `Convert HVAC technician voice notes to bullet points. Only include what the technician actually observed or said - no assumptions, recommendations, or additions unless specifically mentioned.
-
-Format as JSON with 'summary' field containing bullet points:
-• What was found/observed
-• Issues mentioned
-• Only include recommendations if technician specifically stated them
-
-Keep it brief and factual.`
-          },
-          {
             role: "user",
-            content: transcribedText,
+            content: `Format as bullet points, no additions: "${transcribedText}"`
           },
         ],
-        response_format: { type: "json_object" },
-        max_tokens: 150, // Reduced for faster processing
-        temperature: 0.1, // Very low for factual accuracy
+        max_tokens: 80,
+        temperature: 0,
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '{"summary": "Unable to process voice notes"}');
+      const aiFormatted = response.choices[0]?.message?.content || simpleBullets;
       
       return {
-        summary: result.summary || "Unable to process voice notes"
+        summary: aiFormatted.includes('•') ? aiFormatted : `• ${aiFormatted}`
       };
 
     } catch (error) {
