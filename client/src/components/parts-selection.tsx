@@ -187,7 +187,7 @@ export default function PartsSelection({
                               <span className="text-xs text-muted-foreground">Model:</span>
                               <Input
                                 type="text"
-                                value={partNumbers[part.partNumber] || part.partNumber}
+                                value={partNumbers[part.partNumber] || ""}
                                 onChange={(e) => {
                                   setPartNumbers(prev => ({
                                     ...prev,
@@ -195,7 +195,7 @@ export default function PartsSelection({
                                   }));
                                 }}
                                 className="w-24 h-5 text-xs"
-                                placeholder="Model"
+                                placeholder={part.partNumber}
                                 data-testid={`input-model-${part.partNumber}`}
                               />
                             </div>
