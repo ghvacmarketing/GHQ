@@ -137,8 +137,9 @@ export default function ConditionalRequirements({ selectedParts, onAddParts, onA
     setRequirements(prev => prev.filter(req => req.partId !== partId));
   };
 
-  const incompleteRequirements = requirements.filter(req => !req.completed && isRequirementComplete(req));
+  const incompleteRequirements = requirements.filter(req => !req.completed);
   const completedRequirements = requirements.filter(req => req.completed);
+  
 
   if (requirements.length === 0) {
     return null;
