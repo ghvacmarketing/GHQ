@@ -27,21 +27,21 @@ export class VoiceService {
 
       const transcribedText = transcription.text;
 
-      // Use AI to simply summarize what was said in bullet points
+      // Use AI to intelligently summarize the findings
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [
           {
             role: "system",
-            content: "Convert the technician's spoken words into bullet points. Keep exactly what they said but fix grammar. Do not analyze, interpret, or add recommendations."
+            content: "You're helping an HVAC technician organize their job observations. Create concise bullet points summarizing what they found and observed. Group related items together. Fix grammar and make it professional. Do NOT add any recommendations, solutions, or next steps - only summarize what they actually observed or found."
           },
           {
             role: "user",
-            content: `Technician said: "${transcribedText}"\n\nFormat as bullet points:`
+            content: `Summarize these observations into clear bullet points:\n\n"${transcribedText}"`
           },
         ],
-        max_tokens: 100,
-        temperature: 0.1,
+        max_tokens: 120,
+        temperature: 0.3,
       });
 
       const summary = response.choices[0]?.message?.content || `• ${transcribedText}`;
