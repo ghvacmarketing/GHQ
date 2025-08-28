@@ -1,0 +1,75 @@
+import { Button } from "@/components/ui/button";
+import { Calculator, Copy, Mail, Check, Clock } from "lucide-react";
+
+interface QuoteActionsProps {
+  onGenerateQuote: () => void;
+  onCopyQuote: () => void;
+  onMarkAccepted: () => void;
+  onMarkPending: () => void;
+  isGenerating: boolean;
+  quoteGenerated: boolean;
+}
+
+export default function QuoteActions({
+  onGenerateQuote,
+  onCopyQuote,
+  onMarkAccepted,
+  onMarkPending,
+  isGenerating,
+  quoteGenerated,
+}: QuoteActionsProps) {
+  return (
+    <div className="space-y-4">
+      <Button
+        onClick={onGenerateQuote}
+        disabled={isGenerating}
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-4 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2"
+        data-testid="button-generate-quote"
+      >
+        <Calculator className="h-5 w-5" />
+        <span>{quoteGenerated ? "Regenerate Quote" : "Generate Quote"}</span>
+      </Button>
+
+      {quoteGenerated && (
+        <>
+          <div className="grid grid-cols-2 gap-3 slide-in">
+            <Button
+              onClick={onCopyQuote}
+              className="bg-chart-1 hover:bg-chart-1/90 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 pulse-success"
+              data-testid="button-copy-quote"
+            >
+              <Copy className="h-4 w-4" />
+              <span>Copy Quote</span>
+            </Button>
+            <Button
+              className="bg-chart-2 hover:bg-chart-2/90 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              data-testid="button-email-quote"
+            >
+              <Mail className="h-4 w-4" />
+              <span>Email Quote</span>
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 slide-in">
+            <Button
+              onClick={onMarkAccepted}
+              className="bg-chart-4 hover:bg-chart-4/90 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              data-testid="button-mark-accepted"
+            >
+              <Check className="h-4 w-4" />
+              <span>Accepted</span>
+            </Button>
+            <Button
+              onClick={onMarkPending}
+              className="bg-chart-3 hover:bg-chart-3/90 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              data-testid="button-mark-pending"
+            >
+              <Clock className="h-4 w-4" />
+              <span>Pending</span>
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
