@@ -51,40 +51,7 @@
   --shadow-2xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
 }
 
-.dark {
-  --card: hsl(20, 14%, 8%);
-  --ring: hsl(9, 75%, 61%);
-  --input: hsl(20, 14%, 18%);
-  --muted: hsl(20, 14%, 15%);
-  --accent: hsl(25, 45%, 20%);
-  --border: hsl(20, 14%, 15%);
-  --chart-1: hsl(203.8863, 88.2845%, 53.1373%);
-  --chart-2: hsl(159.7826, 100%, 36.0784%);
-  --chart-3: hsl(42.0290, 92.8251%, 56.2745%);
-  --chart-4: hsl(147.1429, 78.5047%, 41.9608%);
-  --chart-5: hsl(341.4894, 75.2000%, 50.9804%);
-  --popover: hsl(20, 14%, 4%);
-  --primary: hsl(9, 75%, 61%);
-  --sidebar: hsl(20, 14%, 8%);
-  --secondary: hsl(30, 15%, 52%);
-  --background: hsl(20, 14%, 4%);
-  --foreground: hsl(45, 25%, 91%);
-  --destructive: hsl(356.3033, 90.5579%, 54.3137%);
-  --sidebar-ring: hsl(9, 75%, 61%);
-  --sidebar-accent: hsl(25, 45%, 20%);
-  --sidebar-border: hsl(20, 14%, 15%);
-  --card-foreground: hsl(45, 25%, 85%);
-  --sidebar-primary: hsl(9, 75%, 61%);
-  --muted-foreground: hsl(45, 15%, 46%);
-  --accent-foreground: hsl(45, 25%, 85%);
-  --popover-foreground: hsl(45, 25%, 91%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --sidebar-foreground: hsl(45, 25%, 85%);
-  --secondary-foreground: hsl(0, 0%, 100%);
-  --destructive-foreground: hsl(0, 0%, 100%);
-  --sidebar-accent-foreground: hsl(45, 25%, 85%);
-  --sidebar-primary-foreground: hsl(0, 0%, 100%);
-}
+/* Dark mode removed - light theme only for GHVAC */
 
 @layer base {
   * {
@@ -92,7 +59,19 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply font-sans antialiased;
+    background: #f0f0f0 !important;
+    color: #1a1a1a !important;
+  }
+
+  html {
+    background: #f0f0f0 !important;
+  }
+
+  /* Force light theme - no dark mode */
+  html, body, #root {
+    background-color: #f0f0f0 !important;
+    color: #1a1a1a !important;
   }
 }
 
