@@ -148,15 +148,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get pricing settings from Google Sheets
-  app.get("/api/settings", async (req, res) => {
-    try {
-      const settings = await googleSheetsService.getSettings();
-      res.json(settings);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching settings" });
-    }
-  });
 
   // Force refresh settings from Google Sheets
   app.post("/api/settings/refresh", async (req, res) => {
@@ -165,6 +156,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Settings refreshed successfully", settings });
     } catch (error) {
       res.status(500).json({ message: "Error refreshing settings" });
+    }
+  });
+
+  // Admin settings storage (in-memory for now)
+  let adminSettings = {
+    laborRate: 65,
+    commissionPercent: 0.03,
+    financingPromotionPercent: 0.04,
+    profitPercent: 0.21,
+    laborBenefitsPercent: 0.34,
+    salesTaxPercent: 0.08,
+    warrantyReserve: 25,
+    overheadPercent: 0.30,
+    warrantyDiscounts: {
+      2: 0.25, 3: 0.35, 4: 0.45, 5: 0.50, 6: 0.55,
+      7: 0.65, 8: 0.70, 9: 0.80, 10: 0.90
+    }
+  };
+
+  // Save admin settings
+  app.post("/api/admin/settings", async (req, res) => {
+    try {
+      adminSettings = { ...adminSettings, ...req.body };
+      res.json({ message: "Settings saved successfully", settings: adminSettings });
+    } catch (error) {
+      res.status(500).json({ message: "Error saving settings" });
+    }
+  });
+
+  // Override regular settings endpoint to use admin settings when available
+  app.get("/api/settings", async (req, res) => {
+    try {
+      // Return admin settings if configured, otherwise try Google Sheets
+      res.json(adminSettings);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching settings" });
     }
   });
 

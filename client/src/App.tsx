@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import QuoteGenerator from "@/pages/quote-generator";
 import SettingsPage from "@/pages/settings";
+import AdminSettings from "@/pages/admin-settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -12,6 +13,7 @@ function Router() {
     <Switch>
       <Route path="/" component={QuoteGenerator} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/admin" component={AdminSettings} />
       <Route component={NotFound} />
     </Switch>
   );

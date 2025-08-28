@@ -305,7 +305,7 @@ export default function QuoteGenerator() {
             <Button 
               variant="ghost" 
               size="icon"
-              onClick={() => window.location.href = '/settings'}
+              onClick={() => window.location.href = '/admin'}
               data-testid="button-settings"
             >
               <Settings className="h-4 w-4" />
