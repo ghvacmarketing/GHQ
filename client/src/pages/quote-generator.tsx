@@ -96,29 +96,74 @@ export default function QuoteGenerator() {
 
 
   const calculateTotals = () => {
-    if (!settings || quoteData.parts.length === 0) return null;
+    if (!settings || (!quoteData.parts.length && !quoteData.laborHours)) return null;
 
-    const subtotal = quoteData.parts.reduce((sum, part) => 
+    // Parts subtotal
+    const partsSubtotal = quoteData.parts.reduce((sum, part) => 
       sum + (parseFloat(part.price) * (part.quantity || 1)), 0
     );
 
-    let laborRate = settings.laborRate;
+    // Labor calculation
+    const hours = parseFloat(quoteData.laborHours || "1");
+    let laborRate = 65; // Base labor rate from template
+    
+    // Apply warranty discount if GHVAC installation
     if (quoteData.ghvacInstalled === true && quoteData.yearsSinceInstallation) {
       const years = parseInt(quoteData.yearsSinceInstallation);
-      const discountFactor = Math.max(0.5, 1 - (years * settings.warrantyDiscountRate));
-      laborRate = laborRate * discountFactor;
+      // Warranty pricing from template (2-10 years)
+      const warrantyDiscounts = {
+        2: 0.25, 3: 0.35, 4: 0.45, 5: 0.50, 6: 0.55, 
+        7: 0.65, 8: 0.70, 9: 0.80, 10: 0.90
+      };
+      const discountPercent = warrantyDiscounts[years as keyof typeof warrantyDiscounts] || 0;
+      laborRate = laborRate * (1 - discountPercent);
     }
-
-    const hours = parseFloat(quoteData.laborHours || "1");
-    const labor = laborRate * hours;
-    const tax = (subtotal + labor) * settings.taxRate;
-    const total = subtotal + labor + tax;
+    
+    const totalLabor = laborRate * hours;
+    
+    // Labor benefits (34% from template)
+    const laborBenefits = totalLabor * 0.34;
+    
+    // Sales tax (8% from template)
+    const salesTax = (partsSubtotal + totalLabor + laborBenefits) * 0.08;
+    
+    // Warranty reserve ($25 from template)
+    const warrantyReserve = 25.00;
+    
+    // Direct cost total
+    const directCost = partsSubtotal + totalLabor + laborBenefits + salesTax + warrantyReserve;
+    
+    // Overhead (30% from template)
+    const overhead = directCost * 0.30;
+    
+    // Profit (21% from template)
+    const profit = directCost * 0.21;
+    
+    // Financing cost (4% from template)
+    const financingCost = directCost * 0.04;
+    
+    // Commission (3% from template)
+    const commission = directCost * 0.03;
+    
+    // Final selling price
+    const sellingPrice = directCost + overhead + profit + financingCost + commission;
 
     return {
-      subtotal: subtotal.toFixed(2),
-      labor: labor.toFixed(2),
-      tax: tax.toFixed(2),
-      total: total.toFixed(2),
+      partsSubtotal: partsSubtotal.toFixed(2),
+      totalLabor: totalLabor.toFixed(2),
+      laborBenefits: laborBenefits.toFixed(2),
+      salesTax: salesTax.toFixed(2),
+      warrantyReserve: warrantyReserve.toFixed(2),
+      directCost: directCost.toFixed(2),
+      overhead: overhead.toFixed(2),
+      profit: profit.toFixed(2),
+      financingCost: financingCost.toFixed(2),
+      commission: commission.toFixed(2),
+      total: sellingPrice.toFixed(2),
+      // Legacy compatibility
+      subtotal: partsSubtotal.toFixed(2),
+      labor: totalLabor.toFixed(2),
+      tax: salesTax.toFixed(2),
     };
   };
 
