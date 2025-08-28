@@ -112,25 +112,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all parts from Google Sheets
+  // Get all parts from storage
   app.get("/api/parts", async (req, res) => {
     try {
-      const parts = await googleSheetsService.getParts();
+      const parts = await storage.getAllParts();
       res.json(parts);
     } catch (error) {
       console.error('Error fetching parts:', error);
-      res.status(500).json({ message: "Error fetching parts from Google Sheets" });
+      res.status(500).json({ message: "Error fetching parts" });
     }
   });
 
   // Get parts by category
   app.get("/api/parts/category/:category", async (req, res) => {
     try {
-      const parts = await googleSheetsService.getParts();
-      const filteredParts = parts.filter(part => 
-        part.category.toLowerCase() === req.params.category.toLowerCase()
-      );
-      res.json(filteredParts);
+      const parts = await storage.getPartsByCategory(req.params.category);
+      res.json(parts);
     } catch (error) {
       res.status(500).json({ message: "Error fetching parts by category" });
     }

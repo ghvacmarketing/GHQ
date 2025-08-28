@@ -44,6 +44,25 @@ export class MemStorage implements IStorage {
     for (const tech of defaultTechnicians) {
       await this.createTechnician(tech);
     }
+
+    // Initialize suggested parts
+    const defaultParts = [
+      // Main Components
+      { partNumber: "CB-001", description: "Control Board", category: "Parts", price: "0.00", availability: "Available", vendor: "Various", warranty: true, isCustom: false },
+      { partNumber: "EC-001", description: "Evaporator Coil", category: "Parts", price: "0.00", availability: "Available", vendor: "Various", warranty: true, isCustom: false },
+      { partNumber: "COMP-001", description: "Compressor", category: "Parts", price: "0.00", availability: "Available", vendor: "Various", warranty: true, isCustom: false },
+      
+      // Materials
+      { partNumber: "RFD-001", description: "Refrigerant Filter Dryer", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
+      { partNumber: "COP-001", description: "Copper", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
+      { partNumber: "ARM-001", description: "Armaflex Insulation", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
+      { partNumber: "AA-001", description: "Acid Away", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
+      { partNumber: "REF-001", description: "Refrigerant", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
+    ];
+
+    for (const part of defaultParts) {
+      await this.createPart(part);
+    }
   }
 
   // Quote operations
