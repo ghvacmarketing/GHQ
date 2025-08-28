@@ -3,12 +3,12 @@
 @tailwind utilities;
 
 :root {
-  --card: hsl(45, 25%, 97%);
+  --card: #fcfcfc;
   --ring: hsl(0, 0%, 41.96%);
-  --input: hsl(20, 14%, 88%);
-  --muted: hsl(45, 15%, 87%);
+  --input: #b5b5b5;
+  --muted: #e3e3e3;
   --accent: hsl(0, 0%, 100%);
-  --border: hsl(45, 15%, 85%);
+  --border: #e8e8e8;
   --radius: 0.8rem;
   --chart-1: hsl(203.8863, 88.2845%, 53.1373%);
   --chart-2: hsl(159.7826, 100%, 36.0784%);
@@ -16,15 +16,15 @@
   --chart-4: hsl(147.1429, 78.5047%, 41.9608%);
   --chart-5: hsl(341.4894, 75.2000%, 50.9804%);
   --popover: hsl(45, 25%, 97%);
-  --primary: hsl(0, 22%, 40%);
+  --primary: #711419;
   --sidebar: hsl(45, 25%, 97%);
   --spacing: 0.25rem;
   --font-mono: Menlo, monospace;
   --font-sans: 'Poppins', sans-serif;
-  --secondary: hsl(0, 0%, 77%);
-  --background: hsl(0, 0%, 94%);
+  --secondary: #c4c4c4;
+  --background: #f0f0f0;
   --font-serif: 'Poppins', sans-serif;
-  --foreground: hsl(0, 0%, 10%);
+  --foreground: #1a1a1a;
   --destructive: hsl(0, 0%, 0%);
   --sidebar-ring: hsl(9, 75%, 61%);
   --sidebar-accent: hsl(25, 45%, 80%);
@@ -32,15 +32,23 @@
   --card-foreground: hsl(0, 0%, 0%);
   --sidebar-primary: hsl(9, 75%, 61%);
   --tracking-normal: 0em;
-  --muted-foreground: hsl(0, 0%, 13%);
+  --muted-foreground: #212121;
   --accent-foreground: hsl(0, 0%, 10.2%);
   --popover-foreground: hsl(0, 0%, 100%);
-  --primary-foreground: hsl(0, 0%, 100%);
+  --primary-foreground: #ffffff;
   --sidebar-foreground: hsl(20, 14%, 17%);
-  --secondary-foreground: hsl(0, 0%, 10%);
-  --destructive-foreground: hsl(0, 0%, 100%);
+  --secondary-foreground: #1a1a1a;
+  --destructive-foreground: #ffffff;
   --sidebar-accent-foreground: hsl(20, 14%, 17%);
   --sidebar-primary-foreground: hsl(0, 0%, 100%);
+  --shadow: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 1px 2px -1px hsl(9, 75%, 61% / 0.00);
+  --shadow-lg: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 4px 6px -1px hsl(9, 75%, 61% / 0.00);
+  --shadow-md: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 2px 4px -1px hsl(9, 75%, 61% / 0.00);
+  --shadow-sm: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 1px 2px -1px hsl(9, 75%, 61% / 0.00);
+  --shadow-xl: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 8px 10px -1px hsl(9, 75%, 61% / 0.00);
+  --shadow-xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
+  --shadow-2xl: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
+  --shadow-2xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
 }
 
 .dark {
