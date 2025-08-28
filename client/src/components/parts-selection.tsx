@@ -151,7 +151,7 @@ export default function PartsSelection({
             data-testid="button-add-custom-part"
           >
             <Plus className="mr-1 h-4 w-4" />
-            Add
+            Add Other
           </Button>
         </div>
 
