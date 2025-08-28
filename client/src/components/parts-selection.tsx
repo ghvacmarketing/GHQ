@@ -202,16 +202,6 @@ export default function PartsSelection({
                                part.description.toLowerCase().includes('refrigerant') ? '/lb' : '/ea'}
                             </span>
                           </div>
-                          <Badge 
-                            variant={
-                              part.availability === 'In Stock' ? 'default' : 
-                              part.availability === 'Out of Stock' || part.availability === 'Backordered' ? 'destructive' : 
-                              'secondary'
-                            } 
-                            className="text-xs"
-                          >
-                            {part.availability}
-                          </Badge>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
