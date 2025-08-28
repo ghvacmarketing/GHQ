@@ -189,13 +189,13 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPa
                 <SelectTrigger className="w-full" data-testid="select-custom-availability">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="In Stock">In Stock</SelectItem>
-                  <SelectItem value="2-3 Days">2-3 Days</SelectItem>
-                  <SelectItem value="1 Week">1 Week</SelectItem>
-                  <SelectItem value="Backordered">Backordered</SelectItem>
-                  <SelectItem value="Out of Stock">Out of Stock</SelectItem>
-                  <SelectItem value="Special Order">Special Order</SelectItem>
+                <SelectContent className="bg-popover text-popover-foreground">
+                  <SelectItem value="In Stock" className="text-popover-foreground">In Stock</SelectItem>
+                  <SelectItem value="2-3 Days" className="text-popover-foreground">2-3 Days</SelectItem>
+                  <SelectItem value="1 Week" className="text-popover-foreground">1 Week</SelectItem>
+                  <SelectItem value="Backordered" className="text-popover-foreground">Backordered</SelectItem>
+                  <SelectItem value="Out of Stock" className="text-popover-foreground">Out of Stock</SelectItem>
+                  <SelectItem value="Special Order" className="text-popover-foreground">Special Order</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -48,9 +48,9 @@ export default function CustomerInfo({
               <SelectTrigger className="w-full" data-testid="select-technician">
                 <SelectValue placeholder="Select technician" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-popover text-popover-foreground">
                 {technicians.map((tech) => (
-                  <SelectItem key={tech.id} value={tech.name}>
+                  <SelectItem key={tech.id} value={tech.name} className="text-popover-foreground">
                     {tech.name}
                   </SelectItem>
                 ))}
