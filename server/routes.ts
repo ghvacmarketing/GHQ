@@ -158,6 +158,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Force refresh settings from Google Sheets
+  app.post("/api/settings/refresh", async (req, res) => {
+    try {
+      const settings = await googleSheetsService.getSettings();
+      res.json({ message: "Settings refreshed successfully", settings });
+    } catch (error) {
+      res.status(500).json({ message: "Error refreshing settings" });
+    }
+  });
+
   // Get all technicians
   app.get("/api/technicians", async (req, res) => {
     try {

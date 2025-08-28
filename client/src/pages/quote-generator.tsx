@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, History } from "lucide-react";
+import { Settings, History, RefreshCw } from "lucide-react";
 import giesbrechtLogo from "../assets/giesbrecht-logo.webp";
 import CustomerInfo from "@/components/customer-info";
 import PartsSelection from "@/components/parts-selection";
@@ -50,9 +50,11 @@ export default function QuoteGenerator() {
     queryKey: ["/api/technicians"],
   });
 
-  // Fetch pricing settings
-  const { data: settings } = useQuery({
+  // Fetch pricing settings with automatic refresh
+  const { data: settings, refetch: refetchSettings } = useQuery({
     queryKey: ["/api/settings"],
+    staleTime: 30000, // Consider data stale after 30 seconds
+    cacheTime: 60000, // Keep in cache for 1 minute
   });
 
   // Create quote mutation
@@ -103,47 +105,45 @@ export default function QuoteGenerator() {
       sum + (parseFloat(part.price) * (part.quantity || 1)), 0
     );
 
-    // Labor calculation
+    // Labor calculation using live Google Sheets data
     const hours = parseFloat(quoteData.laborHours || "1");
-    let laborRate = 65; // Base labor rate from template
+    let laborRate = settings.laborRate || 65; // Use live rate from Google Sheets
     
     // Apply warranty discount if GHVAC installation
     if (quoteData.ghvacInstalled === true && quoteData.yearsSinceInstallation) {
       const years = parseInt(quoteData.yearsSinceInstallation);
-      // Warranty pricing from template (2-10 years)
-      const warrantyDiscounts = {
+      // Use live warranty discounts from Google Sheets
+      const warrantyDiscounts = settings.warrantyDiscounts || {
         2: 0.25, 3: 0.35, 4: 0.45, 5: 0.50, 6: 0.55, 
         7: 0.65, 8: 0.70, 9: 0.80, 10: 0.90
       };
-      const discountPercent = warrantyDiscounts[years as keyof typeof warrantyDiscounts] || 0;
+      const discountPercent = warrantyDiscounts[years] || 0;
       laborRate = laborRate * (1 - discountPercent);
     }
     
     const totalLabor = laborRate * hours;
     
-    // Labor benefits (34% from template)
-    const laborBenefits = totalLabor * 0.34;
+    // All percentages now come live from Google Sheets
+    const laborBenefitsPercent = settings.laborBenefitsPercent || 0.34;
+    const salesTaxPercent = settings.salesTaxPercent || 0.08;
+    const warrantyReserve = settings.warrantyReserve || 25.00;
+    const overheadPercent = settings.overheadPercent || 0.30;
+    const profitPercent = settings.profitPercent || 0.21;
+    const financingPercent = settings.financingPromotionPercent || 0.04;
+    const commissionPercent = settings.commissionPercent || 0.03;
     
-    // Sales tax (8% from template)
-    const salesTax = (partsSubtotal + totalLabor + laborBenefits) * 0.08;
-    
-    // Warranty reserve ($25 from template)
-    const warrantyReserve = 25.00;
+    // Calculations using live data
+    const laborBenefits = totalLabor * laborBenefitsPercent;
+    const salesTax = (partsSubtotal + totalLabor + laborBenefits) * salesTaxPercent;
     
     // Direct cost total
     const directCost = partsSubtotal + totalLabor + laborBenefits + salesTax + warrantyReserve;
     
-    // Overhead (30% from template)
-    const overhead = directCost * 0.30;
-    
-    // Profit (21% from template)
-    const profit = directCost * 0.21;
-    
-    // Financing cost (4% from template)
-    const financingCost = directCost * 0.04;
-    
-    // Commission (3% from template)
-    const commission = directCost * 0.03;
+    // Final calculations
+    const overhead = directCost * overheadPercent;
+    const profit = directCost * profitPercent;
+    const financingCost = directCost * financingPercent;
+    const commission = directCost * commissionPercent;
     
     // Final selling price
     const sellingPrice = directCost + overhead + profit + financingCost + commission;
@@ -254,6 +254,22 @@ export default function QuoteGenerator() {
     }
   };
 
+  const handleRefreshPricing = async () => {
+    try {
+      await refetchSettings();
+      toast({
+        title: "Pricing Refreshed",
+        description: "Latest pricing data loaded from Google Sheets.",
+      });
+    } catch (error) {
+      toast({
+        title: "Refresh Failed",
+        description: "Failed to refresh pricing data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const totals = calculateTotals();
 
   return (
@@ -274,6 +290,15 @@ export default function QuoteGenerator() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={handleRefreshPricing}
+              data-testid="button-refresh-pricing"
+              title="Refresh pricing from Google Sheets"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" data-testid="button-history">
               <History className="h-4 w-4" />
             </Button>
