@@ -177,7 +177,12 @@ export default function PartsSelection({
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex-1">
                           <p className="text-sm font-medium text-card-foreground">{part.description}</p>
-                          <p className="text-xs text-muted-foreground">Model: {part.partNumber}</p>
+                          {part.category === 'Parts' && (
+                            <p className="text-xs text-muted-foreground">Model: {part.partNumber}</p>
+                          )}
+                          {part.category === 'Materials' && (
+                            <p className="text-xs text-muted-foreground">Material Type</p>
+                          )}
                         </div>
                         <div className="text-right">
                           <div className="flex items-center space-x-1 mb-1">
