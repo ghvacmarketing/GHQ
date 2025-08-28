@@ -185,7 +185,14 @@ export default function PartsSelection({
                             ${part.price.toFixed(2)}
                             {part.category.toLowerCase() === 'refrigerants' && '/lb'}
                           </p>
-                          <Badge variant={part.availability === 'In Stock' ? 'default' : 'secondary'} className="text-xs">
+                          <Badge 
+                            variant={
+                              part.availability === 'In Stock' ? 'default' : 
+                              part.availability === 'Out of Stock' || part.availability === 'Backordered' ? 'destructive' : 
+                              'secondary'
+                            } 
+                            className="text-xs"
+                          >
                             {part.availability}
                           </Badge>
                         </div>

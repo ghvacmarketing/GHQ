@@ -193,6 +193,8 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPa
                   <SelectItem value="In Stock">In Stock</SelectItem>
                   <SelectItem value="2-3 Days">2-3 Days</SelectItem>
                   <SelectItem value="1 Week">1 Week</SelectItem>
+                  <SelectItem value="Backordered">Backordered</SelectItem>
+                  <SelectItem value="Out of Stock">Out of Stock</SelectItem>
                   <SelectItem value="Special Order">Special Order</SelectItem>
                 </SelectContent>
               </Select>
