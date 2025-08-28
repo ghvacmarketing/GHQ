@@ -182,22 +182,24 @@ export default function PartsSelection({
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex-1">
                           <p className="text-sm font-medium text-card-foreground">{part.description}</p>
-                          <div className="flex items-center space-x-1">
-                            <span className="text-xs text-muted-foreground">Model:</span>
-                            <Input
-                              type="text"
-                              value={partNumbers[part.partNumber] || part.partNumber}
-                              onChange={(e) => {
-                                setPartNumbers(prev => ({
-                                  ...prev,
-                                  [part.partNumber]: e.target.value,
-                                }));
-                              }}
-                              className="w-24 h-5 text-xs"
-                              placeholder="Model"
-                              data-testid={`input-model-${part.partNumber}`}
-                            />
-                          </div>
+                          {part.category === 'Parts' && (
+                            <div className="flex items-center space-x-1">
+                              <span className="text-xs text-muted-foreground">Model:</span>
+                              <Input
+                                type="text"
+                                value={partNumbers[part.partNumber] || part.partNumber}
+                                onChange={(e) => {
+                                  setPartNumbers(prev => ({
+                                    ...prev,
+                                    [part.partNumber]: e.target.value,
+                                  }));
+                                }}
+                                className="w-24 h-5 text-xs"
+                                placeholder="Model"
+                                data-testid={`input-model-${part.partNumber}`}
+                              />
+                            </div>
+                          )}
                         </div>
                         <div className="text-right">
                           <div className="flex items-center space-x-1 mb-1">
