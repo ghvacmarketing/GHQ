@@ -1,0 +1,110 @@
+Updated Requirements Document (with Sheets as Source of Truth)
+
+Project: HVAC Service Pricing & Quoting App
+Client: Giesbrecht HVAC (GHVAC)
+
+1. Clear Objective
+
+Create a mobile-first quoting app for HVAC technicians that:
+
+Starts simple (no login/password at first).
+
+Lets techs generate quotes on-site immediately.
+
+Pulls all pricing and settings directly from Google Sheets (no in-app settings).
+
+Allows adding new/custom parts and consumables.
+
+Generates copyable text quotes (for FieldEdge or messaging).
+
+Sends email notifications of each quote to manager/admin.
+
+Automates Trello card creation for follow-up and ordering.
+
+2. MVP – Phase 1 (Simple Calculator & Quote Generator)
+Access & Simplicity
+
+No password/login for now.
+
+Direct link, easy for techs to use in the field.
+
+Quote Inputs
+
+Customer info: name only.
+
+Part categories:
+
+Populated directly from Google Sheets pricing guide.
+
+Includes live pricing updates for parts and consumables.
+
+Custom part entry:
+
+Part number.
+
+Availability.
+
+Warranty status.
+
+Vendor-sourced price.
+
+Quote Outputs
+
+Generated text block with all part info, totals, and description.
+
+Copy button → paste directly into FieldEdge.
+
+Email copy → automatically sent to manager/admin.
+
+Workflow Integration
+
+If quote accepted → Trello card under “Parts to be Ordered.”
+
+If quote pending → Trello card under technician’s “Follow-up” list.
+
+3. Phase 2 – Conditional Logic & Smart Features
+Conditional Part Logic
+
+Example: If condenser replacement is selected → automatically add refrigerant.
+
+Rules for coils, compressors, etc. that require extra materials.
+
+Warranty / Loyalty Pricing
+
+Checkbox: “Installed by GHVAC?”
+
+If yes → prorated labor pricing (1–10 years since install).
+
+Pulled from warranty logic defined in Google Sheets.
+
+Smart AI Summary (Technician Notes)
+
+Voice input preferred → speech-to-text capture.
+
+AI-generated bullet point summary of repair/job plan.
+
+Stored alongside quote for admin review and price book updates.
+
+4. Notifications & Admin
+
+Quote notifications: email to admin/manager for every new quote.
+
+Technician tracking: dropdown with tech names.
+
+History log: all quotes saved in app (no login required).
+
+Backend Source of Truth:
+
+All markup, profit margin, labor rate, refrigerant $/lb, etc. are maintained in Google Sheets.
+
+App simply fetches values live from the sheet.
+
+No separate in-app settings menu needed.
+
+5. Long-Term (Phase 3 – Sales Funnel & Expansion)
+
+Automated follow-up system (SMS/email reminders).
+
+Dashboard/reports: weekly review of quotes, accepted jobs, pending jobs.
+
+CRM-lite functions: customer info, history, and pipeline view.
