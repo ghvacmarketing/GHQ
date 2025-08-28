@@ -126,7 +126,7 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPa
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="w-full max-w-md mx-4">
+      <DialogContent className="w-[95vw] max-w-md mx-auto my-8 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Custom Part</DialogTitle>
         </DialogHeader>
