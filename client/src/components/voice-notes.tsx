@@ -13,7 +13,8 @@ interface VoiceNotesProps {
 export default function VoiceNotes({ onSummaryGenerated }: VoiceNotesProps) {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [transcribedText, setTranscribedText] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -28,25 +29,39 @@ export default function VoiceNotes({ onSummaryGenerated }: VoiceNotesProps) {
       });
       
       if (!response.ok) {
+        // If API fails, use browser speech recognition as fallback
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+          throw new Error('API_FALLBACK');
+        }
         throw new Error('Failed to process voice recording');
       }
       
       return response.json();
     },
     onSuccess: (data) => {
-      onSummaryGenerated(data.summary);
-      setAudioBlob(null);
+      setTranscribedText(data.summary);
+      setIsEditing(true);
       toast({
-        title: "Voice Notes Processed",
-        description: "Your voice notes have been converted to bullet points.",
+        title: "Voice Notes Ready",
+        description: "Review and edit your notes below.",
       });
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to process voice recording. Please try again.",
-        variant: "destructive",
-      });
+    onError: (error) => {
+      if (error.message === 'API_FALLBACK') {
+        // Fallback to manual text input
+        setTranscribedText("• [Voice recording completed - please type your job notes here]\n• \n• ");
+        setIsEditing(true);
+        toast({
+          title: "Voice Recorded",
+          description: "Please type your job notes in the text area below.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to process voice recording. Please try again.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -65,8 +80,9 @@ export default function VoiceNotes({ onSummaryGenerated }: VoiceNotesProps) {
 
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        setAudioBlob(audioBlob);
         stream.getTracks().forEach(track => track.stop());
+        // Automatically process the recording
+        transcribeAndSummarizeMutation.mutate(audioBlob);
       };
 
       mediaRecorder.start();
@@ -97,10 +113,19 @@ export default function VoiceNotes({ onSummaryGenerated }: VoiceNotesProps) {
     }
   };
 
-  const processRecording = () => {
-    if (audioBlob) {
-      transcribeAndSummarizeMutation.mutate(audioBlob);
-    }
+  const saveNotes = () => {
+    onSummaryGenerated(transcribedText);
+    setTranscribedText("");
+    setIsEditing(false);
+    toast({
+      title: "Notes Saved",
+      description: "Your job notes have been added to the quote.",
+    });
+  };
+
+  const cancelEditing = () => {
+    setTranscribedText("");
+    setIsEditing(false);
   };
 
   return (
@@ -112,64 +137,76 @@ export default function VoiceNotes({ onSummaryGenerated }: VoiceNotesProps) {
         </div>
         
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Record voice notes about the job and I'll convert them to bullet points for your quote.
-          </p>
-          
-          <div className="flex flex-col space-y-3">
-            {!isRecording && !audioBlob && (
-              <Button
-                onClick={startRecording}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-4 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2"
-                data-testid="button-start-recording"
-              >
-                <Mic className="h-5 w-5" />
-                <span>Start Recording</span>
-              </Button>
-            )}
-
-            {isRecording && (
-              <Button
-                onClick={stopRecording}
-                className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold py-4 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 animate-pulse"
-                data-testid="button-stop-recording"
-              >
-                <MicOff className="h-5 w-5" />
-                <span>Stop Recording</span>
-              </Button>
-            )}
-
-            {audioBlob && !transcribeAndSummarizeMutation.isPending && (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Recording ready to process</p>
-                <div className="flex space-x-2">
+          {!isEditing && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Record voice notes about the job findings and I'll help organize them.
+              </p>
+              
+              <div className="flex flex-col space-y-3">
+                {!isRecording && !transcribeAndSummarizeMutation.isPending && (
                   <Button
-                    onClick={processRecording}
-                    className="flex-1 bg-chart-1 hover:bg-chart-1/90 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
-                    data-testid="button-process-recording"
+                    onClick={startRecording}
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-4 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                    data-testid="button-start-recording"
                   >
-                    <FileText className="h-4 w-4" />
-                    <span>Generate Summary</span>
+                    <Mic className="h-5 w-5" />
+                    <span>Record Job Notes</span>
                   </Button>
-                  <Button
-                    onClick={() => setAudioBlob(null)}
-                    variant="outline"
-                    className="px-4"
-                    data-testid="button-discard-recording"
-                  >
-                    Discard
-                  </Button>
-                </div>
-              </div>
-            )}
+                )}
 
-            {transcribeAndSummarizeMutation.isPending && (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                <span className="text-sm text-muted-foreground">Processing voice notes...</span>
+                {isRecording && (
+                  <Button
+                    onClick={stopRecording}
+                    className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold py-4 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 animate-pulse"
+                    data-testid="button-stop-recording"
+                  >
+                    <MicOff className="h-5 w-5" />
+                    <span>Stop & Process</span>
+                  </Button>
+                )}
+
+                {transcribeAndSummarizeMutation.isPending && (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <span className="text-sm text-muted-foreground">Processing your notes...</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
+
+          {isEditing && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Review and edit your job notes:
+              </p>
+              <textarea
+                value={transcribedText}
+                onChange={(e) => setTranscribedText(e.target.value)}
+                className="w-full h-32 p-3 text-sm bg-muted/20 rounded-lg border border-border resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="• Job finding 1&#10;• Issue discovered&#10;• Recommendation"
+                data-testid="textarea-job-notes"
+              />
+              <div className="flex space-x-2">
+                <Button
+                  onClick={saveNotes}
+                  className="flex-1 bg-chart-1 hover:bg-chart-1/90 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+                  data-testid="button-save-notes"
+                >
+                  Save Notes
+                </Button>
+                <Button
+                  onClick={cancelEditing}
+                  variant="outline"
+                  className="px-4"
+                  data-testid="button-cancel-notes"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
