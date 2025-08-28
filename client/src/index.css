@@ -73,6 +73,35 @@
     background-color: #f0f0f0 !important;
     color: #1a1a1a !important;
   }
+
+  /* Fix dropdown text visibility */
+  [data-radix-select-content] {
+    background-color: #ffffff !important;
+    color: #1a1a1a !important;
+  }
+
+  [data-radix-select-item] {
+    background-color: #ffffff !important;
+    color: #1a1a1a !important;
+  }
+
+  [data-radix-select-item]:hover {
+    background-color: #f5f5f5 !important;
+    color: #1a1a1a !important;
+  }
+
+  [data-radix-select-item][data-highlighted] {
+    background-color: #e5e5e5 !important;
+    color: #1a1a1a !important;
+  }
+
+  [data-radix-select-trigger] {
+    color: #1a1a1a !important;
+  }
+
+  [data-radix-select-value] {
+    color: #1a1a1a !important;
+  }
 }
 
 .slide-in {
