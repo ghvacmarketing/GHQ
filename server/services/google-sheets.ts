@@ -73,68 +73,137 @@ export class GoogleSheetsService {
       const data = await response.json();
       const rows = data.values || [];
       
-      // Parse the pricing template structure
+      // Initialize settings with defaults
       const settings: any = {
-        laborRate: 65, // Base labor rate
-        commissionPercent: 3,
-        financingPromotionPercent: 4, 
-        profitPercent: 21,
-        laborBenefitsPercent: 34,
-        salesTaxPercent: 8,
+        laborRate: 65,
+        commissionPercent: 0.03,
+        financingPromotionPercent: 0.04,
+        profitPercent: 0.21,
+        laborBenefitsPercent: 0.34,
+        salesTaxPercent: 0.08,
         warrantyReserve: 25,
-        overheadPercent: 30,
-        // Warranty pricing by years
+        overheadPercent: 0.30,
         warrantyDiscounts: {
           2: 0.25, 3: 0.35, 4: 0.45, 5: 0.50, 6: 0.55,
           7: 0.65, 8: 0.70, 9: 0.80, 10: 0.90
-        }
+        },
+        parts: {}
       };
 
-      // Parse specific values from the sheet rows
+      // Smart parser - looks across all columns for values
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        if (!row || row.length < 2) continue;
+        if (!row) continue;
         
-        const label = row[0]?.toString().toLowerCase() || '';
-        const value = row[1]?.toString() || '';
+        const firstCell = row[0]?.toString().toLowerCase() || '';
         
-        // Extract key pricing values
-        if (label.includes('labor rate')) {
-          const rate = parseFloat(value.replace(/[$,]/g, ''));
-          if (!isNaN(rate)) settings.laborRate = rate;
-        } else if (label.includes('commission')) {
-          const percent = parseFloat(value.replace(/[%]/g, '')) / 100;
-          if (!isNaN(percent)) settings.commissionPercent = percent;
-        } else if (label.includes('financing') || label.includes('promotion')) {
-          const percent = parseFloat(value.replace(/[%]/g, '')) / 100;
-          if (!isNaN(percent)) settings.financingPromotionPercent = percent;
-        } else if (label.includes('profit')) {
-          const percent = parseFloat(value.replace(/[%]/g, '')) / 100;
-          if (!isNaN(percent)) settings.profitPercent = percent;
-        } else if (label.includes('labor benefits')) {
-          const percent = parseFloat(value.replace(/[%]/g, '')) / 100;
-          if (!isNaN(percent)) settings.laborBenefitsPercent = percent;
-        } else if (label.includes('sales tax')) {
-          const percent = parseFloat(value.replace(/[%]/g, '')) / 100;
-          if (!isNaN(percent)) settings.salesTaxPercent = percent;
-        } else if (label.includes('warranty reserve')) {
-          const amount = parseFloat(value.replace(/[$,]/g, ''));
-          if (!isNaN(amount)) settings.warrantyReserve = amount;
-        } else if (label.includes('overhead')) {
-          const percent = parseFloat(value.replace(/[%]/g, '')) / 100;
-          if (!isNaN(percent)) settings.overheadPercent = percent;
-        }
-      }
-
-      // Look for warranty pricing section
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        if (row && row[0]?.toString().includes('Year')) {
-          const years = parseInt(row[0].toString().replace(/[^0-9]/g, ''));
-          if (years >= 2 && years <= 10 && row[2]) {
-            const percent = parseFloat(row[2].toString().replace(/[%]/g, '')) / 100;
+        // Parse pricing template section
+        if (firstCell.includes('labor rate')) {
+          // Look for the value in columns B, C, D
+          for (let col = 1; col < Math.min(row.length, 4); col++) {
+            const value = parseFloat((row[col] || '').toString().replace(/[$,%]/g, ''));
+            if (!isNaN(value) && value > 0) {
+              settings.laborRate = value;
+              break;
+            }
+          }
+        } else if (firstCell.includes('commission')) {
+          for (let col = 1; col < Math.min(row.length, 4); col++) {
+            const text = (row[col] || '').toString();
+            const percent = parseFloat(text.replace(/[%]/g, ''));
             if (!isNaN(percent)) {
-              settings.warrantyDiscounts[years] = percent;
+              settings.commissionPercent = percent / 100;
+              break;
+            }
+          }
+        } else if (firstCell.includes('financing') || firstCell.includes('promotion')) {
+          for (let col = 1; col < Math.min(row.length, 4); col++) {
+            const text = (row[col] || '').toString();
+            const percent = parseFloat(text.replace(/[%]/g, ''));
+            if (!isNaN(percent)) {
+              settings.financingPromotionPercent = percent / 100;
+              break;
+            }
+          }
+        } else if (firstCell.includes('profit') && !firstCell.includes('gross')) {
+          for (let col = 1; col < Math.min(row.length, 4); col++) {
+            const text = (row[col] || '').toString();
+            const percent = parseFloat(text.replace(/[%]/g, ''));
+            if (!isNaN(percent)) {
+              settings.profitPercent = percent / 100;
+              break;
+            }
+          }
+        } else if (firstCell.includes('labor benefits')) {
+          for (let col = 1; col < Math.min(row.length, 10); col++) {
+            const text = (row[col] || '').toString();
+            const percent = parseFloat(text.replace(/[%]/g, ''));
+            if (!isNaN(percent) && percent > 10) { // Labor benefits should be ~34%
+              settings.laborBenefitsPercent = percent / 100;
+              break;
+            }
+          }
+        } else if (firstCell.includes('sales tax') || firstCell.includes('tax')) {
+          for (let col = 1; col < Math.min(row.length, 10); col++) {
+            const text = (row[col] || '').toString();
+            const percent = parseFloat(text.replace(/[%]/g, ''));
+            if (!isNaN(percent) && percent > 0 && percent < 20) { // Sales tax should be ~8%
+              settings.salesTaxPercent = percent / 100;
+              break;
+            }
+          }
+        } else if (firstCell.includes('warranty reserve')) {
+          for (let col = 1; col < Math.min(row.length, 10); col++) {
+            const value = parseFloat((row[col] || '').toString().replace(/[$,]/g, ''));
+            if (!isNaN(value) && value > 0) {
+              settings.warrantyReserve = value;
+              break;
+            }
+          }
+        } else if (firstCell.includes('overhead')) {
+          for (let col = 1; col < Math.min(row.length, 10); col++) {
+            const text = (row[col] || '').toString();
+            const percent = parseFloat(text.replace(/[%]/g, ''));
+            if (!isNaN(percent) && percent > 10) { // Overhead should be ~30%
+              settings.overheadPercent = percent / 100;
+              break;
+            }
+          }
+        }
+        
+        // Parse parts pricing section
+        const partNames = [
+          'control board', 'evaporator coil', 'compressor', 
+          'refrigerant filter dryer', 'copper', 'armaflex insulation',
+          'acid away', 'refrigerant', 'material shrinkage'
+        ];
+        
+        for (const partName of partNames) {
+          if (firstCell.includes(partName.toLowerCase())) {
+            // Look for price in columns C, D, E, F (cost column and beyond)
+            for (let col = 2; col < Math.min(row.length, 8); col++) {
+              const value = parseFloat((row[col] || '').toString().replace(/[$,]/g, ''));
+              if (!isNaN(value) && value > 0) {
+                settings.parts[partName] = value;
+                break;
+              }
+            }
+          }
+        }
+        
+        // Parse warranty pricing (look for year patterns)
+        const yearMatch = firstCell.match(/(\d+)\s*year/);
+        if (yearMatch) {
+          const years = parseInt(yearMatch[1]);
+          if (years >= 2 && years <= 10) {
+            // Look for percentage in any column
+            for (let col = 1; col < Math.min(row.length, 8); col++) {
+              const text = (row[col] || '').toString();
+              const percent = parseFloat(text.replace(/[%]/g, ''));
+              if (!isNaN(percent) && percent > 0 && percent <= 100) {
+                settings.warrantyDiscounts[years] = percent / 100;
+                break;
+              }
             }
           }
         }
