@@ -27,21 +27,21 @@ export class VoiceService {
 
       const transcribedText = transcription.text;
 
-      // Always use AI for grammar cleanup and better formatting
+      // Simple cleanup only - no analysis or recommendations
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo", // Fast model for text cleanup
         messages: [
           {
             role: "user",
-            content: `Clean up this technician's voice note - fix grammar and organize into bullet points. Only include what was actually said, no recommendations or assumptions:
+            content: `Fix grammar and format as bullet points. Do NOT add recommendations. Only clean up what was said:
 
 "${transcribedText}"
 
-Format as bullet points with • symbols.`
+Return only bullet points of what was stated.`
           },
         ],
-        max_tokens: 150, // Enough for cleanup but keeps it fast
-        temperature: 0.2, // Slight creativity for grammar fixes
+        max_tokens: 100, // Short and fast
+        temperature: 0, // No creativity, just cleanup
       });
 
       const cleanedText = response.choices[0]?.message?.content || `• ${transcribedText}`;

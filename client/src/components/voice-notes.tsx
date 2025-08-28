@@ -67,8 +67,15 @@ export default function VoiceNotes({ onSummaryGenerated }: VoiceNotesProps) {
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { 
+          sampleRate: 16000, // Lower sample rate for faster upload
+          channelCount: 1 // Mono audio
+        } 
+      });
+      const mediaRecorder = new MediaRecorder(stream, {
+        audioBitsPerSecond: 16000 // Low bitrate for speed
+      });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
