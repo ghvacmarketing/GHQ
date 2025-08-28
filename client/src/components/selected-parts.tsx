@@ -38,7 +38,7 @@ export default function SelectedParts({ parts, totals, onUpdate }: SelectedParts
                 <p className="text-sm font-medium text-card-foreground">{part.description}</p>
                 <p className="text-xs text-muted-foreground">
                   Model: {part.partNumber}
-                  {part.quantity && part.quantity > 1 && ` • Qty: ${part.quantity}`}
+                  {part.quantity && part.quantity > 1 && ` • Qty: ${part.quantity}${part.category.toLowerCase() === 'refrigerants' ? ' lbs' : ''}`}
                 </p>
               </div>
               <div className="text-right mr-3">

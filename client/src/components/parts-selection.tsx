@@ -30,7 +30,7 @@ export default function PartsSelection({
   onAddCustomPart,
 }: PartsSelectionProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [refrigerantQuantity, setRefrigerantQuantity] = useState<{ [key: string]: number }>({});
+  const [partQuantities, setPartQuantities] = useState<{ [key: string]: number }>({});
 
   const { data: parts = [], isLoading } = useQuery<Part[]>({
     queryKey: ["/api/parts"],
@@ -46,7 +46,8 @@ export default function PartsSelection({
     setExpandedCategories(newExpanded);
   };
 
-  const addPart = (part: Part, quantity = 1) => {
+  const addPart = (part: Part) => {
+    const quantity = partQuantities[part.partNumber] || 1;
     const partWithQuantity: QuotePart = {
       id: part.partNumber,
       partNumber: part.partNumber,
@@ -71,6 +72,12 @@ export default function PartsSelection({
     } else {
       onUpdate({ parts: [...selectedParts, partWithQuantity] });
     }
+    
+    // Reset quantity after adding
+    setPartQuantities(prev => ({
+      ...prev,
+      [part.partNumber]: 1,
+    }));
   };
 
   const groupedParts = parts.reduce((acc, part) => {
@@ -146,44 +153,19 @@ export default function PartsSelection({
                   {categoryParts.map((part) => (
                     <div
                       key={part.partNumber}
-                      className="flex items-center justify-between p-2 rounded bg-muted/20 hover:bg-muted/30 transition-colors cursor-pointer"
-                      onClick={() => {
-                        if (part.category.toLowerCase() === 'refrigerants') {
-                          const qty = refrigerantQuantity[part.partNumber] || 1;
-                          addPart(part, qty);
-                        } else {
-                          addPart(part);
-                        }
-                      }}
+                      className="p-2 rounded bg-muted/20 hover:bg-muted/30 transition-colors"
                       data-testid={`part-${part.partNumber}`}
                     >
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-card-foreground">{part.description}</p>
-                        <p className="text-xs text-muted-foreground">Model: {part.partNumber}</p>
-                      </div>
-                      <div className="text-right flex items-center space-x-2">
-                        {part.category.toLowerCase() === 'refrigerants' && (
-                          <Input
-                            type="number"
-                            placeholder="lbs"
-                            min="1"
-                            value={refrigerantQuantity[part.partNumber] || ''}
-                            onChange={(e) => {
-                              const value = parseInt(e.target.value) || 1;
-                              setRefrigerantQuantity(prev => ({
-                                ...prev,
-                                [part.partNumber]: value,
-                              }));
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-16 h-8 text-xs"
-                            data-testid={`input-quantity-${part.partNumber}`}
-                          />
-                        )}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-card-foreground">{part.description}</p>
+                          <p className="text-xs text-muted-foreground">Model: {part.partNumber}</p>
+                        </div>
                         <div className="text-right">
                           <p className="text-sm font-semibold text-primary">
                             ${part.price.toFixed(2)}
                             {part.category.toLowerCase() === 'refrigerants' && '/lb'}
+                            {part.category.toLowerCase() !== 'refrigerants' && '/ea'}
                           </p>
                           <Badge 
                             variant={
@@ -196,6 +178,32 @@ export default function PartsSelection({
                             {part.availability}
                           </Badge>
                         </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          type="number"
+                          placeholder={part.category.toLowerCase() === 'refrigerants' ? 'lbs' : 'qty'}
+                          min="1"
+                          step={part.category.toLowerCase() === 'refrigerants' ? '0.1' : '1'}
+                          value={partQuantities[part.partNumber] || ''}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 1;
+                            setPartQuantities(prev => ({
+                              ...prev,
+                              [part.partNumber]: value,
+                            }));
+                          }}
+                          className="flex-1 h-8 text-xs"
+                          data-testid={`input-quantity-${part.partNumber}`}
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => addPart(part)}
+                          className="h-8 px-3 text-xs"
+                          data-testid={`button-add-${part.partNumber}`}
+                        >
+                          Add
+                        </Button>
                       </div>
                     </div>
                   ))}
