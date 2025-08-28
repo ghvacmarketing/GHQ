@@ -10,6 +10,7 @@ import type { QuotePart } from "@shared/schema";
 interface ConditionalRequirementsProps {
   selectedParts: QuotePart[];
   onAddParts: (parts: QuotePart[]) => void;
+  onAddCustomPart: () => void;
 }
 
 interface ServiceRequirement {
@@ -19,7 +20,7 @@ interface ServiceRequirement {
   systemCapacity?: string;
 }
 
-export default function ConditionalRequirements({ selectedParts, onAddParts }: ConditionalRequirementsProps) {
+export default function ConditionalRequirements({ selectedParts, onAddParts, onAddCustomPart }: ConditionalRequirementsProps) {
   const [requirement, setRequirement] = useState<ServiceRequirement>({
     serviceType: "",
     failureType: "",
@@ -53,22 +54,12 @@ export default function ConditionalRequirements({ selectedParts, onAddParts }: C
     return '';
   };
 
-  const getRequiredParts = (): QuotePart[] => {
-    const parts: QuotePart[] = [];
+  const getRequiredPartsInfo = () => {
+    const partsInfo: string[] = [];
 
     if (requirement.serviceType === "compressor") {
-      // ALWAYS REQUIRED: Filter dryer replacement for every compressor replacement
-      parts.push({
-        id: "req-filter-dryer",
-        partNumber: "RFD-REQ",
-        description: "Refrigerant Filter Dryer (Required)",
-        category: "Materials",
-        price: "45.00",
-        availability: "Required",
-        warranty: false,
-        isCustom: false,
-        quantity: 1,
-      });
+      // ALWAYS REQUIRED
+      partsInfo.push("Refrigerant Filter Dryer");
 
       // CONDITIONAL: Based on failure type OR acid test result
       const needsAcidTreatment = 
@@ -80,81 +71,38 @@ export default function ConditionalRequirements({ selectedParts, onAddParts }: C
         requirement.acidTest === "positive";
 
       if (needsAcidTreatment) {
-        parts.push({
-          id: "req-acid-away",
-          partNumber: "AA-REQ",
-          description: "Acid Away (Required for electrical failure/acid contamination)",
-          category: "Materials",
-          price: "85.00",
-          availability: "Required",
-          warranty: false,
-          isCustom: false,
-          quantity: 1,
-        });
+        partsInfo.push("Acid Away");
       }
 
       if (needsRefrigerantReplacement && requirement.systemCapacity) {
         const pounds = parseFloat(requirement.systemCapacity);
-        parts.push({
-          id: "req-refrigerant",
-          partNumber: "REF-REQ",
-          description: "Refrigerant (Full system replacement)",
-          category: "Materials",
-          price: "12.50",
-          availability: "Required",
-          warranty: false,
-          isCustom: false,
-          quantity: pounds,
-        });
+        partsInfo.push(`Refrigerant (${pounds} lbs)`);
       }
     }
 
     if (requirement.serviceType === "evaporator") {
-      // ALWAYS REQUIRED: Filter dryer replacement for every evaporator replacement
-      parts.push({
-        id: "req-evap-filter-dryer",
-        partNumber: "RFD-EVAP-REQ",
-        description: "Refrigerant Filter Dryer (Required for evaporator)",
-        category: "Materials",
-        price: "45.00",
-        availability: "Required",
-        warranty: false,
-        isCustom: false,
-        quantity: 1,
-      });
-
-      // ALWAYS REQUIRED: Full refrigerant replacement for evaporator
+      // ALWAYS REQUIRED
+      partsInfo.push("Refrigerant Filter Dryer");
+      
       if (requirement.systemCapacity) {
         const pounds = parseFloat(requirement.systemCapacity);
-        parts.push({
-          id: "req-evap-refrigerant",
-          partNumber: "REF-EVAP-REQ",
-          description: "Refrigerant (Full system replacement for evaporator)",
-          category: "Materials",
-          price: "12.50",
-          availability: "Required",
-          warranty: false,
-          isCustom: false,
-          quantity: pounds,
-        });
+        partsInfo.push(`Refrigerant (${pounds} lbs)`);
       }
     }
 
-    return parts;
+    return partsInfo;
   };
 
-  const handleAddRequiredParts = () => {
-    const requiredParts = getRequiredParts();
-    if (requiredParts.length > 0) {
-      onAddParts(requiredParts);
-      // Reset form
-      setRequirement({
-        serviceType: "",
-        failureType: "",
-        acidTest: "",
-        systemCapacity: "",
-      });
-    }
+  const handleOpenCustomPartModal = () => {
+    // Open the custom part modal so user can add required parts with their own pricing
+    onAddCustomPart();
+    // Reset form after opening modal
+    setRequirement({
+      serviceType: "",
+      failureType: "",
+      acidTest: "",
+      systemCapacity: "",
+    });
   };
 
   const detectedServiceType = getDetectedServiceType();
@@ -306,12 +254,12 @@ export default function ConditionalRequirements({ selectedParts, onAddParts }: C
         {/* Add Parts Button */}
         {requirement.serviceType && requirement.systemCapacity && (
           <Button
-            onClick={handleAddRequiredParts}
+            onClick={handleOpenCustomPartModal}
             className="w-full flex items-center justify-center"
             data-testid="button-add-required-parts"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add Required Parts
+            Add Required Parts (Custom Pricing)
           </Button>
         )}
       </CardContent>

@@ -326,6 +326,7 @@ export default function QuoteGenerator() {
           <ConditionalRequirements
             selectedParts={quoteData.parts}
             onAddParts={handleAddRequiredParts}
+            onAddCustomPart={() => setIsCustomPartModalOpen(true)}
           />
 
           <PartsSelection
