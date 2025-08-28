@@ -1,12 +1,21 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
 import { storage } from "./storage";
 import { insertQuoteSchema, insertPartSchema } from "@shared/schema";
 import { googleSheetsService } from "./services/google-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
+import { voiceService } from "./services/voice";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Configure multer for file uploads
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 25 * 1024 * 1024, // 25MB limit
+    },
+  });
   // Get all quotes
   app.get("/api/quotes", async (req, res) => {
     try {
@@ -171,6 +180,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ quoteText: formattedQuote });
     } catch (error) {
       res.status(500).json({ message: "Error generating quote text" });
+    }
+  });
+
+  // Voice recording processing
+  app.post("/api/voice/summarize", upload.single('audio'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No audio file provided" });
+      }
+
+      const result = await voiceService.transcribeAndSummarize(
+        req.file.buffer,
+        req.file.originalname || 'recording.webm'
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error processing voice recording:', error);
+      res.status(500).json({ message: "Error processing voice recording" });
     }
   });
 

@@ -12,6 +12,8 @@ import WarrantySection from "@/components/warranty-section";
 import QuoteActions from "@/components/quote-actions";
 import QuotePreview from "@/components/quote-preview";
 import CustomPartModal from "@/components/custom-part-modal";
+import VoiceNotes from "@/components/voice-notes";
+import JobNotesDisplay from "@/components/job-notes-display";
 import { apiRequest } from "@/lib/queryClient";
 import type { QuotePart } from "@shared/schema";
 
@@ -21,6 +23,7 @@ interface QuoteData {
   parts: QuotePart[];
   ghvacInstalled: boolean;
   yearsSinceInstallation?: string;
+  jobNotes?: string;
 }
 
 export default function QuoteGenerator() {
@@ -34,6 +37,7 @@ export default function QuoteGenerator() {
     parts: [],
     ghvacInstalled: false,
     yearsSinceInstallation: "",
+    jobNotes: "",
   });
 
   const [isCustomPartModalOpen, setIsCustomPartModalOpen] = useState(false);
@@ -141,6 +145,7 @@ export default function QuoteGenerator() {
       total: totals.total,
       ghvacInstalled: quoteData.ghvacInstalled,
       yearsSinceInstallation: quoteData.yearsSinceInstallation,
+      jobNotes: quoteData.jobNotes,
       status: "draft",
       quoteText: "", // Will be generated on server
       emailSent: false,
@@ -256,6 +261,17 @@ export default function QuoteGenerator() {
             yearsSinceInstallation={quoteData.yearsSinceInstallation}
             onUpdate={handleUpdateQuoteData}
           />
+
+          <VoiceNotes
+            onSummaryGenerated={(summary) => handleUpdateQuoteData({ jobNotes: summary })}
+          />
+
+          {quoteData.jobNotes && (
+            <JobNotesDisplay
+              jobNotes={quoteData.jobNotes}
+              onClear={() => handleUpdateQuoteData({ jobNotes: "" })}
+            />
+          )}
 
           <QuoteActions
             onGenerateQuote={handleGenerateQuote}
