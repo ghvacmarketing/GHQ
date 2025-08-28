@@ -8,6 +8,7 @@ import { AlertTriangle, Plus } from "lucide-react";
 import type { QuotePart } from "@shared/schema";
 
 interface ConditionalRequirementsProps {
+  selectedParts: QuotePart[];
   onAddParts: (parts: QuotePart[]) => void;
 }
 
@@ -18,14 +19,40 @@ interface ServiceRequirement {
   systemCapacity?: string;
 }
 
-export default function ConditionalRequirements({ onAddParts }: ConditionalRequirementsProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+export default function ConditionalRequirements({ selectedParts, onAddParts }: ConditionalRequirementsProps) {
   const [requirement, setRequirement] = useState<ServiceRequirement>({
     serviceType: "",
     failureType: "",
     acidTest: "",
     systemCapacity: "",
   });
+
+  // Check if any trigger parts are present
+  const hasTriggerParts = () => {
+    if (!selectedParts || selectedParts.length === 0) return false;
+    const triggerKeywords = ['compressor', 'evaporator', 'condenser coil', 'evap coil'];
+    return selectedParts.some(part => 
+      triggerKeywords.some(keyword => 
+        part.name.toLowerCase().includes(keyword)
+      )
+    );
+  };
+
+  // Auto-detect service type from selected parts
+  const getDetectedServiceType = () => {
+    if (!selectedParts || selectedParts.length === 0) return '';
+    const compressorParts = selectedParts.filter(part => 
+      part.name.toLowerCase().includes('compressor')
+    );
+    const evaporatorParts = selectedParts.filter(part => 
+      part.name.toLowerCase().includes('evaporator') || 
+      part.name.toLowerCase().includes('evap coil')
+    );
+    
+    if (compressorParts.length > 0) return 'compressor';
+    if (evaporatorParts.length > 0) return 'evaporator';
+    return '';
+  };
 
   const getRequiredParts = (): QuotePart[] => {
     const parts: QuotePart[] = [];
@@ -144,41 +171,24 @@ export default function ConditionalRequirements({ onAddParts }: ConditionalRequi
 
   const requiredParts = getRequiredParts();
 
-  if (!isExpanded) {
-    return (
-      <Card className="slide-in">
-        <CardContent className="p-4">
-          <Button
-            variant="outline"
-            onClick={() => setIsExpanded(true)}
-            className="w-full"
-            data-testid="button-show-service-requirements"
-          >
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Major Service Requirements (Compressor/Evaporator)
-          </Button>
-        </CardContent>
-      </Card>
-    );
+  // Only show if trigger parts are present
+  if (!hasTriggerParts()) {
+    return null;
   }
 
+  const detectedServiceType = getDetectedServiceType();
+
   return (
-    <Card className="slide-in">
+    <Card className="slide-in border-orange-200 bg-orange-50/50">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between text-card-foreground">
-          <div className="flex items-center">
-            <AlertTriangle className="text-primary mr-3 h-5 w-5" />
-            Service Requirements
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsExpanded(false)}
-            data-testid="button-hide-service-requirements"
-          >
-            Hide
-          </Button>
+        <CardTitle className="flex items-center text-orange-800">
+          <AlertTriangle className="text-orange-600 mr-3 h-5 w-5" />
+          Required Additional Parts Detected
         </CardTitle>
+        <p className="text-sm text-orange-700">
+          {detectedServiceType === 'compressor' && 'Compressor replacement detected - additional parts may be required'}
+          {detectedServiceType === 'evaporator' && 'Evaporator replacement detected - additional parts may be required'}
+        </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-3">
