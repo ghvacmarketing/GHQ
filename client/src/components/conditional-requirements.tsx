@@ -19,6 +19,7 @@ interface ServiceRequirement {
 }
 
 export default function ConditionalRequirements({ onAddParts }: ConditionalRequirementsProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [requirement, setRequirement] = useState<ServiceRequirement>({
     serviceType: "",
     failureType: "",
@@ -143,12 +144,40 @@ export default function ConditionalRequirements({ onAddParts }: ConditionalRequi
 
   const requiredParts = getRequiredParts();
 
+  if (!isExpanded) {
+    return (
+      <Card className="slide-in">
+        <CardContent className="p-4">
+          <Button
+            variant="outline"
+            onClick={() => setIsExpanded(true)}
+            className="w-full"
+            data-testid="button-show-service-requirements"
+          >
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Major Service Requirements (Compressor/Evaporator)
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="slide-in">
       <CardHeader>
-        <CardTitle className="flex items-center text-card-foreground">
-          <AlertTriangle className="text-primary mr-3 h-5 w-5" />
-          Service Requirements
+        <CardTitle className="flex items-center justify-between text-card-foreground">
+          <div className="flex items-center">
+            <AlertTriangle className="text-primary mr-3 h-5 w-5" />
+            Service Requirements
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(false)}
+            data-testid="button-hide-service-requirements"
+          >
+            Hide
+          </Button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
