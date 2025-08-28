@@ -101,11 +101,11 @@ export default function PartsSelection({
               variant="ghost" 
               size="sm" 
               onClick={onAddCustomPart} 
-              className="flex items-center"
+              className="flex items-center justify-center h-8 px-3"
               data-testid="button-add-custom-part"
             >
               <Plus className="mr-1 h-4 w-4" />
-              Custom
+              Add
             </Button>
           </div>
           <div className="space-y-4">
@@ -136,11 +136,11 @@ export default function PartsSelection({
             variant="ghost" 
             size="sm" 
             onClick={onAddCustomPart} 
-            className="flex items-center"
+            className="flex items-center justify-center h-8 px-3"
             data-testid="button-add-custom-part"
           >
             <Plus className="mr-1 h-4 w-4" />
-            Custom
+            Add
           </Button>
         </div>
 
