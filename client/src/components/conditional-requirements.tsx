@@ -30,7 +30,7 @@ export default function ConditionalRequirements({ selectedParts, onAddParts }: C
   // Check if any trigger parts are present
   const hasTriggerParts = () => {
     if (!selectedParts || selectedParts.length === 0) return false;
-    const triggerKeywords = ['compressor', 'evaporator', 'condenser coil', 'evap coil'];
+    const triggerKeywords = ['compressor', 'evaporator'];
     return selectedParts.some(part => 
       triggerKeywords.some(keyword => 
         part.description.toLowerCase().includes(keyword)
@@ -45,8 +45,7 @@ export default function ConditionalRequirements({ selectedParts, onAddParts }: C
       part.description.toLowerCase().includes('compressor')
     );
     const evaporatorParts = selectedParts.filter(part => 
-      part.description.toLowerCase().includes('evaporator') || 
-      part.description.toLowerCase().includes('evap coil')
+      part.description.toLowerCase().includes('evaporator')
     );
     
     if (compressorParts.length > 0) return 'compressor';
@@ -58,98 +57,84 @@ export default function ConditionalRequirements({ selectedParts, onAddParts }: C
     const parts: QuotePart[] = [];
 
     if (requirement.serviceType === "compressor") {
-      // Always required for compressor replacement
+      // ALWAYS REQUIRED: Filter dryer replacement for every compressor replacement
       parts.push({
-        id: "filter-dryer",
-        name: "Filter Dryer",
-        category: "Parts",
-        price: 45.00,
-        availability: "Available",
-        unit: "qty",
+        id: "req-filter-dryer",
+        partNumber: "RFD-REQ",
+        description: "Refrigerant Filter Dryer (Required)",
+        category: "Materials",
+        price: "45.00",
+        availability: "Required",
+        warranty: false,
+        isCustom: false,
         quantity: 1,
       });
 
-      // Conditional based on failure type
-      if (requirement.failureType === "electrical") {
+      // CONDITIONAL: Based on failure type OR acid test result
+      const needsAcidTreatment = 
+        requirement.failureType === "electrical" || 
+        requirement.acidTest === "positive";
+
+      const needsRefrigerantReplacement = 
+        requirement.failureType === "electrical" || 
+        requirement.acidTest === "positive";
+
+      if (needsAcidTreatment) {
         parts.push({
-          id: "acid-away",
-          name: "Acid Away Treatment",
-          category: "Chemicals",
-          price: 85.00,
-          availability: "Available",
-          unit: "qty",
+          id: "req-acid-away",
+          partNumber: "AA-REQ",
+          description: "Acid Away (Required for electrical failure/acid contamination)",
+          category: "Materials",
+          price: "85.00",
+          availability: "Required",
+          warranty: false,
+          isCustom: false,
           quantity: 1,
         });
-
-        // Add refrigerant based on system capacity
-        if (requirement.systemCapacity) {
-          const pounds = parseFloat(requirement.systemCapacity);
-          parts.push({
-            id: "r410a",
-            name: "R410A Refrigerant",
-            category: "Refrigerants",
-            price: 12.50,
-            availability: "Available",
-            unit: "lbs",
-            quantity: pounds,
-          });
-        }
       }
 
-      // Acid test overrides
-      if (requirement.acidTest === "positive") {
-        // Remove existing acid away if present
-        const acidAwayIndex = parts.findIndex(p => p.id === "acid-away");
-        if (acidAwayIndex === -1) {
-          parts.push({
-            id: "acid-away",
-            name: "Acid Away Treatment",
-            category: "Chemicals",
-            price: 85.00,
-            availability: "Available",
-            unit: "qty",
-            quantity: 1,
-          });
-        }
-
-        // Add refrigerant if not already added
-        if (requirement.systemCapacity && !parts.find(p => p.id === "r410a")) {
-          const pounds = parseFloat(requirement.systemCapacity);
-          parts.push({
-            id: "r410a",
-            name: "R410A Refrigerant",
-            category: "Refrigerants",
-            price: 12.50,
-            availability: "Available",
-            unit: "lbs",
-            quantity: pounds,
-          });
-        }
+      if (needsRefrigerantReplacement && requirement.systemCapacity) {
+        const pounds = parseFloat(requirement.systemCapacity);
+        parts.push({
+          id: "req-refrigerant",
+          partNumber: "REF-REQ",
+          description: "Refrigerant (Full system replacement)",
+          category: "Materials",
+          price: "12.50",
+          availability: "Required",
+          warranty: false,
+          isCustom: false,
+          quantity: pounds,
+        });
       }
     }
 
     if (requirement.serviceType === "evaporator") {
-      // Always required for evaporator replacement
+      // ALWAYS REQUIRED: Filter dryer replacement for every evaporator replacement
       parts.push({
-        id: "evap-filter-dryer",
-        name: "Evaporator Filter Dryer",
-        category: "Parts",
-        price: 55.00,
-        availability: "Available",
-        unit: "qty",
+        id: "req-evap-filter-dryer",
+        partNumber: "RFD-EVAP-REQ",
+        description: "Refrigerant Filter Dryer (Required for evaporator)",
+        category: "Materials",
+        price: "45.00",
+        availability: "Required",
+        warranty: false,
+        isCustom: false,
         quantity: 1,
       });
 
-      // Always need full refrigerant replacement
+      // ALWAYS REQUIRED: Full refrigerant replacement for evaporator
       if (requirement.systemCapacity) {
         const pounds = parseFloat(requirement.systemCapacity);
         parts.push({
-          id: "r410a",
-          name: "R410A Refrigerant",
-          category: "Refrigerants",
-          price: 12.50,
-          availability: "Available",
-          unit: "lbs",
+          id: "req-evap-refrigerant",
+          partNumber: "REF-EVAP-REQ",
+          description: "Refrigerant (Full system replacement for evaporator)",
+          category: "Materials",
+          price: "12.50",
+          availability: "Required",
+          warranty: false,
+          isCustom: false,
           quantity: pounds,
         });
       }
@@ -162,73 +147,86 @@ export default function ConditionalRequirements({ selectedParts, onAddParts }: C
     const requiredParts = getRequiredParts();
     if (requiredParts.length > 0) {
       onAddParts(requiredParts);
+      // Reset form
+      setRequirement({
+        serviceType: "",
+        failureType: "",
+        acidTest: "",
+        systemCapacity: "",
+      });
     }
   };
 
-  const canAddParts = requirement.serviceType && 
-    (requirement.serviceType === "evaporator" || 
-     (requirement.serviceType === "compressor" && requirement.failureType));
-
-  const requiredParts = getRequiredParts();
-
-  // Only show if trigger parts are present
-  if (!hasTriggerParts()) {
-    return null;
-  }
-
   const detectedServiceType = getDetectedServiceType();
+
+  if (!hasTriggerParts()) {
+    return null; // Don't show if no trigger parts are selected
+  }
 
   return (
     <Card className="slide-in border-orange-200 bg-orange-50/50">
-      <CardHeader>
-        <CardTitle className="flex items-center text-orange-800">
+      <CardHeader className="pb-4">
+        <div className="flex items-center">
           <AlertTriangle className="text-orange-600 mr-3 h-5 w-5" />
-          Required Additional Parts Detected
-        </CardTitle>
-        <p className="text-sm text-orange-700">
-          {detectedServiceType === 'compressor' && 'Compressor replacement detected - additional parts may be required'}
-          {detectedServiceType === 'evaporator' && 'Evaporator replacement detected - additional parts may be required'}
-        </p>
+          <CardTitle className="text-lg text-orange-800">Service Requirements</CardTitle>
+        </div>
+        {detectedServiceType && (
+          <p className="text-sm text-orange-700 mt-2">
+            Detected {detectedServiceType} replacement - please complete the requirements below
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-3">
+        {/* Service Type Selection */}
+        <div>
           <Label className="text-sm font-medium">Service Type</Label>
           <RadioGroup
             value={requirement.serviceType}
-            onValueChange={(value) => setRequirement(prev => ({ ...prev, serviceType: value }))}
-            data-testid="radio-service-type"
+            onValueChange={(value) => setRequirement(prev => ({ 
+              ...prev, 
+              serviceType: value,
+              failureType: "", // Reset dependent fields
+              acidTest: "",
+            }))}
+            className="mt-2"
           >
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="compressor" id="compressor" />
+              <RadioGroupItem value="compressor" id="compressor" data-testid="radio-compressor" />
               <Label htmlFor="compressor">Compressor Replacement</Label>
             </div>
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="evaporator" id="evaporator" />
+              <RadioGroupItem value="evaporator" id="evaporator" data-testid="radio-evaporator" />
               <Label htmlFor="evaporator">Evaporator Coil Replacement</Label>
             </div>
           </RadioGroup>
         </div>
 
+        {/* Compressor-specific fields */}
         {requirement.serviceType === "compressor" && (
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Failure Type</Label>
-            <RadioGroup
-              value={requirement.failureType}
-              onValueChange={(value) => setRequirement(prev => ({ ...prev, failureType: value }))}
-              data-testid="radio-failure-type"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="electrical" id="electrical" />
-                <Label htmlFor="electrical">Electrical Short/Burnout</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="mechanical" id="mechanical" />
-                <Label htmlFor="mechanical">Mechanical Failure</Label>
-              </div>
-            </RadioGroup>
+          <>
+            <div>
+              <Label className="text-sm font-medium">Failure Type</Label>
+              <RadioGroup
+                value={requirement.failureType}
+                onValueChange={(value) => setRequirement(prev => ({ ...prev, failureType: value }))}
+                className="mt-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="electrical" id="electrical" data-testid="radio-electrical" />
+                  <Label htmlFor="electrical">Electrical Short/Burnout</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="mechanical" id="mechanical" data-testid="radio-mechanical" />
+                  <Label htmlFor="mechanical">Mechanical Failure</Label>
+                </div>
+              </RadioGroup>
+              <p className="text-xs text-gray-600 mt-1">
+                Electrical failures require acid treatment and full refrigerant replacement
+              </p>
+            </div>
 
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Acid Test Result (if performed)</Label>
+            <div>
+              <Label className="text-sm font-medium">Acid Test Result</Label>
               <Select
                 value={requirement.acidTest}
                 onValueChange={(value) => setRequirement(prev => ({ ...prev, acidTest: value }))}
@@ -242,12 +240,16 @@ export default function ConditionalRequirements({ selectedParts, onAddParts }: C
                   <SelectItem value="not-performed">Not Performed</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-gray-600 mt-1">
+                Positive acid test overrides failure type - requires acid treatment and refrigerant replacement
+              </p>
             </div>
-          </div>
+          </>
         )}
 
-        {(requirement.serviceType === "compressor" || requirement.serviceType === "evaporator") && (
-          <div className="space-y-2">
+        {/* System Capacity - shown for both service types */}
+        {requirement.serviceType && (
+          <div>
             <Label className="text-sm font-medium">System Capacity (lbs)</Label>
             <Select
               value={requirement.systemCapacity}
@@ -268,31 +270,50 @@ export default function ConditionalRequirements({ selectedParts, onAddParts }: C
           </div>
         )}
 
-        {requiredParts.length > 0 && (
-          <div className="bg-muted/20 p-3 rounded-lg space-y-2">
-            <Label className="text-sm font-medium text-muted-foreground">Required Parts:</Label>
-            <ul className="text-sm space-y-1">
-              {requiredParts.map((part) => (
-                <li key={part.id} className="flex justify-between">
-                  <span>• {part.name}</span>
-                  <span className="text-muted-foreground">
-                    {part.quantity} {part.unit} - ${(part.price * part.quantity).toFixed(2)}
-                  </span>
-                </li>
-              ))}
+        {/* Requirements Summary */}
+        {requirement.serviceType && (
+          <div className="bg-white border border-gray-200 rounded-lg p-3">
+            <h4 className="font-medium text-sm mb-2">Required Parts:</h4>
+            <ul className="text-xs space-y-1 text-gray-700">
+              {requirement.serviceType === "compressor" && (
+                <>
+                  <li>• Filter Dryer (Always Required)</li>
+                  {(requirement.failureType === "electrical" || requirement.acidTest === "positive") && (
+                    <>
+                      <li>• Acid Away Treatment (Electrical failure/Acid contamination)</li>
+                      {requirement.systemCapacity && (
+                        <li>• {requirement.systemCapacity} lbs Refrigerant (Full replacement)</li>
+                      )}
+                    </>
+                  )}
+                  {requirement.failureType === "mechanical" && requirement.acidTest !== "positive" && (
+                    <li>• No acid treatment or refrigerant replacement needed (Mechanical failure only)</li>
+                  )}
+                </>
+              )}
+              {requirement.serviceType === "evaporator" && (
+                <>
+                  <li>• Filter Dryer (Always Required)</li>
+                  {requirement.systemCapacity && (
+                    <li>• {requirement.systemCapacity} lbs Refrigerant (Always Required)</li>
+                  )}
+                </>
+              )}
             </ul>
           </div>
         )}
 
-        <Button
-          onClick={handleAddRequiredParts}
-          disabled={!canAddParts || requiredParts.length === 0}
-          className="w-full"
-          data-testid="button-add-required-parts"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Required Parts ({requiredParts.length})
-        </Button>
+        {/* Add Parts Button */}
+        {requirement.serviceType && requirement.systemCapacity && (
+          <Button
+            onClick={handleAddRequiredParts}
+            className="w-full flex items-center justify-center"
+            data-testid="button-add-required-parts"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Required Parts
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
