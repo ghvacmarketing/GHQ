@@ -32,6 +32,7 @@ export default function PartsSelection({
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [partQuantities, setPartQuantities] = useState<{ [key: string]: number }>({});
   const [partPrices, setPartPrices] = useState<{ [key: string]: number }>({});
+  const [partNumbers, setPartNumbers] = useState<{ [key: string]: string }>({});
 
   const { data: parts = [], isLoading } = useQuery<Part[]>({
     queryKey: ["/api/parts"],
@@ -52,7 +53,7 @@ export default function PartsSelection({
     const price = partPrices[part.partNumber] || Number(part.price);
     const partWithQuantity: QuotePart = {
       id: part.partNumber,
-      partNumber: part.partNumber,
+      partNumber: partNumbers[part.partNumber] || part.partNumber,
       description: part.description,
       category: part.category,
       price: price.toString(),
@@ -75,7 +76,7 @@ export default function PartsSelection({
       onUpdate({ parts: [...selectedParts, partWithQuantity] });
     }
     
-    // Reset quantity and price after adding
+    // Reset quantity, price, and part number after adding
     setPartQuantities(prev => ({
       ...prev,
       [part.partNumber]: 1,
@@ -83,6 +84,10 @@ export default function PartsSelection({
     setPartPrices(prev => ({
       ...prev,
       [part.partNumber]: Number(part.price),
+    }));
+    setPartNumbers(prev => ({
+      ...prev,
+      [part.partNumber]: part.partNumber,
     }));
   };
 
@@ -177,12 +182,22 @@ export default function PartsSelection({
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex-1">
                           <p className="text-sm font-medium text-card-foreground">{part.description}</p>
-                          {part.category === 'Parts' && (
-                            <p className="text-xs text-muted-foreground">Model: {part.partNumber}</p>
-                          )}
-                          {part.category === 'Materials' && (
-                            <p className="text-xs text-muted-foreground">Material Type</p>
-                          )}
+                          <div className="flex items-center space-x-1">
+                            <span className="text-xs text-muted-foreground">Model:</span>
+                            <Input
+                              type="text"
+                              value={partNumbers[part.partNumber] || part.partNumber}
+                              onChange={(e) => {
+                                setPartNumbers(prev => ({
+                                  ...prev,
+                                  [part.partNumber]: e.target.value,
+                                }));
+                              }}
+                              className="w-24 h-5 text-xs"
+                              placeholder="Model"
+                              data-testid={`input-model-${part.partNumber}`}
+                            />
+                          </div>
                         </div>
                         <div className="text-right">
                           <div className="flex items-center space-x-1 mb-1">
