@@ -34,7 +34,7 @@
   --tracking-normal: 0em;
   --muted-foreground: #212121;
   --accent-foreground: hsl(0, 0%, 10.2%);
-  --popover-foreground: hsl(0, 0%, 0%);
+  --popover-foreground: hsl(0, 0%, 100%);
   --primary-foreground: #ffffff;
   --sidebar-foreground: hsl(20, 14%, 17%);
   --secondary-foreground: #1a1a1a;
