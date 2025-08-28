@@ -1,11 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Shield } from "lucide-react";
 
 interface WarrantySectionProps {
-  ghvacInstalled: boolean;
+  ghvacInstalled?: boolean;
   yearsSinceInstallation?: string;
   onUpdate: (updates: { ghvacInstalled?: boolean; yearsSinceInstallation?: string }) => void;
 }
@@ -23,19 +23,38 @@ export default function WarrantySection({
           <h2 className="text-lg font-semibold text-card-foreground">Warranty & Pricing</h2>
         </div>
         <div className="space-y-4">
-          <div className="flex items-center space-x-3">
-            <Checkbox
-              id="ghvacInstalled"
-              checked={ghvacInstalled}
-              onCheckedChange={(checked) => onUpdate({ ghvacInstalled: !!checked })}
-              data-testid="checkbox-ghvac-installed"
-            />
-            <Label htmlFor="ghvacInstalled" className="text-sm font-medium text-card-foreground">
-              Originally installed by GHVAC?
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-card-foreground">
+              Originally installed by Giesbrecht HVAC? *
             </Label>
+            <div className="flex space-x-2">
+              <Button
+                type="button"
+                variant={ghvacInstalled === true ? "default" : "outline"}
+                size="sm"
+                onClick={() => onUpdate({ ghvacInstalled: true })}
+                className="flex-1"
+                data-testid="button-warranty-yes"
+              >
+                Yes
+              </Button>
+              <Button
+                type="button"
+                variant={ghvacInstalled === false ? "default" : "outline"}
+                size="sm"
+                onClick={() => onUpdate({ ghvacInstalled: false })}
+                className="flex-1"
+                data-testid="button-warranty-no"
+              >
+                No
+              </Button>
+            </div>
+            {ghvacInstalled === undefined && (
+              <p className="text-xs text-destructive">Please select Yes or No</p>
+            )}
           </div>
           
-          {ghvacInstalled && (
+          {ghvacInstalled === true && (
             <div className="p-3 bg-accent/20 rounded-lg slide-in">
               <Label htmlFor="yearsSince" className="block text-sm font-medium text-card-foreground mb-2">
                 Years since installation

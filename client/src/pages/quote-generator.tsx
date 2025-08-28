@@ -22,7 +22,7 @@ interface QuoteData {
   customerName: string;
   technician: string;
   parts: QuotePart[];
-  ghvacInstalled: boolean;
+  ghvacInstalled?: boolean;
   yearsSinceInstallation?: string;
   jobNotes?: string;
 }
@@ -35,7 +35,7 @@ export default function QuoteGenerator() {
     customerName: "",
     technician: "",
     parts: [],
-    ghvacInstalled: false,
+    ghvacInstalled: undefined,
     yearsSinceInstallation: "",
     jobNotes: "",
   });
@@ -101,7 +101,7 @@ export default function QuoteGenerator() {
     );
 
     let laborRate = settings.laborRate;
-    if (quoteData.ghvacInstalled && quoteData.yearsSinceInstallation) {
+    if (quoteData.ghvacInstalled === true && quoteData.yearsSinceInstallation) {
       const years = parseInt(quoteData.yearsSinceInstallation);
       const discountFactor = Math.max(0.5, 1 - (years * settings.warrantyDiscountRate));
       laborRate = laborRate * discountFactor;
@@ -120,10 +120,10 @@ export default function QuoteGenerator() {
   };
 
   const handleGenerateQuote = () => {
-    if (!quoteData.customerName || !quoteData.technician || quoteData.parts.length === 0) {
+    if (!quoteData.customerName || !quoteData.technician || quoteData.parts.length === 0 || quoteData.ghvacInstalled === undefined) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields and select at least one part.",
+        description: "Please fill in all required fields including warranty coverage.",
         variant: "destructive",
       });
       return;

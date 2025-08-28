@@ -17,12 +17,13 @@ interface CustomPartModalProps {
 }
 
 interface CustomPartForm {
+  selectedPart: string;
   partNumber: string;
   description: string;
   price: string;
   availability: string;
   vendor: string;
-  warranty: boolean;
+  warranty?: boolean;
 }
 
 export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPartModalProps) {
@@ -30,13 +31,27 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPa
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState<CustomPartForm>({
+    selectedPart: "",
     partNumber: "",
     description: "",
     price: "",
     availability: "In Stock",
     vendor: "",
-    warranty: false,
+    warranty: undefined,
   });
+
+  // Suggested parts from common inventory
+  const suggestedParts = [
+    { id: "contactor-30a", name: "30A Contactor", price: "45.00", category: "Electrical" },
+    { id: "capacitor-dual", name: "Dual Run Capacitor", price: "25.00", category: "Electrical" },
+    { id: "disconnect-60a", name: "60A Disconnect Switch", price: "35.00", category: "Electrical" },
+    { id: "fuse-30a", name: "30A Time Delay Fuse", price: "8.50", category: "Electrical" },
+    { id: "thermostat-digital", name: "Digital Thermostat", price: "125.00", category: "Controls" },
+    { id: "filter-16x25", name: "16x25x1 Air Filter", price: "12.00", category: "Filters" },
+    { id: "belt-4l", name: "4L Blower Belt", price: "15.00", category: "Parts" },
+    { id: "motor-condenser", name: "Condenser Fan Motor", price: "185.00", category: "Motors" },
+    { id: "custom", name: "Custom Part (Enter Details)", price: "", category: "Custom" }
+  ];
 
   const createCustomPartMutation = useMutation({
     mutationFn: async (partData: any) => {
@@ -76,23 +91,47 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPa
 
   const handleClose = () => {
     setFormData({
+      selectedPart: "",
       partNumber: "",
       description: "",
       price: "",
       availability: "In Stock",
       vendor: "",
-      warranty: false,
+      warranty: undefined,
     });
     onClose();
+  };
+
+  const handlePartSelection = (partId: string) => {
+    const selectedPart = suggestedParts.find(p => p.id === partId);
+    if (selectedPart && partId !== "custom") {
+      // Auto-fill form for suggested parts
+      updateFormData({
+        selectedPart: partId,
+        partNumber: selectedPart.id.toUpperCase(),
+        description: selectedPart.name,
+        price: selectedPart.price,
+        vendor: "Standard",
+      });
+    } else {
+      // Clear form for custom entry
+      updateFormData({
+        selectedPart: partId,
+        partNumber: "",
+        description: "",
+        price: "",
+        vendor: "",
+      });
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.partNumber || !formData.description || !formData.price) {
+    if (!formData.selectedPart || !formData.partNumber || !formData.description || !formData.price || formData.warranty === undefined) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields.",
+        description: "Please complete all required fields including warranty selection.",
         variant: "destructive",
       });
       return;
@@ -132,36 +171,60 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPa
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="partNumber" className="block text-sm font-medium text-card-foreground mb-2">
-              Part Number *
+            <Label htmlFor="partSelect" className="block text-sm font-medium text-card-foreground mb-2">
+              Select Part *
             </Label>
-            <Input
-              id="partNumber"
-              type="text"
-              placeholder="Enter part number"
-              value={formData.partNumber}
-              onChange={(e) => updateFormData({ partNumber: e.target.value })}
-              className="w-full"
-              data-testid="input-custom-part-number"
-              required
-            />
+            <Select value={formData.selectedPart} onValueChange={handlePartSelection}>
+              <SelectTrigger className="w-full" data-testid="select-part-dropdown">
+                <SelectValue placeholder="Choose from suggested parts or custom" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover text-popover-foreground">
+                {suggestedParts.map((part) => (
+                  <SelectItem key={part.id} value={part.id} className="text-popover-foreground">
+                    {part.name} {part.price && `- $${part.price}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          
-          <div>
-            <Label htmlFor="description" className="block text-sm font-medium text-card-foreground mb-2">
-              Description *
-            </Label>
-            <Input
-              id="description"
-              type="text"
-              placeholder="Part description"
-              value={formData.description}
-              onChange={(e) => updateFormData({ description: e.target.value })}
-              className="w-full"
-              data-testid="input-custom-description"
-              required
-            />
-          </div>
+
+          {formData.selectedPart && (
+            <>
+              <div>
+                <Label htmlFor="partNumber" className="block text-sm font-medium text-card-foreground mb-2">
+                  Part Number *
+                </Label>
+                <Input
+                  id="partNumber"
+                  type="text"
+                  placeholder="Enter part number"
+                  value={formData.partNumber}
+                  onChange={(e) => updateFormData({ partNumber: e.target.value })}
+                  className="w-full"
+                  data-testid="input-custom-part-number"
+                  required
+                  readOnly={formData.selectedPart !== "custom"}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="description" className="block text-sm font-medium text-card-foreground mb-2">
+                  Description *
+                </Label>
+                <Input
+                  id="description"
+                  type="text"
+                  placeholder="Part description"
+                  value={formData.description}
+                  onChange={(e) => updateFormData({ description: e.target.value })}
+                  className="w-full"
+                  data-testid="input-custom-description"
+                  required
+                  readOnly={formData.selectedPart !== "custom"}
+                />
+              </div>
+            </>
+          )}
           
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -216,17 +279,38 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart }: CustomPa
             />
           </div>
           
-          <div className="flex items-center space-x-3">
-            <Checkbox
-              id="warrantyPart"
-              checked={formData.warranty}
-              onCheckedChange={(checked) => updateFormData({ warranty: !!checked })}
-              data-testid="checkbox-custom-warranty"
-            />
-            <Label htmlFor="warrantyPart" className="text-sm font-medium text-card-foreground">
-              Warranty covered part
-            </Label>
-          </div>
+          {formData.selectedPart && (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-card-foreground">
+                Warranty covered part? *
+              </Label>
+              <div className="flex space-x-2">
+                <Button
+                  type="button"
+                  variant={formData.warranty === true ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => updateFormData({ warranty: true })}
+                  className="flex-1"
+                  data-testid="button-custom-warranty-yes"
+                >
+                  Yes
+                </Button>
+                <Button
+                  type="button"
+                  variant={formData.warranty === false ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => updateFormData({ warranty: false })}
+                  className="flex-1"
+                  data-testid="button-custom-warranty-no"
+                >
+                  No
+                </Button>
+              </div>
+              {formData.warranty === undefined && (
+                <p className="text-xs text-destructive">Please select Yes or No</p>
+              )}
+            </div>
+          )}
           
           <div className="flex space-x-3 pt-4">
             <Button
