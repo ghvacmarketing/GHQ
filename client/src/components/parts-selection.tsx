@@ -194,7 +194,7 @@ export default function PartsSelection({
                                     [part.partNumber]: e.target.value,
                                   }));
                                 }}
-                                className="w-24 h-5 text-xs"
+                                className="w-24 h-5 text-xs placeholder:text-gray-400"
                                 placeholder={part.partNumber}
                                 data-testid={`input-model-${part.partNumber}`}
                               />
