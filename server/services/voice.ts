@@ -27,34 +27,27 @@ export class VoiceService {
 
       const transcribedText = transcription.text;
 
-      // Option 1: Just return transcribed text formatted as bullet points (fastest)
-      const sentences = transcribedText.split(/[.!?]+/).filter(s => s.trim().length > 0);
-      const simpleBullets = sentences.map(s => `• ${s.trim()}`).join('\n');
-      
-      // If transcription is short and clear, return it directly
-      if (transcribedText.length < 300) {
-        return {
-          summary: simpleBullets || `• ${transcribedText}`
-        };
-      }
-
-      // Option 2: Only use AI for longer, complex transcriptions
+      // Always use AI for grammar cleanup and better formatting
       const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo", // Even faster model for basic text formatting
+        model: "gpt-3.5-turbo", // Fast model for text cleanup
         messages: [
           {
             role: "user",
-            content: `Format as bullet points, no additions: "${transcribedText}"`
+            content: `Clean up this technician's voice note - fix grammar and organize into bullet points. Only include what was actually said, no recommendations or assumptions:
+
+"${transcribedText}"
+
+Format as bullet points with • symbols.`
           },
         ],
-        max_tokens: 80,
-        temperature: 0,
+        max_tokens: 150, // Enough for cleanup but keeps it fast
+        temperature: 0.2, // Slight creativity for grammar fixes
       });
 
-      const aiFormatted = response.choices[0]?.message?.content || simpleBullets;
+      const cleanedText = response.choices[0]?.message?.content || `• ${transcribedText}`;
       
       return {
-        summary: aiFormatted.includes('•') ? aiFormatted : `• ${aiFormatted}`
+        summary: cleanedText.includes('•') ? cleanedText : `• ${cleanedText}`
       };
 
     } catch (error) {
