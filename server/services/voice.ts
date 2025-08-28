@@ -27,18 +27,27 @@ export class VoiceService {
 
       const transcribedText = transcription.text;
 
-      // Skip AI entirely - just format the raw transcription
-      // Split by periods, semicolons, and "and" to create bullet points
-      const sentences = transcribedText
-        .split(/[.;]|(?:\s+and\s+)/)
-        .map(s => s.trim())
-        .filter(s => s.length > 3) // Remove very short fragments
-        .map(s => `• ${s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()}`);
+      // Use AI to simply summarize what was said in bullet points
+      const response = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: "Convert the technician's spoken words into bullet points. Keep exactly what they said but fix grammar. Do not analyze, interpret, or add recommendations."
+          },
+          {
+            role: "user",
+            content: `Technician said: "${transcribedText}"\n\nFormat as bullet points:`
+          },
+        ],
+        max_tokens: 100,
+        temperature: 0.1,
+      });
 
-      const formattedText = sentences.length > 0 ? sentences.join('\n') : `• ${transcribedText}`;
+      const summary = response.choices[0]?.message?.content || `• ${transcribedText}`;
       
       return {
-        summary: formattedText
+        summary: summary
       };
 
     } catch (error) {
