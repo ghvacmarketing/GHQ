@@ -97,7 +97,13 @@ export default function PartsSelection({
               <Cog className="text-primary mr-3 h-5 w-5" />
               <h2 className="text-lg font-semibold text-card-foreground">Parts & Services</h2>
             </div>
-            <Button variant="ghost" size="sm" onClick={onAddCustomPart} data-testid="button-add-custom-part">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onAddCustomPart} 
+              className="flex items-center"
+              data-testid="button-add-custom-part"
+            >
               <Plus className="mr-1 h-4 w-4" />
               Custom
             </Button>
@@ -126,7 +132,13 @@ export default function PartsSelection({
             <Cog className="text-primary mr-3 h-5 w-5" />
             <h2 className="text-lg font-semibold text-card-foreground">Parts & Services</h2>
           </div>
-          <Button variant="ghost" size="sm" onClick={onAddCustomPart} data-testid="button-add-custom-part">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onAddCustomPart} 
+            className="flex items-center"
+            data-testid="button-add-custom-part"
+          >
             <Plus className="mr-1 h-4 w-4" />
             Custom
           </Button>
