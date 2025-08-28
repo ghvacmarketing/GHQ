@@ -175,7 +175,7 @@ export default function PartsSelection({
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-semibold text-primary">
-                            ${part.price.toFixed(2)}
+                            ${Number(part.price).toFixed(2)}
                             {part.category.toLowerCase() === 'refrigerants' && '/lb'}
                             {part.category.toLowerCase() !== 'refrigerants' && '/ea'}
                           </p>
