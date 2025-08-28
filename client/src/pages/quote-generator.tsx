@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Settings, History, Sun, Moon } from "lucide-react";
+import giesbrechtLogo from "../assets/giesbrecht-logo.webp";
 import CustomerInfo from "@/components/customer-info";
 import PartsSelection from "@/components/parts-selection";
 import SelectedParts from "@/components/selected-parts";
@@ -205,11 +206,14 @@ export default function QuoteGenerator() {
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Settings className="text-primary-foreground text-sm" />
-            </div>
+            <img 
+              src={giesbrechtLogo} 
+              alt="Giesbrecht HVAC" 
+              className="h-10 w-auto object-contain"
+              data-testid="img-company-logo"
+            />
             <div>
-              <h1 className="text-lg font-semibold text-foreground">GHVAC Quote</h1>
+              <h1 className="text-lg font-semibold text-foreground">Quote Generator</h1>
               <p className="text-xs text-muted-foreground">Field Technician Tool</p>
             </div>
           </div>
