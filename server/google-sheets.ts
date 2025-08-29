@@ -47,23 +47,23 @@ class GoogleSheetsService {
     try {
       // Define all the cell ranges we need to fetch
       const ranges = [
-        'C5',   // Labor Rate
-        'C6',   // Commission %
-        'C7',   // Financing/Promotion %
-        'C8',   // Profit %
-        'D20',  // Refrigerant Filter Dryer price
-        'D21',  // Copper price
-        'D22',  // Armaflex Insulation price
-        'D23',  // Acid Away price
-        'D24',  // Refrigerant price
-        'B25',  // Material Shrinkage %
-        'B34',  // Labor Benefits %
-        'B38',  // Sales Tax %
-        'E39',  // Warranty Reserve $
-        'B41',  // Overhead %
-        'B42',  // Profit %
-        'B43',  // Financing Cost %
-        'B44'   // Commission %
+        'Template!C5',   // Labor Rate
+        'Template!C6',   // Commission %
+        'Template!C7',   // Financing/Promotion %
+        'Template!C8',   // Profit %
+        'Template!D20',  // Refrigerant Filter Dryer price
+        'Template!D21',  // Copper price
+        'Template!D22',  // Armaflex Insulation price
+        'Template!D23',  // Acid Away price
+        'Template!D24',  // Refrigerant price
+        'Template!B25',  // Material Shrinkage %
+        'Template!B34',  // Labor Benefits %
+        'Template!B38',  // Sales Tax %
+        'Template!E39',  // Warranty Reserve $
+        'Template!B41',  // Overhead %
+        'Template!B42',  // Profit %
+        'Template!B43',  // Financing Cost %
+        'Template!B44'   // Commission %
       ];
 
       const rangeQuery = ranges.map(range => `ranges=${encodeURIComponent(range)}`).join('&');
