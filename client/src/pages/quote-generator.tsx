@@ -342,14 +342,6 @@ export default function QuoteGenerator() {
             }}
           />
 
-          {quoteData.parts.length > 0 && totals && (
-            <SelectedParts
-              parts={quoteData.parts}
-              totals={totals}
-              onUpdate={handleUpdateQuoteData}
-            />
-          )}
-
           <WarrantySection
             ghvacInstalled={quoteData.ghvacInstalled}
             yearsSinceInstallation={quoteData.yearsSinceInstallation}
@@ -365,6 +357,14 @@ export default function QuoteGenerator() {
             <JobNotesDisplay
               jobNotes={quoteData.jobNotes}
               onClear={() => handleUpdateQuoteData({ jobNotes: "" })}
+            />
+          )}
+
+          {quoteData.parts.length > 0 && totals && (
+            <SelectedParts
+              parts={quoteData.parts}
+              totals={totals}
+              onUpdate={handleUpdateQuoteData}
             />
           )}
 

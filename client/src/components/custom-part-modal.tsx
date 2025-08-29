@@ -51,7 +51,7 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
     if (prefillData?.requiredParts && prefillData.requiredParts.length > 0) {
       setMultiplePartsMode(true);
       setMultiplePartsList(prefillData.requiredParts.map((part: any, index: number) => ({
-        partNumber: `REQ-${Date.now()}-${index}`,
+        partNumber: "", // No part numbers for materials
         description: part.description,
         price: part.price || "0",
         availability: "Required",
