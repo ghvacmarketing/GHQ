@@ -193,12 +193,15 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="w-[95vw] max-w-md mx-auto my-8 max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-md mx-auto my-8 max-h-[90vh] overflow-y-auto" aria-describedby="dialog-description">
         <DialogHeader>
           <DialogTitle>
             {multiplePartsMode ? "Add Required Parts" : "Add Other Part"}
           </DialogTitle>
         </DialogHeader>
+        <div id="dialog-description" className="sr-only">
+          {multiplePartsMode ? "Review and add all required parts for this service" : "Add a custom part to your quote"}
+        </div>
         
         {multiplePartsMode ? (
           <div className="space-y-4">
