@@ -49,6 +49,7 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
   // Handle prefilled data from conditional requirements
   useEffect(() => {
     if (prefillData?.requiredParts && prefillData.requiredParts.length > 0) {
+      console.log('Prefill data received:', prefillData.requiredParts);
       setMultiplePartsMode(true);
       setMultiplePartsList(prefillData.requiredParts.map((part: any, index: number) => ({
         partNumber: "", // No part numbers for materials
@@ -60,6 +61,7 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
         quantity: part.quantity || "1",
         category: part.category || "Materials",
       })));
+      console.log('Multiple parts list set:', prefillData.requiredParts);
     }
   }, [prefillData]);
 
@@ -118,6 +120,7 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
   };
 
   const handleMultiplePartsSubmit = () => {
+    console.log('Submitting multiple parts:', multiplePartsList);
     // Build all parts first with unique IDs
     const timestamp = Date.now();
     const partsToAdd: QuotePart[] = multiplePartsList.map((part, index) => ({
@@ -133,8 +136,11 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
       quantity: parseFloat(part.quantity) || 1,
     }));
 
+    console.log('Parts to add:', partsToAdd);
+
     // Add all parts synchronously
     partsToAdd.forEach(part => {
+      console.log('Adding part:', part);
       onAddPart(part);
     });
 
