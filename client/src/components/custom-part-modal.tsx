@@ -118,29 +118,32 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
   };
 
   const handleMultiplePartsSubmit = () => {
-    // Add all multiple parts at once with unique IDs
-    multiplePartsList.forEach((part, index) => {
-      const quotePart: QuotePart = {
-        id: `required-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`,
-        partNumber: part.partNumber || "",
-        description: part.description,
-        category: part.category,
-        price: part.price,
-        availability: part.availability,
-        vendor: part.vendor,
-        warranty: part.warranty || false,
-        isCustom: true,
-        quantity: parseFloat(part.quantity) || 1,
-      };
-      onAddPart(quotePart);
-    });
+    // Build all parts first, then add them
+    const partsToAdd: QuotePart[] = multiplePartsList.map((part, index) => ({
+      id: `required-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`,
+      partNumber: part.partNumber || "",
+      description: part.description,
+      category: part.category,
+      price: part.price,
+      availability: part.availability,
+      vendor: part.vendor,
+      warranty: part.warranty || false,
+      isCustom: true,
+      quantity: parseFloat(part.quantity) || 1,
+    }));
+
+    // Add all parts at once
+    partsToAdd.forEach(part => onAddPart(part));
 
     toast({
       title: "Parts Added",
       description: `${multiplePartsList.length} required parts added to your quote.`,
     });
 
-    handleClose();
+    // Delay close to ensure all parts are added
+    setTimeout(() => {
+      handleClose();
+    }, 100);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

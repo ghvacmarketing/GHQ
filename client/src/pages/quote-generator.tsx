@@ -409,8 +409,7 @@ export default function QuoteGenerator() {
           handleUpdateQuoteData({
             parts: [...quoteData.parts, part],
           });
-          setIsCustomPartModalOpen(false);
-          setCustomPartPrefillData(null);
+          // Don't close modal here - let the modal handle it
         }}
         prefillData={customPartPrefillData}
       />

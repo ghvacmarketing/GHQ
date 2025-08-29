@@ -67,7 +67,7 @@ export default function SelectedParts({ parts, totals, onUpdate }: SelectedParts
         
         <div className="border-t border-border pt-4 mt-4">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-muted-foreground">Subtotal:</span>
+            <span className="text-sm text-muted-foreground">Parts Subtotal:</span>
             <span className="text-sm font-medium text-card-foreground" data-testid="text-subtotal">
               ${totals.subtotal}
             </span>
@@ -79,7 +79,7 @@ export default function SelectedParts({ parts, totals, onUpdate }: SelectedParts
             </span>
           </div>
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-muted-foreground">Tax:</span>
+            <span className="text-sm text-muted-foreground">Tax (8%):</span>
             <span className="text-sm font-medium text-card-foreground" data-testid="text-tax">
               ${totals.tax}
             </span>
@@ -89,6 +89,9 @@ export default function SelectedParts({ parts, totals, onUpdate }: SelectedParts
             <span className="text-lg font-bold text-primary" data-testid="text-total">
               ${totals.total}
             </span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-2">
+            * Includes overhead, warranty, and service fees
           </div>
         </div>
       </CardContent>
