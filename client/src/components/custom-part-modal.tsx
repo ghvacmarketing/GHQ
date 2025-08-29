@@ -132,8 +132,12 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
       quantity: parseFloat(part.quantity) || 1,
     }));
 
-    // Add all parts at once
-    partsToAdd.forEach(part => onAddPart(part));
+    // Add all parts with a small delay between each to ensure they're all added
+    partsToAdd.forEach((part, index) => {
+      setTimeout(() => {
+        onAddPart(part);
+      }, index * 50); // 50ms delay between each part
+    });
 
     toast({
       title: "Parts Added",
@@ -143,7 +147,7 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
     // Delay close to ensure all parts are added
     setTimeout(() => {
       handleClose();
-    }, 100);
+    }, (partsToAdd.length * 50) + 100);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

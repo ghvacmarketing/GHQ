@@ -127,38 +127,85 @@ export default function ConditionalRequirements({ selectedParts, onAddParts, onA
     return false;
   };
 
-  const markAsCompleted = (partId: string) => {
+  const markAsCompleted = async (partId: string) => {
     const req = requirements.find(r => r.partId === partId);
     if (!req) return;
 
     updateRequirement(partId, { completed: true });
     
-    // Generate required parts based on the requirement
-    const requiredPartsInfo = getRequiredPartsInfo(req);
-    const requiredParts = requiredPartsInfo.map((partInfo, index) => {
-      // Parse part info to extract name and quantity/unit
-      let partName = partInfo;
-      let unitInfo = '';
+    // Fetch current settings to get Google Sheets pricing
+    try {
+      const response = await fetch('/api/settings');
+      const settings = await response.json();
       
-      // Handle refrigerant with pounds
-      if (partInfo.includes('Refrigerant (') && partInfo.includes(' lbs)')) {
-        const match = partInfo.match(/Refrigerant \((\d+(?:\.\d+)?)\s*lbs?\)/);
-        if (match) {
-          partName = 'Refrigerant';
-          unitInfo = `${match[1]} lbs`;
+      // Generate required parts based on the requirement
+      const requiredPartsInfo = getRequiredPartsInfo(req);
+      const requiredParts = requiredPartsInfo.map((partInfo, index) => {
+        // Parse part info to extract name and quantity/unit
+        let partName = partInfo;
+        let unitInfo = '';
+        let price = '0';
+        
+        // Handle refrigerant with pounds
+        if (partInfo.includes('Refrigerant (') && partInfo.includes(' lbs)')) {
+          const match = partInfo.match(/Refrigerant \((\d+(?:\.\d+)?)\s*lbs?\)/);
+          if (match) {
+            partName = 'Refrigerant';
+            unitInfo = `${match[1]} lbs`;
+            // Get refrigerant price from Google Sheets (per lb)
+            const pricePerLb = settings.partsPrices?.refrigerant || 65;
+            price = (pricePerLb * parseFloat(match[1])).toFixed(2);
+          }
+        } else if (partName === 'Refrigerant Filter Dryer') {
+          // Get filter dryer price from Google Sheets
+          price = (settings.partsPrices?.refrigerantFilterDryer || 70).toString();
+        } else if (partName === 'Acid Away') {
+          // Get acid away price from Google Sheets
+          price = (settings.partsPrices?.acidAway || 60).toString();
         }
-      }
-      
-      return {
-        description: partName,
-        price: '0',
-        quantity: unitInfo || '1',
-        category: 'Materials'
-      };
-    });
+        
+        return {
+          description: partName,
+          price: price,
+          quantity: unitInfo || '1',
+          category: 'Materials'
+        };
+      });
 
-    // Open custom part modal with pre-filled parts
-    onAddCustomPart({ requiredParts });
+      // Open custom part modal with pre-filled parts
+      onAddCustomPart({ requiredParts });
+    } catch (error) {
+      console.error('Failed to fetch pricing:', error);
+      // Fallback to default prices if fetch fails
+      const requiredPartsInfo = getRequiredPartsInfo(req);
+      const requiredParts = requiredPartsInfo.map((partInfo, index) => {
+        let partName = partInfo;
+        let unitInfo = '';
+        let price = '0';
+        
+        if (partInfo.includes('Refrigerant (') && partInfo.includes(' lbs)')) {
+          const match = partInfo.match(/Refrigerant \((\d+(?:\.\d+)?)\s*lbs?\)/);
+          if (match) {
+            partName = 'Refrigerant';
+            unitInfo = `${match[1]} lbs`;
+            price = (65 * parseFloat(match[1])).toFixed(2); // Default $65/lb
+          }
+        } else if (partName === 'Refrigerant Filter Dryer') {
+          price = '70'; // Default $70
+        } else if (partName === 'Acid Away') {
+          price = '60'; // Default $60
+        }
+        
+        return {
+          description: partName,
+          price: price,
+          quantity: unitInfo || '1',
+          category: 'Materials'
+        };
+      });
+      
+      onAddCustomPart({ requiredParts });
+    }
   };
 
   const removeRequirement = (partId: string) => {
