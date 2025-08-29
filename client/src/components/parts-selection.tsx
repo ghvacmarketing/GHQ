@@ -219,7 +219,7 @@ export default function PartsSelection({
                             />
                             <span className="text-xs text-muted-foreground">
                               {part.description.toLowerCase().includes('copper') || part.description.toLowerCase().includes('insulation') ? '/ft' :
-                               part.description.toLowerCase().includes('refrigerant') ? '/lb' : '/ea'}
+                               part.description.toLowerCase().includes('refrigerant') && !part.description.toLowerCase().includes('filter dryer') ? '/lb' : '/ea'}
                             </span>
                           </div>
                         </div>
@@ -229,11 +229,11 @@ export default function PartsSelection({
                           type="number"
                           placeholder={
                             part.description.toLowerCase().includes('copper') || part.description.toLowerCase().includes('insulation') ? 'feet' :
-                            part.description.toLowerCase().includes('refrigerant') ? 'lbs' : 'qty'
+                            part.description.toLowerCase().includes('refrigerant') && !part.description.toLowerCase().includes('filter dryer') ? 'lbs' : 'qty'
                           }
                           min="1"
                           step={
-                            part.description.toLowerCase().includes('refrigerant') ? '0.1' : '1'
+                            part.description.toLowerCase().includes('refrigerant') && !part.description.toLowerCase().includes('filter dryer') ? '0.1' : '1'
                           }
                           value={partQuantities[part.partNumber] || 1}
                           onChange={(e) => {
