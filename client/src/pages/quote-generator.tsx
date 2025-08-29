@@ -434,9 +434,15 @@ export default function QuoteGenerator() {
           setCustomPartPrefillData(null);
         }}
         onAddPart={(part) => {
-          handleUpdateQuoteData({
-            parts: [...quoteData.parts, part],
-          });
+          setQuoteData(prev => ({
+            ...prev,
+            parts: [...prev.parts, {
+              ...part,
+              id: part.id || `fallback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              price: part.price || "0",
+              quantity: part.quantity || 1
+            }]
+          }));
           // Don't close modal here - let the modal handle it
         }}
         prefillData={customPartPrefillData}
