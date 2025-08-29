@@ -111,19 +111,23 @@ export default function QuoteGenerator() {
     const warrantyDiscountPercent = isGHVACWarranty ? (warrantyDiscounts[warrantyYears] || 0) : 0;
 
     // Parts subtotal with warranty logic
-    let partsSubtotal = 0;
+    let partsSubtotal = 0; // Charged parts (materials + unwarrantied parts)
     let freePartsSubtotal = 0; // Track parts made free by warranty
     
     quoteData.parts.forEach(part => {
       const partCost = parseFloat(part.price) * (part.quantity || 1);
       
       if (isGHVACWarranty) {
-        // For GHVAC warranty: parts are FREE unless it's a custom part with warranty=false
-        if (part.isCustom && part.warranty === false) {
-          // Custom part with no warranty - charge full price
+        // For GHVAC warranty:
+        // - Parts category: FREE under manufacturer warranty
+        // - Materials category: NOT warrantied, charged at discount
+        // - Custom parts with warranty=false: NOT warrantied, charged at discount
+        
+        if (part.category === "Materials" || (part.isCustom && part.warranty === false)) {
+          // Materials and unwarrantied custom parts - charge at discounted rate
           partsSubtotal += partCost;
         } else {
-          // All other parts are free under manufacturer warranty
+          // Parts category - free under manufacturer warranty
           freePartsSubtotal += partCost;
         }
       } else {

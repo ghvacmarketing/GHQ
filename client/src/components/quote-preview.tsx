@@ -21,10 +21,15 @@ export default function QuotePreview({ quote, quoteText }: QuotePreviewProps) {
     
     if ((quote as any).isGHVACWarranty && (quote as any).freePartsSubtotal && parseFloat((quote as any).freePartsSubtotal) > 0) {
       // Show free parts separately from charged parts
-      const chargedParts = quote.parts.filter((part: any) => part.isCustom && part.warranty === false);
-      const freeParts = quote.parts.filter((part: any) => !(part.isCustom && part.warranty === false));
+      const chargedParts = quote.parts.filter((part: any) => 
+        part.category === "Materials" || (part.isCustom && part.warranty === false)
+      );
+      const freeParts = quote.parts.filter((part: any) => 
+        part.category !== "Materials" && !(part.isCustom && part.warranty === false)
+      );
       
       if (chargedParts.length > 0) {
+        partsSection += "MATERIALS & NON-WARRANTIED PARTS (DISCOUNTED):\n";
         partsSection += chargedParts.map((part: any) => 
           `• ${part.description} (${part.partNumber}) - Qty: ${part.quantity || 1} - $${part.price}`
         ).join('\n') + '\n';
