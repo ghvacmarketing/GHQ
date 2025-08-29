@@ -118,9 +118,10 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
   };
 
   const handleMultiplePartsSubmit = () => {
-    // Build all parts first, then add them
+    // Build all parts first with unique IDs
+    const timestamp = Date.now();
     const partsToAdd: QuotePart[] = multiplePartsList.map((part, index) => ({
-      id: `required-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`,
+      id: `required-${timestamp}-${index}-${Math.random().toString(36).substr(2, 9)}`,
       partNumber: part.partNumber || "",
       description: part.description,
       category: part.category,
@@ -132,11 +133,9 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
       quantity: parseFloat(part.quantity) || 1,
     }));
 
-    // Add all parts with a small delay between each to ensure they're all added
-    partsToAdd.forEach((part, index) => {
-      setTimeout(() => {
-        onAddPart(part);
-      }, index * 50); // 50ms delay between each part
+    // Add all parts synchronously
+    partsToAdd.forEach(part => {
+      onAddPart(part);
     });
 
     toast({
@@ -144,10 +143,8 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
       description: `${multiplePartsList.length} required parts added to your quote.`,
     });
 
-    // Delay close to ensure all parts are added
-    setTimeout(() => {
-      handleClose();
-    }, (partsToAdd.length * 50) + 100);
+    // Close immediately after adding all parts
+    handleClose();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
