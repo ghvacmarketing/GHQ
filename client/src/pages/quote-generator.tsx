@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, History, RefreshCw } from "lucide-react";
+import { Settings, History, RefreshCw, RotateCcw } from "lucide-react";
+import { Link } from "wouter";
 import giesbrechtLogo from "../assets/giesbrecht-logo.webp";
 import CustomerInfo from "@/components/customer-info";
 import PartsSelection from "@/components/parts-selection";
@@ -45,6 +46,7 @@ export default function QuoteGenerator() {
   const [isCustomPartModalOpen, setIsCustomPartModalOpen] = useState(false);
   const [customPartPrefillData, setCustomPartPrefillData] = useState<any>(null);
   const [generatedQuote, setGeneratedQuote] = useState<any>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   // Fetch technicians
   const { data: technicians = [] } = useQuery({
@@ -240,14 +242,26 @@ export default function QuoteGenerator() {
   };
 
   const handleGenerateQuote = () => {
-    if (!quoteData.customerName || !quoteData.technician || quoteData.parts.length === 0 || quoteData.ghvacInstalled === undefined || !quoteData.laborHours) {
+    const errors: string[] = [];
+    
+    if (!quoteData.customerName) errors.push('customerName');
+    if (!quoteData.technician) errors.push('technician');
+    if (quoteData.parts.length === 0) errors.push('parts');
+    if (quoteData.ghvacInstalled === undefined) errors.push('warranty');
+    if (!quoteData.laborHours) errors.push('laborHours');
+    
+    if (errors.length > 0) {
+      setValidationErrors(errors);
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields including customer name, technician, warranty coverage, and labor hours.",
+        description: "Please fill in all required fields highlighted in red.",
         variant: "destructive",
       });
       return;
     }
+    
+    // Clear validation errors on success
+    setValidationErrors([]);
 
     const totals = calculateTotals();
     if (!totals) return;
@@ -355,6 +369,24 @@ export default function QuoteGenerator() {
     }
   };
 
+  const handleStartOver = () => {
+    setQuoteData({
+      customerName: "",
+      technician: "",
+      parts: [],
+      ghvacInstalled: undefined,
+      yearsSinceInstallation: "",
+      laborHours: "",
+      jobNotes: "",
+    });
+    setGeneratedQuote(null);
+    setValidationErrors([]);
+    toast({
+      title: "New Quote Started",
+      description: "All fields have been cleared for a new quote.",
+    });
+  };
+
   const totals = calculateTotals();
 
   return (
@@ -384,9 +416,11 @@ export default function QuoteGenerator() {
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" data-testid="button-history">
-              <History className="h-4 w-4" />
-            </Button>
+            <Link href="/history">
+              <Button variant="ghost" size="icon" data-testid="button-history" title="View quote history">
+                <History className="h-4 w-4" />
+              </Button>
+            </Link>
             <Button 
               variant="ghost" 
               size="icon"
@@ -406,6 +440,10 @@ export default function QuoteGenerator() {
             technician={quoteData.technician}
             technicians={technicians}
             onUpdate={handleUpdateQuoteData}
+            hasErrors={{
+              customerName: validationErrors.includes('customerName'),
+              technician: validationErrors.includes('technician'),
+            }}
           />
 
           <ConditionalRequirements
@@ -424,6 +462,7 @@ export default function QuoteGenerator() {
               setCustomPartPrefillData(prefillData);
               setIsCustomPartModalOpen(true);
             }}
+            hasPartsError={validationErrors.includes('parts')}
           />
 
           <WarrantySection
@@ -431,6 +470,10 @@ export default function QuoteGenerator() {
             yearsSinceInstallation={quoteData.yearsSinceInstallation}
             laborHours={quoteData.laborHours}
             onUpdate={handleUpdateQuoteData}
+            hasErrors={{
+              warranty: validationErrors.includes('warranty'),
+              laborHours: validationErrors.includes('laborHours'),
+            }}
           />
 
           <VoiceNotes
@@ -457,6 +500,7 @@ export default function QuoteGenerator() {
             onCopyQuote={handleCopyQuote}
             onMarkAccepted={handleMarkAccepted}
             onMarkPending={handleMarkPending}
+            onStartOver={handleStartOver}
             isGenerating={createQuoteMutation.isPending}
             quoteGenerated={!!generatedQuote}
           />

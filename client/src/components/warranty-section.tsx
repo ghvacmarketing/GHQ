@@ -9,6 +9,10 @@ interface WarrantySectionProps {
   yearsSinceInstallation?: string;
   laborHours?: string;
   onUpdate: (updates: { ghvacInstalled?: boolean; yearsSinceInstallation?: string; laborHours?: string }) => void;
+  hasErrors?: {
+    warranty?: boolean;
+    laborHours?: boolean;
+  };
 }
 
 export default function WarrantySection({
@@ -16,6 +20,7 @@ export default function WarrantySection({
   yearsSinceInstallation,
   laborHours,
   onUpdate,
+  hasErrors,
 }: WarrantySectionProps) {
   return (
     <Card className="slide-in">
@@ -51,7 +56,7 @@ export default function WarrantySection({
                 No
               </Button>
             </div>
-            {ghvacInstalled === undefined && (
+            {(ghvacInstalled === undefined || hasErrors?.warranty) && (
               <p className="text-xs text-destructive">Please select Yes or No</p>
             )}
           </div>
@@ -69,13 +74,13 @@ export default function WarrantySection({
               max="24"
               value={laborHours}
               onChange={(e) => onUpdate({ laborHours: e.target.value })}
-              className="w-full"
+              className={`w-full ${hasErrors?.laborHours ? 'border-destructive focus:border-destructive' : ''}`}
               data-testid="input-labor-hours"
             />
             <p className="text-xs text-muted-foreground">
               Hours of labor to charge (increments of 0.25)
             </p>
-            {!laborHours && (
+            {(!laborHours || hasErrors?.laborHours) && (
               <p className="text-xs text-destructive">Please enter labor hours</p>
             )}
           </div>

@@ -12,6 +12,7 @@ interface PartsSelectionProps {
   selectedParts: QuotePart[];
   onUpdate: (updates: { parts: QuotePart[] }) => void;
   onAddCustomPart: () => void;
+  hasPartsError?: boolean;
 }
 
 interface Part {
@@ -28,6 +29,7 @@ export default function PartsSelection({
   selectedParts,
   onUpdate,
   onAddCustomPart,
+  hasPartsError,
 }: PartsSelectionProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [partQuantities, setPartQuantities] = useState<{ [key: string]: number }>({});
@@ -134,7 +136,7 @@ export default function PartsSelection({
   }
 
   return (
-    <Card className="slide-in">
+    <Card className={`slide-in ${hasPartsError ? 'border-destructive' : ''}`}>
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center">
@@ -152,6 +154,12 @@ export default function PartsSelection({
             Add Other
           </Button>
         </div>
+        
+        {hasPartsError && (
+          <div className="bg-destructive/10 border border-destructive rounded-lg p-3 mb-4">
+            <p className="text-sm text-destructive font-medium">Please add at least one part or service to your quote</p>
+          </div>
+        )}
 
         <div className="space-y-4">
           {Object.entries(groupedParts).map(([category, categoryParts]) => (

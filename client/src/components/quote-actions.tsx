@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { Calculator, Copy, Mail, Check, Clock } from "lucide-react";
+import { Calculator, Copy, Mail, Check, Clock, RotateCcw } from "lucide-react";
 
 interface QuoteActionsProps {
   onGenerateQuote: () => void;
   onCopyQuote: () => void;
   onMarkAccepted: () => void;
   onMarkPending: () => void;
+  onStartOver: () => void;
   isGenerating: boolean;
   quoteGenerated: boolean;
 }
@@ -15,6 +16,7 @@ export default function QuoteActions({
   onCopyQuote,
   onMarkAccepted,
   onMarkPending,
+  onStartOver,
   isGenerating,
   quoteGenerated,
 }: QuoteActionsProps) {
@@ -68,6 +70,16 @@ export default function QuoteActions({
               <span>Pending</span>
             </Button>
           </div>
+          
+          <Button
+            onClick={onStartOver}
+            variant="outline"
+            className="w-full border-muted-foreground/30 hover:bg-muted/50 text-muted-foreground hover:text-foreground font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 mt-3"
+            data-testid="button-start-over"
+          >
+            <RotateCcw className="h-4 w-4" />
+            <span>Start New Quote</span>
+          </Button>
         </>
       )}
     </div>
