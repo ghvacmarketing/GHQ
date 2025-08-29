@@ -118,11 +118,11 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
   };
 
   const handleMultiplePartsSubmit = () => {
-    // Add all multiple parts at once
+    // Add all multiple parts at once with unique IDs
     multiplePartsList.forEach((part, index) => {
       const quotePart: QuotePart = {
-        id: `custom-${Date.now()}-${index}`,
-        partNumber: part.partNumber,
+        id: `required-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`,
+        partNumber: part.partNumber || "",
         description: part.description,
         category: part.category,
         price: part.price,

@@ -394,7 +394,7 @@ export default function QuoteGenerator() {
         }}
         onAddPart={(part) => {
           handleUpdateQuoteData({
-            parts: [...quoteData.parts, { ...part, quantity: 1 }],
+            parts: [...quoteData.parts, part],
           });
           setIsCustomPartModalOpen(false);
           setCustomPartPrefillData(null);

@@ -15,8 +15,8 @@ interface SelectedPartsProps {
 }
 
 export default function SelectedParts({ parts, totals, onUpdate }: SelectedPartsProps) {
-  const removePart = (partNumber: string) => {
-    const updatedParts = parts.filter(part => part.partNumber !== partNumber);
+  const removePart = (partId: string) => {
+    const updatedParts = parts.filter(part => part.id !== partId);
     onUpdate({ parts: updatedParts });
   };
 
@@ -30,14 +30,14 @@ export default function SelectedParts({ parts, totals, onUpdate }: SelectedParts
         <div className="space-y-3">
           {parts.map((part) => (
             <div
-              key={part.partNumber}
+              key={part.id}
               className="flex items-center justify-between p-3 bg-muted/20 rounded-lg"
-              data-testid={`selected-part-${part.partNumber}`}
+              data-testid={`selected-part-${part.id}`}
             >
               <div className="flex-1">
                 <p className="text-sm font-medium text-card-foreground">{part.description}</p>
                 <p className="text-xs text-muted-foreground">
-                  Model: {part.partNumber}
+                  {part.partNumber && `Model: ${part.partNumber}`}
                   {part.quantity && part.quantity > 1 && ` • Qty: ${part.quantity}${part.category.toLowerCase() === 'refrigerants' ? ' lbs' : ''}`}
                 </p>
               </div>
@@ -49,9 +49,9 @@ export default function SelectedParts({ parts, totals, onUpdate }: SelectedParts
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => removePart(part.partNumber)}
+                onClick={() => removePart(part.id)}
                 className="text-destructive hover:text-destructive/80"
-                data-testid={`button-remove-${part.partNumber}`}
+                data-testid={`button-remove-${part.id}`}
               >
                 <X className="h-4 w-4" />
               </Button>
