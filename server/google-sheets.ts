@@ -70,7 +70,8 @@ class GoogleSheetsService {
       const response = await fetch(url);
       
       if (!response.ok) {
-        console.error('Google Sheets API error:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Google Sheets API error:', response.status, response.statusText, errorText);
         return this.getDefaultValues();
       }
 

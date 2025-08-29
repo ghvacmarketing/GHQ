@@ -1,79 +1,22 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Lock, Save, Eye, EyeOff } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
-
-interface PricingSettings {
-  laborRate: number;
-  commissionPercent: number;
-  financingPromotionPercent: number;
-  profitPercent: number;
-  laborBenefitsPercent: number;
-  salesTaxPercent: number;
-  warrantyReserve: number;
-  overheadPercent: number;
-  warrantyDiscounts: Record<number, number>;
-}
+import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink } from "lucide-react";
 
 export default function AdminSettings() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [settings, setSettings] = useState<PricingSettings>({
-    laborRate: 65,
-    commissionPercent: 0.03,
-    financingPromotionPercent: 0.04,
-    profitPercent: 0.21,
-    laborBenefitsPercent: 0.34,
-    salesTaxPercent: 0.08,
-    warrantyReserve: 25,
-    overheadPercent: 0.30,
-    warrantyDiscounts: {
-      2: 0.25, 3: 0.35, 4: 0.45, 5: 0.50, 6: 0.55,
-      7: 0.65, 8: 0.70, 9: 0.80, 10: 0.90
-    }
-  });
 
-  // Fetch current settings
-  const { data: currentSettings } = useQuery({
+  // Fetch current settings from Google Sheets
+  const { data: currentSettings, refetch, isLoading } = useQuery({
     queryKey: ["/api/settings"],
     enabled: isAuthenticated,
-  });
-
-  // Update settings when fetched
-  useEffect(() => {
-    if (currentSettings && isAuthenticated) {
-      setSettings(currentSettings);
-    }
-  }, [currentSettings, isAuthenticated]);
-
-  // Save settings mutation
-  const saveSettingsMutation = useMutation({
-    mutationFn: async (newSettings: PricingSettings) => {
-      const response = await apiRequest("POST", "/api/admin/settings", newSettings);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-      toast({
-        title: "Settings Saved",
-        description: "Pricing settings have been updated successfully.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to save settings.",
-        variant: "destructive",
-      });
-    },
   });
 
   const handleLogin = (e: React.FormEvent) => {
@@ -82,7 +25,7 @@ export default function AdminSettings() {
       setIsAuthenticated(true);
       toast({
         title: "Access Granted",
-        description: "You can now edit pricing settings.",
+        description: "You can now view Google Sheets pricing data.",
       });
     } else {
       toast({
@@ -93,41 +36,28 @@ export default function AdminSettings() {
     }
   };
 
-  const handleSaveSettings = () => {
-    saveSettingsMutation.mutate(settings);
-  };
-
-  const updateSetting = (key: keyof PricingSettings, value: number) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  const updateWarrantyDiscount = (year: number, discount: number) => {
-    setSettings(prev => ({
-      ...prev,
-      warrantyDiscounts: {
-        ...prev.warrantyDiscounts,
-        [year]: discount / 100 // Convert percentage to decimal
-      }
-    }));
+  const handleRefresh = async () => {
+    await refetch();
+    toast({
+      title: "Data Refreshed",
+      description: "Latest pricing data pulled from Google Sheets.",
+    });
   };
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-background text-foreground font-sans antialiased flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="flex items-center justify-center">
-              <Lock className="w-5 h-5 mr-2" />
-              Admin Access Required
-            </CardTitle>
+          <CardHeader>
+            <CardTitle className="text-center">Admin Access Required</CardTitle>
+            <p className="text-center text-sm text-muted-foreground">
+              Enter admin password to view Google Sheets pricing data
+            </p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Admin Password</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -135,6 +65,7 @@ export default function AdminSettings() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter admin password"
+                    className="pr-10"
                     data-testid="input-admin-password"
                   />
                   <Button
@@ -188,150 +119,224 @@ export default function AdminSettings() {
               Back
             </Button>
             <div>
-              <h1 className="text-lg font-semibold text-foreground">Admin Settings</h1>
-              <p className="text-xs text-muted-foreground">Pricing Configuration</p>
+              <h1 className="text-lg font-semibold text-foreground">Settings Dashboard</h1>
+              <p className="text-xs text-muted-foreground">Live data from Google Sheets</p>
             </div>
           </div>
           <Button
-            onClick={handleSaveSettings}
-            disabled={saveSettingsMutation.isPending}
-            data-testid="button-save-settings"
+            onClick={handleRefresh}
+            disabled={isLoading}
+            data-testid="button-refresh-settings"
           >
-            <Save className="w-4 h-4 mr-2" />
-            {saveSettingsMutation.isPending ? "Saving..." : "Save All"}
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            {isLoading ? "Refreshing..." : "Refresh Data"}
           </Button>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-6 max-w-4xl">
         <div className="space-y-6">
-          {/* Basic Pricing */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Basic Pricing</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="laborRate">Labor Rate ($/hour)</Label>
-                <Input
-                  id="laborRate"
-                  type="number"
-                  step="0.01"
-                  value={settings.laborRate}
-                  onChange={(e) => updateSetting('laborRate', parseFloat(e.target.value) || 0)}
-                  data-testid="input-labor-rate"
-                />
-              </div>
-              <div>
-                <Label htmlFor="warrantyReserve">Warranty Reserve ($)</Label>
-                <Input
-                  id="warrantyReserve"
-                  type="number"
-                  step="0.01"
-                  value={settings.warrantyReserve}
-                  onChange={(e) => updateSetting('warrantyReserve', parseFloat(e.target.value) || 0)}
-                  data-testid="input-warranty-reserve"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Percentages */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Percentage Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="commission">Commission (%)</Label>
-                <Input
-                  id="commission"
-                  type="number"
-                  step="0.1"
-                  value={(settings.commissionPercent * 100).toFixed(1)}
-                  onChange={(e) => updateSetting('commissionPercent', (parseFloat(e.target.value) || 0) / 100)}
-                  data-testid="input-commission"
-                />
-              </div>
-              <div>
-                <Label htmlFor="financing">Financing/Promotion (%)</Label>
-                <Input
-                  id="financing"
-                  type="number"
-                  step="0.1"
-                  value={(settings.financingPromotionPercent * 100).toFixed(1)}
-                  onChange={(e) => updateSetting('financingPromotionPercent', (parseFloat(e.target.value) || 0) / 100)}
-                  data-testid="input-financing"
-                />
-              </div>
-              <div>
-                <Label htmlFor="profit">Profit (%)</Label>
-                <Input
-                  id="profit"
-                  type="number"
-                  step="0.1"
-                  value={(settings.profitPercent * 100).toFixed(1)}
-                  onChange={(e) => updateSetting('profitPercent', (parseFloat(e.target.value) || 0) / 100)}
-                  data-testid="input-profit"
-                />
-              </div>
-              <div>
-                <Label htmlFor="laborBenefits">Labor Benefits (%)</Label>
-                <Input
-                  id="laborBenefits"
-                  type="number"
-                  step="0.1"
-                  value={(settings.laborBenefitsPercent * 100).toFixed(1)}
-                  onChange={(e) => updateSetting('laborBenefitsPercent', (parseFloat(e.target.value) || 0) / 100)}
-                  data-testid="input-labor-benefits"
-                />
-              </div>
-              <div>
-                <Label htmlFor="salesTax">Sales Tax (%)</Label>
-                <Input
-                  id="salesTax"
-                  type="number"
-                  step="0.1"
-                  value={(settings.salesTaxPercent * 100).toFixed(1)}
-                  onChange={(e) => updateSetting('salesTaxPercent', (parseFloat(e.target.value) || 0) / 100)}
-                  data-testid="input-sales-tax"
-                />
-              </div>
-              <div>
-                <Label htmlFor="overhead">Overhead (%)</Label>
-                <Input
-                  id="overhead"
-                  type="number"
-                  step="0.1"
-                  value={(settings.overheadPercent * 100).toFixed(1)}
-                  onChange={(e) => updateSetting('overheadPercent', (parseFloat(e.target.value) || 0) / 100)}
-                  data-testid="input-overhead"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Warranty Discounts */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Warranty Discounts by Year</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {Object.entries(settings.warrantyDiscounts).map(([year, discount]) => (
-                <div key={year}>
-                  <Label htmlFor={`warranty-${year}`}>{year} Year (%)</Label>
-                  <Input
-                    id={`warranty-${year}`}
-                    type="number"
-                    step="1"
-                    value={(discount * 100).toFixed(0)}
-                    onChange={(e) => updateWarrantyDiscount(parseInt(year), parseFloat(e.target.value) || 0)}
-                    data-testid={`input-warranty-${year}`}
-                  />
+          {/* Google Sheets Notice */}
+          <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+            <CardContent className="pt-6">
+              <div className="flex items-start space-x-3">
+                <ExternalLink className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <div>
+                  <h3 className="font-medium text-blue-900 dark:text-blue-100">
+                    Settings Managed via Google Sheets
+                  </h3>
+                  <p className="text-sm text-blue-700 dark:text-blue-200 mt-1">
+                    All pricing data is automatically pulled from your Google Sheets spreadsheet. 
+                    To update values, edit your spreadsheet and click "Refresh Data" above.
+                  </p>
                 </div>
-              ))}
+              </div>
             </CardContent>
           </Card>
+
+          {/* Current Settings Display */}
+          {currentSettings && (
+            <>
+              {/* Labor & Basic Pricing */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Labor & Basic Pricing</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Labor Rate ($/hour)</Label>
+                    <Input
+                      value={`$${currentSettings.laborRate || 0}`}
+                      readOnly
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">From cell C5</p>
+                  </div>
+                  <div>
+                    <Label>Warranty Reserve ($)</Label>
+                    <Input
+                      value={`$${currentSettings.warrantyReserve || 0}`}
+                      readOnly
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">From cell E39</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Business Percentages */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Business Percentages</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Commission (%)</Label>
+                    <Input
+                      value={`${((currentSettings.commissionPercent || 0) * 100).toFixed(1)}%`}
+                      readOnly
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">From cell C6</p>
+                  </div>
+                  <div>
+                    <Label>Financing/Promotion (%)</Label>
+                    <Input
+                      value={`${((currentSettings.financingPromotionPercent || 0) * 100).toFixed(1)}%`}
+                      readOnly
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">From cell C7</p>
+                  </div>
+                  <div>
+                    <Label>Profit (%)</Label>
+                    <Input
+                      value={`${((currentSettings.profitPercent || 0) * 100).toFixed(1)}%`}
+                      readOnly
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">From cell C8</p>
+                  </div>
+                  <div>
+                    <Label>Overhead (%)</Label>
+                    <Input
+                      value={`${((currentSettings.overheadPercent || 0) * 100).toFixed(1)}%`}
+                      readOnly
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">From cell B41</p>
+                  </div>
+                  <div>
+                    <Label>Labor Benefits (%)</Label>
+                    <Input
+                      value={`${((currentSettings.laborBenefitsPercent || 0) * 100).toFixed(1)}%`}
+                      readOnly
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">From cell B34</p>
+                  </div>
+                  <div>
+                    <Label>Sales Tax (%)</Label>
+                    <Input
+                      value={`${((currentSettings.salesTaxPercent || 0) * 100).toFixed(1)}%`}
+                      readOnly
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">From cell B38</p>
+                  </div>
+                  <div>
+                    <Label>Material Shrinkage (%)</Label>
+                    <Input
+                      value={`${((currentSettings.materialShrinkagePercent || 0) * 100).toFixed(1)}%`}
+                      readOnly
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">From cell B25</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Parts Pricing */}
+              {currentSettings.partsPrices && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Material Pricing</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Refrigerant Filter Dryer</Label>
+                      <Input
+                        value={`$${currentSettings.partsPrices.refrigerantFilterDryer || 0}`}
+                        readOnly
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">From cell D20</p>
+                    </div>
+                    <div>
+                      <Label>Copper</Label>
+                      <Input
+                        value={`$${currentSettings.partsPrices.copper || 0}/ft`}
+                        readOnly
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">From cell D21</p>
+                    </div>
+                    <div>
+                      <Label>Armaflex Insulation</Label>
+                      <Input
+                        value={`$${currentSettings.partsPrices.armaflexInsulation || 0}/ft`}
+                        readOnly
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">From cell D22</p>
+                    </div>
+                    <div>
+                      <Label>Acid Away</Label>
+                      <Input
+                        value={`$${currentSettings.partsPrices.acidAway || 0}`}
+                        readOnly
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">From cell D23</p>
+                    </div>
+                    <div>
+                      <Label>Refrigerant</Label>
+                      <Input
+                        value={`$${currentSettings.partsPrices.refrigerant || 0}/lb`}
+                        readOnly
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">From cell D24</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Warranty Discounts */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>GHVAC Warranty Discounts</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Labor rate discounts based on years since GHVAC installation
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                    {currentSettings.warrantyDiscounts && Object.entries(currentSettings.warrantyDiscounts).map(([year, discount]) => (
+                      <div key={year} className="text-center">
+                        <Label className="text-xs">Year {year}</Label>
+                        <Input
+                          value={`${(Number(discount) * 100).toFixed(0)}%`}
+                          readOnly
+                          className="bg-muted text-center text-xs h-8"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       </main>
     </div>
