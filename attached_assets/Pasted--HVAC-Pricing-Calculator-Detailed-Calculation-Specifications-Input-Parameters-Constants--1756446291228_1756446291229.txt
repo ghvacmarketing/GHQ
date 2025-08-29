@@ -1,0 +1,212 @@
+# HVAC Pricing Calculator - Detailed Calculation Specifications
+
+## Input Parameters (Constants)
+```javascript
+const LABOR_RATE = 65.00;  // dollars per hour
+const CREW_DAY_HOURS = 16;  // hours (for 2-man crew)
+const COMMISSION_RATE = 0.03;  // 3%
+const FINANCING_RATE = 0.04;  // 4%
+const PROFIT_RATE = 0.21;  // 21%
+const OVERHEAD_RATE = 0.30;  // 30%
+const SALES_TAX_RATE = 0.08;  // 8%
+const LABOR_BENEFITS_RATE = 0.34;  // 34%
+const MATERIAL_SHRINKAGE_RATE = 0.03;  // 3%
+```
+
+## Step-by-Step Calculation Logic
+
+### 1. Parts & Materials Cost Calculation
+```javascript
+// For each line item:
+function calculateLineItem(quantity, unitCost) {
+    return quantity * unitCost;
+}
+
+// Sum all parts
+const totalParts = parts.reduce((sum, item) => {
+    return sum + calculateLineItem(item.quantity, item.unitCost);
+}, 0);
+
+// Apply material shrinkage
+const materialShrinkageCost = totalParts * MATERIAL_SHRINKAGE_RATE;
+const adjustedPartsTotal = totalParts + materialShrinkageCost;
+```
+
+### 2. Labor Cost Calculation
+```javascript
+function calculateLaborCosts(hoursToInstall) {
+    const baseLaborCost = hoursToInstall * LABOR_RATE;
+    const laborBenefits = baseLaborCost * LABOR_BENEFITS_RATE;
+    const totalLaborCost = baseLaborCost + laborBenefits;
+    
+    return {
+        baseLaborCost: baseLaborCost,
+        laborBenefits: laborBenefits,
+        totalLaborCost: totalLaborCost
+    };
+}
+```
+
+### 3. Sales Tax Calculation
+```javascript
+// Sales tax applies only to parts/materials (not labor)
+function calculateSalesTax(partsTotal) {
+    return partsTotal * SALES_TAX_RATE;
+}
+```
+
+### 4. Other Direct Costs
+```javascript
+// Fixed costs that may vary by job
+const warrantyReserve = 25.00;  // Fixed amount or calculated based on job value
+const subcontractorCosts = 0.00;  // Variable by job
+const permitCosts = 0.00;  // Variable by job
+const bonusSpiffCosts = 0.00;  // Variable by job
+```
+
+### 5. Direct Cost Calculation (E40 equivalent)
+```javascript
+function calculateDirectCosts(parts, labor, hoursToInstall, otherCosts = {}) {
+    const partsTotal = calculatePartsTotal(parts);
+    const salesTax = calculateSalesTax(partsTotal);
+    const laborCosts = calculateLaborCosts(hoursToInstall);
+    
+    const directCosts = 
+        partsTotal +
+        materialShrinkageCost +
+        laborCosts.totalLaborCost +
+        salesTax +
+        (otherCosts.warrantyReserve || 25.00) +
+        (otherCosts.subcontractor || 0.00) +
+        (otherCosts.permit || 0.00) +
+        (otherCosts.bonusSpiff || 0.00);
+    
+    return directCosts;
+}
+```
+
+### 6. Core Pricing Formula (E46 equivalent)
+```javascript
+function calculateSellingPrice(directCosts) {
+    const totalDeductionRate = OVERHEAD_RATE + PROFIT_RATE + FINANCING_RATE + COMMISSION_RATE;
+    const remainingRate = 1.0 - totalDeductionRate;  // 100% - 58% = 42%
+    
+    const sellingPrice = directCosts / remainingRate;
+    return sellingPrice;
+}
+```
+
+### 7. Overhead Recovery Calculation (B41 equivalent)
+```javascript
+function calculateOverheadRecovery(sellingPrice) {
+    return sellingPrice * OVERHEAD_RATE;  // 30% of selling price
+}
+```
+
+### 8. Profit Calculation (B42 equivalent)
+```javascript
+function calculateProfit(sellingPrice) {
+    return sellingPrice * PROFIT_RATE;  // 21% of selling price
+}
+```
+
+### 9. Financing Cost Recovery (B43 equivalent)
+```javascript
+function calculateFinancingCost(sellingPrice) {
+    return sellingPrice * FINANCING_RATE;  // 4% of selling price
+}
+```
+
+### 10. Commission Calculation (B44 equivalent)
+```javascript
+function calculateCommission(sellingPrice) {
+    return sellingPrice * COMMISSION_RATE;  // 3% of selling price
+}
+```
+
+## Performance Metrics Calculations
+
+### 11. Gross Margin Percentage
+```javascript
+function calculateGrossMargin(sellingPrice, directCosts) {
+    const grossProfit = sellingPrice - directCosts;
+    const grossMarginPercent = (grossProfit / sellingPrice) * 100;
+    return grossMarginPercent;
+}
+```
+
+### 12. Gross Profit per Crew Day
+```javascript
+function calculateProfitPerCrewDay(sellingPrice, directCosts) {
+    const grossProfit = sellingPrice - directCosts;
+    return grossProfit;  // Assuming this is for one crew day job
+}
+```
+
+### 13. Gross Profit per Man Hour
+```javascript
+function calculateProfitPerManHour(sellingPrice, directCosts, hoursToInstall) {
+    const grossProfit = sellingPrice - directCosts;
+    const profitPerManHour = grossProfit / hoursToInstall;
+    return profitPerManHour;
+}
+```
+
+## Complete Calculation Function
+```javascript
+function calculateJobPricing(jobInputs) {
+    const { parts, hoursToInstall, otherCosts } = jobInputs;
+    
+    // Step 1: Calculate direct costs
+    const directCosts = calculateDirectCosts(parts, hoursToInstall, otherCosts);
+    
+    // Step 2: Calculate selling price
+    const sellingPrice = calculateSellingPrice(directCosts);
+    
+    // Step 3: Calculate allocations
+    const overheadRecovery = calculateOverheadRecovery(sellingPrice);
+    const profitAmount = calculateProfit(sellingPrice);
+    const financingCost = calculateFinancingCost(sellingPrice);
+    const commission = calculateCommission(sellingPrice);
+    
+    // Step 4: Calculate metrics
+    const grossMargin = calculateGrossMargin(sellingPrice, directCosts);
+    const profitPerCrewDay = calculateProfitPerCrewDay(sellingPrice, directCosts);
+    const profitPerManHour = calculateProfitPerManHour(sellingPrice, directCosts, hoursToInstall);
+    
+    return {
+        directCosts: directCosts,
+        sellingPrice: sellingPrice,
+        overheadRecovery: overheadRecovery,
+        profitAmount: profitAmount,
+        financingCost: financingCost,
+        commission: commission,
+        grossMarginPercent: grossMargin,
+        profitPerCrewDay: profitPerCrewDay,
+        profitPerManHour: profitPerManHour
+    };
+}
+```
+
+## Key Validation Points
+To ensure your app matches the spreadsheet:
+
+1. **Direct costs (E40)** = Parts + Material Shrinkage + Labor + Benefits + Sales Tax + Other Direct Costs
+2. **Selling price (E46)** = Direct Costs ÷ (100% - 58%)
+3. **Overhead amount** = Selling Price × 30%
+4. **Profit amount** = Selling Price × 21%
+5. **Gross margin %** = (Selling Price - Direct Costs) ÷ Selling Price × 100
+
+## Example Calculation Trace
+```javascript
+// Input: Control Board (1 × $206.30), 2 hours labor
+const parts = [{ quantity: 1, unitCost: 206.30 }];
+const hoursToInstall = 2;
+
+// Expected outputs should match spreadsheet:
+// Direct Costs: ~$422.00
+// Selling Price: ~$1,004.76
+// Gross Margin: ~58%
+```
+
+This specification should produce identical results to your spreadsheet when implemented in Replit.

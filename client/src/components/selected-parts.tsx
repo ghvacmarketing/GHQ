@@ -67,7 +67,7 @@ export default function SelectedParts({ parts, totals, onUpdate }: SelectedParts
         
         <div className="border-t border-border pt-4 mt-4">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-muted-foreground">Parts Subtotal:</span>
+            <span className="text-sm text-muted-foreground">Parts:</span>
             <span className="text-sm font-medium text-card-foreground" data-testid="text-subtotal">
               ${totals.subtotal}
             </span>
@@ -79,19 +79,20 @@ export default function SelectedParts({ parts, totals, onUpdate }: SelectedParts
             </span>
           </div>
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-muted-foreground">Tax (8%):</span>
+            <span className="text-sm text-muted-foreground">Tax (parts only):</span>
             <span className="text-sm font-medium text-card-foreground" data-testid="text-tax">
               ${totals.tax}
             </span>
           </div>
           <div className="flex justify-between items-center pt-2 border-t border-border">
-            <span className="font-semibold text-card-foreground">Total:</span>
+            <span className="font-semibold text-card-foreground">Total Price:</span>
             <span className="text-lg font-bold text-primary" data-testid="text-total">
               ${totals.total}
             </span>
           </div>
           <div className="text-xs text-muted-foreground mt-2">
-            * Includes overhead, warranty, and service fees
+            * Includes 3% material shrinkage, 34% labor benefits, warranty reserve,
+            <br />30% overhead, 21% profit, 4% financing, and 3% commission
           </div>
         </div>
       </CardContent>

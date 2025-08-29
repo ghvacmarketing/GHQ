@@ -106,6 +106,11 @@ export default function QuoteGenerator() {
       sum + (parseFloat(part.price) * (part.quantity || 1)), 0
     );
 
+    // Apply material shrinkage (3% added to parts cost)
+    const materialShrinkagePercent = settings.materialShrinkagePercent || 0.03;
+    const materialShrinkageCost = partsSubtotal * materialShrinkagePercent;
+    const adjustedPartsTotal = partsSubtotal + materialShrinkageCost;
+
     // Labor calculation using live Google Sheets data
     const hours = parseFloat(quoteData.laborHours || "1");
     let laborRate = settings.laborRate || 65; // Use live rate from Google Sheets
@@ -122,7 +127,7 @@ export default function QuoteGenerator() {
       laborRate = laborRate * (1 - discountPercent);
     }
     
-    const totalLabor = laborRate * hours;
+    const baseLaborCost = laborRate * hours;
     
     // All percentages now come live from Google Sheets
     const laborBenefitsPercent = settings.laborBenefitsPercent || 0.34;
@@ -133,26 +138,35 @@ export default function QuoteGenerator() {
     const financingPercent = settings.financingPromotionPercent || 0.04;
     const commissionPercent = settings.commissionPercent || 0.03;
     
-    // Calculations using live data
-    const laborBenefits = totalLabor * laborBenefitsPercent;
-    const salesTax = (partsSubtotal + totalLabor + laborBenefits) * salesTaxPercent;
+    // Labor benefits calculation
+    const laborBenefits = baseLaborCost * laborBenefitsPercent;
+    const totalLaborCost = baseLaborCost + laborBenefits;
     
-    // Direct cost total
-    const directCost = partsSubtotal + totalLabor + laborBenefits + salesTax + warrantyReserve;
+    // Sales tax applies ONLY to parts/materials, NOT labor
+    const salesTax = adjustedPartsTotal * salesTaxPercent;
     
-    // Final calculations
-    const overhead = directCost * overheadPercent;
-    const profit = directCost * profitPercent;
-    const financingCost = directCost * financingPercent;
-    const commission = directCost * commissionPercent;
+    // Direct cost total (E40 equivalent)
+    const directCost = adjustedPartsTotal + totalLaborCost + salesTax + warrantyReserve;
     
-    // Final selling price
-    const sellingPrice = directCost + overhead + profit + financingCost + commission;
+    // Core pricing formula (E46 equivalent)
+    // Selling Price = Direct Costs ÷ (1 - total deduction rate)
+    const totalDeductionRate = overheadPercent + profitPercent + financingPercent + commissionPercent;
+    const remainingRate = 1.0 - totalDeductionRate; // 1 - 0.58 = 0.42
+    const sellingPrice = directCost / remainingRate;
+    
+    // Calculate allocations based on selling price
+    const overhead = sellingPrice * overheadPercent;
+    const profit = sellingPrice * profitPercent;
+    const financingCost = sellingPrice * financingPercent;
+    const commission = sellingPrice * commissionPercent;
 
     return {
       partsSubtotal: partsSubtotal.toFixed(2),
-      totalLabor: totalLabor.toFixed(2),
+      materialShrinkage: materialShrinkageCost.toFixed(2),
+      adjustedPartsTotal: adjustedPartsTotal.toFixed(2),
+      baseLaborCost: baseLaborCost.toFixed(2),
       laborBenefits: laborBenefits.toFixed(2),
+      totalLaborCost: totalLaborCost.toFixed(2),
       salesTax: salesTax.toFixed(2),
       warrantyReserve: warrantyReserve.toFixed(2),
       directCost: directCost.toFixed(2),
@@ -161,9 +175,9 @@ export default function QuoteGenerator() {
       financingCost: financingCost.toFixed(2),
       commission: commission.toFixed(2),
       total: sellingPrice.toFixed(2),
-      // Legacy compatibility
+      // Legacy compatibility for display
       subtotal: partsSubtotal.toFixed(2),
-      labor: totalLabor.toFixed(2),
+      labor: baseLaborCost.toFixed(2),
       tax: salesTax.toFixed(2),
     };
   };
