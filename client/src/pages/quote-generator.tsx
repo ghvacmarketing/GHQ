@@ -106,9 +106,23 @@ export default function QuoteGenerator() {
       sum + (parseFloat(part.price) * (part.quantity || 1)), 0
     );
 
-    // Apply material shrinkage (3% added to parts cost)
+    // Apply material shrinkage (3%) only to specific materials
     const materialShrinkagePercent = settings.materialShrinkagePercent || 0.03;
-    const materialShrinkageCost = partsSubtotal * materialShrinkagePercent;
+    const shrinkageMaterials = ['refrigerant filter dryer', 'copper', 'armaflex insulation', 'acid away'];
+    
+    const shrinkagePartsTotal = quoteData.parts.reduce((sum, part) => {
+      const description = part.description.toLowerCase();
+      const isShrinkagematerial = shrinkageMaterials.some(material => 
+        description.includes(material)
+      );
+      
+      if (isShrinkagematerial) {
+        return sum + (parseFloat(part.price) * (part.quantity || 1));
+      }
+      return sum;
+    }, 0);
+    
+    const materialShrinkageCost = shrinkagePartsTotal * materialShrinkagePercent;
     const adjustedPartsTotal = partsSubtotal + materialShrinkageCost;
 
     // Labor calculation using live Google Sheets data
