@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
 import { insertQuoteSchema, insertPartSchema } from "@shared/schema";
-import { googleSheetsService } from "./services/google-sheets";
+import { googleSheetsService } from "./google-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
@@ -116,7 +116,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/parts", async (req, res) => {
     try {
       const parts = await storage.getAllParts();
-      res.json(parts);
+      const sheetsData = await googleSheetsService.fetchCellValues();
+      
+      // Update parts with live pricing from Google Sheets
+      const updatedParts = parts.map(part => {
+        const description = part.description.toLowerCase();
+        let updatedPrice = part.price;
+        
+        if (description.includes('refrigerant filter dryer')) {
+          updatedPrice = sheetsData.refrigerantFilterDryerPrice.toString();
+        } else if (description.includes('copper')) {
+          updatedPrice = sheetsData.copperPrice.toString();
+        } else if (description.includes('armaflex insulation')) {
+          updatedPrice = sheetsData.armaflexInsulationPrice.toString();
+        } else if (description.includes('acid away')) {
+          updatedPrice = sheetsData.acidAwayPrice.toString();
+        } else if (description.includes('refrigerant') && !description.includes('filter dryer')) {
+          updatedPrice = sheetsData.refrigerantPrice.toString();
+        }
+        
+        return {
+          ...part,
+          price: updatedPrice
+        };
+      });
+      
+      res.json(updatedParts);
     } catch (error) {
       console.error('Error fetching parts:', error);
       res.status(500).json({ message: "Error fetching parts" });
@@ -185,9 +210,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Override regular settings endpoint to use admin settings when available
   app.get("/api/settings", async (req, res) => {
     try {
-      // Return admin settings if configured, otherwise try Google Sheets
-      res.json(adminSettings);
+      // Fetch live data from Google Sheets
+      const sheetsData = await googleSheetsService.fetchCellValues();
+      
+      // Merge with admin settings (Google Sheets takes precedence)
+      const settings = {
+        ...adminSettings,
+        laborRate: sheetsData.laborRate,
+        commissionPercent: sheetsData.commissionPercent,
+        financingPromotionPercent: sheetsData.financingPromotionPercent,
+        profitPercent: sheetsData.profitPercent,
+        materialShrinkagePercent: sheetsData.materialShrinkagePercent,
+        laborBenefitsPercent: sheetsData.laborBenefitsPercent,
+        salesTaxPercent: sheetsData.salesTaxPercent,
+        warrantyReserve: sheetsData.warrantyReserve,
+        overheadPercent: sheetsData.overheadPercent,
+        // Parts prices for direct access
+        partsPrices: {
+          refrigerantFilterDryer: sheetsData.refrigerantFilterDryerPrice,
+          copper: sheetsData.copperPrice,
+          armaflexInsulation: sheetsData.armaflexInsulationPrice,
+          acidAway: sheetsData.acidAwayPrice,
+          refrigerant: sheetsData.refrigerantPrice,
+        }
+      };
+      
+      res.json(settings);
     } catch (error) {
+      console.error('Error fetching settings:', error);
       res.status(500).json({ message: "Error fetching settings" });
     }
   });
