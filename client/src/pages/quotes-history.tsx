@@ -51,14 +51,14 @@ export default function QuotesHistory() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
+      <div className="container mx-auto p-3 sm:p-6 max-w-4xl">
         <Card className="slide-in">
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-6">
             <div className="flex items-center mb-6">
               <History className="text-primary mr-3 h-6 w-6" />
               <h1 className="text-2xl font-bold text-card-foreground">Quote History</h1>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="border border-border rounded-lg p-4">
                   <Skeleton className="h-6 w-64 mb-2" />
@@ -75,9 +75,9 @@ export default function QuotesHistory() {
 
   if (quotes.length === 0) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
+      <div className="container mx-auto p-3 sm:p-6 max-w-4xl">
         <Card className="slide-in">
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-6">
             <div className="flex items-center mb-6">
               <History className="text-primary mr-3 h-6 w-6" />
               <h1 className="text-2xl font-bold text-card-foreground">Quote History</h1>
@@ -94,33 +94,34 @@ export default function QuotesHistory() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
+    <div className="container mx-auto p-3 sm:p-6 max-w-4xl">
       <Card className="slide-in">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
+        <CardContent className="p-3 sm:p-6">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <div className="flex items-center min-w-0 flex-1">
               <Link href="/">
-                <Button variant="ghost" size="icon" className="mr-2" title="Back to quote generator">
-                  <ArrowLeft className="h-5 w-5" />
+                <Button variant="ghost" size="icon" className="mr-2 flex-shrink-0" title="Back to quote generator">
+                  <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               </Link>
-              <History className="text-primary mr-3 h-6 w-6" />
-              <h1 className="text-2xl font-bold text-card-foreground">Quote History</h1>
+              <History className="text-primary mr-2 sm:mr-3 h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <h1 className="text-lg sm:text-2xl font-bold text-card-foreground truncate">Quote History</h1>
             </div>
-            <div className="flex items-center space-x-3">
-              <Badge variant="secondary" className="text-sm">
-                {quotes.length} quote{quotes.length !== 1 ? 's' : ''}
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+              <Badge variant="secondary" className="text-xs sm:text-sm">
+                {quotes.length}
               </Badge>
               <Link href="/">
-                <Button variant="default" size="sm" className="flex items-center space-x-2">
-                  <Plus className="h-4 w-4" />
-                  <span>New Quote</span>
+                <Button variant="default" size="sm" className="flex items-center space-x-1 sm:space-x-2">
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">New Quote</span>
+                  <span className="sm:hidden">New</span>
                 </Button>
               </Link>
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {sortedQuotes.map((quote) => (
               <div
                 key={quote.id}
@@ -128,49 +129,51 @@ export default function QuotesHistory() {
                 data-testid={`quote-tile-${quote.id}`}
               >
                 <div
-                  className="p-4 cursor-pointer"
+                  className="p-3 sm:p-4 cursor-pointer"
                   onClick={() => toggleQuote(quote.id)}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-3">
-                      <h3 className="font-semibold text-card-foreground text-lg">
+                    <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                      <h3 className="font-semibold text-card-foreground text-base sm:text-lg truncate">
                         {quote.customerName}
                       </h3>
-                      <Badge className={getStatusColor(quote.status || 'draft')}>
+                      <Badge className={getStatusColor(quote.status || 'draft') + " text-xs"}>
                         {(quote.status || 'draft').charAt(0).toUpperCase() + (quote.status || 'draft').slice(1)}
                       </Badge>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xl font-bold text-primary">
+                    <div className="flex items-center space-x-2 flex-shrink-0">
+                      <span className="text-base sm:text-xl font-bold text-primary">
                         ${quote.total}
                       </span>
                       {expandedQuotes.has(quote.id) ? (
-                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                        <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                       ) : (
-                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                        <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-6 text-sm text-muted-foreground">
+                  <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-6 text-xs sm:text-sm text-muted-foreground">
                     <div className="flex items-center">
-                      <User className="h-4 w-4 mr-1" />
-                      {quote.technician}
+                      <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                      <span className="truncate">{quote.technician}</span>
                     </div>
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      {formatDate(quote.createdAt || new Date().toISOString())}
-                    </div>
-                    <div className="flex items-center">
-                      <FileText className="h-4 w-4 mr-1" />
-                      {quote.parts.length} part{quote.parts.length !== 1 ? 's' : ''}
+                    <div className="flex items-center justify-between sm:justify-start">
+                      <div className="flex items-center">
+                        <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        <span className="text-xs sm:text-sm">{formatDate(quote.createdAt || new Date().toISOString())}</span>
+                      </div>
+                      <div className="flex items-center sm:ml-4">
+                        <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        <span>{quote.parts.length} part{quote.parts.length !== 1 ? 's' : ''}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {expandedQuotes.has(quote.id) && (
-                  <div className="border-t border-border p-4 bg-muted/20">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="border-t border-border p-3 sm:p-4 bg-muted/20">
+                    <div className="grid grid-cols-1 gap-4 sm:gap-6">
                       {/* Parts List */}
                       <div>
                         <h4 className="font-medium text-card-foreground mb-3">Parts & Services</h4>

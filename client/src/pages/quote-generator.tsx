@@ -393,20 +393,20 @@ export default function QuoteGenerator() {
     <div className="min-h-screen bg-background text-foreground font-sans antialiased">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center space-x-3">
+        <div className="flex items-center justify-between p-3 sm:p-4">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
             <img 
               src={giesbrechtLogo} 
               alt="Giesbrecht HVAC" 
-              className="h-10 w-auto object-contain"
+              className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
               data-testid="img-company-logo"
             />
-            <div>
-              <h1 className="text-lg font-semibold text-foreground">Quote Generator</h1>
-              <p className="text-xs text-muted-foreground">Field Technician Tool</p>
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg font-semibold text-foreground truncate">Quote Generator</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">Field Technician Tool</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             <Button 
               variant="ghost" 
               size="icon"
