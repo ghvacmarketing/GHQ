@@ -201,17 +201,30 @@ export default function QuoteGenerator() {
   };
 
   const handleUpdateQuoteData = (updates: Partial<QuoteData>) => {
-    setQuoteData(prev => ({ ...prev, ...updates }));
+    setQuoteData(prev => {
+      // Validate parts array if being updated
+      if (updates.parts) {
+        // Ensure all parts have valid IDs
+        updates.parts = updates.parts.map(part => ({
+          ...part,
+          id: part.id || `fallback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          price: part.price || "0",
+          quantity: part.quantity || 1
+        }));
+      }
+      return { ...prev, ...updates };
+    });
   };
 
   const handleAddRequiredParts = (newParts: QuotePart[]) => {
+    if (!newParts || newParts.length === 0) return;
+    
     setQuoteData(prev => {
-      // Merge new parts with existing, avoiding duplicates
-      const existingIds = prev.parts.map(p => p.id);
-      const partsToAdd = newParts.filter(p => !existingIds.includes(p.id));
+      // Add all new parts - allow duplicates for different units
+      // Each part has a unique ID so duplicates are intentional
       return {
         ...prev,
-        parts: [...prev.parts, ...partsToAdd]
+        parts: [...prev.parts, ...newParts]
       };
     });
   };

@@ -51,9 +51,15 @@ export default function PartsSelection({
   const addPart = (part: Part) => {
     const quantity = partQuantities[part.partNumber] || 1;
     const price = partPrices[part.partNumber] || Number(part.price);
+    const customPartNumber = partNumbers[part.partNumber] || part.partNumber;
+    
+    // Generate unique ID for each part instance
+    // This allows multiple of the same part (e.g., 2 compressors for different units)
+    const uniqueId = `${part.partNumber}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     const partWithQuantity: QuotePart = {
-      id: part.partNumber,
-      partNumber: partNumbers[part.partNumber] || part.partNumber,
+      id: uniqueId,
+      partNumber: customPartNumber,
       description: part.description,
       category: part.category,
       price: price.toString(),
@@ -64,17 +70,9 @@ export default function PartsSelection({
       quantity,
     };
 
-    const existingPartIndex = selectedParts.findIndex(p => p.partNumber === part.partNumber);
-    if (existingPartIndex >= 0) {
-      const updatedParts = [...selectedParts];
-      updatedParts[existingPartIndex] = {
-        ...updatedParts[existingPartIndex],
-        quantity: (updatedParts[existingPartIndex].quantity || 1) + quantity,
-      };
-      onUpdate({ parts: updatedParts });
-    } else {
-      onUpdate({ parts: [...selectedParts, partWithQuantity] });
-    }
+    // Always add as new part - no auto-combining
+    // This allows techs to add multiple instances for different equipment
+    onUpdate({ parts: [...selectedParts, partWithQuantity] });
     
     // Reset quantity, price, and part number after adding
     setPartQuantities(prev => ({

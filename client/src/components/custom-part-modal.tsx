@@ -76,16 +76,16 @@ export default function CustomPartModal({ isOpen, onClose, onAddPart, prefillDat
       
       // Create the quote part object
       const quotePart: QuotePart = {
-        id: data.id || `custom-${Date.now()}`,
-        partNumber: formData.partNumber,
+        id: data.id || `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        partNumber: formData.partNumber || "",
         description: formData.description,
-        category: "Custom",
-        price: formData.price,
-        availability: formData.availability,
-        vendor: formData.vendor,
+        category: formData.category || "Custom",
+        price: formData.price || "0",
+        availability: formData.availability || "In Stock",
+        vendor: formData.vendor || "",
         warranty: formData.warranty || false,
         isCustom: true,
-        quantity: 1,
+        quantity: parseFloat(formData.quantity) || 1,
       };
 
       onAddPart(quotePart);
