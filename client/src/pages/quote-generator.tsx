@@ -38,7 +38,7 @@ export default function QuoteGenerator() {
     parts: [],
     ghvacInstalled: undefined,
     yearsSinceInstallation: "",
-    laborHours: "1",
+    laborHours: "",
     jobNotes: "",
   });
 
@@ -197,10 +197,10 @@ export default function QuoteGenerator() {
   };
 
   const handleGenerateQuote = () => {
-    if (!quoteData.customerName || !quoteData.technician || quoteData.parts.length === 0 || quoteData.ghvacInstalled === undefined) {
+    if (!quoteData.customerName || !quoteData.technician || quoteData.parts.length === 0 || quoteData.ghvacInstalled === undefined || !quoteData.laborHours) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields including warranty coverage.",
+        description: "Please fill in all required fields including customer name, technician, warranty coverage, and labor hours.",
         variant: "destructive",
       });
       return;

@@ -63,7 +63,7 @@ export default function WarrantySection({
             <Input
               id="laborHours"
               type="number"
-              placeholder="1"
+              placeholder="Enter hours (e.g. 1, 1.5, 2)"
               min="0.25"
               step="0.25"
               max="24"
@@ -75,6 +75,9 @@ export default function WarrantySection({
             <p className="text-xs text-muted-foreground">
               Hours of labor to charge (increments of 0.25)
             </p>
+            {!laborHours && (
+              <p className="text-xs text-destructive">Please enter labor hours</p>
+            )}
           </div>
 
           {ghvacInstalled === true && (
