@@ -151,10 +151,9 @@ export default function ConditionalRequirements({ selectedParts, onAddParts, onA
           const match = partInfo.match(/Refrigerant \((\d+(?:\.\d+)?)\s*lbs?\)/);
           if (match) {
             partName = 'Refrigerant';
-            unitInfo = `${match[1]} lbs`;
-            // Get refrigerant price from Google Sheets (per lb)
-            const pricePerLb = settings.partsPrices?.refrigerant || 65;
-            price = (pricePerLb * parseFloat(match[1])).toFixed(2);
+            unitInfo = match[1]; // Just the number of pounds as quantity
+            // Get refrigerant price per lb from Google Sheets
+            price = (settings.partsPrices?.refrigerant || 65).toString();
           }
         } else if (partName === 'Refrigerant Filter Dryer') {
           // Get filter dryer price from Google Sheets
@@ -187,8 +186,8 @@ export default function ConditionalRequirements({ selectedParts, onAddParts, onA
           const match = partInfo.match(/Refrigerant \((\d+(?:\.\d+)?)\s*lbs?\)/);
           if (match) {
             partName = 'Refrigerant';
-            unitInfo = `${match[1]} lbs`;
-            price = (65 * parseFloat(match[1])).toFixed(2); // Default $65/lb
+            unitInfo = match[1]; // Just the number of pounds as quantity
+            price = '65'; // Default $65/lb
           }
         } else if (partName === 'Refrigerant Filter Dryer') {
           price = '70'; // Default $70
