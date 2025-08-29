@@ -39,7 +39,7 @@ export default function SelectedParts({ parts, totals, onUpdate }: SelectedParts
                 <p className="text-xs text-muted-foreground">
                   {part.partNumber && `Model: ${part.partNumber}`}
                   {part.quantity && part.quantity !== 1 && (
-                    part.description.toLowerCase().includes('refrigerant') ? 
+                    part.description.toLowerCase().includes('refrigerant') && !part.description.toLowerCase().includes('filter dryer') ? 
                     ` • ${part.quantity} lbs` : 
                     part.description.toLowerCase().includes('copper') || part.description.toLowerCase().includes('insulation') ?
                     ` • ${part.quantity} ft` :
