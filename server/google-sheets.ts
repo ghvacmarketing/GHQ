@@ -34,8 +34,6 @@ class GoogleSheetsService {
     
     if (!this.apiKey || !this.sheetId) {
       console.warn('Google Sheets API key or Sheet ID not configured');
-    } else {
-      console.log('Google Sheets initialized with Sheet ID:', this.sheetId);
     }
   }
 
@@ -69,7 +67,6 @@ class GoogleSheetsService {
       const rangeQuery = ranges.map(range => `ranges=${encodeURIComponent(range)}`).join('&');
       const url = `${this.baseUrl}/${this.sheetId}/values:batchGet?${rangeQuery}&key=${this.apiKey}`;
 
-      console.log('Making Google Sheets API request to:', url.replace(this.apiKey, 'HIDDEN_API_KEY'));
       const response = await fetch(url);
       
       if (!response.ok) {
