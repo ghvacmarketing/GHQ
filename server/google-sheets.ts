@@ -64,8 +64,8 @@ class GoogleSheetsService {
         'B44'   // Commission %
       ];
 
-      const rangeQuery = ranges.join('&ranges=');
-      const url = `${this.baseUrl}/${this.sheetId}/values:batchGet?ranges=${rangeQuery}&key=${this.apiKey}`;
+      const rangeQuery = ranges.map(range => `ranges=${encodeURIComponent(range)}`).join('&');
+      const url = `${this.baseUrl}/${this.sheetId}/values:batchGet?${rangeQuery}&key=${this.apiKey}`;
 
       const response = await fetch(url);
       
