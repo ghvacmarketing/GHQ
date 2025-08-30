@@ -1,3 +1,5 @@
+import { Resend } from 'resend';
+
 interface EmailConfig {
   serviceProvider: string;
   apiKey: string;
@@ -16,13 +18,17 @@ interface QuoteEmailData {
 export class EmailService {
   private config: EmailConfig;
 
+  private resend: Resend;
+
   constructor() {
     this.config = {
-      serviceProvider: process.env.EMAIL_SERVICE || 'sendgrid',
-      apiKey: process.env.EMAIL_API_KEY || '',
+      serviceProvider: process.env.EMAIL_SERVICE || 'resend',
+      apiKey: process.env.RESEND_API_KEY || '',
       fromEmail: process.env.FROM_EMAIL || 'quotes@ghvac.com',
       managerEmail: process.env.MANAGER_EMAIL || 'manager@ghvac.com',
     };
+    
+    this.resend = new Resend(this.config.apiKey);
   }
 
   async sendQuoteNotification(quoteData: QuoteEmailData): Promise<boolean> {
@@ -30,8 +36,8 @@ export class EmailService {
       const subject = `New HVAC Quote - ${quoteData.customerName} - $${quoteData.total}`;
       const htmlContent = this.generateQuoteEmailHtml(quoteData);
       
-      if (this.config.serviceProvider === 'sendgrid') {
-        return await this.sendWithSendGrid(subject, htmlContent);
+      if (this.config.serviceProvider === 'resend') {
+        return await this.sendWithResend(subject, htmlContent);
       } else {
         // Fallback to basic email service
         return await this.sendWithGenericService(subject, htmlContent);
@@ -42,30 +48,24 @@ export class EmailService {
     }
   }
 
-  private async sendWithSendGrid(subject: string, htmlContent: string): Promise<boolean> {
+  private async sendWithResend(subject: string, htmlContent: string): Promise<boolean> {
     try {
-      const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          personalizations: [{
-            to: [{ email: this.config.managerEmail }],
-            subject: subject,
-          }],
-          from: { email: this.config.fromEmail },
-          content: [{
-            type: 'text/html',
-            value: htmlContent,
-          }],
-        }),
+      const { data, error } = await this.resend.emails.send({
+        from: this.config.fromEmail,
+        to: [this.config.managerEmail],
+        subject: subject,
+        html: htmlContent,
       });
 
-      return response.ok;
+      if (error) {
+        console.error('Resend email error:', error);
+        return false;
+      }
+
+      console.log('Email sent successfully:', data?.id);
+      return true;
     } catch (error) {
-      console.error('SendGrid email error:', error);
+      console.error('Resend email error:', error);
       return false;
     }
   }
