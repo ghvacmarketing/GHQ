@@ -24,7 +24,7 @@ export class EmailService {
     this.config = {
       serviceProvider: process.env.EMAIL_SERVICE || 'resend',
       apiKey: process.env.RESEND_API_KEY || '',
-      fromEmail: process.env.FROM_EMAIL || 'quotes@ghvac.com',
+      fromEmail: process.env.FROM_EMAIL || 'onboarding@resend.dev',
       managerEmail: process.env.MANAGER_EMAIL || 'manager@ghvac.com',
     };
     

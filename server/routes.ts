@@ -222,8 +222,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       7: 0.65, 8: 0.70, 9: 0.80, 10: 0.90
     },
     emailSettings: {
-      fromEmail: 'quotes@ghvac.com',
-      notificationEmails: ['manager@ghvac.com']
+      fromEmail: 'onboarding@resend.dev',
+      notificationEmails: ['delivered@resend.dev']
     }
   };
 

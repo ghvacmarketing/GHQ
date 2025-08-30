@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,12 +26,16 @@ export default function AdminSettings() {
   const { data: currentSettings, refetch, isLoading } = useQuery({
     queryKey: ["/api/settings"],
     enabled: isAuthenticated,
-    onSuccess: (data) => {
-      if (data?.emailSettings?.notificationEmails) {
-        setEmailAddresses(data.emailSettings.notificationEmails);
-      }
-    }
   });
+
+  const settings = currentSettings as any;
+
+  // Initialize email addresses when settings load
+  useEffect(() => {
+    if ((currentSettings as any)?.emailSettings?.notificationEmails) {
+      setEmailAddresses((currentSettings as any).emailSettings.notificationEmails);
+    }
+  }, [currentSettings]);
 
   // Fetch quotes for management
   const { data: quotes = [] } = useQuery<Quote[]>({
@@ -115,7 +119,7 @@ export default function AdminSettings() {
       setEmailAddresses(updatedEmails);
       setNewEmailAddress("");
       saveEmailSettingsMutation.mutate({
-        fromEmail: currentSettings?.emailSettings?.fromEmail || "quotes@ghvac.com",
+        fromEmail: settings?.emailSettings?.fromEmail || "quotes@ghvac.com",
         notificationEmails: updatedEmails
       });
     }
@@ -125,7 +129,7 @@ export default function AdminSettings() {
     const updatedEmails = emailAddresses.filter(email => email !== emailToRemove);
     setEmailAddresses(updatedEmails);
     saveEmailSettingsMutation.mutate({
-      fromEmail: currentSettings?.emailSettings?.fromEmail || "quotes@ghvac.com",
+      fromEmail: settings?.emailSettings?.fromEmail || "quotes@ghvac.com",
       notificationEmails: updatedEmails
     });
   };
@@ -284,7 +288,7 @@ export default function AdminSettings() {
                   <div>
                     <Label>Labor Rate ($/hour)</Label>
                     <Input
-                      value={`$${currentSettings.laborRate || 0}`}
+                      value={`$${settings?.laborRate || 0}`}
                       readOnly
                       className="bg-muted"
                     />
@@ -293,7 +297,7 @@ export default function AdminSettings() {
                   <div>
                     <Label>Warranty Reserve ($)</Label>
                     <Input
-                      value={`$${currentSettings.warrantyReserve || 0}`}
+                      value={`$${settings?.warrantyReserve || 0}`}
                       readOnly
                       className="bg-muted"
                     />
@@ -311,7 +315,7 @@ export default function AdminSettings() {
                   <div>
                     <Label>Commission (%)</Label>
                     <Input
-                      value={`${((currentSettings.commissionPercent || 0) * 100).toFixed(1)}%`}
+                      value={`${((settings?.commissionPercent || 0) * 100).toFixed(1)}%`}
                       readOnly
                       className="bg-muted"
                     />
@@ -320,7 +324,7 @@ export default function AdminSettings() {
                   <div>
                     <Label>Financing/Promotion (%)</Label>
                     <Input
-                      value={`${((currentSettings.financingPromotionPercent || 0) * 100).toFixed(1)}%`}
+                      value={`${((settings?.financingPromotionPercent || 0) * 100).toFixed(1)}%`}
                       readOnly
                       className="bg-muted"
                     />
@@ -329,7 +333,7 @@ export default function AdminSettings() {
                   <div>
                     <Label>Profit (%)</Label>
                     <Input
-                      value={`${((currentSettings.profitPercent || 0) * 100).toFixed(1)}%`}
+                      value={`${((settings?.profitPercent || 0) * 100).toFixed(1)}%`}
                       readOnly
                       className="bg-muted"
                     />
@@ -338,7 +342,7 @@ export default function AdminSettings() {
                   <div>
                     <Label>Overhead (%)</Label>
                     <Input
-                      value={`${((currentSettings.overheadPercent || 0) * 100).toFixed(1)}%`}
+                      value={`${((settings?.overheadPercent || 0) * 100).toFixed(1)}%`}
                       readOnly
                       className="bg-muted"
                     />
@@ -347,7 +351,7 @@ export default function AdminSettings() {
                   <div>
                     <Label>Labor Benefits (%)</Label>
                     <Input
-                      value={`${((currentSettings.laborBenefitsPercent || 0) * 100).toFixed(1)}%`}
+                      value={`${((settings?.laborBenefitsPercent || 0) * 100).toFixed(1)}%`}
                       readOnly
                       className="bg-muted"
                     />
@@ -356,7 +360,7 @@ export default function AdminSettings() {
                   <div>
                     <Label>Sales Tax (%)</Label>
                     <Input
-                      value={`${((currentSettings.salesTaxPercent || 0) * 100).toFixed(1)}%`}
+                      value={`${((settings?.salesTaxPercent || 0) * 100).toFixed(1)}%`}
                       readOnly
                       className="bg-muted"
                     />
@@ -365,7 +369,7 @@ export default function AdminSettings() {
                   <div>
                     <Label>Material Shrinkage (%)</Label>
                     <Input
-                      value={`${((currentSettings.materialShrinkagePercent || 0) * 100).toFixed(1)}%`}
+                      value={`${((settings?.materialShrinkagePercent || 0) * 100).toFixed(1)}%`}
                       readOnly
                       className="bg-muted"
                     />
@@ -375,7 +379,7 @@ export default function AdminSettings() {
               </Card>
 
               {/* Parts Pricing */}
-              {currentSettings.partsPrices && (
+              {settings?.partsPrices && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Material Pricing</CardTitle>
@@ -384,7 +388,7 @@ export default function AdminSettings() {
                     <div>
                       <Label>Refrigerant Filter Dryer</Label>
                       <Input
-                        value={`$${currentSettings.partsPrices.refrigerantFilterDryer || 0}`}
+                        value={`$${settings?.partsPrices.refrigerantFilterDryer || 0}`}
                         readOnly
                         className="bg-muted"
                       />
@@ -393,7 +397,7 @@ export default function AdminSettings() {
                     <div>
                       <Label>Copper</Label>
                       <Input
-                        value={`$${currentSettings.partsPrices.copper || 0}/ft`}
+                        value={`$${settings?.partsPrices.copper || 0}/ft`}
                         readOnly
                         className="bg-muted"
                       />
@@ -402,7 +406,7 @@ export default function AdminSettings() {
                     <div>
                       <Label>Armaflex Insulation</Label>
                       <Input
-                        value={`$${currentSettings.partsPrices.armaflexInsulation || 0}/ft`}
+                        value={`$${settings?.partsPrices.armaflexInsulation || 0}/ft`}
                         readOnly
                         className="bg-muted"
                       />
@@ -411,7 +415,7 @@ export default function AdminSettings() {
                     <div>
                       <Label>Acid Away</Label>
                       <Input
-                        value={`$${currentSettings.partsPrices.acidAway || 0}`}
+                        value={`$${settings?.partsPrices.acidAway || 0}`}
                         readOnly
                         className="bg-muted"
                       />
@@ -420,7 +424,7 @@ export default function AdminSettings() {
                     <div>
                       <Label>Refrigerant</Label>
                       <Input
-                        value={`$${currentSettings.partsPrices.refrigerant || 0}/lb`}
+                        value={`$${settings?.partsPrices.refrigerant || 0}/lb`}
                         readOnly
                         className="bg-muted"
                       />
@@ -440,7 +444,7 @@ export default function AdminSettings() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                    {currentSettings.warrantyDiscounts && Object.entries(currentSettings.warrantyDiscounts).map(([year, discount]) => (
+                    {settings?.warrantyDiscounts && Object.entries(settings?.warrantyDiscounts).map(([year, discount]) => (
                       <div key={year} className="text-center">
                         <Label className="text-xs">Year {year}</Label>
                         <Input
