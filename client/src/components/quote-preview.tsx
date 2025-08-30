@@ -67,10 +67,7 @@ ${partsSection}
 Subtotal: $${quote.subtotal}
 Labor: $${quote.labor}
 Tax: $${quote.tax}
-TOTAL: $${quote.total}${warrantySection}
-
-Quote valid for 30 days.
-All work comes with GHVAC warranty.`;
+TOTAL: $${quote.total}${warrantySection}`;
   };
 
   return (
