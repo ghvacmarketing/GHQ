@@ -67,7 +67,7 @@ ${partsSection}
 Subtotal: $${quote.subtotal}
 Labor: $${quote.labor}
 Tax: $${quote.tax}
-TOTAL: $${quote.total}${warrantySection}`;
+TOTAL: $${quote.total}`;
   };
 
   return (

@@ -308,10 +308,5 @@ ${partsList}
 Subtotal: $${quote.subtotal}
 Labor: $${quote.labor}
 Tax: $${quote.tax}
-TOTAL: $${quote.total}
-
-Quote valid for 30 days.
-All work comes with GHVAC warranty.
-
-For questions, contact your technician or GHVAC office.`;
+TOTAL: $${quote.total}`;
 }
