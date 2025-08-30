@@ -53,7 +53,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           total: quote.total,
           quoteText: quote.quoteText || '',
           quoteId: quote.id,
-        });
+        }, adminSettings.emailSettings.notificationEmails);
         
         if (emailSent) {
           await storage.updateQuote(quote.id, { emailSent: true });
@@ -220,6 +220,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     warrantyDiscounts: {
       2: 0.25, 3: 0.35, 4: 0.45, 5: 0.50, 6: 0.55,
       7: 0.65, 8: 0.70, 9: 0.80, 10: 0.90
+    },
+    emailSettings: {
+      fromEmail: 'quotes@ghvac.com',
+      notificationEmails: ['manager@ghvac.com']
     }
   };
 
@@ -258,7 +262,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           armaflexInsulation: sheetsData.armaflexInsulationPrice,
           acidAway: sheetsData.acidAwayPrice,
           refrigerant: sheetsData.refrigerantPrice,
-        }
+        },
+        emailSettings: adminSettings.emailSettings
       };
       
       res.json(settings);

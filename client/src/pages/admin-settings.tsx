@@ -19,11 +19,18 @@ export default function AdminSettings() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [selectedQuotes, setSelectedQuotes] = useState<Set<string>>(new Set());
+  const [emailAddresses, setEmailAddresses] = useState<string[]>([]);
+  const [newEmailAddress, setNewEmailAddress] = useState("");
 
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
     queryKey: ["/api/settings"],
     enabled: isAuthenticated,
+    onSuccess: (data) => {
+      if (data?.emailSettings?.notificationEmails) {
+        setEmailAddresses(data.emailSettings.notificationEmails);
+      }
+    }
   });
 
   // Fetch quotes for management
@@ -79,6 +86,49 @@ export default function AdminSettings() {
       });
     },
   });
+
+  // Email settings mutation
+  const saveEmailSettingsMutation = useMutation({
+    mutationFn: async (emailSettings: { fromEmail: string; notificationEmails: string[] }) => {
+      const response = await apiRequest("POST", "/api/admin/settings", { emailSettings });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({
+        title: "Email Settings Saved",
+        description: "Email notification settings updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Save Failed",
+        description: "Failed to save email settings. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddEmail = () => {
+    if (newEmailAddress && !emailAddresses.includes(newEmailAddress)) {
+      const updatedEmails = [...emailAddresses, newEmailAddress];
+      setEmailAddresses(updatedEmails);
+      setNewEmailAddress("");
+      saveEmailSettingsMutation.mutate({
+        fromEmail: currentSettings?.emailSettings?.fromEmail || "quotes@ghvac.com",
+        notificationEmails: updatedEmails
+      });
+    }
+  };
+
+  const handleRemoveEmail = (emailToRemove: string) => {
+    const updatedEmails = emailAddresses.filter(email => email !== emailToRemove);
+    setEmailAddresses(updatedEmails);
+    saveEmailSettingsMutation.mutate({
+      fromEmail: currentSettings?.emailSettings?.fromEmail || "quotes@ghvac.com",
+      notificationEmails: updatedEmails
+    });
+  };
 
   const handleSelectQuote = (quoteId: string, checked: boolean) => {
     const newSelected = new Set(selectedQuotes);
@@ -400,6 +450,70 @@ export default function AdminSettings() {
                         />
                       </div>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Email Management */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.9a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Email Notifications
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Manage email addresses that receive quote notifications
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Current Email List */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Current Recipients</Label>
+                    {emailAddresses.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No email addresses configured</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {emailAddresses.map((email, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                            <span className="text-sm">{email}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveEmail(email)}
+                              className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                              data-testid={`button-remove-email-${index}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add New Email */}
+                  <div className="space-y-2">
+                    <Label htmlFor="new-email" className="text-sm font-medium">Add Email Address</Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        id="new-email"
+                        type="email"
+                        placeholder="manager@ghvac.com"
+                        value={newEmailAddress}
+                        onChange={(e) => setNewEmailAddress(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleAddEmail()}
+                        data-testid="input-new-email"
+                      />
+                      <Button
+                        onClick={handleAddEmail}
+                        disabled={!newEmailAddress || emailAddresses.includes(newEmailAddress) || saveEmailSettingsMutation.isPending}
+                        data-testid="button-add-email"
+                      >
+                        Add
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

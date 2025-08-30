@@ -31,13 +31,14 @@ export class EmailService {
     this.resend = new Resend(this.config.apiKey);
   }
 
-  async sendQuoteNotification(quoteData: QuoteEmailData): Promise<boolean> {
+  async sendQuoteNotification(quoteData: QuoteEmailData, recipients?: string[]): Promise<boolean> {
     try {
       const subject = `New HVAC Quote - ${quoteData.customerName} - $${quoteData.total}`;
       const htmlContent = this.generateQuoteEmailHtml(quoteData);
+      const emailList = recipients || [this.config.managerEmail];
       
       if (this.config.serviceProvider === 'resend') {
-        return await this.sendWithResend(subject, htmlContent);
+        return await this.sendWithResend(subject, htmlContent, emailList);
       } else {
         // Fallback to basic email service
         return await this.sendWithGenericService(subject, htmlContent);
@@ -48,11 +49,11 @@ export class EmailService {
     }
   }
 
-  private async sendWithResend(subject: string, htmlContent: string): Promise<boolean> {
+  private async sendWithResend(subject: string, htmlContent: string, recipients: string[]): Promise<boolean> {
     try {
       const { data, error } = await this.resend.emails.send({
         from: this.config.fromEmail,
-        to: [this.config.managerEmail],
+        to: recipients,
         subject: subject,
         html: htmlContent,
       });
