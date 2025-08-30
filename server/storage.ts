@@ -7,6 +7,7 @@ export interface IStorage {
   getAllQuotes(): Promise<Quote[]>;
   createQuote(quote: InsertQuote): Promise<Quote>;
   updateQuote(id: string, quote: Partial<Quote>): Promise<Quote | undefined>;
+  deleteQuote(id: string): Promise<boolean>;
   
   // Part operations
   getPart(id: string): Promise<PartData | undefined>;
@@ -94,6 +95,10 @@ export class MemStorage implements IStorage {
     const updatedQuote = { ...existingQuote, ...updateData };
     this.quotes.set(id, updatedQuote);
     return updatedQuote;
+  }
+
+  async deleteQuote(id: string): Promise<boolean> {
+    return this.quotes.delete(id);
   }
 
   // Part operations

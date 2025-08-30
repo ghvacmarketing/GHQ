@@ -1,21 +1,34 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import type { Quote } from "@shared/schema";
 
 export default function AdminSettings() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedQuotes, setSelectedQuotes] = useState<Set<string>>(new Set());
 
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
     queryKey: ["/api/settings"],
+    enabled: isAuthenticated,
+  });
+
+  // Fetch quotes for management
+  const { data: quotes = [] } = useQuery<Quote[]>({
+    queryKey: ["/api/quotes"],
     enabled: isAuthenticated,
   });
 
@@ -42,6 +55,61 @@ export default function AdminSettings() {
       title: "Data Refreshed",
       description: "Latest pricing data pulled from Google Sheets.",
     });
+  };
+
+  // Bulk delete quotes mutation
+  const deleteQuotesMutation = useMutation({
+    mutationFn: async (quoteIds: string[]) => {
+      const response = await apiRequest("DELETE", "/api/quotes/bulk", { quoteIds });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      setSelectedQuotes(new Set());
+      toast({
+        title: "Quotes Deleted",
+        description: `Successfully deleted ${data.deletedCount} quote(s).`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete quotes. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSelectQuote = (quoteId: string, checked: boolean) => {
+    const newSelected = new Set(selectedQuotes);
+    if (checked) {
+      newSelected.add(quoteId);
+    } else {
+      newSelected.delete(quoteId);
+    }
+    setSelectedQuotes(newSelected);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedQuotes(new Set(quotes.map(q => q.id!)));
+    } else {
+      setSelectedQuotes(new Set());
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedQuotes.size === 0) return;
+    deleteQuotesMutation.mutate(Array.from(selectedQuotes));
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "accepted": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
+      case "pending": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+      case "draft": return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+      default: return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+    }
   };
 
   if (!isAuthenticated) {
@@ -333,6 +401,99 @@ export default function AdminSettings() {
                       </div>
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Quote Management */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center">
+                        <FileText className="h-5 w-5 mr-2" />
+                        Quote Management
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        View and delete generated quotes
+                      </p>
+                    </div>
+                    {selectedQuotes.size > 0 && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            disabled={deleteQuotesMutation.isPending}
+                            data-testid="button-bulk-delete"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete {selectedQuotes.size} Quote{selectedQuotes.size !== 1 ? 's' : ''}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete {selectedQuotes.size} selected quote{selectedQuotes.size !== 1 ? 's' : ''}? 
+                              This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {quotes.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p>No quotes found</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-3 pb-3 border-b border-border">
+                        <Checkbox
+                          checked={selectedQuotes.size === quotes.length && quotes.length > 0}
+                          onCheckedChange={handleSelectAll}
+                          data-testid="checkbox-select-all"
+                        />
+                        <Label className="text-sm font-medium">
+                          Select All ({quotes.length} quote{quotes.length !== 1 ? 's' : ''})
+                        </Label>
+                      </div>
+                      
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {quotes.map((quote) => (
+                          <div key={quote.id} className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50">
+                            <Checkbox
+                              checked={selectedQuotes.has(quote.id!)}
+                              onCheckedChange={(checked) => handleSelectQuote(quote.id!, checked as boolean)}
+                              data-testid={`checkbox-quote-${quote.id}`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <span className="font-medium text-sm truncate">{quote.customerName}</span>
+                                <Badge className={getStatusColor(quote.status || 'draft') + " text-xs"}>
+                                  {(quote.status || 'draft').charAt(0).toUpperCase() + (quote.status || 'draft').slice(1)}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>{quote.technician}</span>
+                                <span>{new Date(quote.createdAt!).toLocaleDateString()}</span>
+                                <span className="font-medium text-foreground">${quote.total.toFixed(2)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </>

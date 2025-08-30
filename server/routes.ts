@@ -112,6 +112,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk delete quotes
+  app.delete("/api/quotes/bulk", async (req, res) => {
+    try {
+      const { quoteIds } = req.body;
+      
+      if (!Array.isArray(quoteIds) || quoteIds.length === 0) {
+        return res.status(400).json({ message: "No quote IDs provided" });
+      }
+
+      let deletedCount = 0;
+      for (const quoteId of quoteIds) {
+        try {
+          await storage.deleteQuote(quoteId);
+          deletedCount++;
+        } catch (error) {
+          console.error(`Error deleting quote ${quoteId}:`, error);
+        }
+      }
+      
+      res.json({ deletedCount, totalRequested: quoteIds.length });
+    } catch (error) {
+      console.error('Error bulk deleting quotes:', error);
+      res.status(500).json({ message: "Error deleting quotes" });
+    }
+  });
+
   // Get all parts from storage
   app.get("/api/parts", async (req, res) => {
     try {
