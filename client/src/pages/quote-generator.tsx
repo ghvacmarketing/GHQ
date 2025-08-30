@@ -166,10 +166,11 @@ export default function QuoteGenerator() {
     
     const materialShrinkageCost = shrinkagePartsTotal * materialShrinkagePercent;
     
-    // Materials cost (parts + shrinkage) - apply warranty discount to materials
+    // Materials cost (parts + shrinkage) - apply warranty pricing to materials
+    // The warranty percentage represents what the customer pays, not the discount
     let materialsCost = partsSubtotal + materialShrinkageCost;
     if (isGHVACWarranty && warrantyDiscountPercent > 0) {
-      materialsCost = materialsCost * (1 - warrantyDiscountPercent);
+      materialsCost = materialsCost * warrantyDiscountPercent;
     }
     
     const adjustedPartsTotal = materialsCost;
@@ -178,9 +179,10 @@ export default function QuoteGenerator() {
     const hours = parseFloat(quoteData.laborHours || "1");
     let laborRate = settings.laborRate || 65; // Use live rate from Google Sheets
     
-    // Apply warranty discount to labor if GHVAC installation
+    // Apply warranty pricing to labor if GHVAC installation
+    // The warranty percentage represents what the customer pays, not the discount
     if (isGHVACWarranty && warrantyDiscountPercent > 0) {
-      laborRate = laborRate * (1 - warrantyDiscountPercent);
+      laborRate = laborRate * warrantyDiscountPercent;
     }
     
     const baseLaborCost = laborRate * hours;
