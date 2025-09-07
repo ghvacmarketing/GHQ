@@ -222,8 +222,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       7: 0.65, 8: 0.70, 9: 0.80, 10: 0.90
     },
     emailSettings: {
-      fromEmail: 'onboarding@resend.dev',
-      notificationEmails: ['delivered@resend.dev']
+      fromEmail: 'onboarding@resend.dev', // Resend test domain (no verification needed)
+      notificationEmails: ['delivered@resend.dev'], // Test delivery address
+      developmentMode: true // Set to false for production with your own domain
     }
   };
 
