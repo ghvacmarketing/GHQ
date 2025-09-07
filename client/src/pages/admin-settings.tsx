@@ -473,7 +473,8 @@ export default function AdminSettings() {
                   {settings?.emailSettings?.developmentMode && (
                     <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
                       <p className="text-xs text-blue-700 dark:text-blue-300">
-                        🧪 <strong>Development Mode</strong> - Using Resend test domains (no verification required)
+                        🧪 <strong>Development Mode</strong> - Using Resend test domains (no verification required)<br/>
+                        ✉️ You can add your personal Gmail/email addresses below for testing!
                       </p>
                     </div>
                   )}
