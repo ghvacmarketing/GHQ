@@ -13,6 +13,7 @@ interface QuoteEmailData {
   total: string;
   quoteText: string;
   quoteId: string;
+  jobNotes?: string;
 }
 
 export class EmailService {
@@ -104,6 +105,11 @@ export class EmailService {
             <p><strong>Total Amount:</strong> $${quoteData.total}</p>
             <p><strong>Quote ID:</strong> ${quoteData.quoteId}</p>
           </div>
+          
+          ${quoteData.jobNotes ? `
+          <h3>Job Notes</h3>
+          <div class="quote-text">${quoteData.jobNotes}</div>
+          ` : ''}
           
           <h3>Full Quote Text</h3>
           <div class="quote-text">${quoteData.quoteText}</div>

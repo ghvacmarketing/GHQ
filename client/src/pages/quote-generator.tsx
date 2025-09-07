@@ -281,7 +281,7 @@ export default function QuoteGenerator() {
       jobNotes: quoteData.jobNotes,
       status: "draft",
       quoteText: "", // Will be generated on server
-      emailSent: false,
+      emailSent: true, // Enable automatic email notifications
     };
 
     createQuoteMutation.mutate(quotePayload);

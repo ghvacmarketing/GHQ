@@ -53,6 +53,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           total: quote.total,
           quoteText: quote.quoteText || '',
           quoteId: quote.id,
+          jobNotes: quote.jobNotes || '',
         }, adminSettings.emailSettings.notificationEmails);
         
         if (emailSent) {
