@@ -612,7 +612,7 @@ export default function AdminSettings() {
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <span>{quote.technician}</span>
                                 <span>{new Date(quote.createdAt!).toLocaleDateString()}</span>
-                                <span className="font-medium text-foreground">${quote.total.toFixed(2)}</span>
+                                <span className="font-medium text-foreground">${parseFloat(quote.total).toFixed(2)}</span>
                               </div>
                             </div>
                           </div>
