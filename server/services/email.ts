@@ -324,7 +324,7 @@ export class EmailService {
       managerEmail: process.env.MANAGER_EMAIL || "manager@ghvac.com",
       brandName: process.env.BRAND_NAME || "Giesbrecht HVAC",
       brandColor: process.env.BRAND_COLOR || "#711419",
-      logoUrl: "",
+      logoUrl: "https://images.squarespace-cdn.com/content/v1/65b2790c0b83175df7337294/26a0020c-4218-401d-b789-abf42c0bcd2e/Giesbrecht_Logo-V+%282%29+1.png?format=300w",
       bccManagerByDefault:
         (process.env.BCC_MANAGER_BY_DEFAULT || "true") === "true",
       dryRun: (process.env.DRY_RUN_EMAIL || "false") === "true",
