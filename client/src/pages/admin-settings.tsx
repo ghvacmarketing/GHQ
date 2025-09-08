@@ -260,7 +260,7 @@ export default function AdminSettings() {
         <div className="space-y-6">
           {/* Google Sheets Notice */}
           <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
-            <CardContent className="pt-6">
+            <CardContent className="p-6 pt-[5px] pb-[5px] pl-[10px] pr-[10px]">
               <div className="flex items-start space-x-3">
                 <ExternalLink className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                 <div>
