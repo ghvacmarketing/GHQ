@@ -225,7 +225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     emailSettings: {
       fromEmail: 'quotes@ghvac.work', // Using your verified domain
       notificationEmails: ['shelbgies@gmail.com'], // Testing with your Gmail
-      developmentMode: true // Development mode for testing
+      developmentMode: false // Production mode with verified domain
     }
   };
 
