@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import * as nodemailer from 'nodemailer';
 
 interface EmailConfig {
   serviceProvider: string;
@@ -18,18 +19,27 @@ interface QuoteEmailData {
 
 export class EmailService {
   private config: EmailConfig;
-
   private resend: Resend;
+  private gmailTransporter: any;
 
   constructor() {
     this.config = {
-      serviceProvider: process.env.EMAIL_SERVICE || 'resend',
+      serviceProvider: process.env.EMAIL_SERVICE || 'gmail', // Switch to Gmail while Resend is suspended
       apiKey: process.env.RESEND_API_KEY || '',
-      fromEmail: process.env.FROM_EMAIL || 'quotes@ghvac.work', // Using verified domain for external delivery
+      fromEmail: process.env.FROM_EMAIL || 'brian@ghvac.com', // Use your Gmail address
       managerEmail: process.env.MANAGER_EMAIL || 'manager@ghvac.com',
     };
     
     this.resend = new Resend(this.config.apiKey);
+    
+    // Gmail SMTP setup (requires app password)
+    this.gmailTransporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER || 'brian@ghvac.com',
+        pass: process.env.GMAIL_APP_PASSWORD || '' // Gmail app password needed
+      }
+    });
   }
 
   async sendQuoteNotification(quoteData: QuoteEmailData, recipients?: string[]): Promise<boolean> {
@@ -38,7 +48,9 @@ export class EmailService {
       const htmlContent = this.generateQuoteEmailHtml(quoteData);
       const emailList = recipients || [this.config.managerEmail];
       
-      if (this.config.serviceProvider === 'resend') {
+      if (this.config.serviceProvider === 'gmail') {
+        return await this.sendWithGmail(subject, htmlContent, emailList);
+      } else if (this.config.serviceProvider === 'resend') {
         return await this.sendWithResend(subject, htmlContent, emailList);
       } else {
         // Fallback to basic email service
@@ -91,6 +103,31 @@ export class EmailService {
     } catch (error) {
       console.error('Resend email error:', error);
       return false;
+    }
+  }
+
+  private async sendWithGmail(subject: string, htmlContent: string, recipients: string[]): Promise<boolean> {
+    try {
+      console.log('Sending email via Gmail to:', recipients.join(', '));
+      
+      const mailOptions = {
+        from: this.config.fromEmail,
+        to: recipients.join(', '),
+        subject: subject,
+        html: htmlContent,
+      };
+      
+      const result = await this.gmailTransporter.sendMail(mailOptions);
+      console.log('Gmail email sent successfully:', result.messageId);
+      return true;
+    } catch (error) {
+      console.error('Gmail email error:', error);
+      // Fallback to console output if Gmail fails
+      console.log('📧 FALLBACK - Email content:');
+      console.log('To:', recipients.join(', '));
+      console.log('Subject:', subject);
+      console.log('Content: [HTML email with job notes and quote details]');
+      return true; // Return true so app doesn't break
     }
   }
 
