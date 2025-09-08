@@ -218,6 +218,7 @@ export class QuoteEmailTemplate {
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:top;">
+                    <div style="margin:0 0 4px 0;font-size:14px;color:#6b7280;font-family:Arial,sans-serif;">Customer:</div>
                     <h2 style="margin:0 0 8px 0;font-size:22px;color:#1f2937;font-weight:600;font-family:Arial,sans-serif;">${esc(data.customerName)}</h2>
                     <span style="background:${pill.bg};color:${pill.fg};padding:6px 12px;border-radius:4px;font-size:12px;text-transform:capitalize;font-family:Arial,sans-serif;">${esc(data.status || 'draft')}</span>
                   </td>
@@ -235,9 +236,9 @@ export class QuoteEmailTemplate {
               <div style="border-bottom:2px solid #f3f4f6;padding-bottom:16px;">
                 <table cellpadding="0" cellspacing="0" width="100%">
                   <tr>
-                    <td style="color:#6b7280;font-size:14px;padding-right:15px;font-family:Arial,sans-serif;">👤 ${esc(data.technician)}</td>
+                    <td style="color:#6b7280;font-size:14px;padding-right:15px;font-family:Arial,sans-serif;">Tech: ${esc(data.technician)}</td>
                     <td style="color:#6b7280;font-size:14px;padding-right:15px;font-family:Arial,sans-serif;">${formatDate(data.createdAt)}</td>
-                    <td style="color:#6b7280;font-size:14px;font-family:Arial,sans-serif;">📦 ${data.parts?.length || 0} part${(data.parts?.length || 0) !== 1 ? 's' : ''}</td>
+                    <td style="color:#6b7280;font-size:14px;font-family:Arial,sans-serif;">${data.parts?.length || 0} part${(data.parts?.length || 0) !== 1 ? 's' : ''}</td>
                   </tr>
                 </table>
               </div>
@@ -324,7 +325,7 @@ export class EmailService {
       managerEmail: process.env.MANAGER_EMAIL || "manager@ghvac.com",
       brandName: process.env.BRAND_NAME || "Giesbrecht HVAC",
       brandColor: process.env.BRAND_COLOR || "#711419",
-      logoUrl: "https://images.squarespace-cdn.com/content/v1/65b2790c0b83175df7337294/26a0020c-4218-401d-b789-abf42c0bcd2e/Giesbrecht_Logo-V+%282%29+1.png?format=300w",
+      logoUrl: "https://images.squarespace-cdn.com/content/v1/65b2790c0b83175df7337294/93a31506-d2ae-4e07-958b-c86d0c49f7cd/GHVAC-icons.png?format=200w",
       bccManagerByDefault:
         (process.env.BCC_MANAGER_BY_DEFAULT || "true") === "true",
       dryRun: (process.env.DRY_RUN_EMAIL || "false") === "true",
