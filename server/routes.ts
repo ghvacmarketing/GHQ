@@ -201,7 +201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Force refresh settings from Google Sheets
   app.post("/api/settings/refresh", async (req, res) => {
     try {
-      const settings = await googleSheetsService.getSettings();
+      const settings = await googleSheetsService.fetchCellValues();
       res.json({ message: "Settings refreshed successfully", settings });
     } catch (error) {
       res.status(500).json({ message: "Error refreshing settings" });
