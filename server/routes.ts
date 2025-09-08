@@ -223,9 +223,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       7: 0.65, 8: 0.70, 9: 0.80, 10: 0.90
     },
     emailSettings: {
-      fromEmail: 'delivered@resend.dev', // Better Resend test domain for external delivery
-      notificationEmails: ['delivered@resend.dev', 'shelbgies@gmail.com'], // Fixed: Include Gmail permanently  
-      developmentMode: true // Set to false for production with your own domain
+      fromEmail: 'delivered@resend.dev', // Temporary fallback until domain issue resolved
+      notificationEmails: ['delivered@resend.dev', 'shelbgies@gmail.com'], // Both test and Gmail
+      developmentMode: true // Temporary fallback mode
     }
   };
 

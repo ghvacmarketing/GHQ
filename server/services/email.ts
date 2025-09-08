@@ -25,7 +25,7 @@ export class EmailService {
     this.config = {
       serviceProvider: process.env.EMAIL_SERVICE || 'resend',
       apiKey: process.env.RESEND_API_KEY || '',
-      fromEmail: process.env.FROM_EMAIL || 'delivered@resend.dev', // Changed from onboarding to delivered
+      fromEmail: process.env.FROM_EMAIL || 'quotes@ghvac.work', // Using verified domain for external delivery
       managerEmail: process.env.MANAGER_EMAIL || 'manager@ghvac.com',
     };
     
@@ -63,6 +63,26 @@ export class EmailService {
 
       if (error) {
         console.error('Resend email error:', error);
+        
+        // Fallback to test domain if custom domain fails
+        if (error.name === 'validation_error' && this.config.fromEmail.includes('@ghvac.work')) {
+          console.log('🔄 Retrying with fallback domain...');
+          const fallbackResult = await this.resend.emails.send({
+            from: 'delivered@resend.dev',
+            to: recipients,
+            subject: subject + ' [Fallback Send]',
+            html: htmlContent,
+          });
+          
+          if (fallbackResult.error) {
+            console.error('Fallback email also failed:', fallbackResult.error);
+            return false;
+          }
+          
+          console.log('Email sent via fallback domain:', fallbackResult.data?.id);
+          return true;
+        }
+        
         return false;
       }
 
