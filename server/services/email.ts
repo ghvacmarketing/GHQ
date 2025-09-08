@@ -123,14 +123,15 @@ export class EmailService {
         hour12: true 
       }) : new Date().toLocaleDateString();
     
-    const partsHtml = quoteData.parts.map(part => `
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
-        <div>
-          <div style="font-weight: 500; color: #1f2937;">${part.description}</div>
-          <div style="font-size: 14px; color: #6b7280;">Part #: ${part.partNumber}</div>
-        </div>
-        <div style="text-align: right; color: #1f2937;">$${part.price} x ${part.quantity || 1}</div>
-      </div>
+    const partsRows = quoteData.parts.map(part => `
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-family: Arial, sans-serif;">
+          <div style="font-weight: 600; color: #1f2937; margin-bottom: 4px;">${part.description}</div>
+          <div style="font-size: 13px; color: #6b7280;">Part #: ${part.partNumber}</div>
+        </td>
+        <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-family: Arial, sans-serif;">${part.quantity || 1}</td>
+        <td style="padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb; color: #1f2937; font-weight: 600; font-family: Arial, sans-serif;">$${part.price}</td>
+      </tr>
     `).join('');
 
     return `
@@ -139,210 +140,124 @@ export class EmailService {
       <head>
         <title>New HVAC Quote - ${quoteData.customerName}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; 
-            line-height: 1.5; 
-            color: #1f2937; 
-            background-color: #f9fafb; 
-          }
-          .container { 
-            max-width: 600px; 
-            margin: 0 auto; 
-            background: white; 
-            border-radius: 8px; 
-            overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-          }
-          .header { 
-            background: linear-gradient(135deg, #711419 0%, #8b1c1c 100%); 
-            color: white; 
-            padding: 24px; 
-            text-align: center; 
-          }
-          .header h1 { 
-            font-size: 24px; 
-            font-weight: 600; 
-            margin-bottom: 8px; 
-          }
-          .header p { 
-            font-size: 16px; 
-            opacity: 0.9; 
-          }
-          .content { 
-            padding: 24px; 
-          }
-          .quote-header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: flex-start; 
-            margin-bottom: 24px; 
-            padding-bottom: 16px; 
-            border-bottom: 2px solid #f3f4f6; 
-          }
-          .customer-info h2 { 
-            font-size: 20px; 
-            font-weight: 600; 
-            color: #1f2937; 
-            margin-bottom: 4px; 
-          }
-          .status-badge { 
-            background: #f3f4f6; 
-            color: #6b7280; 
-            padding: 4px 8px; 
-            border-radius: 4px; 
-            font-size: 12px; 
-            font-weight: 500; 
-            text-transform: capitalize; 
-          }
-          .total-amount { 
-            font-size: 24px; 
-            font-weight: 700; 
-            color: #991b1b; 
-            text-align: right; 
-          }
-          .meta-info { 
-            display: flex; 
-            gap: 16px; 
-            margin-bottom: 24px; 
-            font-size: 14px; 
-            color: #6b7280; 
-          }
-          .meta-info svg { 
-            width: 14px; 
-            height: 14px; 
-            margin-right: 4px; 
-            vertical-align: middle; 
-          }
-          .section { 
-            margin-bottom: 24px; 
-          }
-          .section-title { 
-            font-size: 18px; 
-            font-weight: 600; 
-            color: #1f2937; 
-            margin-bottom: 12px; 
-          }
-          .parts-list { 
-            background: #f9fafb; 
-            border-radius: 6px; 
-            padding: 16px; 
-          }
-          .summary-grid { 
-            background: #f9fafb; 
-            border-radius: 6px; 
-            padding: 16px; 
-          }
-          .summary-row { 
-            display: flex; 
-            justify-content: space-between; 
-            padding: 8px 0; 
-            border-bottom: 1px solid #e5e7eb; 
-          }
-          .summary-row:last-child { 
-            border-bottom: none; 
-            font-weight: 600; 
-            font-size: 16px; 
-            color: #991b1b; 
-            padding-top: 12px; 
-            border-top: 2px solid #e5e7eb; 
-          }
-          .footer { 
-            background: #f3f4f6; 
-            padding: 20px 24px; 
-            text-align: center; 
-            color: #6b7280; 
-            font-size: 14px; 
-          }
-          .job-notes { 
-            background: #fef3c7; 
-            border-left: 4px solid #f59e0b; 
-            padding: 12px 16px; 
-            border-radius: 0 4px 4px 0; 
-            margin-bottom: 16px; 
-          }
-        </style>
       </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>New HVAC Quote</h1>
-            <p>Generated by ${quoteData.technician}</p>
-          </div>
-          
-          <div class="content">
-            <div class="quote-header">
-              <div class="customer-info">
-                <h2>${quoteData.customerName}</h2>
-                <span class="status-badge">${quoteData.status || 'draft'}</span>
-              </div>
-              <div class="total-amount">$${quoteData.total}</div>
-            </div>
-            
-            <div class="meta-info">
-              <div>
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                </svg>
-                ${quoteData.technician}
-              </div>
-              <div>
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4h3a1 1 0 011 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V8a1 1 0 011-1h3z"></path>
-                </svg>
-                ${formattedDate}
-              </div>
-              <div>
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                </svg>
-                ${quoteData.parts.length} part${quoteData.parts.length !== 1 ? 's' : ''}
-              </div>
-            </div>
-            
-            ${quoteData.jobNotes ? `
-              <div class="job-notes">
-                <strong>Job Notes:</strong><br>
-                ${quoteData.jobNotes}
-              </div>
-            ` : ''}
-            
-            <div class="section">
-              <h3 class="section-title">Parts & Services</h3>
-              <div class="parts-list">
-                ${partsHtml || '<div style="color: #6b7280; font-style: italic;">No parts listed</div>'}
-              </div>
-            </div>
-            
-            <div class="section">
-              <h3 class="section-title">Quote Summary</h3>
-              <div class="summary-grid">
-                <div class="summary-row">
-                  <span>Parts Subtotal:</span>
-                  <span>$${quoteData.subtotal}</span>
-                </div>
-                <div class="summary-row">
-                  <span>Labor:</span>
-                  <span>$${quoteData.labor}</span>
-                </div>
-                <div class="summary-row">
-                  <span>Tax:</span>
-                  <span>$${quoteData.tax}</span>
-                </div>
-                <div class="summary-row">
-                  <span>Total:</span>
-                  <span>$${quoteData.total}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="footer">
-            <p><strong>Giesbrecht HVAC</strong> - Professional Service Solutions</p>
-            <p style="margin-top: 8px; font-size: 12px;">Quote ID: ${quoteData.quoteId}</p>
-          </div>
-        </div>
+      <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+        
+        <!-- Main Container -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5;">
+          <tr>
+            <td align="center" style="padding: 20px 0;">
+              
+              <!-- Email Content -->
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px;">
+                
+                <!-- Header -->
+                <tr>
+                  <td style="background: #711419; padding: 30px; text-align: center; color: white;">
+                    <h1 style="margin: 0; color: white; font-size: 24px; font-weight: 600; font-family: Arial, sans-serif;">New HVAC Quote</h1>
+                    <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 16px; font-family: Arial, sans-serif;">Generated by ${quoteData.technician}</p>
+                  </td>
+                </tr>
+                
+                <!-- Customer & Total Header -->
+                <tr>
+                  <td style="padding: 24px;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="vertical-align: top;">
+                          <h2 style="margin: 0 0 8px 0; font-size: 22px; color: #1f2937; font-weight: 600; font-family: Arial, sans-serif;">${quoteData.customerName}</h2>
+                          <span style="background: #f3f4f6; color: #6b7280; padding: 6px 12px; border-radius: 4px; font-size: 12px; text-transform: capitalize; font-family: Arial, sans-serif;">${quoteData.status || 'draft'}</span>
+                        </td>
+                        <td style="text-align: right; vertical-align: top;">
+                          <div style="font-size: 32px; font-weight: 700; color: #991b1b; font-family: Arial, sans-serif;">$${quoteData.total}</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                
+                <!-- Meta Information -->
+                <tr>
+                  <td style="padding: 0 24px 24px 24px;">
+                    <div style="border-bottom: 2px solid #f3f4f6; padding-bottom: 16px;">
+                      <table cellpadding="0" cellspacing="0" width="100%">
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding-right: 15px; font-family: Arial, sans-serif;">👤 ${quoteData.technician}</td>
+                          <td style="color: #6b7280; font-size: 14px; padding-right: 15px; font-family: Arial, sans-serif;">📅 ${formattedDate}</td>
+                          <td style="color: #6b7280; font-size: 14px; font-family: Arial, sans-serif;">📦 ${quoteData.parts.length} part${quoteData.parts.length !== 1 ? 's' : ''}</td>
+                        </tr>
+                      </table>
+                    </div>
+                  </td>
+                </tr>
+                
+                ${quoteData.jobNotes ? `
+                <!-- Job Notes -->
+                <tr>
+                  <td style="padding: 0 24px 24px 24px;">
+                    <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 0 4px 4px 0;">
+                      <strong style="color: #92400e; font-family: Arial, sans-serif;">Job Notes:</strong><br>
+                      <span style="color: #78350f; font-family: Arial, sans-serif; line-height: 1.5;">${quoteData.jobNotes}</span>
+                    </div>
+                  </td>
+                </tr>
+                ` : ''}
+                
+                <!-- Parts & Services -->
+                <tr>
+                  <td style="padding: 0 24px 24px 24px;">
+                    <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #1f2937; font-weight: 600; font-family: Arial, sans-serif;">Parts & Services</h3>
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #f9fafb; border-radius: 6px; overflow: hidden;">
+                      <tr style="background: #f3f4f6;">
+                        <th style="padding: 12px; text-align: left; font-weight: 600; color: #374151; font-family: Arial, sans-serif;">Description</th>
+                        <th style="padding: 12px; text-align: center; font-weight: 600; color: #374151; font-family: Arial, sans-serif;">Qty</th>
+                        <th style="padding: 12px; text-align: right; font-weight: 600; color: #374151; font-family: Arial, sans-serif;">Price</th>
+                      </tr>
+                      ${partsRows || '<tr><td colspan="3" style="padding: 20px; text-align: center; color: #6b7280; font-style: italic; font-family: Arial, sans-serif;">No parts listed</td></tr>'}
+                    </table>
+                  </td>
+                </tr>
+                
+                <!-- Quote Summary -->
+                <tr>
+                  <td style="padding: 0 24px 24px 24px;">
+                    <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #1f2937; font-weight: 600; font-family: Arial, sans-serif;">Quote Summary</h3>
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #f9fafb; border-radius: 6px; padding: 16px;">
+                      <tr>
+                        <td style="padding: 8px 0; color: #374151; font-family: Arial, sans-serif;">Parts Subtotal:</td>
+                        <td style="padding: 8px 0; text-align: right; color: #374151; font-family: Arial, sans-serif;">$${quoteData.subtotal}</td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e5e7eb;">
+                        <td style="padding: 8px 0; color: #374151; font-family: Arial, sans-serif;">Labor:</td>
+                        <td style="padding: 8px 0; text-align: right; color: #374151; font-family: Arial, sans-serif;">$${quoteData.labor}</td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e5e7eb;">
+                        <td style="padding: 8px 0; color: #374151; font-family: Arial, sans-serif;">Tax:</td>
+                        <td style="padding: 8px 0; text-align: right; color: #374151; font-family: Arial, sans-serif;">$${quoteData.tax}</td>
+                      </tr>
+                      <tr style="border-top: 2px solid #e5e7eb;">
+                        <td style="padding: 12px 0 8px 0; font-weight: 600; font-size: 16px; color: #991b1b; font-family: Arial, sans-serif;">Total:</td>
+                        <td style="padding: 12px 0 8px 0; text-align: right; font-weight: 600; font-size: 16px; color: #991b1b; font-family: Arial, sans-serif;">$${quoteData.total}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                
+                <!-- Footer -->
+                <tr>
+                  <td style="background: #f3f4f6; padding: 20px; text-align: center; color: #6b7280;">
+                    <p style="margin: 0; font-weight: 600; color: #374151; font-family: Arial, sans-serif;">Giesbrecht HVAC</p>
+                    <p style="margin: 4px 0 0 0; font-size: 14px; font-family: Arial, sans-serif;">Professional Service Solutions</p>
+                    <p style="margin: 8px 0 0 0; font-size: 12px; font-family: Arial, sans-serif;">Quote ID: ${quoteData.quoteId}</p>
+                  </td>
+                </tr>
+                
+              </table>
+              
+            </td>
+          </tr>
+        </table>
+        
       </body>
       </html>
     `;
