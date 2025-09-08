@@ -25,7 +25,7 @@ export class EmailService {
     this.config = {
       serviceProvider: process.env.EMAIL_SERVICE || 'resend',
       apiKey: process.env.RESEND_API_KEY || '',
-      fromEmail: process.env.FROM_EMAIL || 'onboarding@resend.dev',
+      fromEmail: process.env.FROM_EMAIL || 'delivered@resend.dev', // Changed from onboarding to delivered
       managerEmail: process.env.MANAGER_EMAIL || 'manager@ghvac.com',
     };
     
@@ -52,7 +52,7 @@ export class EmailService {
 
   private async sendWithResend(subject: string, htmlContent: string, recipients: string[]): Promise<boolean> {
     try {
-      console.log('Sending email to:', recipients.join(', '));
+      console.log('Sending email to:', recipients.join(', '), 'from:', this.config.fromEmail);
       
       const { data, error } = await this.resend.emails.send({
         from: this.config.fromEmail,
