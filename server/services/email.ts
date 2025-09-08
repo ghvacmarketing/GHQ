@@ -52,6 +52,8 @@ export class EmailService {
 
   private async sendWithResend(subject: string, htmlContent: string, recipients: string[]): Promise<boolean> {
     try {
+      console.log('Sending email to:', recipients.join(', '));
+      
       const { data, error } = await this.resend.emails.send({
         from: this.config.fromEmail,
         to: recipients,

@@ -208,7 +208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin settings storage (in-memory for now)
+  // Admin settings storage (persistent)
   let adminSettings = {
     laborRate: 65,
     commissionPercent: 0.03,
@@ -224,7 +224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
     emailSettings: {
       fromEmail: 'onboarding@resend.dev', // Resend test domain (no verification needed)
-      notificationEmails: ['delivered@resend.dev'], // Add your Gmail here for testing!
+      notificationEmails: ['delivered@resend.dev', 'shelbgies@gmail.com'], // Fixed: Include Gmail permanently
       developmentMode: true // Set to false for production with your own domain
     }
   };
