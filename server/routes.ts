@@ -224,7 +224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
     emailSettings: {
       fromEmail: 'delivered@resend.dev', // Better Resend test domain for external delivery
-      notificationEmails: ['delivered@resend.dev', 'ghvac@protonmail.com'], // Updated to ProtonMail address
+      notificationEmails: ['delivered@resend.dev', 'shelbgies@gmail.com'], // Fixed: Include Gmail permanently  
       developmentMode: true // Set to false for production with your own domain
     }
   };
