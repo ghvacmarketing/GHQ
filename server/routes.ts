@@ -54,6 +54,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quoteText: quote.quoteText || '',
           quoteId: quote.id,
           jobNotes: quote.jobNotes || '',
+          parts: quote.parts || [],
+          subtotal: quote.subtotal,
+          labor: quote.labor,
+          tax: quote.tax,
+          status: quote.status,
+          createdAt: quote.createdAt?.toISOString(),
         }, adminSettings.emailSettings.notificationEmails);
         
         if (emailSent) {
