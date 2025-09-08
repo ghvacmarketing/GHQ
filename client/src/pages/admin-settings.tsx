@@ -249,6 +249,7 @@ export default function AdminSettings() {
             onClick={handleRefresh}
             disabled={isLoading}
             data-testid="button-refresh-settings"
+            className="pl-[8px] pr-[8px]"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             {isLoading ? "Refreshing..." : "Refresh Data"}
