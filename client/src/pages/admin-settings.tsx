@@ -241,7 +241,7 @@ export default function AdminSettings() {
               Back
             </Button>
             <div>
-              <h1 className="text-lg font-semibold text-foreground">Settings Dashboard</h1>
+              <h1 className="font-semibold text-foreground text-[12px] text-center">Settings Dashboard</h1>
               <p className="text-xs text-muted-foreground">Live data from Google Sheets</p>
             </div>
           </div>
@@ -255,7 +255,6 @@ export default function AdminSettings() {
           </Button>
         </div>
       </header>
-
       <main className="container mx-auto px-4 py-6 max-w-4xl">
         <div className="space-y-6">
           {/* Google Sheets Notice */}
