@@ -1,5 +1,7 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, quotes, parts, technicians } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   // Quote operations
@@ -21,121 +23,129 @@ export interface IStorage {
   createTechnician(technician: InsertTechnician): Promise<Technician>;
 }
 
-export class MemStorage implements IStorage {
-  private quotes: Map<string, Quote>;
-  private parts: Map<string, PartData>;
-  private technicians: Map<string, Technician>;
+// Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
 
-  constructor() {
-    this.quotes = new Map();
-    this.parts = new Map();
-    this.technicians = new Map();
-    
-    // Initialize with some default technicians
-    this.initializeDefaultData();
-  }
-
-  private async initializeDefaultData() {
-    const defaultTechnicians = [
-      { name: "Brian", email: "brian@ghvac.com" },
-      { name: "Zack", email: "zack@ghvac.com" },
-      { name: "Sutton", email: "sutton@ghvac.com" },
-    ];
-
-    for (const tech of defaultTechnicians) {
-      await this.createTechnician(tech);
-    }
-
-    // Initialize suggested parts
-    const defaultParts = [
-      // Main Components
-      { partNumber: "CB-001", description: "Control Board", category: "Parts", price: "0.00", availability: "Available", vendor: "Various", warranty: true, isCustom: false },
-      { partNumber: "EC-001", description: "Evaporator Coil", category: "Parts", price: "0.00", availability: "Available", vendor: "Various", warranty: true, isCustom: false },
-      { partNumber: "COMP-001", description: "Compressor", category: "Parts", price: "0.00", availability: "Available", vendor: "Various", warranty: true, isCustom: false },
-      
-      // Materials (no specific part numbers - category suggestions)
-      { partNumber: "MAT-RFD", description: "Refrigerant Filter Dryer", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
-      { partNumber: "MAT-COP", description: "Copper", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
-      { partNumber: "MAT-INS", description: "Armaflex Insulation", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
-      { partNumber: "MAT-AA", description: "Acid Away", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
-      { partNumber: "MAT-REF", description: "Refrigerant", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
-    ];
-
-    for (const part of defaultParts) {
-      await this.createPart(part);
-    }
-  }
-
+export class DatabaseStorage implements IStorage {
   // Quote operations
   async getQuote(id: string): Promise<Quote | undefined> {
-    return this.quotes.get(id);
+    const [quote] = await db.select().from(quotes).where(eq(quotes.id, id));
+    return quote || undefined;
   }
 
   async getAllQuotes(): Promise<Quote[]> {
-    return Array.from(this.quotes.values()).sort((a, b) => 
-      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-    );
+    const allQuotes = await db.select().from(quotes).orderBy(quotes.createdAt);
+    return allQuotes.reverse(); // Most recent first
   }
 
   async createQuote(insertQuote: InsertQuote): Promise<Quote> {
-    const id = randomUUID();
-    const quote: Quote = { 
-      ...insertQuote, 
-      id, 
-      createdAt: new Date() 
-    };
-    this.quotes.set(id, quote);
+    const [quote] = await db
+      .insert(quotes)
+      .values({
+        ...insertQuote,
+        parts: insertQuote.parts || []
+      })
+      .returning();
     return quote;
   }
 
   async updateQuote(id: string, updateData: Partial<Quote>): Promise<Quote | undefined> {
-    const existingQuote = this.quotes.get(id);
-    if (!existingQuote) return undefined;
-    
-    const updatedQuote = { ...existingQuote, ...updateData };
-    this.quotes.set(id, updatedQuote);
-    return updatedQuote;
+    const [quote] = await db
+      .update(quotes)
+      .set(updateData)
+      .where(eq(quotes.id, id))
+      .returning();
+    return quote || undefined;
   }
 
   async deleteQuote(id: string): Promise<boolean> {
-    return this.quotes.delete(id);
+    const result = await db.delete(quotes).where(eq(quotes.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   // Part operations
   async getPart(id: string): Promise<PartData | undefined> {
-    return this.parts.get(id);
+    const [part] = await db.select().from(parts).where(eq(parts.id, id));
+    return part || undefined;
   }
 
   async getAllParts(): Promise<PartData[]> {
-    return Array.from(this.parts.values());
+    return await db.select().from(parts);
   }
 
   async getPartsByCategory(category: string): Promise<PartData[]> {
-    return Array.from(this.parts.values()).filter(part => part.category === category);
+    return await db.select().from(parts).where(eq(parts.category, category));
   }
 
   async createPart(insertPart: InsertPart): Promise<PartData> {
-    const id = randomUUID();
-    const part: PartData = { ...insertPart, id };
-    this.parts.set(id, part);
+    const [part] = await db
+      .insert(parts)
+      .values(insertPart)
+      .returning();
     return part;
   }
 
   // Technician operations
   async getTechnician(id: string): Promise<Technician | undefined> {
-    return this.technicians.get(id);
+    const [technician] = await db.select().from(technicians).where(eq(technicians.id, id));
+    return technician || undefined;
   }
 
   async getAllTechnicians(): Promise<Technician[]> {
-    return Array.from(this.technicians.values());
+    return await db.select().from(technicians);
   }
 
   async createTechnician(insertTechnician: InsertTechnician): Promise<Technician> {
-    const id = randomUUID();
-    const technician: Technician = { ...insertTechnician, id };
-    this.technicians.set(id, technician);
+    const [technician] = await db
+      .insert(technicians)
+      .values(insertTechnician)
+      .returning();
     return technician;
+  }
+
+  // Initialize default data if needed
+  async initializeDefaultData() {
+    // Check if technicians already exist
+    const existingTechs = await this.getAllTechnicians();
+    if (existingTechs.length === 0) {
+      const defaultTechnicians = [
+        { name: "Brian", email: "brian@ghvac.com" },
+        { name: "Zack", email: "zack@ghvac.com" },
+        { name: "Sutton", email: "sutton@ghvac.com" },
+      ];
+
+      for (const tech of defaultTechnicians) {
+        await this.createTechnician(tech);
+      }
+    }
+
+    // Check if parts already exist
+    const existingParts = await this.getAllParts();
+    if (existingParts.length === 0) {
+      const defaultParts = [
+        // Main Components
+        { partNumber: "CB-001", description: "Control Board", category: "Parts", price: "0.00", availability: "Available", vendor: "Various", warranty: true, isCustom: false },
+        { partNumber: "EC-001", description: "Evaporator Coil", category: "Parts", price: "0.00", availability: "Available", vendor: "Various", warranty: true, isCustom: false },
+        { partNumber: "COMP-001", description: "Compressor", category: "Parts", price: "0.00", availability: "Available", vendor: "Various", warranty: true, isCustom: false },
+        
+        // Materials (no specific part numbers - category suggestions)
+        { partNumber: "MAT-RFD", description: "Refrigerant Filter Dryer", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
+        { partNumber: "MAT-COP", description: "Copper", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
+        { partNumber: "MAT-INS", description: "Armaflex Insulation", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
+        { partNumber: "MAT-AA", description: "Acid Away", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
+        { partNumber: "MAT-REF", description: "Refrigerant", category: "Materials", price: "0.00", availability: "Available", vendor: "Various", warranty: false, isCustom: false },
+      ];
+
+      for (const part of defaultParts) {
+        await this.createPart(part);
+      }
+    }
   }
 }
 
-export const storage = new MemStorage();
+// Initialize database storage and default data
+const databaseStorage = new DatabaseStorage();
+
+// Initialize default data on startup
+databaseStorage.initializeDefaultData().catch(console.error);
+
+export const storage = databaseStorage;
