@@ -90,10 +90,6 @@ export default function SelectedParts({ parts, totals, onUpdate }: SelectedParts
               ${totals.total}
             </span>
           </div>
-          <div className="text-xs text-muted-foreground mt-2">
-            * Includes 3% material shrinkage, 34% labor benefits, warranty reserve,
-            <br />30% overhead, 21% profit, 4% financing, and 3% commission
-          </div>
         </div>
       </CardContent>
     </Card>
