@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ interface Part {
   warranty: boolean;
 }
 
-export default function PartsSelection({
+const PartsSelection = memo(function PartsSelection({
   selectedParts,
   onUpdate,
   onAddCustomPart,
@@ -279,4 +279,6 @@ export default function PartsSelection({
       </CardContent>
     </Card>
   );
-}
+});
+
+export default PartsSelection;
