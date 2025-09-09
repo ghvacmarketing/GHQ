@@ -1,7 +1,5 @@
-import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { FileText, Expand } from "lucide-react";
+import { FileText } from "lucide-react";
 import type { Quote } from "@shared/schema";
 
 interface QuotePreviewProps {
@@ -10,7 +8,6 @@ interface QuotePreviewProps {
 }
 
 export default function QuotePreview({ quote, quoteText }: QuotePreviewProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
 
   const generatePreviewText = () => {
     const date = new Date().toLocaleDateString();
@@ -73,41 +70,17 @@ TOTAL: $${quote.total}`;
   return (
     <Card data-testid="card-quote-preview">
       <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <FileText className="text-primary mr-3 h-5 w-5" />
-            <h2 className="text-lg font-semibold text-card-foreground">Quote Preview</h2>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsExpanded(!isExpanded)}
-            data-testid="button-expand-preview"
-          >
-            <Expand className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center mb-4">
+          <FileText className="text-primary mr-3 h-5 w-5" />
+          <h2 className="text-lg font-semibold text-card-foreground">Quote Preview</h2>
         </div>
         <div className="bg-muted/20 rounded-lg p-4">
           <div 
-            className={`text-sm font-mono text-card-foreground leading-relaxed whitespace-pre-line ${
-              isExpanded ? '' : 'max-h-48 overflow-hidden'
-            }`}
+            className="text-sm font-mono text-card-foreground leading-relaxed whitespace-pre-line"
             data-testid="text-quote-preview"
           >
             {generatePreviewText()}
           </div>
-          {!isExpanded && (
-            <div className="mt-2 text-center">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsExpanded(true)}
-                data-testid="button-show-more"
-              >
-                Show More
-              </Button>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
