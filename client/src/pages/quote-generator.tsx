@@ -486,6 +486,7 @@ export default function QuoteGenerator() {
             <JobNotesDisplay
               jobNotes={quoteData.jobNotes}
               onClear={() => handleUpdateQuoteData({ jobNotes: "" })}
+              onUpdate={(updatedNotes) => handleUpdateQuoteData({ jobNotes: updatedNotes })}
             />
           )}
 
