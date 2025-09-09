@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Calculator, Copy, Mail, Check, Clock, RotateCcw } from "lucide-react";
+import { Calculator, Copy, Check, Clock, RotateCcw } from "lucide-react";
 
 interface QuoteActionsProps {
   onGenerateQuote: () => void;
@@ -34,23 +34,14 @@ export default function QuoteActions({
 
       {quoteGenerated && (
         <>
-          <div className="grid grid-cols-2 gap-3 slide-in">
-            <Button
-              onClick={onCopyQuote}
-              className="bg-chart-1 hover:bg-chart-1/90 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 pulse-success"
-              data-testid="button-copy-quote"
-            >
-              <Copy className="h-4 w-4" />
-              <span>Copy Quote</span>
-            </Button>
-            <Button
-              className="bg-chart-2 hover:bg-chart-2/90 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
-              data-testid="button-email-quote"
-            >
-              <Mail className="h-4 w-4" />
-              <span>Email Quote</span>
-            </Button>
-          </div>
+          <Button
+            onClick={onCopyQuote}
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 pulse-success slide-in"
+            data-testid="button-copy-quote"
+          >
+            <Copy className="h-4 w-4" />
+            <span>Copy Quote</span>
+          </Button>
 
           <div className="grid grid-cols-2 gap-3 slide-in">
             <Button
