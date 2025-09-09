@@ -21,7 +21,7 @@ export default function QuotesHistory() {
   // Mutation to update quote status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ quoteId, status }: { quoteId: string; status: string }) => {
-      return apiRequest(`/api/quotes/${quoteId}`, 'PATCH', { status });
+      return apiRequest('PATCH', `/api/quotes/${quoteId}`, { status });
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
