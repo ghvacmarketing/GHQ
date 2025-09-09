@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Calculator, Copy, RotateCcw } from "lucide-react";
 import trelloIcon from "@assets/trello_1757379276597.png";
@@ -21,6 +22,19 @@ export default function QuoteActions({
   isGenerating,
   quoteGenerated,
 }: QuoteActionsProps) {
+  const buttonsRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to buttons when quote is generated
+  useEffect(() => {
+    if (quoteGenerated && buttonsRef.current) {
+      setTimeout(() => {
+        buttonsRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }, 500); // Small delay to allow slide-in animation to complete
+    }
+  }, [quoteGenerated]);
   return (
     <div className="space-y-4">
       {!quoteGenerated && (
@@ -46,7 +60,7 @@ export default function QuoteActions({
             <span>Copy Quote</span>
           </Button>
 
-          <div className="grid grid-cols-2 gap-3 slide-in">
+          <div ref={buttonsRef} className="grid grid-cols-2 gap-3 slide-in">
             <Button
               onClick={onMarkAccepted}
               className="bg-white hover:bg-gray-50 border border-gray-200 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
