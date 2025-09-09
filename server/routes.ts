@@ -21,13 +21,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   });
 
-  // Get all quotes
+  // Get quotes with pagination support
   app.get("/api/quotes", async (req, res) => {
     try {
-      const quotes = await storage.getAllQuotes();
-      res.json(quotes);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = (page - 1) * limit;
+      
+      const allQuotes = await storage.getAllQuotes();
+      const totalQuotes = allQuotes.length;
+      const quotes = allQuotes.slice(offset, offset + limit);
+      
+      res.json({
+        quotes,
+        pagination: {
+          page,
+          limit,
+          total: totalQuotes,
+          totalPages: Math.ceil(totalQuotes / limit),
+          hasNextPage: offset + limit < totalQuotes,
+          hasPrevPage: page > 1
+        }
+      });
     } catch (error) {
       res.status(500).json({ message: "Error fetching quotes" });
+    }
+  });
+
+  // Get quotes summary for admin dashboard
+  app.get("/api/quotes/summary", async (req, res) => {
+    try {
+      const quotes = await storage.getAllQuotes();
+      const totalQuotes = quotes.length;
+      const statusCounts = quotes.reduce((acc, quote) => {
+        const status = quote.status || 'draft';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      const totalValue = quotes.reduce((sum, quote) => sum + parseFloat(quote.total), 0);
+      const recentQuotes = quotes
+        .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime())
+        .slice(0, 5)
+        .map(quote => ({
+          id: quote.id,
+          customerName: quote.customerName,
+          technician: quote.technician,
+          total: quote.total,
+          status: quote.status,
+          createdAt: quote.createdAt
+        }));
+      
+      res.json({
+        totalQuotes,
+        statusCounts,
+        totalValue,
+        recentQuotes
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching quotes summary" });
     }
   });
 
