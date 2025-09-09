@@ -5,9 +5,20 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import QuoteGenerator from "@/pages/quote-generator";
 import SettingsPage from "@/pages/settings";
-import AdminSettings from "@/pages/admin-settings";
 import QuotesHistory from "@/pages/quotes-history";
 import NotFound from "@/pages/not-found";
+import { lazy, Suspense } from "react";
+
+// Lazy load admin settings to reduce initial bundle size
+const AdminSettings = lazy(() => import("@/pages/admin-settings"));
+
+function AdminSettingsWrapper() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen text-muted-foreground">Loading admin settings...</div>}>
+      <AdminSettings />
+    </Suspense>
+  );
+}
 
 function Router() {
   return (
@@ -15,7 +26,7 @@ function Router() {
       <Route path="/" component={QuoteGenerator} />
       <Route path="/history" component={QuotesHistory} />
       <Route path="/settings" component={SettingsPage} />
-      <Route path="/admin" component={AdminSettings} />
+      <Route path="/admin" component={AdminSettingsWrapper} />
       <Route component={NotFound} />
     </Switch>
   );
