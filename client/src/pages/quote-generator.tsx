@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, History, RefreshCw, RotateCcw } from "lucide-react";
+import { Settings, History, RotateCcw } from "lucide-react";
 import { Link } from "wouter";
 import giesbrechtLogo from "../assets/giesbrecht-logo.webp";
 import CustomerInfo from "@/components/customer-info";
@@ -358,21 +358,6 @@ export default function QuoteGenerator() {
     }
   };
 
-  const handleRefreshPricing = async () => {
-    try {
-      await refetchSettings();
-      toast({
-        title: "Pricing Refreshed",
-        description: "Latest pricing data loaded from Google Sheets.",
-      });
-    } catch (error) {
-      toast({
-        title: "Refresh Failed",
-        description: "Failed to refresh pricing data. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleStartOver = () => {
     setQuoteData({
@@ -412,15 +397,6 @@ export default function QuoteGenerator() {
             </div>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={handleRefreshPricing}
-              data-testid="button-refresh-pricing"
-              title="Refresh pricing from Google Sheets"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
             <Link href="/history">
               <Button variant="ghost" size="icon" data-testid="button-history" title="View quote history">
                 <History className="h-4 w-4" />
