@@ -22,15 +22,17 @@ export default function QuoteActions({
 }: QuoteActionsProps) {
   return (
     <div className="space-y-4">
-      <Button
-        onClick={onGenerateQuote}
-        disabled={isGenerating}
-        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-4 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2"
-        data-testid="button-generate-quote"
-      >
-        <Calculator className="h-5 w-5" />
-        <span>{quoteGenerated ? "Regenerate Quote" : "Generate Quote"}</span>
-      </Button>
+      {!quoteGenerated && (
+        <Button
+          onClick={onGenerateQuote}
+          disabled={isGenerating}
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-4 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2"
+          data-testid="button-generate-quote"
+        >
+          <Calculator className="h-5 w-5" />
+          <span>Generate Quote</span>
+        </Button>
+      )}
 
       {quoteGenerated && (
         <>
