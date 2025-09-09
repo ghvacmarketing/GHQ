@@ -530,10 +530,10 @@ export default function AdminSettings() {
               {/* Quote Management */}
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                       <CardTitle className="flex items-center">
-                        <FileText className="h-5 w-5 mr-2" />
+                        <FileText className="h-5 w-5 mr-2 flex-shrink-0" />
                         Quote Management
                       </CardTitle>
                       <p className="text-sm text-muted-foreground mt-1">
@@ -541,34 +541,38 @@ export default function AdminSettings() {
                       </p>
                     </div>
                     {selectedQuotes.size > 0 && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button 
-                            variant="destructive" 
-                            size="sm"
-                            disabled={deleteQuotesMutation.isPending}
-                            data-testid="button-bulk-delete"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete {selectedQuotes.size} Quote{selectedQuotes.size !== 1 ? 's' : ''}
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete {selectedQuotes.size} selected quote{selectedQuotes.size !== 1 ? 's' : ''}? 
-                              This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <div className="flex-shrink-0">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              disabled={deleteQuotesMutation.isPending}
+                              data-testid="button-bulk-delete"
+                              className="w-full sm:w-auto"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              <span className="hidden sm:inline">Delete {selectedQuotes.size} Quote{selectedQuotes.size !== 1 ? 's' : ''}</span>
+                              <span className="sm:hidden">Delete ({selectedQuotes.size})</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete {selectedQuotes.size} selected quote{selectedQuotes.size !== 1 ? 's' : ''}? 
+                                This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     )}
                   </div>
                 </CardHeader>
@@ -593,22 +597,23 @@ export default function AdminSettings() {
                       
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {quotes.map((quote) => (
-                          <div key={quote.id} className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50">
+                          <div key={quote.id} className="flex items-start sm:items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50">
                             <Checkbox
                               checked={selectedQuotes.has(quote.id!)}
                               onCheckedChange={(checked) => handleSelectQuote(quote.id!, checked as boolean)}
                               data-testid={`checkbox-quote-${quote.id}`}
+                              className="mt-0.5 sm:mt-0 flex-shrink-0"
                             />
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center space-x-2 mb-1">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2 mb-1">
                                 <span className="font-medium text-sm truncate">{quote.customerName}</span>
-                                <Badge className={getStatusColor(quote.status || 'draft') + " text-xs"}>
+                                <Badge className={getStatusColor(quote.status || 'draft') + " text-xs w-fit mt-1 sm:mt-0"}>
                                   {(quote.status || 'draft').charAt(0).toUpperCase() + (quote.status || 'draft').slice(1)}
                                 </Badge>
                               </div>
-                              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span>{quote.technician}</span>
-                                <span>{new Date(quote.createdAt!).toLocaleDateString()}</span>
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-muted-foreground space-y-1 sm:space-y-0">
+                                <span className="truncate">{quote.technician}</span>
+                                <span className="text-xs">{new Date(quote.createdAt!).toLocaleDateString()}</span>
                                 <span className="font-medium text-foreground">${parseFloat(quote.total).toFixed(2)}</span>
                               </div>
                             </div>
