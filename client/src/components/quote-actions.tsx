@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Calculator, Copy, Check, Clock, RotateCcw } from "lucide-react";
+import { Calculator, Copy, RotateCcw } from "lucide-react";
+import trelloIcon from "@assets/trello_1757379276597.png";
 
 interface QuoteActionsProps {
   onGenerateQuote: () => void;
@@ -48,18 +49,20 @@ export default function QuoteActions({
           <div className="grid grid-cols-2 gap-3 slide-in">
             <Button
               onClick={onMarkAccepted}
-              className="bg-chart-4 hover:bg-chart-4/90 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              className="bg-white hover:bg-gray-50 border border-gray-200 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              style={{ color: '#0055cc' }}
               data-testid="button-mark-accepted"
             >
-              <Check className="h-4 w-4" />
+              <img src={trelloIcon} alt="Trello" className="h-4 w-4" />
               <span>Accepted</span>
             </Button>
             <Button
               onClick={onMarkPending}
-              className="bg-chart-3 hover:bg-chart-3/90 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              className="bg-white hover:bg-gray-50 border border-gray-200 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              style={{ color: '#0055cc' }}
               data-testid="button-mark-pending"
             >
-              <Clock className="h-4 w-4" />
+              <img src={trelloIcon} alt="Trello" className="h-4 w-4" />
               <span>Pending</span>
             </Button>
           </div>
