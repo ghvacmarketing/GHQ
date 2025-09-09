@@ -48,17 +48,20 @@ export default function QuoteGenerator() {
   const [generatedQuote, setGeneratedQuote] = useState<any>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
-  // Fetch technicians
-  const { data: technicians = [] } = useQuery({
-    queryKey: ["/api/technicians"],
-  });
-
-  // Fetch pricing settings with automatic refresh
-  const { data: settings, refetch: refetchSettings } = useQuery({
-    queryKey: ["/api/settings"],
+  // Fetch all initial data in one optimized call
+  const { data: initialData, refetch: refetchInitialData } = useQuery({
+    queryKey: ["/api/initial-data"],
     staleTime: 30000, // Consider data stale after 30 seconds
     cacheTime: 60000, // Keep in cache for 1 minute
   });
+
+  // Extract data with defaults
+  const technicians = initialData?.technicians || [];
+  const settings = initialData?.settings;
+  const parts = initialData?.parts || [];
+
+  // Create refetch function for settings compatibility
+  const refetchSettings = refetchInitialData;
 
   // Create quote mutation
   const createQuoteMutation = useMutation({
@@ -465,6 +468,7 @@ export default function QuoteGenerator() {
               setIsCustomPartModalOpen(true);
             }}
             hasPartsError={validationErrors.includes('parts')}
+            availableParts={parts}
           />
 
           <WarrantySection

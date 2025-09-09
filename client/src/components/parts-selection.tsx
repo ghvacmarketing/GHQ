@@ -13,6 +13,7 @@ interface PartsSelectionProps {
   onUpdate: (updates: { parts: QuotePart[] }) => void;
   onAddCustomPart: () => void;
   hasPartsError?: boolean;
+  availableParts?: Part[]; // Optional parts data passed from parent
 }
 
 interface Part {
@@ -30,15 +31,20 @@ export default function PartsSelection({
   onUpdate,
   onAddCustomPart,
   hasPartsError,
+  availableParts,
 }: PartsSelectionProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [partQuantities, setPartQuantities] = useState<{ [key: string]: number }>({});
   const [partPrices, setPartPrices] = useState<{ [key: string]: number }>({});
   const [partNumbers, setPartNumbers] = useState<{ [key: string]: string }>({});
 
-  const { data: parts = [], isLoading } = useQuery<Part[]>({
+  // Use provided parts or fallback to API call for compatibility
+  const { data: partsFromAPI = [], isLoading } = useQuery<Part[]>({
     queryKey: ["/api/parts"],
+    enabled: !availableParts, // Only fetch if parts not provided
   });
+  
+  const parts = availableParts || partsFromAPI;
 
   const toggleCategory = (category: string) => {
     const newExpanded = new Set(expandedCategories);

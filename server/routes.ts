@@ -21,72 +21,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   });
 
-  // Optimized initial data endpoint - reduces 3 API calls to 1
-  app.get("/api/initial-data", async (req, res) => {
-    try {
-      // Fetch all data in parallel for best performance
-      const [technicians, parts, sheetsData] = await Promise.all([
-        storage.getAllTechnicians(),
-        storage.getAllParts(),
-        googleSheetsService.fetchCellValues()
-      ]);
-
-      // Update parts with live pricing from Google Sheets
-      const updatedParts = parts.map(part => {
-        const description = part.description.toLowerCase();
-        let updatedPrice = part.price;
-        
-        if (description.includes('refrigerant filter dryer')) {
-          updatedPrice = sheetsData.refrigerantFilterDryerPrice.toString();
-        } else if (description.includes('copper')) {
-          updatedPrice = sheetsData.copperPrice.toString();
-        } else if (description.includes('armaflex insulation')) {
-          updatedPrice = sheetsData.armaflexInsulationPrice.toString();
-        } else if (description.includes('acid away')) {
-          updatedPrice = sheetsData.acidAwayPrice.toString();
-        } else if (description.includes('refrigerant') && !description.includes('filter dryer')) {
-          updatedPrice = sheetsData.refrigerantPrice.toString();
-        }
-        
-        return {
-          ...part,
-          price: updatedPrice
-        };
-      });
-
-      // Merge settings (same logic as /api/settings)
-      const settings = {
-        ...adminSettings,
-        laborRate: sheetsData.laborRate,
-        commissionPercent: sheetsData.commissionPercent,
-        financingPromotionPercent: sheetsData.financingPromotionPercent,
-        profitPercent: sheetsData.profitPercent,
-        materialShrinkagePercent: sheetsData.materialShrinkagePercent,
-        laborBenefitsPercent: sheetsData.laborBenefitsPercent,
-        salesTaxPercent: sheetsData.salesTaxPercent,
-        warrantyReserve: sheetsData.warrantyReserve,
-        overheadPercent: sheetsData.overheadPercent,
-        partsPrices: {
-          refrigerantFilterDryer: sheetsData.refrigerantFilterDryerPrice,
-          copper: sheetsData.copperPrice,
-          armaflexInsulation: sheetsData.armaflexInsulationPrice,
-          acidAway: sheetsData.acidAwayPrice,
-          refrigerant: sheetsData.refrigerantPrice,
-        },
-        emailSettings: adminSettings.emailSettings
-      };
-
-      // Return all data in one response
-      res.json({
-        technicians,
-        parts: updatedParts,
-        settings
-      });
-    } catch (error) {
-      console.error('Error fetching initial data:', error);
-      res.status(500).json({ message: "Error fetching initial data" });
-    }
-  });
   // Get all quotes
   app.get("/api/quotes", async (req, res) => {
     try {
@@ -129,7 +63,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subtotal: quote.subtotal,
           labor: quote.labor,
           tax: quote.tax,
-          status: quote.status,
+          status: quote.status || 'draft',
           createdAt: quote.createdAt?.toISOString(),
         }, adminSettings.emailSettings.notificationEmails);
         
@@ -313,6 +247,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Settings saved successfully", settings: adminSettings });
     } catch (error) {
       res.status(500).json({ message: "Error saving settings" });
+    }
+  });
+
+  // Optimized initial data endpoint - reduces 3 API calls to 1
+  app.get("/api/initial-data", async (req, res) => {
+    try {
+      // Fetch all data in parallel for best performance
+      const [technicians, parts, sheetsData] = await Promise.all([
+        storage.getAllTechnicians(),
+        storage.getAllParts(),
+        googleSheetsService.fetchCellValues()
+      ]);
+
+      // Update parts with live pricing from Google Sheets
+      const updatedParts = parts.map(part => {
+        const description = part.description.toLowerCase();
+        let updatedPrice = part.price;
+        
+        if (description.includes('refrigerant filter dryer')) {
+          updatedPrice = sheetsData.refrigerantFilterDryerPrice.toString();
+        } else if (description.includes('copper')) {
+          updatedPrice = sheetsData.copperPrice.toString();
+        } else if (description.includes('armaflex insulation')) {
+          updatedPrice = sheetsData.armaflexInsulationPrice.toString();
+        } else if (description.includes('acid away')) {
+          updatedPrice = sheetsData.acidAwayPrice.toString();
+        } else if (description.includes('refrigerant') && !description.includes('filter dryer')) {
+          updatedPrice = sheetsData.refrigerantPrice.toString();
+        }
+        
+        return {
+          ...part,
+          price: updatedPrice
+        };
+      });
+
+      // Merge settings (same logic as /api/settings)
+      const settings = {
+        ...adminSettings,
+        laborRate: sheetsData.laborRate,
+        commissionPercent: sheetsData.commissionPercent,
+        financingPromotionPercent: sheetsData.financingPromotionPercent,
+        profitPercent: sheetsData.profitPercent,
+        materialShrinkagePercent: sheetsData.materialShrinkagePercent,
+        laborBenefitsPercent: sheetsData.laborBenefitsPercent,
+        salesTaxPercent: sheetsData.salesTaxPercent,
+        warrantyReserve: sheetsData.warrantyReserve,
+        overheadPercent: sheetsData.overheadPercent,
+        partsPrices: {
+          refrigerantFilterDryer: sheetsData.refrigerantFilterDryerPrice,
+          copper: sheetsData.copperPrice,
+          armaflexInsulation: sheetsData.armaflexInsulationPrice,
+          acidAway: sheetsData.acidAwayPrice,
+          refrigerant: sheetsData.refrigerantPrice,
+        },
+        emailSettings: adminSettings.emailSettings
+      };
+
+      // Return all data in one response
+      res.json({
+        technicians,
+        parts: updatedParts,
+        settings
+      });
+    } catch (error) {
+      console.error('Error fetching initial data:', error);
+      res.status(500).json({ message: "Error fetching initial data" });
     }
   });
 
