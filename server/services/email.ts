@@ -238,21 +238,18 @@ export class QuoteEmailTemplate {
       <td align="center" style="padding:16px 0;">
         <table role="presentation" cellpadding="0" cellspacing="0" class="container" style="background-color:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(16,24,40,0.08);">
 
-          <!-- Header: logo LEFT, title moved right, status pill far right - all vertically centered -->
+          <!-- Header: logo LEFT, title RIGHT - split evenly -->
           <tr>
             <td style="background:${brandColor};padding:16px 20px;color:#ffffff;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="width:100px;vertical-align:middle;padding-right:16px;">
+                  <td style="width:50%;vertical-align:middle;text-align:left;">
                     ${logoImg}
                   </td>
-                  <td style="vertical-align:middle;text-align:center;padding:0 20px;">
+                  <td style="width:50%;vertical-align:middle;text-align:center;">
                     <div style="font-size:18px;font-weight:900;letter-spacing:0.2px;line-height:1.2;color:#fff;">
                       New HVAC Quote
                     </div>
-                  </td>
-                  <td style="text-align:right;vertical-align:middle;white-space:nowrap;width:120px;">
-                    <span class="pill" style="background:${pill.bg};color:${pill.fg};">${esc((data.status || "draft").toUpperCase())}</span>
                   </td>
                 </tr>
               </table>
