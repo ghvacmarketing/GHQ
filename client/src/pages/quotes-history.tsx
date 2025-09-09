@@ -1,18 +1,42 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { History, ChevronDown, ChevronUp, FileText, Calendar, User, ArrowLeft, Plus } from "lucide-react";
+import { History, ChevronDown, ChevronUp, FileText, Calendar, User, ArrowLeft, Plus, Clock, CheckCircle } from "lucide-react";
 import { Link } from "wouter";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Quote } from "@shared/schema";
 
 export default function QuotesHistory() {
   const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
 
   const { data: quotes = [], isLoading } = useQuery<Quote[]>({
     queryKey: ["/api/quotes"],
+  });
+
+  // Mutation to update quote status
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ quoteId, status }: { quoteId: string; status: string }) => {
+      return apiRequest(`/api/quotes/${quoteId}`, 'PATCH', { status });
+    },
+    onSuccess: (_, { status }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      toast({
+        title: "Quote Updated",
+        description: `Quote status changed to ${status}`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update quote status",
+        variant: "destructive",
+      });
+    },
   });
 
   // Sort quotes by most recent first
@@ -161,7 +185,7 @@ export default function QuotesHistory() {
                     <div className="flex items-center justify-between sm:justify-start">
                       <div className="flex items-center">
                         <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                        <span className="text-xs sm:text-sm">{formatDate(quote.createdAt || new Date().toISOString())}</span>
+                        <span className="text-xs sm:text-sm">{formatDate((quote.createdAt || new Date()).toString())}</span>
                       </div>
                       <div className="flex items-center sm:ml-4">
                         <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
@@ -226,6 +250,43 @@ export default function QuotesHistory() {
                             <p className="text-sm text-muted-foreground bg-background rounded-lg p-3 border">
                               {quote.jobNotes}
                             </p>
+                          </div>
+                        )}
+
+                        {/* Status Update Actions - Only show for draft quotes */}
+                        {(quote.status === 'draft' || !quote.status) && (
+                          <div className="mt-4 pt-4 border-t border-border">
+                            <h5 className="font-medium text-card-foreground mb-3">Update Status</h5>
+                            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateStatusMutation.mutate({ quoteId: quote.id, status: 'pending' });
+                                }}
+                                disabled={updateStatusMutation.isPending}
+                                className="flex items-center space-x-2 bg-white dark:bg-white text-[#0055cc] border-[#0055cc] hover:bg-[#0055cc] hover:text-white"
+                                data-testid={`button-mark-pending-${quote.id}`}
+                              >
+                                <Clock className="h-4 w-4" />
+                                <span>Mark as Pending</span>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateStatusMutation.mutate({ quoteId: quote.id, status: 'accepted' });
+                                }}
+                                disabled={updateStatusMutation.isPending}
+                                className="flex items-center space-x-2 bg-white dark:bg-white text-[#0055cc] border-[#0055cc] hover:bg-[#0055cc] hover:text-white"
+                                data-testid={`button-mark-accepted-${quote.id}`}
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                                <span>Mark as Accepted</span>
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </div>
