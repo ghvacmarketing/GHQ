@@ -21,6 +21,8 @@ export default function AdminSettings() {
   const [selectedQuotes, setSelectedQuotes] = useState<Set<string>>(new Set());
   const [emailAddresses, setEmailAddresses] = useState<string[]>([]);
   const [newEmailAddress, setNewEmailAddress] = useState("");
+  const [showQuotesList, setShowQuotesList] = useState(false);
+  const [quotesPage, setQuotesPage] = useState(1);
 
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
@@ -37,11 +39,29 @@ export default function AdminSettings() {
     }
   }, [currentSettings]);
 
-  // Fetch quotes for management
-  const { data: quotes = [] } = useQuery<Quote[]>({
-    queryKey: ["/api/quotes"],
+  // Fetch quotes summary for admin dashboard (fast loading)
+  const { data: quoteSummary } = useQuery<{
+    totalQuotes: number;
+    statusCounts: Record<string, number>;
+    totalValue: number;
+    recentQuotes: Quote[];
+  }>({
+    queryKey: ["/api/quotes/summary"],
     enabled: isAuthenticated,
   });
+
+  // Fetch full quotes list only when needed (lazy loading)
+  const { data: quotesResponse, isLoading: quotesLoading } = useQuery<{
+    quotes: Quote[];
+    pagination: any;
+  }>({
+    queryKey: ["/api/quotes", quotesPage],
+    queryFn: () => fetch(`/api/quotes?page=${quotesPage}&limit=50`).then(res => res.json()),
+    enabled: isAuthenticated && showQuotesList,
+  });
+
+  const quotes = quotesResponse?.quotes || [];
+  const quotesTotal = quoteSummary?.totalQuotes || 0;
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +96,7 @@ export default function AdminSettings() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes/summary"] });
       setSelectedQuotes(new Set());
       toast({
         title: "Quotes Deleted",
@@ -146,7 +167,7 @@ export default function AdminSettings() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedQuotes(new Set(quotes.map(q => q.id!)));
+      setSelectedQuotes(new Set(quotes.map((q: Quote) => q.id!)));
     } else {
       setSelectedQuotes(new Set());
     }
@@ -274,7 +295,7 @@ export default function AdminSettings() {
           </Card>
 
           {/* Current Settings Display */}
-          {currentSettings && (
+          {currentSettings && settings && (
             <>
               {/* Labor & Basic Pricing */}
               <Card>
@@ -577,13 +598,77 @@ export default function AdminSettings() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {quotes.length === 0 ? (
+                  {!showQuotesList ? (
+                    // Show summary view (fast loading)
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="text-center p-3 rounded-lg bg-muted/50">
+                          <div className="text-2xl font-bold">{quoteSummary?.totalQuotes || 0}</div>
+                          <div className="text-sm text-muted-foreground">Total Quotes</div>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-muted/50">
+                          <div className="text-2xl font-bold">{quoteSummary?.statusCounts?.pending || 0}</div>
+                          <div className="text-sm text-muted-foreground">Pending</div>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-muted/50">
+                          <div className="text-2xl font-bold">{quoteSummary?.statusCounts?.approved || 0}</div>
+                          <div className="text-sm text-muted-foreground">Approved</div>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-muted/50">
+                          <div className="text-2xl font-bold">${quoteSummary?.totalValue ? Math.round(quoteSummary.totalValue).toLocaleString() : 0}</div>
+                          <div className="text-sm text-muted-foreground">Total Value</div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-center pt-2">
+                        <Button 
+                          onClick={() => setShowQuotesList(true)}
+                          variant="outline"
+                          className="w-full sm:w-auto"
+                          data-testid="button-load-quotes"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Load Full Quotes List ({quoteSummary?.totalQuotes || 0})
+                        </Button>
+                      </div>
+                    </div>
+                  ) : quotesLoading ? (
+                    // Loading state
+                    <div className="text-center py-8 text-muted-foreground">
+                      <RefreshCw className="h-8 w-8 mx-auto mb-3 animate-spin" />
+                      <p>Loading quotes...</p>
+                    </div>
+                  ) : quotes.length === 0 ? (
+                    // No quotes found
                     <div className="text-center py-8 text-muted-foreground">
                       <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
                       <p>No quotes found</p>
+                      <Button 
+                        onClick={() => setShowQuotesList(false)}
+                        variant="ghost"
+                        size="sm"
+                        className="mt-2"
+                      >
+                        Back to Summary
+                      </Button>
                     </div>
                   ) : (
+                    // Full quotes list
                     <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Button 
+                          onClick={() => setShowQuotesList(false)}
+                          variant="ghost"
+                          size="sm"
+                        >
+                          <ArrowLeft className="h-4 w-4 mr-2" />
+                          Back to Summary
+                        </Button>
+                        <span className="text-sm text-muted-foreground">
+                          Showing {quotes.length} of {quotesTotal} quotes
+                        </span>
+                      </div>
+                      
                       <div className="flex items-center space-x-3 pb-3 border-b border-border">
                         <Checkbox
                           checked={selectedQuotes.size === quotes.length && quotes.length > 0}
@@ -596,7 +681,7 @@ export default function AdminSettings() {
                       </div>
                       
                       <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {quotes.map((quote) => (
+                        {quotes.map((quote: Quote) => (
                           <div key={quote.id} className="flex items-start sm:items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50">
                             <Checkbox
                               checked={selectedQuotes.has(quote.id!)}
