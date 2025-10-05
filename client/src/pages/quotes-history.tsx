@@ -4,11 +4,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { History, ChevronDown, ChevronUp, FileText, Calendar, User, ArrowLeft, Plus, Clock, CheckCircle } from "lucide-react";
+import { History, ChevronDown, ChevronUp, FileText, Calendar, User, ArrowLeft, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Quote } from "@shared/schema";
+import trelloIcon from "@assets/trello_1757379276597.png";
 
 export default function QuotesHistory() {
   const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
@@ -259,34 +260,32 @@ export default function QuotesHistory() {
                         {(quote.status === 'draft' || !quote.status) && (
                           <div className="mt-4 pt-4 border-t border-border">
                             <h5 className="font-medium text-card-foreground mb-3">Update Status</h5>
-                            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                            <div className="grid grid-cols-2 gap-3">
                               <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateStatusMutation.mutate({ quoteId: quote.id, status: 'pending' });
-                                }}
-                                disabled={updateStatusMutation.isPending}
-                                className="flex items-center space-x-2 bg-white dark:bg-white text-[#0055cc] border-[#0055cc] hover:bg-[#0055cc] hover:text-white"
-                                data-testid={`button-mark-pending-${quote.id}`}
-                              >
-                                <Clock className="h-4 w-4" />
-                                <span>Mark as Pending</span>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   updateStatusMutation.mutate({ quoteId: quote.id, status: 'accepted' });
                                 }}
                                 disabled={updateStatusMutation.isPending}
-                                className="flex items-center space-x-2 bg-white dark:bg-white text-[#0055cc] border-[#0055cc] hover:bg-[#0055cc] hover:text-white"
+                                className="bg-white hover:bg-gray-50 border border-gray-200 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                                style={{ color: '#0055cc' }}
                                 data-testid={`button-mark-accepted-${quote.id}`}
                               >
-                                <CheckCircle className="h-4 w-4" />
-                                <span>Mark as Accepted</span>
+                                <img src={trelloIcon} alt="Trello" className="h-4 w-4" />
+                                <span>Accepted</span>
+                              </Button>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateStatusMutation.mutate({ quoteId: quote.id, status: 'pending' });
+                                }}
+                                disabled={updateStatusMutation.isPending}
+                                className="bg-white hover:bg-gray-50 border border-gray-200 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                                style={{ color: '#0055cc' }}
+                                data-testid={`button-mark-pending-${quote.id}`}
+                              >
+                                <img src={trelloIcon} alt="Trello" className="h-4 w-4" />
+                                <span>Pending</span>
                               </Button>
                             </div>
                           </div>
