@@ -67,6 +67,11 @@ Preferred communication style: Simple, everyday language.
 - **Touch-Optimized**: Large buttons and touch targets for field use
 - **Offline Consideration**: Query caching strategy for intermittent connectivity
 - **Performance**: Optimized bundle size and lazy loading for mobile networks
+- **Progressive Web App (PWA)**: Full PWA support with installable app experience
+  - Service worker for offline functionality and caching
+  - Web app manifest with GHVAC branding and icon
+  - Installable on iOS, Android, and desktop devices
+  - Standalone app mode with custom splash screen and app icon
 
 #### Pricing Architecture
 - **Google Sheets Source**: All pricing data sourced from Google Sheets for business user control
