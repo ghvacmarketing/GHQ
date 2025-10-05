@@ -164,12 +164,7 @@ Labor: $${quoteData.labor}
 Tax: $${quoteData.tax}
 TOTAL: $${quoteData.total}${notesSection}
 
-STATUS: Quote Pending - Follow-up Required
-
-ACTION ITEMS:
-- Contact customer to discuss quote
-- Address any questions or concerns
-- Schedule installation if accepted`;
+STATUS: Quote Pending - Follow-up Required`;
   }
 }
 
