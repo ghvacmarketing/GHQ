@@ -149,8 +149,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerName: quote.customerName,
           technician: quote.technician,
           total: quote.total,
+          subtotal: quote.subtotal,
+          labor: quote.labor,
+          tax: quote.tax,
           parts: quote.parts,
           quoteId: quote.id,
+          jobNotes: quote.jobNotes || undefined,
+          ghvacInstalled: quote.ghvacInstalled || false,
+          yearsSinceInstallation: quote.yearsSinceInstallation || undefined,
         });
         
         if (cardId) {
@@ -161,7 +167,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerName: quote.customerName,
           technician: quote.technician,
           total: quote.total,
+          subtotal: quote.subtotal,
+          labor: quote.labor,
+          tax: quote.tax,
+          parts: quote.parts,
           quoteId: quote.id,
+          jobNotes: quote.jobNotes || undefined,
+          ghvacInstalled: quote.ghvacInstalled || false,
+          yearsSinceInstallation: quote.yearsSinceInstallation || undefined,
         });
         
         if (cardId) {

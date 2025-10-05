@@ -31,8 +31,14 @@ export class TrelloService {
     customerName: string;
     technician: string;
     total: string;
+    subtotal: string;
+    labor: string;
+    tax: string;
     parts: any[];
     quoteId: string;
+    jobNotes?: string;
+    ghvacInstalled?: boolean;
+    yearsSinceInstallation?: string;
   }): Promise<string | null> {
     try {
       const cardData: TrelloCard = {
@@ -53,7 +59,14 @@ export class TrelloService {
     customerName: string;
     technician: string;
     total: string;
+    subtotal: string;
+    labor: string;
+    tax: string;
+    parts: any[];
     quoteId: string;
+    jobNotes?: string;
+    ghvacInstalled?: boolean;
+    yearsSinceInstallation?: string;
   }): Promise<string | null> {
     try {
       const cardData: TrelloCard = {
@@ -90,30 +103,70 @@ export class TrelloService {
   }
 
   private generateOrderDescription(quoteData: any): string {
-    const partsList = quoteData.parts.map((part: any) => 
-      `- ${part.description} (${part.partNumber}) - Qty: ${part.quantity || 1}`
-    ).join('\n');
+    const partsList = quoteData.parts.map((part: any) => {
+      const price = typeof part.price === 'string' ? part.price : part.price.toString();
+      const qty = part.quantity || 1;
+      const warranty = part.warranty ? ' [Warranty]' : '';
+      const custom = part.isCustom ? ' [Custom Part]' : '';
+      return `- ${part.description} (${part.partNumber})${warranty}${custom}\n  Qty: ${qty} @ $${price} each = $${(parseFloat(price) * qty).toFixed(2)}`;
+    }).join('\n');
 
-    return `Customer: ${quoteData.customerName}
-Technician: ${quoteData.technician}
-Quote ID: ${quoteData.quoteId}
-Total: $${quoteData.total}
+    const ghvacInfo = quoteData.ghvacInstalled 
+      ? `GHVAC Previously Installed: Yes (${quoteData.yearsSinceInstallation || 'N/A'} years ago)` 
+      : 'GHVAC Previously Installed: No';
 
-Parts to Order:
+    const notesSection = quoteData.jobNotes ? `\n\nJOB NOTES:\n${quoteData.jobNotes}` : '';
+
+    return `CUSTOMER: ${quoteData.customerName}
+TECHNICIAN: ${quoteData.technician}
+QUOTE ID: ${quoteData.quoteId}
+
+${ghvacInfo}
+
+PARTS TO ORDER:
 ${partsList}
 
-Status: Quote Accepted - Parts Need Ordering`;
+PRICING BREAKDOWN:
+Parts Subtotal: $${quoteData.subtotal}
+Labor: $${quoteData.labor}
+Tax: $${quoteData.tax}
+TOTAL: $${quoteData.total}${notesSection}
+
+STATUS: Quote Accepted - Parts Need Ordering`;
   }
 
   private generateFollowupDescription(quoteData: any): string {
-    return `Customer: ${quoteData.customerName}
-Technician: ${quoteData.technician}
-Quote ID: ${quoteData.quoteId}
-Total: $${quoteData.total}
+    const partsList = quoteData.parts.map((part: any) => {
+      const price = typeof part.price === 'string' ? part.price : part.price.toString();
+      const qty = part.quantity || 1;
+      const warranty = part.warranty ? ' [Warranty]' : '';
+      return `- ${part.description} (${part.partNumber})${warranty} - Qty: ${qty} @ $${price}`;
+    }).join('\n');
 
-Status: Quote Pending - Follow-up Required
+    const ghvacInfo = quoteData.ghvacInstalled 
+      ? `GHVAC Previously Installed: Yes (${quoteData.yearsSinceInstallation || 'N/A'} years ago)` 
+      : 'GHVAC Previously Installed: No';
 
-Action Items:
+    const notesSection = quoteData.jobNotes ? `\n\nJOB NOTES:\n${quoteData.jobNotes}` : '';
+
+    return `CUSTOMER: ${quoteData.customerName}
+TECHNICIAN: ${quoteData.technician}
+QUOTE ID: ${quoteData.quoteId}
+
+${ghvacInfo}
+
+QUOTED PARTS:
+${partsList}
+
+PRICING BREAKDOWN:
+Parts Subtotal: $${quoteData.subtotal}
+Labor: $${quoteData.labor}
+Tax: $${quoteData.tax}
+TOTAL: $${quoteData.total}${notesSection}
+
+STATUS: Quote Pending - Follow-up Required
+
+ACTION ITEMS:
 - Contact customer to discuss quote
 - Address any questions or concerns
 - Schedule installation if accepted`;
