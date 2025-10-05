@@ -184,7 +184,7 @@ const PartsSelection = memo(function PartsSelection({
               </button>
 
               {expandedCategories.has(category) && (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {categoryParts.map((part) => (
                     <div
                       key={part.partNumber}

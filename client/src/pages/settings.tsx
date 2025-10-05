@@ -158,7 +158,7 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto py-8 px-4 space-y-6">
+      <main className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto py-8 px-4 space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">

@@ -277,7 +277,7 @@ export default function AdminSettings() {
           </Button>
         </div>
       </header>
-      <main className="container mx-auto px-4 py-6 max-w-4xl">
+      <main className="container mx-auto px-4 py-6 max-w-md md:max-w-3xl lg:max-w-6xl">
         <div className="space-y-6">
           {/* Google Sheets Notice */}
           <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">

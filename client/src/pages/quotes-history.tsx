@@ -78,7 +78,7 @@ export default function QuotesHistory() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-3 sm:p-6 max-w-4xl">
+      <div className="container mx-auto p-3 sm:p-6 max-w-md md:max-w-2xl lg:max-w-5xl">
         <Card className="slide-in">
           <CardContent className="p-3 sm:p-6">
             <div className="flex items-center mb-6">
@@ -102,7 +102,7 @@ export default function QuotesHistory() {
 
   if (quotes.length === 0) {
     return (
-      <div className="container mx-auto p-3 sm:p-6 max-w-4xl">
+      <div className="container mx-auto p-3 sm:p-6 max-w-md md:max-w-2xl lg:max-w-5xl">
         <Card className="slide-in">
           <CardContent className="p-3 sm:p-6">
             <div className="flex items-center mb-6">
@@ -121,7 +121,7 @@ export default function QuotesHistory() {
   }
 
   return (
-    <div className="container mx-auto p-3 sm:p-6 max-w-4xl">
+    <div className="container mx-auto p-3 sm:p-6 max-w-md md:max-w-2xl lg:max-w-5xl">
       <Card className="slide-in">
         <CardContent className="p-3 sm:p-6">
           <div className="flex items-center justify-between mb-4 sm:mb-6">

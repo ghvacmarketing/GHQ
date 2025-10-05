@@ -52,13 +52,13 @@ export default function QuoteGenerator() {
   const { data: initialData, refetch: refetchInitialData } = useQuery({
     queryKey: ["/api/initial-data"],
     staleTime: 30000, // Consider data stale after 30 seconds
-    cacheTime: 60000, // Keep in cache for 1 minute
+    gcTime: 60000, // Keep in cache for 1 minute
   });
 
   // Extract data with defaults
-  const technicians = initialData?.technicians || [];
-  const settings = initialData?.settings;
-  const parts = initialData?.parts || [];
+  const technicians = (initialData as any)?.technicians || [];
+  const settings = (initialData as any)?.settings;
+  const parts = (initialData as any)?.parts || [];
 
   // Create refetch function for settings compatibility
   const refetchSettings = refetchInitialData;
@@ -414,7 +414,7 @@ export default function QuoteGenerator() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 max-w-md">
+      <main className="container mx-auto px-4 py-6 max-w-md md:max-w-2xl lg:max-w-4xl">
         <div className="space-y-6">
           <CustomerInfo
             customerName={quoteData.customerName}
@@ -439,7 +439,7 @@ export default function QuoteGenerator() {
           <PartsSelection
             selectedParts={quoteData.parts}
             onUpdate={handleUpdateQuoteData}
-            onAddCustomPart={(prefillData) => {
+            onAddCustomPart={(prefillData?: any) => {
               setCustomPartPrefillData(prefillData);
               setIsCustomPartModalOpen(true);
             }}
