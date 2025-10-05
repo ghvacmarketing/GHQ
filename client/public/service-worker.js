@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ghvac-quotes-v1';
+const CACHE_NAME = 'ghvac-quotes-v2';
 const urlsToCache = [
   '/',
   '/src/main.tsx',
