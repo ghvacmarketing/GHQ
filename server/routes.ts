@@ -449,6 +449,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper endpoint to get Trello board lists with their IDs
+  app.get("/api/trello/lists", async (req, res) => {
+    try {
+      const apiKey = process.env.TRELLO_API_KEY;
+      const token = process.env.TRELLO_TOKEN;
+      const boardId = process.env.TRELLO_BOARD_ID;
+
+      if (!apiKey || !token || !boardId) {
+        return res.status(400).json({ message: "Trello credentials not configured" });
+      }
+
+      const url = `https://api.trello.com/1/boards/${boardId}/lists?key=${apiKey}&token=${token}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`Trello API error: ${response.statusText}`);
+      }
+
+      const lists = await response.json();
+      res.json(lists);
+    } catch (error) {
+      console.error('Error fetching Trello lists:', error);
+      res.status(500).json({ message: "Error fetching Trello lists", error: (error as Error).message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
