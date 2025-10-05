@@ -14,9 +14,11 @@ export default function QuotesHistory() {
   const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
-  const { data: quotes = [], isLoading } = useQuery<Quote[]>({
+  const { data: quotesData, isLoading } = useQuery<{ quotes: Quote[]; pagination: any }>({
     queryKey: ["/api/quotes"],
   });
+
+  const quotes = quotesData?.quotes || [];
 
   // Mutation to update quote status
   const updateStatusMutation = useMutation({
