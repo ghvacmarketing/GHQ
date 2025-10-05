@@ -35,12 +35,20 @@ export class TrelloService {
     quoteId: string;
   }): Promise<string | null> {
     try {
+      // Test with minimal data first to isolate the issue
       const cardData: TrelloCard = {
         name: `Order - ${quoteData.customerName} - $${quoteData.total}`,
-        desc: this.generateOrderDescription(quoteData),
+        desc: `Customer: ${quoteData.customerName}\nTotal: $${quoteData.total}`,
         idList: this.config.ordersListId,
-        labels: ['parts-order'],
       };
+
+      console.log('Creating Trello card with config:', {
+        hasApiKey: !!this.config.apiKey,
+        hasToken: !!this.config.token,
+        hasBoardId: !!this.config.boardId,
+        ordersListId: this.config.ordersListId,
+        cardName: cardData.name
+      });
 
       const response = await this.createCard(cardData);
       return response?.id || null;
@@ -61,7 +69,6 @@ export class TrelloService {
         name: `Follow-up - ${quoteData.customerName} - $${quoteData.total}`,
         desc: this.generateFollowupDescription(quoteData),
         idList: this.config.followupListId,
-        labels: ['follow-up'],
       };
 
       const response = await this.createCard(cardData);
@@ -84,7 +91,14 @@ export class TrelloService {
     });
 
     if (!response.ok) {
-      throw new Error(`Trello API error: ${response.statusText}`);
+      const errorBody = await response.text();
+      console.error('Trello API error details:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody,
+        requestData: cardData
+      });
+      throw new Error(`Trello API error: ${response.statusText} - ${errorBody}`);
     }
 
     return await response.json();
@@ -95,26 +109,26 @@ export class TrelloService {
       `- ${part.description} (${part.partNumber}) - Qty: ${part.quantity || 1}`
     ).join('\n');
 
-    return `**Customer:** ${quoteData.customerName}
-**Technician:** ${quoteData.technician}
-**Quote ID:** ${quoteData.quoteId}
-**Total:** $${quoteData.total}
+    return `Customer: ${quoteData.customerName}
+Technician: ${quoteData.technician}
+Quote ID: ${quoteData.quoteId}
+Total: $${quoteData.total}
 
-**Parts to Order:**
+Parts to Order:
 ${partsList}
 
-**Status:** Quote Accepted - Parts Need Ordering`;
+Status: Quote Accepted - Parts Need Ordering`;
   }
 
   private generateFollowupDescription(quoteData: any): string {
-    return `**Customer:** ${quoteData.customerName}
-**Technician:** ${quoteData.technician}
-**Quote ID:** ${quoteData.quoteId}
-**Total:** $${quoteData.total}
+    return `Customer: ${quoteData.customerName}
+Technician: ${quoteData.technician}
+Quote ID: ${quoteData.quoteId}
+Total: $${quoteData.total}
 
-**Status:** Quote Pending - Follow-up Required
+Status: Quote Pending - Follow-up Required
 
-**Action Items:**
+Action Items:
 - Contact customer to discuss quote
 - Address any questions or concerns
 - Schedule installation if accepted`;
