@@ -132,7 +132,7 @@ Labor: $${quoteData.labor}
 Tax: $${quoteData.tax}
 TOTAL: $${quoteData.total}${notesSection}
 
-STATUS: Quote Accepted - Parts Need Ordering`;
+STATUS: Quote Accepted`;
   }
 
   private generateFollowupDescription(quoteData: any): string {
