@@ -1,25 +1,41 @@
 const CACHE_NAME = 'ghvac-quotes-v1';
-const urlsToCache = [
-  '/',
-  '/src/main.tsx',
-  '/src/index.css'
-];
 
+// Only cache static assets, not source files
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME).then((cache) => {
+      // Cache will be populated on first fetch
+      return Promise.resolve();
+    })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {
+  // Skip caching for dev server HMR and API calls
+  if (event.request.url.includes('/@vite') || 
+      event.request.url.includes('/api/') ||
+      event.request.url.includes('/@fs/') ||
+      event.request.url.includes('/__replco') ||
+      event.request.url.includes('/src/')) {
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then((response) => {
-        if (response) {
-          return response;
+        // Only cache successful responses
+        if (response.status === 200) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
         }
-        return fetch(event.request);
+        return response;
+      })
+      .catch(() => {
+        // Fallback to cache if network fails
+        return caches.match(event.request);
       })
   );
 });
@@ -36,4 +52,5 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  self.clients.claim();
 });
