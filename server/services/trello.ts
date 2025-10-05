@@ -35,20 +35,11 @@ export class TrelloService {
     quoteId: string;
   }): Promise<string | null> {
     try {
-      // Test with minimal data first to isolate the issue
       const cardData: TrelloCard = {
         name: `Order - ${quoteData.customerName} - $${quoteData.total}`,
-        desc: `Customer: ${quoteData.customerName}\nTotal: $${quoteData.total}`,
+        desc: this.generateOrderDescription(quoteData),
         idList: this.config.ordersListId,
       };
-
-      console.log('Creating Trello card with config:', {
-        hasApiKey: !!this.config.apiKey,
-        hasToken: !!this.config.token,
-        hasBoardId: !!this.config.boardId,
-        ordersListId: this.config.ordersListId,
-        cardName: cardData.name
-      });
 
       const response = await this.createCard(cardData);
       return response?.id || null;
@@ -92,12 +83,6 @@ export class TrelloService {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error('Trello API error details:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorBody,
-        requestData: cardData
-      });
       throw new Error(`Trello API error: ${response.statusText} - ${errorBody}`);
     }
 
@@ -105,7 +90,7 @@ export class TrelloService {
   }
 
   private generateOrderDescription(quoteData: any): string {
-    const partsList = quoteData.parts.map(part => 
+    const partsList = quoteData.parts.map((part: any) => 
       `- ${part.description} (${part.partNumber}) - Qty: ${part.quantity || 1}`
     ).join('\n');
 
