@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Settings, History, RotateCcw } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import NavDropdown from "@/components/nav-dropdown";
 import giesbrechtLogo from "../assets/giesbrecht-logo.webp";
 import CustomerInfo from "@/components/customer-info";
 import PartsSelection from "@/components/parts-selection";
@@ -32,6 +33,7 @@ interface QuoteData {
 export default function QuoteGenerator() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [location] = useLocation();
 
   const [quoteData, setQuoteData] = useState<QuoteData>({
     customerName: "",
@@ -392,16 +394,24 @@ export default function QuoteGenerator() {
               data-testid="img-company-logo"
             />
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-semibold text-foreground truncate">Quote Generator</h1>
+              <NavDropdown 
+                currentPageTitle="Quote Generator"
+                items={[
+                  { label: "Quote Generator", path: "/" },
+                  { label: "Process Builder", path: "/process-builder" },
+                ]}
+              />
               <p className="text-xs text-muted-foreground hidden sm:block">Field Technician Tool</p>
             </div>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-            <Link href="/history">
-              <Button variant="ghost" size="icon" data-testid="button-history" title="View quote history">
-                <History className="h-4 w-4" />
-              </Button>
-            </Link>
+            {location === "/" && (
+              <Link href="/history">
+                <Button variant="ghost" size="icon" data-testid="button-history" title="View quote history">
+                  <History className="h-4 w-4" />
+                </Button>
+              </Link>
+            )}
             <Button 
               variant="ghost" 
               size="icon"

@@ -1,0 +1,46 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Wrench, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
+
+export default function ProcessBuilder() {
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
+        <div className="flex items-center justify-between p-3 sm:p-4">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <Link href="/">
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Wrench className="h-5 w-5 text-primary" />
+            <h1 className="text-base sm:text-lg font-semibold text-foreground">Process Builder</h1>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-6 max-w-md md:max-w-2xl lg:max-w-4xl">
+        <Card>
+          <CardHeader>
+            <CardTitle>Process Builder</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-muted-foreground">
+                Build and manage your HVAC service processes here.
+              </p>
+              <div className="bg-muted/30 rounded-lg p-6 text-center">
+                <Wrench className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">Coming Soon</h3>
+                <p className="text-sm text-muted-foreground">
+                  Process builder features will be added here.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
+    </div>
+  );
+}
