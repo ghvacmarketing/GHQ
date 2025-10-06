@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import QuoteGenerator from "@/pages/quote-generator";
 import SettingsPage from "@/pages/settings";
 import QuotesHistory from "@/pages/quotes-history";
+import ProcessBuilder from "@/pages/process-builder";
 import NotFound from "@/pages/not-found";
 import { lazy, Suspense } from "react";
 
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/" component={QuoteGenerator} />
       <Route path="/history" component={QuotesHistory} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/process-builder" component={ProcessBuilder} />
       <Route path="/admin" component={AdminSettingsWrapper} />
       <Route component={NotFound} />
     </Switch>
