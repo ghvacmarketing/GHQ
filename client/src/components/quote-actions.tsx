@@ -11,6 +11,7 @@ interface QuoteActionsProps {
   onStartOver: () => void;
   isGenerating: boolean;
   quoteGenerated: boolean;
+  quoteStatus?: string;
 }
 
 export default function QuoteActions({
@@ -21,6 +22,7 @@ export default function QuoteActions({
   onStartOver,
   isGenerating,
   quoteGenerated,
+  quoteStatus,
 }: QuoteActionsProps) {
   const buttonsRef = useRef<HTMLDivElement>(null);
 
@@ -63,21 +65,31 @@ export default function QuoteActions({
           <div ref={buttonsRef} className="grid grid-cols-2 gap-3 slide-in">
             <Button
               onClick={onMarkAccepted}
-              className="bg-white hover:bg-gray-50 border border-gray-200 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
-              style={{ color: '#0055cc' }}
+              disabled={quoteStatus === 'accepted' || quoteStatus === 'pending'}
+              className={`font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
+                quoteStatus === 'accepted'
+                  ? 'bg-gray-100 border border-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-white hover:bg-gray-50 border border-gray-200'
+              }`}
+              style={quoteStatus === 'accepted' ? { color: '#9ca3af' } : { color: '#0055cc' }}
               data-testid="button-mark-accepted"
             >
-              <img src={trelloIcon} alt="Trello" className="h-4 w-4" />
-              <span>Accepted</span>
+              <img src={trelloIcon} alt="Trello" className={`h-4 w-4 ${quoteStatus === 'accepted' ? 'opacity-50' : ''}`} />
+              <span>{quoteStatus === 'accepted' ? 'Accepted ✓' : 'Accepted'}</span>
             </Button>
             <Button
               onClick={onMarkPending}
-              className="bg-white hover:bg-gray-50 border border-gray-200 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
-              style={{ color: '#0055cc' }}
+              disabled={quoteStatus === 'accepted' || quoteStatus === 'pending'}
+              className={`font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
+                quoteStatus === 'pending'
+                  ? 'bg-gray-100 border border-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-white hover:bg-gray-50 border border-gray-200'
+              }`}
+              style={quoteStatus === 'pending' ? { color: '#9ca3af' } : { color: '#0055cc' }}
               data-testid="button-mark-pending"
             >
-              <img src={trelloIcon} alt="Trello" className="h-4 w-4" />
-              <span>Pending</span>
+              <img src={trelloIcon} alt="Trello" className={`h-4 w-4 ${quoteStatus === 'pending' ? 'opacity-50' : ''}`} />
+              <span>{quoteStatus === 'pending' ? 'Pending ✓' : 'Pending'}</span>
             </Button>
           </div>
           

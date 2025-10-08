@@ -97,6 +97,15 @@ export default function QuoteGenerator() {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
       const statusText = variables.status === "accepted" ? "accepted" : "pending";
+      
+      // Update the generatedQuote state with the new status
+      if (generatedQuote) {
+        setGeneratedQuote({
+          ...generatedQuote,
+          status: variables.status
+        });
+      }
+      
       toast({
         title: "Quote Updated",
         description: `Quote has been marked as ${statusText}.`,
@@ -496,6 +505,7 @@ export default function QuoteGenerator() {
             onStartOver={handleStartOver}
             isGenerating={createQuoteMutation.isPending}
             quoteGenerated={!!generatedQuote}
+            quoteStatus={generatedQuote?.status}
           />
 
           {generatedQuote && (
