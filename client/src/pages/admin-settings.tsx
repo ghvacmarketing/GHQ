@@ -23,6 +23,8 @@ export default function AdminSettings() {
   const [newEmailAddress, setNewEmailAddress] = useState("");
   const [showQuotesList, setShowQuotesList] = useState(false);
   const [quotesPage, setQuotesPage] = useState(1);
+  const [newTechnicianName, setNewTechnicianName] = useState("");
+  const [newTechnicianEmail, setNewTechnicianEmail] = useState("");
 
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
@@ -62,6 +64,12 @@ export default function AdminSettings() {
 
   const quotes = quotesResponse?.quotes || [];
   const quotesTotal = quoteSummary?.totalQuotes || 0;
+
+  // Fetch technicians
+  const { data: technicians = [] } = useQuery({
+    queryKey: ["/api/technicians"],
+    enabled: isAuthenticated,
+  });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +142,53 @@ export default function AdminSettings() {
     },
   });
 
+  // Technician mutations
+  const createTechnicianMutation = useMutation({
+    mutationFn: async (techData: { name: string; email: string }) => {
+      const response = await apiRequest("POST", "/api/technicians", techData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/technicians"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/initial-data"] });
+      setNewTechnicianName("");
+      setNewTechnicianEmail("");
+      toast({
+        title: "Technician Added",
+        description: "New technician added successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Add Failed",
+        description: "Failed to add technician. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTechnicianMutation = useMutation({
+    mutationFn: async (techId: string) => {
+      const response = await apiRequest("DELETE", `/api/technicians/${techId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/technicians"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/initial-data"] });
+      toast({
+        title: "Technician Removed",
+        description: "Technician removed successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Delete Failed",
+        description: "Failed to remove technician. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleAddEmail = () => {
     if (newEmailAddress && !emailAddresses.includes(newEmailAddress)) {
       const updatedEmails = [...emailAddresses, newEmailAddress];
@@ -153,6 +208,19 @@ export default function AdminSettings() {
       fromEmail: settings?.emailSettings?.fromEmail || "quotes@ghvac.com",
       notificationEmails: updatedEmails
     });
+  };
+
+  const handleAddTechnician = () => {
+    if (newTechnicianName && newTechnicianEmail) {
+      createTechnicianMutation.mutate({
+        name: newTechnicianName,
+        email: newTechnicianEmail
+      });
+    }
+  };
+
+  const handleRemoveTechnician = (techId: string) => {
+    deleteTechnicianMutation.mutate(techId);
   };
 
   const handleSelectQuote = (quoteId: string, checked: boolean) => {
@@ -540,6 +608,82 @@ export default function AdminSettings() {
                         onClick={handleAddEmail}
                         disabled={!newEmailAddress || emailAddresses.includes(newEmailAddress) || saveEmailSettingsMutation.isPending}
                         data-testid="button-add-email"
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Technician Management */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    Technician Management
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Add or remove technicians from the system
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Current Technician List */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Current Technicians</Label>
+                    {(technicians as any[]).length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No technicians configured</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {(technicians as any[]).map((tech: any, index: number) => (
+                          <div key={tech.id} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                            <div className="flex-1">
+                              <span className="text-sm font-medium">{tech.name}</span>
+                              <span className="text-xs text-muted-foreground ml-2">({tech.email})</span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveTechnician(tech.id)}
+                              className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                              data-testid={`button-remove-technician-${index}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add New Technician */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Add Technician</Label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Input
+                        type="text"
+                        placeholder="Name"
+                        value={newTechnicianName}
+                        onChange={(e) => setNewTechnicianName(e.target.value)}
+                        className="flex-1"
+                        data-testid="input-technician-name"
+                      />
+                      <Input
+                        type="email"
+                        placeholder="Email"
+                        value={newTechnicianEmail}
+                        onChange={(e) => setNewTechnicianEmail(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleAddTechnician()}
+                        className="flex-1"
+                        data-testid="input-technician-email"
+                      />
+                      <Button
+                        onClick={handleAddTechnician}
+                        disabled={!newTechnicianName || !newTechnicianEmail || createTechnicianMutation.isPending}
+                        data-testid="button-add-technician"
+                        className="sm:w-auto w-full"
                       >
                         Add
                       </Button>
