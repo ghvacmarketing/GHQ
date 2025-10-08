@@ -102,6 +102,11 @@ export class DatabaseStorage implements IStorage {
     return technician;
   }
 
+  async deleteTechnician(id: string): Promise<boolean> {
+    const result = await db.delete(technicians).where(eq(technicians.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
   // Initialize default data if needed
   async initializeDefaultData() {
     // Check if technicians already exist
