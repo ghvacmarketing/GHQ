@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import compression from "compression";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
@@ -273,6 +273,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Technician endpoints
+  app.get("/api/technicians", async (req, res) => {
+    try {
+      const technicians = await storage.getAllTechnicians();
+      res.json(technicians);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching technicians" });
+    }
+  });
+
+  app.post("/api/technicians", async (req, res) => {
+    try {
+      const validatedData = insertTechnicianSchema.parse(req.body);
+      const technician = await storage.createTechnician(validatedData);
+      res.json(technician);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid technician data" });
+    }
+  });
+
+  app.delete("/api/technicians/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteTechnician(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Technician not found" });
+      }
+      res.json({ message: "Technician deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Error deleting technician" });
+    }
+  });
 
   // Force refresh settings from Google Sheets
   app.post("/api/settings/refresh", async (req, res) => {
