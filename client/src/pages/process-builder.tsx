@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Wrench, Settings } from "lucide-react";
 import { useLocation } from "wouter";
 import NavDropdown from "@/components/nav-dropdown";
-import giesbrechtLogo from "../assets/giesbrecht-logo.webp";
+import redlogo from "@assets/redlogo.webp";
 
 export default function ProcessBuilder() {
   const [location] = useLocation();
@@ -14,7 +14,7 @@ export default function ProcessBuilder() {
         <div className="flex items-center justify-between p-3 sm:p-4">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
             <img 
-              src={giesbrechtLogo} 
+              src={redlogo} 
               alt="Giesbrecht HVAC" 
               className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
               data-testid="img-company-logo"
