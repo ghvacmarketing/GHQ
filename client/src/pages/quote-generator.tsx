@@ -394,7 +394,7 @@ export default function QuoteGenerator() {
     <div className="min-h-screen bg-background text-foreground font-sans antialiased">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
-        <div className="flex items-center justify-between p-3 sm:p-4">
+        <div className="flex items-center justify-between p-3 sm:p-4 bg-[#641f31]">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
             <img 
               src={giesbrechtLogo} 
@@ -432,7 +432,6 @@ export default function QuoteGenerator() {
           </div>
         </div>
       </header>
-
       <main className="container mx-auto px-4 py-6 max-w-md md:max-w-2xl lg:max-w-4xl">
         <div className="space-y-6">
           <CustomerInfo
@@ -516,7 +515,6 @@ export default function QuoteGenerator() {
           )}
         </div>
       </main>
-
       <CustomPartModal
         isOpen={isCustomPartModalOpen}
         onClose={() => {
