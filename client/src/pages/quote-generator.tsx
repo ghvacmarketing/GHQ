@@ -22,6 +22,8 @@ import type { QuotePart } from "@shared/schema";
 
 import GHVAC_icons from "@assets/GHVAC-icons.webp";
 
+import whitlogo from "@assets/whitlogo.webp";
+
 interface QuoteData {
   customerName: string;
   technician: string;
@@ -399,7 +401,7 @@ export default function QuoteGenerator() {
         <div className="flex items-center justify-between p-3 sm:p-4 bg-[#641f31]">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
             <img 
-              src={GHVAC_icons} 
+              src={whitlogo} 
               alt="Giesbrecht HVAC" 
               className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
               data-testid="img-company-logo"
