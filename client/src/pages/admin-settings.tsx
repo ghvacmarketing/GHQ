@@ -355,7 +355,7 @@ export default function AdminSettings() {
                   <h3 className="font-medium text-blue-900 dark:text-blue-100">
                     Settings Managed via Google Sheets
                   </h3>
-                  <p className="text-sm text-blue-700 dark:text-blue-200 mt-1">To update values, edit your spreadsheet and click "Refresh Data" above.</p>
+                  <p className="text-sm text-blue-700 dark:text-blue-200 mt-1">Click "Refresh Data" above if recent changes aren't live.</p>
                 </div>
               </div>
             </CardContent>
