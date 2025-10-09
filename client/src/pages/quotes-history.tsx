@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Quote } from "@shared/schema";
 import trelloIcon from "@assets/trello_1757379276597.png";
+import redlogo from "@assets/redlogo.webp";
 
 export default function QuotesHistory() {
   const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
@@ -121,32 +122,38 @@ export default function QuotesHistory() {
   }
 
   return (
-    <div className="container mx-auto p-3 sm:p-6 max-w-md md:max-w-2xl lg:max-w-5xl">
-      <Card className="slide-in">
-        <CardContent className="p-3 sm:p-6">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <div className="flex items-center min-w-0 flex-1">
-              <Link href="/">
-                <Button variant="ghost" size="icon" className="mr-2 flex-shrink-0" title="Back to quote generator">
-                  <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-                </Button>
-              </Link>
-              <History className="text-primary mr-2 sm:mr-3 h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
-              <h1 className="text-lg sm:text-2xl font-bold text-card-foreground truncate">Quote History</h1>
-            </div>
-            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
-              <Badge variant="secondary" className="text-xs sm:text-sm">
-                {quotes.length}
-              </Badge>
-              <Link href="/">
-                <Button variant="default" size="sm" className="flex items-center space-x-1 sm:space-x-2">
-                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">New Quote</span>
-                  <span className="sm:hidden">New</span>
-                </Button>
-              </Link>
+    <div className="min-h-screen bg-background text-foreground font-sans antialiased">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
+        <div className="flex items-center justify-between p-3 sm:p-4">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <img 
+              src={redlogo} 
+              alt="Giesbrecht HVAC" 
+              className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
+              data-testid="img-company-logo"
+            />
+            <div className="min-w-0">
+              <h1 className="font-semibold text-foreground text-sm sm:text-base truncate">Quote History</h1>
             </div>
           </div>
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            <Badge variant="secondary" className="text-xs sm:text-sm">
+              {quotes.length}
+            </Badge>
+            <Link href="/">
+              <Button variant="default" size="sm" className="flex items-center space-x-1 sm:space-x-2 h-9">
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">New Quote</span>
+                <span className="sm:hidden">New</span>
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </header>
+      <main className="container mx-auto p-3 sm:p-6 max-w-md md:max-w-2xl lg:max-w-5xl">
+        <Card className="slide-in">
+          <CardContent className="p-3 sm:p-6">
 
           <div className="space-y-3 sm:space-y-4">
             {sortedQuotes.map((quote) => (
@@ -299,6 +306,7 @@ export default function QuotesHistory() {
           </div>
         </CardContent>
       </Card>
+    </main>
     </div>
   );
 }

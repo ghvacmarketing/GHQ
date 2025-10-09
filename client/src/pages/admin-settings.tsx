@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Quote } from "@shared/schema";
+import redlogo from "@assets/redlogo.webp";
 
 export default function AdminSettings() {
   const { toast } = useToast();
@@ -318,19 +319,16 @@ export default function AdminSettings() {
     <div className="min-h-screen bg-background text-foreground font-sans antialiased">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => window.location.href = "/"}
-              data-testid="button-back"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-            <div>
-              <h1 className="font-semibold text-foreground text-center text-[13px]">Settings</h1>
+        <div className="flex items-center justify-between p-3 sm:p-4">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <img 
+              src={redlogo} 
+              alt="Giesbrecht HVAC" 
+              className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
+              data-testid="img-company-logo"
+            />
+            <div className="min-w-0">
+              <h1 className="font-semibold text-foreground text-sm sm:text-base truncate">Settings Dashboard</h1>
             </div>
           </div>
           <Button
