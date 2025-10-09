@@ -171,7 +171,7 @@ const PartsSelection = memo(function PartsSelection({
           {Object.entries(groupedParts).map(([category, categoryParts]) => (
             <div key={category} className="border border-border rounded-lg p-4">
               <button
-                className="flex items-center justify-between w-full mb-3 text-left"
+                className="flex items-center justify-between w-full text-left mt-[0px] mb-[0px]"
                 onClick={() => toggleCategory(category)}
                 data-testid={`button-toggle-${category.toLowerCase()}`}
               >
