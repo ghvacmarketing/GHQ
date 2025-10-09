@@ -331,7 +331,6 @@ export default function AdminSettings() {
             </Button>
             <div>
               <h1 className="font-semibold text-foreground text-center text-[13px]">Settings Dashboard</h1>
-              <p className="text-xs text-muted-foreground">Live data from Google Sheets</p>
             </div>
           </div>
           <Button
