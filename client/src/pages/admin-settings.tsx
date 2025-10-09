@@ -330,7 +330,7 @@ export default function AdminSettings() {
               Back
             </Button>
             <div>
-              <h1 className="font-semibold text-foreground text-center text-[13px]">Settings Dashboard</h1>
+              <h1 className="font-semibold text-foreground text-center text-[13px]">Settings</h1>
             </div>
           </div>
           <Button
@@ -743,7 +743,7 @@ export default function AdminSettings() {
                 <CardContent>
                   {!showQuotesList ? (
                     // Show summary view (fast loading)
-                    <div className="space-y-4">
+                    (<div className="space-y-4">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <div className="text-center p-3 rounded-lg bg-muted/50">
                           <div className="text-2xl font-bold">{quoteSummary?.totalQuotes || 0}</div>
@@ -762,7 +762,6 @@ export default function AdminSettings() {
                           <div className="text-sm text-muted-foreground">Total Value</div>
                         </div>
                       </div>
-                      
                       <div className="flex justify-center pt-2">
                         <Button 
                           onClick={() => setShowQuotesList(true)}
@@ -774,16 +773,16 @@ export default function AdminSettings() {
                           Load Full Quotes List ({quoteSummary?.totalQuotes || 0})
                         </Button>
                       </div>
-                    </div>
+                    </div>)
                   ) : quotesLoading ? (
                     // Loading state
-                    <div className="text-center py-8 text-muted-foreground">
+                    (<div className="text-center py-8 text-muted-foreground">
                       <RefreshCw className="h-8 w-8 mx-auto mb-3 animate-spin" />
                       <p>Loading quotes...</p>
-                    </div>
+                    </div>)
                   ) : quotes.length === 0 ? (
                     // No quotes found
-                    <div className="text-center py-8 text-muted-foreground">
+                    (<div className="text-center py-8 text-muted-foreground">
                       <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
                       <p>No quotes found</p>
                       <Button 
@@ -794,10 +793,10 @@ export default function AdminSettings() {
                       >
                         Back to Summary
                       </Button>
-                    </div>
+                    </div>)
                   ) : (
                     // Full quotes list
-                    <div className="space-y-4">
+                    (<div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <Button 
                           onClick={() => setShowQuotesList(false)}
@@ -811,7 +810,6 @@ export default function AdminSettings() {
                           Showing {quotes.length} of {quotesTotal} quotes
                         </span>
                       </div>
-                      
                       <div className="flex items-center space-x-3 pb-3 border-b border-border">
                         <Checkbox
                           checked={selectedQuotes.size === quotes.length && quotes.length > 0}
@@ -822,7 +820,6 @@ export default function AdminSettings() {
                           Select All ({quotes.length} quote{quotes.length !== 1 ? 's' : ''})
                         </Label>
                       </div>
-                      
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {quotes.map((quote: Quote) => (
                           <div key={quote.id} className="flex items-start sm:items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50">
@@ -848,7 +845,7 @@ export default function AdminSettings() {
                           </div>
                         ))}
                       </div>
-                    </div>
+                    </div>)
                   )}
                 </CardContent>
               </Card>
