@@ -39,12 +39,23 @@ export default function VoiceNotes({ onSummaryGenerated }: VoiceNotesProps) {
       return response.json();
     },
     onSuccess: (data) => {
-      setTranscribedText(data.summary);
-      setIsEditing(true);
-      toast({
-        title: "Voice Notes Ready",
-        description: "Review and edit your notes below.",
-      });
+      // Check if no meaningful audio was detected
+      if (data.summary === "NO_AUDIO_DETECTED") {
+        setTranscribedText("• ");
+        setIsEditing(true);
+        toast({
+          title: "No Audio Detected",
+          description: "Please speak clearly or type your job notes manually.",
+          variant: "destructive",
+        });
+      } else {
+        setTranscribedText(data.summary);
+        setIsEditing(true);
+        toast({
+          title: "Voice Notes Ready",
+          description: "Review and edit your notes below.",
+        });
+      }
     },
     onError: (error) => {
       if (error.message === 'API_FALLBACK') {

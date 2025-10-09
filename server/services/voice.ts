@@ -25,7 +25,14 @@ export class VoiceService {
         model: "whisper-1",
       });
 
-      const transcribedText = transcription.text;
+      const transcribedText = transcription.text.trim();
+
+      // Check if transcription is meaningful (at least 10 characters and contains actual words)
+      if (!transcribedText || transcribedText.length < 10) {
+        return {
+          summary: "NO_AUDIO_DETECTED"
+        };
+      }
 
       // Use AI to intelligently summarize the findings
       const response = await openai.chat.completions.create({
@@ -33,7 +40,7 @@ export class VoiceService {
         messages: [
           {
             role: "system",
-            content: "You're helping an HVAC technician organize their job observations. Create concise bullet points summarizing what they found and observed. Group related items together. Fix grammar and make it professional. Do NOT add any recommendations, solutions, or next steps - only summarize what they actually observed or found."
+            content: "You're helping an HVAC technician organize their job observations. Create concise bullet points summarizing what they found and observed. Group related items together. Fix grammar and make it professional. Do NOT add any recommendations, solutions, or next steps - only summarize what they actually observed or found. If the input is unclear, silence, or doesn't contain actual observations, respond with exactly: NO_CONTENT"
           },
           {
             role: "user",
@@ -44,7 +51,14 @@ export class VoiceService {
         temperature: 0.3,
       });
 
-      const summary = response.choices[0]?.message?.content || `• ${transcribedText}`;
+      const summary = response.choices[0]?.message?.content?.trim() || "NO_CONTENT";
+      
+      // If GPT indicates no meaningful content, return special flag
+      if (summary === "NO_CONTENT" || summary === "NO_AUDIO_DETECTED") {
+        return {
+          summary: "NO_AUDIO_DETECTED"
+        };
+      }
       
       return {
         summary: summary
