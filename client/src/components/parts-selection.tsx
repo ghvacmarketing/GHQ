@@ -118,7 +118,7 @@ const PartsSelection = memo(function PartsSelection({
               variant="ghost" 
               size="sm" 
               onClick={onAddCustomPart} 
-              className="flex items-center justify-center h-8 px-3"
+              className="flex items-center justify-center h-10 px-4 touch-manipulation"
               data-testid="button-add-custom-part"
             >
               <Plus className="mr-1 h-4 w-4" />
@@ -153,7 +153,7 @@ const PartsSelection = memo(function PartsSelection({
             variant="ghost" 
             size="sm" 
             onClick={onAddCustomPart} 
-            className="flex items-center justify-center h-8 px-3"
+            className="flex items-center justify-center h-10 px-4 touch-manipulation"
             data-testid="button-add-custom-part"
           >
             <Plus className="mr-1 h-4 w-4" />
@@ -263,7 +263,7 @@ const PartsSelection = memo(function PartsSelection({
                         <Button
                           size="sm"
                           onClick={() => addPart(part)}
-                          className="h-8 px-3 text-xs"
+                          className="h-10 px-4 text-sm min-w-[60px] touch-manipulation"
                           data-testid={`button-add-${part.partNumber}`}
                         >
                           Add
