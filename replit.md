@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a mobile-first web application designed for HVAC technicians to generate professional quotes on-site. The app follows a simple, no-authentication approach for MVP deployment, allowing techs to immediately access pricing data, select parts from integrated Google Sheets, add custom components, and generate copyable quotes for FieldEdge or messaging platforms. The system automatically handles email notifications to managers and creates Trello cards for follow-up and parts ordering.
+This is a mobile-first web application designed for HVAC technicians to generate professional quotes on-site and manage service processes. The app follows a simple, no-authentication approach for MVP deployment, allowing techs to immediately access pricing data, select parts from integrated Google Sheets, add custom components, and generate copyable quotes for FieldEdge or messaging platforms. The system automatically handles email notifications to managers and creates Trello cards for follow-up and parts ordering. Additionally, the Processes and Systems module provides a searchable wiki for saved processes with manual and voice-guided creation options, plus PDF export functionality.
 
 ## User Preferences
 
@@ -85,8 +85,33 @@ Preferred communication style: Simple, everyday language.
 - **Warranty Logic**: GHVAC installation history affects pricing calculations
 - **Status Tracking**: Quote lifecycle management (draft, pending, accepted)
 
+#### Processes and Systems Module
+- **Wiki Interface**: Searchable knowledge base for saved processes organized by categories
+- **Process Builder**: Two creation methods:
+  - **Manual Entry**: Form-based creation with name, description, category, rationale, and dynamic step management
+  - **Voice-Guided**: Speech-to-text process creation with prompted questions using OpenAI's Whisper transcription
+- **PDF Export**: Generate professional PDF documents from processes using jsPDF
+- **Process Structure**: 
+  - Name and description
+  - Category for organization
+  - Rationale explaining why the process is necessary
+  - Step-by-step instructions with numbered guidance
+- **Data Model**: PostgreSQL table with JSON column for flexible step storage
+
 #### Development and Deployment
 - **Hot Reloading**: Vite integration with Express for development efficiency
 - **Type Safety**: End-to-end TypeScript with strict compiler settings
 - **Build Process**: ESBuild for server bundling and Vite for client optimization
 - **Environment Configuration**: Comprehensive environment variable support for all integrations
+
+## Recent Changes
+
+### October 10, 2025
+- **Processes and Systems Module**: Built comprehensive process management system
+  - Created searchable wiki interface with category filtering
+  - Implemented dual creation modes: manual form entry and voice-guided builder
+  - Added PDF export functionality using jsPDF library
+  - Integrated with existing voice transcription service for speech-to-text process creation
+  - Database schema extended with processes table including JSON-based step storage
+- **Navigation Updates**: Renamed "Process Builder" to "Processes and Systems" across all navigation menus
+- **Page Routing**: Updated app routing to `/processes` for the new module
