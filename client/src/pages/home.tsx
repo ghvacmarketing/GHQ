@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { FileText, History, Settings, BookOpen, Shield } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import giesbrechtLogo from "@/assets/giesbrecht-logo.webp";
@@ -10,35 +11,30 @@ export default function Home() {
       title: "New Quote",
       icon: FileText,
       href: "/quote",
-      color: "bg-primary",
       testId: "link-new-quote"
     },
     {
       title: "Quote History",
       icon: History,
       href: "/history",
-      color: "bg-primary/90",
       testId: "link-quote-history"
     },
     {
       title: "Processes & Systems",
       icon: BookOpen,
       href: "/processes",
-      color: "bg-primary/80",
       testId: "link-processes"
     },
     {
       title: "Settings",
       icon: Settings,
       href: "/settings",
-      color: "bg-primary/70",
       testId: "link-settings"
     },
     {
       title: "Admin",
       icon: Shield,
       href: "/admin",
-      color: "bg-primary/60",
       testId: "link-admin"
     }
   ];
@@ -67,6 +63,16 @@ export default function Home() {
               <p className="text-xs text-muted-foreground hidden sm:block">Field Technician Tool</p>
             </div>
           </div>
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => window.location.href = '/admin'}
+              data-testid="button-settings"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -90,7 +96,7 @@ export default function Home() {
                 className="flex flex-col items-center justify-center space-y-3 p-4 rounded-lg transition-all hover:bg-muted/50 cursor-pointer group"
                 data-testid={app.testId}
               >
-                <div className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl ${app.color} flex items-center justify-center transition-transform group-hover:scale-110 shadow-lg`}>
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-primary flex items-center justify-center transition-transform group-hover:scale-110 shadow-lg">
                   <app.icon className="h-8 w-8 md:h-10 md:w-10 text-white" />
                 </div>
                 <span className="text-sm md:text-base font-medium text-center text-foreground" data-testid={`text-${app.testId}-title`}>
