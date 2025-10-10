@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, X } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { insertProcessSchema, type ProcessStep } from "@shared/schema";
+import { insertProcessSchema, type ProcessStep, type Category } from "@shared/schema";
 import { nanoid } from "nanoid";
 
 const formSchema = insertProcessSchema.extend({
@@ -28,6 +29,10 @@ interface ProcessBuilderFormProps {
 export default function ProcessBuilderForm({ onSuccess }: ProcessBuilderFormProps) {
   const [steps, setSteps] = useState<ProcessStep[]>([]);
   const [currentStep, setCurrentStep] = useState("");
+
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+  });
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -115,9 +120,20 @@ export default function ProcessBuilderForm({ onSuccess }: ProcessBuilderFormProp
           render={({ field }) => (
             <FormItem>
               <FormLabel>Category</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="e.g., Maintenance, Repair, Installation" data-testid="input-process-category" />
-              </FormControl>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger data-testid="select-process-category">
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {categories.map(category => (
+                    <SelectItem key={category.id} value={category.name}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
