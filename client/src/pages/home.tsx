@@ -1,8 +1,8 @@
 import { Link } from "wouter";
 import { FileText, History, Settings, BookOpen, Shield } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
+import giesbrechtLogo from "@/assets/giesbrecht-logo.webp";
 
 export default function Home() {
   const apps = [
@@ -10,35 +10,35 @@ export default function Home() {
       title: "New Quote",
       icon: FileText,
       href: "/quote",
-      color: "bg-blue-500",
+      color: "bg-primary",
       testId: "link-new-quote"
     },
     {
       title: "Quote History",
       icon: History,
       href: "/history",
-      color: "bg-purple-500",
+      color: "bg-primary/90",
       testId: "link-quote-history"
     },
     {
       title: "Processes & Systems",
       icon: BookOpen,
       href: "/processes",
-      color: "bg-green-500",
+      color: "bg-primary/80",
       testId: "link-processes"
     },
     {
       title: "Settings",
       icon: Settings,
       href: "/settings",
-      color: "bg-orange-500",
+      color: "bg-primary/70",
       testId: "link-settings"
     },
     {
       title: "Admin",
       icon: Shield,
       href: "/admin",
-      color: "bg-red-500",
+      color: "bg-primary/60",
       testId: "link-admin"
     }
   ];
@@ -70,9 +70,20 @@ export default function Home() {
         </div>
       </header>
 
-      {/* App Drawer */}
-      <main className="container mx-auto px-4 py-8 max-w-md md:max-w-2xl lg:max-w-4xl">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8">
+      {/* App Drawer with Background Logo */}
+      <main className="container mx-auto px-4 py-8 max-w-md md:max-w-2xl lg:max-w-4xl relative">
+        {/* Background Logo Watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
+          <img 
+            src={giesbrechtLogo} 
+            alt="" 
+            className="w-[300px] md:w-[400px] lg:w-[500px] opacity-[0.08] dark:opacity-[0.05] select-none"
+            data-testid="img-background-logo"
+          />
+        </div>
+
+        {/* App Icons Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 relative z-10">
           {apps.map((app) => (
             <Link key={app.href} href={app.href}>
               <div 
