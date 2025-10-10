@@ -1,7 +1,8 @@
 import { Link } from "wouter";
-import { FileText, History, Settings, BookOpen, Shield, TrendingUp, Clock } from "lucide-react";
+import { FileText, History, Settings, BookOpen, Shield, TrendingUp, Clock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import { useQuery } from "@tanstack/react-query";
@@ -92,6 +93,14 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+      {/* In Development Banner */}
+      <Alert className="mx-4 mt-4 border-orange-500/50 bg-orange-500/10" data-testid="alert-in-development">
+        <AlertCircle className="h-4 w-4 text-orange-500" />
+        <AlertDescription className="text-orange-600 dark:text-orange-400">
+          This application is currently in development. Some features may be incomplete or subject to change.
+        </AlertDescription>
+      </Alert>
 
       {/* Dashboard */}
       <main className="container mx-auto px-4 py-6 max-w-md md:max-w-2xl lg:max-w-5xl">
