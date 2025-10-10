@@ -1,95 +1,95 @@
 import { Link } from "wouter";
 import { FileText, History, Settings, BookOpen, Shield } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import NavDropdown from "@/components/nav-dropdown";
+import redlogo from "@assets/redlogo.webp";
 
 export default function Home() {
-  const shortcuts = [
+  const apps = [
     {
       title: "New Quote",
-      description: "Generate a professional quote for HVAC services",
       icon: FileText,
       href: "/quote",
-      color: "from-blue-500 to-blue-600",
+      color: "bg-blue-500",
       testId: "link-new-quote"
     },
     {
       title: "Quote History",
-      description: "View and manage previous quotes",
       icon: History,
       href: "/history",
-      color: "from-purple-500 to-purple-600",
+      color: "bg-purple-500",
       testId: "link-quote-history"
     },
     {
       title: "Processes & Systems",
-      description: "Access saved processes and create new ones",
       icon: BookOpen,
       href: "/processes",
-      color: "from-green-500 to-green-600",
+      color: "bg-green-500",
       testId: "link-processes"
     },
     {
       title: "Settings",
-      description: "Configure parts catalog and categories",
       icon: Settings,
       href: "/settings",
-      color: "from-orange-500 to-orange-600",
+      color: "bg-orange-500",
       testId: "link-settings"
     },
     {
-      title: "Admin Settings",
-      description: "Manage system configuration and integrations",
+      title: "Admin",
       icon: Shield,
       href: "/admin",
-      color: "from-red-500 to-red-600",
+      color: "bg-red-500",
       testId: "link-admin"
     }
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="container max-w-6xl mx-auto px-4 py-12">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent" data-testid="text-home-title">
-            HVAC Service Hub
-          </h1>
-          <p className="text-muted-foreground text-lg" data-testid="text-home-subtitle">
-            Professional quoting and process management for field technicians
-          </p>
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
+        <div className="flex items-center justify-between p-3 sm:p-4">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <img 
+              src={redlogo} 
+              alt="Giesbrecht HVAC" 
+              className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
+              data-testid="img-company-logo"
+            />
+            <div className="min-w-0">
+              <NavDropdown 
+                currentPageTitle="Home"
+                items={[
+                  { label: "Home", path: "/" },
+                  { label: "Quote Generator", path: "/quote" },
+                  { label: "Processes and Systems", path: "/processes" },
+                ]}
+              />
+              <p className="text-xs text-muted-foreground hidden sm:block">Field Technician Tool</p>
+            </div>
+          </div>
         </div>
+      </header>
 
-        {/* Shortcuts Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {shortcuts.map((shortcut) => (
-            <Link key={shortcut.href} href={shortcut.href}>
-              <Card 
-                className="h-full transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer border-2 hover:border-primary/50"
-                data-testid={shortcut.testId}
+      {/* App Drawer */}
+      <main className="container mx-auto px-4 py-8 max-w-md md:max-w-2xl lg:max-w-4xl">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8">
+          {apps.map((app) => (
+            <Link key={app.href} href={app.href}>
+              <div 
+                className="flex flex-col items-center justify-center space-y-3 p-4 rounded-lg transition-all hover:bg-muted/50 cursor-pointer group"
+                data-testid={app.testId}
               >
-                <CardContent className="p-6">
-                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${shortcut.color} flex items-center justify-center mb-4`}>
-                    <shortcut.icon className="h-7 w-7 text-white" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2" data-testid={`text-${shortcut.testId}-title`}>
-                    {shortcut.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground" data-testid={`text-${shortcut.testId}-description`}>
-                    {shortcut.description}
-                  </p>
-                </CardContent>
-              </Card>
+                <div className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl ${app.color} flex items-center justify-center transition-transform group-hover:scale-110 shadow-lg`}>
+                  <app.icon className="h-8 w-8 md:h-10 md:w-10 text-white" />
+                </div>
+                <span className="text-sm md:text-base font-medium text-center text-foreground" data-testid={`text-${app.testId}-title`}>
+                  {app.title}
+                </span>
+              </div>
             </Link>
           ))}
         </div>
-
-        {/* Footer */}
-        <div className="mt-16 text-center">
-          <p className="text-sm text-muted-foreground" data-testid="text-home-footer">
-            Optimized for mobile field work • No authentication required
-          </p>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }
