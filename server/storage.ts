@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, quotes, parts, technicians, processes } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type Category, type InsertCategory, quotes, parts, technicians, processes, categories } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -29,6 +29,12 @@ export interface IStorage {
   createProcess(process: InsertProcess): Promise<Process>;
   updateProcess(id: string, process: Partial<Process>): Promise<Process | undefined>;
   deleteProcess(id: string): Promise<boolean>;
+  
+  // Category operations
+  getAllCategories(): Promise<Category[]>;
+  createCategory(category: InsertCategory): Promise<Category>;
+  updateCategory(id: string, category: Partial<Category>): Promise<Category | undefined>;
+  deleteCategory(id: string): Promise<boolean>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -149,6 +155,34 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
+  // Category operations
+  async getAllCategories(): Promise<Category[]> {
+    const allCategories = await db.select().from(categories).orderBy(categories.order);
+    return allCategories;
+  }
+
+  async createCategory(insertCategory: InsertCategory): Promise<Category> {
+    const [category] = await db
+      .insert(categories)
+      .values(insertCategory)
+      .returning();
+    return category;
+  }
+
+  async updateCategory(id: string, updateData: Partial<Category>): Promise<Category | undefined> {
+    const [category] = await db
+      .update(categories)
+      .set(updateData)
+      .where(eq(categories.id, id))
+      .returning();
+    return category || undefined;
+  }
+
+  async deleteCategory(id: string): Promise<boolean> {
+    const result = await db.delete(categories).where(eq(categories.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
   // Initialize default data if needed
   async initializeDefaultData() {
     // Check if technicians already exist
@@ -184,6 +218,23 @@ export class DatabaseStorage implements IStorage {
 
       for (const part of defaultParts) {
         await this.createPart(part);
+      }
+    }
+
+    // Check if categories already exist
+    const existingCategories = await this.getAllCategories();
+    if (existingCategories.length === 0) {
+      const defaultCategories = [
+        { name: "Maintenance", order: "1" },
+        { name: "Repair", order: "2" },
+        { name: "Installation", order: "3" },
+        { name: "Troubleshooting", order: "4" },
+        { name: "Safety", order: "5" },
+        { name: "System Setup", order: "6" },
+      ];
+
+      for (const category of defaultCategories) {
+        await this.createCategory(category);
       }
     }
   }
