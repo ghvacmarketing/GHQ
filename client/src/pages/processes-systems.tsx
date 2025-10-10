@@ -103,12 +103,14 @@ export default function ProcessesSystems() {
       </header>
 
       {/* In Development Banner */}
-      <Alert className="mx-4 mt-4 border-orange-500/50 bg-orange-500/10" data-testid="alert-in-development">
-        <AlertCircle className="h-4 w-4 text-orange-500" />
-        <AlertDescription className="text-orange-600 dark:text-orange-400">
-          This application is currently in development. Some features may be incomplete or subject to change.
-        </AlertDescription>
-      </Alert>
+      <div className="px-3 sm:px-4 mt-3 sm:mt-4">
+        <Alert className="border-orange-500/50 bg-orange-500/10 flex-col sm:flex-row items-start gap-2" data-testid="alert-in-development">
+          <AlertCircle className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
+          <AlertDescription className="text-orange-600 dark:text-orange-400 text-sm sm:text-base">
+            This application is currently in development. Some features may be incomplete or subject to change.
+          </AlertDescription>
+        </Alert>
+      </div>
 
       <main className="container mx-auto px-4 py-6 max-w-md md:max-w-2xl lg:max-w-4xl">
         {selectedProcess ? (
