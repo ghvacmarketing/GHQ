@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Trash2, Edit } from "lucide-react";
 import type { Process } from "@shared/schema";
 import { jsPDF } from "jspdf";
 import {
@@ -14,6 +15,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import ProcessEditForm from "./process-edit-form";
+import { queryClient } from "@/lib/queryClient";
 
 interface ProcessDetailViewProps {
   process: Process;
@@ -22,6 +25,22 @@ interface ProcessDetailViewProps {
 }
 
 export default function ProcessDetailView({ process, onBack, onDelete }: ProcessDetailViewProps) {
+  const [isEditing, setIsEditing] = useState(false);
+
+  const handleEditSuccess = () => {
+    setIsEditing(false);
+    queryClient.invalidateQueries({ queryKey: ['/api/processes'] });
+  };
+
+  if (isEditing) {
+    return (
+      <ProcessEditForm
+        process={process}
+        onSuccess={handleEditSuccess}
+        onCancel={() => setIsEditing(false)}
+      />
+    );
+  }
   const exportToPDF = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -111,6 +130,10 @@ export default function ProcessDetailView({ process, onBack, onDelete }: Process
           Back to Wiki
         </Button>
         <div className="flex gap-2">
+          <Button onClick={() => setIsEditing(true)} variant="outline" data-testid="button-edit-process">
+            <Edit className="h-4 w-4 mr-2" />
+            Edit
+          </Button>
           <Button onClick={exportToPDF} variant="outline" data-testid="button-export-pdf">
             <Download className="h-4 w-4 mr-2" />
             Export PDF

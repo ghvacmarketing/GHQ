@@ -493,6 +493,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Voice recording with context for better AI formatting
+  app.post("/api/voice/transcribe-with-context", upload.single('audio'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No audio file provided" });
+      }
+
+      const context = req.body.context || '';
+      const result = await voiceService.transcribeWithContext(
+        req.file.buffer,
+        req.file.originalname || 'recording.webm',
+        context
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error processing voice recording:', error);
+      res.status(500).json({ message: "Error processing voice recording" });
+    }
+  });
+
   // Process routes
   app.get("/api/processes", async (req, res) => {
     try {
@@ -525,6 +546,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(process);
     } catch (error) {
       res.status(500).json({ message: "Error creating process" });
+    }
+  });
+
+  app.patch("/api/processes/:id", async (req, res) => {
+    try {
+      const process = await storage.updateProcess(req.params.id, req.body);
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+      res.json(process);
+    } catch (error) {
+      res.status(500).json({ message: "Error updating process" });
     }
   });
 

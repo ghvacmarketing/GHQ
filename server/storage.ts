@@ -27,6 +27,7 @@ export interface IStorage {
   getAllProcesses(): Promise<Process[]>;
   getProcessesByCategory(category: string): Promise<Process[]>;
   createProcess(process: InsertProcess): Promise<Process>;
+  updateProcess(id: string, process: Partial<Process>): Promise<Process | undefined>;
   deleteProcess(id: string): Promise<boolean>;
 }
 
@@ -132,6 +133,15 @@ export class DatabaseStorage implements IStorage {
       .values(insertProcess)
       .returning();
     return process;
+  }
+
+  async updateProcess(id: string, updateData: Partial<Process>): Promise<Process | undefined> {
+    const [process] = await db
+      .update(processes)
+      .set(updateData)
+      .where(eq(processes.id, id))
+      .returning();
+    return process || undefined;
   }
 
   async deleteProcess(id: string): Promise<boolean> {
