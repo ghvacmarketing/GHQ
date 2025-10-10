@@ -42,13 +42,6 @@ export default function Home() {
       testId: "link-processes"
     },
     {
-      title: "Settings",
-      description: "Configure parts catalog and categories",
-      icon: Settings,
-      href: "/settings",
-      testId: "link-settings"
-    },
-    {
       title: "Admin",
       description: "System configuration and integrations",
       icon: Shield,

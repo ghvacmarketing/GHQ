@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/home";
 import QuoteGenerator from "@/pages/quote-generator";
-import SettingsPage from "@/pages/settings";
 import QuotesHistory from "@/pages/quotes-history";
 import ProcessesSystems from "@/pages/processes-systems";
 import NotFound from "@/pages/not-found";
@@ -28,7 +27,6 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/quote" component={QuoteGenerator} />
       <Route path="/history" component={QuotesHistory} />
-      <Route path="/settings" component={SettingsPage} />
       <Route path="/processes" component={ProcessesSystems} />
       <Route path="/admin" component={AdminSettingsWrapper} />
       <Route component={NotFound} />
