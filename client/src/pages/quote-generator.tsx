@@ -409,7 +409,7 @@ export default function QuoteGenerator() {
                 currentPageTitle="Quote Generator"
                 items={[
                   { label: "Quote Generator", path: "/" },
-                  { label: "Process Builder", path: "/process-builder" },
+                  { label: "Processes and Systems", path: "/processes" },
                 ]}
               />
               <p className="text-xs text-muted-foreground hidden sm:block">Field Technician Tool</p>
