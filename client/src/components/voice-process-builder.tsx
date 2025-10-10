@@ -5,10 +5,11 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
-import { Mic, MicOff, Loader2, Check } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
-import { insertProcessSchema, type ProcessStep } from "@shared/schema";
+import { Mic, MicOff, Loader2, Check, Keyboard } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { insertProcessSchema, type ProcessStep, type Category } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +33,7 @@ export default function VoiceProcessBuilder({ onSuccess }: VoiceProcessBuilderPr
   const [currentPromptIndex, setCurrentPromptIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [skippedToType, setSkippedToType] = useState(false);
   const [processData, setProcessData] = useState<Partial<FormData>>({
     name: "",
     description: "",
@@ -40,6 +42,10 @@ export default function VoiceProcessBuilder({ onSuccess }: VoiceProcessBuilderPr
     steps: [],
   });
   const { toast } = useToast();
+
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+  });
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -164,6 +170,27 @@ export default function VoiceProcessBuilder({ onSuccess }: VoiceProcessBuilderPr
     }
   };
 
+  const handleSkipToType = () => {
+    setSkippedToType(true);
+  };
+
+  const handleNext = () => {
+    // Move to next prompt if current field is filled
+    const currentField = prompts[currentPromptIndex].field;
+    if (processData[currentField as keyof Partial<FormData>]) {
+      setSkippedToType(false); // Reset for next prompt
+      if (currentPromptIndex < prompts.length - 1) {
+        setCurrentPromptIndex(currentPromptIndex + 1);
+      }
+    } else {
+      toast({
+        title: "Please fill in the field",
+        description: "Enter a value before moving to the next step.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSave = () => {
     const finalData: FormData = {
       name: processData.name || "",
@@ -214,41 +241,103 @@ export default function VoiceProcessBuilder({ onSuccess }: VoiceProcessBuilderPr
           </Card>
 
           {/* Recording Controls */}
-          <div className="flex flex-col items-center gap-4 mb-6">
-            <Button
-              type="button"
-              size="lg"
-              variant={isRecording ? "destructive" : "default"}
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={transcribeMutation.isPending || createMutation.isPending}
-              className="w-full h-16"
-              data-testid="button-record-toggle"
-            >
-              {transcribeMutation.isPending || createMutation.isPending ? (
-                <>
-                  <Loader2 className="h-6 w-6 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : isRecording ? (
-                <>
-                  <MicOff className="h-6 w-6 mr-2" />
-                  Stop Recording
-                </>
-              ) : (
-                <>
-                  <Mic className="h-6 w-6 mr-2" />
-                  Start Recording
-                </>
-              )}
-            </Button>
-
-            {isRecording && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
-                Recording...
+          {!skippedToType ? (
+            <div className="flex flex-col items-center gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-2 w-full">
+                <Button
+                  type="button"
+                  size="lg"
+                  variant={isRecording ? "destructive" : "default"}
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={transcribeMutation.isPending || createMutation.isPending}
+                  className="h-16"
+                  data-testid="button-record-toggle"
+                >
+                  {transcribeMutation.isPending || createMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-6 w-6 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : isRecording ? (
+                    <>
+                      <MicOff className="h-6 w-6 mr-2" />
+                      Stop Recording
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="h-6 w-6 mr-2" />
+                      Record
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  size="lg"
+                  variant="outline"
+                  onClick={handleSkipToType}
+                  disabled={transcribeMutation.isPending || createMutation.isPending}
+                  className="h-16"
+                  data-testid="button-skip-to-type"
+                >
+                  <Keyboard className="h-6 w-6 mr-2" />
+                  Skip & Type
+                </Button>
               </div>
-            )}
-          </div>
+
+              {isRecording && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+                  Recording...
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mb-6 space-y-4">
+              <div className="bg-primary/10 p-4 rounded-lg">
+                <p className="text-sm font-medium mb-3">Type your response:</p>
+                {currentPrompt.field === "category" ? (
+                  <Select 
+                    value={processData.category || ""} 
+                    onValueChange={(value) => setProcessData(prev => ({ ...prev, category: value }))}
+                  >
+                    <SelectTrigger data-testid="select-voice-category">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map(category => (
+                        <SelectItem key={category.id} value={category.name}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : currentPrompt.field === "description" || currentPrompt.field === "rationale" ? (
+                  <Textarea
+                    value={processData[currentPrompt.field as keyof Partial<FormData>] as string || ""}
+                    onChange={(e) => setProcessData(prev => ({ ...prev, [currentPrompt.field]: e.target.value }))}
+                    placeholder={`Enter ${currentPrompt.field}...`}
+                    rows={3}
+                    data-testid={`textarea-type-${currentPrompt.field}`}
+                  />
+                ) : (
+                  <Input
+                    value={processData[currentPrompt.field as keyof Partial<FormData>] as string || ""}
+                    onChange={(e) => setProcessData(prev => ({ ...prev, [currentPrompt.field]: e.target.value }))}
+                    placeholder={`Enter ${currentPrompt.field}...`}
+                    data-testid={`input-type-${currentPrompt.field}`}
+                  />
+                )}
+              </div>
+              <Button
+                type="button"
+                onClick={handleNext}
+                className="w-full"
+                data-testid="button-next-prompt"
+              >
+                Next
+              </Button>
+            </div>
+          )}
 
           {/* Editable Captured Data */}
           <div className="space-y-3">
@@ -278,12 +367,21 @@ export default function VoiceProcessBuilder({ onSuccess }: VoiceProcessBuilderPr
 
               <div>
                 <label className="text-xs text-muted-foreground">Category</label>
-                <Input
+                <Select
                   value={processData.category || ""}
-                  onChange={(e) => setProcessData(prev => ({ ...prev, category: e.target.value }))}
-                  placeholder="Not captured yet..."
-                  data-testid="input-edit-category"
-                />
+                  onValueChange={(value) => setProcessData(prev => ({ ...prev, category: value }))}
+                >
+                  <SelectTrigger data-testid="select-edit-category">
+                    <SelectValue placeholder="Select category..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(category => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
