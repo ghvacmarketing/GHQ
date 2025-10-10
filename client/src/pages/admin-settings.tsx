@@ -8,9 +8,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText } from "lucide-react";
+import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import type { Quote } from "@shared/schema";
+import type { Quote, Category } from "@shared/schema";
 import redlogo from "@assets/redlogo.webp";
 
 export default function AdminSettings() {
@@ -26,6 +26,8 @@ export default function AdminSettings() {
   const [quotesPage, setQuotesPage] = useState(1);
   const [newTechnicianName, setNewTechnicianName] = useState("");
   const [newTechnicianEmail, setNewTechnicianEmail] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
@@ -187,6 +189,51 @@ export default function AdminSettings() {
         description: "Failed to remove technician. Please try again.",
         variant: "destructive",
       });
+    },
+  });
+
+  // Fetch categories
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+    enabled: isAuthenticated,
+  });
+
+  // Category mutations
+  const createCategoryMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const lastOrder = categories.length > 0 
+        ? Math.max(...categories.map(c => parseInt(c.order)))
+        : 0;
+      const response = await apiRequest('POST', '/api/categories', { name, order: String(lastOrder + 1) });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      setNewCategoryName("");
+      toast({ title: "Category added successfully" });
+    },
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const response = await apiRequest('PATCH', `/api/categories/${id}`, { name });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      setEditingCategory(null);
+      toast({ title: "Category updated successfully" });
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('DELETE', `/api/categories/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      toast({ title: "Category deleted successfully" });
     },
   });
 
@@ -845,6 +892,101 @@ export default function AdminSettings() {
                       </div>
                     </div>)
                   )}
+                </CardContent>
+              </Card>
+
+              {/* Process Categories Management */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <FolderKanban className="mr-3 h-5 w-5" />
+                    Process Categories
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Manage categories for organizing your processes and systems
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Add New Category */}
+                  <div className="flex gap-2">
+                    <Input
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Enter new category name"
+                      onKeyPress={(e) => e.key === 'Enter' && newCategoryName && createCategoryMutation.mutate(newCategoryName)}
+                      data-testid="input-new-category"
+                    />
+                    <Button 
+                      onClick={() => newCategoryName && createCategoryMutation.mutate(newCategoryName)}
+                      disabled={!newCategoryName || createCategoryMutation.isPending}
+                      data-testid="button-add-category"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add
+                    </Button>
+                  </div>
+
+                  {/* Categories List */}
+                  <div className="space-y-2">
+                    {categories.map((category) => (
+                      <div 
+                        key={category.id} 
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                        data-testid={`category-item-${category.id}`}
+                      >
+                        {editingCategory?.id === category.id ? (
+                          <div className="flex-1 flex gap-2">
+                            <Input
+                              value={editingCategory.name}
+                              onChange={(e) => setEditingCategory(prev => prev ? { ...prev, name: e.target.value } : null)}
+                              data-testid={`input-edit-category-${category.id}`}
+                            />
+                            <Button 
+                              size="sm" 
+                              onClick={() => updateCategoryMutation.mutate({ id: category.id, name: editingCategory.name })}
+                              disabled={!editingCategory.name}
+                              data-testid={`button-save-category-${category.id}`}
+                            >
+                              Save
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => setEditingCategory(null)}
+                              data-testid={`button-cancel-category-${category.id}`}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex-1 font-medium" data-testid={`text-category-${category.id}`}>
+                              {category.name}
+                            </div>
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditingCategory(category)}
+                                data-testid={`button-edit-category-${category.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => deleteCategoryMutation.mutate(category.id)}
+                                disabled={deleteCategoryMutation.isPending}
+                                data-testid={`button-delete-category-${category.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </>
