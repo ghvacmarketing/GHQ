@@ -54,7 +54,7 @@ export class DatabaseStorage implements IStorage {
   async createQuote(insertQuote: InsertQuote): Promise<Quote> {
     const [quote] = await db
       .insert(quotes)
-      .values(insertQuote)
+      .values([insertQuote])
       .returning();
     return quote;
   }
@@ -136,7 +136,7 @@ export class DatabaseStorage implements IStorage {
   async createProcess(insertProcess: InsertProcess): Promise<Process> {
     const [process] = await db
       .insert(processes)
-      .values(insertProcess)
+      .values([insertProcess])
       .returning();
     return process;
   }
