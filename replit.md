@@ -107,6 +107,21 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### October 10, 2025
+- **Home Landing Page**: Created elegant landing page with shortcuts to all main pages
+  - Gradient card-based design with icons for each section (New Quote, Quote History, Processes & Systems, Settings, Admin)
+  - Mobile-first responsive layout with hover animations
+  - Set as default route at `/` (root path)
+  - Updated all navigation dropdowns to include Home link
+- **Routing Updates**: 
+  - Home page now at `/` (was Quote Generator)
+  - Quote Generator moved to `/quote`
+  - All navigation menus updated with Home link and correct paths
+  - Updated "New Quote" button in Quote History to link to `/quote`
+- **Category Management System**: Complete configurable category system for processes
+  - PostgreSQL categories table with default categories (Maintenance, Repair, Installation, Troubleshooting, Safety)
+  - Settings page UI for adding, editing, and deleting categories
+  - All process forms (manual, voice, edit) use dynamic category dropdowns
+  - Voice builder includes "Skip to Type" functionality for all fields including category selection
 - **Processes and Systems Module**: Built comprehensive process management system
   - Created searchable wiki interface with category filtering
   - Implemented dual creation modes: manual form entry and voice-guided builder
@@ -114,4 +129,3 @@ Preferred communication style: Simple, everyday language.
   - Integrated with existing voice transcription service for speech-to-text process creation
   - Database schema extended with processes table including JSON-based step storage
 - **Navigation Updates**: Renamed "Process Builder" to "Processes and Systems" across all navigation menus
-- **Page Routing**: Updated app routing to `/processes` for the new module

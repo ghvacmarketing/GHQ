@@ -80,7 +80,8 @@ export default function ProcessesSystems() {
               <NavDropdown 
                 currentPageTitle="Processes and Systems"
                 items={[
-                  { label: "Quote Generator", path: "/" },
+                  { label: "Home", path: "/" },
+                  { label: "Quote Generator", path: "/quote" },
                   { label: "Processes and Systems", path: "/processes" },
                 ]}
               />

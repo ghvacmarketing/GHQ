@@ -141,7 +141,7 @@ export default function QuotesHistory() {
             <Badge variant="secondary" className="text-xs sm:text-sm">
               {quotes.length}
             </Badge>
-            <Link href="/">
+            <Link href="/quote">
               <Button variant="default" size="sm" className="flex items-center space-x-1 sm:space-x-2 h-9">
                 <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">New Quote</span>

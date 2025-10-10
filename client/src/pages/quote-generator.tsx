@@ -408,7 +408,8 @@ export default function QuoteGenerator() {
               <NavDropdown 
                 currentPageTitle="Quote Generator"
                 items={[
-                  { label: "Quote Generator", path: "/" },
+                  { label: "Home", path: "/" },
+                  { label: "Quote Generator", path: "/quote" },
                   { label: "Processes and Systems", path: "/processes" },
                 ]}
               />
@@ -416,7 +417,7 @@ export default function QuoteGenerator() {
             </div>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-            {location === "/" && (
+            {location === "/quote" && (
               <Link href="/history">
                 <Button variant="ghost" size="icon" data-testid="button-history" title="View quote history">
                   <History className="h-4 w-4" />

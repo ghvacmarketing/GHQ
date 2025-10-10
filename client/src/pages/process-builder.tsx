@@ -23,7 +23,8 @@ export default function ProcessBuilder() {
               <NavDropdown 
                 currentPageTitle="Process Builder"
                 items={[
-                  { label: "Quote Generator", path: "/" },
+                  { label: "Home", path: "/" },
+                  { label: "Quote Generator", path: "/quote" },
                   { label: "Process Builder", path: "/process-builder" },
                 ]}
               />
