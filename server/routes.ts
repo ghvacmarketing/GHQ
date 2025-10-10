@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import compression from "compression";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
@@ -490,6 +490,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error processing voice recording:', error);
       res.status(500).json({ message: "Error processing voice recording" });
+    }
+  });
+
+  // Process routes
+  app.get("/api/processes", async (req, res) => {
+    try {
+      const category = req.query.category as string;
+      const processes = category 
+        ? await storage.getProcessesByCategory(category)
+        : await storage.getAllProcesses();
+      res.json(processes);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching processes" });
+    }
+  });
+
+  app.get("/api/processes/:id", async (req, res) => {
+    try {
+      const process = await storage.getProcess(req.params.id);
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+      res.json(process);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching process" });
+    }
+  });
+
+  app.post("/api/processes", async (req, res) => {
+    try {
+      const validatedData = insertProcessSchema.parse(req.body);
+      const process = await storage.createProcess(validatedData);
+      res.json(process);
+    } catch (error) {
+      res.status(500).json({ message: "Error creating process" });
+    }
+  });
+
+  app.delete("/api/processes/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteProcess(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error deleting process" });
     }
   });
 

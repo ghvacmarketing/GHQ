@@ -76,3 +76,27 @@ export type InsertPart = z.infer<typeof insertPartSchema>;
 export type PartData = typeof parts.$inferSelect;
 export type InsertTechnician = z.infer<typeof insertTechnicianSchema>;
 export type Technician = typeof technicians.$inferSelect;
+
+export const processes = pgTable("processes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(),
+  rationale: text("rationale").notNull(),
+  steps: json("steps").$type<ProcessStep[]>().notNull().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ProcessStep = {
+  id: string;
+  stepNumber: number;
+  instruction: string;
+};
+
+export const insertProcessSchema = createInsertSchema(processes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertProcess = z.infer<typeof insertProcessSchema>;
+export type Process = typeof processes.$inferSelect;

@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, quotes, parts, technicians } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, quotes, parts, technicians, processes } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -21,6 +21,13 @@ export interface IStorage {
   getTechnician(id: string): Promise<Technician | undefined>;
   getAllTechnicians(): Promise<Technician[]>;
   createTechnician(technician: InsertTechnician): Promise<Technician>;
+  
+  // Process operations
+  getProcess(id: string): Promise<Process | undefined>;
+  getAllProcesses(): Promise<Process[]>;
+  getProcessesByCategory(category: string): Promise<Process[]>;
+  createProcess(process: InsertProcess): Promise<Process>;
+  deleteProcess(id: string): Promise<boolean>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -104,6 +111,37 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTechnician(id: string): Promise<boolean> {
     const result = await db.delete(technicians).where(eq(technicians.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Process operations
+  async getProcess(id: string): Promise<Process | undefined> {
+    const [process] = await db.select().from(processes).where(eq(processes.id, id));
+    return process || undefined;
+  }
+
+  async getAllProcesses(): Promise<Process[]> {
+    const allProcesses = await db.select().from(processes).orderBy(processes.createdAt);
+    return allProcesses.reverse(); // Most recent first
+  }
+
+  async getProcessesByCategory(category: string): Promise<Process[]> {
+    return await db.select().from(processes).where(eq(processes.category, category));
+  }
+
+  async createProcess(insertProcess: InsertProcess): Promise<Process> {
+    const [process] = await db
+      .insert(processes)
+      .values({
+        ...insertProcess,
+        steps: insertProcess.steps || []
+      })
+      .returning();
+    return process;
+  }
+
+  async deleteProcess(id: string): Promise<boolean> {
+    const result = await db.delete(processes).where(eq(processes.id, id));
     return (result.rowCount || 0) > 0;
   }
 
