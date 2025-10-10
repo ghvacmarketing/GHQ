@@ -1,38 +1,55 @@
 import { Link } from "wouter";
-import { FileText, History, Settings, BookOpen, Shield } from "lucide-react";
+import { FileText, History, Settings, BookOpen, Shield, TrendingUp, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
-import giesbrechtLogo from "@/assets/giesbrecht-logo.webp";
+import { useQuery } from "@tanstack/react-query";
+import type { Quote } from "@shared/schema";
 
 export default function Home() {
-  const apps = [
+  const { data: quotesData } = useQuery({
+    queryKey: ['/api/quotes'],
+  });
+
+  const { data: processes = [] } = useQuery({
+    queryKey: ['/api/processes'],
+  });
+
+  const quotes = quotesData?.quotes || [];
+
+  const actions = [
     {
       title: "New Quote",
+      description: "Generate a professional HVAC quote on-site",
       icon: FileText,
       href: "/quote",
       testId: "link-new-quote"
     },
     {
       title: "Quote History",
+      description: "View and manage all your quotes",
       icon: History,
       href: "/history",
       testId: "link-quote-history"
     },
     {
       title: "Processes & Systems",
+      description: "Access saved procedures and guides",
       icon: BookOpen,
       href: "/processes",
       testId: "link-processes"
     },
     {
       title: "Settings",
+      description: "Configure parts catalog and categories",
       icon: Settings,
       href: "/settings",
       testId: "link-settings"
     },
     {
       title: "Admin",
+      description: "System configuration and integrations",
       icon: Shield,
       href: "/admin",
       testId: "link-admin"
@@ -76,35 +93,95 @@ export default function Home() {
         </div>
       </header>
 
-      {/* App Drawer with Background Logo */}
-      <main className="container mx-auto px-4 py-8 max-w-md md:max-w-2xl lg:max-w-4xl relative">
-        {/* Background Logo Watermark */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
-          <img 
-            src={giesbrechtLogo} 
-            alt="" 
-            className="w-[300px] md:w-[400px] lg:w-[500px] opacity-[0.08] dark:opacity-[0.05] select-none"
-            data-testid="img-background-logo"
-          />
+      {/* Dashboard */}
+      <main className="container mx-auto px-4 py-6 max-w-md md:max-w-2xl lg:max-w-5xl">
+        {/* Stats Section */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <Card className="bg-primary/5 border-primary/20" data-testid="card-total-quotes">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Quotes</p>
+                  <p className="text-2xl font-bold text-primary" data-testid="text-total-quotes">{quotes.length}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-primary/40" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-primary/5 border-primary/20" data-testid="card-total-processes">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Processes</p>
+                  <p className="text-2xl font-bold text-primary" data-testid="text-total-processes">{processes.length}</p>
+                </div>
+                <BookOpen className="h-8 w-8 text-primary/40" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-primary/5 border-primary/20" data-testid="card-recent-activity">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Recent</p>
+                  <p className="text-2xl font-bold text-primary" data-testid="text-recent-count">
+                    {quotes.filter(q => {
+                      if (!q.createdAt) return false;
+                      const weekAgo = new Date();
+                      weekAgo.setDate(weekAgo.getDate() - 7);
+                      return new Date(q.createdAt) > weekAgo;
+                    }).length}
+                  </p>
+                </div>
+                <Clock className="h-8 w-8 text-primary/40" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-primary/5 border-primary/20" data-testid="card-quick-access">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Quick Access</p>
+                  <p className="text-2xl font-bold text-primary">{actions.length}</p>
+                </div>
+                <Shield className="h-8 w-8 text-primary/40" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* App Icons Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 relative z-10">
-          {apps.map((app) => (
-            <Link key={app.href} href={app.href}>
-              <div 
-                className="flex flex-col items-center justify-center space-y-3 p-4 rounded-lg transition-all hover:bg-muted/50 cursor-pointer group"
-                data-testid={app.testId}
-              >
-                <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-primary flex items-center justify-center transition-transform group-hover:scale-110 shadow-lg">
-                  <app.icon className="h-8 w-8 md:h-10 md:w-10 text-white" />
-                </div>
-                <span className="text-sm md:text-base font-medium text-center text-foreground" data-testid={`text-${app.testId}-title`}>
-                  {app.title}
-                </span>
-              </div>
-            </Link>
-          ))}
+        {/* Action Cards */}
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold mb-4" data-testid="text-quick-actions-title">Quick Actions</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {actions.map((action) => (
+              <Link key={action.href} href={action.href}>
+                <Card 
+                  className="transition-all hover:shadow-lg hover:border-primary/50 cursor-pointer group"
+                  data-testid={action.testId}
+                >
+                  <CardContent className="p-5">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110">
+                        <action.icon className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-foreground mb-1" data-testid={`text-${action.testId}-title`}>
+                          {action.title}
+                        </h3>
+                        <p className="text-sm text-muted-foreground" data-testid={`text-${action.testId}-description`}>
+                          {action.description}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
         </div>
       </main>
     </div>
