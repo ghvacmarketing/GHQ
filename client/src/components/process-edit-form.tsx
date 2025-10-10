@@ -5,10 +5,11 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Plus, X, ArrowLeft } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
-import { insertProcessSchema, type ProcessStep, type Process } from "@shared/schema";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { insertProcessSchema, type ProcessStep, type Process, type Category } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { queryClient } from "@/lib/queryClient";
 
@@ -30,6 +31,10 @@ interface ProcessEditFormProps {
 export default function ProcessEditForm({ process, onSuccess, onCancel }: ProcessEditFormProps) {
   const [steps, setSteps] = useState<ProcessStep[]>(process.steps || []);
   const [currentStep, setCurrentStep] = useState("");
+
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+  });
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -131,9 +136,20 @@ export default function ProcessEditForm({ process, onSuccess, onCancel }: Proces
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Category</FormLabel>
-                <FormControl>
-                  <Input {...field} placeholder="e.g., Maintenance, Repair, Installation" data-testid="input-edit-process-category" />
-                </FormControl>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-edit-process-category">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {categories.map(category => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
