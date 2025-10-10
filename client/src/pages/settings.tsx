@@ -5,8 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Plus, Trash2, Edit } from "lucide-react";
+import { Settings, Plus, Trash2, Edit, FolderKanban } from "lucide-react";
 import giesbrechtLogo from "../assets/giesbrecht-logo.webp";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Category } from "@shared/schema";
 
 interface SuggestedPart {
   id: string;
@@ -18,6 +21,55 @@ interface SuggestedPart {
 export default function SettingsPage() {
   const { toast } = useToast();
   
+  // Category state and queries
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+  });
+
+  const createCategoryMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const lastOrder = categories.length > 0 
+        ? Math.max(...categories.map(c => parseInt(c.order)))
+        : 0;
+      return apiRequest('/api/categories', {
+        method: 'POST',
+        body: JSON.stringify({ name, order: String(lastOrder + 1) }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      setNewCategoryName("");
+      toast({ title: "Category added successfully" });
+    },
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      return apiRequest(`/api/categories/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      setEditingCategory(null);
+      toast({ title: "Category updated successfully" });
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/categories/${id}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      toast({ title: "Category deleted successfully" });
+    },
+  });
+
   const [suggestedParts, setSuggestedParts] = useState<SuggestedPart[]>([
     { id: "contactor-30a", name: "30A Contactor", price: "45.00", category: "Electrical" },
     { id: "capacitor-dual", name: "Dual Run Capacitor", price: "25.00", category: "Electrical" },
@@ -36,7 +88,7 @@ export default function SettingsPage() {
     category: "Electrical",
   });
 
-  const categories = ["Electrical", "Controls", "Filters", "Parts", "Motors", "Refrigeration"];
+  const partCategories = ["Electrical", "Controls", "Filters", "Parts", "Motors", "Refrigeration"];
 
   const handleAddPart = () => {
     if (!newPart.name || !newPart.price || !newPart.category) {
@@ -213,7 +265,7 @@ export default function SettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map(category => (
+                    {partCategories.map(category => (
                       <SelectItem key={category} value={category}>
                         {category}
                       </SelectItem>
@@ -268,7 +320,7 @@ export default function SettingsPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {categories.map(category => (
+                          {partCategories.map(category => (
                             <SelectItem key={category} value={category}>
                               {category}
                             </SelectItem>
@@ -333,6 +385,101 @@ export default function SettingsPage() {
               >
                 Save All Settings
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Process Categories Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <FolderKanban className="mr-3 h-5 w-5" />
+              Process Categories
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Manage categories for organizing your processes and systems
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Add New Category */}
+            <div className="flex gap-2">
+              <Input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Enter new category name"
+                onKeyPress={(e) => e.key === 'Enter' && newCategoryName && createCategoryMutation.mutate(newCategoryName)}
+                data-testid="input-new-category"
+              />
+              <Button 
+                onClick={() => newCategoryName && createCategoryMutation.mutate(newCategoryName)}
+                disabled={!newCategoryName || createCategoryMutation.isPending}
+                data-testid="button-add-category"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add
+              </Button>
+            </div>
+
+            {/* Categories List */}
+            <div className="space-y-2">
+              {categories.map((category) => (
+                <div 
+                  key={category.id} 
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                  data-testid={`category-item-${category.id}`}
+                >
+                  {editingCategory?.id === category.id ? (
+                    <div className="flex-1 flex gap-2">
+                      <Input
+                        value={editingCategory.name}
+                        onChange={(e) => setEditingCategory(prev => prev ? { ...prev, name: e.target.value } : null)}
+                        data-testid={`input-edit-category-${category.id}`}
+                      />
+                      <Button 
+                        size="sm" 
+                        onClick={() => updateCategoryMutation.mutate({ id: category.id, name: editingCategory.name })}
+                        disabled={!editingCategory.name}
+                        data-testid={`button-save-category-${category.id}`}
+                      >
+                        Save
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => setEditingCategory(null)}
+                        data-testid={`button-cancel-category-${category.id}`}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-1 font-medium" data-testid={`text-category-${category.id}`}>
+                        {category.name}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingCategory(category)}
+                          data-testid={`button-edit-category-${category.id}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => deleteCategoryMutation.mutate(category.id)}
+                          disabled={deleteCategoryMutation.isPending}
+                          data-testid={`button-delete-category-${category.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
