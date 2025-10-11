@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -13,8 +13,8 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 export default function PriceBook() {
   const [numPages, setNumPages] = useState<number | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
-  const [scale, setScale] = useState(1.0);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Check if PDF exists in database
   const { data: pdfExists } = useQuery({
@@ -29,16 +29,20 @@ export default function PriceBook() {
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
-    setPageNumber(1);
   }
 
-  function changePage(offset: number) {
-    setPageNumber(prevPageNumber => Math.min(Math.max(1, prevPageNumber + offset), numPages || 1));
-  }
+  // Measure container width and update on resize
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth - 32); // Subtract padding
+      }
+    };
 
-  function changeScale(delta: number) {
-    setScale(prevScale => Math.min(Math.max(0.5, prevScale + delta), 3.0));
-  }
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -91,59 +95,13 @@ export default function PriceBook() {
           </div>
         ) : (
           <div className="max-w-5xl mx-auto">
-            {/* PDF Controls */}
-            <div className="flex items-center justify-between mb-4 p-3 bg-card border border-border rounded-lg" data-testid="pdf-controls">
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => changePage(-1)}
-                  disabled={pageNumber <= 1}
-                  data-testid="button-prev-page"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-medium" data-testid="text-page-info">
-                  Page {pageNumber} of {numPages || '?'}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => changePage(1)}
-                  disabled={pageNumber >= (numPages || 1)}
-                  data-testid="button-next-page"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => changeScale(-0.1)}
-                  disabled={scale <= 0.5}
-                  data-testid="button-zoom-out"
-                >
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-medium" data-testid="text-zoom-level">
-                  {Math.round(scale * 100)}%
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => changeScale(0.1)}
-                  disabled={scale >= 3.0}
-                  data-testid="button-zoom-in"
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* PDF Viewer */}
-            <div className="bg-card border border-border rounded-lg overflow-hidden" data-testid="pdf-viewer">
-              <div className="flex justify-center p-4 bg-muted/30">
+            {/* PDF Viewer - Vertically Scrollable */}
+            <div 
+              ref={containerRef}
+              className="bg-card border border-border rounded-lg overflow-auto" 
+              data-testid="pdf-viewer"
+            >
+              <div className="p-4 bg-muted/30">
                 <Document
                   file={pdfUrl}
                   onLoadSuccess={onDocumentLoadSuccess}
@@ -157,18 +115,24 @@ export default function PriceBook() {
                       <Alert className="border-destructive/50 bg-destructive/10 inline-block">
                         <AlertCircle className="h-4 w-4 text-destructive" />
                         <AlertDescription className="text-destructive">
-                          Failed to load PDF. Please check the URL in Admin Settings.
+                          Failed to load PDF. Please try uploading it again in Admin Settings.
                         </AlertDescription>
                       </Alert>
                     </div>
                   }
                 >
-                  <Page
-                    pageNumber={pageNumber}
-                    scale={scale}
-                    renderTextLayer={true}
-                    renderAnnotationLayer={true}
-                  />
+                  <div className="space-y-4">
+                    {numPages && containerWidth > 0 && Array.from(new Array(numPages), (_, index) => (
+                      <div key={`page_${index + 1}`} className="flex justify-center">
+                        <Page
+                          pageNumber={index + 1}
+                          width={containerWidth}
+                          renderTextLayer={false}
+                          renderAnnotationLayer={false}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </Document>
               </div>
             </div>
