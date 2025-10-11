@@ -106,6 +106,23 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 11, 2025
+- **Homepage Redesign**: Replaced stats boxes with clean "GHVAC Tools" hero section
+  - Removed Total Quotes, Processes, Recent Activity, and Quick Access stat cards
+  - Added large hero text with tagline for professional appearance
+  - Maintained all existing action cards (New Quote, Quote History, Price Book, Processes & Systems, Admin)
+- **Price Book Feature**: New PDF viewer page for pricing catalog
+  - Created dedicated `/price-book` route with native-looking PDF viewer using react-pdf
+  - PDF displays with zoom controls (50%-300%) and page navigation
+  - Admin settings configuration for PDF URL in System Configuration section
+  - Database-backed settings storage for flexible app configuration
+  - Clean error states when no PDF is configured or load fails
+- **API Architecture Enhancement**: Separated app configuration from Google Sheets pricing
+  - Added `/api/app-settings` endpoints for database-backed user settings (PDF URLs, etc.)
+  - Preserved `/api/settings` for Google Sheets pricing data (read-only)
+  - Clear separation prevents endpoint conflicts and maintains data clarity
+  - Settings table in PostgreSQL for persistent app configuration
+
 ### October 10, 2025
 - **Home Landing Page**: Created elegant landing page with shortcuts to all main pages
   - Gradient card-based design with icons for each section (New Quote, Quote History, Processes & Systems, Settings, Admin)
