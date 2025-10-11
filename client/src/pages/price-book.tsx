@@ -18,7 +18,7 @@ export default function PriceBook() {
   const [scale, setScale] = useState(1.0);
 
   const { data: settings } = useQuery<Setting[]>({
-    queryKey: ['/api/settings'],
+    queryKey: ['/api/app-settings'],
   });
 
   const pdfUrl = settings?.find(s => s.key === 'price_book_pdf_url')?.value;

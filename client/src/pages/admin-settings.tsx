@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit, Settings2, Users, FolderOpen, ReceiptText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import type { Quote, Category, Process } from "@shared/schema";
+import type { Quote, Category, Process, Setting } from "@shared/schema";
 import redlogo from "@assets/redlogo.webp";
 
 export default function AdminSettings() {
@@ -29,6 +29,7 @@ export default function AdminSettings() {
   const [newTechnicianEmail, setNewTechnicianEmail] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [pdfUrl, setPdfUrl] = useState("");
 
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
@@ -205,6 +206,20 @@ export default function AdminSettings() {
     enabled: isAuthenticated,
   });
 
+  // Fetch app settings (PDF URLs, etc.)
+  const { data: appSettings = [] } = useQuery<Setting[]>({
+    queryKey: ['/api/app-settings'],
+    enabled: isAuthenticated,
+  });
+
+  // Initialize PDF URL from app settings
+  useEffect(() => {
+    const pdfSetting = appSettings.find((s: Setting) => s.key === 'price_book_pdf_url');
+    if (pdfSetting) {
+      setPdfUrl(pdfSetting.value);
+    }
+  }, [appSettings]);
+
   // Category mutations
   const createCategoryMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -258,6 +273,31 @@ export default function AdminSettings() {
       toast({
         title: "Delete Failed",
         description: "Failed to delete process. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // PDF URL mutation
+  const savePdfUrlMutation = useMutation({
+    mutationFn: async (url: string) => {
+      const response = await apiRequest('POST', '/api/app-settings', { 
+        key: 'price_book_pdf_url', 
+        value: url 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/app-settings'] });
+      toast({ 
+        title: "PDF URL Saved",
+        description: "Price book PDF URL updated successfully." 
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Save Failed",
+        description: "Failed to save PDF URL. Please try again.",
         variant: "destructive",
       });
     },
@@ -619,6 +659,43 @@ export default function AdminSettings() {
                         />
                       </div>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Price Book PDF Configuration */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <FileText className="h-5 w-5 mr-2" />
+                    Price Book PDF
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Configure the PDF URL for the price book viewer
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="pdf-url">PDF URL</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="pdf-url"
+                        placeholder="https://example.com/pricebook.pdf"
+                        value={pdfUrl}
+                        onChange={(e) => setPdfUrl(e.target.value)}
+                        data-testid="input-pdf-url"
+                      />
+                      <Button 
+                        onClick={() => savePdfUrlMutation.mutate(pdfUrl)}
+                        disabled={!pdfUrl || savePdfUrlMutation.isPending}
+                        data-testid="button-save-pdf-url"
+                      >
+                        {savePdfUrlMutation.isPending ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Enter a publicly accessible PDF URL. This will be displayed in the Price Book page.
+                    </p>
                   </div>
                 </CardContent>
               </Card>

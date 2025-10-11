@@ -616,8 +616,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Settings routes
-  app.get("/api/settings", async (req, res) => {
+  // App Settings routes - for user-managed configuration (PDF URLs, etc.)
+  // Note: /api/settings is reserved for Google Sheets-derived pricing data
+  app.get("/api/app-settings", async (req, res) => {
     try {
       const settings = await storage.getAllSettings();
       res.json(settings);
@@ -626,7 +627,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/settings/:key", async (req, res) => {
+  app.get("/api/app-settings/:key", async (req, res) => {
     try {
       const setting = await storage.getSetting(req.params.key);
       if (!setting) {
@@ -638,7 +639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/settings", async (req, res) => {
+  app.post("/api/app-settings", async (req, res) => {
     try {
       const { key, value } = req.body;
       if (!key || value === undefined) {
@@ -651,7 +652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/settings/:key", async (req, res) => {
+  app.delete("/api/app-settings/:key", async (req, res) => {
     try {
       const success = await storage.deleteSetting(req.params.key);
       if (!success) {
