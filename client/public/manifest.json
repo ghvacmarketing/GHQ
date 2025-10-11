@@ -1,6 +1,6 @@
 {
-  "name": "GHVAC Quote Generator",
-  "short_name": "GHVAC Quotes",
+  "name": "GHVAC Tools",
+  "short_name": "GHVAC Tools",
   "description": "Professional HVAC service pricing and quote generation for field technicians",
   "start_url": "/",
   "display": "standalone",
