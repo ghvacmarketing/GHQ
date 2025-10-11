@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import type { Quote, Category } from "@shared/schema";
+import type { Quote, Category, Process } from "@shared/schema";
 import redlogo from "@assets/redlogo.webp";
 
 export default function AdminSettings() {
@@ -198,6 +198,12 @@ export default function AdminSettings() {
     enabled: isAuthenticated,
   });
 
+  // Fetch processes
+  const { data: processes = [] } = useQuery<Process[]>({
+    queryKey: ['/api/processes'],
+    enabled: isAuthenticated,
+  });
+
   // Category mutations
   const createCategoryMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -234,6 +240,25 @@ export default function AdminSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
       toast({ title: "Category deleted successfully" });
+    },
+  });
+
+  // Process mutation
+  const deleteProcessMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('DELETE', `/api/processes/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/processes'] });
+      toast({ title: "Process deleted successfully" });
+    },
+    onError: () => {
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete process. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -987,6 +1012,79 @@ export default function AdminSettings() {
                       </div>
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Process Management */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <FileText className="mr-3 h-5 w-5" />
+                    Processes Management
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    View and delete saved processes ({processes.length} total)
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {processes.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No processes saved yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {processes.map((process) => (
+                        <div 
+                          key={process.id} 
+                          className="flex items-start justify-between p-3 border rounded-lg hover:bg-muted/50"
+                          data-testid={`process-item-${process.id}`}
+                        >
+                          <div className="flex-1 min-w-0 mr-3">
+                            <div className="font-medium truncate" data-testid={`process-name-${process.id}`}>
+                              {process.name}
+                            </div>
+                            <div className="text-sm text-muted-foreground line-clamp-1">
+                              {process.description}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className="text-xs">
+                                {process.category}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {process.steps?.length || 0} steps
+                              </span>
+                            </div>
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                data-testid={`button-delete-process-${process.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Process</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete "{process.name}"? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteProcessMutation.mutate(process.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </>
