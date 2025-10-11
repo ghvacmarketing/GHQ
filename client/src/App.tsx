@@ -7,6 +7,8 @@ import Home from "@/pages/home";
 import QuoteGenerator from "@/pages/quote-generator";
 import QuotesHistory from "@/pages/quotes-history";
 import ProcessesSystems from "@/pages/processes-systems";
+import ProcessBuilderManual from "@/pages/process-builder-manual";
+import ProcessBuilderVoice from "@/pages/process-builder-voice";
 import PriceBook from "@/pages/price-book";
 import NotFound from "@/pages/not-found";
 import { lazy, Suspense } from "react";
@@ -30,6 +32,8 @@ function Router() {
       <Route path="/history" component={QuotesHistory} />
       <Route path="/price-book" component={PriceBook} />
       <Route path="/processes" component={ProcessesSystems} />
+      <Route path="/processes/new" component={ProcessBuilderManual} />
+      <Route path="/processes/new/voice" component={ProcessBuilderVoice} />
       <Route path="/admin" component={AdminSettingsWrapper} />
       <Route component={NotFound} />
     </Switch>

@@ -9,21 +9,19 @@ import { useLocation } from "wouter";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import type { Process } from "@shared/schema";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ProcessBuilderForm from "@/components/process-builder-form";
-import VoiceProcessBuilder from "@/components/voice-process-builder";
 import ProcessDetailView from "@/components/process-detail-view";
-import { queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function ProcessesSystems() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedProcess, setSelectedProcess] = useState<Process | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const { toast } = useToast();
 
   const { data: processes = [], isLoading } = useQuery<Process[]>({
     queryKey: ['/api/processes'],
@@ -40,15 +38,6 @@ export default function ProcessesSystems() {
     const matchesCategory = selectedCategory === "all" || process.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
-
-  const handleProcessCreated = () => {
-    setIsCreateDialogOpen(false);
-    queryClient.invalidateQueries({ queryKey: ['/api/processes'] });
-    toast({
-      title: "Process created",
-      description: "Your new process has been saved successfully.",
-    });
-  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -86,7 +75,6 @@ export default function ProcessesSystems() {
           </div>
         </div>
       </header>
-
       {/* Processes Page Notice */}
       <div className="px-3 sm:px-4 mt-3 sm:mt-4">
         <Alert className="border-orange-500/50 bg-orange-500/10 flex-col sm:flex-row items-start gap-2" data-testid="alert-processes-notice">
@@ -96,7 +84,6 @@ export default function ProcessesSystems() {
           </AlertDescription>
         </Alert>
       </div>
-
       <main className="container mx-auto px-4 py-6 max-w-md md:max-w-2xl lg:max-w-4xl">
         {selectedProcess ? (
           <ProcessDetailView 
@@ -107,38 +94,31 @@ export default function ProcessesSystems() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Processes and Systems Wiki</CardTitle>
-                <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                  <DialogTrigger asChild>
+                <CardTitle>Wiki</CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
                     <Button data-testid="button-create-process">
                       <Plus className="h-4 w-4 mr-2" />
                       Create Process
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Create New Process</DialogTitle>
-                    </DialogHeader>
-                    <Tabs defaultValue="manual" className="w-full">
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="manual" data-testid="tab-manual">
-                          <FileText className="h-4 w-4 mr-2" />
-                          Manual Entry
-                        </TabsTrigger>
-                        <TabsTrigger value="voice" data-testid="tab-voice">
-                          <Mic className="h-4 w-4 mr-2" />
-                          Voice Guided
-                        </TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="manual" className="mt-4">
-                        <ProcessBuilderForm onSuccess={handleProcessCreated} />
-                      </TabsContent>
-                      <TabsContent value="voice" className="mt-4">
-                        <VoiceProcessBuilder onSuccess={handleProcessCreated} />
-                      </TabsContent>
-                    </Tabs>
-                  </DialogContent>
-                </Dialog>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem 
+                      onClick={() => setLocation('/processes/new')}
+                      data-testid="menu-item-manual"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Manual Entry
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setLocation('/processes/new/voice')}
+                      data-testid="menu-item-voice"
+                    >
+                      <Mic className="h-4 w-4 mr-2" />
+                      Voice Guided
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </CardHeader>
             <CardContent>
