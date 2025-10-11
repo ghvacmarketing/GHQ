@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { FileText, History, Settings, BookOpen, Shield, TrendingUp, Clock, AlertCircle } from "lucide-react";
+import { FileText, History, Settings, BookOpen, Shield, AlertCircle, Book } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -33,6 +33,13 @@ export default function Home() {
       icon: History,
       href: "/history",
       testId: "link-quote-history"
+    },
+    {
+      title: "Price Book",
+      description: "View current pricing and parts catalog",
+      icon: Book,
+      href: "/price-book",
+      testId: "link-price-book"
     },
     {
       title: "Processes & Systems",
@@ -99,62 +106,14 @@ export default function Home() {
 
       {/* Dashboard */}
       <main className="container mx-auto px-4 py-6 max-w-md md:max-w-2xl lg:max-w-5xl">
-        {/* Stats Section */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-primary/5 border-primary/20" data-testid="card-total-quotes">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Quotes</p>
-                  <p className="text-2xl font-bold text-primary" data-testid="text-total-quotes">{quotes.length}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-primary/40" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-primary/5 border-primary/20" data-testid="card-total-processes">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Processes</p>
-                  <p className="text-2xl font-bold text-primary" data-testid="text-total-processes">{processes.length}</p>
-                </div>
-                <BookOpen className="h-8 w-8 text-primary/40" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-primary/5 border-primary/20" data-testid="card-recent-activity">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Recent</p>
-                  <p className="text-2xl font-bold text-primary" data-testid="text-recent-count">
-                    {quotes.filter(q => {
-                      if (!q.createdAt) return false;
-                      const weekAgo = new Date();
-                      weekAgo.setDate(weekAgo.getDate() - 7);
-                      return new Date(q.createdAt) > weekAgo;
-                    }).length}
-                  </p>
-                </div>
-                <Clock className="h-8 w-8 text-primary/40" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-primary/5 border-primary/20" data-testid="card-quick-access">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Quick Access</p>
-                  <p className="text-2xl font-bold text-primary">{actions.length}</p>
-                </div>
-                <Shield className="h-8 w-8 text-primary/40" />
-              </div>
-            </CardContent>
-          </Card>
+        {/* Hero Section */}
+        <div className="text-center mb-12" data-testid="hero-section">
+          <h1 className="text-4xl md:text-5xl font-bold text-primary mb-2" data-testid="text-hero-title">
+            GHVAC Tools
+          </h1>
+          <p className="text-muted-foreground text-sm md:text-base">
+            Professional field technician solutions
+          </p>
         </div>
 
         {/* Action Cards */}
