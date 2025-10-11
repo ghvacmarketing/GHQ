@@ -25,7 +25,8 @@ export default function ProcessBuilder() {
                 items={[
                   { label: "Home", path: "/" },
                   { label: "Quote Generator", path: "/quote" },
-                  { label: "Process Builder", path: "/process-builder" },
+                  { label: "Price Book", path: "/price-book" },
+                  { label: "Processes and Systems", path: "/processes" },
                 ]}
               />
               <p className="text-xs text-muted-foreground hidden sm:block">Field Technician Tool</p>

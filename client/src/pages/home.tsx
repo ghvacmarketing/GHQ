@@ -75,6 +75,7 @@ export default function Home() {
                 items={[
                   { label: "Home", path: "/" },
                   { label: "Quote Generator", path: "/quote" },
+                  { label: "Price Book", path: "/price-book" },
                   { label: "Processes and Systems", path: "/processes" },
                 ]}
               />
