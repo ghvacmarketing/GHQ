@@ -7,7 +7,6 @@ import { AlertCircle } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import { useQuery } from "@tanstack/react-query";
-import type { Setting } from "@shared/schema";
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -17,11 +16,16 @@ export default function PriceBook() {
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
 
-  const { data: settings } = useQuery<Setting[]>({
-    queryKey: ['/api/app-settings'],
+  // Check if PDF exists in database
+  const { data: pdfExists } = useQuery({
+    queryKey: ['/api/price-book/pdf-check'],
+    queryFn: async () => {
+      const response = await fetch('/api/price-book/pdf', { method: 'HEAD' });
+      return response.ok;
+    },
   });
 
-  const pdfUrl = settings?.find(s => s.key === 'price_book_pdf_url')?.value;
+  const pdfUrl = pdfExists ? '/api/price-book/pdf' : null;
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
@@ -80,7 +84,7 @@ export default function PriceBook() {
             <Alert className="border-orange-500/50 bg-orange-500/10" data-testid="alert-no-pdf">
               <AlertCircle className="h-4 w-4 text-orange-500" />
               <AlertDescription className="text-orange-600 dark:text-orange-400">
-                No price book configured. Please add a PDF URL in the{" "}
+                No price book uploaded. Please upload a PDF file in the{" "}
                 <a href="/admin" className="underline font-medium">Admin Settings</a>.
               </AlertDescription>
             </Alert>

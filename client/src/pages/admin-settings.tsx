@@ -29,7 +29,7 @@ export default function AdminSettings() {
   const [newTechnicianEmail, setNewTechnicianEmail] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [pdfUrl, setPdfUrl] = useState("");
+  const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
 
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
@@ -278,30 +278,71 @@ export default function AdminSettings() {
     },
   });
 
-  // PDF URL mutation
-  const savePdfUrlMutation = useMutation({
-    mutationFn: async (url: string) => {
-      const response = await apiRequest('POST', '/api/app-settings', { 
-        key: 'price_book_pdf_url', 
-        value: url 
+  // PDF upload mutation
+  const uploadPdfMutation = useMutation({
+    mutationFn: async (file: File) => {
+      // Read file as base64
+      return new Promise<void>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const base64Data = (reader.result as string).split(',')[1];
+            const response = await apiRequest('POST', '/api/price-book/upload', {
+              name: file.name,
+              data: base64Data,
+              size: file.size,
+              password: "ghvacadmin" // Authentication
+            });
+            await response.json();
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
       });
-      return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/app-settings'] });
-      toast({ 
-        title: "PDF URL Saved",
-        description: "Price book PDF URL updated successfully." 
+      setSelectedPdfFile(null);
+      // Reset the file input
+      const fileInput = document.getElementById('pdf-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+      
+      toast({
+        title: "PDF Uploaded",
+        description: "Price book PDF uploaded successfully and is now available in the Price Book page."
       });
     },
     onError: () => {
       toast({
-        title: "Save Failed",
-        description: "Failed to save PDF URL. Please try again.",
+        title: "Upload Failed",
+        description: "Failed to upload PDF. Please try again.",
         variant: "destructive",
       });
     },
   });
+
+  const handlePdfFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: "Invalid File Type",
+          description: "Please select a PDF file.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSelectedPdfFile(file);
+    }
+  };
+
+  const handlePdfUpload = () => {
+    if (selectedPdfFile) {
+      uploadPdfMutation.mutate(selectedPdfFile);
+    }
+  };
 
   const handleAddEmail = () => {
     if (newEmailAddress && !emailAddresses.includes(newEmailAddress)) {
@@ -671,30 +712,37 @@ export default function AdminSettings() {
                     Price Book PDF
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Configure the PDF URL for the price book viewer
+                    Upload your pricing PDF (stored securely in the database)
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="pdf-url">PDF URL</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="pdf-url"
-                        placeholder="https://example.com/pricebook.pdf"
-                        value={pdfUrl}
-                        onChange={(e) => setPdfUrl(e.target.value)}
-                        data-testid="input-pdf-url"
-                      />
+                    <Label htmlFor="pdf-upload">Upload PDF File</Label>
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <Input
+                          id="pdf-upload"
+                          type="file"
+                          accept="application/pdf"
+                          onChange={handlePdfFileSelect}
+                          data-testid="input-pdf-file"
+                        />
+                      </div>
                       <Button 
-                        onClick={() => savePdfUrlMutation.mutate(pdfUrl)}
-                        disabled={!pdfUrl || savePdfUrlMutation.isPending}
-                        data-testid="button-save-pdf-url"
+                        onClick={handlePdfUpload}
+                        disabled={!selectedPdfFile || uploadPdfMutation.isPending}
+                        data-testid="button-upload-pdf"
                       >
-                        {savePdfUrlMutation.isPending ? "Saving..." : "Save"}
+                        {uploadPdfMutation.isPending ? "Uploading..." : "Upload"}
                       </Button>
                     </div>
+                    {selectedPdfFile && (
+                      <p className="text-xs text-muted-foreground">
+                        Selected: {selectedPdfFile.name} ({(selectedPdfFile.size / 1024 / 1024).toFixed(2)} MB)
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground">
-                      Enter a publicly accessible PDF URL. This will be displayed in the Price Book page.
+                      Upload a PDF file to display in the Price Book page. The file will be stored securely in the database.
                     </p>
                   </div>
                 </CardContent>

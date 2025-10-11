@@ -667,10 +667,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Price Book PDF routes
   app.post("/api/price-book/upload", async (req, res) => {
     try {
-      const { name, data, size } = req.body;
+      const { name, data, size, password } = req.body;
+      
+      // Authentication check
+      if (password !== "ghvacadmin") {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       
       if (!name || !data || !size) {
         return res.status(400).json({ message: "PDF name, data, and size are required" });
+      }
+
+      // Validate file size (50MB limit including base64 overhead)
+      const maxSize = 50 * 1024 * 1024; // 50MB
+      if (size > maxSize) {
+        return res.status(400).json({ message: "PDF file too large. Maximum size is 50MB." });
+      }
+
+      // Validate base64 data format
+      if (!data || typeof data !== 'string') {
+        return res.status(400).json({ message: "Invalid PDF data format" });
+      }
+
+      // Basic validation of base64 string
+      const base64Regex = /^[A-Za-z0-9+/]+={0,2}$/;
+      if (!base64Regex.test(data)) {
+        return res.status(400).json({ message: "Invalid base64 encoding" });
       }
 
       const pdfData = {
@@ -710,6 +732,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/price-book/pdf", async (req, res) => {
     try {
+      const { password } = req.body;
+      
+      // Authentication check
+      if (password !== "ghvacadmin") {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const success = await storage.deletePriceBookPdf();
       if (!success) {
         return res.status(404).json({ message: "No PDF found to delete" });
