@@ -102,12 +102,12 @@ export default function ProcessesSystems() {
         </div>
       </header>
 
-      {/* In Development Banner */}
+      {/* Processes Page Notice */}
       <div className="px-3 sm:px-4 mt-3 sm:mt-4">
-        <Alert className="border-orange-500/50 bg-orange-500/10 flex-col sm:flex-row items-start gap-2" data-testid="alert-in-development">
+        <Alert className="border-orange-500/50 bg-orange-500/10 flex-col sm:flex-row items-start gap-2" data-testid="alert-processes-notice">
           <AlertCircle className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
           <AlertDescription className="text-orange-600 dark:text-orange-400 text-sm sm:text-base">
-            This application is currently in development. Some features may be incomplete or subject to change.
+            The Processes & Systems feature is currently under development. Process creation and management may be enhanced in future updates.
           </AlertDescription>
         </Alert>
       </div>
