@@ -664,8 +664,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Price Book PDF routes
-  app.post("/api/price-book/upload", async (req, res) => {
+  // Admin authentication endpoint
+  app.post("/api/admin/login", async (req, res) => {
+    try {
+      const { password } = req.body;
+      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
+      
+      if (password === adminPassword) {
+        res.json({ success: true });
+      } else {
+        res.status(401).json({ success: false, message: "Invalid password" });
+      }
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Authentication error" });
+    }
+  });
+
+  // Price Book PDF routes (with increased body size limit)
+  app.post("/api/price-book/upload", express.json({ limit: '50mb' }), async (req, res) => {
     try {
       const { name, data, size, password } = req.body;
       

@@ -76,18 +76,29 @@ export default function AdminSettings() {
     enabled: isAuthenticated,
   });
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === "ghvacadmin") {
-      setIsAuthenticated(true);
+    try {
+      const response = await apiRequest("POST", "/api/admin/login", { password });
+      const result = await response.json();
+      
+      if (result.success) {
+        setIsAuthenticated(true);
+        toast({
+          title: "Access Granted",
+          description: "You can now view Google Sheets pricing data.",
+        });
+      } else {
+        toast({
+          title: "Access Denied",
+          description: "Incorrect password.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
       toast({
-        title: "Access Granted",
-        description: "You can now view Google Sheets pricing data.",
-      });
-    } else {
-      toast({
-        title: "Access Denied",
-        description: "Incorrect password.",
+        title: "Authentication Error",
+        description: "Failed to verify password. Please try again.",
         variant: "destructive",
       });
     }
@@ -291,7 +302,7 @@ export default function AdminSettings() {
               name: file.name,
               data: base64Data,
               size: file.size,
-              password: "ghvacadmin" // Authentication
+              password: password // Use the password from login state
             });
             await response.json();
             resolve();

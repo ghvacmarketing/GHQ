@@ -3,8 +3,14 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
-app.use(express.json({ limit: '50mb' })); // Increased limit for PDF uploads
-app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+// Conditional JSON parsing - skip for PDF upload route which needs 50MB limit
+app.use((req, res, next) => {
+  if (req.path === '/api/price-book/upload') {
+    return next(); // Skip global JSON parsing for PDF upload
+  }
+  express.json({ limit: '1mb' })(req, res, next);
+});
+app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
   const start = Date.now();
