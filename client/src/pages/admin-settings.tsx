@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit } from "lucide-react";
+import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit, Settings2, Users, FolderOpen, ReceiptText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Quote, Category, Process } from "@shared/schema";
 import redlogo from "@assets/redlogo.webp";
@@ -431,11 +432,20 @@ export default function AdminSettings() {
             </CardContent>
           </Card>
 
-          {/* Current Settings Display */}
+          {/* Settings Accordion */}
           {currentSettings && settings && (
-            <>
-              {/* Labor & Basic Pricing */}
-              <Card>
+            <Accordion type="single" collapsible className="space-y-4">
+              {/* System Configuration */}
+              <AccordionItem value="system" className="border rounded-lg px-4 bg-card">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center">
+                    <Settings2 className="h-5 w-5 mr-3 text-primary" />
+                    <span className="font-semibold">System Configuration</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4 pt-4">
+                  {/* Labor & Basic Pricing */}
+                  <Card>
                 <CardHeader>
                   <CardTitle>Labor & Basic Pricing</CardTitle>
                 </CardHeader>
@@ -612,9 +622,20 @@ export default function AdminSettings() {
                   </div>
                 </CardContent>
               </Card>
+                </AccordionContent>
+              </AccordionItem>
 
-              {/* Email Management */}
-              <Card>
+              {/* User Management */}
+              <AccordionItem value="users" className="border rounded-lg px-4 bg-card">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center">
+                    <Users className="h-5 w-5 mr-3 text-primary" />
+                    <span className="font-semibold">User Management</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4 pt-4">
+                  {/* Email Management */}
+                  <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
                     <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -760,9 +781,225 @@ export default function AdminSettings() {
                   </div>
                 </CardContent>
               </Card>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Content Management */}
+              <AccordionItem value="content" className="border rounded-lg px-4 bg-card">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center">
+                    <FolderOpen className="h-5 w-5 mr-3 text-primary" />
+                    <span className="font-semibold">Content Management</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4 pt-4">
+                  {/* Process Categories Management */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <FolderKanban className="h-5 w-5 mr-2" />
+                        Process Categories
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        Manage process categories for organizing workflows
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Add New Category */}
+                      <div className="space-y-2">
+                        <Label htmlFor="new-category" className="text-sm font-medium">Add Category</Label>
+                        <div className="flex space-x-2">
+                          <Input
+                            id="new-category"
+                            placeholder="Enter category name"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && newCategoryName && createCategoryMutation.mutate(newCategoryName)}
+                            data-testid="input-new-category"
+                          />
+                          <Button
+                            onClick={() => newCategoryName && createCategoryMutation.mutate(newCategoryName)}
+                            disabled={!newCategoryName || createCategoryMutation.isPending}
+                            data-testid="button-add-category"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Categories List */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Current Categories</Label>
+                        {categories.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No categories yet</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {categories.map((category: Category) => (
+                              <div key={category.id} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                                {editingCategory?.id === category.id ? (
+                                  <div className="flex items-center space-x-2 flex-1">
+                                    <Input
+                                      value={editingCategory.name}
+                                      onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                                      onKeyPress={(e) => e.key === 'Enter' && updateCategoryMutation.mutate({ id: editingCategory.id, name: editingCategory.name })}
+                                      className="h-8"
+                                      data-testid={`input-edit-category-${category.id}`}
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => updateCategoryMutation.mutate({ id: editingCategory.id, name: editingCategory.name })}
+                                      className="h-8"
+                                      data-testid={`button-save-category-${category.id}`}
+                                    >
+                                      Save
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setEditingCategory(null)}
+                                      className="h-8"
+                                      data-testid={`button-cancel-category-${category.id}`}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <span className="text-sm">{category.name}</span>
+                                    <div className="flex space-x-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setEditingCategory(category)}
+                                        className="h-6 w-6 p-0"
+                                        data-testid={`button-edit-category-${category.id}`}
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </Button>
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                                            data-testid={`button-delete-category-${category.id}`}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete Category</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              Are you sure you want to delete "{category.name}"? This action cannot be undone.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction 
+                                              onClick={() => deleteCategoryMutation.mutate(category.id)}
+                                              className="bg-destructive hover:bg-destructive/90"
+                                            >
+                                              Delete
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Processes Management */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <FileText className="h-5 w-5 mr-2" />
+                        Processes
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        View and manage all processes
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      {processes.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No processes created yet</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {processes.map((process: Process) => (
+                            <div key={process.id} className="flex items-start justify-between p-3 rounded-lg border border-border hover:bg-muted/50">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center space-x-2 mb-1">
+                                  <h4 className="font-medium text-sm truncate">{process.name}</h4>
+                                  {process.category && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {process.category}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground line-clamp-2">
+                                  {process.description || 'No description'}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {process.steps?.length || 0} step{(process.steps?.length || 0) !== 1 ? 's' : ''}
+                                </p>
+                              </div>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 hover:bg-destructive hover:text-destructive-foreground ml-2"
+                                    data-testid={`button-delete-process-${process.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Process</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete "{process.name}"? This will remove all associated steps and cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction 
+                                      onClick={() => deleteProcessMutation.mutate(process.id)}
+                                      className="bg-destructive hover:bg-destructive/90"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </AccordionContent>
+              </AccordionItem>
 
               {/* Quote Management */}
-              <Card>
+              <AccordionItem value="quotes" className="border rounded-lg px-4 bg-card">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center">
+                    <ReceiptText className="h-5 w-5 mr-3 text-primary" />
+                    <span className="font-semibold">Quote Management</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4 pt-4">
+                  <Card>
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -919,175 +1156,9 @@ export default function AdminSettings() {
                   )}
                 </CardContent>
               </Card>
-
-              {/* Process Categories Management */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <FolderKanban className="mr-3 h-5 w-5" />
-                    Process Categories
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Manage categories for organizing your processes and systems
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Add New Category */}
-                  <div className="flex gap-2">
-                    <Input
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      placeholder="Enter new category name"
-                      onKeyPress={(e) => e.key === 'Enter' && newCategoryName && createCategoryMutation.mutate(newCategoryName)}
-                      data-testid="input-new-category"
-                    />
-                    <Button 
-                      onClick={() => newCategoryName && createCategoryMutation.mutate(newCategoryName)}
-                      disabled={!newCategoryName || createCategoryMutation.isPending}
-                      data-testid="button-add-category"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add
-                    </Button>
-                  </div>
-
-                  {/* Categories List */}
-                  <div className="space-y-2">
-                    {categories.map((category) => (
-                      <div 
-                        key={category.id} 
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                        data-testid={`category-item-${category.id}`}
-                      >
-                        {editingCategory?.id === category.id ? (
-                          <div className="flex-1 flex gap-2">
-                            <Input
-                              value={editingCategory.name}
-                              onChange={(e) => setEditingCategory(prev => prev ? { ...prev, name: e.target.value } : null)}
-                              data-testid={`input-edit-category-${category.id}`}
-                            />
-                            <Button 
-                              size="sm" 
-                              onClick={() => updateCategoryMutation.mutate({ id: category.id, name: editingCategory.name })}
-                              disabled={!editingCategory.name}
-                              data-testid={`button-save-category-${category.id}`}
-                            >
-                              Save
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => setEditingCategory(null)}
-                              data-testid={`button-cancel-category-${category.id}`}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex-1 font-medium" data-testid={`text-category-${category.id}`}>
-                              {category.name}
-                            </div>
-                            <div className="flex space-x-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setEditingCategory(category)}
-                                data-testid={`button-edit-category-${category.id}`}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => deleteCategoryMutation.mutate(category.id)}
-                                disabled={deleteCategoryMutation.isPending}
-                                data-testid={`button-delete-category-${category.id}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Process Management */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <FileText className="mr-3 h-5 w-5" />
-                    Processes Management
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    View and delete saved processes ({processes.length} total)
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  {processes.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No processes saved yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {processes.map((process) => (
-                        <div 
-                          key={process.id} 
-                          className="flex items-start justify-between p-3 border rounded-lg hover:bg-muted/50"
-                          data-testid={`process-item-${process.id}`}
-                        >
-                          <div className="flex-1 min-w-0 mr-3">
-                            <div className="font-medium truncate" data-testid={`process-name-${process.id}`}>
-                              {process.name}
-                            </div>
-                            <div className="text-sm text-muted-foreground line-clamp-1">
-                              {process.description}
-                            </div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant="outline" className="text-xs">
-                                {process.category}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {process.steps?.length || 0} steps
-                              </span>
-                            </div>
-                          </div>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                data-testid={`button-delete-process-${process.id}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Process</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete "{process.name}"? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteProcessMutation.mutate(process.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           )}
         </div>
       </main>
