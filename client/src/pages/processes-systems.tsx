@@ -3,8 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Settings, Search, Plus, FileText, Mic, AlertCircle } from "lucide-react";
+import { Settings, Search, Plus, FileText, Mic } from "lucide-react";
 import { useLocation } from "wouter";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
@@ -75,15 +74,6 @@ export default function ProcessesSystems() {
           </div>
         </div>
       </header>
-      {/* Processes Page Notice */}
-      <div className="px-3 sm:px-4 mt-3 sm:mt-4">
-        <Alert className="border-orange-500/50 bg-orange-500/10 flex-col sm:flex-row items-start gap-2" data-testid="alert-processes-notice">
-          <AlertCircle className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
-          <AlertDescription className="text-orange-600 dark:text-orange-400 text-sm sm:text-base">
-            The Processes & Systems feature is currently under development. Process creation and management may be enhanced in future updates.
-          </AlertDescription>
-        </Alert>
-      </div>
       <main className="container mx-auto px-4 py-6 max-w-md md:max-w-2xl lg:max-w-4xl">
         {selectedProcess ? (
           <ProcessDetailView 

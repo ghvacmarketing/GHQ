@@ -21,7 +21,6 @@ const formSchema = insertProcessSchema.extend({
   name: z.string().min(1, "Process name is required"),
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
-  rationale: z.string().min(1, "Rationale is required"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -36,7 +35,6 @@ export default function ProcessBuilderManual() {
   const nameRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const categoryRef = useRef<HTMLButtonElement>(null);
-  const rationaleRef = useRef<HTMLTextAreaElement>(null);
   const stepInputRef = useRef<HTMLInputElement>(null);
 
   const { data: categories = [] } = useQuery<Category[]>({
@@ -49,7 +47,6 @@ export default function ProcessBuilderManual() {
       name: "",
       description: "",
       category: "",
-      rationale: "",
       steps: [],
     },
   });
@@ -124,11 +121,10 @@ export default function ProcessBuilderManual() {
 
   const completionPercentage = () => {
     let completed = 0;
-    if (form.watch('name')) completed += 20;
-    if (form.watch('description')) completed += 20;
-    if (form.watch('category')) completed += 20;
-    if (form.watch('rationale')) completed += 20;
-    if (steps.length > 0) completed += 20;
+    if (form.watch('name')) completed += 25;
+    if (form.watch('description')) completed += 25;
+    if (form.watch('category')) completed += 25;
+    if (steps.length > 0) completed += 25;
     return completed;
   };
 
@@ -260,28 +256,6 @@ export default function ProcessBuilderManual() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="rationale"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Rationale & Details *</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      ref={rationaleRef}
-                      placeholder="Why this process is necessary and other relevant information"
-                      rows={4}
-                      data-testid="input-process-rationale"
-                      onFocus={(e) => handleFocus(e.target)}
-                      onKeyDown={(e) => handleKeyDown(e, stepInputRef)}
-                    />
-                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

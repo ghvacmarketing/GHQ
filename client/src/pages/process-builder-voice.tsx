@@ -25,7 +25,6 @@ const prompts = [
   { field: "name", prompt: "What is the name of this process?", context: "the process name (a short title)" },
   { field: "description", prompt: "Please provide a brief description of this process.", context: "a brief description of the process" },
   { field: "category", prompt: "What category does this process belong to?", context: "the category name (e.g., Maintenance, Repair, Installation)" },
-  { field: "rationale", prompt: "Why is this process necessary? Provide details and relevant information.", context: "the rationale explaining why this process is necessary" },
   { field: "steps", prompt: "Now, please describe each step one by one. Say 'next step' between each instruction. Say 'finished' when done.", context: "step-by-step instructions" },
 ];
 
@@ -40,7 +39,6 @@ export default function ProcessBuilderVoice() {
     name: "",
     description: "",
     category: "",
-    rationale: "",
     steps: [],
   });
 
@@ -200,22 +198,20 @@ export default function ProcessBuilderVoice() {
       name: processData.name || "",
       description: processData.description || "",
       category: processData.category || "",
-      rationale: processData.rationale || "",
       steps: processData.steps || [],
     };
     createMutation.mutate(finalData);
   };
 
   const currentPrompt = prompts[currentPromptIndex];
-  const allFieldsFilled = processData.name && processData.description && processData.category && processData.rationale && (processData.steps?.length || 0) > 0;
+  const allFieldsFilled = processData.name && processData.description && processData.category && (processData.steps?.length || 0) > 0;
 
   const completionPercentage = () => {
     let completed = 0;
-    if (processData.name) completed += 20;
-    if (processData.description) completed += 20;
-    if (processData.category) completed += 20;
-    if (processData.rationale) completed += 20;
-    if ((processData.steps?.length || 0) > 0) completed += 20;
+    if (processData.name) completed += 25;
+    if (processData.description) completed += 25;
+    if (processData.category) completed += 25;
+    if ((processData.steps?.length || 0) > 0) completed += 25;
     return completed;
   };
 
@@ -380,7 +376,7 @@ export default function ProcessBuilderVoice() {
                           ))}
                         </SelectContent>
                       </Select>
-                    ) : currentPrompt.field === "description" || currentPrompt.field === "rationale" ? (
+                    ) : currentPrompt.field === "description" ? (
                       <Textarea
                         value={processData[currentPrompt.field as keyof Partial<FormData>] as string || ""}
                         onChange={(e) => setProcessData(prev => ({ ...prev, [currentPrompt.field]: e.target.value }))}
@@ -435,10 +431,6 @@ export default function ProcessBuilderVoice() {
                   <div>
                     <span className="text-muted-foreground">Category:</span>{" "}
                     <span className="font-medium">{processData.category || <span className="text-muted-foreground italic">Not yet captured</span>}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Rationale:</span>{" "}
-                    <span className="font-medium">{processData.rationale || <span className="text-muted-foreground italic">Not yet captured</span>}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Steps:</span>{" "}
