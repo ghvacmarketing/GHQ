@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,9 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 export default function PriceBook() {
   const [numPages, setNumPages] = useState<number | null>(null);
+  const [scale, setScale] = useState(1.0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lastTouchDistance = useRef<number>(0);
 
   // Check if PDF exists in database
   const { data: pdfExists } = useQuery({
@@ -28,6 +31,62 @@ export default function PriceBook() {
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
   }
+
+  // Mouse wheel zoom
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        setScale(prev => Math.min(Math.max(0.5, prev + delta), 3.0));
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  // Touch pinch-to-zoom
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const getTouchDistance = (touches: TouchList) => {
+      const touch1 = touches[0];
+      const touch2 = touches[1];
+      return Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        lastTouchDistance.current = getTouchDistance(e.touches);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const distance = getTouchDistance(e.touches);
+        const delta = (distance - lastTouchDistance.current) / 100;
+        setScale(prev => Math.min(Math.max(0.5, prev + delta), 3.0));
+        lastTouchDistance.current = distance;
+      }
+    };
+
+    container.addEventListener('touchstart', handleTouchStart);
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -80,10 +139,19 @@ export default function PriceBook() {
           </div>
         ) : (
           <div className="w-full">
-            {/* PDF Viewer - Vertically Scrollable */}
+            {/* Zoom indicator */}
+            <div className="mb-2 text-center">
+              <span className="text-sm text-muted-foreground">
+                {Math.round(scale * 100)}% • Ctrl+Scroll or Pinch to Zoom
+              </span>
+            </div>
+            
+            {/* PDF Viewer - Vertically Scrollable with Zoom */}
             <div 
+              ref={containerRef}
               className="bg-card border border-border rounded-lg overflow-auto" 
               data-testid="pdf-viewer"
+              style={{ touchAction: 'pan-x pan-y' }}
             >
               <div className="p-2 sm:p-4 bg-muted/30">
                 <Document
@@ -112,7 +180,7 @@ export default function PriceBook() {
                         <div key={`page_${index + 1}`}>
                           <Page
                             pageNumber={index + 1}
-                            width={Math.min(window.innerWidth - 48, 1200)}
+                            width={Math.min(window.innerWidth - 48, 1200) * scale}
                             renderTextLayer={false}
                             renderAnnotationLayer={false}
                           />
