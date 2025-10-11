@@ -486,6 +486,15 @@ export default function AdminSettings() {
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="flex items-center justify-between p-3 sm:p-4">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.history.back()}
+              data-testid="button-back"
+              className="flex-shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
             <img 
               src={redlogo} 
               alt="Giesbrecht HVAC" 
@@ -500,10 +509,11 @@ export default function AdminSettings() {
             onClick={handleRefresh}
             disabled={isLoading}
             data-testid="button-refresh-settings"
-            className="pl-[8px] pr-[8px]"
+            className="pl-[8px] pr-[8px] flex-shrink-0"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            {isLoading ? "Refreshing..." : "Refresh Data"}
+            <span className="hidden sm:inline">{isLoading ? "Refreshing..." : "Refresh Data"}</span>
+            <span className="sm:hidden">{isLoading ? "..." : "Refresh"}</span>
           </Button>
         </div>
       </header>
