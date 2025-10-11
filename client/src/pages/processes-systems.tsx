@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Settings, Search, Plus, FileText, Mic, Trash2, Download, AlertCircle } from "lucide-react";
+import { Settings, Search, Plus, FileText, Mic, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
@@ -27,22 +27,6 @@ export default function ProcessesSystems() {
 
   const { data: processes = [], isLoading } = useQuery<Process[]>({
     queryKey: ['/api/processes'],
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await fetch(`/api/processes/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Failed to delete process');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/processes'] });
-      toast({
-        title: "Process deleted",
-        description: "The process has been successfully removed.",
-      });
-      setSelectedProcess(null);
-    },
   });
 
   // Get unique categories
@@ -118,9 +102,6 @@ export default function ProcessesSystems() {
           <ProcessDetailView 
             process={selectedProcess} 
             onBack={() => setSelectedProcess(null)}
-            onDelete={(id: string) => {
-              deleteMutation.mutate(id);
-            }}
           />
         ) : (
           <Card>

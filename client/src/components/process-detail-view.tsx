@@ -1,30 +1,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, Trash2, Edit } from "lucide-react";
+import { ArrowLeft, Download, Edit } from "lucide-react";
 import type { Process } from "@shared/schema";
 import { jsPDF } from "jspdf";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import ProcessEditForm from "./process-edit-form";
 import { queryClient } from "@/lib/queryClient";
 
 interface ProcessDetailViewProps {
   process: Process;
   onBack: () => void;
-  onDelete: (id: string) => void;
 }
 
-export default function ProcessDetailView({ process, onBack, onDelete }: ProcessDetailViewProps) {
+export default function ProcessDetailView({ process, onBack }: ProcessDetailViewProps) {
   const [isEditing, setIsEditing] = useState(false);
 
   const handleEditSuccess = () => {
@@ -128,28 +116,6 @@ export default function ProcessDetailView({ process, onBack, onDelete }: Process
             <Download className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Export PDF</span>
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" data-testid="button-delete" className="flex-1 sm:flex-none">
-                <Trash2 className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Delete</span>
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Process</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete "{process.name}"? This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onDelete(process.id)} data-testid="button-confirm-delete">
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
       </div>
 

@@ -563,6 +563,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/processes/:id", async (req, res) => {
     try {
+      // Require admin password for deletion
+      const { password } = req.body;
+      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
+      
+      if (!password || password !== adminPassword) {
+        return res.status(401).json({ message: "Unauthorized: Admin password required" });
+      }
+
       const success = await storage.deleteProcess(req.params.id);
       if (!success) {
         return res.status(404).json({ message: "Process not found" });

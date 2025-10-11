@@ -273,7 +273,7 @@ export default function AdminSettings() {
   // Process mutation
   const deleteProcessMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest('DELETE', `/api/processes/${id}`);
+      const response = await apiRequest('DELETE', `/api/processes/${id}`, { password });
       return response.json();
     },
     onSuccess: () => {
