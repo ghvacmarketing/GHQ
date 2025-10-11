@@ -71,17 +71,7 @@ export default function ProcessDetailView({ process, onBack, onDelete }: Process
     doc.setFont("helvetica", "normal");
     const descriptionLines = doc.splitTextToSize(process.description, maxWidth);
     doc.text(descriptionLines, margin, yPosition);
-    yPosition += (descriptionLines.length * 7) + 10;
-
-    // Rationale
-    doc.setFont("helvetica", "bold");
-    doc.text("Rationale & Details:", margin, yPosition);
-    yPosition += 7;
-    
-    doc.setFont("helvetica", "normal");
-    const rationaleLines = doc.splitTextToSize(process.rationale, maxWidth);
-    doc.text(rationaleLines, margin, yPosition);
-    yPosition += (rationaleLines.length * 7) + 10;
+    yPosition += (descriptionLines.length * 7) + 15;
 
     // Steps
     doc.setFont("helvetica", "bold");
@@ -124,25 +114,25 @@ export default function ProcessDetailView({ process, onBack, onDelete }: Process
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={onBack} data-testid="button-back">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <Button variant="ghost" onClick={onBack} data-testid="button-back" className="flex-shrink-0">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Wiki
         </Button>
-        <div className="flex gap-2">
-          <Button onClick={() => setIsEditing(true)} variant="outline" data-testid="button-edit-process">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <Button onClick={() => setIsEditing(true)} variant="outline" data-testid="button-edit-process" className="flex-1 sm:flex-none">
             <Edit className="h-4 w-4 mr-2" />
-            Edit
+            <span className="hidden sm:inline">Edit</span>
           </Button>
-          <Button onClick={exportToPDF} variant="outline" data-testid="button-export-pdf">
+          <Button onClick={exportToPDF} variant="outline" data-testid="button-export-pdf" className="flex-1 sm:flex-none">
             <Download className="h-4 w-4 mr-2" />
-            Export PDF
+            <span className="hidden sm:inline">Export PDF</span>
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" data-testid="button-delete">
+              <Button variant="destructive" data-testid="button-delete" className="flex-1 sm:flex-none">
                 <Trash2 className="h-4 w-4 mr-2" />
-                Delete
+                <span className="hidden sm:inline">Delete</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -163,11 +153,11 @@ export default function ProcessDetailView({ process, onBack, onDelete }: Process
         </div>
       </div>
 
-      <Card>
+      <Card className="break-words">
         <CardHeader>
           <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <CardTitle className="text-2xl" data-testid="text-process-title">{process.name}</CardTitle>
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-xl sm:text-2xl break-words" data-testid="text-process-title">{process.name}</CardTitle>
               <div className="mt-2">
                 <span className="text-sm bg-primary/10 text-primary px-3 py-1 rounded" data-testid="text-process-category">
                   {process.category}
@@ -179,24 +169,19 @@ export default function ProcessDetailView({ process, onBack, onDelete }: Process
         <CardContent className="space-y-6">
           <div>
             <h3 className="font-semibold text-lg mb-2">Description</h3>
-            <p className="text-muted-foreground" data-testid="text-process-description">{process.description}</p>
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-lg mb-2">Rationale & Details</h3>
-            <p className="text-muted-foreground whitespace-pre-wrap" data-testid="text-process-rationale">{process.rationale}</p>
+            <p className="text-muted-foreground break-words" data-testid="text-process-description">{process.description}</p>
           </div>
 
           <div>
             <h3 className="font-semibold text-lg mb-3">Step-by-Step Instructions</h3>
             <div className="space-y-4">
               {process.steps?.map((step) => (
-                <div key={step.id} className="flex gap-4" data-testid={`step-display-${step.id}`}>
+                <div key={step.id} className="flex gap-3 sm:gap-4" data-testid={`step-display-${step.id}`}>
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">
                     {step.stepNumber}
                   </div>
-                  <div className="flex-1 pt-1">
-                    <p className="text-muted-foreground">{step.instruction}</p>
+                  <div className="flex-1 pt-1 min-w-0">
+                    <p className="text-muted-foreground break-words">{step.instruction}</p>
                   </div>
                 </div>
               ))}
