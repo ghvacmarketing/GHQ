@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type Category, type InsertCategory, type Setting, type InsertSetting, quotes, parts, technicians, processes, categories, settings } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, quotes, parts, technicians, processes, categories, settings, pdfFiles } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -41,6 +41,11 @@ export interface IStorage {
   getAllSettings(): Promise<Setting[]>;
   setSetting(key: string, value: string): Promise<Setting>;
   deleteSetting(key: string): Promise<boolean>;
+  
+  // PDF File operations
+  getPriceBookPdf(): Promise<PdfFile | undefined>;
+  uploadPriceBookPdf(pdfData: InsertPdfFile): Promise<PdfFile>;
+  deletePriceBookPdf(): Promise<boolean>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -220,6 +225,28 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSetting(key: string): Promise<boolean> {
     const result = await db.delete(settings).where(eq(settings.key, key));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // PDF File operations
+  async getPriceBookPdf(): Promise<PdfFile | undefined> {
+    const [pdf] = await db.select().from(pdfFiles).orderBy(pdfFiles.uploadedAt).limit(1);
+    return pdf || undefined;
+  }
+
+  async uploadPriceBookPdf(pdfData: InsertPdfFile): Promise<PdfFile> {
+    // Delete existing price book PDF first (we only want one at a time)
+    await db.delete(pdfFiles);
+    
+    const [pdf] = await db
+      .insert(pdfFiles)
+      .values(pdfData)
+      .returning();
+    return pdf;
+  }
+
+  async deletePriceBookPdf(): Promise<boolean> {
+    const result = await db.delete(pdfFiles);
     return (result.rowCount || 0) > 0;
   }
 

@@ -664,6 +664,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Price Book PDF routes
+  app.post("/api/price-book/upload", async (req, res) => {
+    try {
+      const { name, data, size } = req.body;
+      
+      if (!name || !data || !size) {
+        return res.status(400).json({ message: "PDF name, data, and size are required" });
+      }
+
+      const pdfData = {
+        name,
+        data, // Base64 encoded PDF
+        size: size.toString(),
+        contentType: "application/pdf",
+      };
+
+      const pdf = await storage.uploadPriceBookPdf(pdfData);
+      res.json({ success: true, id: pdf.id });
+    } catch (error) {
+      console.error("Error uploading PDF:", error);
+      res.status(500).json({ message: "Error uploading PDF" });
+    }
+  });
+
+  app.get("/api/price-book/pdf", async (req, res) => {
+    try {
+      const pdf = await storage.getPriceBookPdf();
+      
+      if (!pdf) {
+        return res.status(404).json({ message: "No price book PDF found" });
+      }
+
+      // Convert base64 to buffer
+      const buffer = Buffer.from(pdf.data, 'base64');
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${pdf.name}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error retrieving PDF:", error);
+      res.status(500).json({ message: "Error retrieving PDF" });
+    }
+  });
+
+  app.delete("/api/price-book/pdf", async (req, res) => {
+    try {
+      const success = await storage.deletePriceBookPdf();
+      if (!success) {
+        return res.status(404).json({ message: "No PDF found to delete" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error deleting PDF" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
