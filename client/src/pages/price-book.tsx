@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 export default function PriceBook() {
   const [numPages, setNumPages] = useState<number | null>(null);
-  const [containerWidth, setContainerWidth] = useState<number>(0);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Check if PDF exists in database
   const { data: pdfExists } = useQuery({
@@ -30,19 +28,6 @@ export default function PriceBook() {
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
   }
-
-  // Measure container width and update on resize
-  useEffect(() => {
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth - 32); // Subtract padding
-      }
-    };
-
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -94,14 +79,13 @@ export default function PriceBook() {
             </Alert>
           </div>
         ) : (
-          <div className="max-w-5xl mx-auto">
+          <div className="w-full">
             {/* PDF Viewer - Vertically Scrollable */}
             <div 
-              ref={containerRef}
               className="bg-card border border-border rounded-lg overflow-auto" 
               data-testid="pdf-viewer"
             >
-              <div className="p-4 bg-muted/30">
+              <div className="p-2 sm:p-4 bg-muted/30">
                 <Document
                   file={pdfUrl}
                   onLoadSuccess={onDocumentLoadSuccess}
@@ -120,19 +104,22 @@ export default function PriceBook() {
                       </Alert>
                     </div>
                   }
+                  className="w-full"
                 >
-                  <div className="space-y-4">
-                    {numPages && containerWidth > 0 && Array.from(new Array(numPages), (_, index) => (
-                      <div key={`page_${index + 1}`} className="flex justify-center">
-                        <Page
-                          pageNumber={index + 1}
-                          width={containerWidth}
-                          renderTextLayer={false}
-                          renderAnnotationLayer={false}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                  {numPages && (
+                    <div className="space-y-4">
+                      {Array.from(new Array(numPages), (_, index) => (
+                        <div key={`page_${index + 1}`}>
+                          <Page
+                            pageNumber={index + 1}
+                            width={Math.min(window.innerWidth - 48, 1200)}
+                            renderTextLayer={false}
+                            renderAnnotationLayer={false}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </Document>
               </div>
             </div>
