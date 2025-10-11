@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-import { Settings } from "lucide-react";
+import { Settings, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -14,8 +14,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 export default function PriceBook() {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [scale, setScale] = useState(1.0);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const lastTouchDistance = useRef<number>(0);
 
   // Check if PDF exists in database
   const { data: pdfExists } = useQuery({
@@ -32,61 +30,13 @@ export default function PriceBook() {
     setNumPages(numPages);
   }
 
-  // Mouse wheel zoom
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+  const handleZoomIn = () => {
+    setScale(prev => Math.min(prev + 0.25, 3.0));
+  };
 
-    const handleWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        setScale(prev => Math.min(Math.max(0.5, prev + delta), 3.0));
-      }
-    };
-
-    container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => container.removeEventListener('wheel', handleWheel);
-  }, []);
-
-  // Touch pinch-to-zoom
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const getTouchDistance = (touches: TouchList) => {
-      const touch1 = touches[0];
-      const touch2 = touches[1];
-      return Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
-    };
-
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        lastTouchDistance.current = getTouchDistance(e.touches);
-      }
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        e.preventDefault();
-        const distance = getTouchDistance(e.touches);
-        const delta = (distance - lastTouchDistance.current) / 100;
-        setScale(prev => Math.min(Math.max(0.5, prev + delta), 3.0));
-        lastTouchDistance.current = distance;
-      }
-    };
-
-    container.addEventListener('touchstart', handleTouchStart);
-    container.addEventListener('touchmove', handleTouchMove, { passive: false });
-    
-    return () => {
-      container.removeEventListener('touchstart', handleTouchStart);
-      container.removeEventListener('touchmove', handleTouchMove);
-    };
-  }, []);
+  const handleZoomOut = () => {
+    setScale(prev => Math.max(prev - 0.25, 0.5));
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -139,19 +89,35 @@ export default function PriceBook() {
           </div>
         ) : (
           <div className="w-full">
-            {/* Zoom indicator */}
-            <div className="mb-2 text-center">
-              <span className="text-sm text-muted-foreground">
-                {Math.round(scale * 100)}% • Ctrl+Scroll or Pinch to Zoom
+            {/* Zoom controls */}
+            <div className="mb-4 flex items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleZoomOut}
+                disabled={scale <= 0.5}
+                data-testid="button-zoom-out"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-16 text-center" data-testid="text-zoom-level">
+                {Math.round(scale * 100)}%
               </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleZoomIn}
+                disabled={scale >= 3.0}
+                data-testid="button-zoom-in"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
             </div>
             
             {/* PDF Viewer - Vertically Scrollable with Zoom */}
             <div 
-              ref={containerRef}
               className="bg-card border border-border rounded-lg overflow-auto" 
               data-testid="pdf-viewer"
-              style={{ touchAction: 'pan-x pan-y' }}
             >
               <div className="p-2 sm:p-4 bg-muted/30">
                 <Document
