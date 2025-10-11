@@ -111,17 +111,24 @@ Preferred communication style: Simple, everyday language.
   - Removed Total Quotes, Processes, Recent Activity, and Quick Access stat cards
   - Added large hero text with tagline for professional appearance
   - Maintained all existing action cards (New Quote, Quote History, Price Book, Processes & Systems, Admin)
-- **Price Book Feature**: New PDF viewer page for pricing catalog
+- **Price Book Feature**: Secure PDF storage and viewing system for pricing catalog
   - Created dedicated `/price-book` route with native-looking PDF viewer using react-pdf
   - PDF displays with zoom controls (50%-300%) and page navigation
-  - Admin settings configuration for PDF URL in System Configuration section
-  - Database-backed settings storage for flexible app configuration
+  - **Secure Database Storage**: PDFs stored in PostgreSQL (Base64 encoded) for privacy instead of public URLs
+  - **File Upload System**: Admin interface with file upload, validation, and password protection
+  - **Security Implementation**: 
+    - Server-side authentication endpoint (`/api/admin/login`) validates password against `ADMIN_PASSWORD` env var
+    - Password validation moved entirely to server (no credentials in client bundle)
+    - Scoped body size limits: 50MB for PDF upload, 1MB for all other endpoints
+    - Conditional middleware to prevent DoS attacks while allowing large PDF uploads
+  - **Upload Validation**: File type checking, size limits (50MB max), Base64 format validation
   - Clean error states when no PDF is configured or load fails
 - **API Architecture Enhancement**: Separated app configuration from Google Sheets pricing
-  - Added `/api/app-settings` endpoints for database-backed user settings (PDF URLs, etc.)
+  - Added `/api/app-settings` endpoints for database-backed user settings
+  - Added `/api/price-book/upload`, `/api/price-book/pdf`, `/api/price-book/pdf` (DELETE) for secure PDF management
   - Preserved `/api/settings` for Google Sheets pricing data (read-only)
   - Clear separation prevents endpoint conflicts and maintains data clarity
-  - Settings table in PostgreSQL for persistent app configuration
+  - Settings and PDF files tables in PostgreSQL for persistent storage
 
 ### October 10, 2025
 - **Home Landing Page**: Created elegant landing page with shortcuts to all main pages
