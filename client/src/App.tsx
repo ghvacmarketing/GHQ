@@ -7,6 +7,7 @@ import Home from "@/pages/home";
 import QuoteGenerator from "@/pages/quote-generator";
 import QuotesHistory from "@/pages/quotes-history";
 import ProcessesSystems from "@/pages/processes-systems";
+import PriceBook from "@/pages/price-book";
 import NotFound from "@/pages/not-found";
 import { lazy, Suspense } from "react";
 
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/quote" component={QuoteGenerator} />
       <Route path="/history" component={QuotesHistory} />
+      <Route path="/price-book" component={PriceBook} />
       <Route path="/processes" component={ProcessesSystems} />
       <Route path="/admin" component={AdminSettingsWrapper} />
       <Route component={NotFound} />
