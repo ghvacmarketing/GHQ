@@ -130,3 +130,20 @@ export const insertSettingSchema = createInsertSchema(settings).omit({
 
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
+
+export const pdfFiles = pgTable("pdf_files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  contentType: text("content_type").notNull().default("application/pdf"),
+  size: text("size").notNull(),
+  data: text("data").notNull(), // Base64 encoded PDF data
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export const insertPdfFileSchema = createInsertSchema(pdfFiles).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export type InsertPdfFile = z.infer<typeof insertPdfFileSchema>;
+export type PdfFile = typeof pdfFiles.$inferSelect;
