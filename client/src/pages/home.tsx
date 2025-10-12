@@ -22,7 +22,7 @@ export default function Home() {
   const actions = [
     {
       title: "New Quote",
-      description: "Generate a professional HVAC quote on-site",
+      description: "Generate a quick quote",
       icon: FileText,
       href: "/quote",
       testId: "link-new-quote"

@@ -60,7 +60,6 @@ export default function PriceBook() {
                   { label: "Processes and Systems", path: "/processes" },
                 ]}
               />
-              <p className="text-xs text-muted-foreground hidden sm:block">Pricing & Parts Catalog</p>
             </div>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
