@@ -93,7 +93,6 @@ export default function Home() {
           </div>
         </div>
       </header>
-
       {/* Dashboard */}
       <main className="container mx-auto px-4 py-6 max-w-md md:max-w-2xl lg:max-w-5xl">
         {/* Hero Section */}
@@ -101,9 +100,7 @@ export default function Home() {
           <h1 className="text-4xl md:text-5xl font-bold text-primary mb-2" data-testid="text-hero-title">
             GHVAC Tools
           </h1>
-          <p className="text-muted-foreground text-sm md:text-base">
-            Professional field technician solutions
-          </p>
+          <p className="text-muted-foreground text-sm md:text-base">Field technician solutions</p>
         </div>
 
         {/* Action Cards */}
