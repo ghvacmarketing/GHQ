@@ -514,6 +514,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Format text into numbered steps using AI
+  app.post("/api/format-text", async (req, res) => {
+    try {
+      const { text, cleanupLevel } = req.body;
+      
+      if (!text) {
+        return res.status(400).json({ message: "No text provided" });
+      }
+
+      const level = parseInt(cleanupLevel) || 3;
+      const result = await voiceService.formatText(text, level);
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error formatting text:', error);
+      res.status(500).json({ message: "Error formatting text" });
+    }
+  });
+
+  // Transcribe full process from single voice recording
+  app.post("/api/voice/transcribe-full-process", upload.single('audio'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No audio file provided" });
+      }
+
+      const cleanupLevel = parseInt(req.body.cleanupLevel) || 3;
+      const result = await voiceService.transcribeFullProcess(
+        req.file.buffer,
+        req.file.originalname || 'recording.webm',
+        cleanupLevel
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error processing full process recording:', error);
+      if (error instanceof Error && error.message === 'NO_AUDIO_DETECTED') {
+        return res.status(400).json({ message: "No audio detected" });
+      }
+      res.status(500).json({ message: "Error processing voice recording" });
+    }
+  });
+
   // Process routes
   app.get("/api/processes", async (req, res) => {
     try {

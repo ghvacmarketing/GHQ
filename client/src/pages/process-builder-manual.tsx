@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, X, Settings } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { ArrowLeft, Settings, Sparkles, Clipboard, X, Loader2 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { insertProcessSchema, type ProcessStep, type Category } from "@shared/schema";
 import { nanoid } from "nanoid";
@@ -15,7 +16,7 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 const formSchema = insertProcessSchema.extend({
   name: z.string().min(1, "Process name is required"),
@@ -29,13 +30,10 @@ export default function ProcessBuilderManual() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [steps, setSteps] = useState<ProcessStep[]>([]);
-  const [currentStep, setCurrentStep] = useState("");
-  
-  // Refs for auto-scroll and field navigation
-  const nameRef = useRef<HTMLInputElement>(null);
-  const descriptionRef = useRef<HTMLTextAreaElement>(null);
-  const categoryRef = useRef<HTMLButtonElement>(null);
-  const stepInputRef = useRef<HTMLInputElement>(null);
+  const [stepsText, setStepsText] = useState("");
+  const [cleanupLevel, setCleanupLevel] = useState(3);
+  const [isFormatting, setIsFormatting] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
@@ -53,12 +51,7 @@ export default function ProcessBuilderManual() {
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const response = await fetch('/api/processes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to create process');
+      const response = await apiRequest('POST', '/api/processes', data);
       return response.json();
     },
     onSuccess: () => {
@@ -69,20 +62,74 @@ export default function ProcessBuilderManual() {
       });
       setLocation('/processes');
     },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create process. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
-  const addStep = () => {
-    if (currentStep.trim()) {
-      const newStep: ProcessStep = {
-        id: nanoid(),
-        stepNumber: steps.length + 1,
-        instruction: currentStep.trim(),
-      };
-      setSteps([...steps, newStep]);
-      setCurrentStep("");
-      // Keep focus on step input
-      setTimeout(() => stepInputRef.current?.focus(), 0);
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setStepsText(text);
+      toast({
+        title: "Pasted",
+        description: "Text pasted from clipboard",
+      });
+    } catch (error) {
+      toast({
+        title: "Paste failed",
+        description: "Please paste manually using Ctrl+V or Cmd+V",
+        variant: "destructive",
+      });
     }
+  };
+
+  const handleFormat = async () => {
+    if (!stepsText.trim()) {
+      toast({
+        title: "No text to format",
+        description: "Please enter or paste some text first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsFormatting(true);
+    try {
+      const response = await apiRequest('POST', '/api/format-text', {
+        text: stepsText,
+        cleanupLevel,
+      });
+      const result = await response.json();
+      
+      // Add IDs to steps
+      const stepsWithIds = result.steps.map((step: any) => ({
+        ...step,
+        id: nanoid(),
+      }));
+      
+      setSteps(stepsWithIds);
+      toast({
+        title: "Formatted!",
+        description: `Created ${stepsWithIds.length} steps at cleanup level ${cleanupLevel}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Formatting failed",
+        description: "Please try again or adjust the cleanup level",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFormatting(false);
+    }
+  };
+
+  const updateStep = (id: string, instruction: string) => {
+    setSteps(steps.map(s => s.id === id ? { ...s, instruction } : s));
   };
 
   const removeStep = (id: string) => {
@@ -93,30 +140,15 @@ export default function ProcessBuilderManual() {
   };
 
   const onSubmit = (data: FormData) => {
+    if (steps.length === 0) {
+      toast({
+        title: "No steps added",
+        description: "Please format some steps before saving",
+        variant: "destructive",
+      });
+      return;
+    }
     createMutation.mutate({ ...data, steps });
-  };
-
-  // Auto-scroll to focused element with offset for keyboard
-  const handleFocus = (element: HTMLElement | null) => {
-    if (element) {
-      setTimeout(() => {
-        const elementTop = element.getBoundingClientRect().top;
-        const offset = window.innerHeight * 0.3; // Scroll so input is in top 30% of screen
-        window.scrollBy({
-          top: elementTop - offset,
-          behavior: 'smooth'
-        });
-      }, 300); // Delay to let keyboard appear
-    }
-  };
-
-  // Handle Enter key to move to next field
-  const handleKeyDown = (e: React.KeyboardEvent, nextRef: React.RefObject<any>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      nextRef.current?.focus();
-      nextRef.current?.click?.(); // For select triggers
-    }
   };
 
   const completionPercentage = () => {
@@ -126,6 +158,17 @@ export default function ProcessBuilderManual() {
     if (form.watch('category')) completed += 25;
     if (steps.length > 0) completed += 25;
     return completed;
+  };
+
+  const getCleanupLabel = (level: number) => {
+    const labels: Record<number, string> = {
+      1: "Minimal cleanup",
+      2: "Light cleanup",
+      3: "Moderate cleanup",
+      4: "Heavy cleanup",
+      5: "Maximum polish"
+    };
+    return labels[level] || labels[3];
   };
 
   return (
@@ -184,7 +227,7 @@ export default function ProcessBuilderManual() {
             Back to Processes
           </Button>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Create New Process</h1>
-          <p className="text-sm text-muted-foreground mt-1">Fill out the form below to document a new process</p>
+          <p className="text-sm text-muted-foreground mt-1">Enter process details and paste or type steps to format with AI</p>
         </div>
 
         <Form {...form}>
@@ -198,11 +241,8 @@ export default function ProcessBuilderManual() {
                   <FormControl>
                     <Input
                       {...field}
-                      ref={nameRef}
-                      placeholder="e.g., Compressor Replacement"
+                      placeholder="e.g., Split System AC Diagnosis"
                       data-testid="input-process-name"
-                      onFocus={(e) => handleFocus(e.target)}
-                      onKeyDown={(e) => handleKeyDown(e, descriptionRef)}
                     />
                   </FormControl>
                   <FormMessage />
@@ -219,12 +259,9 @@ export default function ProcessBuilderManual() {
                   <FormControl>
                     <Textarea
                       {...field}
-                      ref={descriptionRef}
                       placeholder="Brief description of this process"
-                      rows={3}
+                      rows={2}
                       data-testid="input-process-description"
-                      onFocus={(e) => handleFocus(e.target)}
-                      onKeyDown={(e) => handleKeyDown(e, categoryRef)}
                     />
                   </FormControl>
                   <FormMessage />
@@ -240,11 +277,7 @@ export default function ProcessBuilderManual() {
                   <FormLabel>Category *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger
-                        ref={categoryRef}
-                        data-testid="select-process-category"
-                        onFocus={(e) => handleFocus(e.target)}
-                      >
+                      <SelectTrigger data-testid="select-process-category">
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                     </FormControl>
@@ -261,35 +294,99 @@ export default function ProcessBuilderManual() {
               )}
             />
 
+            {/* Steps Input Section */}
             <div className="space-y-3">
               <FormLabel>Steps *</FormLabel>
-              <p className="text-sm text-muted-foreground">Add step-by-step instructions. Press Enter to add each step.</p>
-              <div className="flex gap-2">
-                <Input
-                  ref={stepInputRef}
-                  value={currentStep}
-                  onChange={(e) => setCurrentStep(e.target.value)}
-                  placeholder="Enter step instruction"
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addStep())}
-                  onFocus={(e) => handleFocus(e.target)}
-                  data-testid="input-step-instruction"
+              <p className="text-sm text-muted-foreground">
+                Paste or type all steps below, then click "Format with AI" to organize them
+              </p>
+              
+              <Textarea
+                ref={textareaRef}
+                value={stepsText}
+                onChange={(e) => setStepsText(e.target.value)}
+                placeholder="Paste or type your steps here. Examples:&#10;- Plain text list&#10;- Numbered steps from another source&#10;- Natural language instructions&#10;&#10;The AI will format them into clean, numbered steps."
+                rows={8}
+                className="font-mono text-sm"
+                data-testid="textarea-steps-input"
+              />
+
+              {/* AI Cleanup Level Slider */}
+              <div className="space-y-2 p-4 bg-muted rounded-lg">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">AI Cleanup Level: {cleanupLevel}</label>
+                  <span className="text-xs text-muted-foreground">{getCleanupLabel(cleanupLevel)}</span>
+                </div>
+                <Slider
+                  value={[cleanupLevel]}
+                  onValueChange={(value) => setCleanupLevel(value[0])}
+                  min={1}
+                  max={5}
+                  step={1}
+                  className="w-full"
+                  data-testid="slider-cleanup-level"
                 />
-                <Button type="button" onClick={addStep} size="icon" data-testid="button-add-step">
-                  <Plus className="h-4 w-4" />
-                </Button>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Lower = keeps your wording | Higher = more professional polish
+                </p>
               </div>
 
-              {steps.length > 0 && (
-                <div className="mt-4 space-y-2">
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePaste}
+                  className="flex-1"
+                  data-testid="button-paste"
+                >
+                  <Clipboard className="h-4 w-4 mr-2" />
+                  Paste
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleFormat}
+                  disabled={!stepsText.trim() || isFormatting}
+                  className="flex-1"
+                  data-testid="button-format"
+                >
+                  {isFormatting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Formatting...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Format with AI
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Formatted Steps Preview (Editable) */}
+            {steps.length > 0 && (
+              <div className="space-y-3 p-4 bg-muted rounded-lg">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Formatted Steps ({steps.length})</h3>
+                  <p className="text-xs text-muted-foreground">Edit any step before saving</p>
+                </div>
+                <div className="space-y-2">
                   {steps.map((step) => (
-                    <div key={step.id} className="flex items-start gap-2 p-3 bg-muted rounded-lg" data-testid={`step-item-${step.id}`}>
-                      <span className="text-sm font-semibold min-w-[28px] flex-shrink-0 mt-0.5">{step.stepNumber}.</span>
-                      <p className="flex-1 text-sm">{step.instruction}</p>
+                    <div key={step.id} className="flex items-start gap-2 p-3 bg-background rounded-lg" data-testid={`step-item-${step.id}`}>
+                      <span className="text-sm font-semibold min-w-[28px] flex-shrink-0 mt-2">{step.stepNumber}.</span>
+                      <Textarea
+                        value={step.instruction}
+                        onChange={(e) => updateStep(step.id, e.target.value)}
+                        className="flex-1 min-h-[60px] text-sm resize-none"
+                        data-testid={`textarea-step-${step.id}`}
+                      />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 flex-shrink-0"
+                        className="h-8 w-8 flex-shrink-0 mt-1"
                         onClick={() => removeStep(step.id)}
                         data-testid={`button-remove-step-${step.id}`}
                       >
@@ -298,8 +395,8 @@ export default function ProcessBuilderManual() {
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Fixed Bottom Action Bar */}
             <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4 shadow-lg">
