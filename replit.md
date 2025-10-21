@@ -106,6 +106,34 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 21, 2025
+- **Process Builders Complete Redesign**: Both manual and voice process builders completely overhauled for simplified, AI-powered workflows
+  - **Manual Builder Redesign**: 
+    - Replaced one-step-at-a-time input with large textarea for pasting or typing all steps at once
+    - Added "Paste" button for quick clipboard access
+    - Added "Format with AI" button that intelligently parses and formats messy text into clean numbered steps
+    - Added 1-5 cleanup intensity slider for user calibration (1 = minimal cleanup, 5 = maximum polish)
+    - AI processes comma-separated lists, plain language, or any format into structured steps
+    - Shows editable preview with all formatted steps before saving
+    - Users can edit any step content before finalizing
+  - **Voice Builder Redesign**:
+    - Replaced multi-step sequential prompts with single continuous recording session
+    - Shows clear instructions upfront explaining what to say (name, description, category, steps)
+    - One "Record Full Process" button captures entire process in natural speech
+    - Added 1-5 cleanup intensity slider matching manual builder
+    - AI extracts all 4 fields (name, description, category, steps) from one recording using OpenAI Whisper + GPT
+    - Shows editable preview of extracted data before saving
+    - Users can refine any field or step before finalizing
+  - **Backend AI Services**:
+    - Added POST `/api/format-text` endpoint: accepts raw text and cleanup level, returns formatted steps array
+    - Added POST `/api/voice/transcribe-full-process` endpoint: accepts audio file and cleanup level, extracts full process
+    - Both endpoints use OpenAI GPT-3.5-turbo for intelligent formatting and extraction
+    - Voice endpoint uses Whisper for transcription, then GPT for structured extraction
+  - **Schema Update**: Made `rationale` field optional (previously required) to streamline simplified builders
+  - **User Experience**: "Fast-ball to 90%" philosophy - AI does heavy lifting, users polish the final 10%
+  - **Data Flow**: AI extraction → editable preview → user refinement → save to database
+  - **Routes**: Manual builder at `/processes/new`, Voice builder at `/processes/new/voice`
+
 ### October 11, 2025
 - **App Rebranding**: Changed application name to "GHVAC Tools" across all interfaces
   - Updated PWA manifest name from "GHVAC Quote Generator" to "GHVAC Tools"
