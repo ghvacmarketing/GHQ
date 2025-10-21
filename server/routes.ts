@@ -588,6 +588,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const process = await storage.createProcess(validatedData);
       res.json(process);
     } catch (error) {
+      console.error('Error creating process:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+      }
       res.status(500).json({ message: "Error creating process" });
     }
   });

@@ -82,7 +82,7 @@ export const processes = pgTable("processes", {
   name: text("name").notNull(),
   description: text("description").notNull(),
   category: text("category").notNull(),
-  rationale: text("rationale").notNull(),
+  rationale: text("rationale"),
   steps: json("steps").$type<ProcessStep[]>().notNull().default([]),
   createdAt: timestamp("created_at").defaultNow(),
 });
