@@ -34,12 +34,8 @@ export default function ProcessBuilderVoice() {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [cleanupLevel, setCleanupLevel] = useState(3);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processData, setProcessData] = useState<{
-    name: string;
-    description: string;
-    category: string;
-    steps: ProcessStep[];
-  } | null>(null);
+  const [steps, setSteps] = useState<ProcessStep[]>([]);
+  const [hasRecorded, setHasRecorded] = useState(false);
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
@@ -135,17 +131,14 @@ export default function ProcessBuilderVoice() {
         id: nanoid(),
       }));
 
-      setProcessData({
-        name: result.name,
-        description: result.description,
-        category: result.category,
-        steps: stepsWithIds,
-      });
-
       // Update form with extracted data
       form.setValue('name', result.name);
       form.setValue('description', result.description);
       form.setValue('category', result.category);
+      
+      // Update steps state
+      setSteps(stepsWithIds);
+      setHasRecorded(true);
 
       toast({
         title: "Process extracted!",
@@ -164,23 +157,18 @@ export default function ProcessBuilderVoice() {
   };
 
   const updateStep = (id: string, instruction: string) => {
-    if (!processData) return;
-    setProcessData({
-      ...processData,
-      steps: processData.steps.map(s => s.id === id ? { ...s, instruction } : s)
-    });
+    setSteps(steps.map(s => s.id === id ? { ...s, instruction } : s));
   };
 
   const removeStep = (id: string) => {
-    if (!processData) return;
-    const updatedSteps = processData.steps
+    const updatedSteps = steps
       .filter(s => s.id !== id)
       .map((s, idx) => ({ ...s, stepNumber: idx + 1 }));
-    setProcessData({ ...processData, steps: updatedSteps });
+    setSteps(updatedSteps);
   };
 
   const onSubmit = (data: FormData) => {
-    if (!processData || processData.steps.length === 0) {
+    if (steps.length === 0) {
       toast({
         title: "No steps recorded",
         description: "Please record a process first",
@@ -188,16 +176,16 @@ export default function ProcessBuilderVoice() {
       });
       return;
     }
-    createMutation.mutate({ ...data, steps: processData.steps });
+    createMutation.mutate({ ...data, steps });
   };
 
   const completionPercentage = () => {
-    if (!processData) return 0;
+    if (!hasRecorded) return 0;
     let completed = 0;
-    if (processData.name) completed += 25;
-    if (processData.description) completed += 25;
-    if (processData.category) completed += 25;
-    if (processData.steps.length > 0) completed += 25;
+    if (form.watch('name')) completed += 25;
+    if (form.watch('description')) completed += 25;
+    if (form.watch('category')) completed += 25;
+    if (steps.length > 0) completed += 25;
     return completed;
   };
 
@@ -271,7 +259,7 @@ export default function ProcessBuilderVoice() {
           <p className="text-sm text-muted-foreground mt-1">Record the entire process in one session - AI will format everything</p>
         </div>
 
-        {!processData ? (
+        {!hasRecorded ? (
           <div className="space-y-6">
             {/* Instructions Card */}
             <Card>
@@ -420,14 +408,14 @@ export default function ProcessBuilderVoice() {
               />
 
               {/* Formatted Steps (Editable) */}
-              {processData.steps.length > 0 && (
+              {steps.length > 0 && (
                 <div className="space-y-3 p-4 bg-muted rounded-lg">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">Steps ({processData.steps.length})</h3>
+                    <h3 className="font-semibold">Steps ({steps.length})</h3>
                     <p className="text-xs text-muted-foreground">Edit any step before saving</p>
                   </div>
                   <div className="space-y-2">
-                    {processData.steps.map((step) => (
+                    {steps.map((step) => (
                       <div key={step.id} className="flex items-start gap-2 p-3 bg-background rounded-lg" data-testid={`step-item-${step.id}`}>
                         <span className="text-sm font-semibold min-w-[28px] flex-shrink-0 mt-2">{step.stepNumber}.</span>
                         <Textarea
@@ -459,7 +447,8 @@ export default function ProcessBuilderVoice() {
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      setProcessData(null);
+                      setHasRecorded(false);
+                      setSteps([]);
                       form.reset();
                     }}
                     className="flex-1"
@@ -469,7 +458,7 @@ export default function ProcessBuilderVoice() {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={createMutation.isPending || processData.steps.length === 0}
+                    disabled={createMutation.isPending || steps.length === 0}
                     className="flex-1"
                     data-testid="button-save-process"
                   >
