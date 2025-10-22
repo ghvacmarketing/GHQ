@@ -4,8 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { History, ChevronDown, ChevronUp, FileText, Calendar, User, ArrowLeft, Plus } from "lucide-react";
-import { Link } from "wouter";
+import { History, ChevronDown, ChevronUp, FileText, Calendar, User, ArrowLeft, Plus, Edit } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Quote } from "@shared/schema";
@@ -15,6 +15,7 @@ import redlogo from "@assets/redlogo.webp";
 export default function QuotesHistory() {
   const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const { data: quotesData, isLoading } = useQuery<{ quotes: Quote[]; pagination: any }>({
     queryKey: ["/api/quotes"],
@@ -75,6 +76,18 @@ export default function QuotesHistory() {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handleEditClick = (quote: Quote) => {
+    if (quote.pushedToTrello) {
+      toast({
+        title: "Cannot Edit Quote",
+        description: "This quote has already been pushed to Trello and cannot be edited.",
+        variant: "destructive",
+      });
+    } else {
+      setLocation(`/quote/edit/${quote.id}`);
+    }
   };
 
   if (isLoading) {
@@ -262,6 +275,22 @@ export default function QuotesHistory() {
                             </p>
                           </div>
                         )}
+
+                        {/* Edit Quote Button */}
+                        <div className="mt-4 pt-4 border-t border-border">
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditClick(quote);
+                            }}
+                            variant="outline"
+                            className="w-full flex items-center justify-center space-x-2"
+                            data-testid={`button-edit-quote-${quote.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                            <span>Edit Quote</span>
+                          </Button>
+                        </div>
 
                         {/* Status Update Actions - Only show for draft quotes */}
                         {(quote.status === 'draft' || !quote.status) && (

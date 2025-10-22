@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/home";
 import QuoteGenerator from "@/pages/quote-generator";
+import QuoteEdit from "@/pages/quote-edit";
 import QuotesHistory from "@/pages/quotes-history";
 import ProcessesSystems from "@/pages/processes-systems";
 import ProcessBuilderManual from "@/pages/process-builder-manual";
@@ -30,6 +31,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/quote" component={QuoteGenerator} />
+      <Route path="/quote/edit/:id" component={QuoteEdit} />
       <Route path="/history" component={QuotesHistory} />
       <Route path="/price-book" component={PriceBook} />
       <Route path="/processes" component={ProcessesSystems} />

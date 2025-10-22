@@ -131,50 +131,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update quote status
+  // Update quote (status or full quote data)
   app.patch("/api/quotes/:id", async (req, res) => {
     try {
-      const { status } = req.body;
       const quote = await storage.getQuote(req.params.id);
       
       if (!quote) {
         return res.status(404).json({ message: "Quote not found" });
       }
 
-      const updatedQuote = await storage.updateQuote(req.params.id, { status });
+      // Build update object - accept both status updates and full quote updates
+      const updateData: any = {};
       
-      // Create Trello cards based on status
-      if (status === 'accepted' && !quote.trelloCardId) {
+      // If only status is provided, it's a status update
+      if (req.body.status && Object.keys(req.body).length === 1) {
+        updateData.status = req.body.status;
+      } else {
+        // Full quote update from edit page
+        if (req.body.customerName !== undefined) updateData.customerName = req.body.customerName;
+        if (req.body.technician !== undefined) updateData.technician = req.body.technician;
+        if (req.body.parts !== undefined) updateData.parts = req.body.parts;
+        if (req.body.subtotal !== undefined) updateData.subtotal = req.body.subtotal;
+        if (req.body.labor !== undefined) updateData.labor = req.body.labor;
+        if (req.body.tax !== undefined) updateData.tax = req.body.tax;
+        if (req.body.total !== undefined) updateData.total = req.body.total;
+        if (req.body.ghvacInstalled !== undefined) updateData.ghvacInstalled = req.body.ghvacInstalled;
+        if (req.body.yearsSinceInstallation !== undefined) updateData.yearsSinceInstallation = req.body.yearsSinceInstallation;
+        if (req.body.jobNotes !== undefined) updateData.jobNotes = req.body.jobNotes;
+        if (req.body.status !== undefined) updateData.status = req.body.status;
+      }
+
+      const updatedQuote = await storage.updateQuote(req.params.id, updateData);
+      
+      // Create Trello cards based on status (only for status updates)
+      // Use updatedQuote to ensure Trello gets the latest data
+      const status = updateData.status;
+      if (status === 'accepted' && !quote.trelloCardId && updatedQuote) {
         const cardId = await trelloService.createOrderCard({
-          customerName: quote.customerName,
-          technician: quote.technician,
-          total: quote.total,
-          subtotal: quote.subtotal,
-          labor: quote.labor,
-          tax: quote.tax,
-          parts: quote.parts,
-          quoteId: quote.id,
-          jobNotes: quote.jobNotes || undefined,
-          ghvacInstalled: quote.ghvacInstalled || false,
-          yearsSinceInstallation: quote.yearsSinceInstallation || undefined,
+          customerName: updatedQuote.customerName,
+          technician: updatedQuote.technician,
+          total: updatedQuote.total,
+          subtotal: updatedQuote.subtotal,
+          labor: updatedQuote.labor,
+          tax: updatedQuote.tax,
+          parts: updatedQuote.parts,
+          quoteId: updatedQuote.id,
+          jobNotes: updatedQuote.jobNotes || undefined,
+          ghvacInstalled: updatedQuote.ghvacInstalled || false,
+          yearsSinceInstallation: updatedQuote.yearsSinceInstallation || undefined,
         });
         
         if (cardId) {
           await storage.updateQuote(req.params.id, { trelloCardId: cardId, pushedToTrello: true });
         }
-      } else if (status === 'pending' && !quote.trelloCardId) {
+      } else if (status === 'pending' && !quote.trelloCardId && updatedQuote) {
         const cardId = await trelloService.createFollowupCard({
-          customerName: quote.customerName,
-          technician: quote.technician,
-          total: quote.total,
-          subtotal: quote.subtotal,
-          labor: quote.labor,
-          tax: quote.tax,
-          parts: quote.parts,
-          quoteId: quote.id,
-          jobNotes: quote.jobNotes || undefined,
-          ghvacInstalled: quote.ghvacInstalled || false,
-          yearsSinceInstallation: quote.yearsSinceInstallation || undefined,
+          customerName: updatedQuote.customerName,
+          technician: updatedQuote.technician,
+          total: updatedQuote.total,
+          subtotal: updatedQuote.subtotal,
+          labor: updatedQuote.labor,
+          tax: updatedQuote.tax,
+          parts: updatedQuote.parts,
+          quoteId: updatedQuote.id,
+          jobNotes: updatedQuote.jobNotes || undefined,
+          ghvacInstalled: updatedQuote.ghvacInstalled || false,
+          yearsSinceInstallation: updatedQuote.yearsSinceInstallation || undefined,
         });
         
         if (cardId) {
