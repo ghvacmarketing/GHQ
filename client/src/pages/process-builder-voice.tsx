@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -36,10 +36,21 @@ export default function ProcessBuilderVoice() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [steps, setSteps] = useState<ProcessStep[]>([]);
   const [hasRecorded, setHasRecorded] = useState(false);
+  const [remainingTime, setRemainingTime] = useState(300); // 5 minutes in seconds
+  const [timerInterval, setTimerInterval] = useState<ReturnType<typeof setInterval> | null>(null);
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
   });
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+    };
+  }, [timerInterval]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -89,6 +100,29 @@ export default function ProcessBuilderVoice() {
       recorder.start();
       setMediaRecorder(recorder);
       setIsRecording(true);
+      setRemainingTime(300); // Reset to 5 minutes
+
+      // Start countdown timer
+      const interval = setInterval(() => {
+        setRemainingTime((prev) => {
+          if (prev <= 1) {
+            // Time's up - auto-stop recording
+            clearInterval(interval);
+            if (recorder.state === 'recording') {
+              recorder.stop();
+              setIsRecording(false);
+              setMediaRecorder(null);
+              toast({
+                title: "Recording timeout",
+                description: "Maximum recording time (5 minutes) reached. Processing your audio...",
+              });
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      setTimerInterval(interval);
     } catch (error) {
       console.error('Error starting recording:', error);
       toast({
@@ -104,7 +138,19 @@ export default function ProcessBuilderVoice() {
       mediaRecorder.stop();
       setIsRecording(false);
       setMediaRecorder(null);
+      
+      // Clear the timer
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        setTimerInterval(null);
+      }
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const processFullRecording = async (audioBlob: Blob) => {
@@ -331,9 +377,17 @@ export default function ProcessBuilderVoice() {
                 </Button>
 
                 {isRecording && (
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mt-4">
-                    <div className="h-3 w-3 bg-red-500 rounded-full animate-pulse" />
-                    Recording in progress... Speak naturally about all 4 fields
+                  <div className="space-y-2 mt-4">
+                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-3 w-3 bg-red-500 rounded-full animate-pulse" />
+                      Recording in progress... Speak naturally about all 4 fields
+                    </div>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-2xl font-mono font-bold text-primary" data-testid="text-timer">
+                        {formatTime(remainingTime)}
+                      </span>
+                      <span className="text-sm text-muted-foreground">remaining</span>
+                    </div>
                   </div>
                 )}
               </CardContent>
