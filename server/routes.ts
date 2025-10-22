@@ -11,7 +11,7 @@ import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
 import { twilioService } from "./sms";
-import { db } from "./db";
+import { pool } from "./db";
 import { randomUUID } from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -21,7 +21,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(
     session({
       store: new PgSession({
-        pool: db as any, // connect-pg-simple expects a pool-like object
+        pool: pool, // Use the actual PostgreSQL pool object
         tableName: 'session',
         createTableIfMissing: false, // We already created the table via schema
       }),

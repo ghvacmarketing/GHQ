@@ -25,7 +25,14 @@ export class TwilioService {
 
       const message = `Your GHVAC Tools login link: ${magicLink}\n\nThis link expires in 15 minutes.`;
 
-      // Make request to Twilio API
+      // Dev mode: Skip SMS for test numbers in development
+      if (process.env.NODE_ENV === 'development' && phoneNumber.startsWith('+1555')) {
+        console.log('[DEV MODE] Skipping SMS send for test number:', phoneNumber);
+        console.log('[DEV MODE] Magic link would be:', magicLink);
+        return true; // Pretend SMS was sent successfully
+      }
+
+      // Production mode or real number: Send via Twilio
       const response = await fetch(
         `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`,
         {
