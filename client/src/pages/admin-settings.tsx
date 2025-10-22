@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit, Settings2, Users, FolderOpen, ReceiptText, Bell } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import type { Quote, Category, Process, Setting, Announcement } from "@shared/schema";
+import type { Quote, Category, Process, Setting, Announcement, PhoneWhitelist } from "@shared/schema";
 import redlogo from "@assets/redlogo.webp";
 
 export default function AdminSettings() {
@@ -36,6 +36,8 @@ export default function AdminSettings() {
   const [announcementMessage, setAnnouncementMessage] = useState("");
   const [announcementButtonText, setAnnouncementButtonText] = useState("Got it");
   const [announcementIsActive, setAnnouncementIsActive] = useState(true);
+  const [newPhoneNumber, setNewPhoneNumber] = useState("");
+  const [newPhoneName, setNewPhoneName] = useState("");
 
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
@@ -289,6 +291,64 @@ export default function AdminSettings() {
       toast({
         title: 'Delete Failed',
         description: 'Failed to delete announcement. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Fetch phone whitelist
+  const { data: phoneWhitelist = [] } = useQuery<PhoneWhitelist[]>({
+    queryKey: ['/api/phone-whitelist'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/phone-whitelist', { password });
+      return response.json();
+    },
+    enabled: isAuthenticated,
+  });
+
+  // Phone whitelist mutations
+  const addPhoneWhitelistMutation = useMutation({
+    mutationFn: async (data: { phoneNumber: string; name: string }) => {
+      const response = await apiRequest('POST', '/api/phone-whitelist', { 
+        ...data,
+        password 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/phone-whitelist'] });
+      setNewPhoneNumber('');
+      setNewPhoneName('');
+      toast({
+        title: 'Phone Added',
+        description: 'Phone number has been added to the whitelist.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Add Failed',
+        description: 'Failed to add phone number. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deletePhoneWhitelistMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('DELETE', `/api/phone-whitelist/${id}`, { password });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/phone-whitelist'] });
+      toast({
+        title: 'Phone Removed',
+        description: 'Phone number has been removed from the whitelist.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Delete Failed',
+        description: 'Failed to remove phone number. Please try again.',
         variant: 'destructive',
       });
     },
@@ -1534,6 +1594,146 @@ export default function AdminSettings() {
                                         className="bg-destructive hover:bg-destructive/90"
                                       >
                                         Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Phone Whitelist Management */}
+              <AccordionItem value="phone-whitelist" className="border rounded-lg px-4 bg-card">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center">
+                    <Users className="h-5 w-5 mr-3 text-primary" />
+                    <span className="font-semibold">Phone Whitelist Management</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <Card className="border-0 shadow-none">
+                    <CardContent className="pt-6 space-y-6">
+                      {/* Add Phone Form */}
+                      <div className="space-y-4 p-4 border rounded-lg">
+                        <h3 className="font-semibold text-lg">Add Phone Number</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Add authorized phone numbers for SMS authentication access.
+                        </p>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="phone-number">Phone Number</Label>
+                          <Input
+                            id="phone-number"
+                            value={newPhoneNumber}
+                            onChange={(e) => setNewPhoneNumber(e.target.value)}
+                            placeholder="+1234567890"
+                            data-testid="input-phone-number"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Format: +1234567890 (include country code)
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="phone-name">Name</Label>
+                          <Input
+                            id="phone-name"
+                            value={newPhoneName}
+                            onChange={(e) => setNewPhoneName(e.target.value)}
+                            placeholder="John Doe"
+                            data-testid="input-phone-name"
+                          />
+                        </div>
+
+                        <Button
+                          onClick={() => {
+                            if (!newPhoneNumber || !newPhoneName) {
+                              toast({
+                                title: 'Missing Fields',
+                                description: 'Please fill in phone number and name.',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            if (!newPhoneNumber.startsWith('+')) {
+                              toast({
+                                title: 'Invalid Format',
+                                description: 'Phone number must start with + (e.g., +1234567890)',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            addPhoneWhitelistMutation.mutate({
+                              phoneNumber: newPhoneNumber,
+                              name: newPhoneName,
+                            });
+                          }}
+                          disabled={addPhoneWhitelistMutation.isPending}
+                          className="w-full"
+                          data-testid="button-add-phone"
+                        >
+                          {addPhoneWhitelistMutation.isPending ? 'Adding...' : 'Add Phone Number'}
+                        </Button>
+                      </div>
+
+                      {/* Whitelisted Phones List */}
+                      <div className="space-y-2">
+                        <h3 className="font-semibold text-lg">Authorized Phone Numbers ({phoneWhitelist.length})</h3>
+                        {phoneWhitelist.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No phone numbers whitelisted yet.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {phoneWhitelist.map((entry) => (
+                              <div 
+                                key={entry.id} 
+                                className="flex items-center justify-between p-3 border rounded-lg"
+                                data-testid={`phone-entry-${entry.id}`}
+                              >
+                                <div className="flex-1 space-y-1">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="font-medium">{entry.name}</span>
+                                    {entry.isActive && (
+                                      <Badge className="bg-green-500 text-xs">Active</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground font-mono">
+                                    {entry.phoneNumber}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Added: {new Date(entry.createdAt!).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon"
+                                      className="flex-shrink-0 ml-2"
+                                      data-testid={`button-delete-phone-${entry.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Remove Phone Number</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to remove {entry.name} ({entry.phoneNumber}) from the whitelist? They will no longer be able to log in.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deletePhoneWhitelistMutation.mutate(entry.id)}
+                                        className="bg-destructive hover:bg-destructive/90"
+                                      >
+                                        Remove
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>

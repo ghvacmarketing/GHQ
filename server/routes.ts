@@ -2,14 +2,41 @@ import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import compression from "compression";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { storage } from "./storage";
 import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
+import { twilioService } from "./sms";
+import { db } from "./db";
+import { randomUUID } from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Session management with connect-pg-simple
+  const PgSession = connectPgSimple(session);
+  
+  app.use(
+    session({
+      store: new PgSession({
+        pool: db as any, // connect-pg-simple expects a pool-like object
+        tableName: 'session',
+        createTableIfMissing: false, // We already created the table via schema
+      }),
+      secret: process.env.SESSION_SECRET || 'ghvac-secret-key-change-in-production',
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+        sameSite: 'lax',
+      },
+    })
+  );
+
   // Add compression middleware for better performance
   app.use(compression());
 
@@ -915,6 +942,189 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Error deleting announcement:', error);
       res.status(500).json({ message: "Error deleting announcement" });
     }
+  });
+
+  // Phone Whitelist routes (admin only)
+  // Get all whitelisted phone numbers
+  app.get("/api/phone-whitelist", async (req, res) => {
+    try {
+      const { password } = req.body;
+      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
+      
+      if (password !== adminPassword) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const whitelist = await storage.getAllPhoneWhitelist();
+      res.json(whitelist);
+    } catch (error) {
+      console.error('Error fetching phone whitelist:', error);
+      res.status(500).json({ message: "Error fetching phone whitelist" });
+    }
+  });
+
+  // Add phone number to whitelist
+  app.post("/api/phone-whitelist", async (req, res) => {
+    try {
+      const { password, phoneNumber, name } = req.body;
+      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
+      
+      if (password !== adminPassword) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const entry = await storage.createPhoneWhitelistEntry({
+        phoneNumber,
+        name,
+        isActive: true,
+      });
+      
+      res.json(entry);
+    } catch (error) {
+      console.error('Error adding phone to whitelist:', error);
+      res.status(400).json({ message: "Error adding phone to whitelist" });
+    }
+  });
+
+  // Delete phone number from whitelist
+  app.delete("/api/phone-whitelist/:id", async (req, res) => {
+    try {
+      const { password } = req.body;
+      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
+      
+      if (password !== adminPassword) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const success = await storage.deletePhoneWhitelistEntry(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Phone number not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting phone from whitelist:', error);
+      res.status(500).json({ message: "Error deleting phone from whitelist" });
+    }
+  });
+
+  // Authentication routes
+  // Request magic link - validates phone number is whitelisted and sends SMS
+  app.post("/api/auth/request-link", async (req, res) => {
+    try {
+      const { phoneNumber } = req.body;
+
+      if (!phoneNumber) {
+        return res.status(400).json({ message: "Phone number is required" });
+      }
+
+      // Check if phone number is whitelisted
+      const whitelistEntry = await storage.getPhoneWhitelistEntry(phoneNumber);
+      if (!whitelistEntry || !whitelistEntry.isActive) {
+        return res.status(403).json({ message: "Phone number not authorized" });
+      }
+
+      // Generate magic link token
+      const token = randomUUID();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+      // Save token to database
+      await storage.createAuthToken({
+        phoneNumber,
+        token,
+        expiresAt,
+      });
+
+      // Send SMS with magic link
+      const smsSent = await twilioService.sendMagicLink(phoneNumber, token, req);
+      if (!smsSent) {
+        return res.status(500).json({ message: "Failed to send SMS" });
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Magic link sent to your phone" 
+      });
+    } catch (error) {
+      console.error('Error requesting magic link:', error);
+      res.status(500).json({ message: "Error sending magic link" });
+    }
+  });
+
+  // Verify magic link token and create session
+  app.get("/api/auth/verify/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      // Get token from database
+      const authToken = await storage.getAuthToken(token);
+      if (!authToken) {
+        return res.status(404).json({ message: "Invalid or expired token" });
+      }
+
+      // Check if token is expired
+      if (new Date() > new Date(authToken.expiresAt)) {
+        await storage.deleteAuthToken(token);
+        return res.status(401).json({ message: "Token expired" });
+      }
+
+      // Check if phone is still whitelisted
+      const whitelistEntry = await storage.getPhoneWhitelistEntry(authToken.phoneNumber);
+      if (!whitelistEntry || !whitelistEntry.isActive) {
+        return res.status(403).json({ message: "Phone number no longer authorized" });
+      }
+
+      // Create session
+      (req.session as any).authenticated = true;
+      (req.session as any).phoneNumber = authToken.phoneNumber;
+      (req.session as any).name = whitelistEntry.name;
+
+      // Delete the used token
+      await storage.deleteAuthToken(token);
+
+      res.json({ 
+        success: true, 
+        user: {
+          phoneNumber: authToken.phoneNumber,
+          name: whitelistEntry.name,
+        }
+      });
+    } catch (error) {
+      console.error('Error verifying token:', error);
+      res.status(500).json({ message: "Error verifying token" });
+    }
+  });
+
+  // Check authentication status
+  app.get("/api/auth/status", async (req, res) => {
+    const replitAccessToken = process.env.REPLIT_ACCESS_TOKEN;
+    const hasReplitAccess = !!replitAccessToken;
+    
+    const isAuthenticated = (req.session as any)?.authenticated || hasReplitAccess;
+    
+    if (isAuthenticated) {
+      res.json({
+        authenticated: true,
+        user: (req.session as any)?.phoneNumber ? {
+          phoneNumber: (req.session as any).phoneNumber,
+          name: (req.session as any).name,
+        } : null,
+        replitAccess: hasReplitAccess,
+      });
+    } else {
+      res.json({ authenticated: false });
+    }
+  });
+
+  // Logout
+  app.post("/api/auth/logout", async (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Error destroying session:', err);
+        return res.status(500).json({ message: "Error logging out" });
+      }
+      res.json({ success: true });
+    });
   });
 
   const httpServer = createServer(app);

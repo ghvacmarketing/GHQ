@@ -12,6 +12,8 @@ import ProcessBuilderManual from "@/pages/process-builder-manual";
 import ProcessBuilderVoice from "@/pages/process-builder-voice";
 import PriceBook from "@/pages/price-book";
 import SalesProspects from "@/pages/sales-prospects";
+import Login from "@/pages/login";
+import AuthVerify from "@/pages/auth-verify";
 import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import { lazy, Suspense, useState, useEffect } from "react";
@@ -31,6 +33,8 @@ function AdminSettingsWrapper() {
 function Router() {
   return (
     <Switch>
+      <Route path="/login" component={Login} />
+      <Route path="/auth/verify/:token" component={AuthVerify} />
       <Route path="/" component={Home} />
       <Route path="/quote" component={QuoteGenerator} />
       <Route path="/quote/edit/:id" component={QuoteEdit} />
