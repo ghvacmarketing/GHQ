@@ -412,6 +412,7 @@ export default function QuoteGenerator() {
                   { label: "Quote Generator", path: "/quote" },
                   { label: "Price Book", path: "/price-book" },
                   { label: "Processes and Systems", path: "/processes" },
+                  { label: "Sales Prospects", path: "/sales-prospects" },
                 ]}
               />
             </div>
