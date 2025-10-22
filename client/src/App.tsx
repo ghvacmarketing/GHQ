@@ -56,7 +56,7 @@ function AppContent() {
   const [location, navigate] = useLocation();
 
   // Check authentication status
-  const { data: authStatus, isLoading: authLoading } = useQuery<{
+  const { data: authStatus, isLoading: authLoading, isError } = useQuery<{
     authenticated: boolean;
     user?: { phoneNumber: string; name: string } | null;
     replitAccess?: boolean;
@@ -89,14 +89,15 @@ function AppContent() {
 
   // Redirect to login if not authenticated (except for public routes)
   useEffect(() => {
-    if (!authLoading && authStatus) {
+    if (!authLoading) {
       const isPublicRoute = location === '/login' || location.startsWith('/auth/verify');
       
-      if (!authStatus.authenticated && !isPublicRoute) {
+      // If error or explicitly not authenticated, redirect to login
+      if ((isError || !authStatus?.authenticated) && !isPublicRoute) {
         navigate('/login');
       }
     }
-  }, [authStatus, authLoading, location, navigate]);
+  }, [authStatus, authLoading, isError, location, navigate]);
 
   // Show loading spinner while checking auth
   if (authLoading) {

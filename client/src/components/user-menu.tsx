@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 
 export default function UserMenu() {
@@ -30,6 +30,9 @@ export default function UserMenu() {
       const result = await response.json();
 
       if (result.success) {
+        // Invalidate auth status cache to reflect logged-out state
+        await queryClient.invalidateQueries({ queryKey: ['/api/auth/status'] });
+        
         toast({
           title: "Logged Out",
           description: "You have been successfully logged out",
