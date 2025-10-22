@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -18,6 +18,7 @@ import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import { lazy, Suspense, useState, useEffect } from "react";
 import type { Announcement } from "@shared/schema";
+import { Loader2 } from "lucide-react";
 
 // Lazy load admin settings to reduce initial bundle size
 const AdminSettings = lazy(() => import("@/pages/admin-settings"));
@@ -52,10 +53,22 @@ function Router() {
 
 function AppContent() {
   const [showAnnouncement, setShowAnnouncement] = useState(false);
+  const [location, navigate] = useLocation();
+
+  // Check authentication status
+  const { data: authStatus, isLoading: authLoading } = useQuery<{
+    authenticated: boolean;
+    user?: { phoneNumber: string; name: string } | null;
+    replitAccess?: boolean;
+  }>({
+    queryKey: ['/api/auth/status'],
+    retry: false,
+  });
 
   // Fetch active announcement
   const { data: announcement } = useQuery<Announcement | null>({
     queryKey: ['/api/announcement'],
+    enabled: authStatus?.authenticated === true, // Only fetch when authenticated
   });
 
   // Check if announcement should be shown
@@ -73,6 +86,29 @@ function AppContent() {
   const handleDismiss = () => {
     setShowAnnouncement(false);
   };
+
+  // Redirect to login if not authenticated (except for public routes)
+  useEffect(() => {
+    if (!authLoading && authStatus) {
+      const isPublicRoute = location === '/login' || location.startsWith('/auth/verify');
+      
+      if (!authStatus.authenticated && !isPublicRoute) {
+        navigate('/login');
+      }
+    }
+  }, [authStatus, authLoading, location, navigate]);
+
+  // Show loading spinner while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

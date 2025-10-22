@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import NavDropdown from "@/components/nav-dropdown";
+import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
 import { useQuery } from "@tanstack/react-query";
 import type { Quote } from "@shared/schema";
@@ -98,6 +99,7 @@ export default function Home() {
             >
               <Settings className="h-4 w-4" />
             </Button>
+            <UserMenu />
           </div>
         </div>
       </header>
