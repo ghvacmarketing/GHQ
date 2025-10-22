@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import compression from "compression";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
@@ -839,6 +839,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Error deleting PDF" });
+    }
+  });
+
+  // Announcement routes
+  // Get active announcement (public, no auth needed)
+  app.get("/api/announcement", async (req, res) => {
+    try {
+      const announcement = await storage.getActiveAnnouncement();
+      if (!announcement) {
+        return res.json(null);
+      }
+      res.json(announcement);
+    } catch (error) {
+      console.error('Error fetching active announcement:', error);
+      res.status(500).json({ message: "Error fetching announcement" });
+    }
+  });
+
+  // Get all announcements (admin only)
+  app.get("/api/announcements", async (req, res) => {
+    try {
+      const { password } = req.body;
+      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
+      
+      if (password !== adminPassword) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const announcements = await storage.getAllAnnouncements();
+      res.json(announcements);
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
+      res.status(500).json({ message: "Error fetching announcements" });
+    }
+  });
+
+  // Create/update announcement (admin only)
+  app.post("/api/announcement", async (req, res) => {
+    try {
+      const { password, ...announcementData } = req.body;
+      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
+      
+      if (password !== adminPassword) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const validatedData = insertAnnouncementSchema.parse(announcementData);
+      const announcement = await storage.createAnnouncement(validatedData);
+      
+      res.json(announcement);
+    } catch (error) {
+      console.error('Error creating announcement:', error);
+      res.status(400).json({ message: "Invalid announcement data" });
+    }
+  });
+
+  // Delete announcement (admin only)
+  app.delete("/api/announcement/:id", async (req, res) => {
+    try {
+      const { password } = req.body;
+      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
+      
+      if (password !== adminPassword) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const success = await storage.deleteAnnouncement(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Announcement not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting announcement:', error);
+      res.status(500).json({ message: "Error deleting announcement" });
     }
   });
 

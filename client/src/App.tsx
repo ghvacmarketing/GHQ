@@ -1,6 +1,6 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/home";
@@ -13,7 +13,9 @@ import ProcessBuilderVoice from "@/pages/process-builder-voice";
 import PriceBook from "@/pages/price-book";
 import SalesProspects from "@/pages/sales-prospects";
 import NotFound from "@/pages/not-found";
-import { lazy, Suspense } from "react";
+import AnnouncementModal from "@/components/AnnouncementModal";
+import { lazy, Suspense, useState, useEffect } from "react";
+import type { Announcement } from "@shared/schema";
 
 // Lazy load admin settings to reduce initial bundle size
 const AdminSettings = lazy(() => import("@/pages/admin-settings"));
@@ -44,12 +46,48 @@ function Router() {
   );
 }
 
+function AppContent() {
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
+
+  // Fetch active announcement
+  const { data: announcement } = useQuery<Announcement | null>({
+    queryKey: ['/api/announcement'],
+  });
+
+  // Check if announcement should be shown
+  useEffect(() => {
+    if (announcement) {
+      const dismissalKey = `ghvac-announcement-dismissed-v${announcement.version}`;
+      const isDismissed = localStorage.getItem(dismissalKey);
+      
+      if (!isDismissed) {
+        setShowAnnouncement(true);
+      }
+    }
+  }, [announcement]);
+
+  const handleDismiss = () => {
+    setShowAnnouncement(false);
+  };
+
+  return (
+    <>
+      <Toaster />
+      <Router />
+      <AnnouncementModal 
+        announcement={announcement || null}
+        open={showAnnouncement}
+        onDismiss={handleDismiss}
+      />
+    </>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        <AppContent />
       </TooltipProvider>
     </QueryClientProvider>
   );

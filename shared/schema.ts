@@ -148,3 +148,63 @@ export const insertPdfFileSchema = createInsertSchema(pdfFiles).omit({
 
 export type InsertPdfFile = z.infer<typeof insertPdfFileSchema>;
 export type PdfFile = typeof pdfFiles.$inferSelect;
+
+export const announcements = pgTable("announcements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  buttonText: text("button_text").notNull().default("Got it"),
+  version: text("version").notNull().default("1"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+export type Announcement = typeof announcements.$inferSelect;
+
+export const phoneWhitelist = pgTable("phone_whitelist", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  phoneNumber: text("phone_number").notNull().unique(),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPhoneWhitelistSchema = createInsertSchema(phoneWhitelist).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPhoneWhitelist = z.infer<typeof insertPhoneWhitelistSchema>;
+export type PhoneWhitelist = typeof phoneWhitelist.$inferSelect;
+
+export const authTokens = pgTable("auth_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  phoneNumber: text("phone_number").notNull(),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAuthTokenSchema = createInsertSchema(authTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAuthToken = z.infer<typeof insertAuthTokenSchema>;
+export type AuthToken = typeof authTokens.$inferSelect;
+
+export const sessions = pgTable("session", {
+  sid: varchar("sid").primaryKey(),
+  sess: json("sess").notNull(),
+  expire: timestamp("expire").notNull(),
+});
+
+export type Session = typeof sessions.$inferSelect;

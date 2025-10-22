@@ -5,13 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit, Settings2, Users, FolderOpen, ReceiptText } from "lucide-react";
+import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit, Settings2, Users, FolderOpen, ReceiptText, Bell } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import type { Quote, Category, Process, Setting } from "@shared/schema";
+import type { Quote, Category, Process, Setting, Announcement } from "@shared/schema";
 import redlogo from "@assets/redlogo.webp";
 
 export default function AdminSettings() {
@@ -30,6 +32,10 @@ export default function AdminSettings() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementMessage, setAnnouncementMessage] = useState("");
+  const [announcementButtonText, setAnnouncementButtonText] = useState("Got it");
+  const [announcementIsActive, setAnnouncementIsActive] = useState(true);
 
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
@@ -223,13 +229,70 @@ export default function AdminSettings() {
     enabled: isAuthenticated,
   });
 
-  // Initialize PDF URL from app settings
-  useEffect(() => {
-    const pdfSetting = appSettings.find((s: Setting) => s.key === 'price_book_pdf_url');
-    if (pdfSetting) {
-      setPdfUrl(pdfSetting.value);
-    }
-  }, [appSettings]);
+  // Fetch announcements
+  const { data: announcements = [] } = useQuery<Announcement[]>({
+    queryKey: ['/api/announcements'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/announcements', { password });
+      return response.json();
+    },
+    enabled: isAuthenticated,
+  });
+
+  // Get active announcement
+  const activeAnnouncement = announcements.find(a => a.isActive);
+
+  // Announcement mutations
+  const createAnnouncementMutation = useMutation({
+    mutationFn: async (data: { title: string; message: string; buttonText: string; isActive: boolean }) => {
+      const version = Date.now().toString();
+      const response = await apiRequest('POST', '/api/announcement', { 
+        ...data, 
+        version,
+        password 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/announcements'] });
+      setAnnouncementTitle('');
+      setAnnouncementMessage('');
+      setAnnouncementButtonText('Got it');
+      setAnnouncementIsActive(true);
+      toast({
+        title: 'Announcement Created',
+        description: 'Announcement has been created successfully.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Create Failed',
+        description: 'Failed to create announcement. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteAnnouncementMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('DELETE', `/api/announcement/${id}`, { password });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/announcements'] });
+      toast({
+        title: 'Announcement Deleted',
+        description: 'Announcement has been deleted successfully.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Delete Failed',
+        description: 'Failed to delete announcement. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Category mutations
   const createCategoryMutation = useMutation({
@@ -1302,6 +1365,186 @@ export default function AdminSettings() {
                   )}
                 </CardContent>
               </Card>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Announcement Management */}
+              <AccordionItem value="announcements" className="border rounded-lg px-4 bg-card">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center">
+                    <Bell className="h-5 w-5 mr-3 text-primary" />
+                    <span className="font-semibold">Announcement Management</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <Card className="border-0 shadow-none">
+                    <CardContent className="pt-6 space-y-6">
+                      {/* Create Announcement Form */}
+                      <div className="space-y-4 p-4 border rounded-lg">
+                        <h3 className="font-semibold text-lg">Create New Announcement</h3>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="announcement-title">Title</Label>
+                          <Input
+                            id="announcement-title"
+                            value={announcementTitle}
+                            onChange={(e) => setAnnouncementTitle(e.target.value)}
+                            placeholder="Enter announcement title"
+                            data-testid="input-announcement-title"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="announcement-message">Message</Label>
+                          <Textarea
+                            id="announcement-message"
+                            value={announcementMessage}
+                            onChange={(e) => setAnnouncementMessage(e.target.value)}
+                            placeholder="Enter announcement message"
+                            rows={4}
+                            data-testid="textarea-announcement-message"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="announcement-button">Button Text</Label>
+                          <Input
+                            id="announcement-button"
+                            value={announcementButtonText}
+                            onChange={(e) => setAnnouncementButtonText(e.target.value)}
+                            placeholder="e.g., Got it, Okay, Dismiss"
+                            data-testid="input-announcement-button-text"
+                          />
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="announcement-active"
+                            checked={announcementIsActive}
+                            onCheckedChange={setAnnouncementIsActive}
+                            data-testid="switch-announcement-active"
+                          />
+                          <Label htmlFor="announcement-active" className="cursor-pointer">
+                            Set as Active Announcement
+                          </Label>
+                        </div>
+
+                        <Button
+                          onClick={() => {
+                            if (!announcementTitle || !announcementMessage) {
+                              toast({
+                                title: 'Missing Fields',
+                                description: 'Please fill in title and message.',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            createAnnouncementMutation.mutate({
+                              title: announcementTitle,
+                              message: announcementMessage,
+                              buttonText: announcementButtonText,
+                              isActive: announcementIsActive,
+                            });
+                          }}
+                          disabled={createAnnouncementMutation.isPending}
+                          className="w-full"
+                          data-testid="button-create-announcement"
+                        >
+                          {createAnnouncementMutation.isPending ? 'Creating...' : 'Create Announcement'}
+                        </Button>
+                      </div>
+
+                      {/* Current Active Announcement */}
+                      {activeAnnouncement && (
+                        <div className="space-y-2 p-4 border rounded-lg bg-muted/50">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-semibold text-lg">Current Active Announcement</h3>
+                            <Badge className="bg-green-500">Active</Badge>
+                          </div>
+                          <div className="space-y-2">
+                            <div>
+                              <Label className="text-sm text-muted-foreground">Title</Label>
+                              <p className="font-medium" data-testid="text-active-announcement-title">{activeAnnouncement.title}</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm text-muted-foreground">Message</Label>
+                              <p className="whitespace-pre-wrap" data-testid="text-active-announcement-message">{activeAnnouncement.message}</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm text-muted-foreground">Button Text</Label>
+                              <p data-testid="text-active-announcement-button">{activeAnnouncement.buttonText}</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm text-muted-foreground">Version</Label>
+                              <p className="text-xs font-mono" data-testid="text-active-announcement-version">{activeAnnouncement.version}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* All Announcements List */}
+                      <div className="space-y-2">
+                        <h3 className="font-semibold text-lg">All Announcements ({announcements.length})</h3>
+                        {announcements.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No announcements created yet.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {announcements.map((announcement) => (
+                              <div 
+                                key={announcement.id} 
+                                className="flex items-start justify-between p-3 border rounded-lg"
+                                data-testid={`announcement-item-${announcement.id}`}
+                              >
+                                <div className="flex-1 space-y-1">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="font-medium">{announcement.title}</span>
+                                    {announcement.isActive && (
+                                      <Badge className="bg-green-500 text-xs">Active</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground line-clamp-2">
+                                    {announcement.message}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Version: {announcement.version} • Created: {new Date(announcement.createdAt!).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon"
+                                      className="flex-shrink-0 ml-2"
+                                      data-testid={`button-delete-announcement-${announcement.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Announcement</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete this announcement? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deleteAnnouncementMutation.mutate(announcement.id)}
+                                        className="bg-destructive hover:bg-destructive/90"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

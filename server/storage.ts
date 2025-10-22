@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, quotes, parts, technicians, processes, categories, settings, pdfFiles } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, quotes, parts, technicians, processes, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -46,6 +46,25 @@ export interface IStorage {
   getPriceBookPdf(): Promise<PdfFile | undefined>;
   uploadPriceBookPdf(pdfData: InsertPdfFile): Promise<PdfFile>;
   deletePriceBookPdf(): Promise<boolean>;
+  
+  // Announcement operations
+  getActiveAnnouncement(): Promise<Announcement | undefined>;
+  getAllAnnouncements(): Promise<Announcement[]>;
+  createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
+  updateAnnouncement(id: string, announcement: Partial<Announcement>): Promise<Announcement | undefined>;
+  deleteAnnouncement(id: string): Promise<boolean>;
+  
+  // Phone Whitelist operations
+  getPhoneWhitelistEntry(phoneNumber: string): Promise<PhoneWhitelist | undefined>;
+  getAllPhoneWhitelist(): Promise<PhoneWhitelist[]>;
+  createPhoneWhitelistEntry(entry: InsertPhoneWhitelist): Promise<PhoneWhitelist>;
+  deletePhoneWhitelistEntry(id: string): Promise<boolean>;
+  
+  // Auth Token operations
+  createAuthToken(token: InsertAuthToken): Promise<AuthToken>;
+  getAuthToken(token: string): Promise<AuthToken | undefined>;
+  deleteAuthToken(token: string): Promise<boolean>;
+  deleteExpiredTokens(): Promise<number>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -248,6 +267,108 @@ export class DatabaseStorage implements IStorage {
   async deletePriceBookPdf(): Promise<boolean> {
     const result = await db.delete(pdfFiles);
     return (result.rowCount || 0) > 0;
+  }
+
+  // Announcement operations
+  async getActiveAnnouncement(): Promise<Announcement | undefined> {
+    const [announcement] = await db
+      .select()
+      .from(announcements)
+      .where(eq(announcements.isActive, true))
+      .limit(1);
+    return announcement || undefined;
+  }
+
+  async getAllAnnouncements(): Promise<Announcement[]> {
+    return await db.select().from(announcements).orderBy(announcements.createdAt);
+  }
+
+  async createAnnouncement(insertAnnouncement: InsertAnnouncement): Promise<Announcement> {
+    // Deactivate all existing announcements
+    await db.update(announcements).set({ isActive: false });
+    
+    // Get the highest version number and increment
+    const allAnnouncements = await this.getAllAnnouncements();
+    const maxVersion = allAnnouncements.length > 0 
+      ? Math.max(...allAnnouncements.map(a => parseInt(a.version) || 0))
+      : 0;
+    
+    const [announcement] = await db
+      .insert(announcements)
+      .values({
+        ...insertAnnouncement,
+        version: String(maxVersion + 1),
+        isActive: true,
+      })
+      .returning();
+    return announcement;
+  }
+
+  async updateAnnouncement(id: string, updateData: Partial<Announcement>): Promise<Announcement | undefined> {
+    const [announcement] = await db
+      .update(announcements)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(announcements.id, id))
+      .returning();
+    return announcement || undefined;
+  }
+
+  async deleteAnnouncement(id: string): Promise<boolean> {
+    const result = await db.delete(announcements).where(eq(announcements.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Phone Whitelist operations
+  async getPhoneWhitelistEntry(phoneNumber: string): Promise<PhoneWhitelist | undefined> {
+    const [entry] = await db
+      .select()
+      .from(phoneWhitelist)
+      .where(eq(phoneWhitelist.phoneNumber, phoneNumber));
+    return entry || undefined;
+  }
+
+  async getAllPhoneWhitelist(): Promise<PhoneWhitelist[]> {
+    return await db.select().from(phoneWhitelist).orderBy(phoneWhitelist.createdAt);
+  }
+
+  async createPhoneWhitelistEntry(insertEntry: InsertPhoneWhitelist): Promise<PhoneWhitelist> {
+    const [entry] = await db
+      .insert(phoneWhitelist)
+      .values(insertEntry)
+      .returning();
+    return entry;
+  }
+
+  async deletePhoneWhitelistEntry(id: string): Promise<boolean> {
+    const result = await db.delete(phoneWhitelist).where(eq(phoneWhitelist.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Auth Token operations
+  async createAuthToken(insertToken: InsertAuthToken): Promise<AuthToken> {
+    const [token] = await db
+      .insert(authTokens)
+      .values(insertToken)
+      .returning();
+    return token;
+  }
+
+  async getAuthToken(token: string): Promise<AuthToken | undefined> {
+    const [authToken] = await db
+      .select()
+      .from(authTokens)
+      .where(eq(authTokens.token, token));
+    return authToken || undefined;
+  }
+
+  async deleteAuthToken(token: string): Promise<boolean> {
+    const result = await db.delete(authTokens).where(eq(authTokens.token, token));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async deleteExpiredTokens(): Promise<number> {
+    const result = await db.delete(authTokens).where(eq(authTokens.expiresAt, new Date()));
+    return result.rowCount || 0;
   }
 
   // Initialize default data if needed
