@@ -18,6 +18,7 @@ export const quotes = pgTable("quotes", {
   quoteText: text("quote_text"),
   emailSent: boolean("email_sent").default(false),
   trelloCardId: text("trello_card_id"),
+  pushedToTrello: boolean("pushed_to_trello").default(false),
   jobNotes: text("job_notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });

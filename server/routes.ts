@@ -160,7 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         if (cardId) {
-          await storage.updateQuote(req.params.id, { trelloCardId: cardId });
+          await storage.updateQuote(req.params.id, { trelloCardId: cardId, pushedToTrello: true });
         }
       } else if (status === 'pending' && !quote.trelloCardId) {
         const cardId = await trelloService.createFollowupCard({
@@ -178,7 +178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         if (cardId) {
-          await storage.updateQuote(req.params.id, { trelloCardId: cardId });
+          await storage.updateQuote(req.params.id, { trelloCardId: cardId, pushedToTrello: true });
         }
       }
       
