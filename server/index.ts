@@ -2,6 +2,14 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
+// Validate required environment variables
+if (!process.env.SESSION_SECRET) {
+  console.error("❌ FATAL ERROR: SESSION_SECRET environment variable is required but not set.");
+  console.error("   Please set SESSION_SECRET to a secure random string.");
+  console.error("   Example: SESSION_SECRET=your-secure-random-string-here");
+  process.exit(1);
+}
+
 const app = express();
 // Conditional JSON parsing - skip for PDF upload route which needs 50MB limit
 app.use((req, res, next) => {

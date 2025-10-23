@@ -80,7 +80,7 @@ export default function QuoteEdit() {
         parts: quote.parts as QuotePart[],
         ghvacInstalled: quote.ghvacInstalled ?? undefined,
         yearsSinceInstallation: quote.yearsSinceInstallation ?? "",
-        laborHours: "1", // Default labor hours
+        laborHours: quote.laborHours ?? "",
         jobNotes: quote.jobNotes ?? "",
       });
     }
@@ -239,6 +239,7 @@ export default function QuoteEdit() {
       total: totals.total,
       ghvacInstalled: quoteData.ghvacInstalled,
       yearsSinceInstallation: quoteData.yearsSinceInstallation,
+      laborHours: quoteData.laborHours,
       jobNotes: quoteData.jobNotes,
     };
 

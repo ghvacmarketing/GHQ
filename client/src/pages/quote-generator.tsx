@@ -294,6 +294,7 @@ export default function QuoteGenerator() {
       total: totals.total,
       ghvacInstalled: quoteData.ghvacInstalled,
       yearsSinceInstallation: quoteData.yearsSinceInstallation,
+      laborHours: quoteData.laborHours,
       jobNotes: quoteData.jobNotes,
       status: "draft",
       quoteText: "", // Will be generated on server

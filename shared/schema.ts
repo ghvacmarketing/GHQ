@@ -14,6 +14,7 @@ export const quotes = pgTable("quotes", {
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   ghvacInstalled: boolean("ghvac_installed").default(false),
   yearsSinceInstallation: text("years_since_installation"),
+  laborHours: text("labor_hours"),
   status: text("status").default("draft"), // draft, pending, accepted
   quoteText: text("quote_text"),
   emailSent: boolean("email_sent").default(false),
