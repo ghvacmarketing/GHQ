@@ -29,6 +29,7 @@ Preferred communication style: Simple, everyday language.
 - **Monorepo**: Shared TypeScript types and Zod schemas, unified build, path aliases.
 - **Pricing**: Google Sheets as source of truth, server-side caching, real-time updates, custom parts support.
 - **Quote Generation**: Text-based output, server-side calculation (subtotals, labor, tax, totals), warranty logic.
+- **Quote Editing Protection**: Quotes can only be edited when status is "draft" and not pushed to Trello. Non-editable quotes display a warning banner with context-aware messaging and disable all form fields to prevent accidental changes. This ensures data integrity for quotes being tracked in external systems.
 - **Processes and Systems Module**: Searchable wiki, manual and voice-guided process creation (using OpenAI Whisper for transcription and GPT for formatting/extraction with configurable cleanup intensity), PDF export (jsPDF), PostgreSQL storage with JSON column for steps.
 - **PDF Management**: Secure storage and viewing of Price Book PDFs in PostgreSQL, admin-controlled upload with password protection and size validation.
 - **App Configuration**: Separate API endpoints for Google Sheets pricing and database-backed application settings.
