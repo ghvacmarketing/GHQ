@@ -23,10 +23,21 @@ export default function Login() {
       const result = await response.json();
 
       if (result.success) {
-        toast({
-          title: "Magic Link Sent!",
-          description: "Check your phone for a login link. It expires in 15 minutes.",
-        });
+        // Check if auto-login is enabled (SMS disabled mode)
+        if (result.autoLogin) {
+          toast({
+            title: "Success!",
+            description: result.message || "Logging you in...",
+          });
+          // Redirect to home immediately
+          setTimeout(() => navigate("/"), 500);
+        } else {
+          // Normal SMS flow
+          toast({
+            title: "Magic Link Sent!",
+            description: "Check your phone for a login link. It expires in 15 minutes.",
+          });
+        }
       } else {
         toast({
           title: "Error",

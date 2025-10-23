@@ -1024,6 +1024,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Phone number not authorized" });
       }
 
+      // TEMPORARY BYPASS: If SMS is disabled, immediately log user in
+      // TODO: Re-enable SMS when Twilio is configured properly
+      const smsDisabled = process.env.DISABLE_SMS_AUTH === 'true';
+      if (smsDisabled) {
+        console.log('[SMS DISABLED] Auto-logging in user:', phoneNumber);
+        
+        // Create session immediately
+        (req.session as any).user = {
+          phoneNumber: whitelistEntry.phoneNumber,
+          name: whitelistEntry.name,
+        };
+        
+        await new Promise((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) reject(err);
+            else resolve(true);
+          });
+        });
+        
+        return res.json({ 
+          success: true, 
+          message: `Welcome, ${whitelistEntry.name}!`,
+          autoLogin: true // Signal to frontend to redirect immediately
+        });
+      }
+
+      // Original SMS flow (when SMS is enabled)
       // Generate magic link token
       const token = randomUUID();
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
