@@ -184,6 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (req.body.total !== undefined) updateData.total = req.body.total;
         if (req.body.ghvacInstalled !== undefined) updateData.ghvacInstalled = req.body.ghvacInstalled;
         if (req.body.yearsSinceInstallation !== undefined) updateData.yearsSinceInstallation = req.body.yearsSinceInstallation;
+        if (req.body.laborHours !== undefined) updateData.laborHours = req.body.laborHours;
         if (req.body.jobNotes !== undefined) updateData.jobNotes = req.body.jobNotes;
         if (req.body.status !== undefined) updateData.status = req.body.status;
       }
