@@ -14,6 +14,7 @@ interface CustomerInfoProps {
     customerName?: boolean;
     technician?: boolean;
   };
+  disabled?: boolean;
 }
 
 export default function CustomerInfo({
@@ -22,6 +23,7 @@ export default function CustomerInfo({
   technicians,
   onUpdate,
   hasErrors,
+  disabled = false,
 }: CustomerInfoProps) {
   return (
     <Card className="slide-in">
@@ -43,6 +45,7 @@ export default function CustomerInfo({
               onChange={(e) => onUpdate({ customerName: e.target.value })}
               className={`w-full ${hasErrors?.customerName ? 'border-destructive focus:border-destructive' : ''}`}
               data-testid="input-customer-name"
+              disabled={disabled}
             />
             {hasErrors?.customerName && (
               <p className="text-xs text-destructive mt-1">Customer name is required</p>
@@ -52,7 +55,7 @@ export default function CustomerInfo({
             <Label htmlFor="technician" className="block text-sm font-medium text-card-foreground mb-2">
               Technician
             </Label>
-            <Select value={technician} onValueChange={(value) => onUpdate({ technician: value })}>
+            <Select value={technician} onValueChange={(value) => onUpdate({ technician: value })} disabled={disabled}>
               <SelectTrigger className={`w-full ${hasErrors?.technician ? 'border-destructive focus:border-destructive' : ''}`} data-testid="select-technician">
                 <SelectValue placeholder="Select technician" />
               </SelectTrigger>

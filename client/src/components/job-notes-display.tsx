@@ -7,9 +7,10 @@ interface JobNotesDisplayProps {
   jobNotes: string;
   onClear: () => void;
   onUpdate: (updatedNotes: string) => void;
+  disabled?: boolean;
 }
 
-export default function JobNotesDisplay({ jobNotes, onClear, onUpdate }: JobNotesDisplayProps) {
+export default function JobNotesDisplay({ jobNotes, onClear, onUpdate, disabled = false }: JobNotesDisplayProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedNotes, setEditedNotes] = useState(jobNotes);
 
@@ -46,6 +47,7 @@ export default function JobNotesDisplay({ jobNotes, onClear, onUpdate }: JobNote
                 onClick={handleStartEdit}
                 className="text-muted-foreground hover:text-primary"
                 data-testid="button-edit-notes"
+                disabled={disabled}
               >
                 <Edit3 className="h-4 w-4" />
               </Button>
@@ -56,6 +58,7 @@ export default function JobNotesDisplay({ jobNotes, onClear, onUpdate }: JobNote
               onClick={onClear}
               className="text-muted-foreground hover:text-destructive"
               data-testid="button-clear-notes"
+              disabled={disabled}
             >
               <X className="h-4 w-4" />
             </Button>

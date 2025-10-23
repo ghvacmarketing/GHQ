@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, AlertCircle } from "lucide-react";
 import { Link, useLocation, useRoute } from "wouter";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import NavDropdown from "@/components/nav-dropdown";
 import CustomerInfo from "@/components/customer-info";
 import PartsSelection from "@/components/parts-selection";
@@ -66,6 +67,9 @@ export default function QuoteEdit() {
   const technicians = (initialData as any)?.technicians || [];
   const settings = (initialData as any)?.settings;
   const parts = (initialData as any)?.parts || [];
+
+  // Check if quote is editable (not pushed to Trello and status is draft)
+  const isQuoteEditable = quote && !quote.pushedToTrello && quote.status === "draft";
 
   // Pre-fill form when quote loads
   useEffect(() => {
@@ -318,6 +322,27 @@ export default function QuoteEdit() {
 
       {/* Main Content */}
       <main className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-md md:max-w-2xl lg:max-w-5xl">
+        {/* Warning Banner for Non-Editable Quotes */}
+        {!isQuoteEditable && quote && (
+          <Alert variant="destructive" data-testid="alert-quote-not-editable">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Quote Cannot Be Edited</AlertTitle>
+            <AlertDescription>
+              {quote.pushedToTrello ? (
+                <>
+                  This quote has been pushed to Trello with status "{quote.status}". 
+                  To make changes, please edit the quote directly in Trello where it's being tracked.
+                </>
+              ) : (
+                <>
+                  This quote has status "{quote.status}" and cannot be edited. 
+                  Only quotes with status "draft" can be modified.
+                </>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <CustomerInfo
           customerName={quoteData.customerName}
           technician={quoteData.technician}
@@ -327,6 +352,7 @@ export default function QuoteEdit() {
             customerName: validationErrors.includes('customerName'),
             technician: validationErrors.includes('technician'),
           }}
+          disabled={!isQuoteEditable}
         />
 
         <WarrantySection
@@ -338,6 +364,7 @@ export default function QuoteEdit() {
             warranty: validationErrors.includes('warranty'),
             laborHours: validationErrors.includes('laborHours'),
           }}
+          disabled={!isQuoteEditable}
         />
 
         <PartsSelection
@@ -346,6 +373,7 @@ export default function QuoteEdit() {
           onAddCustomPart={() => setIsCustomPartModalOpen(true)}
           hasPartsError={validationErrors.includes('parts')}
           availableParts={parts}
+          disabled={!isQuoteEditable}
         />
 
         {quoteData.parts.length > 0 && totals && (
@@ -353,6 +381,7 @@ export default function QuoteEdit() {
             parts={quoteData.parts}
             totals={totals}
             onUpdate={handleUpdateQuoteData}
+            disabled={!isQuoteEditable}
           />
         )}
 
@@ -360,18 +389,19 @@ export default function QuoteEdit() {
           jobNotes={quoteData.jobNotes || ""}
           onUpdate={(notes) => handleUpdateQuoteData({ jobNotes: notes })}
           onClear={() => handleUpdateQuoteData({ jobNotes: "" })}
+          disabled={!isQuoteEditable}
         />
 
         {/* Save Button */}
         <div className="flex justify-center pb-6">
           <Button
             onClick={handleSaveQuote}
-            disabled={updateQuoteMutation.isPending}
+            disabled={!isQuoteEditable || updateQuoteMutation.isPending}
             className="w-full sm:w-auto px-8 py-6 text-lg"
             data-testid="button-save-quote"
           >
             <Save className="mr-2 h-5 w-5" />
-            {updateQuoteMutation.isPending ? "Saving..." : "Save Changes"}
+            {updateQuoteMutation.isPending ? "Saving..." : !isQuoteEditable ? "Cannot Edit" : "Save Changes"}
           </Button>
         </div>
       </main>

@@ -14,6 +14,7 @@ interface PartsSelectionProps {
   onAddCustomPart: () => void;
   hasPartsError?: boolean;
   availableParts?: Part[]; // Optional parts data passed from parent
+  disabled?: boolean;
 }
 
 interface Part {
@@ -32,6 +33,7 @@ const PartsSelection = memo(function PartsSelection({
   onAddCustomPart,
   hasPartsError,
   availableParts,
+  disabled = false,
 }: PartsSelectionProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [partQuantities, setPartQuantities] = useState<{ [key: string]: number }>({});
@@ -155,6 +157,7 @@ const PartsSelection = memo(function PartsSelection({
             onClick={onAddCustomPart} 
             className="flex items-center justify-center h-10 px-4 touch-manipulation"
             data-testid="button-add-custom-part"
+            disabled={disabled}
           >
             <Plus className="mr-1 h-4 w-4" />
             Add Other
@@ -172,8 +175,9 @@ const PartsSelection = memo(function PartsSelection({
             <div key={category} className="border border-border rounded-lg p-4">
               <button
                 className="flex items-center justify-between w-full text-left mt-[0px] mb-[0px]"
-                onClick={() => toggleCategory(category)}
+                onClick={() => !disabled && toggleCategory(category)}
                 data-testid={`button-toggle-${category.toLowerCase()}`}
+                disabled={disabled}
               >
                 <h3 className="font-medium text-card-foreground">{category}</h3>
                 {expandedCategories.has(category) ? (
@@ -209,6 +213,7 @@ const PartsSelection = memo(function PartsSelection({
                                 className="w-24 h-5 text-xs placeholder:text-gray-400"
                                 placeholder={part.partNumber}
                                 data-testid={`input-model-${part.partNumber}`}
+                                disabled={disabled}
                               />
                             </div>
                           )}
@@ -230,6 +235,7 @@ const PartsSelection = memo(function PartsSelection({
                               }}
                               className="w-20 h-6 text-xs text-right"
                               data-testid={`input-price-${part.partNumber}`}
+                              disabled={disabled}
                             />
                             <span className="text-xs text-muted-foreground">
                               {part.description.toLowerCase().includes('copper') || part.description.toLowerCase().includes('insulation') ? '/ft' :
@@ -259,12 +265,14 @@ const PartsSelection = memo(function PartsSelection({
                           }}
                           className="flex-1 h-8 text-xs"
                           data-testid={`input-quantity-${part.partNumber}`}
+                          disabled={disabled}
                         />
                         <Button
                           size="sm"
                           onClick={() => addPart(part)}
                           className="h-10 px-4 text-sm min-w-[60px] touch-manipulation"
                           data-testid={`button-add-${part.partNumber}`}
+                          disabled={disabled}
                         >
                           Add
                         </Button>

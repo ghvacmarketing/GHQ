@@ -12,9 +12,10 @@ interface SelectedPartsProps {
     total: string;
   };
   onUpdate: (updates: { parts: QuotePart[] }) => void;
+  disabled?: boolean;
 }
 
-export default function SelectedParts({ parts, totals, onUpdate }: SelectedPartsProps) {
+export default function SelectedParts({ parts, totals, onUpdate, disabled = false }: SelectedPartsProps) {
   const removePart = (partId: string) => {
     const updatedParts = parts.filter(part => part.id !== partId);
     onUpdate({ parts: updatedParts });
@@ -58,6 +59,7 @@ export default function SelectedParts({ parts, totals, onUpdate }: SelectedParts
                 onClick={() => removePart(part.id)}
                 className="text-destructive hover:text-destructive/80"
                 data-testid={`button-remove-${part.id}`}
+                disabled={disabled}
               >
                 <X className="h-4 w-4" />
               </Button>

@@ -13,6 +13,7 @@ interface WarrantySectionProps {
     warranty?: boolean;
     laborHours?: boolean;
   };
+  disabled?: boolean;
 }
 
 export default function WarrantySection({
@@ -21,6 +22,7 @@ export default function WarrantySection({
   laborHours,
   onUpdate,
   hasErrors,
+  disabled = false,
 }: WarrantySectionProps) {
   return (
     <Card className="slide-in">
@@ -42,6 +44,7 @@ export default function WarrantySection({
                 onClick={() => onUpdate({ ghvacInstalled: true })}
                 className="flex-1"
                 data-testid="button-warranty-yes"
+                disabled={disabled}
               >
                 Yes
               </Button>
@@ -52,6 +55,7 @@ export default function WarrantySection({
                 onClick={() => onUpdate({ ghvacInstalled: false })}
                 className="flex-1"
                 data-testid="button-warranty-no"
+                disabled={disabled}
               >
                 No
               </Button>
@@ -76,6 +80,7 @@ export default function WarrantySection({
               onChange={(e) => onUpdate({ laborHours: e.target.value })}
               className={`w-full ${hasErrors?.laborHours ? 'border-destructive focus:border-destructive' : ''}`}
               data-testid="input-labor-hours"
+              disabled={disabled}
             />
             <p className="text-xs text-muted-foreground">
               Hours of labor to charge (increments of 0.25)
@@ -100,6 +105,7 @@ export default function WarrantySection({
                 onChange={(e) => onUpdate({ yearsSinceInstallation: e.target.value })}
                 className="w-full"
                 data-testid="input-years-since-installation"
+                disabled={disabled}
               />
               <p className="text-xs text-muted-foreground mt-2">
                 Prorated labor pricing will be applied
