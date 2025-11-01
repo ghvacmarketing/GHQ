@@ -40,11 +40,14 @@ export interface IStorage {
   getSetting(key: string): Promise<Setting | undefined>;
   getAllSettings(): Promise<Setting[]>;
   setSetting(key: string, value: string): Promise<Setting>;
+  updateSetting(key: string, value: string): Promise<Setting>;
   deleteSetting(key: string): Promise<boolean>;
   
   // PDF File operations
   getPriceBookPdf(): Promise<PdfFile | undefined>;
+  getAllPdfFiles(): Promise<PdfFile[]>;
   uploadPriceBookPdf(pdfData: InsertPdfFile): Promise<PdfFile>;
+  createPdfFile(pdfData: InsertPdfFile): Promise<PdfFile>;
   deletePriceBookPdf(): Promise<boolean>;
   
   // Announcement operations
@@ -65,6 +68,9 @@ export interface IStorage {
   getAuthToken(token: string): Promise<AuthToken | undefined>;
   deleteAuthToken(token: string): Promise<boolean>;
   deleteExpiredTokens(): Promise<number>;
+  
+  // Backup operations
+  clearAllData(): Promise<void>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -247,10 +253,18 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
+  async updateSetting(key: string, value: string): Promise<Setting> {
+    return this.setSetting(key, value);
+  }
+
   // PDF File operations
   async getPriceBookPdf(): Promise<PdfFile | undefined> {
     const [pdf] = await db.select().from(pdfFiles).orderBy(pdfFiles.uploadedAt).limit(1);
     return pdf || undefined;
+  }
+
+  async getAllPdfFiles(): Promise<PdfFile[]> {
+    return await db.select().from(pdfFiles).orderBy(pdfFiles.uploadedAt);
   }
 
   async uploadPriceBookPdf(pdfData: InsertPdfFile): Promise<PdfFile> {
@@ -267,6 +281,10 @@ export class DatabaseStorage implements IStorage {
   async deletePriceBookPdf(): Promise<boolean> {
     const result = await db.delete(pdfFiles);
     return (result.rowCount || 0) > 0;
+  }
+
+  async createPdfFile(pdfData: InsertPdfFile): Promise<PdfFile> {
+    return this.uploadPriceBookPdf(pdfData);
   }
 
   // Announcement operations
@@ -369,6 +387,21 @@ export class DatabaseStorage implements IStorage {
   async deleteExpiredTokens(): Promise<number> {
     const result = await db.delete(authTokens).where(eq(authTokens.expiresAt, new Date()));
     return result.rowCount || 0;
+  }
+
+  // Backup operations
+  async clearAllData(): Promise<void> {
+    // Clear all tables except sessions (preserve active sessions)
+    await db.delete(authTokens);
+    await db.delete(phoneWhitelist);
+    await db.delete(announcements);
+    await db.delete(pdfFiles);
+    await db.delete(settings);
+    await db.delete(processes);
+    await db.delete(quotes);
+    await db.delete(technicians);
+    await db.delete(parts);
+    await db.delete(categories);
   }
 
   // Initialize default data if needed

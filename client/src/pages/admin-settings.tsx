@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit, Settings2, Users, FolderOpen, ReceiptText, Bell } from "lucide-react";
+import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit, Settings2, Users, FolderOpen, ReceiptText, Bell, Download, Upload, Database } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Quote, Category, Process, Setting, Announcement, PhoneWhitelist } from "@shared/schema";
 import ReactMarkdown from 'react-markdown';
@@ -46,6 +46,9 @@ export default function AdminSettings() {
   const [editIsActive, setEditIsActive] = useState(false);
   const [newPhoneNumber, setNewPhoneNumber] = useState("");
   const [newPhoneName, setNewPhoneName] = useState("");
+  const [backupFile, setBackupFile] = useState<File | null>(null);
+  const [restoreMode, setRestoreMode] = useState<'replace' | 'merge'>('replace');
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
 
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
@@ -383,6 +386,80 @@ export default function AdminSettings() {
       toast({
         title: 'Delete Failed',
         description: 'Failed to remove phone number. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Backup and restore mutations
+  const handleBackupDownload = async () => {
+    try {
+      const response = await fetch('/api/backup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password }),
+      });
+      if (!response.ok) throw new Error('Backup failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ghvac-backup-${new Date().toISOString().split('T')[0]}.ghvac`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: 'Backup Created',
+        description: 'Your backup file has been downloaded successfully.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Backup Failed',
+        description: 'Failed to create backup. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const restoreBackupMutation = useMutation({
+    mutationFn: async ({ file, mode }: { file: File; mode: 'replace' | 'merge' }) => {
+      const formData = new FormData();
+      formData.append('backup', file);
+      formData.append('mode', mode);
+      formData.append('password', password);
+      
+      const response = await fetch('/api/restore', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Restore failed');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      // Invalidate all queries to refresh data
+      queryClient.invalidateQueries();
+      setBackupFile(null);
+      setShowRestoreConfirm(false);
+      
+      toast({
+        title: 'Backup Restored',
+        description: `Successfully restored ${data.stats.quotes + data.stats.processes + data.stats.categories} items.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Restore Failed',
+        description: error.message || 'Failed to restore backup. Please check the file and try again.',
         variant: 'destructive',
       });
     },
@@ -1819,10 +1896,178 @@ export default function AdminSettings() {
                   </Card>
                 </AccordionContent>
               </AccordionItem>
+
+              {/* Backup & Restore */}
+              <AccordionItem value="backup-restore" className="border rounded-lg px-4 bg-card">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center">
+                    <Database className="h-5 w-5 mr-3 text-primary" />
+                    <span className="font-semibold">Backup & Restore</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <Card className="border-0 shadow-none">
+                    <CardContent className="pt-6 space-y-6">
+                      {/* Backup Section */}
+                      <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold text-lg">Create Backup</h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Export all your data to a .ghvac file
+                            </p>
+                          </div>
+                          <Download className="h-8 w-8 text-primary" />
+                        </div>
+
+                        <div className="space-y-2 text-sm">
+                          <p className="font-medium">What gets backed up:</p>
+                          <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-2">
+                            <li>All quotes and pricing data</li>
+                            <li>Processes & systems wiki</li>
+                            <li>Categories and settings</li>
+                            <li>Announcements and phone whitelist</li>
+                            <li>Price book PDFs</li>
+                          </ul>
+                        </div>
+
+                        <Button
+                          onClick={handleBackupDownload}
+                          className="w-full"
+                          data-testid="button-create-backup"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Download Backup (.ghvac)
+                        </Button>
+                      </div>
+
+                      {/* Restore Section */}
+                      <div className="space-y-4 p-4 border rounded-lg border-orange-500/50 bg-orange-500/5">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold text-lg">Restore Backup</h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Import data from a .ghvac backup file
+                            </p>
+                          </div>
+                          <Upload className="h-8 w-8 text-orange-500" />
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="backup-file">Select Backup File</Label>
+                            <Input
+                              id="backup-file"
+                              type="file"
+                              accept=".ghvac"
+                              onChange={(e) => setBackupFile(e.target.files?.[0] || null)}
+                              data-testid="input-backup-file"
+                            />
+                            {backupFile && (
+                              <p className="text-sm text-muted-foreground">
+                                Selected: {backupFile.name}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Restore Mode</Label>
+                            <div className="flex gap-4">
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="radio"
+                                  id="mode-replace"
+                                  name="restore-mode"
+                                  value="replace"
+                                  checked={restoreMode === 'replace'}
+                                  onChange={(e) => setRestoreMode(e.target.value as 'replace' | 'merge')}
+                                  className="cursor-pointer"
+                                  data-testid="radio-mode-replace"
+                                />
+                                <Label htmlFor="mode-replace" className="cursor-pointer font-normal">
+                                  Replace all data
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="radio"
+                                  id="mode-merge"
+                                  name="restore-mode"
+                                  value="merge"
+                                  checked={restoreMode === 'merge'}
+                                  onChange={(e) => setRestoreMode(e.target.value as 'replace' | 'merge')}
+                                  className="cursor-pointer"
+                                  data-testid="radio-mode-merge"
+                                />
+                                <Label htmlFor="mode-merge" className="cursor-pointer font-normal">
+                                  Merge with existing
+                                </Label>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {restoreMode === 'replace' 
+                                ? '⚠️ This will delete all current data before importing' 
+                                : 'Add backup data to existing data (may create duplicates)'}
+                            </p>
+                          </div>
+
+                          <Button
+                            onClick={() => setShowRestoreConfirm(true)}
+                            disabled={!backupFile || restoreBackupMutation.isPending}
+                            variant="destructive"
+                            className="w-full"
+                            data-testid="button-restore-backup"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {restoreBackupMutation.isPending ? 'Restoring...' : 'Restore Backup'}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </AccordionContent>
+              </AccordionItem>
             </Accordion>
           )}
         </div>
       </main>
+
+      {/* Restore Confirmation Dialog */}
+      <AlertDialog open={showRestoreConfirm} onOpenChange={setShowRestoreConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Backup Restore</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                You are about to restore data from: <strong>{backupFile?.name}</strong>
+              </p>
+              <p>
+                Mode: <strong>{restoreMode === 'replace' ? 'Replace All Data' : 'Merge with Existing'}</strong>
+              </p>
+              {restoreMode === 'replace' && (
+                <p className="text-destructive font-semibold">
+                  ⚠️ Warning: This will permanently delete all current data before importing the backup!
+                </p>
+              )}
+              <p>This action cannot be easily undone. Are you sure?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-restore">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (backupFile) {
+                  restoreBackupMutation.mutate({ file: backupFile, mode: restoreMode });
+                }
+              }}
+              className="bg-destructive hover:bg-destructive/90"
+              data-testid="button-confirm-restore"
+            >
+              Restore Backup
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Edit Announcement Dialog */}
       <Dialog open={!!editingAnnouncement} onOpenChange={(open) => !open && setEditingAnnouncement(null)}>

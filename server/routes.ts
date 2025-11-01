@@ -5,13 +5,14 @@ import compression from "compression";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, announcements } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, announcements, categories } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
+import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1180,6 +1181,242 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ success: true });
     });
+  });
+
+  // Create backup - exports all data to .ghvac file
+  app.post("/api/backup", async (req, res) => {
+    try {
+      // Verify admin authentication
+      const { password } = req.body;
+      if (password !== process.env.ADMIN_PASSWORD) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Fetch all data from database
+      const quotes = await storage.getAllQuotes();
+      const parts = await storage.getAllParts();
+      const technicians = await storage.getAllTechnicians();
+      const processes = await storage.getAllProcesses();
+      const categories = await storage.getAllCategories();
+      const settingsData = await storage.getAllSettings();
+      const pdfFiles = await storage.getAllPdfFiles();
+      const announcementsData = await storage.getAllAnnouncements();
+      const phoneWhitelistData = await storage.getAllPhoneWhitelist();
+
+      // Create backup object
+      const backup = {
+        version: "1.0.0",
+        timestamp: new Date().toISOString(),
+        data: {
+          quotes,
+          parts,
+          technicians,
+          processes,
+          categories,
+          settings: settingsData,
+          pdfFiles,
+          announcements: announcementsData,
+          phoneWhitelist: phoneWhitelistData,
+        },
+      };
+
+      // Set headers for file download with .ghvac extension
+      const filename = `ghvac-backup-${new Date().toISOString().split('T')[0]}.ghvac`;
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      res.json(backup);
+    } catch (error) {
+      console.error('Error creating backup:', error);
+      res.status(500).json({ message: "Error creating backup" });
+    }
+  });
+
+  // Restore backup - imports .ghvac file
+  app.post("/api/restore", upload.single('backup'), async (req, res) => {
+    try {
+      // Verify admin authentication
+      const { password } = req.body;
+      if (password !== process.env.ADMIN_PASSWORD) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No backup file provided" });
+      }
+
+      // Parse the uploaded file
+      const backupContent = req.file.buffer.toString('utf-8');
+      let backup;
+      try {
+        backup = JSON.parse(backupContent);
+      } catch (error) {
+        return res.status(400).json({ message: "Invalid backup file format" });
+      }
+
+      // Validate backup structure
+      if (!backup.version || !backup.data) {
+        return res.status(400).json({ message: "Invalid backup file structure" });
+      }
+
+      const mode = req.body.mode || 'replace'; // 'replace' or 'merge'
+
+      // If replace mode, clear existing data first
+      if (mode === 'replace') {
+        await storage.clearAllData();
+      }
+
+      // Restore data in order (to handle dependencies)
+      const { data } = backup;
+      let stats = {
+        quotes: 0,
+        parts: 0,
+        technicians: 0,
+        processes: 0,
+        categories: 0,
+        settings: 0,
+        pdfFiles: 0,
+        announcements: 0,
+        phoneWhitelist: 0,
+      };
+
+      // In merge mode, we need to check if records exist before inserting
+      const shouldInsert = async (id: string, checkFn: () => Promise<any>) => {
+        if (mode === 'replace') return true;
+        const existing = await checkFn();
+        return !existing;
+      };
+
+      // Restore categories first (referenced by processes and parts)
+      if (data.categories && Array.isArray(data.categories)) {
+        for (const category of data.categories) {
+          try {
+            // Check if category already exists by name (since categories have unique names)
+            const existing = await db.select().from(categories).where(eq(categories.name, category.name));
+            if (mode === 'merge' && existing.length > 0) {
+              continue; // Skip if exists in merge mode
+            }
+            await storage.createCategory(category);
+            stats.categories++;
+          } catch (error) {
+            // Skip duplicates in merge mode
+            if (mode === 'replace') throw error;
+          }
+        }
+      }
+
+      // Restore parts
+      if (data.parts && Array.isArray(data.parts)) {
+        for (const part of data.parts) {
+          try {
+            await storage.createPart(part);
+            stats.parts++;
+          } catch (error) {
+            // Skip duplicates in merge mode
+            if (mode === 'replace') throw error;
+          }
+        }
+      }
+
+      // Restore technicians
+      if (data.technicians && Array.isArray(data.technicians)) {
+        for (const technician of data.technicians) {
+          try {
+            await storage.createTechnician(technician);
+            stats.technicians++;
+          } catch (error) {
+            // Skip duplicates in merge mode
+            if (mode === 'replace') throw error;
+          }
+        }
+      }
+
+      // Restore quotes
+      if (data.quotes && Array.isArray(data.quotes)) {
+        for (const quote of data.quotes) {
+          try {
+            await storage.createQuote(quote);
+            stats.quotes++;
+          } catch (error) {
+            // Skip duplicates in merge mode
+            if (mode === 'replace') throw error;
+          }
+        }
+      }
+
+      // Restore processes
+      if (data.processes && Array.isArray(data.processes)) {
+        for (const process of data.processes) {
+          try {
+            await storage.createProcess(process);
+            stats.processes++;
+          } catch (error) {
+            // Skip duplicates in merge mode
+            if (mode === 'replace') throw error;
+          }
+        }
+      }
+
+      // Restore settings (always upsert since setSetting handles updates)
+      if (data.settings && Array.isArray(data.settings)) {
+        for (const setting of data.settings) {
+          try {
+            await storage.updateSetting(setting.key, setting.value);
+            stats.settings++;
+          } catch (error) {
+            console.error('Error restoring setting:', error);
+          }
+        }
+      }
+
+      // Restore PDF files
+      if (data.pdfFiles && Array.isArray(data.pdfFiles)) {
+        for (const pdf of data.pdfFiles) {
+          try {
+            await storage.createPdfFile(pdf);
+            stats.pdfFiles++;
+          } catch (error) {
+            // Skip duplicates in merge mode
+            if (mode === 'replace') throw error;
+          }
+        }
+      }
+
+      // Restore announcements
+      if (data.announcements && Array.isArray(data.announcements)) {
+        for (const announcement of data.announcements) {
+          try {
+            await storage.createAnnouncement(announcement);
+            stats.announcements++;
+          } catch (error) {
+            // Skip duplicates in merge mode
+            if (mode === 'replace') throw error;
+          }
+        }
+      }
+
+      // Restore phone whitelist
+      if (data.phoneWhitelist && Array.isArray(data.phoneWhitelist)) {
+        for (const entry of data.phoneWhitelist) {
+          try {
+            await storage.createPhoneWhitelistEntry(entry);
+            stats.phoneWhitelist++;
+          } catch (error) {
+            // Skip duplicates in merge mode
+            if (mode === 'replace') throw error;
+          }
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Backup restored successfully (${mode} mode)`,
+        stats
+      });
+    } catch (error) {
+      console.error('Error restoring backup:', error);
+      res.status(500).json({ message: "Error restoring backup" });
+    }
   });
 
   const httpServer = createServer(app);
