@@ -1931,10 +1931,23 @@ export default function AdminSettings() {
                           </ul>
                         </div>
 
+                        <div className="space-y-2">
+                          <Label htmlFor="backup-password">Admin Password</Label>
+                          <Input
+                            id="backup-password"
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Enter admin password"
+                            data-testid="input-backup-password"
+                          />
+                        </div>
+
                         <Button
                           onClick={handleBackupDownload}
                           className="w-full"
                           data-testid="button-create-backup"
+                          disabled={!password}
                         >
                           <Download className="h-4 w-4 mr-2" />
                           Download Backup (.ghvac)
@@ -1954,6 +1967,18 @@ export default function AdminSettings() {
                         </div>
 
                         <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="restore-password">Admin Password</Label>
+                            <Input
+                              id="restore-password"
+                              type="password"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              placeholder="Enter admin password"
+                              data-testid="input-restore-password"
+                            />
+                          </div>
+
                           <div className="space-y-2">
                             <Label htmlFor="backup-file">Select Backup File</Label>
                             <Input
@@ -2013,7 +2038,7 @@ export default function AdminSettings() {
 
                           <Button
                             onClick={() => setShowRestoreConfirm(true)}
-                            disabled={!backupFile || restoreBackupMutation.isPending}
+                            disabled={!backupFile || !password || restoreBackupMutation.isPending}
                             variant="destructive"
                             className="w-full"
                             data-testid="button-restore-backup"
