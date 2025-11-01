@@ -33,7 +33,7 @@ Preferred communication style: Simple, everyday language.
 - **Processes and Systems Module**: Searchable wiki, manual and voice-guided process creation (using OpenAI Whisper for transcription and GPT for formatting/extraction with configurable cleanup intensity), PDF export (jsPDF), PostgreSQL storage with JSON column for steps.
 - **PDF Management**: Secure storage and viewing of Price Book PDFs in PostgreSQL, admin-controlled upload with password protection and size validation.
 - **App Configuration**: Separate API endpoints for Google Sheets pricing and database-backed application settings.
-- **Announcement System**: Admin-configurable modal for user notifications with version tracking via localStorage.
+- **Announcement System**: Admin-configurable modal for user notifications with version tracking via localStorage. Supports full CRUD operations (create, edit, delete) with automatic active/inactive management. Markdown support for links (plain URLs and [text](url) format) with URL sanitization for security.
 - **Security**: SESSION_SECRET environment variable is required at startup to prevent use of insecure default secrets.
 
 ## External Dependencies
