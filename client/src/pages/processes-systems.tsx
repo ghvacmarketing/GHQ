@@ -9,6 +9,7 @@ import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import type { Process } from "@shared/schema";
 import ProcessDetailView from "@/components/process-detail-view";
+import { renderTextWithLinks } from "@/lib/link-parser";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -163,8 +164,8 @@ export default function ProcessesSystems() {
                               <h3 className="font-semibold text-lg" data-testid={`text-process-name-${process.id}`}>
                                 {process.name}
                               </h3>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {process.description}
+                              <p className="text-sm text-muted-foreground mt-1 break-words overflow-wrap-anywhere">
+                                {renderTextWithLinks(process.description)}
                               </p>
                               <div className="flex items-center gap-3 mt-2">
                                 <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded" data-testid={`text-category-${process.id}`}>

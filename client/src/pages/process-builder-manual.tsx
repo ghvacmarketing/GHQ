@@ -267,6 +267,9 @@ export default function ProcessBuilderManual() {
                       data-testid="input-process-description"
                     />
                   </FormControl>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    💡 Tip: Add links using <code className="bg-muted px-1 py-0.5 rounded">[keyword](url)</code> or paste plain URLs
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}

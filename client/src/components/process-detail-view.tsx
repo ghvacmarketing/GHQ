@@ -6,6 +6,7 @@ import type { Process } from "@shared/schema";
 import { jsPDF } from "jspdf";
 import ProcessEditForm from "./process-edit-form";
 import { queryClient } from "@/lib/queryClient";
+import { renderTextWithLinks } from "@/lib/link-parser";
 
 interface ProcessDetailViewProps {
   process: Process;
@@ -135,7 +136,7 @@ export default function ProcessDetailView({ process, onBack }: ProcessDetailView
         <CardContent className="space-y-6">
           <div>
             <h3 className="font-semibold text-lg mb-2">Description</h3>
-            <p className="text-muted-foreground break-words" data-testid="text-process-description">{process.description}</p>
+            <p className="text-muted-foreground break-words overflow-wrap-anywhere" data-testid="text-process-description">{renderTextWithLinks(process.description)}</p>
           </div>
 
           <div>
