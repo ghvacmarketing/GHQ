@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit, Settings2, Users, FolderOpen, ReceiptText, Bell } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Quote, Category, Process, Setting, Announcement, PhoneWhitelist } from "@shared/schema";
+import { renderTextWithLinks } from "@/lib/link-parser";
 import redlogo from "@assets/redlogo.webp";
 
 export default function AdminSettings() {
@@ -1496,6 +1497,9 @@ export default function AdminSettings() {
                             rows={4}
                             data-testid="textarea-announcement-message"
                           />
+                          <p className="text-xs text-muted-foreground">
+                            Supports links: plain URLs or markdown [text](url)
+                          </p>
                         </div>
 
                         <div className="space-y-2">
@@ -1560,7 +1564,7 @@ export default function AdminSettings() {
                             </div>
                             <div>
                               <Label className="text-sm text-muted-foreground">Message</Label>
-                              <p className="whitespace-pre-wrap" data-testid="text-active-announcement-message">{activeAnnouncement.message}</p>
+                              <p className="whitespace-pre-wrap" data-testid="text-active-announcement-message">{renderTextWithLinks(activeAnnouncement.message)}</p>
                             </div>
                             <div>
                               <Label className="text-sm text-muted-foreground">Button Text</Label>
@@ -1594,9 +1598,9 @@ export default function AdminSettings() {
                                       <Badge className="bg-green-500 text-xs">Active</Badge>
                                     )}
                                   </div>
-                                  <p className="text-sm text-muted-foreground line-clamp-2">
-                                    {announcement.message}
-                                  </p>
+                                  <div className="text-sm text-muted-foreground line-clamp-2">
+                                    {renderTextWithLinks(announcement.message)}
+                                  </div>
                                   <p className="text-xs text-muted-foreground">
                                     Version: {announcement.version} • Created: {new Date(announcement.createdAt!).toLocaleDateString()}
                                   </p>
@@ -1831,6 +1835,9 @@ export default function AdminSettings() {
                 rows={4}
                 data-testid="textarea-edit-announcement-message"
               />
+              <p className="text-xs text-muted-foreground">
+                Supports links: plain URLs or markdown [text](url)
+              </p>
             </div>
 
             <div className="space-y-2">

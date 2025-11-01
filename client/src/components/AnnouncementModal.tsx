@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { Announcement } from "@shared/schema";
+import { renderTextWithLinks } from "@/lib/link-parser";
 
 interface AnnouncementModalProps {
   announcement: Announcement | null;
@@ -23,7 +24,7 @@ export default function AnnouncementModal({ announcement, open, onDismiss }: Ann
         <DialogHeader>
           <DialogTitle data-testid="announcement-title">{announcement.title}</DialogTitle>
           <DialogDescription data-testid="announcement-message" className="whitespace-pre-wrap pt-4 text-base">
-            {announcement.message}
+            {renderTextWithLinks(announcement.message)}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
