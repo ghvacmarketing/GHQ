@@ -51,11 +51,10 @@ export default function AdminSettings() {
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
 
-  // Prefetch all data immediately (before authentication) for faster perceived load time
-  // Data won't be displayed until authenticated, but will be ready instantly after login
+  // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
     queryKey: ["/api/settings"],
-    enabled: true, // Always load in background
+    enabled: isAuthenticated,
   });
 
   const settings = currentSettings as any;
@@ -75,7 +74,7 @@ export default function AdminSettings() {
     recentQuotes: Quote[];
   }>({
     queryKey: ["/api/quotes/summary"],
-    enabled: true, // Always load in background
+    enabled: isAuthenticated,
   });
 
   // Fetch full quotes list only when needed (lazy loading)
@@ -85,7 +84,7 @@ export default function AdminSettings() {
   }>({
     queryKey: ["/api/quotes", quotesPage],
     queryFn: () => fetch(`/api/quotes?page=${quotesPage}&limit=50`).then(res => res.json()),
-    enabled: showQuotesList, // Load when user expands quotes section
+    enabled: isAuthenticated && showQuotesList,
   });
 
   const quotes = quotesResponse?.quotes || [];
@@ -94,7 +93,7 @@ export default function AdminSettings() {
   // Fetch technicians
   const { data: technicians = [] } = useQuery({
     queryKey: ["/api/technicians"],
-    enabled: true, // Always load in background
+    enabled: isAuthenticated,
   });
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -105,6 +104,17 @@ export default function AdminSettings() {
       
       if (result.success) {
         setIsAuthenticated(true);
+        
+        // Immediately prefetch all admin data in parallel for instant display
+        Promise.all([
+          queryClient.prefetchQuery({ queryKey: ["/api/settings"] }),
+          queryClient.prefetchQuery({ queryKey: ["/api/quotes/summary"] }),
+          queryClient.prefetchQuery({ queryKey: ["/api/technicians"] }),
+          queryClient.prefetchQuery({ queryKey: ['/api/categories'] }),
+          queryClient.prefetchQuery({ queryKey: ['/api/processes'] }),
+          queryClient.prefetchQuery({ queryKey: ['/api/app-settings'] }),
+        ]).catch(err => console.error('Error prefetching data:', err));
+        
         toast({
           title: "Access Granted",
           description: "You can now view Google Sheets pricing data.",
@@ -229,19 +239,19 @@ export default function AdminSettings() {
   // Fetch categories
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
-    enabled: true, // Always load in background
+    enabled: isAuthenticated,
   });
 
   // Fetch processes
   const { data: processes = [] } = useQuery<Process[]>({
     queryKey: ['/api/processes'],
-    enabled: true, // Always load in background
+    enabled: isAuthenticated,
   });
 
   // Fetch app settings (PDF URLs, etc.)
   const { data: appSettings = [] } = useQuery<Setting[]>({
     queryKey: ['/api/app-settings'],
-    enabled: true, // Always load in background
+    enabled: isAuthenticated,
   });
 
   // Fetch announcements
