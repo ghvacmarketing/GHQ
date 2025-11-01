@@ -5,13 +5,13 @@ import compression from "compression";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, announcements } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
 import { twilioService } from "./sms";
-import { pool } from "./db";
+import { pool, db } from "./db";
 import { randomUUID } from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -920,6 +920,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating announcement:', error);
       res.status(400).json({ message: "Invalid announcement data" });
+    }
+  });
+
+  // Update announcement (admin only)
+  app.patch("/api/announcement/:id", async (req, res) => {
+    try {
+      const { password, ...announcementData } = req.body;
+      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
+      
+      if (password !== adminPassword) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // If setting this announcement to active, deactivate all others first
+      if (announcementData.isActive === true) {
+        await db.update(announcements).set({ isActive: false });
+      }
+
+      const announcement = await storage.updateAnnouncement(req.params.id, announcementData);
+      if (!announcement) {
+        return res.status(404).json({ message: "Announcement not found" });
+      }
+      
+      res.json(announcement);
+    } catch (error) {
+      console.error('Error updating announcement:', error);
+      res.status(500).json({ message: "Error updating announcement" });
     }
   });
 

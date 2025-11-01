@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +37,11 @@ export default function AdminSettings() {
   const [announcementMessage, setAnnouncementMessage] = useState("");
   const [announcementButtonText, setAnnouncementButtonText] = useState("Got it");
   const [announcementIsActive, setAnnouncementIsActive] = useState(true);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editMessage, setEditMessage] = useState("");
+  const [editButtonText, setEditButtonText] = useState("");
+  const [editIsActive, setEditIsActive] = useState(false);
   const [newPhoneNumber, setNewPhoneNumber] = useState("");
   const [newPhoneName, setNewPhoneName] = useState("");
 
@@ -270,6 +276,32 @@ export default function AdminSettings() {
       toast({
         title: 'Create Failed',
         description: 'Failed to create announcement. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateAnnouncementMutation = useMutation({
+    mutationFn: async (data: { id: string; title: string; message: string; buttonText: string; isActive: boolean }) => {
+      const { id, ...updateData } = data;
+      const response = await apiRequest('PATCH', `/api/announcement/${id}`, { 
+        ...updateData,
+        password 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/announcements'] });
+      setEditingAnnouncement(null);
+      toast({
+        title: 'Announcement Updated',
+        description: 'Announcement has been updated successfully.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Update Failed',
+        description: 'Failed to update announcement. Please try again.',
         variant: 'destructive',
       });
     },
@@ -1569,35 +1601,50 @@ export default function AdminSettings() {
                                     Version: {announcement.version} • Created: {new Date(announcement.createdAt!).toLocaleDateString()}
                                   </p>
                                 </div>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon"
-                                      className="flex-shrink-0 ml-2"
-                                      data-testid={`button-delete-announcement-${announcement.id}`}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Announcement</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Are you sure you want to delete this announcement? This action cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => deleteAnnouncementMutation.mutate(announcement.id)}
-                                        className="bg-destructive hover:bg-destructive/90"
+                                <div className="flex items-center space-x-1 flex-shrink-0 ml-2">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon"
+                                    onClick={() => {
+                                      setEditingAnnouncement(announcement);
+                                      setEditTitle(announcement.title);
+                                      setEditMessage(announcement.message);
+                                      setEditButtonText(announcement.buttonText);
+                                      setEditIsActive(announcement.isActive);
+                                    }}
+                                    data-testid={`button-edit-announcement-${announcement.id}`}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        data-testid={`button-delete-announcement-${announcement.id}`}
                                       >
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Delete Announcement</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Are you sure you want to delete this announcement? This action cannot be undone.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => deleteAnnouncementMutation.mutate(announcement.id)}
+                                          className="bg-destructive hover:bg-destructive/90"
+                                        >
+                                          Delete
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -1751,6 +1798,101 @@ export default function AdminSettings() {
           )}
         </div>
       </main>
+
+      {/* Edit Announcement Dialog */}
+      <Dialog open={!!editingAnnouncement} onOpenChange={(open) => !open && setEditingAnnouncement(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Announcement</DialogTitle>
+            <DialogDescription>
+              Update the announcement details and active status.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Enter announcement title"
+                data-testid="input-edit-announcement-title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-message">Message</Label>
+              <Textarea
+                id="edit-message"
+                value={editMessage}
+                onChange={(e) => setEditMessage(e.target.value)}
+                placeholder="Enter announcement message"
+                rows={4}
+                data-testid="textarea-edit-announcement-message"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-button-text">Button Text</Label>
+              <Input
+                id="edit-button-text"
+                value={editButtonText}
+                onChange={(e) => setEditButtonText(e.target.value)}
+                placeholder="e.g., Got it, Okay, Dismiss"
+                data-testid="input-edit-announcement-button-text"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="edit-active"
+                checked={editIsActive}
+                onCheckedChange={setEditIsActive}
+                data-testid="switch-edit-announcement-active"
+              />
+              <Label htmlFor="edit-active" className="cursor-pointer">
+                Set as Active Announcement
+              </Label>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditingAnnouncement(null)}
+              data-testid="button-cancel-edit-announcement"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!editTitle || !editMessage) {
+                  toast({
+                    title: 'Missing Fields',
+                    description: 'Please fill in title and message.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+                if (editingAnnouncement) {
+                  updateAnnouncementMutation.mutate({
+                    id: editingAnnouncement.id,
+                    title: editTitle,
+                    message: editMessage,
+                    buttonText: editButtonText,
+                    isActive: editIsActive,
+                  });
+                }
+              }}
+              disabled={updateAnnouncementMutation.isPending}
+              data-testid="button-save-edit-announcement"
+            >
+              {updateAnnouncementMutation.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
