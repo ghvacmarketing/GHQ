@@ -777,6 +777,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
       
       if (password === adminPassword) {
+        // Set admin session flag
+        (req.session as any).isAdmin = true;
+        await new Promise((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) reject(err);
+            else resolve(true);
+          });
+        });
         res.json({ success: true });
       } else {
         res.status(401).json({ success: false, message: "Invalid password" });
@@ -1186,11 +1194,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create backup - exports all data to .ghvac file
   app.post("/api/backup", async (req, res) => {
     try {
-      // Verify admin authentication
-      const { password } = req.body;
-      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
-      if (password !== adminPassword) {
-        return res.status(401).json({ message: "Unauthorized" });
+      // Verify admin authentication via session
+      if (!(req.session as any)?.isAdmin) {
+        return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
       // Fetch all data from database
@@ -1236,11 +1242,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Restore backup - imports .ghvac file
   app.post("/api/restore", upload.single('backup'), async (req, res) => {
     try {
-      // Verify admin authentication
-      const { password } = req.body;
-      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
-      if (password !== adminPassword) {
-        return res.status(401).json({ message: "Unauthorized" });
+      // Verify admin authentication via session
+      if (!(req.session as any)?.isAdmin) {
+        return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
       if (!req.file) {

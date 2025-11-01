@@ -49,6 +49,7 @@ export default function AdminSettings() {
   const [backupFile, setBackupFile] = useState<File | null>(null);
   const [restoreMode, setRestoreMode] = useState<'replace' | 'merge'>('replace');
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [showBackupConfirm, setShowBackupConfirm] = useState(false);
 
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
@@ -396,10 +397,7 @@ export default function AdminSettings() {
     try {
       const response = await fetch('/api/backup', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ password }),
+        credentials: 'include',
       });
       if (!response.ok) throw new Error('Backup failed');
       
@@ -413,11 +411,13 @@ export default function AdminSettings() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
+      setShowBackupConfirm(false);
       toast({
         title: 'Backup Created',
         description: 'Your backup file has been downloaded successfully.',
       });
     } catch (error) {
+      setShowBackupConfirm(false);
       toast({
         title: 'Backup Failed',
         description: 'Failed to create backup. Please try again.',
@@ -431,10 +431,10 @@ export default function AdminSettings() {
       const formData = new FormData();
       formData.append('backup', file);
       formData.append('mode', mode);
-      formData.append('password', password);
       
       const response = await fetch('/api/restore', {
         method: 'POST',
+        credentials: 'include',
         body: formData,
       });
       
@@ -1931,23 +1931,10 @@ export default function AdminSettings() {
                           </ul>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="backup-password">Admin Password</Label>
-                          <Input
-                            id="backup-password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Enter admin password"
-                            data-testid="input-backup-password"
-                          />
-                        </div>
-
                         <Button
-                          onClick={handleBackupDownload}
+                          onClick={() => setShowBackupConfirm(true)}
                           className="w-full"
                           data-testid="button-create-backup"
-                          disabled={!password}
                         >
                           <Download className="h-4 w-4 mr-2" />
                           Download Backup (.ghvac)
@@ -1967,18 +1954,6 @@ export default function AdminSettings() {
                         </div>
 
                         <div className="space-y-3">
-                          <div className="space-y-2">
-                            <Label htmlFor="restore-password">Admin Password</Label>
-                            <Input
-                              id="restore-password"
-                              type="password"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              placeholder="Enter admin password"
-                              data-testid="input-restore-password"
-                            />
-                          </div>
-
                           <div className="space-y-2">
                             <Label htmlFor="backup-file">Select Backup File</Label>
                             <Input
@@ -2038,7 +2013,7 @@ export default function AdminSettings() {
 
                           <Button
                             onClick={() => setShowRestoreConfirm(true)}
-                            disabled={!backupFile || !password || restoreBackupMutation.isPending}
+                            disabled={!backupFile || restoreBackupMutation.isPending}
                             variant="destructive"
                             className="w-full"
                             data-testid="button-restore-backup"
@@ -2056,6 +2031,39 @@ export default function AdminSettings() {
           )}
         </div>
       </main>
+
+      {/* Backup Confirmation Dialog */}
+      <AlertDialog open={showBackupConfirm} onOpenChange={setShowBackupConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create Backup</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                You are about to download a complete backup of all your data including:
+              </p>
+              <ul className="list-disc list-inside text-sm space-y-1 ml-2">
+                <li>All quotes and pricing data</li>
+                <li>Processes & systems wiki</li>
+                <li>Categories and settings</li>
+                <li>Announcements and phone whitelist</li>
+                <li>Price book PDFs</li>
+              </ul>
+              <p className="pt-2">
+                This will create a <code className="text-xs bg-muted px-1 py-0.5 rounded">.ghvac</code> file that you can use to restore your data later.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-backup">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBackupDownload}
+              data-testid="button-confirm-backup"
+            >
+              Download Backup
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Restore Confirmation Dialog */}
       <AlertDialog open={showRestoreConfirm} onOpenChange={setShowRestoreConfirm}>
