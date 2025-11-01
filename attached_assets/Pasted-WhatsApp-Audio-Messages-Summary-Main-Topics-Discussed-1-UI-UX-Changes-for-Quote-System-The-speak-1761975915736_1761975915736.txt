@@ -1,0 +1,52 @@
+WhatsApp Audio Messages Summary
+Main Topics Discussed
+1. UI/UX Changes for Quote System
+The speaker requested two specific modifications to the quoting interface:
+
+Rename "Job Notes" to "Quote Description": To make the field purpose clearer for users
+Add Helper Text: Include placeholder text like "insert scope of work" to guide users on what content should be entered in this field
+Copy Function Placement:
+Definitely include a copy button on the quote generator page
+Copy button may not be necessary on the quote history page since users will likely access it from computers where they can easily highlight and copy text with a cursor
+2. Long-term Vision: Employee Performance Dashboard
+The speaker outlined an ambitious vision for transforming the app into a comprehensive employee performance tracking system.
+
+Login & Access Structure
+All employees would have individual login credentials
+The login feature would operate somewhat in the background rather than being prominently displayed upfront
+Currently, there's a backend login system in place that could be leveraged
+Key Performance Indicators (KPIs) to Track
+The speaker wants to measure and display several performance metrics:
+
+Callbacks - Number of return visits required (indicates training needs)
+Jobs Sold - Sales conversion tracking
+Training Quiz Scores - Performance on Friday training sessions and knowledge assessments
+Spiffs and Commissions - Complete breakdown of:
+Jobs sold by each employee
+Commission earned per job
+Total earnings from spiffs
+Truck Inspection Scores - Grading on vehicle maintenance and readiness
+Data Integration Approach
+Some metrics currently exist in FieldEdge (their existing system) but need to be pulled into the app
+New metrics that aren't currently tracked anywhere would be added
+Data entry might be handled via spreadsheet input (possibly weekly)
+Spreadsheet data would automatically populate individual employee dashboards
+Design Inspiration
+Drawing inspiration from the BNI Connect app
+Plans to share screenshots with the developer
+May provide actual login credentials so developer can explore the BNI Connect interface
+Emphasized that their app doesn't need to be as feature-rich as BNI Connect, but can use similar UI/UX concepts
+Implementation Timeline
+Acknowledged this is a long-term project (approximately one year to full implementation)
+Wants to prioritize the most important features first
+Avoid doing too much at once - phased approach preferred
+Current Training Program
+Team conducts training sessions every Friday
+Recently implemented quiz system to test knowledge retention
+This training program is still being developed and refined
+Key Takeaways
+Immediate action items: Rename job notes field and add copy functionality to quote generator
+Strategic direction: Transform from a simple quoting tool into a comprehensive employee performance management system
+Phased approach: Prioritize essential KPIs first, then gradually expand functionality
+Data strategy: Likely manual spreadsheet entry (at least initially) with automated dashboard population
+Timeline: Roughly one-year roadmap for full KPI dashboard implementation
