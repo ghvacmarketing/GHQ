@@ -51,10 +51,11 @@ export default function AdminSettings() {
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
 
-  // Fetch current settings from Google Sheets
+  // Prefetch all data immediately (before authentication) for faster perceived load time
+  // Data won't be displayed until authenticated, but will be ready instantly after login
   const { data: currentSettings, refetch, isLoading } = useQuery({
     queryKey: ["/api/settings"],
-    enabled: isAuthenticated,
+    enabled: true, // Always load in background
   });
 
   const settings = currentSettings as any;
@@ -74,7 +75,7 @@ export default function AdminSettings() {
     recentQuotes: Quote[];
   }>({
     queryKey: ["/api/quotes/summary"],
-    enabled: isAuthenticated,
+    enabled: true, // Always load in background
   });
 
   // Fetch full quotes list only when needed (lazy loading)
@@ -84,7 +85,7 @@ export default function AdminSettings() {
   }>({
     queryKey: ["/api/quotes", quotesPage],
     queryFn: () => fetch(`/api/quotes?page=${quotesPage}&limit=50`).then(res => res.json()),
-    enabled: isAuthenticated && showQuotesList,
+    enabled: showQuotesList, // Load when user expands quotes section
   });
 
   const quotes = quotesResponse?.quotes || [];
@@ -93,7 +94,7 @@ export default function AdminSettings() {
   // Fetch technicians
   const { data: technicians = [] } = useQuery({
     queryKey: ["/api/technicians"],
-    enabled: isAuthenticated,
+    enabled: true, // Always load in background
   });
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -228,19 +229,19 @@ export default function AdminSettings() {
   // Fetch categories
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
-    enabled: isAuthenticated,
+    enabled: true, // Always load in background
   });
 
   // Fetch processes
   const { data: processes = [] } = useQuery<Process[]>({
     queryKey: ['/api/processes'],
-    enabled: isAuthenticated,
+    enabled: true, // Always load in background
   });
 
   // Fetch app settings (PDF URLs, etc.)
   const { data: appSettings = [] } = useQuery<Setting[]>({
     queryKey: ['/api/app-settings'],
-    enabled: isAuthenticated,
+    enabled: true, // Always load in background
   });
 
   // Fetch announcements
