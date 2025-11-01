@@ -14,8 +14,7 @@ import WarrantySection from "@/components/warranty-section";
 import QuoteActions from "@/components/quote-actions";
 import QuotePreview from "@/components/quote-preview";
 import CustomPartModal from "@/components/custom-part-modal";
-import VoiceNotes from "@/components/voice-notes";
-import JobNotesDisplay from "@/components/job-notes-display";
+import QuoteDescription from "@/components/quote-description";
 import ConditionalRequirements from "@/components/conditional-requirements";
 import { apiRequest } from "@/lib/queryClient";
 import type { QuotePart } from "@shared/schema";
@@ -481,17 +480,11 @@ export default function QuoteGenerator() {
             }}
           />
 
-          <VoiceNotes
-            onSummaryGenerated={(summary) => handleUpdateQuoteData({ jobNotes: summary })}
+          <QuoteDescription
+            value={quoteData.jobNotes || ""}
+            onChange={(value) => handleUpdateQuoteData({ jobNotes: value })}
+            onClear={() => handleUpdateQuoteData({ jobNotes: "" })}
           />
-
-          {quoteData.jobNotes && (
-            <JobNotesDisplay
-              jobNotes={quoteData.jobNotes}
-              onClear={() => handleUpdateQuoteData({ jobNotes: "" })}
-              onUpdate={(updatedNotes) => handleUpdateQuoteData({ jobNotes: updatedNotes })}
-            />
-          )}
 
           {quoteData.parts.length > 0 && totals && (
             <SelectedParts
