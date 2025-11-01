@@ -182,7 +182,7 @@ export default function QuoteDescription({ value, onChange, onClear, disabled = 
         {inputMode === 'voice' && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Record a description of the job scope and findings:
+              Speak naturally to get a summary. e.g. scope of work
             </p>
             
             <div className="flex flex-col space-y-3">
