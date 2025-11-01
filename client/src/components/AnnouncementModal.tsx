@@ -1,7 +1,8 @@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { Announcement } from "@shared/schema";
-import { renderTextWithLinks } from "@/lib/link-parser";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface AnnouncementModalProps {
   announcement: Announcement | null;
@@ -23,8 +24,19 @@ export default function AnnouncementModal({ announcement, open, onDismiss }: Ann
       <DialogContent className="sm:max-w-[500px]" data-testid="announcement-modal">
         <DialogHeader>
           <DialogTitle data-testid="announcement-title">{announcement.title}</DialogTitle>
-          <DialogDescription data-testid="announcement-message" className="whitespace-pre-wrap pt-4 text-base">
-            {renderTextWithLinks(announcement.message)}
+          <DialogDescription asChild data-testid="announcement-message" className="pt-4">
+            <div className="text-base prose prose-sm dark:prose-invert max-w-none">
+              <ReactMarkdown 
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  a: ({ node, ...props }) => (
+                    <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline" />
+                  ),
+                }}
+              >
+                {announcement.message}
+              </ReactMarkdown>
+            </div>
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
