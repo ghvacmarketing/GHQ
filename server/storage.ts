@@ -1,7 +1,7 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, quotes, parts, technicians, processes, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type ImportBatch, type InsertImportBatch, quotes, parts, technicians, processes, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, importBatches } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, or, and } from "drizzle-orm";
 
 export interface IStorage {
   // Quote operations
@@ -68,6 +68,23 @@ export interface IStorage {
   getAuthToken(token: string): Promise<AuthToken | undefined>;
   deleteAuthToken(token: string): Promise<boolean>;
   deleteExpiredTokens(): Promise<number>;
+  
+  // Lead Management operations
+  getLead(id: string): Promise<Lead | undefined>;
+  getAllLeads(): Promise<Lead[]>;
+  getLeadsByStatus(status: string): Promise<Lead[]>;
+  getActiveLeads(): Promise<Lead[]>; // Not won or lost
+  getWonLeads(): Promise<Lead[]>;
+  getLostLeads(): Promise<Lead[]>;
+  createLead(lead: InsertLead): Promise<Lead>;
+  updateLead(id: string, lead: Partial<Lead>): Promise<Lead | undefined>;
+  deleteLead(id: string): Promise<boolean>;
+  findDuplicateLead(phone?: string, email?: string, externalId?: string): Promise<Lead | undefined>;
+  
+  // Import Batch operations
+  createImportBatch(batch: InsertImportBatch): Promise<ImportBatch>;
+  getImportBatch(id: string): Promise<ImportBatch | undefined>;
+  getAllImportBatches(): Promise<ImportBatch[]>;
   
   // Backup operations
   clearAllData(): Promise<void>;
@@ -389,9 +406,129 @@ export class DatabaseStorage implements IStorage {
     return result.rowCount || 0;
   }
 
+  // Lead Management operations
+  async getLead(id: string): Promise<Lead | undefined> {
+    const [lead] = await db.select().from(leads).where(eq(leads.id, id));
+    return lead || undefined;
+  }
+
+  async getAllLeads(): Promise<Lead[]> {
+    const allLeads = await db.select().from(leads).orderBy(leads.createdAt);
+    return allLeads.reverse(); // Most recent first
+  }
+
+  async getLeadsByStatus(status: string): Promise<Lead[]> {
+    return await db
+      .select()
+      .from(leads)
+      .where(and(eq(leads.status, status), eq(leads.won, false), eq(leads.lost, false)))
+      .orderBy(leads.createdAt);
+  }
+
+  async getActiveLeads(): Promise<Lead[]> {
+    return await db
+      .select()
+      .from(leads)
+      .where(and(eq(leads.won, false), eq(leads.lost, false)))
+      .orderBy(leads.createdAt);
+  }
+
+  async getWonLeads(): Promise<Lead[]> {
+    return await db
+      .select()
+      .from(leads)
+      .where(eq(leads.won, true))
+      .orderBy(leads.closedAt);
+  }
+
+  async getLostLeads(): Promise<Lead[]> {
+    return await db
+      .select()
+      .from(leads)
+      .where(eq(leads.lost, true))
+      .orderBy(leads.closedAt);
+  }
+
+  async createLead(insertLead: InsertLead): Promise<Lead> {
+    const [lead] = await db
+      .insert(leads)
+      .values(insertLead)
+      .returning();
+    return lead;
+  }
+
+  async updateLead(id: string, updateData: Partial<Lead>): Promise<Lead | undefined> {
+    const [lead] = await db
+      .update(leads)
+      .set(updateData)
+      .where(eq(leads.id, id))
+      .returning();
+    return lead || undefined;
+  }
+
+  async deleteLead(id: string): Promise<boolean> {
+    const result = await db.delete(leads).where(eq(leads.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async findDuplicateLead(phone?: string, email?: string, externalId?: string): Promise<Lead | undefined> {
+    const conditions = [];
+    
+    // Primary: Match by externalId if provided
+    if (externalId) {
+      conditions.push(eq(leads.externalId, externalId));
+    }
+    
+    // Secondary: Match by phone (normalized)
+    if (phone) {
+      const normalizedPhone = phone.replace(/\D/g, ''); // Remove all non-digits
+      if (normalizedPhone) {
+        conditions.push(eq(leads.phone, phone));
+      }
+    }
+    
+    // Tertiary: Match by email
+    if (email) {
+      conditions.push(eq(leads.email, email.toLowerCase()));
+    }
+    
+    if (conditions.length === 0) {
+      return undefined;
+    }
+    
+    // Find lead matching any of the conditions
+    const [lead] = await db
+      .select()
+      .from(leads)
+      .where(or(...conditions))
+      .limit(1);
+    
+    return lead || undefined;
+  }
+
+  // Import Batch operations
+  async createImportBatch(insertBatch: InsertImportBatch): Promise<ImportBatch> {
+    const [batch] = await db
+      .insert(importBatches)
+      .values(insertBatch)
+      .returning();
+    return batch;
+  }
+
+  async getImportBatch(id: string): Promise<ImportBatch | undefined> {
+    const [batch] = await db.select().from(importBatches).where(eq(importBatches.id, id));
+    return batch || undefined;
+  }
+
+  async getAllImportBatches(): Promise<ImportBatch[]> {
+    return await db.select().from(importBatches).orderBy(importBatches.importedAt);
+  }
+
   // Backup operations
   async clearAllData(): Promise<void> {
     // Clear all tables except sessions (preserve active sessions)
+    await db.delete(importBatches);
+    await db.delete(leads);
     await db.delete(authTokens);
     await db.delete(phoneWhitelist);
     await db.delete(announcements);

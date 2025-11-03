@@ -209,3 +209,77 @@ export const sessions = pgTable("session", {
 });
 
 export type Session = typeof sessions.$inferSelect;
+
+// Lead Management System
+export type LeadAction = {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+  completedAt?: string;
+};
+
+export type LeadTask = {
+  id: string;
+  text: string;
+  scheduledDate: string;
+  completed: boolean;
+  createdAt: string;
+  completedAt?: string;
+};
+
+export const leads = pgTable("leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  phone: text("phone"),
+  email: text("email"),
+  address: text("address"),
+  estimatedValue: decimal("estimated_value", { precision: 10, scale: 2 }),
+  status: text("status").notNull().default("New"), // New, Contacted, Quote Sent, Negotiating, Won, Lost
+  clientIssue: text("client_issue"),
+  projectedCloseDate: timestamp("projected_close_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  won: boolean("won").notNull().default(false),
+  lost: boolean("lost").notNull().default(false),
+  closedAt: timestamp("closed_at"),
+  nextActions: json("next_actions").$type<LeadAction[]>().notNull().default([]),
+  scheduledTasks: json("scheduled_tasks").$type<LeadTask[]>().notNull().default([]),
+  quoteDetails: text("quote_details"),
+  quotePricing: text("quote_pricing"),
+  customerType: text("customer_type"), // Residential, Commercial, etc.
+  leadSource: text("lead_source"),
+  // De-duplication and import tracking
+  externalId: text("external_id"), // ID from Field Edge or other external system
+  importSource: text("import_source"), // "fieldedge", "manual", etc.
+  importBatchId: varchar("import_batch_id"),
+  lastImportedAt: timestamp("last_imported_at"),
+  dedupeHash: text("dedupe_hash"), // Hash of key fields for quick duplicate detection
+});
+
+export const importBatches = pgTable("import_batches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  source: text("source").notNull(), // "fieldedge", "manual", etc.
+  filename: text("filename"),
+  importedAt: timestamp("imported_at").defaultNow(),
+  status: text("status").notNull().default("completed"), // processing, completed, failed
+  createdCount: text("created_count").default("0"),
+  updatedCount: text("updated_count").default("0"),
+  skippedCount: text("skipped_count").default("0"),
+  errorCount: text("error_count").default("0"),
+  summary: text("summary"),
+});
+
+export const insertLeadSchema = createInsertSchema(leads).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertImportBatchSchema = createInsertSchema(importBatches).omit({
+  id: true,
+  importedAt: true,
+});
+
+export type InsertLead = z.infer<typeof insertLeadSchema>;
+export type Lead = typeof leads.$inferSelect;
+export type InsertImportBatch = z.infer<typeof insertImportBatchSchema>;
+export type ImportBatch = typeof importBatches.$inferSelect;
