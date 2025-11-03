@@ -407,46 +407,59 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Lead Management operations
+  // Helper to normalize lead data (coerce booleans from database strings)
+  private normalizeLead(lead: any): Lead {
+    return {
+      ...lead,
+      won: Boolean(lead.won),
+      lost: Boolean(lead.lost),
+    };
+  }
+
   async getLead(id: string): Promise<Lead | undefined> {
     const [lead] = await db.select().from(leads).where(eq(leads.id, id));
-    return lead || undefined;
+    return lead ? this.normalizeLead(lead) : undefined;
   }
 
   async getAllLeads(): Promise<Lead[]> {
     const allLeads = await db.select().from(leads).orderBy(leads.createdAt);
-    return allLeads.reverse(); // Most recent first
+    return allLeads.reverse().map(lead => this.normalizeLead(lead)); // Most recent first
   }
 
   async getLeadsByStatus(status: string): Promise<Lead[]> {
-    return await db
+    const result = await db
       .select()
       .from(leads)
       .where(and(eq(leads.status, status), eq(leads.won, false), eq(leads.lost, false)))
       .orderBy(leads.createdAt);
+    return result.map(lead => this.normalizeLead(lead));
   }
 
   async getActiveLeads(): Promise<Lead[]> {
-    return await db
+    const result = await db
       .select()
       .from(leads)
       .where(and(eq(leads.won, false), eq(leads.lost, false)))
       .orderBy(leads.createdAt);
+    return result.map(lead => this.normalizeLead(lead));
   }
 
   async getWonLeads(): Promise<Lead[]> {
-    return await db
+    const result = await db
       .select()
       .from(leads)
       .where(eq(leads.won, true))
       .orderBy(leads.closedAt);
+    return result.map(lead => this.normalizeLead(lead));
   }
 
   async getLostLeads(): Promise<Lead[]> {
-    return await db
+    const result = await db
       .select()
       .from(leads)
       .where(eq(leads.lost, true))
       .orderBy(leads.closedAt);
+    return result.map(lead => this.normalizeLead(lead));
   }
 
   async createLead(insertLead: InsertLead): Promise<Lead> {
@@ -454,7 +467,7 @@ export class DatabaseStorage implements IStorage {
       .insert(leads)
       .values(insertLead)
       .returning();
-    return lead;
+    return this.normalizeLead(lead);
   }
 
   async updateLead(id: string, updateData: Partial<Lead>): Promise<Lead | undefined> {
@@ -463,7 +476,7 @@ export class DatabaseStorage implements IStorage {
       .set(updateData)
       .where(eq(leads.id, id))
       .returning();
-    return lead || undefined;
+    return lead ? this.normalizeLead(lead) : undefined;
   }
 
   async deleteLead(id: string): Promise<boolean> {
@@ -503,7 +516,7 @@ export class DatabaseStorage implements IStorage {
       .where(or(...conditions))
       .limit(1);
     
-    return lead || undefined;
+    return lead ? this.normalizeLead(lead) : undefined;
   }
 
   // Import Batch operations
