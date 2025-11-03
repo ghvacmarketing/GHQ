@@ -898,11 +898,11 @@ function LeadCard({
             <>
               <Button size="sm" variant="outline" className="touch-manipulation" onClick={onMarkWon} data-testid={`button-mark-won-${lead.id}`}>
                 <CheckCircle2 className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline ml-1">Mark Won</span>
+                <span className="sr-only sm:not-sr-only sm:inline ml-1">Mark Won</span>
               </Button>
               <Button size="sm" variant="outline" className="touch-manipulation" onClick={onMarkLost} data-testid={`button-mark-lost-${lead.id}`}>
                 <X className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline ml-1">Mark Lost</span>
+                <span className="sr-only sm:not-sr-only sm:inline ml-1">Mark Lost</span>
               </Button>
             </>
           )}
@@ -911,7 +911,7 @@ function LeadCard({
             <AlertDialogTrigger asChild>
               <Button size="sm" variant="outline" className="touch-manipulation" data-testid={`button-delete-${lead.id}`}>
                 <Trash2 className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline ml-1">Delete</span>
+                <span className="sr-only sm:not-sr-only sm:inline ml-1">Delete</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
