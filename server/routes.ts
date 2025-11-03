@@ -5,7 +5,7 @@ import compression from "compression";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, announcements, categories } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertLeadSchema, announcements, categories } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
@@ -1425,8 +1425,604 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // LEAD MANAGEMENT API ROUTES
+  // ========================================
+
+  // 1. GET /api/leads - Get all leads
+  app.get("/api/leads", async (req, res) => {
+    try {
+      const leads = await storage.getAllLeads();
+      res.json(leads);
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+      res.status(500).json({ message: "Error fetching leads" });
+    }
+  });
+
+  // 2. GET /api/leads/:id - Get single lead
+  app.get("/api/leads/:id", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+      res.json(lead);
+    } catch (error) {
+      console.error('Error fetching lead:', error);
+      res.status(500).json({ message: "Error fetching lead" });
+    }
+  });
+
+  // 3. POST /api/leads - Create new lead
+  app.post("/api/leads", async (req, res) => {
+    try {
+      const validatedData = insertLeadSchema.parse(req.body);
+      const lead = await storage.createLead(validatedData);
+      res.json(lead);
+    } catch (error) {
+      console.error('Error creating lead:', error);
+      res.status(400).json({ message: "Invalid lead data" });
+    }
+  });
+
+  // 4. PATCH /api/leads/:id - Update lead
+  app.patch("/api/leads/:id", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+      
+      const updatedLead = await storage.updateLead(req.params.id, req.body);
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error updating lead:', error);
+      res.status(500).json({ message: "Error updating lead" });
+    }
+  });
+
+  // 5. DELETE /api/leads/:id - Delete lead
+  app.delete("/api/leads/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteLead(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+      res.json({ message: "Lead deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      res.status(500).json({ message: "Error deleting lead" });
+    }
+  });
+
+  // 6. GET /api/leads/filter/:status - Get leads by status
+  app.get("/api/leads/filter/:status", async (req, res) => {
+    try {
+      const leads = await storage.getLeadsByStatus(req.params.status);
+      res.json(leads);
+    } catch (error) {
+      console.error('Error fetching leads by status:', error);
+      res.status(500).json({ message: "Error fetching leads by status" });
+    }
+  });
+
+  // 7. GET /api/leads/active - Get active leads (not won/lost)
+  app.get("/api/leads/active", async (req, res) => {
+    try {
+      const leads = await storage.getActiveLeads();
+      res.json(leads);
+    } catch (error) {
+      console.error('Error fetching active leads:', error);
+      res.status(500).json({ message: "Error fetching active leads" });
+    }
+  });
+
+  // 8. GET /api/leads/won - Get won leads
+  app.get("/api/leads/won", async (req, res) => {
+    try {
+      const leads = await storage.getWonLeads();
+      res.json(leads);
+    } catch (error) {
+      console.error('Error fetching won leads:', error);
+      res.status(500).json({ message: "Error fetching won leads" });
+    }
+  });
+
+  // 9. GET /api/leads/lost - Get lost leads
+  app.get("/api/leads/lost", async (req, res) => {
+    try {
+      const leads = await storage.getLostLeads();
+      res.json(leads);
+    } catch (error) {
+      console.error('Error fetching lost leads:', error);
+      res.status(500).json({ message: "Error fetching lost leads" });
+    }
+  });
+
+  // 10. PATCH /api/leads/:id/status - Update lead status
+  app.patch("/api/leads/:id/status", async (req, res) => {
+    try {
+      const { status } = req.body;
+      if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+      }
+
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const updatedLead = await storage.updateLead(req.params.id, { status });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error updating lead status:', error);
+      res.status(500).json({ message: "Error updating lead status" });
+    }
+  });
+
+  // 11. PATCH /api/leads/:id/mark-won - Mark lead as won
+  app.patch("/api/leads/:id/mark-won", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const updatedLead = await storage.updateLead(req.params.id, {
+        won: true,
+        lost: false,
+        closedAt: new Date(),
+        status: "Won"
+      });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error marking lead as won:', error);
+      res.status(500).json({ message: "Error marking lead as won" });
+    }
+  });
+
+  // 12. PATCH /api/leads/:id/mark-lost - Mark lead as lost
+  app.patch("/api/leads/:id/mark-lost", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const updatedLead = await storage.updateLead(req.params.id, {
+        lost: true,
+        won: false,
+        closedAt: new Date(),
+        status: "Lost"
+      });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error marking lead as lost:', error);
+      res.status(500).json({ message: "Error marking lead as lost" });
+    }
+  });
+
+  // 13. POST /api/leads/:id/actions - Add action to lead
+  app.post("/api/leads/:id/actions", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const { text } = req.body;
+      if (!text) {
+        return res.status(400).json({ message: "Action text is required" });
+      }
+
+      const newAction = {
+        id: randomUUID(),
+        text,
+        completed: false,
+        createdAt: new Date().toISOString()
+      };
+
+      const nextActions = [...(lead.nextActions || []), newAction];
+      const updatedLead = await storage.updateLead(req.params.id, { nextActions });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error adding action:', error);
+      res.status(500).json({ message: "Error adding action" });
+    }
+  });
+
+  // 14. PATCH /api/leads/:id/actions/:actionId - Toggle action complete
+  app.patch("/api/leads/:id/actions/:actionId", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const nextActions = (lead.nextActions || []).map(action => {
+        if (action.id === req.params.actionId) {
+          return {
+            ...action,
+            completed: !action.completed,
+            completedAt: !action.completed ? new Date().toISOString() : undefined
+          };
+        }
+        return action;
+      });
+
+      const updatedLead = await storage.updateLead(req.params.id, { nextActions });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error toggling action:', error);
+      res.status(500).json({ message: "Error toggling action" });
+    }
+  });
+
+  // 15. DELETE /api/leads/:id/actions/:actionId - Delete action
+  app.delete("/api/leads/:id/actions/:actionId", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const nextActions = (lead.nextActions || []).filter(
+        action => action.id !== req.params.actionId
+      );
+
+      const updatedLead = await storage.updateLead(req.params.id, { nextActions });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error deleting action:', error);
+      res.status(500).json({ message: "Error deleting action" });
+    }
+  });
+
+  // 16. POST /api/leads/:id/tasks - Add scheduled task to lead
+  app.post("/api/leads/:id/tasks", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const { text, scheduledDate } = req.body;
+      if (!text || !scheduledDate) {
+        return res.status(400).json({ message: "Task text and scheduled date are required" });
+      }
+
+      const newTask = {
+        id: randomUUID(),
+        text,
+        scheduledDate,
+        completed: false,
+        createdAt: new Date().toISOString()
+      };
+
+      const scheduledTasks = [...(lead.scheduledTasks || []), newTask];
+      const updatedLead = await storage.updateLead(req.params.id, { scheduledTasks });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error adding task:', error);
+      res.status(500).json({ message: "Error adding task" });
+    }
+  });
+
+  // 17. PATCH /api/leads/:id/tasks/:taskId - Toggle task complete
+  app.patch("/api/leads/:id/tasks/:taskId", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const scheduledTasks = (lead.scheduledTasks || []).map(task => {
+        if (task.id === req.params.taskId) {
+          return {
+            ...task,
+            completed: !task.completed,
+            completedAt: !task.completed ? new Date().toISOString() : undefined
+          };
+        }
+        return task;
+      });
+
+      const updatedLead = await storage.updateLead(req.params.id, { scheduledTasks });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error toggling task:', error);
+      res.status(500).json({ message: "Error toggling task" });
+    }
+  });
+
+  // 18. DELETE /api/leads/:id/tasks/:taskId - Delete task
+  app.delete("/api/leads/:id/tasks/:taskId", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const scheduledTasks = (lead.scheduledTasks || []).filter(
+        task => task.id !== req.params.taskId
+      );
+
+      const updatedLead = await storage.updateLead(req.params.id, { scheduledTasks });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      res.status(500).json({ message: "Error deleting task" });
+    }
+  });
+
+  // 19. POST /api/leads/import - CSV import with de-duplication
+  app.post("/api/leads/import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file provided" });
+      }
+
+      const csvContent = req.file.buffer.toString('utf-8');
+      const lines = csvContent.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        return res.status(400).json({ message: "CSV file is empty or has no data rows" });
+      }
+
+      // Parse header
+      const headerLine = lines[0];
+      const headers = parseCSVLine(headerLine);
+
+      // Map common column names to our fields
+      const columnMap: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        const normalized = header.toLowerCase().trim();
+        if (normalized.includes('name') && !normalized.includes('company')) {
+          columnMap['name'] = headers[index];
+        } else if (normalized.includes('phone') || normalized.includes('mobile') || normalized.includes('cell')) {
+          columnMap['phone'] = headers[index];
+        } else if (normalized.includes('email') || normalized.includes('e-mail')) {
+          columnMap['email'] = headers[index];
+        } else if (normalized.includes('address') || normalized.includes('location')) {
+          columnMap['address'] = headers[index];
+        } else if (normalized.includes('value') || normalized.includes('estimated') || normalized.includes('amount')) {
+          columnMap['estimatedValue'] = headers[index];
+        } else if (normalized.includes('status')) {
+          columnMap['status'] = headers[index];
+        } else if (normalized.includes('issue') || normalized.includes('problem') || normalized.includes('description')) {
+          columnMap['clientIssue'] = headers[index];
+        }
+      });
+
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+
+      // Process each data row
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const values = parseCSVLine(line);
+        const rowData: Record<string, string> = {};
+        
+        headers.forEach((header, index) => {
+          rowData[header] = values[index] || '';
+        });
+
+        // Extract fields using column mapping
+        const leadData: any = {
+          name: rowData[columnMap['name']] || 'Unknown',
+          phone: rowData[columnMap['phone']] || undefined,
+          email: rowData[columnMap['email']] || undefined,
+          address: rowData[columnMap['address']] || undefined,
+          estimatedValue: rowData[columnMap['estimatedValue']] || undefined,
+          status: rowData[columnMap['status']] || 'New',
+          clientIssue: rowData[columnMap['clientIssue']] || undefined,
+          importSource: 'manual',
+          lastImportedAt: new Date()
+        };
+
+        // Check for duplicates
+        const duplicate = await storage.findDuplicateLead(
+          leadData.phone,
+          leadData.email,
+          undefined
+        );
+
+        if (duplicate) {
+          // Update existing lead
+          await storage.updateLead(duplicate.id, {
+            ...leadData,
+            lastImportedAt: new Date()
+          });
+          updated++;
+        } else {
+          // Create new lead
+          try {
+            await storage.createLead(leadData);
+            created++;
+          } catch (error) {
+            console.error('Error creating lead:', error);
+            skipped++;
+          }
+        }
+      }
+
+      // Create import batch record
+      await storage.createImportBatch({
+        source: 'manual',
+        filename: req.file.originalname,
+        status: 'completed',
+        createdCount: String(created),
+        updatedCount: String(updated),
+        skippedCount: String(skipped),
+        errorCount: '0',
+        summary: `Imported ${created} new leads, updated ${updated} existing leads, skipped ${skipped} leads`
+      });
+
+      res.json({
+        success: true,
+        created,
+        updated,
+        skipped,
+        total: created + updated + skipped
+      });
+    } catch (error) {
+      console.error('Error importing leads:', error);
+      res.status(500).json({ message: "Error importing leads" });
+    }
+  });
+
+  // 20. GET /api/leads/export - Export all leads to CSV
+  app.get("/api/leads/export", async (req, res) => {
+    try {
+      const leads = await storage.getAllLeads();
+      
+      // Define CSV headers
+      const headers = [
+        'name', 'phone', 'email', 'address', 'estimatedValue', 'status',
+        'clientIssue', 'projectedCloseDate', 'createdAt', 'quoteDetails', 'quotePricing'
+      ];
+
+      // Create CSV content
+      let csv = headers.join(',') + '\n';
+
+      leads.forEach(lead => {
+        const row = headers.map(header => {
+          let value = (lead as any)[header] || '';
+          
+          // Format dates
+          if (header === 'projectedCloseDate' || header === 'createdAt') {
+            value = value ? new Date(value).toISOString().split('T')[0] : '';
+          }
+          
+          // Escape commas and quotes
+          value = String(value).replace(/"/g, '""');
+          if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+            value = `"${value}"`;
+          }
+          
+          return value;
+        });
+        
+        csv += row.join(',') + '\n';
+      });
+
+      // Set headers for file download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="leads-export-${Date.now()}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      console.error('Error exporting leads:', error);
+      res.status(500).json({ message: "Error exporting leads" });
+    }
+  });
+
+  // 21. GET /api/leads/metrics - Calculate and return metrics
+  app.get("/api/leads/metrics", async (req, res) => {
+    try {
+      const allLeads = await storage.getAllLeads();
+      const activeLeads = allLeads.filter(lead => !lead.won && !lead.lost);
+      const wonLeads = allLeads.filter(lead => lead.won);
+      const lostLeads = allLeads.filter(lead => lead.lost);
+
+      // Calculate pipeline value
+      const pipelineValue = activeLeads.reduce((sum, lead) => {
+        const value = parseFloat(lead.estimatedValue || '0');
+        return sum + value;
+      }, 0);
+
+      // Calculate conversion rate
+      const totalClosed = wonLeads.length + lostLeads.length;
+      const conversionRate = totalClosed > 0 
+        ? (wonLeads.length / totalClosed) * 100 
+        : 0;
+
+      // Count pending actions
+      const pendingActions = allLeads.reduce((count, lead) => {
+        const incomplete = (lead.nextActions || []).filter(action => !action.completed);
+        return count + incomplete.length;
+      }, 0);
+
+      // Count recent completions (last 7 days)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      const recentCompletions = allLeads.reduce((count, lead) => {
+        const recentCompleted = (lead.nextActions || []).filter(action => {
+          if (!action.completed || !action.completedAt) return false;
+          const completedDate = new Date(action.completedAt);
+          return completedDate >= sevenDaysAgo;
+        });
+        return count + recentCompleted.length;
+      }, 0);
+
+      // Build sales funnel
+      const salesFunnel = {
+        New: { count: 0, value: 0 },
+        Contacted: { count: 0, value: 0 },
+        'Quote Sent': { count: 0, value: 0 },
+        Negotiating: { count: 0, value: 0 },
+        Won: { count: 0, value: 0 },
+        Lost: { count: 0, value: 0 }
+      };
+
+      allLeads.forEach(lead => {
+        const status = lead.status || 'New';
+        const value = parseFloat(lead.estimatedValue || '0');
+        
+        if (salesFunnel[status as keyof typeof salesFunnel]) {
+          salesFunnel[status as keyof typeof salesFunnel].count++;
+          salesFunnel[status as keyof typeof salesFunnel].value += value;
+        }
+      });
+
+      res.json({
+        activeLeads: activeLeads.length,
+        pipelineValue: pipelineValue.toFixed(2),
+        conversionRate: conversionRate.toFixed(1),
+        pendingActions,
+        recentCompletions,
+        salesFunnel
+      });
+    } catch (error) {
+      console.error('Error calculating metrics:', error);
+      res.status(500).json({ message: "Error calculating metrics" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
+}
+
+// Helper function to parse CSV line with proper quote handling
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  
+  result.push(current.trim());
+  return result;
 }
 
 function generateQuoteText(quote: any): string {
