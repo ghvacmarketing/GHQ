@@ -10,7 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp } from "lucide-react";
+import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -306,7 +306,7 @@ export default function SalesProspects() {
 
       <div className="container mx-auto p-4 max-w-7xl">
         {/* Dashboard Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
           {isLoadingMetrics ? (
             <>
               {[1, 2, 3, 4].map((i) => (
@@ -324,10 +324,10 @@ export default function SalesProspects() {
             <>
               <Card data-testid="card-metric-active">
                 <CardHeader className="pb-2">
-                  <CardDescription>Active Leads</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">Active Leads</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold" data-testid="text-active-leads">
+                  <div className="text-2xl sm:text-3xl font-bold" data-testid="text-active-leads">
                     {metrics?.activeLeads || 0}
                   </div>
                 </CardContent>
@@ -335,32 +335,32 @@ export default function SalesProspects() {
 
               <Card data-testid="card-metric-pipeline">
                 <CardHeader className="pb-2">
-                  <CardDescription>Pipeline Value</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">Pipeline Value</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold" data-testid="text-pipeline-value">
-                    {metrics?.pipelineValue || "$0.00"}
+                  <div className="text-xl sm:text-3xl font-bold truncate" data-testid="text-pipeline-value">
+                    ${parseFloat(metrics?.pipelineValue || "0").toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
 
               <Card data-testid="card-metric-conversion">
                 <CardHeader className="pb-2">
-                  <CardDescription>Conversion Rate</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">Conversion Rate</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold" data-testid="text-conversion-rate">
-                    {metrics?.conversionRate || "0%"}
+                  <div className="text-2xl sm:text-3xl font-bold" data-testid="text-conversion-rate">
+                    {metrics?.conversionRate || "0"}%
                   </div>
                 </CardContent>
               </Card>
 
               <Card data-testid="card-metric-actions">
                 <CardHeader className="pb-2">
-                  <CardDescription>Pending Actions</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">Pending Actions</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold" data-testid="text-pending-actions">
+                  <div className="text-2xl sm:text-3xl font-bold" data-testid="text-pending-actions">
                     {metrics?.pendingActions || 0}
                   </div>
                 </CardContent>
@@ -424,9 +424,45 @@ export default function SalesProspects() {
           </Card>
         )}
 
-        {/* Filter Tabs & Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <div className="flex flex-wrap gap-2">
+        {/* Filter & Actions */}
+        <div className="space-y-3 mb-6">
+          {/* Mobile Filter Dropdown */}
+          <div className="md:hidden">
+            <Select value={activeFilter} onValueChange={setActiveFilter}>
+              <SelectTrigger className="w-full" data-testid="select-filter-mobile">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  <SelectValue />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {["All Active", "New", "Contacted", "Quote Sent", "Negotiating", "Won", "Lost"].map((filter) => {
+                  const count = (() => {
+                    if (filter === "All Active") return allLeads.filter((l) => !l.won && !l.lost).length;
+                    if (filter === "Won") return allLeads.filter((l) => l.won).length;
+                    if (filter === "Lost") return allLeads.filter((l) => l.lost).length;
+                    return allLeads.filter((l) => l.status === filter && !l.won && !l.lost).length;
+                  })();
+
+                  return (
+                    <SelectItem 
+                      key={filter} 
+                      value={filter}
+                      data-testid={`select-filter-option-${filter.toLowerCase().replace(/\s+/g, "-")}`}
+                    >
+                      <div className="flex items-center justify-between w-full gap-3">
+                        <span>{filter}</span>
+                        <Badge variant="secondary" className="text-xs">{count}</Badge>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Desktop Filter Buttons */}
+          <div className="hidden md:flex md:flex-wrap gap-2">
             {["All Active", "New", "Contacted", "Quote Sent", "Negotiating", "Won", "Lost"].map((filter) => {
               const count = (() => {
                 if (filter === "All Active") return allLeads.filter((l) => !l.won && !l.lost).length;
@@ -438,6 +474,7 @@ export default function SalesProspects() {
               return (
                 <Button
                   key={filter}
+                  size="sm"
                   variant={activeFilter === filter ? "default" : "outline"}
                   onClick={() => setActiveFilter(filter)}
                   data-testid={`button-filter-${filter.toLowerCase().replace(/\s+/g, "-")}`}
@@ -451,12 +488,13 @@ export default function SalesProspects() {
             })}
           </div>
 
-          <div className="flex gap-2">
-            <label htmlFor="csv-upload">
-              <Button variant="outline" asChild data-testid="button-import-csv">
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-2">
+            <label htmlFor="csv-upload" className="flex-1 sm:flex-initial">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" asChild data-testid="button-import-csv">
                 <span>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Import CSV
+                  <Upload className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Import CSV</span>
                 </span>
               </Button>
               <input
@@ -469,19 +507,19 @@ export default function SalesProspects() {
               />
             </label>
 
-            <Button variant="outline" onClick={handleExport} data-testid="button-export-csv">
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
+            <Button variant="outline" size="sm" className="flex-1 sm:flex-initial" onClick={handleExport} data-testid="button-export-csv">
+              <Download className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Export CSV</span>
             </Button>
 
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button data-testid="button-create-lead">
+                <Button size="sm" className="flex-1 sm:flex-initial" data-testid="button-create-lead">
                   <Plus className="h-4 w-4 mr-2" />
                   New Lead
                 </Button>
               </DialogTrigger>
-              <DialogContent data-testid="dialog-create-lead">
+              <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto" data-testid="dialog-create-lead">
                 <DialogHeader>
                   <DialogTitle>Create New Lead</DialogTitle>
                   <DialogDescription>Add a new sales prospect to track</DialogDescription>
@@ -793,13 +831,13 @@ function LeadCard({
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 items-end">
+          <div className="flex flex-col gap-2 items-end min-w-[120px]">
             {isActive ? (
               <Select
                 value={lead.status}
                 onValueChange={(value) => onUpdate({ status: value })}
               >
-                <SelectTrigger className="w-40" data-testid={`select-status-${lead.id}`}>
+                <SelectTrigger className="w-full min-w-[120px] h-9" data-testid={`select-status-${lead.id}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -810,7 +848,7 @@ function LeadCard({
                 </SelectContent>
               </Select>
             ) : (
-              <Badge variant={lead.won ? "default" : "destructive"} data-testid={`badge-status-${lead.id}`}>
+              <Badge variant={lead.won ? "default" : "destructive"} className="px-3 py-1" data-testid={`badge-status-${lead.id}`}>
                 {lead.status}
               </Badge>
             )}
@@ -858,22 +896,22 @@ function LeadCard({
         <div className="flex flex-wrap gap-2 mb-4">
           {isActive && (
             <>
-              <Button size="sm" variant="outline" onClick={onMarkWon} data-testid={`button-mark-won-${lead.id}`}>
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                Mark Won
+              <Button size="sm" variant="outline" className="touch-manipulation" onClick={onMarkWon} data-testid={`button-mark-won-${lead.id}`}>
+                <CheckCircle2 className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline ml-1">Mark Won</span>
               </Button>
-              <Button size="sm" variant="outline" onClick={onMarkLost} data-testid={`button-mark-lost-${lead.id}`}>
-                <X className="h-4 w-4 mr-1" />
-                Mark Lost
+              <Button size="sm" variant="outline" className="touch-manipulation" onClick={onMarkLost} data-testid={`button-mark-lost-${lead.id}`}>
+                <X className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline ml-1">Mark Lost</span>
               </Button>
             </>
           )}
 
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button size="sm" variant="outline" data-testid={`button-delete-${lead.id}`}>
-                <Trash2 className="h-4 w-4 mr-1" />
-                Delete
+              <Button size="sm" variant="outline" className="touch-manipulation" data-testid={`button-delete-${lead.id}`}>
+                <Trash2 className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline ml-1">Delete</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
