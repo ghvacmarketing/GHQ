@@ -1440,323 +1440,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 2. GET /api/leads/:id - Get single lead
-  app.get("/api/leads/:id", async (req, res) => {
+  // 2. GET /api/leads/metrics - Calculate and return metrics
+  app.get("/api/leads/metrics", async (req, res) => {
     try {
-      const lead = await storage.getLead(req.params.id);
-      if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
-      res.json(lead);
-    } catch (error) {
-      console.error('Error fetching lead:', error);
-      res.status(500).json({ message: "Error fetching lead" });
-    }
-  });
+      const allLeads = await storage.getAllLeads();
+      const activeLeads = allLeads.filter(lead => !lead.won && !lead.lost);
+      const wonLeads = allLeads.filter(lead => lead.won);
+      const lostLeads = allLeads.filter(lead => lead.lost);
 
-  // 3. POST /api/leads - Create new lead
-  app.post("/api/leads", async (req, res) => {
-    try {
-      const validatedData = insertLeadSchema.parse(req.body);
-      const lead = await storage.createLead(validatedData);
-      res.json(lead);
-    } catch (error) {
-      console.error('Error creating lead:', error);
-      res.status(400).json({ message: "Invalid lead data" });
-    }
-  });
+      // Calculate pipeline value
+      const pipelineValue = activeLeads.reduce((sum, lead) => {
+        const value = parseFloat(lead.estimatedValue || '0');
+        return sum + value;
+      }, 0);
 
-  // 4. PATCH /api/leads/:id - Update lead
-  app.patch("/api/leads/:id", async (req, res) => {
-    try {
-      const lead = await storage.getLead(req.params.id);
-      if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
+      // Calculate conversion rate
+      const totalClosed = wonLeads.length + lostLeads.length;
+      const conversionRate = totalClosed > 0 
+        ? (wonLeads.length / totalClosed) * 100 
+        : 0;
+
+      // Count pending actions
+      const pendingActions = allLeads.reduce((count, lead) => {
+        const incomplete = (lead.nextActions || []).filter(action => !action.completed);
+        return count + incomplete.length;
+      }, 0);
+
+      // Count recent completions (last 7 days)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
-      const updatedLead = await storage.updateLead(req.params.id, req.body);
-      res.json(updatedLead);
-    } catch (error) {
-      console.error('Error updating lead:', error);
-      res.status(500).json({ message: "Error updating lead" });
-    }
-  });
+      const recentCompletions = allLeads.reduce((count, lead) => {
+        const recentCompleted = (lead.nextActions || []).filter(action => {
+          if (!action.completed || !action.completedAt) return false;
+          const completedDate = new Date(action.completedAt);
+          return completedDate >= sevenDaysAgo;
+        });
+        return count + recentCompleted.length;
+      }, 0);
 
-  // 5. DELETE /api/leads/:id - Delete lead
-  app.delete("/api/leads/:id", async (req, res) => {
-    try {
-      const deleted = await storage.deleteLead(req.params.id);
-      if (!deleted) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
-      res.json({ message: "Lead deleted successfully" });
-    } catch (error) {
-      console.error('Error deleting lead:', error);
-      res.status(500).json({ message: "Error deleting lead" });
-    }
-  });
-
-  // 6. GET /api/leads/filter/:status - Get leads by status
-  app.get("/api/leads/filter/:status", async (req, res) => {
-    try {
-      const leads = await storage.getLeadsByStatus(req.params.status);
-      res.json(leads);
-    } catch (error) {
-      console.error('Error fetching leads by status:', error);
-      res.status(500).json({ message: "Error fetching leads by status" });
-    }
-  });
-
-  // 7. GET /api/leads/active - Get active leads (not won/lost)
-  app.get("/api/leads/active", async (req, res) => {
-    try {
-      const leads = await storage.getActiveLeads();
-      res.json(leads);
-    } catch (error) {
-      console.error('Error fetching active leads:', error);
-      res.status(500).json({ message: "Error fetching active leads" });
-    }
-  });
-
-  // 8. GET /api/leads/won - Get won leads
-  app.get("/api/leads/won", async (req, res) => {
-    try {
-      const leads = await storage.getWonLeads();
-      res.json(leads);
-    } catch (error) {
-      console.error('Error fetching won leads:', error);
-      res.status(500).json({ message: "Error fetching won leads" });
-    }
-  });
-
-  // 9. GET /api/leads/lost - Get lost leads
-  app.get("/api/leads/lost", async (req, res) => {
-    try {
-      const leads = await storage.getLostLeads();
-      res.json(leads);
-    } catch (error) {
-      console.error('Error fetching lost leads:', error);
-      res.status(500).json({ message: "Error fetching lost leads" });
-    }
-  });
-
-  // 10. PATCH /api/leads/:id/status - Update lead status
-  app.patch("/api/leads/:id/status", async (req, res) => {
-    try {
-      const { status } = req.body;
-      if (!status) {
-        return res.status(400).json({ message: "Status is required" });
-      }
-
-      const lead = await storage.getLead(req.params.id);
-      if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
-
-      const updatedLead = await storage.updateLead(req.params.id, { status });
-      res.json(updatedLead);
-    } catch (error) {
-      console.error('Error updating lead status:', error);
-      res.status(500).json({ message: "Error updating lead status" });
-    }
-  });
-
-  // 11. PATCH /api/leads/:id/mark-won - Mark lead as won
-  app.patch("/api/leads/:id/mark-won", async (req, res) => {
-    try {
-      const lead = await storage.getLead(req.params.id);
-      if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
-
-      const updatedLead = await storage.updateLead(req.params.id, {
-        won: true,
-        lost: false,
-        closedAt: new Date(),
-        status: "Won"
-      });
-      res.json(updatedLead);
-    } catch (error) {
-      console.error('Error marking lead as won:', error);
-      res.status(500).json({ message: "Error marking lead as won" });
-    }
-  });
-
-  // 12. PATCH /api/leads/:id/mark-lost - Mark lead as lost
-  app.patch("/api/leads/:id/mark-lost", async (req, res) => {
-    try {
-      const lead = await storage.getLead(req.params.id);
-      if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
-
-      const updatedLead = await storage.updateLead(req.params.id, {
-        lost: true,
-        won: false,
-        closedAt: new Date(),
-        status: "Lost"
-      });
-      res.json(updatedLead);
-    } catch (error) {
-      console.error('Error marking lead as lost:', error);
-      res.status(500).json({ message: "Error marking lead as lost" });
-    }
-  });
-
-  // 13. POST /api/leads/:id/actions - Add action to lead
-  app.post("/api/leads/:id/actions", async (req, res) => {
-    try {
-      const lead = await storage.getLead(req.params.id);
-      if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
-
-      const { text } = req.body;
-      if (!text) {
-        return res.status(400).json({ message: "Action text is required" });
-      }
-
-      const newAction = {
-        id: randomUUID(),
-        text,
-        completed: false,
-        createdAt: new Date().toISOString()
+      // Build sales funnel
+      const salesFunnel = {
+        New: { count: 0, value: 0 },
+        Contacted: { count: 0, value: 0 },
+        'Quote Sent': { count: 0, value: 0 },
+        Negotiating: { count: 0, value: 0 },
+        Won: { count: 0, value: 0 },
+        Lost: { count: 0, value: 0 }
       };
 
-      const nextActions = [...(lead.nextActions || []), newAction];
-      const updatedLead = await storage.updateLead(req.params.id, { nextActions });
-      res.json(updatedLead);
-    } catch (error) {
-      console.error('Error adding action:', error);
-      res.status(500).json({ message: "Error adding action" });
-    }
-  });
-
-  // 14. PATCH /api/leads/:id/actions/:actionId - Toggle action complete
-  app.patch("/api/leads/:id/actions/:actionId", async (req, res) => {
-    try {
-      const lead = await storage.getLead(req.params.id);
-      if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
-
-      const nextActions = (lead.nextActions || []).map(action => {
-        if (action.id === req.params.actionId) {
-          return {
-            ...action,
-            completed: !action.completed,
-            completedAt: !action.completed ? new Date().toISOString() : undefined
-          };
+      allLeads.forEach(lead => {
+        const status = lead.status || 'New';
+        const value = parseFloat(lead.estimatedValue || '0');
+        
+        if (salesFunnel[status as keyof typeof salesFunnel]) {
+          salesFunnel[status as keyof typeof salesFunnel].count++;
+          salesFunnel[status as keyof typeof salesFunnel].value += value;
         }
-        return action;
       });
 
-      const updatedLead = await storage.updateLead(req.params.id, { nextActions });
-      res.json(updatedLead);
+      res.json({
+        activeLeads: activeLeads.length,
+        pipelineValue: pipelineValue.toFixed(2),
+        conversionRate: conversionRate.toFixed(1),
+        pendingActions,
+        recentCompletions,
+        salesFunnel
+      });
     } catch (error) {
-      console.error('Error toggling action:', error);
-      res.status(500).json({ message: "Error toggling action" });
+      console.error('Error calculating metrics:', error);
+      res.status(500).json({ message: "Error calculating metrics" });
     }
   });
 
-  // 15. DELETE /api/leads/:id/actions/:actionId - Delete action
-  app.delete("/api/leads/:id/actions/:actionId", async (req, res) => {
+  // 3. GET /api/leads/export - Export all leads to CSV
+  app.get("/api/leads/export", async (req, res) => {
     try {
-      const lead = await storage.getLead(req.params.id);
-      if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
+      const leads = await storage.getAllLeads();
+      
+      // Define CSV headers
+      const headers = [
+        'name', 'phone', 'email', 'address', 'estimatedValue', 'status',
+        'clientIssue', 'projectedCloseDate', 'createdAt', 'quoteDetails', 'quotePricing'
+      ];
 
-      const nextActions = (lead.nextActions || []).filter(
-        action => action.id !== req.params.actionId
-      );
+      // Create CSV content
+      let csv = headers.join(',') + '\n';
 
-      const updatedLead = await storage.updateLead(req.params.id, { nextActions });
-      res.json(updatedLead);
-    } catch (error) {
-      console.error('Error deleting action:', error);
-      res.status(500).json({ message: "Error deleting action" });
-    }
-  });
-
-  // 16. POST /api/leads/:id/tasks - Add scheduled task to lead
-  app.post("/api/leads/:id/tasks", async (req, res) => {
-    try {
-      const lead = await storage.getLead(req.params.id);
-      if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
-
-      const { text, scheduledDate } = req.body;
-      if (!text || !scheduledDate) {
-        return res.status(400).json({ message: "Task text and scheduled date are required" });
-      }
-
-      const newTask = {
-        id: randomUUID(),
-        text,
-        scheduledDate,
-        completed: false,
-        createdAt: new Date().toISOString()
-      };
-
-      const scheduledTasks = [...(lead.scheduledTasks || []), newTask];
-      const updatedLead = await storage.updateLead(req.params.id, { scheduledTasks });
-      res.json(updatedLead);
-    } catch (error) {
-      console.error('Error adding task:', error);
-      res.status(500).json({ message: "Error adding task" });
-    }
-  });
-
-  // 17. PATCH /api/leads/:id/tasks/:taskId - Toggle task complete
-  app.patch("/api/leads/:id/tasks/:taskId", async (req, res) => {
-    try {
-      const lead = await storage.getLead(req.params.id);
-      if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
-
-      const scheduledTasks = (lead.scheduledTasks || []).map(task => {
-        if (task.id === req.params.taskId) {
-          return {
-            ...task,
-            completed: !task.completed,
-            completedAt: !task.completed ? new Date().toISOString() : undefined
-          };
-        }
-        return task;
+      leads.forEach(lead => {
+        const row = headers.map(header => {
+          let value = (lead as any)[header] || '';
+          
+          // Format dates
+          if (header === 'projectedCloseDate' || header === 'createdAt') {
+            value = value ? new Date(value).toISOString().split('T')[0] : '';
+          }
+          
+          // Escape commas and quotes
+          value = String(value).replace(/"/g, '""');
+          if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+            value = `"${value}"`;
+          }
+          
+          return value;
+        });
+        
+        csv += row.join(',') + '\n';
       });
 
-      const updatedLead = await storage.updateLead(req.params.id, { scheduledTasks });
-      res.json(updatedLead);
+      // Set headers for file download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="leads-export-${Date.now()}.csv"`);
+      res.send(csv);
     } catch (error) {
-      console.error('Error toggling task:', error);
-      res.status(500).json({ message: "Error toggling task" });
+      console.error('Error exporting leads:', error);
+      res.status(500).json({ message: "Error exporting leads" });
     }
   });
 
-  // 18. DELETE /api/leads/:id/tasks/:taskId - Delete task
-  app.delete("/api/leads/:id/tasks/:taskId", async (req, res) => {
-    try {
-      const lead = await storage.getLead(req.params.id);
-      if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
-
-      const scheduledTasks = (lead.scheduledTasks || []).filter(
-        task => task.id !== req.params.taskId
-      );
-
-      const updatedLead = await storage.updateLead(req.params.id, { scheduledTasks });
-      res.json(updatedLead);
-    } catch (error) {
-      console.error('Error deleting task:', error);
-      res.status(500).json({ message: "Error deleting task" });
-    }
-  });
-
-  // 19. POST /api/leads/import - CSV import with de-duplication
+  // 4. POST /api/leads/import - CSV import with de-duplication
   app.post("/api/leads/import", upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
@@ -1875,121 +1677,319 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 20. GET /api/leads/export - Export all leads to CSV
-  app.get("/api/leads/export", async (req, res) => {
+  // 5. GET /api/leads/filter/:status - Get leads by status
+  app.get("/api/leads/filter/:status", async (req, res) => {
     try {
-      const leads = await storage.getAllLeads();
-      
-      // Define CSV headers
-      const headers = [
-        'name', 'phone', 'email', 'address', 'estimatedValue', 'status',
-        'clientIssue', 'projectedCloseDate', 'createdAt', 'quoteDetails', 'quotePricing'
-      ];
-
-      // Create CSV content
-      let csv = headers.join(',') + '\n';
-
-      leads.forEach(lead => {
-        const row = headers.map(header => {
-          let value = (lead as any)[header] || '';
-          
-          // Format dates
-          if (header === 'projectedCloseDate' || header === 'createdAt') {
-            value = value ? new Date(value).toISOString().split('T')[0] : '';
-          }
-          
-          // Escape commas and quotes
-          value = String(value).replace(/"/g, '""');
-          if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-            value = `"${value}"`;
-          }
-          
-          return value;
-        });
-        
-        csv += row.join(',') + '\n';
-      });
-
-      // Set headers for file download
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="leads-export-${Date.now()}.csv"`);
-      res.send(csv);
+      const leads = await storage.getLeadsByStatus(req.params.status);
+      res.json(leads);
     } catch (error) {
-      console.error('Error exporting leads:', error);
-      res.status(500).json({ message: "Error exporting leads" });
+      console.error('Error fetching leads by status:', error);
+      res.status(500).json({ message: "Error fetching leads by status" });
     }
   });
 
-  // 21. GET /api/leads/metrics - Calculate and return metrics
-  app.get("/api/leads/metrics", async (req, res) => {
+  // 6. GET /api/leads/active - Get active leads (not won/lost)
+  app.get("/api/leads/active", async (req, res) => {
     try {
-      const allLeads = await storage.getAllLeads();
-      const activeLeads = allLeads.filter(lead => !lead.won && !lead.lost);
-      const wonLeads = allLeads.filter(lead => lead.won);
-      const lostLeads = allLeads.filter(lead => lead.lost);
+      const leads = await storage.getActiveLeads();
+      res.json(leads);
+    } catch (error) {
+      console.error('Error fetching active leads:', error);
+      res.status(500).json({ message: "Error fetching active leads" });
+    }
+  });
 
-      // Calculate pipeline value
-      const pipelineValue = activeLeads.reduce((sum, lead) => {
-        const value = parseFloat(lead.estimatedValue || '0');
-        return sum + value;
-      }, 0);
+  // 7. GET /api/leads/won - Get won leads
+  app.get("/api/leads/won", async (req, res) => {
+    try {
+      const leads = await storage.getWonLeads();
+      res.json(leads);
+    } catch (error) {
+      console.error('Error fetching won leads:', error);
+      res.status(500).json({ message: "Error fetching won leads" });
+    }
+  });
 
-      // Calculate conversion rate
-      const totalClosed = wonLeads.length + lostLeads.length;
-      const conversionRate = totalClosed > 0 
-        ? (wonLeads.length / totalClosed) * 100 
-        : 0;
+  // 8. GET /api/leads/lost - Get lost leads
+  app.get("/api/leads/lost", async (req, res) => {
+    try {
+      const leads = await storage.getLostLeads();
+      res.json(leads);
+    } catch (error) {
+      console.error('Error fetching lost leads:', error);
+      res.status(500).json({ message: "Error fetching lost leads" });
+    }
+  });
 
-      // Count pending actions
-      const pendingActions = allLeads.reduce((count, lead) => {
-        const incomplete = (lead.nextActions || []).filter(action => !action.completed);
-        return count + incomplete.length;
-      }, 0);
+  // 9. GET /api/leads/:id - Get single lead
+  app.get("/api/leads/:id", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+      res.json(lead);
+    } catch (error) {
+      console.error('Error fetching lead:', error);
+      res.status(500).json({ message: "Error fetching lead" });
+    }
+  });
 
-      // Count recent completions (last 7 days)
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  // 10. POST /api/leads - Create new lead
+  app.post("/api/leads", async (req, res) => {
+    try {
+      const validatedData = insertLeadSchema.parse(req.body);
+      const lead = await storage.createLead(validatedData);
+      res.json(lead);
+    } catch (error) {
+      console.error('Error creating lead:', error);
+      res.status(400).json({ message: "Invalid lead data" });
+    }
+  });
+
+  // 11. PATCH /api/leads/:id - Update lead
+  app.patch("/api/leads/:id", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
       
-      const recentCompletions = allLeads.reduce((count, lead) => {
-        const recentCompleted = (lead.nextActions || []).filter(action => {
-          if (!action.completed || !action.completedAt) return false;
-          const completedDate = new Date(action.completedAt);
-          return completedDate >= sevenDaysAgo;
-        });
-        return count + recentCompleted.length;
-      }, 0);
+      const updatedLead = await storage.updateLead(req.params.id, req.body);
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error updating lead:', error);
+      res.status(500).json({ message: "Error updating lead" });
+    }
+  });
 
-      // Build sales funnel
-      const salesFunnel = {
-        New: { count: 0, value: 0 },
-        Contacted: { count: 0, value: 0 },
-        'Quote Sent': { count: 0, value: 0 },
-        Negotiating: { count: 0, value: 0 },
-        Won: { count: 0, value: 0 },
-        Lost: { count: 0, value: 0 }
+  // 12. DELETE /api/leads/:id - Delete lead
+  app.delete("/api/leads/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteLead(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+      res.json({ message: "Lead deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      res.status(500).json({ message: "Error deleting lead" });
+    }
+  });
+
+  // 13. PATCH /api/leads/:id/status - Update lead status
+  app.patch("/api/leads/:id/status", async (req, res) => {
+    try {
+      const { status } = req.body;
+      if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+      }
+
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const updatedLead = await storage.updateLead(req.params.id, { status });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error updating lead status:', error);
+      res.status(500).json({ message: "Error updating lead status" });
+    }
+  });
+
+  // 14. PATCH /api/leads/:id/mark-won - Mark lead as won
+  app.patch("/api/leads/:id/mark-won", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const updatedLead = await storage.updateLead(req.params.id, {
+        won: true,
+        lost: false,
+        closedAt: new Date(),
+        status: "Won"
+      });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error marking lead as won:', error);
+      res.status(500).json({ message: "Error marking lead as won" });
+    }
+  });
+
+  // 15. PATCH /api/leads/:id/mark-lost - Mark lead as lost
+  app.patch("/api/leads/:id/mark-lost", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const updatedLead = await storage.updateLead(req.params.id, {
+        lost: true,
+        won: false,
+        closedAt: new Date(),
+        status: "Lost"
+      });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error marking lead as lost:', error);
+      res.status(500).json({ message: "Error marking lead as lost" });
+    }
+  });
+
+  // 16. POST /api/leads/:id/actions - Add action to lead
+  app.post("/api/leads/:id/actions", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const { text } = req.body;
+      if (!text) {
+        return res.status(400).json({ message: "Action text is required" });
+      }
+
+      const newAction = {
+        id: randomUUID(),
+        text,
+        completed: false,
+        createdAt: new Date().toISOString()
       };
 
-      allLeads.forEach(lead => {
-        const status = lead.status || 'New';
-        const value = parseFloat(lead.estimatedValue || '0');
-        
-        if (salesFunnel[status as keyof typeof salesFunnel]) {
-          salesFunnel[status as keyof typeof salesFunnel].count++;
-          salesFunnel[status as keyof typeof salesFunnel].value += value;
+      const nextActions = [...(lead.nextActions || []), newAction];
+      const updatedLead = await storage.updateLead(req.params.id, { nextActions });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error adding action:', error);
+      res.status(500).json({ message: "Error adding action" });
+    }
+  });
+
+  // 17. PATCH /api/leads/:id/actions/:actionId - Toggle action complete
+  app.patch("/api/leads/:id/actions/:actionId", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const nextActions = (lead.nextActions || []).map(action => {
+        if (action.id === req.params.actionId) {
+          return {
+            ...action,
+            completed: !action.completed,
+            completedAt: !action.completed ? new Date().toISOString() : undefined
+          };
         }
+        return action;
       });
 
-      res.json({
-        activeLeads: activeLeads.length,
-        pipelineValue: pipelineValue.toFixed(2),
-        conversionRate: conversionRate.toFixed(1),
-        pendingActions,
-        recentCompletions,
-        salesFunnel
-      });
+      const updatedLead = await storage.updateLead(req.params.id, { nextActions });
+      res.json(updatedLead);
     } catch (error) {
-      console.error('Error calculating metrics:', error);
-      res.status(500).json({ message: "Error calculating metrics" });
+      console.error('Error toggling action:', error);
+      res.status(500).json({ message: "Error toggling action" });
+    }
+  });
+
+  // 18. DELETE /api/leads/:id/actions/:actionId - Delete action
+  app.delete("/api/leads/:id/actions/:actionId", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const nextActions = (lead.nextActions || []).filter(
+        action => action.id !== req.params.actionId
+      );
+
+      const updatedLead = await storage.updateLead(req.params.id, { nextActions });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error deleting action:', error);
+      res.status(500).json({ message: "Error deleting action" });
+    }
+  });
+
+  // 19. POST /api/leads/:id/tasks - Add scheduled task to lead
+  app.post("/api/leads/:id/tasks", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const { text, scheduledDate } = req.body;
+      if (!text || !scheduledDate) {
+        return res.status(400).json({ message: "Task text and scheduled date are required" });
+      }
+
+      const newTask = {
+        id: randomUUID(),
+        text,
+        scheduledDate,
+        completed: false,
+        createdAt: new Date().toISOString()
+      };
+
+      const scheduledTasks = [...(lead.scheduledTasks || []), newTask];
+      const updatedLead = await storage.updateLead(req.params.id, { scheduledTasks });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error adding task:', error);
+      res.status(500).json({ message: "Error adding task" });
+    }
+  });
+
+  // 20. PATCH /api/leads/:id/tasks/:taskId - Toggle task complete
+  app.patch("/api/leads/:id/tasks/:taskId", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const scheduledTasks = (lead.scheduledTasks || []).map(task => {
+        if (task.id === req.params.taskId) {
+          return {
+            ...task,
+            completed: !task.completed,
+            completedAt: !task.completed ? new Date().toISOString() : undefined
+          };
+        }
+        return task;
+      });
+
+      const updatedLead = await storage.updateLead(req.params.id, { scheduledTasks });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error toggling task:', error);
+      res.status(500).json({ message: "Error toggling task" });
+    }
+  });
+
+  // 21. DELETE /api/leads/:id/tasks/:taskId - Delete task
+  app.delete("/api/leads/:id/tasks/:taskId", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const scheduledTasks = (lead.scheduledTasks || []).filter(
+        task => task.id !== req.params.taskId
+      );
+
+      const updatedLead = await storage.updateLead(req.params.id, { scheduledTasks });
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      res.status(500).json({ message: "Error deleting task" });
     }
   });
 
