@@ -57,6 +57,7 @@ export default function SalesProspects() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
       toast({ description: "Lead created successfully", duration: 1000 });
       setIsCreateDialogOpen(false);
     },
@@ -70,6 +71,7 @@ export default function SalesProspects() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
       toast({ description: "Lead updated successfully", duration: 1000 });
     },
   });
@@ -81,6 +83,7 @@ export default function SalesProspects() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
       toast({ description: "Lead deleted successfully", duration: 1000 });
     },
   });
@@ -93,6 +96,7 @@ export default function SalesProspects() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
       toast({ description: "Lead marked as won!", duration: 1000 });
     },
   });
@@ -105,6 +109,7 @@ export default function SalesProspects() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
       toast({ description: "Lead marked as lost", duration: 1000 });
     },
   });
@@ -117,6 +122,7 @@ export default function SalesProspects() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
       toast({ description: "Action added", duration: 1000 });
     },
   });
@@ -129,6 +135,7 @@ export default function SalesProspects() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
     },
   });
 
@@ -139,6 +146,7 @@ export default function SalesProspects() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
       toast({ description: "Action deleted", duration: 1000 });
     },
   });
@@ -151,6 +159,7 @@ export default function SalesProspects() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
       toast({ description: "Task added", duration: 1000 });
     },
   });
@@ -163,6 +172,7 @@ export default function SalesProspects() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
     },
   });
 
@@ -173,6 +183,7 @@ export default function SalesProspects() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
       toast({ description: "Task deleted", duration: 1000 });
     },
   });
@@ -191,6 +202,7 @@ export default function SalesProspects() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
       toast({
         description: `Import complete: ${data.created} created, ${data.updated} updated, ${data.skipped} skipped`,
         duration: 1000,
