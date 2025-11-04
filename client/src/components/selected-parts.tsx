@@ -12,7 +12,7 @@ interface SelectedPartsProps {
     tax: string;
     total: string;
     partsSubtotal?: string;
-    freePartsSubtotal?: string;
+    ghvacCoveredParts?: string;
     materialShrinkage?: string;
     adjustedPartsTotal?: string;
     baseLaborCost?: string;
@@ -25,7 +25,9 @@ interface SelectedPartsProps {
     profit?: string;
     financingCost?: string;
     commission?: string;
-    warrantyDiscount?: number;
+    fullSellingPrice?: string;
+    priceBeforeWarranty?: string;
+    warrantyCoverage?: number;
     isGHVACWarranty?: boolean;
   };
   onUpdate: (updates: { parts: QuotePart[] }) => void;
@@ -144,13 +146,13 @@ export default function SelectedParts({ parts, totals, onUpdate, disabled = fals
               {/* Parts Section */}
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Charged Parts:</span>
+                  <span className="text-muted-foreground">All Parts:</span>
                   <span className="font-medium">${totals.partsSubtotal}</span>
                 </div>
-                {totals.freePartsSubtotal && parseFloat(totals.freePartsSubtotal) > 0 && (
+                {totals.ghvacCoveredParts && parseFloat(totals.ghvacCoveredParts) > 0 && (
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Free (Warranty Parts):</span>
-                    <span className="text-green-600 dark:text-green-400">${totals.freePartsSubtotal}</span>
+                    <span className="text-muted-foreground">GHVAC Covered (Control Board, Evap Coil, Compressor):</span>
+                    <span className="text-green-600 dark:text-green-400">-${totals.ghvacCoveredParts}</span>
                   </div>
                 )}
                 {totals.materialShrinkage && parseFloat(totals.materialShrinkage) > 0 && (
@@ -251,18 +253,59 @@ export default function SelectedParts({ parts, totals, onUpdate, disabled = fals
 
               <div className="border-t border-border my-2"></div>
 
-              {/* Final Total */}
-              <div className="flex justify-between items-center pt-2 bg-primary/10 p-3 rounded">
-                <span className="font-bold text-foreground">Selling Price:</span>
-                <span className="text-xl font-bold text-primary" data-testid="text-total-detailed">
-                  ${totals.total}
-                </span>
-              </div>
+              {/* Final Total with Warranty Calculation */}
+              {totals.isGHVACWarranty && totals.warrantyCoverage && totals.warrantyCoverage > 0 ? (
+                <>
+                  {/* Full Selling Price */}
+                  {totals.fullSellingPrice && (
+                    <div className="flex justify-between items-center bg-muted/30 p-2 rounded">
+                      <span className="font-medium">Full Selling Price:</span>
+                      <span className="font-medium">${totals.fullSellingPrice}</span>
+                    </div>
+                  )}
+                  
+                  {/* GHVAC Covered Parts Subtraction */}
+                  {totals.ghvacCoveredParts && parseFloat(totals.ghvacCoveredParts) > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground text-xs">Less: GHVAC Covered Parts</span>
+                      <span className="text-green-600 dark:text-green-400 text-sm">-${totals.ghvacCoveredParts}</span>
+                    </div>
+                  )}
+                  
+                  {/* Price Before Warranty */}
+                  {totals.priceBeforeWarranty && (
+                    <div className="flex justify-between items-center bg-muted/20 p-2 rounded">
+                      <span className="font-medium text-sm">Price Before Warranty:</span>
+                      <span className="font-medium">${totals.priceBeforeWarranty}</span>
+                    </div>
+                  )}
+                  
+                  {/* Warranty Coverage */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground text-xs">Customer Pays (Warranty Coverage):</span>
+                    <span className="text-sm font-medium">{(totals.warrantyCoverage * 100).toFixed(0)}%</span>
+                  </div>
 
-              {/* Warranty Info */}
-              {totals.isGHVACWarranty && totals.warrantyDiscount && totals.warrantyDiscount > 0 && (
-                <div className="mt-2 p-2 bg-green-50 dark:bg-green-950 rounded text-xs text-green-700 dark:text-green-300">
-                  ✓ GHVAC Warranty Active: {(totals.warrantyDiscount * 100).toFixed(0)}% discount applied on materials and labor
+                  <div className="border-t-2 border-primary my-2"></div>
+                  
+                  {/* Customer Total */}
+                  <div className="flex justify-between items-center pt-2 bg-green-50 dark:bg-green-950 p-3 rounded">
+                    <span className="font-bold text-foreground">Customer Pays:</span>
+                    <span className="text-xl font-bold text-green-700 dark:text-green-400" data-testid="text-total-detailed">
+                      ${totals.total}
+                    </span>
+                  </div>
+
+                  <div className="mt-2 p-2 bg-green-50 dark:bg-green-950 rounded text-xs text-green-700 dark:text-green-300">
+                    ✓ GHVAC Warranty Active: Customer pays {(totals.warrantyCoverage * 100).toFixed(0)}% of non-covered costs. GHVAC covers control board, evap coil, and compressor.
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between items-center pt-2 bg-primary/10 p-3 rounded">
+                  <span className="font-bold text-foreground">Selling Price:</span>
+                  <span className="text-xl font-bold text-primary" data-testid="text-total-detailed">
+                    ${totals.total}
+                  </span>
                 </div>
               )}
             </div>

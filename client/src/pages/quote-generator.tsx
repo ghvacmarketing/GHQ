@@ -121,88 +121,68 @@ export default function QuoteGenerator() {
     // Check if warranty applies (GHVAC installation)
     const isGHVACWarranty = quoteData.ghvacInstalled === true && quoteData.yearsSinceInstallation;
     const warrantyYears = isGHVACWarranty ? parseInt(quoteData.yearsSinceInstallation!) : 0;
-    const warrantyDiscounts = settings.warrantyDiscounts || {
+    const warrantyCoverage = settings.warrantyDiscounts || {
       2: 0.25, 3: 0.35, 4: 0.45, 5: 0.50, 6: 0.55, 
       7: 0.65, 8: 0.70, 9: 0.80, 10: 0.90
     };
-    const warrantyDiscountPercent = isGHVACWarranty ? (warrantyDiscounts[warrantyYears] || 0) : 0;
+    const warrantyCoveragePercent = isGHVACWarranty ? (warrantyCoverage[warrantyYears] || 0) : 0;
 
-    // Parts subtotal with warranty logic
-    let partsSubtotal = 0; // Charged parts (materials + unwarrantied parts)
-    let freePartsSubtotal = 0; // Track parts made free by warranty
+    // STEP 1: Separate GHVAC-covered parts from customer-responsible parts
+    let customerPartsCost = 0; // Parts customer is responsible for
+    let ghvacCoveredPartsCost = 0; // Parts GHVAC pays for (control board, evap coil, compressor)
     
     quoteData.parts.forEach(part => {
       const partCost = parseFloat(part.price) * (part.quantity || 1);
+      const description = part.description.toLowerCase();
       
-      if (isGHVACWarranty) {
-        // For GHVAC warranty:
-        // - Parts category: FREE under manufacturer warranty
-        // - Materials category: NOT warrantied, charged at discount
-        // - Custom parts with warranty=false: NOT warrantied, charged at discount
-        
-        if (part.category === "Materials" || (part.isCustom && part.warranty === false)) {
-          // Materials and unwarrantied custom parts - charge at discounted rate
-          partsSubtotal += partCost;
-        } else {
-          // Parts category - free under manufacturer warranty
-          freePartsSubtotal += partCost;
-        }
+      // Identify specific GHVAC-covered parts by description
+      const isGHVACCovered = isGHVACWarranty && (
+        description.includes('control board') ||
+        description.includes('evaporator coil') ||
+        description.includes('evap coil') ||
+        description.includes('compressor')
+      );
+      
+      if (isGHVACCovered) {
+        ghvacCoveredPartsCost += partCost;
       } else {
-        // No warranty - charge full price for all parts
-        partsSubtotal += partCost;
+        customerPartsCost += partCost;
       }
     });
 
-    // Apply material shrinkage (3%) only to charged parts that are shrinkage materials
+    // STEP 2: Calculate material shrinkage (only on customer-responsible parts)
     const materialShrinkagePercent = settings.materialShrinkagePercent || 0.03;
     const shrinkageMaterials = ['refrigerant filter dryer', 'copper', 'armaflex insulation', 'acid away'];
     
     const shrinkagePartsTotal = quoteData.parts.reduce((sum, part) => {
       const description = part.description.toLowerCase();
-      const isShrinkagematerial = shrinkageMaterials.some(material => 
+      const isShrinkageMaterial = shrinkageMaterials.some(material => 
         description.includes(material)
       );
       
-      if (isShrinkagematerial) {
+      // Only count shrinkage on parts the customer is paying for
+      const isGHVACCovered = isGHVACWarranty && (
+        description.includes('control board') ||
+        description.includes('evaporator coil') ||
+        description.includes('evap coil') ||
+        description.includes('compressor')
+      );
+      
+      if (isShrinkageMaterial && !isGHVACCovered) {
         const partCost = parseFloat(part.price) * (part.quantity || 1);
-        // Only apply shrinkage to parts that are actually being charged
-        if (isGHVACWarranty) {
-          // Only charge shrinkage if this part isn't free under warranty
-          if (part.isCustom && part.warranty === false) {
-            return sum + partCost;
-          }
-          return sum; // Part is free, no shrinkage charge
-        } else {
-          return sum + partCost; // No warranty, charge shrinkage
-        }
+        return sum + partCost;
       }
       return sum;
     }, 0);
     
     const materialShrinkageCost = shrinkagePartsTotal * materialShrinkagePercent;
     
-    // Materials cost (parts + shrinkage) - apply warranty pricing to materials
-    // The warranty percentage represents what the customer pays, not the discount
-    let materialsCost = partsSubtotal + materialShrinkageCost;
-    if (isGHVACWarranty && warrantyDiscountPercent > 0) {
-      materialsCost = materialsCost * warrantyDiscountPercent;
-    }
-    
-    const adjustedPartsTotal = materialsCost;
-
-    // Labor calculation using live Google Sheets data
+    // STEP 3: Calculate labor
     const hours = parseFloat(quoteData.laborHours || "1");
-    let laborRate = settings.laborRate || 65; // Use live rate from Google Sheets
-    
-    // Apply warranty pricing to labor if GHVAC installation
-    // The warranty percentage represents what the customer pays, not the discount
-    if (isGHVACWarranty && warrantyDiscountPercent > 0) {
-      laborRate = laborRate * warrantyDiscountPercent;
-    }
-    
+    const laborRate = settings.laborRate || 65;
     const baseLaborCost = laborRate * hours;
     
-    // All percentages now come live from Google Sheets
+    // STEP 4: All percentages and constants
     const laborBenefitsPercent = settings.laborBenefitsPercent || 0.34;
     const salesTaxPercent = settings.salesTaxPercent || 0.08;
     const warrantyReserve = settings.warrantyReserve || 25.00;
@@ -211,50 +191,64 @@ export default function QuoteGenerator() {
     const financingPercent = settings.financingPromotionPercent || 0.04;
     const commissionPercent = settings.commissionPercent || 0.03;
     
-    // Labor benefits calculation
     const laborBenefits = baseLaborCost * laborBenefitsPercent;
     const totalLaborCost = baseLaborCost + laborBenefits;
     
-    // Sales tax applies ONLY to parts/materials, NOT labor
-    const salesTax = adjustedPartsTotal * salesTaxPercent;
-    
-    // Direct cost total (E40 equivalent)
-    const directCost = adjustedPartsTotal + totalLaborCost + salesTax + warrantyReserve;
-    
-    // Core pricing formula (E46 equivalent)
-    // Selling Price = Direct Costs ÷ (1 - total deduction rate)
+    // STEP 5: Calculate FULL selling price (with ALL parts for display)
+    const allPartsSubtotal = customerPartsCost + ghvacCoveredPartsCost;
+    const allPartsWithShrinkage = allPartsSubtotal + materialShrinkageCost;
+    const fullSalesTax = allPartsWithShrinkage * salesTaxPercent;
+    const fullDirectCost = allPartsWithShrinkage + totalLaborCost + fullSalesTax + warrantyReserve;
     const totalDeductionRate = overheadPercent + profitPercent + financingPercent + commissionPercent;
-    const remainingRate = 1.0 - totalDeductionRate; // 1 - 0.58 = 0.42
-    const sellingPrice = directCost / remainingRate;
+    const remainingRate = 1.0 - totalDeductionRate;
+    const fullSellingPrice = fullDirectCost / remainingRate;
     
-    // Calculate allocations based on selling price
-    const overhead = sellingPrice * overheadPercent;
-    const profit = sellingPrice * profitPercent;
-    const financingCost = sellingPrice * financingPercent;
-    const commission = sellingPrice * commissionPercent;
+    // STEP 6: Calculate CUSTOMER selling price (only parts customer pays for)
+    const customerPartsWithShrinkage = customerPartsCost + materialShrinkageCost;
+    const customerSalesTax = customerPartsWithShrinkage * salesTaxPercent;
+    const customerDirectCost = customerPartsWithShrinkage + totalLaborCost + customerSalesTax + warrantyReserve;
+    const customerSellingPrice = customerDirectCost / remainingRate;
+    
+    // STEP 7: Apply warranty coverage percentage
+    let customerTotal = fullSellingPrice;
+    let priceBeforeWarranty = fullSellingPrice;
+    
+    if (isGHVACWarranty && warrantyCoveragePercent > 0) {
+      // Customer pays warranty% of the price calculated without GHVAC parts
+      customerTotal = customerSellingPrice * warrantyCoveragePercent;
+      priceBeforeWarranty = customerSellingPrice;
+    }
+    
+    // Calculate allocations based on full selling price (for transparency)
+    const overhead = fullSellingPrice * overheadPercent;
+    const profit = fullSellingPrice * profitPercent;
+    const financingCost = fullSellingPrice * financingPercent;
+    const commission = fullSellingPrice * commissionPercent;
 
     return {
-      partsSubtotal: partsSubtotal.toFixed(2),
-      freePartsSubtotal: freePartsSubtotal.toFixed(2), // Track free parts value
+      partsSubtotal: allPartsSubtotal.toFixed(2),
+      ghvacCoveredParts: ghvacCoveredPartsCost.toFixed(2),
       materialShrinkage: materialShrinkageCost.toFixed(2),
-      adjustedPartsTotal: adjustedPartsTotal.toFixed(2),
+      adjustedPartsTotal: allPartsWithShrinkage.toFixed(2),
       baseLaborCost: baseLaborCost.toFixed(2),
       laborBenefits: laborBenefits.toFixed(2),
       totalLaborCost: totalLaborCost.toFixed(2),
-      salesTax: salesTax.toFixed(2),
+      salesTax: fullSalesTax.toFixed(2),
       warrantyReserve: warrantyReserve.toFixed(2),
-      directCost: directCost.toFixed(2),
+      directCost: fullDirectCost.toFixed(2),
       overhead: overhead.toFixed(2),
       profit: profit.toFixed(2),
       financingCost: financingCost.toFixed(2),
       commission: commission.toFixed(2),
-      total: sellingPrice.toFixed(2),
-      warrantyDiscount: warrantyDiscountPercent,
-      isGHVACWarranty: isGHVACWarranty,
+      fullSellingPrice: fullSellingPrice.toFixed(2),
+      priceBeforeWarranty: priceBeforeWarranty.toFixed(2),
+      warrantyCoverage: warrantyCoveragePercent,
+      total: customerTotal.toFixed(2),
+      isGHVACWarranty: Boolean(isGHVACWarranty),
       // Legacy compatibility for display
-      subtotal: partsSubtotal.toFixed(2),
+      subtotal: allPartsSubtotal.toFixed(2),
       labor: baseLaborCost.toFixed(2),
-      tax: salesTax.toFixed(2),
+      tax: fullSalesTax.toFixed(2),
     };
   };
 

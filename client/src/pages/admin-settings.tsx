@@ -2070,10 +2070,10 @@ export default function AdminSettings() {
                           <div className="space-y-1">
                             <div className="font-semibold text-primary">1. Parts & Materials:</div>
                             <div className="ml-4 space-y-1">
-                              <div>• Charged Parts Subtotal = Sum of (Price × Quantity) for Materials + Non-warranty parts</div>
-                              <div>• Free Parts (Warranty) = Parts covered by manufacturer warranty</div>
-                              <div>• Material Shrinkage = Charged Parts × 3% (for specific materials)</div>
-                              <div className="font-medium">→ Adjusted Parts Total = (Charged Parts + Shrinkage) × Warranty Discount (if applicable)</div>
+                              <div>• All Parts Subtotal = Sum of (Price × Quantity) for ALL parts</div>
+                              <div>• Material Shrinkage = Specific Materials × 3% (refrigerant filter, copper, insulation, acid away)</div>
+                              <div className="font-medium">→ Adjusted Parts Total = All Parts + Material Shrinkage</div>
+                              <div className="text-xs text-muted-foreground">Note: Warranty is applied AFTER calculating full selling price (see step 6)</div>
                             </div>
                           </div>
 
@@ -2123,15 +2123,26 @@ export default function AdminSettings() {
                           </div>
 
                           {/* Warranty Logic */}
-                          <div className="space-y-1 mt-3">
-                            <div className="font-semibold text-primary">6. GHVAC Warranty Discounts:</div>
-                            <div className="ml-4 space-y-1 text-xs">
-                              <div>• 2 years: 25% discount</div>
-                              <div>• 3 years: 35% discount</div>
-                              <div>• 4 years: 45% discount</div>
-                              <div>• 5 years: 50% discount</div>
-                              <div>• 6+ years: 55-90% discount</div>
-                              <div className="text-muted-foreground mt-1">Applied to materials and labor when GHVAC installation confirmed</div>
+                          <div className="space-y-1 mt-3 bg-green-50 dark:bg-green-950 p-3 rounded">
+                            <div className="font-semibold text-primary">6. GHVAC Warranty Coverage:</div>
+                            <div className="ml-4 space-y-2 text-xs">
+                              <div className="font-medium">When warranty applies:</div>
+                              <div className="ml-2 space-y-1">
+                                <div>1. Calculate Full Selling Price (all parts included)</div>
+                                <div>2. Identify GHVAC-Covered Parts: Control Board, Evap Coil, Compressor</div>
+                                <div>3. Subtract GHVAC-Covered Parts from Full Price</div>
+                                <div>4. Customer Pays = Coverage% × (Full Price - GHVAC-Covered Parts)</div>
+                              </div>
+                              <div className="mt-2 font-medium border-t border-green-200 dark:border-green-800 pt-2">Coverage Percentages (what customer pays):</div>
+                              <div className="ml-2 space-y-0.5">
+                                <div>• Year 2: 25% | Year 3: 35% | Year 4: 45%</div>
+                                <div>• Year 5: 50% | Year 6: 55% | Year 7: 65%</div>
+                                <div>• Year 8: 70% | Year 9: 80% | Year 10: 90%</div>
+                              </div>
+                              <div className="text-muted-foreground mt-2 italic">
+                                Example: $1000 total with $200 control board, Year 2 (25%) warranty<br/>
+                                Customer pays: 25% × ($1000 - $200) = $200
+                              </div>
                             </div>
                           </div>
                         </div>
