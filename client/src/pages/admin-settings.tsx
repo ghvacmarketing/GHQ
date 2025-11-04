@@ -2108,25 +2108,19 @@ export default function AdminSettings() {
                           <div className="space-y-1 mt-3">
                             <div className="font-semibold text-primary">5. Selling Price Calculation:</div>
                             <div className="ml-4 space-y-1">
+                              <div className="mb-2">
+                                <div>• Overhead = {((settings?.overheadPercent || 0.30) * 100).toFixed(0)}%</div>
+                                <div>• Profit = {((settings?.profitPercent || 0.15) * 100).toFixed(0)}%</div>
+                                <div>• Financing = {((settings?.financingPromotionPercent || 0.03) * 100).toFixed(0)}%</div>
+                                <div>• Commission = {((settings?.commissionPercent || 0.03) * 100).toFixed(0)}%</div>
+                              </div>
+                              <div className="mt-2">Total Deduction Rate = {((settings?.overheadPercent || 0.30) * 100).toFixed(0)}% + {((settings?.profitPercent || 0.15) * 100).toFixed(0)}% + {((settings?.financingPromotionPercent || 0.03) * 100).toFixed(0)}% + {((settings?.commissionPercent || 0.03) * 100).toFixed(0)}% = {(((settings?.overheadPercent || 0.30) + (settings?.profitPercent || 0.15) + (settings?.financingPromotionPercent || 0.03) + (settings?.commissionPercent || 0.03)) * 100).toFixed(0)}%</div>
                               <div className="font-medium text-lg mt-2 bg-green-50 dark:bg-green-950 p-2 rounded">
-                                <strong>Selling Price = Direct Cost ÷ (1 - Overhead%)</strong>
+                                <strong>Selling Price = Direct Cost ÷ (1 - Total Deduction Rate)</strong>
                               </div>
-                              <div className="mt-2">• Overhead = {((settings?.overheadPercent || 0.30) * 100).toFixed(0)}%</div>
                               <div className="text-xs text-muted-foreground mt-2">
-                                Example: If Direct Cost = $1,000, Selling Price = $1,000 ÷ (1 - 0.30) = $1,000 ÷ 0.70 = $1,428.57
+                                Example: If Direct Cost = $1,000, Selling Price = $1,000 ÷ (1 - {(((settings?.overheadPercent || 0.30) + (settings?.profitPercent || 0.15) + (settings?.financingPromotionPercent || 0.03) + (settings?.commissionPercent || 0.03)) * 100).toFixed(0)}%) = $1,000 ÷ {(1 - ((settings?.overheadPercent || 0.30) + (settings?.profitPercent || 0.15) + (settings?.financingPromotionPercent || 0.03) + (settings?.commissionPercent || 0.03))).toFixed(2)} = ${(1000 / (1 - ((settings?.overheadPercent || 0.30) + (settings?.profitPercent || 0.15) + (settings?.financingPromotionPercent || 0.03) + (settings?.commissionPercent || 0.03)))).toFixed(2)}
                               </div>
-                            </div>
-                          </div>
-
-                          {/* Informational Breakdowns */}
-                          <div className="space-y-1 mt-3 bg-blue-50 dark:bg-blue-950 p-3 rounded">
-                            <div className="font-semibold text-primary">6. Informational Breakdowns (Not Added to Price):</div>
-                            <div className="ml-4 space-y-1 text-xs">
-                              <div className="text-muted-foreground mb-2">These are calculated FROM the selling price for transparency but are NOT added to the customer's total:</div>
-                              <div>• Profit ({((settings?.profitPercent || 0.15) * 100).toFixed(0)}%) = Selling Price × {((settings?.profitPercent || 0.15) * 100).toFixed(0)}%</div>
-                              <div>• Financing ({((settings?.financingPromotionPercent || 0.03) * 100).toFixed(0)}%) = Selling Price × {((settings?.financingPromotionPercent || 0.03) * 100).toFixed(0)}%</div>
-                              <div>• Commission ({((settings?.commissionPercent || 0.03) * 100).toFixed(0)}%) = Selling Price × {((settings?.commissionPercent || 0.03) * 100).toFixed(0)}%</div>
-                              <div className="mt-2 text-muted-foreground italic">These values show where the money goes but do not increase the price.</div>
                             </div>
                           </div>
 

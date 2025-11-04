@@ -30,11 +30,10 @@ Preferred communication style: Simple, everyday language.
 - **Pricing**: Google Sheets as source of truth, server-side caching, real-time updates, custom parts support.
 - **Quote Generation**: Text-based output, server-side calculation (subtotals, labor, tax, totals), warranty logic. The `laborHours` field is persisted in the database to ensure accurate recalculation when editing quotes.
 - **Pricing Formula** (Updated Nov 2025):
-  - **Selling Price = Direct Cost ÷ (1 - Overhead%)**
+  - **Selling Price = Direct Cost ÷ (1 - (Overhead% + Profit% + Financing% + Commission%))**
   - Direct Cost = Parts + Material Shrinkage + Labor + Labor Benefits + Sales Tax + Warranty Reserve
-  - Only overhead is applied as markup to calculate selling price
-  - Profit, financing, and commission are calculated FROM the selling price for transparency but are NOT added to the customer's total
-  - These informational breakdowns show where revenue is allocated but do not inflate the price
+  - All percentages (overhead, profit, financing, commission) are included in the divisor to calculate selling price
+  - This ensures all costs and margins are properly accounted for in the final customer price
 - **Warranty Calculation Logic** (Updated Nov 2025): 
   - GHVAC covers specific parts at 100%: control board, evaporator coil, and compressor (identified by description matching)
   - Dual selling price calculation: (1) Full Selling Price with ALL parts for transparency, (2) Customer Selling Price excluding GHVAC-covered parts
