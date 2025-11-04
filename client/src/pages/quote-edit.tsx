@@ -189,19 +189,19 @@ export default function QuoteEdit() {
     const totalLaborCost = baseLaborCost + laborBenefits;
     
     // STEP 5: Calculate FULL selling price (with ALL parts for display)
+    // Selling price = Direct Cost / (1 - Overhead%)
+    // Profit, financing, and commission are calculated FROM selling price but NOT added to it
     const allPartsSubtotal = customerPartsCost + ghvacCoveredPartsCost;
     const allPartsWithShrinkage = allPartsSubtotal + materialShrinkageCost;
     const fullSalesTax = allPartsWithShrinkage * salesTaxPercent;
     const fullDirectCost = allPartsWithShrinkage + totalLaborCost + fullSalesTax + warrantyReserve;
-    const totalDeductionRate = overheadPercent + profitPercent + financingPercent + commissionPercent;
-    const remainingRate = 1.0 - totalDeductionRate;
-    const fullSellingPrice = fullDirectCost / remainingRate;
+    const fullSellingPrice = fullDirectCost / (1.0 - overheadPercent);
     
     // STEP 6: Calculate CUSTOMER selling price (only parts customer pays for)
     const customerPartsWithShrinkage = customerPartsCost + materialShrinkageCost;
     const customerSalesTax = customerPartsWithShrinkage * salesTaxPercent;
     const customerDirectCost = customerPartsWithShrinkage + totalLaborCost + customerSalesTax + warrantyReserve;
-    const customerSellingPrice = customerDirectCost / remainingRate;
+    const customerSellingPrice = customerDirectCost / (1.0 - overheadPercent);
     
     // STEP 7: Apply warranty coverage percentage
     let customerTotal = fullSellingPrice;
