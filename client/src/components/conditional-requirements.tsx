@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Plus, X, CheckCircle } from "lucide-react";
@@ -114,6 +115,13 @@ export default function ConditionalRequirements({ selectedParts, onAddParts, onA
 
   const isRequirementComplete = (req: ServiceRequirement) => {
     if (!req.systemCapacity) return false;
+    
+    // If systemCapacity is "custom" (not yet entered), it's not complete
+    if (req.systemCapacity === 'custom') return false;
+    
+    // Validate that systemCapacity is a valid number
+    const capacity = parseFloat(req.systemCapacity);
+    if (isNaN(capacity) || capacity <= 0) return false;
     
     if (req.serviceType === "compressor") {
       // Need either failure type OR acid test result
@@ -287,10 +295,16 @@ export default function ConditionalRequirements({ selectedParts, onAddParts, onA
             <div>
               <Label className="text-xs font-medium">System Capacity (lbs)</Label>
               <Select
-                value={req.systemCapacity}
-                onValueChange={(value) => updateRequirement(req.partId, { systemCapacity: value })}
+                value={req.systemCapacity === 'custom' || (req.systemCapacity && !['2', '3', '4', '6', '8', '10'].includes(req.systemCapacity)) ? 'custom' : req.systemCapacity}
+                onValueChange={(value) => {
+                  if (value === 'custom') {
+                    updateRequirement(req.partId, { systemCapacity: 'custom' });
+                  } else {
+                    updateRequirement(req.partId, { systemCapacity: value });
+                  }
+                }}
               >
-                <SelectTrigger className="h-8 text-xs">
+                <SelectTrigger className="h-8 text-xs" data-testid={`select-capacity-${req.partId}`}>
                   <SelectValue placeholder="Select capacity" />
                 </SelectTrigger>
                 <SelectContent>
@@ -300,8 +314,28 @@ export default function ConditionalRequirements({ selectedParts, onAddParts, onA
                   <SelectItem value="6">6 lbs (Small Commercial)</SelectItem>
                   <SelectItem value="8">8 lbs (Medium Commercial)</SelectItem>
                   <SelectItem value="10">10 lbs (Large Commercial)</SelectItem>
+                  <SelectItem value="custom">Custom Amount</SelectItem>
                 </SelectContent>
               </Select>
+              
+              {/* Custom Amount Input */}
+              {(req.systemCapacity === 'custom' || (req.systemCapacity && !['2', '3', '4', '6', '8', '10'].includes(req.systemCapacity))) && (
+                <div className="mt-2">
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    placeholder="Enter lbs (e.g., 5.5)"
+                    className="h-8 text-xs"
+                    data-testid={`input-custom-capacity-${req.partId}`}
+                    value={req.systemCapacity === 'custom' ? '' : req.systemCapacity || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      updateRequirement(req.partId, { systemCapacity: value });
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Requirements Summary */}
