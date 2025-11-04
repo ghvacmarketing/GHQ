@@ -58,7 +58,7 @@ export default function QuoteEdit() {
   });
 
   // Fetch initial data
-  const { data: initialData } = useQuery({
+  const { data: initialData, isLoading: isLoadingData, isError: isErrorData } = useQuery({
     queryKey: ["/api/initial-data"],
     staleTime: 30000,
     gcTime: 60000,
@@ -110,15 +110,40 @@ export default function QuoteEdit() {
   });
 
   const calculateTotals = () => {
-    if (!settings || (!quoteData.parts.length && !quoteData.laborHours)) return null;
+    // Don't validate while data is still loading
+    if (isLoadingData) return null;
+    
+    // Validate that all required settings are loaded from Google Sheets
+    // This check happens BEFORE the empty quote check to ensure errors are shown immediately
+    if (!settings || 
+        settings.laborRate === undefined ||
+        settings.laborBenefitsPercent === undefined ||
+        settings.salesTaxPercent === undefined ||
+        settings.warrantyReserve === undefined ||
+        settings.materialShrinkagePercent === undefined ||
+        settings.overheadPercent === undefined ||
+        settings.profitPercent === undefined ||
+        settings.financingPromotionPercent === undefined ||
+        settings.commissionPercent === undefined ||
+        !settings.warrantyDiscounts) {
+      // Only show error if query has actually failed, not during initial load
+      if (isErrorData || initialData) {
+        toast({
+          title: "Settings Not Available",
+          description: "Unable to load pricing settings from Google Sheets. Please check your internet connection and try again.",
+          variant: "destructive",
+        });
+      }
+      return null;
+    }
+    
+    // Only proceed with calculations if there's actual quote data
+    if (!quoteData.parts.length && !quoteData.laborHours) return null;
 
     // Check if warranty applies (GHVAC installation)
     const isGHVACWarranty = quoteData.ghvacInstalled === true && quoteData.yearsSinceInstallation;
     const warrantyYears = isGHVACWarranty ? parseInt(quoteData.yearsSinceInstallation!) : 0;
-    const warrantyCoverage = settings.warrantyDiscounts || {
-      2: 0.25, 3: 0.35, 4: 0.45, 5: 0.50, 6: 0.55, 
-      7: 0.65, 8: 0.70, 9: 0.80, 10: 0.90
-    };
+    const warrantyCoverage = settings.warrantyDiscounts;
     const warrantyCoveragePercent = isGHVACWarranty ? (warrantyCoverage[warrantyYears] || 0) : 0;
 
     // STEP 1: Separate GHVAC-covered parts from customer-responsible parts
@@ -145,7 +170,7 @@ export default function QuoteEdit() {
     });
 
     // STEP 2: Calculate material shrinkage (only on customer-responsible parts)
-    const materialShrinkagePercent = settings.materialShrinkagePercent || 0.03;
+    const materialShrinkagePercent = settings.materialShrinkagePercent;
     const shrinkageMaterials = ['refrigerant filter dryer', 'copper', 'armaflex insulation', 'acid away'];
     
     const shrinkagePartsTotal = quoteData.parts.reduce((sum, part) => {
@@ -173,17 +198,17 @@ export default function QuoteEdit() {
     
     // STEP 3: Calculate labor
     const hours = parseFloat(quoteData.laborHours || "1");
-    const laborRate = settings.laborRate || 65;
+    const laborRate = settings.laborRate;
     const baseLaborCost = laborRate * hours;
     
-    // STEP 4: All percentages and constants
-    const laborBenefitsPercent = settings.laborBenefitsPercent || 0.34;
-    const salesTaxPercent = settings.salesTaxPercent || 0.08;
-    const warrantyReserve = settings.warrantyReserve || 25.00;
-    const overheadPercent = settings.overheadPercent || 0.30;
-    const profitPercent = settings.profitPercent || 0.21;
-    const financingPercent = settings.financingPromotionPercent || 0.04;
-    const commissionPercent = settings.commissionPercent || 0.03;
+    // STEP 4: All percentages and constants (from Google Sheets only, no fallbacks)
+    const laborBenefitsPercent = settings.laborBenefitsPercent;
+    const salesTaxPercent = settings.salesTaxPercent;
+    const warrantyReserve = settings.warrantyReserve;
+    const overheadPercent = settings.overheadPercent;
+    const profitPercent = settings.profitPercent;
+    const financingPercent = settings.financingPromotionPercent;
+    const commissionPercent = settings.commissionPercent;
     
     const laborBenefits = baseLaborCost * laborBenefitsPercent;
     const totalLaborCost = baseLaborCost + laborBenefits;
