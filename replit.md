@@ -29,6 +29,12 @@ Preferred communication style: Simple, everyday language.
 - **Monorepo**: Shared TypeScript types and Zod schemas, unified build, path aliases.
 - **Pricing**: Google Sheets as source of truth, server-side caching, real-time updates, custom parts support.
 - **Quote Generation**: Text-based output, server-side calculation (subtotals, labor, tax, totals), warranty logic. The `laborHours` field is persisted in the database to ensure accurate recalculation when editing quotes.
+- **Warranty Calculation Logic** (Updated Nov 2025): 
+  - GHVAC covers specific parts at 100%: control board, evaporator coil, and compressor (identified by description matching)
+  - Dual selling price calculation: (1) Full Selling Price with ALL parts for transparency, (2) Customer Selling Price excluding GHVAC-covered parts
+  - Warranty coverage percentages (25%-90% by year) represent what the customer PAYS, not what they save
+  - Customer total = Customer Selling Price × Warranty Coverage %
+  - This ensures proper accounting of markup, overhead, tax, and profit on GHVAC-covered components
 - **Quote Editing Protection**: Quotes can only be edited when status is "draft" and not pushed to Trello. Non-editable quotes display a warning banner with context-aware messaging and disable all form fields to prevent accidental changes. This ensures data integrity for quotes being tracked in external systems.
 - **Quote Breakdown Display**: Toggleable detailed breakdown in quote summary showing all intermediate calculations. Default view displays simple summary (subtotal, labor, tax, total). Expandable view reveals complete calculation breakdown including parts subtotal, free parts, material shrinkage, labor benefits, warranty reserve, direct cost, overhead allocation, profit allocation, financing cost, and commission. Works identically in both quote creation and edit flows.
 - **Developer Tools**: Admin-accessible section displaying live quote calculation formulas with actual values from current Google Sheets settings. Shows step-by-step calculation logic including material costs, labor calculations, taxes, warranty reserve, and selling price formula with all percentage allocations (overhead, profit, financing, commission). Explicitly labeled as "Live Formula" to clarify values come from Google Sheets, not hard-coded constants.
