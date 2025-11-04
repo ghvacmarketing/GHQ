@@ -54,8 +54,8 @@ export default function QuoteGenerator() {
   // Fetch all initial data in one optimized call
   const { data: initialData, refetch: refetchInitialData, isLoading: isLoadingData, isError: isErrorData } = useQuery({
     queryKey: ["/api/initial-data"],
-    staleTime: 30000, // Consider data stale after 30 seconds
-    gcTime: 60000, // Keep in cache for 1 minute
+    staleTime: Infinity, // Cache for entire browser session (server has 24hr cache)
+    gcTime: Infinity, // Keep in cache indefinitely
   });
 
   // Extract data with defaults

@@ -397,6 +397,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manually refresh Google Sheets cache (force fresh fetch)
+  app.post("/api/admin/refresh-sheets", async (req, res) => {
+    try {
+      console.log('Manual refresh requested for Google Sheets cache');
+      // refreshData forces a fresh fetch and handles cache restoration on failure
+      const freshData = await googleSheetsService.refreshData();
+      const metadata = googleSheetsService.getCacheMetadata();
+      res.json({ 
+        message: "Google Sheets data refreshed successfully",
+        timestamp: metadata.timestamp,
+        data: freshData
+      });
+    } catch (error) {
+      console.error('Error refreshing Google Sheets:', error);
+      res.status(500).json({ message: "Error refreshing Google Sheets data" });
+    }
+  });
+
+  // Get cache metadata (for UI display)
+  app.get("/api/admin/cache-metadata", async (req, res) => {
+    try {
+      const metadata = googleSheetsService.getCacheMetadata();
+      res.json(metadata);
+    } catch (error) {
+      res.status(500).json({ message: "Error getting cache metadata" });
+    }
+  });
+
   // Optimized initial data endpoint - reduces 3 API calls to 1
   app.get("/api/initial-data", async (req, res) => {
     try {

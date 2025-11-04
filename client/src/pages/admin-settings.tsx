@@ -58,6 +58,17 @@ export default function AdminSettings() {
     enabled: isAuthenticated,
   });
 
+  // Fetch cache metadata to display freshness
+  const { data: cacheMetadata, refetch: refetchMetadata } = useQuery<{
+    cached: boolean;
+    timestamp: number | null;
+    age: number | null;
+  }>({
+    queryKey: ["/api/admin/cache-metadata"],
+    enabled: isAuthenticated,
+    refetchInterval: 60000, // Refetch every minute to update age display
+  });
+
   const settings = currentSettings as any;
 
   // Initialize email addresses when settings load
@@ -137,11 +148,31 @@ export default function AdminSettings() {
   };
 
   const handleRefresh = async () => {
-    await refetch();
-    toast({
-      title: "Data Refreshed",
-      description: "Latest pricing data pulled from Google Sheets.",
-    });
+    try {
+      // Call the server endpoint to invalidate cache and fetch fresh data
+      const response = await apiRequest("POST", "/api/admin/refresh-sheets", {});
+      const result = await response.json();
+      
+      // Invalidate all related queries to force refetch with fresh data
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/initial-data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/cache-metadata"] });
+      
+      // Refetch current page data
+      await refetch();
+      await refetchMetadata();
+      
+      toast({
+        title: "Data Refreshed",
+        description: "Fresh pricing data loaded from Google Sheets.",
+      });
+    } catch (error) {
+      toast({
+        title: "Refresh Failed",
+        description: "Failed to refresh data from Google Sheets.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Bulk delete quotes mutation
@@ -768,13 +799,30 @@ export default function AdminSettings() {
           {/* Google Sheets Notice */}
           <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
             <CardContent className="p-6 pt-[5px] pb-[5px] pl-[10px] pr-[10px]">
-              <div className="flex items-start space-x-3">
-                <ExternalLink className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-                <div>
-                  <h3 className="font-medium text-blue-900 dark:text-blue-100">
-                    Settings Managed via Google Sheets
-                  </h3>
-                  <p className="text-sm text-blue-700 dark:text-blue-200 mt-1">Click "Refresh Data" above if recent changes aren't live.</p>
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-3">
+                  <ExternalLink className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                  <div>
+                    <h3 className="font-medium text-blue-900 dark:text-blue-100">
+                      Settings Managed via Google Sheets
+                    </h3>
+                    <p className="text-sm text-blue-700 dark:text-blue-200 mt-1">
+                      Click "Refresh Data" above if recent changes aren't live.
+                    </p>
+                    {cacheMetadata && cacheMetadata.cached && cacheMetadata.timestamp && (
+                      <p className="text-xs text-blue-600 dark:text-blue-300 mt-2" data-testid="text-cache-info">
+                        <span className="font-medium">Cache: </span>
+                        Last synced {new Date(cacheMetadata.timestamp).toLocaleString()} 
+                        ({Math.round((cacheMetadata.age || 0) / 1000 / 60)} min ago)
+                      </p>
+                    )}
+                    {cacheMetadata && !cacheMetadata.cached && (
+                      <p className="text-xs text-blue-600 dark:text-blue-300 mt-2">
+                        <span className="font-medium">Cache: </span>
+                        No cache - will fetch fresh on next request
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>

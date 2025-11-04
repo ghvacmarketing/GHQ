@@ -28,6 +28,15 @@ Preferred communication style: Simple, everyday language.
 ### Key Design Decisions
 - **Monorepo**: Shared TypeScript types and Zod schemas, unified build, path aliases.
 - **Pricing**: Google Sheets as source of truth, server-side caching, real-time updates, custom parts support.
+- **Google Sheets Caching** (Added Nov 2025):
+  - **Server-side in-memory cache** with 24-hour TTL for optimal performance
+  - **Client-side session cache** via React Query (staleTime: Infinity)
+  - First load fetches from Google Sheets, subsequent loads served from cache (instant)
+  - Manual "Refresh Data" button in admin to force fresh fetch
+  - **Resilient cache restoration**: If refresh fails (API error, timeout, etc.), previous cache is preserved and served
+  - Cache only expires after 24 hours or successful refresh
+  - Cache metadata displayed in admin UI showing last sync time and age
+  - Dramatically reduces Google Sheets API quota usage and improves load times
 - **Quote Generation**: Text-based output, server-side calculation (subtotals, labor, tax, totals), warranty logic. The `laborHours` field is persisted in the database to ensure accurate recalculation when editing quotes.
 - **Pricing Formula** (Updated Nov 2025):
   - **Selling Price = Direct Cost ÷ (1 - (Overhead% + Profit% + Financing% + Commission%))**

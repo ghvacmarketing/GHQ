@@ -23,10 +23,17 @@ interface GoogleSheetsData {
   commissionPercentB44: number;
 }
 
+interface CachedData {
+  data: GoogleSheetsData;
+  timestamp: number;
+}
+
 class GoogleSheetsService {
   private apiKey: string;
   private sheetId: string;
   private baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
+  private cache: CachedData | null = null;
+  private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
   constructor() {
     this.apiKey = process.env.GOOGLE_SHEETS_API_KEY || '';
@@ -37,11 +44,44 @@ class GoogleSheetsService {
     }
   }
 
-  async fetchCellValues(): Promise<GoogleSheetsData> {
+  private isCacheValid(): boolean {
+    if (!this.cache) return false;
+    const now = Date.now();
+    const age = now - this.cache.timestamp;
+    return age < this.CACHE_TTL;
+  }
+
+  getCacheMetadata(): { cached: boolean; timestamp: number | null; age: number | null } {
+    if (!this.cache) {
+      return { cached: false, timestamp: null, age: null };
+    }
+    const age = Date.now() - this.cache.timestamp;
+    return {
+      cached: this.isCacheValid(),
+      timestamp: this.cache.timestamp,
+      age: age
+    };
+  }
+
+  invalidateCache(): void {
+    this.cache = null;
+    console.log('Google Sheets cache invalidated');
+  }
+
+  async fetchCellValues(forceRefresh: boolean = false): Promise<GoogleSheetsData> {
+    // Return cached data if valid and not forcing refresh
+    if (!forceRefresh && this.isCacheValid() && this.cache) {
+      console.log('Returning cached Google Sheets data (age: ' + Math.round((Date.now() - this.cache.timestamp) / 1000 / 60) + ' minutes)');
+      return this.cache.data;
+    }
+
     if (!this.apiKey || !this.sheetId) {
+      console.warn('Google Sheets API key or Sheet ID not configured, returning defaults');
       return this.getDefaultValues();
     }
 
+    console.log('Fetching fresh data from Google Sheets...');
+    const previousCache = this.cache; // Store previous cache in case fetch fails
     try {
       // Define all the cell ranges we need to fetch
       const ranges = [
@@ -72,6 +112,16 @@ class GoogleSheetsService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Google Sheets API error:', response.status, response.statusText, errorText);
+        
+        // If we had a previous cache and fetch failed, restore it and return cached data
+        if (previousCache) {
+          this.cache = previousCache;
+          console.log('API error, restored previous cache (age: ' + Math.round((Date.now() - previousCache.timestamp) / 1000 / 60) + ' minutes)');
+          return previousCache.data;
+        }
+        
+        // No previous cache available, return defaults
+        console.warn('No previous cache available after API error, returning default values');
         return this.getDefaultValues();
       }
 
@@ -91,7 +141,7 @@ class GoogleSheetsService {
         return parseFloat(cellValue) || 0;
       });
 
-      return {
+      const fetchedData = {
         // Labor and business rates (C5-C8)
         laborRate: values[0] || 65,
         commissionPercent: values[1] || 0.03,
@@ -116,8 +166,27 @@ class GoogleSheetsService {
         commissionPercentB44: values[16] || 0.03,
       };
 
+      // Store in cache
+      this.cache = {
+        data: fetchedData,
+        timestamp: Date.now()
+      };
+      console.log('Google Sheets data cached successfully');
+
+      return fetchedData;
+
     } catch (error) {
       console.error('Error fetching Google Sheets data:', error);
+      
+      // If we had a previous cache and fetch failed, restore it and return cached data
+      if (previousCache) {
+        this.cache = previousCache;
+        console.log('Fetch failed, restored previous cache (age: ' + Math.round((Date.now() - previousCache.timestamp) / 1000 / 60) + ' minutes)');
+        return previousCache.data;
+      }
+      
+      // No previous cache available, return defaults
+      console.warn('No previous cache available, returning default values');
       return this.getDefaultValues();
     }
   }
@@ -145,7 +214,8 @@ class GoogleSheetsService {
   }
 
   async refreshData(): Promise<GoogleSheetsData> {
-    return await this.fetchCellValues();
+    console.log('Forcing refresh of Google Sheets data...');
+    return await this.fetchCellValues(true); // Force refresh
   }
 }
 

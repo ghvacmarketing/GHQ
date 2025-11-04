@@ -60,8 +60,8 @@ export default function QuoteEdit() {
   // Fetch initial data
   const { data: initialData, isLoading: isLoadingData, isError: isErrorData } = useQuery({
     queryKey: ["/api/initial-data"],
-    staleTime: 30000,
-    gcTime: 60000,
+    staleTime: Infinity, // Cache for entire browser session (server has 24hr cache)
+    gcTime: Infinity, // Keep in cache indefinitely
   });
 
   const technicians = (initialData as any)?.technicians || [];
