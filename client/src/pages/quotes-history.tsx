@@ -155,6 +155,12 @@ export default function QuotesHistory() {
               {quotes.length}
             </Badge>
             <Link href="/quote">
+              <Button variant="outline" size="sm" className="flex items-center space-x-1 h-9" data-testid="button-back-to-generator">
+                <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Back</span>
+              </Button>
+            </Link>
+            <Link href="/quote">
               <Button variant="default" size="sm" className="flex items-center space-x-1 sm:space-x-2 h-9">
                 <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">New Quote</span>

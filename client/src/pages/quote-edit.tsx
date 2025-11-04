@@ -196,12 +196,35 @@ export default function QuoteEdit() {
     const totalDeductionRate = overheadPercent + profitPercent + financingPercent + commissionPercent;
     const remainingRate = 1.0 - totalDeductionRate;
     const sellingPrice = directCost / remainingRate;
+    
+    // Calculate allocations based on selling price
+    const overhead = sellingPrice * overheadPercent;
+    const profit = sellingPrice * profitPercent;
+    const financingCost = sellingPrice * financingPercent;
+    const commission = sellingPrice * commissionPercent;
 
     return {
+      partsSubtotal: partsSubtotal.toFixed(2),
+      freePartsSubtotal: freePartsSubtotal.toFixed(2),
+      materialShrinkage: materialShrinkageCost.toFixed(2),
+      adjustedPartsTotal: adjustedPartsTotal.toFixed(2),
+      baseLaborCost: baseLaborCost.toFixed(2),
+      laborBenefits: laborBenefits.toFixed(2),
+      totalLaborCost: totalLaborCost.toFixed(2),
+      salesTax: salesTax.toFixed(2),
+      warrantyReserve: warrantyReserve.toFixed(2),
+      directCost: directCost.toFixed(2),
+      overhead: overhead.toFixed(2),
+      profit: profit.toFixed(2),
+      financingCost: financingCost.toFixed(2),
+      commission: commission.toFixed(2),
+      total: sellingPrice.toFixed(2),
+      warrantyDiscount: warrantyDiscountPercent,
+      isGHVACWarranty: Boolean(isGHVACWarranty),
+      // Legacy compatibility for display
       subtotal: partsSubtotal.toFixed(2),
       labor: baseLaborCost.toFixed(2),
       tax: salesTax.toFixed(2),
-      total: sellingPrice.toFixed(2),
     };
   };
 

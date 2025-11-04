@@ -7,12 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit, Settings2, Users, FolderOpen, ReceiptText, Bell, Download, Upload, Database } from "lucide-react";
+import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit, Settings2, Users, FolderOpen, ReceiptText, Bell, Download, Upload, Database, Code } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Quote, Category, Process, Setting, Announcement, PhoneWhitelist } from "@shared/schema";
 import ReactMarkdown from 'react-markdown';
@@ -2036,6 +2037,147 @@ export default function AdminSettings() {
                       </div>
                     </CardContent>
                   </Card>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Developer Tools */}
+              <AccordionItem value="dev-tools" className="border rounded-lg px-4 bg-card">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center">
+                    <Code className="h-5 w-5 mr-3 text-primary" />
+                    <span className="font-semibold">Developer Tools</span>
+                    <Badge variant="secondary" className="ml-2">Beta</Badge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-6 mt-4">
+                    {/* Quote Calculation Formula Viewer */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Quote Calculation Formula</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                          <p className="text-sm font-semibold text-green-900 dark:text-green-100">
+                            ✓ Live Formula - All values below are pulled from your current Google Sheets settings
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-3 text-sm font-mono bg-muted/30 p-4 rounded-lg">
+                          <div className="font-bold text-base mb-3">Step-by-Step Calculation:</div>
+                          
+                          {/* Parts Calculation */}
+                          <div className="space-y-1">
+                            <div className="font-semibold text-primary">1. Parts & Materials:</div>
+                            <div className="ml-4 space-y-1">
+                              <div>• Charged Parts Subtotal = Sum of (Price × Quantity) for Materials + Non-warranty parts</div>
+                              <div>• Free Parts (Warranty) = Parts covered by manufacturer warranty</div>
+                              <div>• Material Shrinkage = Charged Parts × 3% (for specific materials)</div>
+                              <div className="font-medium">→ Adjusted Parts Total = (Charged Parts + Shrinkage) × Warranty Discount (if applicable)</div>
+                            </div>
+                          </div>
+
+                          {/* Labor Calculation */}
+                          <div className="space-y-1 mt-3">
+                            <div className="font-semibold text-primary">2. Labor:</div>
+                            <div className="ml-4 space-y-1">
+                              <div>• Base Labor = Labor Hours × Labor Rate (${settings?.laborRate || '65'}/hr)</div>
+                              <div>• Labor Benefits = Base Labor × 34%</div>
+                              <div className="font-medium">→ Total Labor = Base Labor + Labor Benefits</div>
+                            </div>
+                          </div>
+
+                          {/* Tax & Fees */}
+                          <div className="space-y-1 mt-3">
+                            <div className="font-semibold text-primary">3. Tax & Fees:</div>
+                            <div className="ml-4 space-y-1">
+                              <div>• Sales Tax = Adjusted Parts Total × {((settings?.salesTaxPercent || 0.08) * 100).toFixed(2)}%</div>
+                              <div>• Warranty Reserve = ${settings?.warrantyReserve || '25'} (fixed)</div>
+                            </div>
+                          </div>
+
+                          {/* Direct Cost */}
+                          <div className="space-y-1 mt-3 bg-yellow-50 dark:bg-yellow-950 p-3 rounded">
+                            <div className="font-semibold text-primary">4. Direct Cost:</div>
+                            <div className="ml-4">
+                              <div className="font-medium">Direct Cost = Adjusted Parts + Total Labor + Tax + Warranty Reserve</div>
+                            </div>
+                          </div>
+
+                          {/* Markup Formula */}
+                          <div className="space-y-1 mt-3">
+                            <div className="font-semibold text-primary">5. Markup & Final Price:</div>
+                            <div className="ml-4 space-y-1">
+                              <div>• Overhead = {((settings?.overheadPercent || 0.30) * 100).toFixed(0)}%</div>
+                              <div>• Profit = {((settings?.profitPercent || 0.15) * 100).toFixed(0)}%</div>
+                              <div>• Financing = {((settings?.financingPromotionPercent || 0.03) * 100).toFixed(0)}%</div>
+                              <div>• Commission = {((settings?.commissionPercent || 0.03) * 100).toFixed(0)}%</div>
+                              <div className="mt-2">Total Deduction Rate = {((settings?.overheadPercent || 0.30) * 100).toFixed(0)}% + {((settings?.profitPercent || 0.15) * 100).toFixed(0)}% + {((settings?.financingPromotionPercent || 0.03) * 100).toFixed(0)}% + {((settings?.commissionPercent || 0.03) * 100).toFixed(0)}% = {(((settings?.overheadPercent || 0.30) + (settings?.profitPercent || 0.15) + (settings?.financingPromotionPercent || 0.03) + (settings?.commissionPercent || 0.03)) * 100).toFixed(0)}%</div>
+                              <div className="font-medium text-lg mt-2 bg-green-50 dark:bg-green-950 p-2 rounded">
+                                <strong>Selling Price = Direct Cost ÷ (1 - Total Deduction Rate)</strong>
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-2">
+                                Example: If Direct Cost = $1,000, Selling Price = $1,000 ÷ (1 - 0.51) = $1,000 ÷ 0.49 = $2,040.82
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Warranty Logic */}
+                          <div className="space-y-1 mt-3">
+                            <div className="font-semibold text-primary">6. GHVAC Warranty Discounts:</div>
+                            <div className="ml-4 space-y-1 text-xs">
+                              <div>• 2 years: 25% discount</div>
+                              <div>• 3 years: 35% discount</div>
+                              <div>• 4 years: 45% discount</div>
+                              <div>• 5 years: 50% discount</div>
+                              <div>• 6+ years: 55-90% discount</div>
+                              <div className="text-muted-foreground mt-1">Applied to materials and labor when GHVAC installation confirmed</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Formula Comparison */}
+                        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                          <h4 className="font-semibold mb-2">Formula Comparison with Spreadsheet:</h4>
+                          <p className="text-sm text-muted-foreground">
+                            This formula matches your Excel spreadsheet's pricing model. The app calculates all intermediate values (shrinkage, benefits, reserves) that aren't shown in the simple summary view. 
+                            Use the "Show Detailed Breakdown" toggle in the quote generator to see all intermediate calculations line-by-line.
+                          </p>
+                        </div>
+
+                        {/* Current Settings */}
+                        <div className="mt-6 p-4 border rounded-lg">
+                          <h4 className="font-semibold mb-3">Current Settings (from Google Sheets):</h4>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Labor Rate:</span>
+                              <span className="ml-2 font-medium">${settings?.laborRate || '65'}/hr</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Sales Tax:</span>
+                              <span className="ml-2 font-medium">{((settings?.salesTaxPercent || 0.08) * 100).toFixed(2)}%</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Overhead:</span>
+                              <span className="ml-2 font-medium">{((settings?.overheadPercent || 0.30) * 100).toFixed(0)}%</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Profit:</span>
+                              <span className="ml-2 font-medium">{((settings?.profitPercent || 0.15) * 100).toFixed(0)}%</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Financing:</span>
+                              <span className="ml-2 font-medium">{((settings?.financingPromotionPercent || 0.03) * 100).toFixed(0)}%</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Commission:</span>
+                              <span className="ml-2 font-medium">{((settings?.commissionPercent || 0.03) * 100).toFixed(0)}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
