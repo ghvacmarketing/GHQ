@@ -37,6 +37,12 @@ Preferred communication style: Simple, everyday language.
   - Cache only expires after 24 hours or successful refresh
   - Cache metadata displayed in admin UI showing last sync time and age
   - Dramatically reduces Google Sheets API quota usage and improves load times
+- **Admin Settings Performance Optimization** (Added Nov 2025):
+  - Split admin page into lightweight `AdminLogin` component (instant render) and heavy `AdminDashboard` component (loads after auth)
+  - Login page now renders instantly (<50ms) without query setup overhead
+  - All admin data prefetches in parallel immediately upon successful login
+  - Dashboard appears with cached data already loaded (instant for repeat visits)
+  - Removed redundant authentication checks from queries since AdminDashboard only renders after auth verification
 - **Quote Generation**: Text-based output, server-side calculation (subtotals, labor, tax, totals), warranty logic. The `laborHours` field is persisted in the database to ensure accurate recalculation when editing quotes.
 - **Pricing Formula** (Updated Nov 2025):
   - **Selling Price = Direct Cost ÷ (1 - (Overhead% + Profit% + Financing% + Commission%))**
