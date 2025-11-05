@@ -195,8 +195,8 @@ class GoogleSheetsService {
     return {
       laborRate: 65,
       commissionPercent: 0.03,
-      financingPromotionPercent: 0.04,
-      profitPercent: 0.21,
+      financingPromotionPercent: 0.03,
+      profitPercent: 0.15,
       refrigerantFilterDryerPrice: 0,
       copperPrice: 0,
       armaflexInsulationPrice: 0,
@@ -207,8 +207,8 @@ class GoogleSheetsService {
       salesTaxPercent: 0.08,
       warrantyReserve: 25.00,
       overheadPercent: 0.30,
-      profitPercentB42: 0.21,
-      financingCostPercent: 0.04,
+      profitPercentB42: 0.15,
+      financingCostPercent: 0.03,
       commissionPercentB44: 0.03,
     };
   }
