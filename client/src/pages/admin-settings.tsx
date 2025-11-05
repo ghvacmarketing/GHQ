@@ -20,12 +20,114 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import redlogo from "@assets/redlogo.webp";
 
+// Login component - renders instantly without heavy queries
+function AdminLogin({ onLogin }: { onLogin: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await apiRequest("POST", "/api/admin/login", { password });
+      const result = await response.json();
+      
+      if (result.success) {
+        // Start loading all data in background immediately
+        Promise.all([
+          queryClient.prefetchQuery({ queryKey: ["/api/settings"], staleTime: Infinity }),
+          queryClient.prefetchQuery({ queryKey: ["/api/quotes/summary"] }),
+          queryClient.prefetchQuery({ queryKey: ["/api/technicians"] }),
+          queryClient.prefetchQuery({ queryKey: ['/api/categories'] }),
+          queryClient.prefetchQuery({ queryKey: ['/api/processes'] }),
+          queryClient.prefetchQuery({ queryKey: ['/api/app-settings'] }),
+          queryClient.prefetchQuery({ queryKey: ['/api/admin/cache-metadata'] }),
+        ]).catch(err => console.error('Error prefetching data:', err));
+        
+        toast({
+          title: "Access Granted",
+          description: "Loading admin dashboard...",
+        });
+        
+        onLogin();
+      } else {
+        toast({
+          title: "Access Denied",
+          description: "Incorrect password.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Authentication Error",
+        description: "Failed to verify password. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-center">Admin Access Required</CardTitle>
+          <p className="text-center text-sm text-muted-foreground">
+            Enter admin password to view Google Sheets pricing data
+          </p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <Label htmlFor="password">Admin Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter admin password"
+                  className="pr-10"
+                  data-testid="input-admin-password"
+                  autoFocus
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowPassword(!showPassword)}
+                  data-testid="button-toggle-password"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <Button type="submit" className="w-full" data-testid="button-login">
+              Access Admin Panel
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  
+  // Show lightweight login form first for instant render
+  if (!isAuthenticated) {
+    return <AdminLogin onLogin={() => setIsAuthenticated(true)} />;
+  }
+  
+  // Main admin component with all the heavy queries and state
+  return <AdminDashboard toast={toast} queryClient={queryClient} />;
+}
+
+function AdminDashboard({ toast, queryClient }: { toast: any; queryClient: any }) {
   const [selectedQuotes, setSelectedQuotes] = useState<Set<string>>(new Set());
   const [emailAddresses, setEmailAddresses] = useState<string[]>([]);
   const [newEmailAddress, setNewEmailAddress] = useState("");
@@ -55,7 +157,6 @@ export default function AdminSettings() {
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
     queryKey: ["/api/settings"],
-    enabled: isAuthenticated,
     staleTime: Infinity, // Keep cached for entire session
   });
 
@@ -66,7 +167,6 @@ export default function AdminSettings() {
     age: number | null;
   }>({
     queryKey: ["/api/admin/cache-metadata"],
-    enabled: isAuthenticated,
     staleTime: 60000, // Refetch every minute to update age display
     refetchInterval: 60000,
   });
@@ -88,7 +188,6 @@ export default function AdminSettings() {
     recentQuotes: Quote[];
   }>({
     queryKey: ["/api/quotes/summary"],
-    enabled: isAuthenticated,
   });
 
   // Fetch full quotes list only when needed (lazy loading)
@@ -98,7 +197,7 @@ export default function AdminSettings() {
   }>({
     queryKey: ["/api/quotes", quotesPage],
     queryFn: () => fetch(`/api/quotes?page=${quotesPage}&limit=50`).then(res => res.json()),
-    enabled: isAuthenticated && showQuotesList,
+    enabled: showQuotesList,
   });
 
   const quotes = quotesResponse?.quotes || [];
@@ -107,47 +206,7 @@ export default function AdminSettings() {
   // Fetch technicians
   const { data: technicians = [] } = useQuery({
     queryKey: ["/api/technicians"],
-    enabled: isAuthenticated,
   });
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const response = await apiRequest("POST", "/api/admin/login", { password });
-      const result = await response.json();
-      
-      if (result.success) {
-        setIsAuthenticated(true);
-        
-        // Immediately prefetch all admin data in parallel for instant display
-        Promise.all([
-          queryClient.prefetchQuery({ queryKey: ["/api/settings"] }),
-          queryClient.prefetchQuery({ queryKey: ["/api/quotes/summary"] }),
-          queryClient.prefetchQuery({ queryKey: ["/api/technicians"] }),
-          queryClient.prefetchQuery({ queryKey: ['/api/categories'] }),
-          queryClient.prefetchQuery({ queryKey: ['/api/processes'] }),
-          queryClient.prefetchQuery({ queryKey: ['/api/app-settings'] }),
-        ]).catch(err => console.error('Error prefetching data:', err));
-        
-        toast({
-          title: "Access Granted",
-          description: "You can now view Google Sheets pricing data.",
-        });
-      } else {
-        toast({
-          title: "Access Denied",
-          description: "Incorrect password.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Authentication Error",
-        description: "Failed to verify password. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleRefresh = async () => {
     try {
@@ -273,29 +332,21 @@ export default function AdminSettings() {
   // Fetch categories
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
-    enabled: isAuthenticated,
   });
 
   // Fetch processes
   const { data: processes = [] } = useQuery<Process[]>({
     queryKey: ['/api/processes'],
-    enabled: isAuthenticated,
   });
 
   // Fetch app settings (PDF URLs, etc.)
   const { data: appSettings = [] } = useQuery<Setting[]>({
     queryKey: ['/api/app-settings'],
-    enabled: isAuthenticated,
   });
 
   // Fetch announcements
   const { data: announcements = [] } = useQuery<Announcement[]>({
     queryKey: ['/api/announcements'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/announcements', { password });
-      return response.json();
-    },
-    enabled: isAuthenticated,
   });
 
   // Get active announcement
@@ -307,8 +358,7 @@ export default function AdminSettings() {
       const version = Date.now().toString();
       const response = await apiRequest('POST', '/api/announcement', { 
         ...data, 
-        version,
-        password 
+        version
       });
       return response.json();
     },
@@ -335,10 +385,7 @@ export default function AdminSettings() {
   const updateAnnouncementMutation = useMutation({
     mutationFn: async (data: { id: string; title: string; message: string; buttonText: string; isActive: boolean }) => {
       const { id, ...updateData } = data;
-      const response = await apiRequest('PATCH', `/api/announcement/${id}`, { 
-        ...updateData,
-        password 
-      });
+      const response = await apiRequest('PATCH', `/api/announcement/${id}`, updateData);
       return response.json();
     },
     onSuccess: () => {
@@ -360,7 +407,7 @@ export default function AdminSettings() {
 
   const deleteAnnouncementMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest('DELETE', `/api/announcement/${id}`, { password });
+      const response = await apiRequest('DELETE', `/api/announcement/${id}`, {});
       return response.json();
     },
     onSuccess: () => {
@@ -382,20 +429,12 @@ export default function AdminSettings() {
   // Fetch phone whitelist
   const { data: phoneWhitelist = [] } = useQuery<PhoneWhitelist[]>({
     queryKey: ['/api/phone-whitelist'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/phone-whitelist', { password });
-      return response.json();
-    },
-    enabled: isAuthenticated,
   });
 
   // Phone whitelist mutations
   const addPhoneWhitelistMutation = useMutation({
     mutationFn: async (data: { phoneNumber: string; name: string }) => {
-      const response = await apiRequest('POST', '/api/phone-whitelist', { 
-        ...data,
-        password 
-      });
+      const response = await apiRequest('POST', '/api/phone-whitelist', data);
       return response.json();
     },
     onSuccess: () => {
@@ -418,7 +457,7 @@ export default function AdminSettings() {
 
   const deletePhoneWhitelistMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest('DELETE', `/api/phone-whitelist/${id}`, { password });
+      const response = await apiRequest('DELETE', `/api/phone-whitelist/${id}`, {});
       return response.json();
     },
     onSuccess: () => {
@@ -552,7 +591,7 @@ export default function AdminSettings() {
   // Process mutation
   const deleteProcessMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest('DELETE', `/api/processes/${id}`, { password });
+      const response = await apiRequest('DELETE', `/api/processes/${id}`, {});
       return response.json();
     },
     onSuccess: () => {
@@ -580,8 +619,7 @@ export default function AdminSettings() {
             const response = await apiRequest('POST', '/api/price-book/upload', {
               name: file.name,
               data: base64Data,
-              size: file.size,
-              password: password // Use the password from login state
+              size: file.size
             });
             await response.json();
             resolve();
@@ -699,65 +737,6 @@ export default function AdminSettings() {
       default: return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
     }
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center">Admin Access Required</CardTitle>
-            <p className="text-center text-sm text-muted-foreground">
-              Enter admin password to view Google Sheets pricing data
-            </p>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <Label htmlFor="password">Admin Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter admin password"
-                    className="pr-10"
-                    data-testid="input-admin-password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 top-1/2 -translate-y-1/2"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-              <Button
-                type="submit"
-                className="w-full"
-                data-testid="button-login"
-              >
-                Access Settings
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                onClick={() => window.location.href = "/"}
-                data-testid="button-back-to-app"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to App
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans antialiased">
