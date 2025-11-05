@@ -56,6 +56,7 @@ export default function AdminSettings() {
   const { data: currentSettings, refetch, isLoading } = useQuery({
     queryKey: ["/api/settings"],
     enabled: isAuthenticated,
+    staleTime: Infinity, // Keep cached for entire session
   });
 
   // Fetch cache metadata to display freshness
@@ -66,7 +67,8 @@ export default function AdminSettings() {
   }>({
     queryKey: ["/api/admin/cache-metadata"],
     enabled: isAuthenticated,
-    refetchInterval: 60000, // Refetch every minute to update age display
+    staleTime: 60000, // Refetch every minute to update age display
+    refetchInterval: 60000,
   });
 
   const settings = currentSettings as any;
