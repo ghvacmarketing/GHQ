@@ -142,11 +142,11 @@ class GoogleSheetsService {
       });
 
       const fetchedData = {
-        // Labor and business rates (C5-C8)
+        // Labor and business rates (C5-C8) - kept for backward compatibility but not used
         laborRate: values[0] || 65,
         commissionPercent: values[1] || 0.03,
-        financingPromotionPercent: values[2] || 0.04,
-        profitPercent: values[3] || 0.21,
+        financingPromotionPercent: values[2] || 0.03,
+        profitPercent: values[3] || 0.15,
         
         // Parts prices (D20-D24)
         refrigerantFilterDryerPrice: values[4] || 0,
@@ -161,8 +161,8 @@ class GoogleSheetsService {
         salesTaxPercent: values[11] || 0.08,
         warrantyReserve: values[12] || 25.00,
         overheadPercent: values[13] || 0.30,
-        profitPercentB42: values[14] || 0.21,
-        financingCostPercent: values[15] || 0.04,
+        profitPercentB42: values[14] || 0.15,
+        financingCostPercent: values[15] || 0.03,
         commissionPercentB44: values[16] || 0.03,
       };
 
