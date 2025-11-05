@@ -223,30 +223,38 @@ export default function SelectedParts({ parts, totals, onUpdate, disabled = fals
 
               <div className="border-t border-border my-2"></div>
 
-              {/* Markup Components */}
+              {/* Markup Components as % of Direct Cost */}
               <div className="space-y-1">
-                {totals.overhead && parseFloat(totals.overhead) > 0 && (
+                {totals.overhead && totals.directCost && parseFloat(totals.overhead) > 0 && (
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Overhead (30%):</span>
-                    <span className="font-medium">${totals.overhead}</span>
+                    <span className="text-muted-foreground">Overhead:</span>
+                    <span className="font-medium">
+                      {((parseFloat(totals.overhead) / parseFloat(totals.directCost)) * 100).toFixed(1)}% of DC
+                    </span>
                   </div>
                 )}
-                {totals.profit && parseFloat(totals.profit) > 0 && (
+                {totals.profit && totals.directCost && parseFloat(totals.profit) > 0 && (
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Profit (15%):</span>
-                    <span className="font-medium">${totals.profit}</span>
+                    <span className="text-muted-foreground">Profit:</span>
+                    <span className="font-medium">
+                      {((parseFloat(totals.profit) / parseFloat(totals.directCost)) * 100).toFixed(1)}% of DC
+                    </span>
                   </div>
                 )}
-                {totals.financingCost && parseFloat(totals.financingCost) > 0 && (
+                {totals.financingCost && totals.directCost && parseFloat(totals.financingCost) > 0 && (
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Financing (3%):</span>
-                    <span className="font-medium">${totals.financingCost}</span>
+                    <span className="text-muted-foreground">Financing:</span>
+                    <span className="font-medium">
+                      {((parseFloat(totals.financingCost) / parseFloat(totals.directCost)) * 100).toFixed(1)}% of DC
+                    </span>
                   </div>
                 )}
-                {totals.commission && parseFloat(totals.commission) > 0 && (
+                {totals.commission && totals.directCost && parseFloat(totals.commission) > 0 && (
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Commission (3%):</span>
-                    <span className="font-medium">${totals.commission}</span>
+                    <span className="text-muted-foreground">Commission:</span>
+                    <span className="font-medium">
+                      {((parseFloat(totals.commission) / parseFloat(totals.directCost)) * 100).toFixed(1)}% of DC
+                    </span>
                   </div>
                 )}
               </div>
