@@ -244,11 +244,11 @@ export default function QuoteEdit() {
       priceBeforeWarranty = customerSellingPrice;
     }
     
-    // Calculate allocations based on full selling price (for transparency)
-    const overhead = fullSellingPrice * overheadPercent;
-    const profit = fullSellingPrice * profitPercent;
-    const financingCost = fullSellingPrice * financingPercent;
-    const commission = fullSellingPrice * commissionPercent;
+    // Calculate allocations as percentages of direct cost
+    const overhead = fullDirectCost * overheadPercent;
+    const profit = fullDirectCost * profitPercent;
+    const financingCost = fullDirectCost * financingPercent;
+    const commission = fullDirectCost * commissionPercent;
 
     return {
       partsSubtotal: allPartsSubtotal.toFixed(2),
