@@ -298,7 +298,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedParts);
     } catch (error) {
       console.error('Error fetching parts:', error);
-      res.status(500).json({ message: "Error fetching parts" });
+      const errorMessage = error instanceof Error && error.message.includes('Google Sheets sync failed')
+        ? error.message
+        : "Error fetching parts";
+      res.status(500).json({ message: errorMessage });
     }
   });
 
@@ -362,7 +365,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await googleSheetsService.fetchCellValues();
       res.json({ message: "Settings refreshed successfully", settings });
     } catch (error) {
-      res.status(500).json({ message: "Error refreshing settings" });
+      console.error('Error refreshing settings:', error);
+      const errorMessage = error instanceof Error && error.message.includes('Google Sheets sync failed')
+        ? error.message
+        : "Error refreshing settings";
+      res.status(500).json({ message: errorMessage });
     }
   });
 
@@ -488,7 +495,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Error fetching initial data:', error);
-      res.status(500).json({ message: "Error fetching initial data" });
+      const errorMessage = error instanceof Error && error.message.includes('Google Sheets sync failed')
+        ? error.message
+        : "Error fetching initial data";
+      res.status(500).json({ message: errorMessage });
     }
   });
 
@@ -524,7 +534,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(settings);
     } catch (error) {
       console.error('Error fetching settings:', error);
-      res.status(500).json({ message: "Error fetching settings" });
+      const errorMessage = error instanceof Error && error.message.includes('Google Sheets sync failed')
+        ? error.message
+        : "Error fetching settings";
+      res.status(500).json({ message: errorMessage });
     }
   });
 
