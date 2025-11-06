@@ -6,7 +6,7 @@ import { X, Download, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-
 import { useToast } from "@/hooks/use-toast";
 
 // Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 
 type FullScreenFileViewerProps = {
   fileId: string;
