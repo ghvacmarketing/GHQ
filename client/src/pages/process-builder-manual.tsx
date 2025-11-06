@@ -8,7 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { ArrowLeft, Settings, Sparkles, Clipboard, X, Loader2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ArrowLeft, Settings, Sparkles, Clipboard, X, Loader2, Link as LinkIcon } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { insertProcessSchema, type ProcessStep, type Category } from "@shared/schema";
 import { nanoid } from "nanoid";
@@ -17,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import FileUploadSection, { type PendingFile } from "@/components/file-upload-section";
 
 const formSchema = insertProcessSchema.extend({
   name: z.string().min(1, "Process name is required"),
@@ -31,9 +35,17 @@ export default function ProcessBuilderManual() {
   const { toast } = useToast();
   const [steps, setSteps] = useState<ProcessStep[]>([]);
   const [stepsText, setStepsText] = useState("");
+  const [aiCleanupEnabled, setAiCleanupEnabled] = useState(true);
   const [cleanupLevel, setCleanupLevel] = useState(3);
   const [isFormatting, setIsFormatting] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkText, setLinkText] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [createdProcessId, setCreatedProcessId] = useState<string | null>(null);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const descriptionFieldRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
@@ -53,14 +65,6 @@ export default function ProcessBuilderManual() {
     mutationFn: async (data: FormData) => {
       const response = await apiRequest('POST', '/api/processes', data);
       return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/processes'] });
-      toast({
-        title: "Process created",
-        description: "Your new process has been saved successfully.",
-      });
-      setLocation('/processes');
     },
     onError: () => {
       toast({
@@ -100,22 +104,45 @@ export default function ProcessBuilderManual() {
 
     setIsFormatting(true);
     try {
-      const response = await apiRequest('POST', '/api/format-text', {
-        text: stepsText,
-        cleanupLevel,
-      });
-      const result = await response.json();
-      
-      // Add IDs to steps
-      const stepsWithIds = result.steps.map((step: any) => ({
-        ...step,
-        id: nanoid(),
-      }));
+      let stepsWithIds: ProcessStep[];
+
+      if (aiCleanupEnabled) {
+        // Use AI formatting
+        const response = await apiRequest('POST', '/api/format-text', {
+          text: stepsText,
+          cleanupLevel,
+        });
+        const result = await response.json();
+        
+        // Add IDs to steps
+        stepsWithIds = result.steps.map((step: any) => ({
+          ...step,
+          id: nanoid(),
+        }));
+      } else {
+        // Simple manual parsing without AI
+        const lines = stepsText
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0)
+          .map(line => {
+            // Remove common prefixes like numbers, bullets, dashes
+            return line.replace(/^(\d+\.|\d+\)|-|\*|\•)\s*/, '');
+          });
+        
+        stepsWithIds = lines.map((instruction, index) => ({
+          id: nanoid(),
+          stepNumber: index + 1,
+          instruction,
+        }));
+      }
       
       setSteps(stepsWithIds);
       toast({
         title: "Formatted!",
-        description: `Created ${stepsWithIds.length} steps at cleanup level ${cleanupLevel}`,
+        description: aiCleanupEnabled 
+          ? `Created ${stepsWithIds.length} steps at cleanup level ${cleanupLevel}` 
+          : `Created ${stepsWithIds.length} steps from raw text`,
       });
     } catch (error) {
       toast({
@@ -139,16 +166,106 @@ export default function ProcessBuilderManual() {
     setSteps(updatedSteps);
   };
 
-  const onSubmit = (data: FormData) => {
-    if (steps.length === 0) {
+  const onSubmit = async (data: FormData) => {
+    // Either steps or files must be present
+    if (steps.length === 0 && pendingFiles.length === 0) {
       toast({
-        title: "No steps added",
-        description: "Please format some steps before saving",
+        title: "Nothing to save",
+        description: "Please add steps or attach files before saving",
         variant: "destructive",
       });
       return;
     }
-    createMutation.mutate({ ...data, steps });
+
+    try {
+      let processId = createdProcessId;
+      
+      // Create process only if not already created
+      if (!processId) {
+        const processData = {
+          ...data,
+          steps: steps.length > 0 ? steps : null,
+        };
+        
+        const process = await createMutation.mutateAsync(processData);
+        processId = process.id;
+        setCreatedProcessId(processId);
+      }
+      
+      // Upload files if any
+      if (pendingFiles.length > 0 && processId) {
+        setIsUploadingFiles(true);
+        await uploadFiles(processId);
+        setIsUploadingFiles(false);
+      }
+
+      // Success - invalidate queries and navigate
+      queryClient.invalidateQueries({ queryKey: ['/api/processes'] });
+      toast({
+        title: "Process created",
+        description: pendingFiles.length > 0 
+          ? `Process saved with ${pendingFiles.length} file(s)`
+          : "Your new process has been saved successfully.",
+      });
+      setLocation('/processes');
+    } catch (error) {
+      console.error('Error creating/uploading process:', error);
+      setIsUploadingFiles(false);
+      // Error toasts already shown by mutation or uploadFiles
+      // Keep createdProcessId so retry will reuse existing process
+    }
+  };
+
+  const uploadFiles = async (processId: string) => {
+    const failedFiles: PendingFile[] = [];
+    const successfulFiles: PendingFile[] = [];
+    
+    for (const pendingFile of pendingFiles) {
+      try {
+        const formData = new FormData();
+        formData.append('file', pendingFile.file);
+        
+        const response = await fetch(`/api/processes/${processId}/attachments`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          failedFiles.push(pendingFile);
+        } else {
+          successfulFiles.push(pendingFile);
+        }
+      } catch (error) {
+        failedFiles.push(pendingFile);
+      }
+    }
+    
+    // Remove successfully uploaded files from pendingFiles
+    if (successfulFiles.length > 0) {
+      setPendingFiles(prev => prev.filter(pf => 
+        !successfulFiles.some(sf => sf.id === pf.id)
+      ));
+    }
+    
+    // If any files failed, throw error to prevent navigation
+    if (failedFiles.length > 0) {
+      const failedNames = failedFiles.map(f => f.file.name);
+      const fileList = failedNames.length <= 3 
+        ? failedNames.join(', ')
+        : `${failedNames.slice(0, 3).join(', ')} and ${failedNames.length - 3} more`;
+      
+      const errorMessage = failedFiles.length === pendingFiles.length
+        ? `All files failed: ${fileList}`
+        : `Failed to upload: ${fileList}`;
+      
+      toast({
+        title: "File upload error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      
+      throw new Error(errorMessage);
+    }
   };
 
   const completionPercentage = () => {
@@ -156,7 +273,7 @@ export default function ProcessBuilderManual() {
     if (form.watch('name')) completed += 25;
     if (form.watch('description')) completed += 25;
     if (form.watch('category')) completed += 25;
-    if (steps.length > 0) completed += 25;
+    if (steps.length > 0 || pendingFiles.length > 0) completed += 25;
     return completed;
   };
 
@@ -169,6 +286,54 @@ export default function ProcessBuilderManual() {
       5: "Maximum polish"
     };
     return labels[level] || labels[3];
+  };
+
+  const handleInsertLink = () => {
+    if (!linkText.trim() || !linkUrl.trim()) {
+      toast({
+        title: "Missing information",
+        description: "Please provide both text and URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const markdownLink = `[${linkText}](${linkUrl})`;
+    const currentDescription = form.getValues('description') || '';
+    
+    // Get cursor position if ref is available
+    if (descriptionFieldRef.current) {
+      const textarea = descriptionFieldRef.current;
+      const cursorPos = textarea.selectionStart || currentDescription.length;
+      const newValue = 
+        currentDescription.slice(0, cursorPos) + 
+        markdownLink + 
+        currentDescription.slice(cursorPos);
+      
+      form.setValue('description', newValue);
+      
+      // Set cursor position after the inserted link
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(
+          cursorPos + markdownLink.length, 
+          cursorPos + markdownLink.length
+        );
+      }, 0);
+    } else {
+      // Fallback: append to end
+      form.setValue('description', currentDescription + (currentDescription ? ' ' : '') + markdownLink);
+    }
+
+    // Reset and close dialog
+    setLinkText("");
+    setLinkUrl("");
+    setLinkDialogOpen(false);
+    
+    toast({
+      title: "Link inserted",
+      description: "Markdown link added to description",
+    });
   };
 
   return (
@@ -258,17 +423,86 @@ export default function ProcessBuilderManual() {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description *</FormLabel>
+                  <div className="flex items-center justify-between mb-2">
+                    <FormLabel>Description *</FormLabel>
+                    <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm"
+                          className="h-7 text-xs"
+                          data-testid="button-add-link"
+                        >
+                          <LinkIcon className="h-3 w-3 mr-1" />
+                          Add Link
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md" data-testid="dialog-add-link">
+                        <DialogHeader>
+                          <DialogTitle>Insert Link</DialogTitle>
+                          <DialogDescription>
+                            Add a markdown link to your description
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="link-text">Display Text</Label>
+                            <Input
+                              id="link-text"
+                              placeholder="Click here"
+                              value={linkText}
+                              onChange={(e) => setLinkText(e.target.value)}
+                              data-testid="input-link-text"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="link-url">URL</Label>
+                            <Input
+                              id="link-url"
+                              placeholder="https://example.com"
+                              value={linkUrl}
+                              onChange={(e) => setLinkUrl(e.target.value)}
+                              data-testid="input-link-url"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setLinkDialogOpen(false)}
+                              data-testid="button-cancel-link"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="button"
+                              onClick={handleInsertLink}
+                              data-testid="button-insert-link"
+                            >
+                              Insert Link
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                   <FormControl>
                     <Textarea
                       {...field}
+                      ref={(e) => {
+                        field.ref(e);
+                        if (e) {
+                          (descriptionFieldRef as any).current = e;
+                        }
+                      }}
                       placeholder="Brief description of this process"
                       rows={2}
                       data-testid="input-process-description"
                     />
                   </FormControl>
                   <p className="text-xs text-muted-foreground mt-1">
-                    💡 Tip: Add links using <code className="bg-muted px-1 py-0.5 rounded">[keyword](url)</code> or paste plain URLs
+                    💡 Tip: Use the "Add Link" button or manually format: <code className="bg-muted px-1 py-0.5 rounded">[keyword](url)</code>
                   </p>
                   <FormMessage />
                 </FormItem>
@@ -302,9 +536,9 @@ export default function ProcessBuilderManual() {
 
             {/* Steps Input Section */}
             <div className="space-y-3">
-              <FormLabel>Steps *</FormLabel>
+              <FormLabel>Steps (optional)</FormLabel>
               <p className="text-sm text-muted-foreground">
-                Paste or type all steps below, then click "Format with AI" to organize them
+                Paste or type all steps below, then click "Format with AI" to organize them. Or skip steps and just attach files below.
               </p>
               
               <Textarea
@@ -317,24 +551,47 @@ export default function ProcessBuilderManual() {
                 data-testid="textarea-steps-input"
               />
 
-              {/* AI Cleanup Level Slider */}
-              <div className="space-y-2 p-4 bg-muted rounded-lg">
+              {/* AI Cleanup Toggle and Settings */}
+              <div className="space-y-3 p-4 bg-muted rounded-lg">
+                {/* AI Cleanup Toggle */}
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">AI Cleanup Level: {cleanupLevel}</label>
-                  <span className="text-xs text-muted-foreground">{getCleanupLabel(cleanupLevel)}</span>
+                  <div className="space-y-0.5">
+                    <Label htmlFor="ai-cleanup-toggle" className="text-sm font-medium">
+                      AI Cleanup
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Use OpenAI to format and polish your steps
+                    </p>
+                  </div>
+                  <Switch
+                    id="ai-cleanup-toggle"
+                    checked={aiCleanupEnabled}
+                    onCheckedChange={setAiCleanupEnabled}
+                    data-testid="switch-ai-cleanup"
+                  />
                 </div>
-                <Slider
-                  value={[cleanupLevel]}
-                  onValueChange={(value) => setCleanupLevel(value[0])}
-                  min={1}
-                  max={5}
-                  step={1}
-                  className="w-full"
-                  data-testid="slider-cleanup-level"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Lower = keeps your wording | Higher = more professional polish
-                </p>
+
+                {/* AI Cleanup Level Slider (only shown when AI is enabled) */}
+                {aiCleanupEnabled && (
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Cleanup Level: {cleanupLevel}</label>
+                      <span className="text-xs text-muted-foreground">{getCleanupLabel(cleanupLevel)}</span>
+                    </div>
+                    <Slider
+                      value={[cleanupLevel]}
+                      onValueChange={(value) => setCleanupLevel(value[0])}
+                      min={1}
+                      max={5}
+                      step={1}
+                      className="w-full"
+                      data-testid="slider-cleanup-level"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Lower = keeps your wording | Higher = more professional polish
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -404,6 +661,14 @@ export default function ProcessBuilderManual() {
               </div>
             )}
 
+            {/* File Attachments Section */}
+            <FileUploadSection
+              files={pendingFiles}
+              onFilesChange={setPendingFiles}
+              maxTotalSizeMB={50}
+              disabled={createMutation.isPending || isUploadingFiles}
+            />
+
             {/* Fixed Bottom Action Bar */}
             <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4 shadow-lg">
               <div className="container mx-auto max-w-2xl flex gap-3">
@@ -418,11 +683,20 @@ export default function ProcessBuilderManual() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createMutation.isPending || steps.length === 0}
+                  disabled={createMutation.isPending || isUploadingFiles || (steps.length === 0 && pendingFiles.length === 0)}
                   className="flex-1"
                   data-testid="button-save-process"
                 >
-                  {createMutation.isPending ? "Saving..." : "Save Process"}
+                  {isUploadingFiles ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Uploading files...
+                    </>
+                  ) : createMutation.isPending ? (
+                    "Saving..."
+                  ) : (
+                    "Save Process"
+                  )}
                 </Button>
               </div>
             </div>

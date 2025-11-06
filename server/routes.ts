@@ -720,6 +720,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Process Attachment routes
+  app.post("/api/processes/:id/attachments", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const processId = req.params.id;
+      const process = await storage.getProcess(processId);
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      // Get file info
+      const filename = req.file.originalname;
+      const mimeType = req.file.mimetype;
+      const fileSize = req.file.size.toString();
+      const fileData = req.file.buffer.toString('base64');
+      
+      // Determine file type
+      let fileType = 'other';
+      if (mimeType === 'application/pdf') fileType = 'pdf';
+      else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') fileType = 'docx';
+      else if (mimeType === 'application/msword') fileType = 'doc';
+      else if (mimeType.startsWith('image/')) fileType = 'image';
+
+      // Get current max display order for this process
+      const existingAttachments = await storage.getProcessAttachments(processId);
+      const maxOrder = existingAttachments.length > 0 
+        ? Math.max(...existingAttachments.map(a => parseInt(a.displayOrder))) 
+        : -1;
+      const displayOrder = (maxOrder + 1).toString();
+
+      const attachment = await storage.createProcessAttachment({
+        processId,
+        filename,
+        fileType,
+        mimeType,
+        fileSize,
+        fileData,
+        displayOrder
+      });
+
+      res.json(attachment);
+    } catch (error) {
+      console.error('Error uploading attachment:', error);
+      res.status(500).json({ message: "Error uploading attachment" });
+    }
+  });
+
+  app.get("/api/processes/:id/attachments", async (req, res) => {
+    try {
+      const attachments = await storage.getProcessAttachments(req.params.id);
+      // Don't send file data in list response, just metadata
+      const attachmentList = attachments.map(({ fileData, ...rest }) => rest);
+      res.json(attachmentList);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching attachments" });
+    }
+  });
+
+  app.get("/api/attachments/:id", async (req, res) => {
+    try {
+      const attachment = await storage.getProcessAttachment(req.params.id);
+      if (!attachment) {
+        return res.status(404).json({ message: "Attachment not found" });
+      }
+      res.json(attachment);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching attachment" });
+    }
+  });
+
+  app.delete("/api/attachments/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteProcessAttachment(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Attachment not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error deleting attachment" });
+    }
+  });
+
+  app.patch("/api/attachments/:id/order", async (req, res) => {
+    try {
+      const { displayOrder } = req.body;
+      if (displayOrder === undefined) {
+        return res.status(400).json({ message: "Display order is required" });
+      }
+      
+      const attachment = await storage.updateAttachmentOrder(req.params.id, displayOrder.toString());
+      if (!attachment) {
+        return res.status(404).json({ message: "Attachment not found" });
+      }
+      res.json(attachment);
+    } catch (error) {
+      res.status(500).json({ message: "Error updating attachment order" });
+    }
+  });
+
   // Category routes
   app.get("/api/categories", async (req, res) => {
     try {

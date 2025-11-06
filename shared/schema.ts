@@ -85,7 +85,7 @@ export const processes = pgTable("processes", {
   description: text("description").notNull(),
   category: text("category").notNull(),
   rationale: text("rationale"),
-  steps: json("steps").$type<ProcessStep[]>().notNull().default([]),
+  steps: json("steps").$type<ProcessStep[]>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -95,13 +95,32 @@ export type ProcessStep = {
   instruction: string;
 };
 
+export const processAttachments = pgTable("process_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  processId: varchar("process_id").notNull(),
+  filename: text("filename").notNull(),
+  fileType: text("file_type").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSize: text("file_size").notNull(),
+  fileData: text("file_data").notNull(),
+  displayOrder: text("display_order").notNull().default("0"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
 export const insertProcessSchema = createInsertSchema(processes).omit({
   id: true,
   createdAt: true,
 });
 
+export const insertProcessAttachmentSchema = createInsertSchema(processAttachments).omit({
+  id: true,
+  uploadedAt: true,
+});
+
 export type InsertProcess = z.infer<typeof insertProcessSchema>;
 export type Process = typeof processes.$inferSelect;
+export type InsertProcessAttachment = z.infer<typeof insertProcessAttachmentSchema>;
+export type ProcessAttachment = typeof processAttachments.$inferSelect;
 
 export const categories = pgTable("categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

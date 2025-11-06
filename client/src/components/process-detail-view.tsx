@@ -1,11 +1,13 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, Edit } from "lucide-react";
-import type { Process } from "@shared/schema";
+import { ArrowLeft, Download, Edit, FileText, Image as ImageIcon, FileType, ChevronRight } from "lucide-react";
+import type { Process, ProcessAttachment } from "@shared/schema";
 import { jsPDF } from "jspdf";
 import ProcessEditForm from "./process-edit-form";
-import { queryClient } from "@/lib/queryClient";
+import FullScreenFileViewer from "./full-screen-file-viewer";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { renderTextWithLinks } from "@/lib/link-parser";
 
 interface ProcessDetailViewProps {
@@ -15,11 +17,44 @@ interface ProcessDetailViewProps {
 
 export default function ProcessDetailView({ process, onBack }: ProcessDetailViewProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [viewingFile, setViewingFile] = useState<ProcessAttachment | null>(null);
+
+  const { data: attachments = [] } = useQuery<Omit<ProcessAttachment, 'fileData'>[]>({
+    queryKey: ['/api/processes', process.id, 'attachments'],
+    queryFn: async () => {
+      const response = await fetch(`/api/processes/${process.id}/attachments`);
+      return response.json();
+    },
+  });
 
   const handleEditSuccess = () => {
     setIsEditing(false);
     queryClient.invalidateQueries({ queryKey: ['/api/processes'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/processes', process.id, 'attachments'] });
   };
+
+  const handleViewFile = async (attachmentId: string) => {
+    try {
+      const response = await fetch(`/api/attachments/${attachmentId}`);
+      const fullAttachment: ProcessAttachment = await response.json();
+      setViewingFile(fullAttachment);
+    } catch (error) {
+      console.error('Error loading file:', error);
+    }
+  };
+
+  if (viewingFile) {
+    return (
+      <FullScreenFileViewer
+        fileId={viewingFile.id}
+        filename={viewingFile.filename}
+        fileType={viewingFile.fileType}
+        mimeType={viewingFile.mimeType}
+        fileData={viewingFile.fileData}
+        onClose={() => setViewingFile(null)}
+      />
+    );
+  }
 
   if (isEditing) {
     return (
@@ -30,6 +65,16 @@ export default function ProcessDetailView({ process, onBack }: ProcessDetailView
       />
     );
   }
+  
+  const getFileIcon = (fileType: string) => {
+    if (fileType === 'image') {
+      return <ImageIcon className="h-5 w-5 text-blue-500" />;
+    } else if (fileType === 'pdf') {
+      return <FileText className="h-5 w-5 text-red-500" />;
+    } else {
+      return <FileType className="h-5 w-5 text-purple-500" />;
+    }
+  };
   const exportToPDF = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -139,21 +184,50 @@ export default function ProcessDetailView({ process, onBack }: ProcessDetailView
             <p className="text-muted-foreground break-words overflow-wrap-anywhere" data-testid="text-process-description">{renderTextWithLinks(process.description)}</p>
           </div>
 
-          <div>
-            <h3 className="font-semibold text-lg mb-3">Step-by-Step Instructions</h3>
-            <div className="space-y-4">
-              {process.steps?.map((step) => (
-                <div key={step.id} className="flex gap-3 sm:gap-4" data-testid={`step-display-${step.id}`}>
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">
-                    {step.stepNumber}
+          {process.steps && process.steps.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-lg mb-3">Step-by-Step Instructions</h3>
+              <div className="space-y-4">
+                {process.steps.map((step) => (
+                  <div key={step.id} className="flex gap-3 sm:gap-4" data-testid={`step-display-${step.id}`}>
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">
+                      {step.stepNumber}
+                    </div>
+                    <div className="flex-1 pt-1 min-w-0">
+                      <p className="text-muted-foreground break-words">{step.instruction}</p>
+                    </div>
                   </div>
-                  <div className="flex-1 pt-1 min-w-0">
-                    <p className="text-muted-foreground break-words">{step.instruction}</p>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {attachments.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-lg mb-3">Attachments</h3>
+              <div className="space-y-2">
+                {attachments.map((attachment) => (
+                  <button
+                    key={attachment.id}
+                    onClick={() => handleViewFile(attachment.id)}
+                    className="w-full flex items-center gap-3 p-3 bg-muted hover:bg-muted/70 rounded-lg transition-colors cursor-pointer text-left"
+                    data-testid={`attachment-${attachment.id}`}
+                  >
+                    {getFileIcon(attachment.fileType)}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate" data-testid={`attachment-name-${attachment.id}`}>
+                        {attachment.filename}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {attachment.fileType.toUpperCase()}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

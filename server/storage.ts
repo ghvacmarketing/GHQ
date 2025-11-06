@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type ImportBatch, type InsertImportBatch, quotes, parts, technicians, processes, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, importBatches } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type ImportBatch, type InsertImportBatch, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, importBatches } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and } from "drizzle-orm";
@@ -29,6 +29,13 @@ export interface IStorage {
   createProcess(process: InsertProcess): Promise<Process>;
   updateProcess(id: string, process: Partial<Process>): Promise<Process | undefined>;
   deleteProcess(id: string): Promise<boolean>;
+  
+  // Process Attachment operations
+  getProcessAttachment(id: string): Promise<ProcessAttachment | undefined>;
+  getProcessAttachments(processId: string): Promise<ProcessAttachment[]>;
+  createProcessAttachment(attachment: InsertProcessAttachment): Promise<ProcessAttachment>;
+  deleteProcessAttachment(id: string): Promise<boolean>;
+  updateAttachmentOrder(id: string, displayOrder: string): Promise<ProcessAttachment | undefined>;
   
   // Category operations
   getAllCategories(): Promise<Category[]>;
@@ -204,8 +211,45 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProcess(id: string): Promise<boolean> {
+    // First delete all attachments for this process
+    await db.delete(processAttachments).where(eq(processAttachments.processId, id));
+    // Then delete the process itself
     const result = await db.delete(processes).where(eq(processes.id, id));
     return (result.rowCount || 0) > 0;
+  }
+
+  // Process Attachment operations
+  async getProcessAttachment(id: string): Promise<ProcessAttachment | undefined> {
+    const [attachment] = await db.select().from(processAttachments).where(eq(processAttachments.id, id));
+    return attachment || undefined;
+  }
+
+  async getProcessAttachments(processId: string): Promise<ProcessAttachment[]> {
+    return await db.select().from(processAttachments)
+      .where(eq(processAttachments.processId, processId))
+      .orderBy(processAttachments.displayOrder);
+  }
+
+  async createProcessAttachment(insertAttachment: InsertProcessAttachment): Promise<ProcessAttachment> {
+    const [attachment] = await db
+      .insert(processAttachments)
+      .values(insertAttachment)
+      .returning();
+    return attachment;
+  }
+
+  async deleteProcessAttachment(id: string): Promise<boolean> {
+    const result = await db.delete(processAttachments).where(eq(processAttachments.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async updateAttachmentOrder(id: string, displayOrder: string): Promise<ProcessAttachment | undefined> {
+    const [attachment] = await db
+      .update(processAttachments)
+      .set({ displayOrder })
+      .where(eq(processAttachments.id, id))
+      .returning();
+    return attachment || undefined;
   }
 
   // Category operations
