@@ -120,9 +120,8 @@ class GoogleSheetsService {
           return previousCache.data;
         }
         
-        // No previous cache available, return defaults
-        console.warn('No previous cache available after API error, returning default values');
-        return this.getDefaultValues();
+        // No previous cache available - CANNOT provide accurate quotes without Google Sheets data
+        throw new Error(`Google Sheets sync failed and no cached data available. Cannot generate accurate quotes. API error: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -185,9 +184,8 @@ class GoogleSheetsService {
         return previousCache.data;
       }
       
-      // No previous cache available, return defaults
-      console.warn('No previous cache available, returning default values');
-      return this.getDefaultValues();
+      // No previous cache available - CANNOT provide accurate quotes without Google Sheets data
+      throw new Error(`Google Sheets sync failed and no cached data available. Cannot generate accurate quotes. Error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
