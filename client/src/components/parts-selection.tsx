@@ -36,7 +36,7 @@ const PartsSelection = memo(function PartsSelection({
   disabled = false,
 }: PartsSelectionProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [partQuantities, setPartQuantities] = useState<{ [key: string]: number }>({});
+  const [partQuantities, setPartQuantities] = useState<{ [key: string]: number | string }>({});
   const [partPrices, setPartPrices] = useState<{ [key: string]: number }>({});
   const [partNumbers, setPartNumbers] = useState<{ [key: string]: string }>({});
 
@@ -59,7 +59,12 @@ const PartsSelection = memo(function PartsSelection({
   };
 
   const addPart = (part: Part) => {
-    const quantity = partQuantities[part.partNumber] || 1;
+    const quantityValue = partQuantities[part.partNumber];
+    const quantity = (typeof quantityValue === 'number' && quantityValue > 0) 
+      ? quantityValue
+      : (typeof quantityValue === 'string' && parseFloat(quantityValue) > 0)
+        ? parseFloat(quantityValue)
+        : 1;
     const price = partPrices[part.partNumber] || Number(part.price);
     const customPartNumber = partNumbers[part.partNumber] || part.partNumber;
     
@@ -87,7 +92,7 @@ const PartsSelection = memo(function PartsSelection({
     // Reset quantity, price, and part number after adding
     setPartQuantities(prev => ({
       ...prev,
-      [part.partNumber]: 1,
+      [part.partNumber]: '',
     }));
     setPartPrices(prev => ({
       ...prev,
@@ -251,13 +256,13 @@ const PartsSelection = memo(function PartsSelection({
                             part.description.toLowerCase().includes('copper') || part.description.toLowerCase().includes('insulation') ? 'feet' :
                             part.description.toLowerCase().includes('refrigerant') && !part.description.toLowerCase().includes('filter dryer') ? 'lbs' : 'qty'
                           }
-                          min="1"
+                          min="0"
                           step={
                             part.description.toLowerCase().includes('refrigerant') && !part.description.toLowerCase().includes('filter dryer') ? '0.1' : '1'
                           }
-                          value={partQuantities[part.partNumber] || 1}
+                          value={partQuantities[part.partNumber] ?? ''}
                           onChange={(e) => {
-                            const value = parseFloat(e.target.value) || 1;
+                            const value = e.target.value === '' ? '' : parseFloat(e.target.value);
                             setPartQuantities(prev => ({
                               ...prev,
                               [part.partNumber]: value,
