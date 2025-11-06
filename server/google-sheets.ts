@@ -146,15 +146,6 @@ class GoogleSheetsService {
         return parseFloat(cellValue) || 0;
       });
 
-      console.log('Google Sheets values debug:');
-      console.log('  C6 commissionPercent:', values[1]);
-      console.log('  C7 financingPromotionPercent:', values[2]);
-      console.log('  C8 profitPercent:', values[3]);
-      console.log('  B41 overheadPercent:', values[13]);
-      console.log('  B42 profitPercentB42:', values[14]);
-      console.log('  B43 financingCostPercent:', values[15]);
-      console.log('  B44 commissionPercentB44:', values[16]);
-      
       const fetchedData = {
         // Labor and business rates (C5-C8) - kept for backward compatibility but not used
         laborRate: values[0] || 65,
