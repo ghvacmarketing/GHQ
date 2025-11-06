@@ -37,6 +37,7 @@ Preferred communication style: Simple, everyday language.
   - Cache only expires after 24 hours or successful refresh
   - Cache metadata displayed in admin UI showing last sync time and age
   - Dramatically reduces Google Sheets API quota usage and improves load times
+  - **NO FALLBACK DEFAULTS**: System will throw error if Google Sheets sync fails AND no cache exists, preventing incorrect quotes with outdated pricing
 - **Admin Settings Performance Optimization** (Added Nov 2025):
   - Split admin page into lightweight `AdminLogin` component (instant render) and heavy `AdminDashboard` component (loads after auth)
   - Login page now renders instantly (<50ms) without query setup overhead

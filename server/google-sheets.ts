@@ -76,8 +76,14 @@ class GoogleSheetsService {
     }
 
     if (!this.apiKey || !this.sheetId) {
-      console.warn('Google Sheets API key or Sheet ID not configured, returning defaults');
-      return this.getDefaultValues();
+      console.error('Google Sheets API key or Sheet ID not configured');
+      // If we have a previous cache, use it
+      if (this.cache) {
+        console.log('Using cached data due to missing credentials (age: ' + Math.round((Date.now() - this.cache.timestamp) / 1000 / 60) + ' minutes)');
+        return this.cache.data;
+      }
+      // No cache available - throw error
+      throw new Error('Google Sheets API credentials not configured and no cached data available. Cannot generate accurate quotes.');
     }
 
     console.log('Fetching fresh data from Google Sheets...');

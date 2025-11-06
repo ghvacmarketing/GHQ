@@ -58,7 +58,7 @@ export default function QuoteEdit() {
   });
 
   // Fetch initial data
-  const { data: initialData, isLoading: isLoadingData, isError: isErrorData } = useQuery({
+  const { data: initialData, isLoading: isLoadingData, isError: isErrorData, error: initialDataError } = useQuery({
     queryKey: ["/api/initial-data"],
     staleTime: Infinity, // Cache for entire browser session (server has 24hr cache)
     gcTime: Infinity, // Keep in cache indefinitely
@@ -128,9 +128,14 @@ export default function QuoteEdit() {
         !settings.warrantyDiscounts) {
       // Only show error if query has actually failed, not during initial load
       if (isErrorData || initialData) {
+        // Extract error message from API response if available
+        const errorMessage = initialDataError instanceof Error 
+          ? (initialDataError as any).message || "Unable to load pricing settings from Google Sheets."
+          : "Unable to load pricing settings from Google Sheets.";
+        
         toast({
-          title: "Settings Not Available",
-          description: "Unable to load pricing settings from Google Sheets. Please check your internet connection and try again.",
+          title: "Google Sheets Sync Error",
+          description: errorMessage,
           variant: "destructive",
         });
       }
