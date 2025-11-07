@@ -10,6 +10,7 @@ import redlogo from "@assets/redlogo.webp";
 import type { Process } from "@shared/schema";
 import ProcessDetailView from "@/components/process-detail-view";
 import { renderTextWithLinks } from "@/lib/link-parser";
+import { stripHtml } from "@/lib/markdown-to-html";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -165,7 +166,7 @@ export default function ProcessesSystems() {
                                 {process.name}
                               </h3>
                               <p className="text-sm text-muted-foreground mt-1 break-words overflow-wrap-anywhere">
-                                {renderTextWithLinks(process.description)}
+                                {stripHtml(process.description)}
                               </p>
                               <div className="flex items-center gap-3 mt-2">
                                 <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded" data-testid={`text-category-${process.id}`}>

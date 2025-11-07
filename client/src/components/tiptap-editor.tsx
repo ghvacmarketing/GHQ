@@ -295,7 +295,7 @@ export default function TiptapEditor({
   if (!editor) return null;
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden bg-background" data-testid="tiptap-editor">
+    <div className="border-2 border-muted-foreground/30 rounded-lg overflow-hidden bg-background" data-testid="tiptap-editor">
       {editable && (
         <MenuBar
           editor={editor}
