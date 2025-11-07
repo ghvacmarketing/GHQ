@@ -9,6 +9,8 @@ import ProcessEditForm from "./process-edit-form";
 import FullScreenFileViewer from "./full-screen-file-viewer";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { renderTextWithLinks } from "@/lib/link-parser";
+import TiptapEditor from "./tiptap-editor";
+import { stripHtml } from "@/lib/markdown-to-html";
 
 interface ProcessDetailViewProps {
   process: Process;
@@ -103,7 +105,8 @@ export default function ProcessDetailView({ process, onBack }: ProcessDetailView
     yPosition += 7;
     
     doc.setFont("helvetica", "normal");
-    const descriptionLines = doc.splitTextToSize(process.description, maxWidth);
+    const plainDescription = stripHtml(process.description); // Strip HTML tags for PDF export
+    const descriptionLines = doc.splitTextToSize(plainDescription, maxWidth);
     doc.text(descriptionLines, margin, yPosition);
     yPosition += (descriptionLines.length * 7) + 15;
 
@@ -181,7 +184,29 @@ export default function ProcessDetailView({ process, onBack }: ProcessDetailView
         <CardContent className="space-y-6">
           <div>
             <h3 className="font-semibold text-lg mb-2">Description</h3>
-            <p className="text-muted-foreground break-words overflow-wrap-anywhere" data-testid="text-process-description">{renderTextWithLinks(process.description)}</p>
+            <div 
+              data-testid="text-process-description"
+              onClick={(e) => {
+                // Handle file reference clicks
+                const target = e.target as HTMLElement;
+                if (target.tagName === 'A') {
+                  const href = target.getAttribute('href');
+                  // Check if this is an attachment link
+                  const attachmentMatch = href?.match(/\/api\/processes\/[^/]+\/attachments\/([^/]+)/);
+                  if (attachmentMatch) {
+                    e.preventDefault();
+                    const attachmentId = attachmentMatch[1];
+                    handleViewFile(attachmentId);
+                  }
+                }
+              }}
+            >
+              <TiptapEditor
+                content={process.description}
+                onChange={() => {}}
+                editable={false}
+              />
+            </div>
           </div>
 
           {process.steps && process.steps.length > 0 && (

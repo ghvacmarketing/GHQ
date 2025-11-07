@@ -60,6 +60,22 @@ Preferred communication style: Simple, everyday language.
 - **Quote Breakdown Display**: Toggleable detailed breakdown in quote summary showing all intermediate calculations. Default view displays simple summary (subtotal, labor, tax, total). Expandable view reveals complete calculation breakdown including parts subtotal, free parts, material shrinkage, labor benefits, warranty reserve, direct cost, overhead allocation, profit allocation, financing cost, and commission. Works identically in both quote creation and edit flows.
 - **Developer Tools**: Admin-accessible section displaying live quote calculation formulas with actual values from current Google Sheets settings. Shows step-by-step calculation logic including material costs, labor calculations, taxes, warranty reserve, and selling price formula with all percentage allocations (overhead, profit, financing, commission). Explicitly labeled as "Live Formula" to clarify values come from Google Sheets, not hard-coded constants.
 - **Processes and Systems Module**: Searchable wiki, manual and voice-guided process creation (using OpenAI Whisper for transcription and GPT for formatting/extraction with configurable cleanup intensity), PDF export (jsPDF), PostgreSQL storage with JSON column for steps.
+  - **Rich Text Editor** (Added Nov 2025): Process descriptions use Tiptap rich text editor with mobile-friendly toolbar for formatting (bold, italic, headings, lists), inline images (base64-encoded, 5MB limit), links, and file references to attached documents. File references are clickable and open the full-screen viewer.
+  - **Backward Compatibility System** (Added Nov 2025): Comprehensive conversion and preservation logic for legacy content:
+    - `containsHtmlTags()`: Detects actual HTML tags (p, div, span, strong, em, a, br, h1-6, ul, ol, li, etc.) vs plain text with angle brackets
+    - `convertToHtml()`: Converts legacy markdown/plain text to HTML for Tiptap rendering
+      - Preserves legacy inline HTML like "Inspect <strong>filter</strong> monthly"
+      - Escapes plain text with angle brackets like "Replace <filter> monthly" or "L1 < L2 > L3"
+      - Converts markdown links [text](url) to HTML <a> tags with proper escaping
+      - Converts plain URLs to clickable links
+      - Handles special characters (<, >, &, ", ') correctly
+    - `stripHtml()`: Strips HTML for PDF export while preserving structure
+      - Returns plain text as-is if no HTML tags detected (preserves angle brackets in legacy content)
+      - Converts structural tags to text equivalents: <p> → \n\n, <br> → \n, <li> → •
+      - Appends link URLs in parentheses: "text (url)"
+      - Normalizes whitespace in multi-line links to prevent PDF formatting issues
+    - Ensures all legacy content (plain text, markdown, inline HTML) renders correctly in both view and edit modes
+    - Preserves formatting in PDF exports while maintaining readability
 - **PDF Management**: Secure storage and viewing of Price Book PDFs in PostgreSQL, admin-controlled upload with password protection and size validation.
 - **App Configuration**: Separate API endpoints for Google Sheets pricing and database-backed application settings.
 - **Announcement System**: Admin-configurable modal for user notifications with version tracking via localStorage. Supports full CRUD operations (create, edit, delete) with automatic active/inactive management. Markdown support for links (plain URLs and [text](url) format) with URL sanitization for security.

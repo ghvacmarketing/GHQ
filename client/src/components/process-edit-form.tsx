@@ -12,6 +12,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { insertProcessSchema, type ProcessStep, type Process, type Category } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { queryClient } from "@/lib/queryClient";
+import TiptapEditor from "./tiptap-editor";
 
 const formSchema = insertProcessSchema.extend({
   name: z.string().min(1, "Process name is required"),
@@ -123,11 +124,13 @@ export default function ProcessEditForm({ process, onSuccess, onCancel }: Proces
               <FormItem>
                 <FormLabel>Description</FormLabel>
                 <FormControl>
-                  <Textarea {...field} placeholder="Brief description of this process" rows={2} data-testid="input-edit-process-description" />
+                  <TiptapEditor
+                    content={field.value || ''}
+                    onChange={field.onChange}
+                    placeholder="Brief description of this process. Use the toolbar to add formatting, images, and links."
+                    processId={process.id}
+                  />
                 </FormControl>
-                <p className="text-xs text-muted-foreground mt-1">
-                  💡 Tip: Add links using <code className="bg-muted px-1 py-0.5 rounded">[keyword](url)</code> or paste plain URLs
-                </p>
                 <FormMessage />
               </FormItem>
             )}

@@ -10,8 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Settings, Sparkles, Clipboard, X, Loader2, Link as LinkIcon } from "lucide-react";
+import { ArrowLeft, Settings, Sparkles, Clipboard, X, Loader2 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { insertProcessSchema, type ProcessStep, type Category } from "@shared/schema";
 import { nanoid } from "nanoid";
@@ -21,6 +20,7 @@ import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import FileUploadSection, { type PendingFile } from "@/components/file-upload-section";
+import TiptapEditor from "@/components/tiptap-editor";
 
 const formSchema = insertProcessSchema.extend({
   name: z.string().min(1, "Process name is required"),
@@ -38,14 +38,10 @@ export default function ProcessBuilderManual() {
   const [aiCleanupEnabled, setAiCleanupEnabled] = useState(true);
   const [cleanupLevel, setCleanupLevel] = useState(3);
   const [isFormatting, setIsFormatting] = useState(false);
-  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
-  const [linkText, setLinkText] = useState("");
-  const [linkUrl, setLinkUrl] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [createdProcessId, setCreatedProcessId] = useState<string | null>(null);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const descriptionFieldRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
@@ -288,53 +284,6 @@ export default function ProcessBuilderManual() {
     return labels[level] || labels[3];
   };
 
-  const handleInsertLink = () => {
-    if (!linkText.trim() || !linkUrl.trim()) {
-      toast({
-        title: "Missing information",
-        description: "Please provide both text and URL",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const markdownLink = `[${linkText}](${linkUrl})`;
-    const currentDescription = form.getValues('description') || '';
-    
-    // Get cursor position if ref is available
-    if (descriptionFieldRef.current) {
-      const textarea = descriptionFieldRef.current;
-      const cursorPos = textarea.selectionStart || currentDescription.length;
-      const newValue = 
-        currentDescription.slice(0, cursorPos) + 
-        markdownLink + 
-        currentDescription.slice(cursorPos);
-      
-      form.setValue('description', newValue);
-      
-      // Set cursor position after the inserted link
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(
-          cursorPos + markdownLink.length, 
-          cursorPos + markdownLink.length
-        );
-      }, 0);
-    } else {
-      // Fallback: append to end
-      form.setValue('description', currentDescription + (currentDescription ? ' ' : '') + markdownLink);
-    }
-
-    // Reset and close dialog
-    setLinkText("");
-    setLinkUrl("");
-    setLinkDialogOpen(false);
-    
-    toast({
-      title: "Link inserted",
-      description: "Markdown link added to description",
-    });
-  };
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
@@ -423,87 +372,20 @@ export default function ProcessBuilderManual() {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-center justify-between mb-2">
-                    <FormLabel>Description *</FormLabel>
-                    <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm"
-                          className="h-7 text-xs"
-                          data-testid="button-add-link"
-                        >
-                          <LinkIcon className="h-3 w-3 mr-1" />
-                          Add Link
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-md" data-testid="dialog-add-link">
-                        <DialogHeader>
-                          <DialogTitle>Insert Link</DialogTitle>
-                          <DialogDescription>
-                            Add a markdown link to your description
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div>
-                            <Label htmlFor="link-text">Display Text</Label>
-                            <Input
-                              id="link-text"
-                              placeholder="Click here"
-                              value={linkText}
-                              onChange={(e) => setLinkText(e.target.value)}
-                              data-testid="input-link-text"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="link-url">URL</Label>
-                            <Input
-                              id="link-url"
-                              placeholder="https://example.com"
-                              value={linkUrl}
-                              onChange={(e) => setLinkUrl(e.target.value)}
-                              data-testid="input-link-url"
-                            />
-                          </div>
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => setLinkDialogOpen(false)}
-                              data-testid="button-cancel-link"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              type="button"
-                              onClick={handleInsertLink}
-                              data-testid="button-insert-link"
-                            >
-                              Insert Link
-                            </Button>
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+                  <FormLabel>Description *</FormLabel>
                   <FormControl>
-                    <Textarea
-                      {...field}
-                      ref={(e) => {
-                        field.ref(e);
-                        if (e) {
-                          (descriptionFieldRef as any).current = e;
-                        }
-                      }}
-                      placeholder="Brief description of this process"
-                      rows={2}
-                      data-testid="input-process-description"
+                    <TiptapEditor
+                      content={field.value || ''}
+                      onChange={field.onChange}
+                      placeholder="Brief description of this process. Use the toolbar to add formatting, images, and links."
+                      attachedFiles={pendingFiles.map(pf => ({
+                        id: pf.id,
+                        filename: pf.file.name,
+                        fileType: pf.file.type.startsWith('image/') ? 'image' : 'file',
+                      }))}
+                      processId={createdProcessId}
                     />
                   </FormControl>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    💡 Tip: Use the "Add Link" button or manually format: <code className="bg-muted px-1 py-0.5 rounded">[keyword](url)</code>
-                  </p>
                   <FormMessage />
                 </FormItem>
               )}

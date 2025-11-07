@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { convertToHtml } from '@/lib/markdown-to-html';
 
 type TiptapEditorProps = {
   content: string;
@@ -203,7 +204,7 @@ export default function TiptapEditor({
         placeholder,
       }),
     ],
-    content,
+    content: convertToHtml(content), // Convert legacy markdown/plain text to HTML
     editable,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -217,7 +218,7 @@ export default function TiptapEditor({
 
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content);
+      editor.commands.setContent(convertToHtml(content));
     }
   }, [content, editor]);
 
@@ -230,11 +231,11 @@ export default function TiptapEditor({
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      // Validate file size (10MB max)
-      if (file.size > 10 * 1024 * 1024) {
+      // Validate file size (5MB max for inline images to keep description payload reasonable)
+      if (file.size > 5 * 1024 * 1024) {
         toast({
           title: 'File too large',
-          description: 'Image must be less than 10MB',
+          description: 'Inline images must be less than 5MB. Use file attachments for larger files.',
           variant: 'destructive',
         });
         return;
@@ -242,19 +243,29 @@ export default function TiptapEditor({
 
       setIsUploading(true);
       try {
+        // If custom upload handler provided, use it
         if (onImageUpload) {
           const imageUrl = await onImageUpload(file);
           editor?.chain().focus().setImage({ src: imageUrl }).run();
-          toast({
-            title: 'Image uploaded',
-            description: 'Image added to description',
-          });
+        } else {
+          // Otherwise convert to base64 and embed directly
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64 = reader.result as string;
+            editor?.chain().focus().setImage({ src: base64 }).run();
+          };
+          reader.readAsDataURL(file);
         }
+        
+        toast({
+          title: 'Image added',
+          description: 'Image inserted into description',
+        });
       } catch (error) {
         console.error('Error uploading image:', error);
         toast({
           title: 'Upload failed',
-          description: 'Could not upload image',
+          description: 'Could not add image',
           variant: 'destructive',
         });
       } finally {
