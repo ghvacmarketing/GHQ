@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Plus, X, ArrowLeft } from "lucide-react";
+import { Plus, X, ArrowLeft, Info } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { insertProcessSchema, type ProcessStep, type Process, type Category } from "@shared/schema";
 import { nanoid } from "nanoid";
@@ -123,6 +123,10 @@ export default function ProcessEditForm({ process, onSuccess, onCancel }: Proces
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Description</FormLabel>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
+                  <Info className="h-3 w-3" />
+                  Tip: Paste markdown-formatted text from AI tools or other sources
+                </p>
                 <FormControl>
                   <TiptapEditor
                     content={field.value || ''}

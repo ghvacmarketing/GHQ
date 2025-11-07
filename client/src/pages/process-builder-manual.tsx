@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Settings, Sparkles, Clipboard, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Settings, Sparkles, Clipboard, X, Loader2, Info } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { insertProcessSchema, type ProcessStep, type Category } from "@shared/schema";
 import { nanoid } from "nanoid";
@@ -373,6 +373,10 @@ export default function ProcessBuilderManual() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Description *</FormLabel>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
+                    <Info className="h-3 w-3" />
+                    Tip: Paste markdown-formatted text from AI tools or other sources
+                  </p>
                   <FormControl>
                     <TiptapEditor
                       content={field.value || ''}
