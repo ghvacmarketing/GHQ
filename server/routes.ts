@@ -702,11 +702,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/processes/:id", async (req, res) => {
     try {
-      // Verify admin authentication via session
-      if (!(req.session as any)?.isAdmin) {
-        return res.status(401).json({ message: "Unauthorized - Admin access required" });
-      }
-
       const success = await storage.deleteProcess(req.params.id);
       if (!success) {
         return res.status(404).json({ message: "Process not found" });
