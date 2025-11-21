@@ -126,10 +126,10 @@ export default function AdminSettings() {
   }
   
   // Main admin component with all the heavy queries and state
-  return <AdminDashboard toast={toast} queryClient={queryClient} />;
+  return <AdminDashboard toast={toast} queryClient={queryClient} setLocation={setLocation} />;
 }
 
-function AdminDashboard({ toast, queryClient }: { toast: any; queryClient: any }) {
+function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; queryClient: any; setLocation: any }) {
   const [selectedQuotes, setSelectedQuotes] = useState<Set<string>>(new Set());
   const [emailAddresses, setEmailAddresses] = useState<string[]>([]);
   const [newEmailAddress, setNewEmailAddress] = useState("");
