@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,6 +117,7 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
 export default function AdminSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
   // Show lightweight login form first for instant render
@@ -747,7 +749,7 @@ function AdminDashboard({ toast, queryClient }: { toast: any; queryClient: any }
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => window.history.back()}
+              onClick={() => setLocation('/')}
               data-testid="button-back"
               className="flex-shrink-0"
             >
