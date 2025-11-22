@@ -129,3 +129,52 @@ export function stripHtml(html: string): string {
   
   return text.trim();
 }
+
+/**
+ * Render sanitized HTML for preview contexts (e.g., card lists)
+ * Keeps only safe formatting tags (p, strong, em, a) and removes images, headings, lists
+ * Converts markdown links to HTML if needed for backward compatibility
+ */
+export function renderPreviewHtml(content: string): string {
+  if (!content) return '';
+  
+  let html = content;
+  
+  // If content doesn't contain HTML tags, convert markdown to HTML first
+  if (!containsHtmlTags(content)) {
+    html = convertToHtml(content);
+  }
+  
+  // Remove unsafe/complex tags but keep basic formatting
+  // Remove images
+  html = html.replace(/<img[^>]*>/gi, '');
+  
+  // Remove headings but keep content (convert to spans for inline display)
+  html = html.replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '<span class="font-semibold">$1</span>');
+  
+  // Remove lists but keep content (convert to inline with bullets)
+  html = html.replace(/<ul[^>]*>(.*?)<\/ul>/gis, '$1');
+  html = html.replace(/<ol[^>]*>(.*?)<\/ol>/gis, '$1');
+  html = html.replace(/<li[^>]*>(.*?)<\/li>/gi, '• $1 ');
+  
+  // Remove block elements that might cause layout issues
+  html = html.replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gis, '$1');
+  html = html.replace(/<pre[^>]*>(.*?)<\/pre>/gis, '$1');
+  html = html.replace(/<code[^>]*>(.*?)<\/code>/gi, '$1');
+  
+  // Remove divs but keep content
+  html = html.replace(/<div[^>]*>/gi, '');
+  html = html.replace(/<\/div>/gi, ' ');
+  
+  // Collapse multiple spaces and line breaks
+  html = html.replace(/\s+/g, ' ');
+  html = html.replace(/<br\s*\/?>/gi, ' ');
+  
+  // Clean up paragraph spacing for inline preview
+  html = html.replace(/<\/p>\s*<p[^>]*>/gi, ' ');
+  
+  // Ensure links open in new tab and have proper styling
+  html = html.replace(/<a\s+/gi, '<a target="_blank" rel="noopener noreferrer" class="text-primary hover:underline" ');
+  
+  return html.trim();
+}
