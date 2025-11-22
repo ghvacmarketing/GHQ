@@ -77,13 +77,17 @@ export function convertToHtml(content: string): string {
 export function stripHtml(html: string): string {
   if (!html) return '';
   
-  // If content doesn't contain actual HTML tags, return as-is
-  // This preserves legacy plain text like "Replace <filter> monthly" or "L1 < L2"
-  if (!containsHtmlTags(html)) {
-    return html;
-  }
-  
   let text = html;
+  
+  // If content doesn't contain actual HTML tags, handle markdown links in plain text
+  // This converts [text](url) to "text (url)" for legacy plain text content
+  if (!containsHtmlTags(html)) {
+    // Convert markdown links to readable format
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
+      return `${linkText} (${url})`;
+    });
+    return text;
+  }
   
   // Extract and preserve link URLs BEFORE removing tags
   // Convert <a href="url">text</a> to "text (url)"
