@@ -79,6 +79,12 @@ Preferred communication style: Simple, everyday language.
 - **PDF Management**: Secure storage and viewing of Price Book PDFs in PostgreSQL, admin-controlled upload with password protection and size validation.
 - **App Configuration**: Separate API endpoints for Google Sheets pricing and database-backed application settings.
 - **Announcement System**: Admin-configurable modal for user notifications with version tracking via localStorage. Supports full CRUD operations (create, edit, delete) with automatic active/inactive management. Markdown support for links (plain URLs and [text](url) format) with URL sanitization for security.
+- **Sales Prospects** (Added Nov 2025): Full CRM pipeline with lead management, notes, actions, tasks, and CSV import/export. Enhanced form validation including:
+  - **Phone Formatting**: Auto-formats to (XXX) XXX-XXXX as user types with real-time validation
+  - **Email Validation**: Regex-based validation with visual error feedback
+  - **Address Autocomplete**: Integrated with Geoapify API for dropdown address suggestions (requires VITE_GEOAPIFY_API_KEY env var)
+  - **Geolocation**: HTML5 Geolocation + reverse geocoding to auto-populate address from current location
+  - **Date Handling**: Zod schema transforms accept both string and Date formats for projectedCloseDate, closedAt, and lastImportedAt fields
 - **Security**: SESSION_SECRET environment variable is required at startup to prevent use of insecure default secrets.
 
 ## External Dependencies
@@ -89,5 +95,6 @@ Preferred communication style: Simple, everyday language.
 - **Neon Database**: Serverless PostgreSQL hosting.
 - **OpenAI API (Whisper & GPT)**: For voice transcription, intelligent text formatting, and extraction in the Processes module.
 - **Twilio**: For SMS Magic Link authentication.
+- **Geoapify API**: For address autocomplete and reverse geocoding in Sales Prospects. Requires `VITE_GEOAPIFY_API_KEY` environment variable. Free tier: 3,000 requests/day. Sign up at https://www.geoapify.com/
 - **react-pdf**: For PDF viewing.
 - **jsPDF**: For generating PDF exports of processes.

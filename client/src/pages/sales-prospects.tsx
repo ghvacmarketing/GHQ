@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter } from "lucide-react";
+import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter, Navigation } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { nanoid } from "nanoid";
 import type { Lead, LeadAction, LeadTask } from "@shared/schema";
+import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
 
 type MetricsData = {
   activeLeads: number;
@@ -593,6 +594,7 @@ export default function SalesProspects() {
 
 // Create Lead Form Component
 function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -605,16 +607,136 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
     customerType: "",
     leadSource: "",
   });
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const addressInputRef = useRef<HTMLInputElement>(null);
+
+  const GEOAPIFY_API_KEY = import.meta.env.VITE_GEOAPIFY_API_KEY || "";
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setFormData({ ...formData, phone: formatted });
+    
+    const cleaned = formatted.replace(/\D/g, '');
+    if (cleaned.length > 0 && cleaned.length < 10) {
+      setPhoneError("Phone must be 10 digits");
+    } else {
+      setPhoneError("");
+    }
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const email = e.target.value;
+    setFormData({ ...formData, email });
+    
+    if (email && !validateEmail(email)) {
+      setEmailError("Invalid email format");
+    } else {
+      setEmailError("");
+    }
+  };
+
+  const handleAddressChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData({ ...formData, address: value });
+
+    if (value.length > 2 && GEOAPIFY_API_KEY) {
+      setIsLoadingAddress(true);
+      try {
+        const response = await fetch(
+          `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(value)}&apiKey=${GEOAPIFY_API_KEY}&limit=5`
+        );
+        const data = await response.json();
+        setAddressSuggestions(data.features || []);
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error("Address autocomplete error:", error);
+      } finally {
+        setIsLoadingAddress(false);
+      }
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectAddress = (suggestion: any) => {
+    const formatted = suggestion.properties.formatted || suggestion.properties.address_line1;
+    setFormData({ ...formData, address: formatted });
+    setShowSuggestions(false);
+  };
+
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast({ description: "Geolocation is not supported", variant: "destructive" });
+      return;
+    }
+
+    setIsGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          if (!GEOAPIFY_API_KEY) {
+            toast({ description: "Location API not configured", variant: "destructive" });
+            setIsGettingLocation(false);
+            return;
+          }
+
+          const { latitude, longitude } = position.coords;
+          const response = await fetch(
+            `https://api.geoapify.com/v1/geocode/reverse?lat=${latitude}&lon=${longitude}&apiKey=${GEOAPIFY_API_KEY}`
+          );
+          const data = await response.json();
+          
+          if (data.features && data.features.length > 0) {
+            const address = data.features[0].properties.formatted || data.features[0].properties.address_line1;
+            setFormData({ ...formData, address });
+            toast({ description: "Location detected successfully", duration: 1000 });
+          }
+        } catch (error) {
+          console.error("Reverse geocoding error:", error);
+          toast({ description: "Failed to get address", variant: "destructive" });
+        } finally {
+          setIsGettingLocation(false);
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        toast({ description: "Failed to get your location", variant: "destructive" });
+        setIsGettingLocation(false);
+      }
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) return;
+    
+    // Only validate if values are entered
+    if (formData.email && formData.email.trim() !== "" && !validateEmail(formData.email)) {
+      toast({ description: "Please enter a valid email", variant: "destructive" });
+      return;
+    }
+    const cleanedPhone = formData.phone.replace(/\D/g, '');
+    if (cleanedPhone.length > 0 && cleanedPhone.length < 10) {
+      toast({ description: "Please enter a valid 10-digit phone number", variant: "destructive" });
+      return;
+    }
 
-    onSubmit({
+    const submitData: any = {
       ...formData,
       estimatedValue: formData.estimatedValue ? formData.estimatedValue : undefined,
-      projectedCloseDate: formData.projectedCloseDate ? new Date(formData.projectedCloseDate) : undefined,
-    });
+    };
+
+    // Convert date string to Date object if present
+    if (formData.projectedCloseDate) {
+      submitData.projectedCloseDate = new Date(formData.projectedCloseDate).toISOString();
+    }
+
+    onSubmit(submitData);
 
     setFormData({
       name: "",
@@ -628,6 +750,8 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       customerType: "",
       leadSource: "",
     });
+    setEmailError("");
+    setPhoneError("");
   };
 
   return (
@@ -648,28 +772,75 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
           <Input
             type="tel"
             value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            onChange={handlePhoneChange}
+            placeholder="(555) 123-4567"
             data-testid="input-lead-phone"
+            className={phoneError ? "border-red-500" : ""}
           />
+          {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
         </div>
         <div>
           <label className="text-sm font-medium">Email</label>
           <Input
             type="email"
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            onChange={handleEmailChange}
+            placeholder="email@example.com"
             data-testid="input-lead-email"
+            className={emailError ? "border-red-500" : ""}
           />
+          {emailError && <p className="text-xs text-red-500 mt-1">{emailError}</p>}
         </div>
       </div>
 
       <div>
         <label className="text-sm font-medium">Address</label>
-        <Input
-          value={formData.address}
-          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-          data-testid="input-lead-address"
-        />
+        <div className="flex gap-2 relative">
+          <div className="flex-1 relative">
+            <Input
+              ref={addressInputRef}
+              value={formData.address}
+              onChange={handleAddressChange}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              onFocus={() => addressSuggestions.length > 0 && setShowSuggestions(true)}
+              placeholder="Start typing address..."
+              data-testid="input-lead-address"
+            />
+            {showSuggestions && addressSuggestions.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-auto">
+                {addressSuggestions.map((suggestion, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => selectAddress(suggestion)}
+                    className="w-full text-left px-3 py-2 hover:bg-accent text-sm border-b last:border-b-0"
+                    data-testid={`button-address-suggestion-${idx}`}
+                  >
+                    <div className="font-medium">
+                      {suggestion.properties.formatted || suggestion.properties.address_line1}
+                    </div>
+                    {suggestion.properties.city && (
+                      <div className="text-xs text-muted-foreground">
+                        {suggestion.properties.city}, {suggestion.properties.state} {suggestion.properties.postcode}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={getCurrentLocation}
+            disabled={isGettingLocation}
+            title="Use current location"
+            data-testid="button-geolocation"
+          >
+            <Navigation className={`h-4 w-4 ${isGettingLocation ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

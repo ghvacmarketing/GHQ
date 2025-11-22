@@ -291,6 +291,22 @@ export const importBatches = pgTable("import_batches", {
 export const insertLeadSchema = createInsertSchema(leads).omit({
   id: true,
   createdAt: true,
+}).extend({
+  projectedCloseDate: z.union([z.string(), z.date()]).optional().transform((val) => {
+    if (!val) return undefined;
+    if (typeof val === 'string') return new Date(val);
+    return val;
+  }),
+  closedAt: z.union([z.string(), z.date()]).optional().transform((val) => {
+    if (!val) return undefined;
+    if (typeof val === 'string') return new Date(val);
+    return val;
+  }),
+  lastImportedAt: z.union([z.string(), z.date()]).optional().transform((val) => {
+    if (!val) return undefined;
+    if (typeof val === 'string') return new Date(val);
+    return val;
+  }),
 });
 
 export const insertImportBatchSchema = createInsertSchema(importBatches).omit({
