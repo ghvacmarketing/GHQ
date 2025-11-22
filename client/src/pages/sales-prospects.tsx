@@ -617,6 +617,15 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
 
   const GEOAPIFY_API_KEY = import.meta.env.VITE_GEOAPIFY_API_KEY || "";
 
+  // Debug: Log if API key is available
+  useEffect(() => {
+    if (GEOAPIFY_API_KEY) {
+      console.log("Geoapify API key configured");
+    } else {
+      console.warn("Geoapify API key not found - address autocomplete disabled");
+    }
+  }, [GEOAPIFY_API_KEY]);
+
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneNumber(e.target.value);
     setFormData({ ...formData, phone: formatted });
@@ -646,15 +655,27 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
 
     if (value.length > 2 && GEOAPIFY_API_KEY) {
       setIsLoadingAddress(true);
+      console.log("Fetching address suggestions for:", value);
       try {
-        const response = await fetch(
-          `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(value)}&apiKey=${GEOAPIFY_API_KEY}&limit=5`
-        );
+        const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(value)}&apiKey=${GEOAPIFY_API_KEY}&limit=5`;
+        console.log("Geoapify URL:", url.replace(GEOAPIFY_API_KEY, "***"));
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log("Geoapify response:", data);
         setAddressSuggestions(data.features || []);
         setShowSuggestions(true);
       } catch (error) {
         console.error("Address autocomplete error:", error);
+        toast({ 
+          description: "Address autocomplete unavailable", 
+          variant: "destructive",
+          duration: 2000
+        });
       } finally {
         setIsLoadingAddress(false);
       }
@@ -671,7 +692,16 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
-      toast({ description: "Geolocation is not supported", variant: "destructive" });
+      toast({ description: "Geolocation is not supported by your browser", variant: "destructive" });
+      return;
+    }
+
+    if (!GEOAPIFY_API_KEY) {
+      toast({ 
+        description: "Location feature unavailable - API key not configured", 
+        variant: "destructive",
+        duration: 3000
+      });
       return;
     }
 
@@ -679,33 +709,47 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
-          if (!GEOAPIFY_API_KEY) {
-            toast({ description: "Location API not configured", variant: "destructive" });
-            setIsGettingLocation(false);
-            return;
-          }
-
           const { latitude, longitude } = position.coords;
+          console.log("Got coordinates:", latitude, longitude);
+          
           const response = await fetch(
             `https://api.geoapify.com/v1/geocode/reverse?lat=${latitude}&lon=${longitude}&apiKey=${GEOAPIFY_API_KEY}`
           );
+          
+          if (!response.ok) {
+            throw new Error(`Reverse geocoding failed: ${response.status}`);
+          }
+          
           const data = await response.json();
+          console.log("Reverse geocoding response:", data);
           
           if (data.features && data.features.length > 0) {
             const address = data.features[0].properties.formatted || data.features[0].properties.address_line1;
             setFormData({ ...formData, address });
-            toast({ description: "Location detected successfully", duration: 1000 });
+            toast({ description: "Address detected from your location", duration: 2000 });
+          } else {
+            toast({ description: "Could not find address for your location", variant: "destructive" });
           }
         } catch (error) {
           console.error("Reverse geocoding error:", error);
-          toast({ description: "Failed to get address", variant: "destructive" });
+          toast({ description: "Failed to get address from location", variant: "destructive" });
         } finally {
           setIsGettingLocation(false);
         }
       },
       (error) => {
         console.error("Geolocation error:", error);
-        toast({ description: "Failed to get your location", variant: "destructive" });
+        let errorMessage = "Failed to get your location";
+        
+        if (error.code === 1) {
+          errorMessage = "Location permission denied - please enable location access";
+        } else if (error.code === 2) {
+          errorMessage = "Location unavailable - check your device settings";
+        } else if (error.code === 3) {
+          errorMessage = "Location request timed out - please try again";
+        }
+        
+        toast({ description: errorMessage, variant: "destructive", duration: 3000 });
         setIsGettingLocation(false);
       }
     );
