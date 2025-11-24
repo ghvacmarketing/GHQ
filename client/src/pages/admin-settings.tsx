@@ -35,8 +35,16 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
       const result = await response.json();
       
       if (result.success) {
+        toast({
+          title: "Access Granted",
+          description: "Loading admin dashboard...",
+        });
+        
+        // Wait a moment for the session cookie to be set in the browser
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Start loading all data in background immediately
-        Promise.all([
+        await Promise.all([
           queryClient.prefetchQuery({ queryKey: ["/api/settings"], staleTime: Infinity }),
           queryClient.prefetchQuery({ queryKey: ["/api/quotes/summary"] }),
           queryClient.prefetchQuery({ queryKey: ["/api/technicians"] }),
@@ -47,11 +55,6 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
           queryClient.prefetchQuery({ queryKey: ['/api/announcements'] }),
           queryClient.prefetchQuery({ queryKey: ['/api/phone-whitelist'] }),
         ]).catch(err => console.error('Error prefetching data:', err));
-        
-        toast({
-          title: "Access Granted",
-          description: "Loading admin dashboard...",
-        });
         
         onLogin();
       } else {
