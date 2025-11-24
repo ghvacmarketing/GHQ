@@ -738,6 +738,10 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
           if (data.results && data.results.length > 0) {
             const address = data.results[0].formatted_address;
             setFormData({ ...formData, address });
+            // Update the input field directly since it's uncontrolled
+            if (addressInputRef.current) {
+              addressInputRef.current.value = address;
+            }
             toast({ description: "Address detected from your location", duration: 2000 });
           } else {
             toast({ description: "Could not find address for your location", variant: "destructive" });
@@ -782,8 +786,12 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       return;
     }
 
+    // Get address from the input field since it's uncontrolled
+    const address = addressInputRef.current?.value || "";
+
     const submitData: any = {
       ...formData,
+      address,
       estimatedValue: formData.estimatedValue ? formData.estimatedValue : undefined,
     };
 
@@ -806,6 +814,10 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       customerType: "",
       leadSource: "",
     });
+    // Clear the address input field since it's uncontrolled
+    if (addressInputRef.current) {
+      addressInputRef.current.value = "";
+    }
     setEmailError("");
     setPhoneError("");
   };
@@ -854,11 +866,12 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
         <div className="flex gap-2">
           <Input
             ref={addressInputRef}
-            value={formData.address}
+            defaultValue={formData.address}
             onChange={handleAddressChange}
             placeholder="Start typing address..."
             data-testid="input-lead-address"
             className="flex-1"
+            autoComplete="off"
           />
           <Button
             type="button"
