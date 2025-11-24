@@ -670,7 +670,10 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
     autocomplete.addListener('place_changed', () => {
       const place = autocomplete.getPlace();
       
-      if (place.formatted_address) {
+      if (place.formatted_address && addressInputRef.current) {
+        // Update the input field value directly since it's uncontrolled
+        addressInputRef.current.value = place.formatted_address;
+        // Also update the state for form submission
         setFormData(prev => ({ ...prev, address: place.formatted_address || '' }));
       }
     });
