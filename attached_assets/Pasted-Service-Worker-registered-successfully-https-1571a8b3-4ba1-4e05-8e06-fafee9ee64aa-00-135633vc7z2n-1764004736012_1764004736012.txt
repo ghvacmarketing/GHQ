@@ -1,0 +1,27 @@
+Service Worker registered successfully: https://1571a8b3-4ba1-4e05-8e06-fafee9ee64aa-00-135633vc7z2nc.worf.replit.dev/
+prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1764004657036&sid=d579ed69-4010-4578-b84b-d5768d8362c5&ec=3063&gz=1:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENTUnderstand this error
+installHook.js:1  ERROR  [Statsig] A networking error occurred during POST request to https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1764004657036&sid=d579ed69-4010-4578-b84b-d5768d8362c5&ec=3063&gz=1. TypeError: Failed to fetch TypeError: Failed to fetch
+    at a0df91602a414c03.js:2:106527
+    at becc4393c9fd3238.js:2:123752
+    at i (becc4393c9fd3238.js:2:122098)
+    at t.<anonymous> (e7f41799b4d05fca.js:2:45850)
+    at Object.next (aef1f2c6f8544e95.js:2:11778)
+    at e7f41799b4d05fca.js:2:42952
+    at new Promise (<anonymous>)
+    at e7f41799b4d05fca.js:2:42706
+    at t.value (e7f41799b4d05fca.js:2:44940)
+    at e7f41799b4d05fca.js:2:31768
+    at e.value (e7f41799b4d05fca.js:2:32175)
+    at e.<computed> [as _sendRequest] (e7f41799b4d05fca.js:2:31708)
+    at t.<anonymous> (e7f41799b4d05fca.js:2:47326)
+    at Object.next (aef1f2c6f8544e95.js:2:11778)
+    at s (e7f41799b4d05fca.js:2:42762)
+overrideMethod @ installHook.js:1Understand this error
+installHook.js:1   WARN  [Statsig] Failed to flush events.
+overrideMethod @ installHook.js:1Understand this warning
+installHook.js:1   WARN  [Statsig] Unable to save failed logs to storage
+overrideMethod @ installHook.js:1Understand this warning
+1571a8b3-4ba1-4e05-8e06-fafee9ee64aa-00-135633vc7z2nc.worf.replit.dev/api/phone-whitelist:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)Understand this error
+1571a8b3-4ba1-4e05-8e06-fafee9ee64aa-00-135633vc7z2nc.worf.replit.dev/api/announcements:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)Understand this error
+1571a8b3-4ba1-4e05-8e06-fafee9ee64aa-00-135633vc7z2nc.worf.replit.dev/api/announcement:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)Understand this error
+701 log entries are not shown.

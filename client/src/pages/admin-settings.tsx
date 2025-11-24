@@ -44,6 +44,8 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
           queryClient.prefetchQuery({ queryKey: ['/api/processes'] }),
           queryClient.prefetchQuery({ queryKey: ['/api/app-settings'] }),
           queryClient.prefetchQuery({ queryKey: ['/api/admin/cache-metadata'] }),
+          queryClient.prefetchQuery({ queryKey: ['/api/announcements'] }),
+          queryClient.prefetchQuery({ queryKey: ['/api/phone-whitelist'] }),
         ]).catch(err => console.error('Error prefetching data:', err));
         
         toast({
