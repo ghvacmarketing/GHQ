@@ -635,25 +635,47 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       try {
         console.log('Loading Google Places API...');
         
-        // Load the Maps JavaScript API
-        if (!window.google?.maps) {
-          await new Promise<void>((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_PLACES_API_KEY}&libraries=places&loading=async`;
-            script.async = true;
-            script.onload = () => resolve();
-            script.onerror = () => reject(new Error('Failed to load Google Maps'));
-            document.head.appendChild(script);
-          });
+        // Check if already loaded
+        if (window.google?.maps?.places?.PlaceAutocompleteElement) {
+          console.log('Google Places API already loaded');
+          initializePlaceAutocomplete();
+          return;
         }
 
-        // Wait for google.maps.importLibrary to be available
-        await window.google.maps.importLibrary('places');
+        // Load using importLibrary if available
+        if (window.google?.maps?.importLibrary) {
+          console.log('Using importLibrary...');
+          await window.google.maps.importLibrary('places');
+          console.log('Google Places API loaded via importLibrary');
+          initializePlaceAutocomplete();
+          return;
+        }
+
+        // Otherwise load the script with callback
+        console.log('Loading Google Maps script...');
+        const callbackName = 'initGooglePlacesCallback_' + Date.now();
         
-        console.log('Google Places API loaded successfully');
-        initializePlaceAutocomplete();
+        (window as any)[callbackName] = async () => {
+          console.log('Google Maps script loaded, importing places library...');
+          try {
+            await window.google.maps.importLibrary('places');
+            console.log('Places library imported successfully');
+            initializePlaceAutocomplete();
+          } catch (error) {
+            console.error('Error importing places library:', error);
+          }
+        };
+
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_PLACES_API_KEY}&libraries=places&callback=${callbackName}`;
+        script.async = true;
+        script.defer = true;
+        script.onerror = () => {
+          console.error('Failed to load Google Maps script');
+        };
+        document.head.appendChild(script);
       } catch (error) {
-        console.error('Error loading Google Places API:', error);
+        console.error('Error in loadPlacesAPI:', error);
       }
     }
 
