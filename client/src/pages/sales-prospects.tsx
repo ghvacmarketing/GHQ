@@ -20,6 +20,14 @@ import { nanoid } from "nanoid";
 import type { Lead, LeadAction, LeadTask } from "@shared/schema";
 import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
 
+// Extend Window interface for Google Maps
+declare global {
+  interface Window {
+    google: any;
+    initGooglePlaces: () => void;
+  }
+}
+
 type MetricsData = {
   activeLeads: number;
   pipelineValue: string;
@@ -607,35 +615,66 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
     customerType: "",
     leadSource: "",
   });
-  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const addressInputRef = useRef<HTMLInputElement>(null);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const currentQueryRef = useRef<string>("");
+  const autocompleteRef = useRef<any>(null);
 
-  const GEOAPIFY_API_KEY = import.meta.env.VITE_GEOAPIFY_API_KEY || "";
+  const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || "";
 
-  // Debug: Log if API key is available
+  // Load Google Places API and initialize autocomplete
   useEffect(() => {
-    if (GEOAPIFY_API_KEY) {
-      console.log("Geoapify API key configured");
-    } else {
-      console.warn("Geoapify API key not found - address autocomplete disabled");
+    if (!GOOGLE_PLACES_API_KEY) {
+      console.warn("Google Places API key not found - address autocomplete disabled");
+      return;
     }
-  }, [GEOAPIFY_API_KEY]);
 
-  // Cleanup debounce timer on unmount
-  useEffect(() => {
+    // Load Google Places script if not already loaded
+    if (!window.google?.maps?.places) {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_PLACES_API_KEY}&libraries=places&callback=initGooglePlaces`;
+      script.async = true;
+      script.defer = true;
+      
+      (window as any).initGooglePlaces = () => {
+        initializeAutocomplete();
+      };
+      
+      document.head.appendChild(script);
+    } else {
+      initializeAutocomplete();
+    }
+
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
+      // Cleanup autocomplete listeners
+      if (autocompleteRef.current && window.google?.maps?.event) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
     };
-  }, []);
+  }, [GOOGLE_PLACES_API_KEY]);
+
+  const initializeAutocomplete = () => {
+    if (!addressInputRef.current || !window.google?.maps?.places) return;
+
+    // Initialize Google Places Autocomplete
+    const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
+      types: ['address'],
+      componentRestrictions: { country: 'us' },
+      fields: ['formatted_address', 'address_components', 'geometry']
+    });
+
+    autocompleteRef.current = autocomplete;
+
+    // Handle place selection
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      
+      if (place.formatted_address) {
+        setFormData(prev => ({ ...prev, address: place.formatted_address || '' }));
+      }
+    });
+  };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneNumber(e.target.value);
@@ -661,72 +700,8 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
   };
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setFormData({ ...formData, address: value });
-
-    // Clear any existing debounce timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
-
-    // Clear suggestions if input is empty or too short
-    if (value.length < 2) {
-      currentQueryRef.current = "";
-      setShowSuggestions(false);
-      setAddressSuggestions([]);
-      return;
-    }
-
-    // Update current query
-    currentQueryRef.current = value;
-
-    // Fetch new suggestions after debounce delay
-    if (GEOAPIFY_API_KEY) {
-      debounceTimerRef.current = setTimeout(async () => {
-        // Check if query is still current (user might have changed input during debounce delay)
-        if (currentQueryRef.current !== value) {
-          return;
-        }
-
-        setIsLoadingAddress(true);
-        try {
-          const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(value)}&filter=countrycode:us&apiKey=${GEOAPIFY_API_KEY}&limit=5`;
-          const response = await fetch(url);
-          
-          if (!response.ok) {
-            throw new Error(`API error: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          
-          // Double-check the query is still current before updating state
-          if (currentQueryRef.current === value) {
-            setAddressSuggestions(data.features || []);
-            setShowSuggestions(true);
-          }
-        } catch (error) {
-          console.error("Address autocomplete error:", error);
-          if (currentQueryRef.current === value) {
-            toast({ 
-              description: "Address autocomplete unavailable", 
-              variant: "destructive",
-              duration: 2000
-            });
-          }
-        } finally {
-          // Always clear loading state, even if query is no longer current
-          setIsLoadingAddress(false);
-        }
-      }, 300);
-    }
-  };
-
-  const selectAddress = (suggestion: any) => {
-    const formatted = suggestion.properties.formatted || suggestion.properties.address_line1;
-    setFormData({ ...formData, address: formatted });
-    setShowSuggestions(false);
-    setAddressSuggestions([]);
+    // Just update form data - Google Places handles autocomplete automatically
+    setFormData({ ...formData, address: e.target.value });
   };
 
   const getCurrentLocation = () => {
@@ -735,7 +710,7 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       return;
     }
 
-    if (!GEOAPIFY_API_KEY) {
+    if (!GOOGLE_PLACES_API_KEY) {
       toast({ 
         description: "Location feature unavailable - API key not configured", 
         variant: "destructive",
@@ -749,10 +724,9 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          console.log("Got coordinates:", latitude, longitude);
           
           const response = await fetch(
-            `https://api.geoapify.com/v1/geocode/reverse?lat=${latitude}&lon=${longitude}&apiKey=${GEOAPIFY_API_KEY}`
+            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_PLACES_API_KEY}`
           );
           
           if (!response.ok) {
@@ -760,10 +734,9 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
           }
           
           const data = await response.json();
-          console.log("Reverse geocoding response:", data);
           
-          if (data.features && data.features.length > 0) {
-            const address = data.features[0].properties.formatted || data.features[0].properties.address_line1;
+          if (data.results && data.results.length > 0) {
+            const address = data.results[0].formatted_address;
             setFormData({ ...formData, address });
             toast({ description: "Address detected from your location", duration: 2000 });
           } else {
@@ -878,40 +851,15 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
 
       <div>
         <label className="text-sm font-medium">Address</label>
-        <div className="flex gap-2 relative">
-          <div className="flex-1 relative">
-            <Input
-              ref={addressInputRef}
-              value={formData.address}
-              onChange={handleAddressChange}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              onFocus={() => addressSuggestions.length > 0 && setShowSuggestions(true)}
-              placeholder="Start typing address..."
-              data-testid="input-lead-address"
-            />
-            {showSuggestions && addressSuggestions.length > 0 && (
-              <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-auto">
-                {addressSuggestions.map((suggestion, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => selectAddress(suggestion)}
-                    className="w-full text-left px-3 py-2 hover:bg-accent text-sm border-b last:border-b-0"
-                    data-testid={`button-address-suggestion-${idx}`}
-                  >
-                    <div className="font-medium">
-                      {suggestion.properties.formatted || suggestion.properties.address_line1}
-                    </div>
-                    {suggestion.properties.city && (
-                      <div className="text-xs text-muted-foreground">
-                        {suggestion.properties.city}, {suggestion.properties.state} {suggestion.properties.postcode}
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+        <div className="flex gap-2">
+          <Input
+            ref={addressInputRef}
+            value={formData.address}
+            onChange={handleAddressChange}
+            placeholder="Start typing address..."
+            data-testid="input-lead-address"
+            className="flex-1"
+          />
           <Button
             type="button"
             variant="outline"
