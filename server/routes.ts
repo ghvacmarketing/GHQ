@@ -5,7 +5,7 @@ import compression from "compression";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertLeadSchema, announcements, categories } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
@@ -1032,11 +1032,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all announcements (admin only)
   app.get("/api/announcements", async (req, res) => {
     try {
-      const { password } = req.body;
-      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
-      
-      if (password !== adminPassword) {
-        return res.status(401).json({ message: "Unauthorized" });
+      // Verify admin authentication via session
+      if (!(req.session as any)?.isAdmin) {
+        return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
       const announcements = await storage.getAllAnnouncements();
@@ -1047,17 +1045,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create/update announcement (admin only)
+  // Create announcement (admin only)
   app.post("/api/announcement", async (req, res) => {
     try {
-      const { password, ...announcementData } = req.body;
-      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
-      
-      if (password !== adminPassword) {
-        return res.status(401).json({ message: "Unauthorized" });
+      // Verify admin authentication via session
+      if (!(req.session as any)?.isAdmin) {
+        return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
-      const validatedData = insertAnnouncementSchema.parse(announcementData);
+      // Validate and parse request body
+      const validatedData = insertAnnouncementSchema.parse(req.body);
       const announcement = await storage.createAnnouncement(validatedData);
       
       res.json(announcement);
@@ -1070,19 +1067,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update announcement (admin only)
   app.patch("/api/announcement/:id", async (req, res) => {
     try {
-      const { password, ...announcementData } = req.body;
-      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
-      
-      if (password !== adminPassword) {
-        return res.status(401).json({ message: "Unauthorized" });
+      // Verify admin authentication via session
+      if (!(req.session as any)?.isAdmin) {
+        return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
+      // Validate update data (allow partial updates)
+      const validatedData = insertAnnouncementSchema.partial().parse(req.body);
+
       // If setting this announcement to active, deactivate all others first
-      if (announcementData.isActive === true) {
+      if (validatedData.isActive === true) {
         await db.update(announcements).set({ isActive: false });
       }
 
-      const announcement = await storage.updateAnnouncement(req.params.id, announcementData);
+      const announcement = await storage.updateAnnouncement(req.params.id, validatedData);
       if (!announcement) {
         return res.status(404).json({ message: "Announcement not found" });
       }
@@ -1097,11 +1095,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete announcement (admin only)
   app.delete("/api/announcement/:id", async (req, res) => {
     try {
-      const { password } = req.body;
-      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
-      
-      if (password !== adminPassword) {
-        return res.status(401).json({ message: "Unauthorized" });
+      // Verify admin authentication via session
+      if (!(req.session as any)?.isAdmin) {
+        return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
       const success = await storage.deleteAnnouncement(req.params.id);
@@ -1120,11 +1116,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all whitelisted phone numbers
   app.get("/api/phone-whitelist", async (req, res) => {
     try {
-      const { password } = req.body;
-      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
-      
-      if (password !== adminPassword) {
-        return res.status(401).json({ message: "Unauthorized" });
+      // Verify admin authentication via session
+      if (!(req.session as any)?.isAdmin) {
+        return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
       const whitelist = await storage.getAllPhoneWhitelist();
@@ -1138,18 +1132,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add phone number to whitelist
   app.post("/api/phone-whitelist", async (req, res) => {
     try {
-      const { password, phoneNumber, name } = req.body;
-      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
-      
-      if (password !== adminPassword) {
-        return res.status(401).json({ message: "Unauthorized" });
+      // Verify admin authentication via session
+      if (!(req.session as any)?.isAdmin) {
+        return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
-      const entry = await storage.createPhoneWhitelistEntry({
-        phoneNumber,
-        name,
-        isActive: true,
-      });
+      // Validate and parse request body
+      const validatedData = insertPhoneWhitelistSchema.parse(req.body);
+      const entry = await storage.createPhoneWhitelistEntry(validatedData);
       
       res.json(entry);
     } catch (error) {
@@ -1161,11 +1151,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete phone number from whitelist
   app.delete("/api/phone-whitelist/:id", async (req, res) => {
     try {
-      const { password } = req.body;
-      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
-      
-      if (password !== adminPassword) {
-        return res.status(401).json({ message: "Unauthorized" });
+      // Verify admin authentication via session
+      if (!(req.session as any)?.isAdmin) {
+        return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
       const success = await storage.deletePhoneWhitelistEntry(req.params.id);
