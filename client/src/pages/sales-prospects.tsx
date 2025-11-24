@@ -655,8 +655,17 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
   }, [GOOGLE_PLACES_API_KEY]);
 
   const initializeAutocomplete = () => {
-    if (!addressInputRef.current || !window.google?.maps?.places) return;
+    console.log('initializeAutocomplete called', {
+      hasInput: !!addressInputRef.current,
+      hasGoogle: !!window.google?.maps?.places
+    });
+    
+    if (!addressInputRef.current || !window.google?.maps?.places) {
+      console.warn('Cannot initialize autocomplete - missing input or Google Maps');
+      return;
+    }
 
+    console.log('Creating Google Places Autocomplete...');
     // Initialize Google Places Autocomplete
     const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
       types: ['address'],
@@ -665,13 +674,17 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
     });
 
     autocompleteRef.current = autocomplete;
+    console.log('Autocomplete initialized successfully');
 
     // Handle place selection - Google Places will automatically update the input field
     // We just need to capture the value for form submission
     autocomplete.addListener('place_changed', () => {
+      console.log('place_changed event fired');
       const place = autocomplete.getPlace();
+      console.log('Selected place:', place);
       
       if (place.formatted_address) {
+        console.log('Updating address to:', place.formatted_address);
         // Google Places already updated the input field
         // Just update state for form submission
         setFormData(prev => ({ ...prev, address: place.formatted_address || '' }));
