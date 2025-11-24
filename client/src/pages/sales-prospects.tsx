@@ -618,76 +618,96 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");
-  const addressInputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<any>(null);
+  const addressContainerRef = useRef<HTMLDivElement>(null);
+  const autocompleteElementRef = useRef<any>(null);
+  const [selectedAddress, setSelectedAddress] = useState("");
 
   const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || "";
 
-  // Load Google Places API and initialize autocomplete
+  // Load Google Places API and initialize new PlaceAutocompleteElement
   useEffect(() => {
     if (!GOOGLE_PLACES_API_KEY) {
       console.warn("Google Places API key not found - address autocomplete disabled");
       return;
     }
 
-    // Load Google Places script if not already loaded
-    if (!window.google?.maps?.places) {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_PLACES_API_KEY}&libraries=places&callback=initGooglePlaces`;
-      script.async = true;
-      script.defer = true;
-      
-      (window as any).initGooglePlaces = () => {
-        initializeAutocomplete();
-      };
-      
-      document.head.appendChild(script);
-    } else {
-      initializeAutocomplete();
+    async function loadPlacesAPI() {
+      try {
+        console.log('Loading Google Places API...');
+        
+        // Load the Maps JavaScript API
+        if (!window.google?.maps) {
+          await new Promise<void>((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_PLACES_API_KEY}&libraries=places&loading=async`;
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error('Failed to load Google Maps'));
+            document.head.appendChild(script);
+          });
+        }
+
+        // Wait for google.maps.importLibrary to be available
+        await window.google.maps.importLibrary('places');
+        
+        console.log('Google Places API loaded successfully');
+        initializePlaceAutocomplete();
+      } catch (error) {
+        console.error('Error loading Google Places API:', error);
+      }
     }
 
+    loadPlacesAPI();
+
     return () => {
-      // Cleanup autocomplete listeners
-      if (autocompleteRef.current && window.google?.maps?.event) {
-        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      // Cleanup autocomplete element
+      if (autocompleteElementRef.current) {
+        autocompleteElementRef.current.remove();
       }
     };
   }, [GOOGLE_PLACES_API_KEY]);
 
-  const initializeAutocomplete = () => {
-    console.log('initializeAutocomplete called', {
-      hasInput: !!addressInputRef.current,
-      hasGoogle: !!window.google?.maps?.places
-    });
-    
-    if (!addressInputRef.current || !window.google?.maps?.places) {
-      console.warn('Cannot initialize autocomplete - missing input or Google Maps');
+  const initializePlaceAutocomplete = () => {
+    if (!addressContainerRef.current || !window.google?.maps?.places?.PlaceAutocompleteElement) {
+      console.warn('Cannot initialize PlaceAutocompleteElement');
       return;
     }
 
-    console.log('Creating Google Places Autocomplete...');
-    // Initialize Google Places Autocomplete
-    const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
-      types: ['address'],
-      componentRestrictions: { country: 'us' },
-      fields: ['formatted_address', 'address_components', 'geometry']
+    console.log('Creating PlaceAutocompleteElement...');
+    
+    // Create the new PlaceAutocompleteElement
+    const placeAutocomplete = new window.google.maps.places.PlaceAutocompleteElement({
+      componentRestrictions: { country: ['us'] },
     });
 
-    autocompleteRef.current = autocomplete;
-    console.log('Autocomplete initialized successfully');
+    // Style the element to match our input
+    placeAutocomplete.style.width = '100%';
+    
+    // Clear container and append autocomplete element
+    addressContainerRef.current.innerHTML = '';
+    addressContainerRef.current.appendChild(placeAutocomplete);
+    autocompleteElementRef.current = placeAutocomplete;
 
-    // Handle place selection - Google Places will automatically update the input field
-    // We just need to capture the value for form submission
-    autocomplete.addListener('place_changed', () => {
-      console.log('place_changed event fired');
-      const place = autocomplete.getPlace();
-      console.log('Selected place:', place);
+    console.log('PlaceAutocompleteElement initialized');
+
+    // Listen for place selection
+    placeAutocomplete.addEventListener('gmp-placeselect', async (event: any) => {
+      console.log('gmp-placeselect event fired');
+      const place = event.place;
       
-      if (place.formatted_address) {
-        console.log('Updating address to:', place.formatted_address);
-        // Google Places already updated the input field
-        // Just update state for form submission
-        setFormData(prev => ({ ...prev, address: place.formatted_address || '' }));
+      try {
+        // Fetch the formatted address
+        await place.fetchFields({
+          fields: ['formattedAddress']
+        });
+        
+        const address = place.formattedAddress || '';
+        console.log('Selected address:', address);
+        
+        setSelectedAddress(address);
+        setFormData(prev => ({ ...prev, address }));
+      } catch (error) {
+        console.error('Error fetching place details:', error);
       }
     });
   };
@@ -749,11 +769,8 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
           
           if (data.results && data.results.length > 0) {
             const address = data.results[0].formatted_address;
-            // Update the input field directly
-            if (addressInputRef.current) {
-              addressInputRef.current.value = address;
-            }
             // Update state for form submission
+            setSelectedAddress(address);
             setFormData(prev => ({ ...prev, address }));
             toast({ description: "Address detected from your location", duration: 2000 });
           } else {
@@ -799,12 +816,8 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       return;
     }
 
-    // Get address from the input field since it's uncontrolled
-    const address = addressInputRef.current?.value || "";
-
     const submitData: any = {
       ...formData,
-      address,
       estimatedValue: formData.estimatedValue ? formData.estimatedValue : undefined,
     };
 
@@ -827,9 +840,10 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       customerType: "",
       leadSource: "",
     });
-    // Clear the address input field since it's uncontrolled
-    if (addressInputRef.current) {
-      addressInputRef.current.value = "";
+    setSelectedAddress("");
+    // Reinitialize the autocomplete element to clear it
+    if (autocompleteElementRef.current) {
+      autocompleteElementRef.current.value = "";
     }
     setEmailError("");
     setPhoneError("");
@@ -876,14 +890,11 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
 
       <div>
         <label className="text-sm font-medium">Address</label>
-        <div className="flex gap-2">
-          <input
-            ref={addressInputRef}
-            type="text"
-            placeholder="Start typing address..."
-            data-testid="input-lead-address"
-            className="flex-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            autoComplete="off"
+        <div className="flex gap-2 items-center">
+          <div 
+            ref={addressContainerRef} 
+            className="flex-1"
+            data-testid="autocomplete-address-container"
           />
           <Button
             type="button"
@@ -897,6 +908,9 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
             <Navigation className={`h-4 w-4 ${isGettingLocation ? 'animate-spin' : ''}`} />
           </Button>
         </div>
+        {selectedAddress && (
+          <p className="text-xs text-muted-foreground mt-1">Selected: {selectedAddress}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
