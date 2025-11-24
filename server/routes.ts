@@ -912,19 +912,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
       
       if (password === adminPassword) {
-        // Set admin session flag
-        (req.session as any).isAdmin = true;
-        await new Promise((resolve, reject) => {
-          req.session.save((err) => {
+        // Regenerate session to get a fresh session ID and clear any old data
+        await new Promise<void>((resolve, reject) => {
+          req.session.regenerate((err) => {
             if (err) reject(err);
-            else resolve(true);
+            else resolve();
           });
         });
+        
+        // Set admin session flag on the NEW session
+        (req.session as any).isAdmin = true;
+        
+        // Save the session to ensure it's written to the database
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+        
         res.json({ success: true });
       } else {
         res.status(401).json({ success: false, message: "Invalid password" });
       }
     } catch (error) {
+      console.error('Admin login error:', error);
       res.status(500).json({ success: false, message: "Authentication error" });
     }
   });

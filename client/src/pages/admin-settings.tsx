@@ -40,23 +40,41 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
           description: "Loading admin dashboard...",
         });
         
-        // Wait a moment for the session cookie to be set in the browser
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait for session cookie to be fully established
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Start loading all data in background immediately
-        await Promise.all([
-          queryClient.prefetchQuery({ queryKey: ["/api/settings"], staleTime: Infinity }),
-          queryClient.prefetchQuery({ queryKey: ["/api/quotes/summary"] }),
-          queryClient.prefetchQuery({ queryKey: ["/api/technicians"] }),
-          queryClient.prefetchQuery({ queryKey: ['/api/categories'] }),
-          queryClient.prefetchQuery({ queryKey: ['/api/processes'] }),
-          queryClient.prefetchQuery({ queryKey: ['/api/app-settings'] }),
-          queryClient.prefetchQuery({ queryKey: ['/api/admin/cache-metadata'] }),
-          queryClient.prefetchQuery({ queryKey: ['/api/announcements'] }),
-          queryClient.prefetchQuery({ queryKey: ['/api/phone-whitelist'] }),
-        ]).catch(err => console.error('Error prefetching data:', err));
-        
-        onLogin();
+        // Verify session is active before loading dashboard
+        try {
+          const testResponse = await fetch('/api/announcements', {
+            credentials: 'include'
+          });
+          
+          if (!testResponse.ok) {
+            throw new Error('Session not established');
+          }
+          
+          // Start loading all data in background
+          await Promise.all([
+            queryClient.prefetchQuery({ queryKey: ["/api/settings"], staleTime: Infinity }),
+            queryClient.prefetchQuery({ queryKey: ["/api/quotes/summary"] }),
+            queryClient.prefetchQuery({ queryKey: ["/api/technicians"] }),
+            queryClient.prefetchQuery({ queryKey: ['/api/categories'] }),
+            queryClient.prefetchQuery({ queryKey: ['/api/processes'] }),
+            queryClient.prefetchQuery({ queryKey: ['/api/app-settings'] }),
+            queryClient.prefetchQuery({ queryKey: ['/api/admin/cache-metadata'] }),
+            queryClient.prefetchQuery({ queryKey: ['/api/announcements'] }),
+            queryClient.prefetchQuery({ queryKey: ['/api/phone-whitelist'] }),
+          ]);
+          
+          onLogin();
+        } catch (error) {
+          console.error('Session verification failed:', error);
+          toast({
+            title: "Session Error",
+            description: "Failed to establish admin session. Please try again.",
+            variant: "destructive",
+          });
+        }
       } else {
         toast({
           title: "Access Denied",
