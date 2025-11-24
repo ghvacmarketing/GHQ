@@ -633,33 +633,25 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
 
     async function loadPlacesAPI() {
       try {
-        console.log('Loading Google Places API...');
-        
         // Check if already loaded
         if (window.google?.maps?.places?.PlaceAutocompleteElement) {
-          console.log('Google Places API already loaded');
           initializePlaceAutocomplete();
           return;
         }
 
         // Load using importLibrary if available
         if (window.google?.maps?.importLibrary) {
-          console.log('Using importLibrary...');
           await window.google.maps.importLibrary('places');
-          console.log('Google Places API loaded via importLibrary');
           initializePlaceAutocomplete();
           return;
         }
 
         // Otherwise load the script with callback
-        console.log('Loading Google Maps script...');
         const callbackName = 'initGooglePlacesCallback_' + Date.now();
         
         (window as any)[callbackName] = async () => {
-          console.log('Google Maps script loaded, importing places library...');
           try {
             await window.google.maps.importLibrary('places');
-            console.log('Places library imported successfully');
             initializePlaceAutocomplete();
           } catch (error) {
             console.error('Error importing places library:', error);
@@ -694,8 +686,6 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       console.warn('Cannot initialize PlaceAutocompleteElement');
       return;
     }
-
-    console.log('Creating PlaceAutocompleteElement...');
     
     // Create the new PlaceAutocompleteElement
     const placeAutocomplete = new window.google.maps.places.PlaceAutocompleteElement({
@@ -710,11 +700,8 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
     addressContainerRef.current.appendChild(placeAutocomplete);
     autocompleteElementRef.current = placeAutocomplete;
 
-    console.log('PlaceAutocompleteElement initialized');
-
     // Listen for place selection
     placeAutocomplete.addEventListener('gmp-placeselect', async (event: any) => {
-      console.log('gmp-placeselect event fired');
       const place = event.place;
       
       try {
@@ -724,7 +711,6 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
         });
         
         const address = place.formattedAddress || '';
-        console.log('Selected address:', address);
         
         setSelectedAddress(address);
         setFormData(prev => ({ ...prev, address }));
