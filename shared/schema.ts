@@ -273,6 +273,30 @@ export const leads = pgTable("leads", {
   importBatchId: varchar("import_batch_id"),
   lastImportedAt: timestamp("last_imported_at"),
   dedupeHash: text("dedupe_hash"), // Hash of key fields for quick duplicate detection
+  // Soft delete and audit
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: text("deleted_by"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  tags: json("tags").$type<string[]>().notNull().default([]),
+});
+
+// Lead History / Audit Trail
+export type LeadHistoryEntry = {
+  id: string;
+  leadId: string;
+  actor: string;
+  actionType: string; // created, updated, status_changed, deleted, restored, etc.
+  payload: Record<string, any>; // snapshot of changes
+  createdAt: string;
+};
+
+export const leadHistory = pgTable("lead_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").notNull(),
+  actor: text("actor").notNull(), // user phone or "system"
+  actionType: text("action_type").notNull(),
+  payload: json("payload").$type<Record<string, any>>().notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const importBatches = pgTable("import_batches", {
@@ -291,6 +315,9 @@ export const importBatches = pgTable("import_batches", {
 export const insertLeadSchema = createInsertSchema(leads).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+  deletedBy: true,
 }).extend({
   projectedCloseDate: z.union([z.string(), z.date()]).optional().transform((val) => {
     if (!val) return undefined;
@@ -309,6 +336,11 @@ export const insertLeadSchema = createInsertSchema(leads).omit({
   }),
 });
 
+export const insertLeadHistorySchema = createInsertSchema(leadHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertImportBatchSchema = createInsertSchema(importBatches).omit({
   id: true,
   importedAt: true,
@@ -316,5 +348,7 @@ export const insertImportBatchSchema = createInsertSchema(importBatches).omit({
 
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 export type Lead = typeof leads.$inferSelect;
+export type InsertLeadHistory = z.infer<typeof insertLeadHistorySchema>;
+export type LeadHistory = typeof leadHistory.$inferSelect;
 export type InsertImportBatch = z.infer<typeof insertImportBatchSchema>;
 export type ImportBatch = typeof importBatches.$inferSelect;
