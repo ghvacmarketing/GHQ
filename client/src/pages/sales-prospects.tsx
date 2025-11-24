@@ -666,14 +666,14 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
 
     autocompleteRef.current = autocomplete;
 
-    // Handle place selection
+    // Handle place selection - Google Places will automatically update the input field
+    // We just need to capture the value for form submission
     autocomplete.addListener('place_changed', () => {
       const place = autocomplete.getPlace();
       
-      if (place.formatted_address && addressInputRef.current) {
-        // Update the input field value directly since it's uncontrolled
-        addressInputRef.current.value = place.formatted_address;
-        // Also update the state for form submission
+      if (place.formatted_address) {
+        // Google Places already updated the input field
+        // Just update state for form submission
         setFormData(prev => ({ ...prev, address: place.formatted_address || '' }));
       }
     });
@@ -702,10 +702,6 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
     }
   };
 
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Just update form data - Google Places handles autocomplete automatically
-    setFormData({ ...formData, address: e.target.value });
-  };
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -740,11 +736,12 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
           
           if (data.results && data.results.length > 0) {
             const address = data.results[0].formatted_address;
-            setFormData({ ...formData, address });
-            // Update the input field directly since it's uncontrolled
+            // Update the input field directly
             if (addressInputRef.current) {
               addressInputRef.current.value = address;
             }
+            // Update state for form submission
+            setFormData(prev => ({ ...prev, address }));
             toast({ description: "Address detected from your location", duration: 2000 });
           } else {
             toast({ description: "Could not find address for your location", variant: "destructive" });
@@ -870,8 +867,6 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
           <input
             ref={addressInputRef}
             type="text"
-            defaultValue={formData.address}
-            onChange={handleAddressChange}
             placeholder="Start typing address..."
             data-testid="input-lead-address"
             className="flex-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
