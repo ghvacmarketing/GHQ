@@ -1,0 +1,31 @@
+Service Worker registered successfully: https://1571a8b3-4ba1-4e05-8e06-fafee9ee64aa-00-135633vc7z2nc.worf.replit.dev/
+prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1763932288219&sid=03d72256-d5bf-480f-a4b4-1a470eafd799&ec=2&gz=1:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENTUnderstand this error
+sales-prospects.tsx:623 Geoapify API key configured
+prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1763932290222&sid=03d72256-d5bf-480f-a4b4-1a470eafd799&ec=2&gz=1:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENTUnderstand this error
+sales-prospects.tsx:658 Fetching address suggestions for: 670
+sales-prospects.tsx:661 Geoapify URL: https://api.geoapify.com/v1/geocode/autocomplete?text=670&apiKey=***&limit=5
+api.geoapify.com/v1/geocode/autocomplete?text=670&apiKey=df9bb6c31b274ec1b03f088b6d1b9724&limit=5:1  Failed to load resource: the server responded with a status of 401 ()Understand this error
+sales-prospects.tsx:673 Address autocomplete error: Error: API error: 401
+    at handleAddressChange (sales-prospects.tsx:665:17)
+handleAddressChange @ sales-prospects.tsx:673Understand this error
+prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1763932294728&sid=03d72256-d5bf-480f-a4b4-1a470eafd799&ec=2&gz=1:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENTUnderstand this error
+installHook.js:1  ERROR  [Statsig] A networking error occurred during POST request to https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1763932294728&sid=03d72256-d5bf-480f-a4b4-1a470eafd799&ec=2&gz=1. TypeError: Failed to fetch TypeError: Failed to fetch
+    at a0df91602a414c03.js:2:106527
+    at becc4393c9fd3238.js:2:123752
+    at i (becc4393c9fd3238.js:2:122098)
+    at t.<anonymous> (e7f41799b4d05fca.js:2:45850)
+    at Object.next (aef1f2c6f8544e95.js:2:11778)
+    at e7f41799b4d05fca.js:2:42952
+    at new Promise (<anonymous>)
+    at e7f41799b4d05fca.js:2:42706
+    at t.value (e7f41799b4d05fca.js:2:44940)
+    at e7f41799b4d05fca.js:2:31768
+    at e.value (e7f41799b4d05fca.js:2:32175)
+    at e.<computed> [as _sendRequest] (e7f41799b4d05fca.js:2:31708)
+    at t.<anonymous> (e7f41799b4d05fca.js:2:47326)
+    at Object.next (aef1f2c6f8544e95.js:2:11778)
+    at s (e7f41799b4d05fca.js:2:42762)
+overrideMethod @ installHook.js:1Understand this error
+installHook.js:1   WARN  [Statsig] Failed to flush events.
+overrideMethod @ installHook.js:1Understand this warning
+installHook.js:1   WARN  [Statsig] Unable to save failed logs to storage

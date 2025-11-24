@@ -614,6 +614,8 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
   const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const addressInputRef = useRef<HTMLInputElement>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentQueryRef = useRef<string>("");
 
   const GEOAPIFY_API_KEY = import.meta.env.VITE_GEOAPIFY_API_KEY || "";
 
@@ -625,6 +627,15 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       console.warn("Geoapify API key not found - address autocomplete disabled");
     }
   }, [GEOAPIFY_API_KEY]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneNumber(e.target.value);
@@ -649,38 +660,65 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
     }
   };
 
-  const handleAddressChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setFormData({ ...formData, address: value });
 
-    if (value.length > 2 && GEOAPIFY_API_KEY) {
-      setIsLoadingAddress(true);
-      console.log("Fetching address suggestions for:", value);
-      try {
-        const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(value)}&apiKey=${GEOAPIFY_API_KEY}&limit=5`;
-        console.log("Geoapify URL:", url.replace(GEOAPIFY_API_KEY, "***"));
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log("Geoapify response:", data);
-        setAddressSuggestions(data.features || []);
-        setShowSuggestions(true);
-      } catch (error) {
-        console.error("Address autocomplete error:", error);
-        toast({ 
-          description: "Address autocomplete unavailable", 
-          variant: "destructive",
-          duration: 2000
-        });
-      } finally {
-        setIsLoadingAddress(false);
-      }
-    } else {
+    // Clear any existing debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    // Clear suggestions if input is empty or too short
+    if (value.length < 2) {
+      currentQueryRef.current = "";
       setShowSuggestions(false);
+      setAddressSuggestions([]);
+      return;
+    }
+
+    // Update current query
+    currentQueryRef.current = value;
+
+    // Fetch new suggestions after debounce delay
+    if (GEOAPIFY_API_KEY) {
+      debounceTimerRef.current = setTimeout(async () => {
+        // Check if query is still current (user might have changed input during debounce delay)
+        if (currentQueryRef.current !== value) {
+          return;
+        }
+
+        setIsLoadingAddress(true);
+        try {
+          const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(value)}&filter=countrycode:us&type=street&apiKey=${GEOAPIFY_API_KEY}&limit=5`;
+          const response = await fetch(url);
+          
+          if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          // Double-check the query is still current before updating state
+          if (currentQueryRef.current === value) {
+            setAddressSuggestions(data.features || []);
+            setShowSuggestions(true);
+          }
+        } catch (error) {
+          console.error("Address autocomplete error:", error);
+          if (currentQueryRef.current === value) {
+            toast({ 
+              description: "Address autocomplete unavailable", 
+              variant: "destructive",
+              duration: 2000
+            });
+          }
+        } finally {
+          // Always clear loading state, even if query is no longer current
+          setIsLoadingAddress(false);
+        }
+      }, 300);
     }
   };
 
@@ -688,6 +726,7 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
     const formatted = suggestion.properties.formatted || suggestion.properties.address_line1;
     setFormData({ ...formData, address: formatted });
     setShowSuggestions(false);
+    setAddressSuggestions([]);
   };
 
   const getCurrentLocation = () => {
