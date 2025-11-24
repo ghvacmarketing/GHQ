@@ -691,7 +691,7 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
 
         setIsLoadingAddress(true);
         try {
-          const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(value)}&filter=countrycode:us&type=street&apiKey=${GEOAPIFY_API_KEY}&limit=5`;
+          const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(value)}&filter=countrycode:us&apiKey=${GEOAPIFY_API_KEY}&limit=5`;
           const response = await fetch(url);
           
           if (!response.ok) {
