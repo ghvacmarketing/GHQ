@@ -43,28 +43,28 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
         // Wait for session cookie to be fully established
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Verify session is active before loading dashboard
+        // Load all admin data with optimized single request
         try {
-          const testResponse = await fetch('/api/announcements', {
+          const dashboardResponse = await fetch('/api/admin/dashboard', {
             credentials: 'include'
           });
           
-          if (!testResponse.ok) {
+          if (!dashboardResponse.ok) {
             throw new Error('Session not established');
           }
           
-          // Start loading all data in background
-          await Promise.all([
-            queryClient.prefetchQuery({ queryKey: ["/api/settings"], staleTime: Infinity }),
-            queryClient.prefetchQuery({ queryKey: ["/api/quotes/summary"] }),
-            queryClient.prefetchQuery({ queryKey: ["/api/technicians"] }),
-            queryClient.prefetchQuery({ queryKey: ['/api/categories'] }),
-            queryClient.prefetchQuery({ queryKey: ['/api/processes'] }),
-            queryClient.prefetchQuery({ queryKey: ['/api/app-settings'] }),
-            queryClient.prefetchQuery({ queryKey: ['/api/admin/cache-metadata'] }),
-            queryClient.prefetchQuery({ queryKey: ['/api/announcements'] }),
-            queryClient.prefetchQuery({ queryKey: ['/api/phone-whitelist'] }),
-          ]);
+          const dashboardData = await dashboardResponse.json();
+          
+          // Populate React Query cache with all data from single request
+          queryClient.setQueryData(["/api/settings"], dashboardData.settings);
+          queryClient.setQueryData(["/api/quotes/summary"], dashboardData.quoteSummary);
+          queryClient.setQueryData(["/api/technicians"], dashboardData.technicians);
+          queryClient.setQueryData(['/api/categories'], dashboardData.categories);
+          queryClient.setQueryData(['/api/processes'], dashboardData.processes);
+          queryClient.setQueryData(['/api/app-settings'], dashboardData.appSettings);
+          queryClient.setQueryData(['/api/admin/cache-metadata'], dashboardData.cacheMetadata);
+          queryClient.setQueryData(['/api/announcements'], dashboardData.announcements);
+          queryClient.setQueryData(['/api/phone-whitelist'], dashboardData.phoneWhitelist);
           
           onLogin();
         } catch (error) {

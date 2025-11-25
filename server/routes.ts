@@ -16,6 +16,12 @@ import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Trust proxy for Replit's infrastructure (enables secure cookies behind HTTPS proxy)
+  app.set('trust proxy', 1);
+  
+  // Detect if running on Replit (behind HTTPS proxy in iframe)
+  const isReplit = !!process.env.REPL_ID;
+  
   // Session management with connect-pg-simple
   const PgSession = connectPgSimple(session);
   
@@ -32,8 +38,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       cookie: {
         maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-        sameSite: 'lax',
+        // Replit runs in iframe - need sameSite=none + secure=true for cookies to work
+        secure: isReplit || process.env.NODE_ENV === 'production',
+        sameSite: isReplit ? 'none' : 'lax',
       },
     })
   );
@@ -935,6 +942,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Admin login error:', error);
       res.status(500).json({ success: false, message: "Authentication error" });
+    }
+  });
+
+  // Aggregated admin dashboard data (optimized single request)
+  app.get("/api/admin/dashboard", async (req, res) => {
+    try {
+      // Verify admin authentication
+      if (!(req.session as any)?.isAdmin) {
+        return res.status(401).json({ message: "Unauthorized - Admin access required" });
+      }
+
+      // Fetch all admin data in parallel for maximum performance
+      const [
+        settings,
+        quoteSummary,
+        technicians,
+        categories,
+        processes,
+        appSettings,
+        cacheMetadata,
+        announcements,
+        phoneWhitelist
+      ] = await Promise.all([
+        googleSheetsService.getSettings(), // Served from cache
+        storage.getQuoteSummary(),
+        storage.getAllTechnicians(),
+        storage.getAllCategories(),
+        storage.getAllProcesses(),
+        storage.getAllSettings(),
+        (async () => {
+          const cache = googleSheetsService.getCacheMetadata();
+          return {
+            cached: cache.cached,
+            timestamp: cache.timestamp,
+            age: cache.age
+          };
+        })(),
+        storage.getAllAnnouncements(),
+        storage.getAllPhoneWhitelist()
+      ]);
+
+      res.json({
+        settings,
+        quoteSummary,
+        technicians,
+        categories,
+        processes,
+        appSettings,
+        cacheMetadata,
+        announcements,
+        phoneWhitelist
+      });
+    } catch (error) {
+      console.error('Error fetching admin dashboard data:', error);
+      res.status(500).json({ message: "Error loading admin dashboard" });
     }
   });
 
