@@ -573,6 +573,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Convert quote to sales lead
+  app.post("/api/quotes/:id/convert-to-lead", async (req, res) => {
+    try {
+      const quote = await storage.getQuote(req.params.id);
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      // Extract customer address from quote if it exists in jobNotes
+      const address = req.body.address || quote.jobNotes || "";
+
+      // Create lead with quote data pre-filled
+      const leadData = {
+        name: quote.customerName,
+        phone: req.body.phone || "",
+        email: req.body.email || "",
+        address: address,
+        estimatedValue: quote.total,
+        status: "New",
+        clientIssue: req.body.clientIssue || `Quote #${quote.id.slice(0, 8)} - ${(quote.parts as any[]).map(p => p.description).join(', ')}`,
+        projectedCloseDate: req.body.projectedCloseDate,
+        customerType: req.body.customerType,
+        leadSource: req.body.leadSource || "Quote Generated",
+        assignedEmployeeId: req.body.assignedEmployeeId,
+        quoteId: quote.id,
+        nextActions: [],
+        scheduledTasks: [],
+        won: false,
+        lost: false,
+        tags: []
+      };
+
+      const lead = await storage.createLead(leadData);
+
+      // Create history entry for lead creation from quote
+      await storage.createLeadHistory({
+        leadId: lead.id,
+        actor: (req.session as any)?.user?.phone || "system",
+        actionType: "created",
+        payload: { 
+          source: "quote_conversion",
+          quoteId: quote.id,
+          quoteTechnician: quote.technician
+        }
+      });
+
+      res.json(lead);
+    } catch (error) {
+      console.error('Error converting quote to lead:', error);
+      res.status(500).json({ message: "Error converting quote to lead" });
+    }
+  });
+
   // Voice recording processing
   app.post("/api/voice/summarize", upload.single('audio'), async (req, res) => {
     try {

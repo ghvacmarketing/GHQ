@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Calculator, Copy, RotateCcw } from "lucide-react";
+import { Calculator, Copy, RotateCcw, UserPlus } from "lucide-react";
 import trelloIcon from "@assets/trello_1757379276597.png";
 
 interface QuoteActionsProps {
@@ -9,6 +9,7 @@ interface QuoteActionsProps {
   onMarkAccepted: () => void;
   onMarkPending: () => void;
   onStartOver: () => void;
+  onConvertToLead?: () => void;
   isGenerating: boolean;
   quoteGenerated: boolean;
   quoteStatus?: string;
@@ -20,6 +21,7 @@ export default function QuoteActions({
   onMarkAccepted,
   onMarkPending,
   onStartOver,
+  onConvertToLead,
   isGenerating,
   quoteGenerated,
   quoteStatus,
@@ -61,6 +63,17 @@ export default function QuoteActions({
             <Copy className="h-4 w-4" />
             <span>Copy Quote</span>
           </Button>
+
+          {onConvertToLead && (
+            <Button
+              onClick={onConvertToLead}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 slide-in"
+              data-testid="button-convert-to-lead"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>Add as Sales Lead</span>
+            </Button>
+          )}
 
           <div ref={buttonsRef} className="grid grid-cols-2 gap-3 slide-in">
             <Button

@@ -16,6 +16,7 @@ import QuotePreview from "@/components/quote-preview";
 import CustomPartModal from "@/components/custom-part-modal";
 import QuoteDescription from "@/components/quote-description";
 import ConditionalRequirements from "@/components/conditional-requirements";
+import ConvertQuoteToLeadDialog from "@/components/convert-quote-to-lead-dialog";
 import { apiRequest } from "@/lib/queryClient";
 import type { QuotePart } from "@shared/schema";
 
@@ -50,6 +51,7 @@ export default function QuoteGenerator() {
   const [customPartPrefillData, setCustomPartPrefillData] = useState<any>(null);
   const [generatedQuote, setGeneratedQuote] = useState<any>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
 
   // Fetch all initial data in one optimized call
   const { data: initialData, refetch: refetchInitialData, isLoading: isLoadingData, isError: isErrorData, error: initialDataError } = useQuery({
@@ -525,6 +527,7 @@ export default function QuoteGenerator() {
             onMarkAccepted={handleMarkAccepted}
             onMarkPending={handleMarkPending}
             onStartOver={handleStartOver}
+            onConvertToLead={() => setIsConvertDialogOpen(true)}
             isGenerating={createQuoteMutation.isPending}
             quoteGenerated={!!generatedQuote}
             quoteStatus={generatedQuote?.status}
@@ -557,6 +560,21 @@ export default function QuoteGenerator() {
           // Don't close modal here - let the modal handle it
         }}
         prefillData={customPartPrefillData}
+      />
+
+      <ConvertQuoteToLeadDialog
+        quote={generatedQuote}
+        isOpen={isConvertDialogOpen}
+        onClose={() => setIsConvertDialogOpen(false)}
+        onSuccess={(leadId) => {
+          toast({
+            title: "Success",
+            description: "Quote converted to sales lead! Redirecting to Sales Prospects...",
+          });
+          setTimeout(() => {
+            window.location.href = "/sales-prospects";
+          }, 1500);
+        }}
       />
     </div>
   );
