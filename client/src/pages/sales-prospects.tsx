@@ -34,12 +34,12 @@ type MetricsData = {
   conversionRate: string;
   pendingActions: number;
   statusBreakdown: {
-    New: number;
-    Contacted: number;
-    "Quote Sent": number;
-    Negotiating: number;
-    Won: { count: number; value: string };
-    Lost: { count: number };
+    New: { count: number; value: number };
+    Contacted: { count: number; value: number };
+    "Quote Sent": { count: number; value: number };
+    Negotiating: { count: number; value: number };
+    Won: { count: number; value: number };
+    Lost: { count: number; value: number };
   };
 };
 
