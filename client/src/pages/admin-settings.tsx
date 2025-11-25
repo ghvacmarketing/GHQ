@@ -35,25 +35,46 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
       const result = await response.json();
       
       if (result.success) {
-        // Check if dashboard data was included in login response (eliminates session timing issues)
+        // Check if dashboard data was included in login response
         if (result.dashboardData) {
-          // Populate React Query cache with all data from login response
-          queryClient.setQueryData(["/api/settings"], result.dashboardData.settings);
-          queryClient.setQueryData(["/api/quotes/summary"], result.dashboardData.quoteSummary);
-          queryClient.setQueryData(["/api/technicians"], result.dashboardData.technicians);
-          queryClient.setQueryData(['/api/categories'], result.dashboardData.categories);
-          queryClient.setQueryData(['/api/processes'], result.dashboardData.processes);
-          queryClient.setQueryData(['/api/app-settings'], result.dashboardData.appSettings);
-          queryClient.setQueryData(['/api/admin/cache-metadata'], result.dashboardData.cacheMetadata);
-          queryClient.setQueryData(['/api/announcements'], result.dashboardData.announcements);
-          queryClient.setQueryData(['/api/phone-whitelist'], result.dashboardData.phoneWhitelist);
+          // Wait for session cookie to propagate, then verify it works with a test request
+          await new Promise(resolve => setTimeout(resolve, 500));
           
-          toast({
-            title: "Access Granted",
-            description: "Welcome to the admin dashboard.",
-          });
-          
-          onLogin();
+          try {
+            // Verify session cookie works by making authenticated request
+            const verifyResponse = await fetch('/api/admin/dashboard', {
+              credentials: 'include'
+            });
+            
+            if (!verifyResponse.ok) {
+              throw new Error('Session verification failed');
+            }
+            
+            // Session verified - populate cache and proceed
+            queryClient.setQueryData(["/api/settings"], result.dashboardData.settings);
+            queryClient.setQueryData(["/api/quotes/summary"], result.dashboardData.quoteSummary);
+            queryClient.setQueryData(["/api/technicians"], result.dashboardData.technicians);
+            queryClient.setQueryData(['/api/categories'], result.dashboardData.categories);
+            queryClient.setQueryData(['/api/processes'], result.dashboardData.processes);
+            queryClient.setQueryData(['/api/app-settings'], result.dashboardData.appSettings);
+            queryClient.setQueryData(['/api/admin/cache-metadata'], result.dashboardData.cacheMetadata);
+            queryClient.setQueryData(['/api/announcements'], result.dashboardData.announcements);
+            queryClient.setQueryData(['/api/phone-whitelist'], result.dashboardData.phoneWhitelist);
+            
+            toast({
+              title: "Access Granted",
+              description: "Welcome to the admin dashboard.",
+            });
+            
+            onLogin();
+          } catch (verifyError) {
+            console.error('Session verification failed:', verifyError);
+            toast({
+              title: "Session Error",
+              description: "Session cookie not working. Please try logging in again.",
+              variant: "destructive",
+            });
+          }
         } else if (result.dashboardError) {
           // Dashboard data fetch failed - don't proceed to avoid inconsistent auth state
           toast({
