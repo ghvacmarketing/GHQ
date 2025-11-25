@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type ImportBatch, type InsertImportBatch, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, importBatches } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and } from "drizzle-orm";
@@ -87,6 +87,10 @@ export interface IStorage {
   updateLead(id: string, lead: Partial<Lead>): Promise<Lead | undefined>;
   deleteLead(id: string): Promise<boolean>;
   findDuplicateLead(phone?: string, email?: string, externalId?: string): Promise<Lead | undefined>;
+  
+  // Lead History operations
+  createLeadHistory(history: InsertLeadHistory): Promise<LeadHistory>;
+  getLeadHistory(leadId: string): Promise<LeadHistory[]>;
   
   // Import Batch operations
   createImportBatch(batch: InsertImportBatch): Promise<ImportBatch>;
@@ -563,6 +567,24 @@ export class DatabaseStorage implements IStorage {
     return lead ? this.normalizeLead(lead) : undefined;
   }
 
+  // Lead History operations
+  async createLeadHistory(insertHistory: InsertLeadHistory): Promise<LeadHistory> {
+    const [history] = await db
+      .insert(leadHistory)
+      .values(insertHistory)
+      .returning();
+    return history;
+  }
+
+  async getLeadHistory(leadId: string): Promise<LeadHistory[]> {
+    const history = await db
+      .select()
+      .from(leadHistory)
+      .where(eq(leadHistory.leadId, leadId))
+      .orderBy(leadHistory.createdAt);
+    return history.reverse(); // Most recent first
+  }
+
   // Import Batch operations
   async createImportBatch(insertBatch: InsertImportBatch): Promise<ImportBatch> {
     const [batch] = await db
@@ -585,6 +607,7 @@ export class DatabaseStorage implements IStorage {
   async clearAllData(): Promise<void> {
     // Clear all tables except sessions (preserve active sessions)
     await db.delete(importBatches);
+    await db.delete(leadHistory);
     await db.delete(leads);
     await db.delete(authTokens);
     await db.delete(phoneWhitelist);

@@ -1891,6 +1891,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updatedLead = await storage.updateLead(req.params.id, req.body);
+      
+      // Track changes to key fields in history
+      const actor = (req.session as any)?.user?.phone || "system";
+      
+      // Track status change
+      if (req.body.status && req.body.status !== lead.status) {
+        await storage.createLeadHistory({
+          leadId: req.params.id,
+          actor,
+          actionType: "status_changed",
+          payload: { from: lead.status, to: req.body.status }
+        });
+      }
+      
+      // Track assignment change
+      if (req.body.assignedEmployeeId !== undefined && req.body.assignedEmployeeId !== lead.assignedEmployeeId) {
+        await storage.createLeadHistory({
+          leadId: req.params.id,
+          actor,
+          actionType: "assignment_changed",
+          payload: { 
+            from: lead.assignedEmployeeId || null, 
+            to: req.body.assignedEmployeeId || null 
+          }
+        });
+      }
+      
+      // Track estimated value change
+      if (req.body.estimatedValue !== undefined && req.body.estimatedValue !== lead.estimatedValue) {
+        await storage.createLeadHistory({
+          leadId: req.params.id,
+          actor,
+          actionType: "field_updated",
+          payload: { 
+            field: "estimatedValue",
+            from: lead.estimatedValue, 
+            to: req.body.estimatedValue 
+          }
+        });
+      }
+      
+      // Track projected close date change
+      if (req.body.projectedCloseDate !== undefined) {
+        const oldDate = lead.projectedCloseDate ? new Date(lead.projectedCloseDate).toISOString() : null;
+        const newDate = req.body.projectedCloseDate ? new Date(req.body.projectedCloseDate).toISOString() : null;
+        
+        if (oldDate !== newDate) {
+          await storage.createLeadHistory({
+            leadId: req.params.id,
+            actor,
+            actionType: "field_updated",
+            payload: { 
+              field: "projectedCloseDate",
+              from: oldDate, 
+              to: newDate 
+            }
+          });
+        }
+      }
+      
       res.json(updatedLead);
     } catch (error) {
       console.error('Error updating lead:', error);
@@ -1947,6 +2007,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         closedAt: new Date(),
         status: "Won"
       });
+      
+      // Create history entry for marking won
+      const actor = (req.session as any)?.user?.phone || "system";
+      await storage.createLeadHistory({
+        leadId: req.params.id,
+        actor,
+        actionType: "status_changed",
+        payload: { from: lead.status, to: "Won", won: true }
+      });
+      
       res.json(updatedLead);
     } catch (error) {
       console.error('Error marking lead as won:', error);
@@ -1968,6 +2038,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         closedAt: new Date(),
         status: "Lost"
       });
+      
+      // Create history entry for marking lost
+      const actor = (req.session as any)?.user?.phone || "system";
+      await storage.createLeadHistory({
+        leadId: req.params.id,
+        actor,
+        actionType: "status_changed",
+        payload: { from: lead.status, to: "Lost", lost: true }
+      });
+      
       res.json(updatedLead);
     } catch (error) {
       console.error('Error marking lead as lost:', error);
@@ -2125,6 +2205,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting task:', error);
       res.status(500).json({ message: "Error deleting task" });
+    }
+  });
+
+  // 22. GET /api/leads/:id/history - Get lead history/activity timeline
+  app.get("/api/leads/:id/history", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const history = await storage.getLeadHistory(req.params.id);
+      res.json(history);
+    } catch (error) {
+      console.error('Error fetching lead history:', error);
+      res.status(500).json({ message: "Error fetching lead history" });
+    }
+  });
+
+  // 23. POST /api/leads/:id/history - Add activity to lead history (note, callback, etc.)
+  app.post("/api/leads/:id/history", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const { actionType, payload } = req.body;
+      if (!actionType) {
+        return res.status(400).json({ message: "actionType is required" });
+      }
+
+      // Get actor from session (phone number) or use "system"
+      const actor = (req.session as any)?.user?.phone || "system";
+
+      const historyEntry = await storage.createLeadHistory({
+        leadId: req.params.id,
+        actor,
+        actionType,
+        payload: payload || {}
+      });
+
+      res.json(historyEntry);
+    } catch (error) {
+      console.error('Error adding lead history:', error);
+      res.status(500).json({ message: "Error adding lead history" });
     }
   });
 

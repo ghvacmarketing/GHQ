@@ -267,6 +267,7 @@ export const leads = pgTable("leads", {
   quotePricing: text("quote_pricing"),
   customerType: text("customer_type"), // Residential, Commercial, etc.
   leadSource: text("lead_source"),
+  assignedEmployeeId: varchar("assigned_employee_id"), // Optional employee assignment
   // De-duplication and import tracking
   externalId: text("external_id"), // ID from Field Edge or other external system
   importSource: text("import_source"), // "fieldedge", "manual", etc.

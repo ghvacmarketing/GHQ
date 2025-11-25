@@ -10,7 +10,10 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter, Navigation } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter, Navigation, MessageSquare, StickyNote, ArrowRightCircle, UserPlus, Activity } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -56,6 +59,10 @@ export default function SalesProspects() {
 
   const { data: metrics, isLoading: isLoadingMetrics } = useQuery<MetricsData>({
     queryKey: ["/api/leads/metrics"],
+  });
+
+  const { data: technicians = [] } = useQuery<any[]>({
+    queryKey: ["/api/technicians"],
   });
 
   // Create lead mutation
@@ -533,7 +540,7 @@ export default function SalesProspects() {
                   <DialogTitle>Create New Lead</DialogTitle>
                   <DialogDescription>Add a new sales prospect to track</DialogDescription>
                 </DialogHeader>
-                <CreateLeadForm onSubmit={(data) => createLeadMutation.mutate(data)} />
+                <CreateLeadForm onSubmit={(data) => createLeadMutation.mutate(data)} technicians={technicians} />
               </DialogContent>
             </Dialog>
           </div>
@@ -591,6 +598,7 @@ export default function SalesProspects() {
                 onDeleteTask={(taskId) => deleteTaskMutation.mutate({ leadId: lead.id, taskId })}
                 calculateDaysToClose={calculateDaysToClose}
                 formatCurrency={formatCurrency}
+                technicians={technicians}
               />
             ))}
           </div>
@@ -601,7 +609,7 @@ export default function SalesProspects() {
 }
 
 // Create Lead Form Component
-function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
+function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => void; technicians: any[] }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: "",
@@ -614,6 +622,7 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
     projectedCloseDate: "",
     customerType: "",
     leadSource: "",
+    assignedEmployeeId: "",
   });
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [emailError, setEmailError] = useState("");
@@ -847,6 +856,7 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       projectedCloseDate: "",
       customerType: "",
       leadSource: "",
+      assignedEmployeeId: "",
     });
     setSelectedAddress("");
     // Reinitialize the autocomplete element to clear it
@@ -988,10 +998,329 @@ function CreateLeadForm({ onSubmit }: { onSubmit: (data: any) => void }) {
         />
       </div>
 
+      <div>
+        <label className="text-sm font-medium">Assigned Employee</label>
+        <Select 
+          value={formData.assignedEmployeeId || undefined} 
+          onValueChange={(value) => setFormData({ ...formData, assignedEmployeeId: value })}
+        >
+          <SelectTrigger data-testid="select-assigned-employee">
+            <SelectValue placeholder="None (Optional)" />
+          </SelectTrigger>
+          <SelectContent>
+            {technicians.map((tech) => (
+              <SelectItem key={tech.id} value={tech.id}>
+                {tech.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <Button type="submit" className="w-full" data-testid="button-submit-lead">
         Create Lead
       </Button>
     </form>
+  );
+}
+
+// Activity Timeline Sheet Component
+function ActivityTimelineSheet({ 
+  leadId, 
+  leadName, 
+  isOpen, 
+  onClose 
+}: { 
+  leadId: string; 
+  leadName: string; 
+  isOpen: boolean; 
+  onClose: () => void; 
+}) {
+  const { toast } = useToast();
+  const [noteContent, setNoteContent] = useState("");
+  const [callbackDate, setCallbackDate] = useState("");
+  const [callbackCaller, setCallbackCaller] = useState("");
+  const [callbackResponse, setCallbackResponse] = useState("");
+
+  // Fetch technicians for employee name resolution
+  const { data: technicians = [] } = useQuery<Technician[]>({
+    queryKey: ["/api/technicians"],
+  });
+
+  // Fetch lead history
+  const { data: history = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/leads", leadId, "history"],
+    enabled: isOpen,
+  });
+
+  // Add note mutation
+  const addNoteMutation = useMutation({
+    mutationFn: async (note: string) => {
+      const res = await apiRequest("POST", `/api/leads/${leadId}/history`, {
+        actionType: "note_added",
+        payload: { note },
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId, "history"] });
+      toast({ description: "Note added successfully", duration: 1000 });
+      setNoteContent("");
+    },
+    onError: () => {
+      toast({ description: "Failed to add note", variant: "destructive" });
+    },
+  });
+
+  // Log callback mutation
+  const logCallbackMutation = useMutation({
+    mutationFn: async (data: { date: string; caller: string; response: string }) => {
+      const res = await apiRequest("POST", `/api/leads/${leadId}/history`, {
+        actionType: "callback_logged",
+        payload: data,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId, "history"] });
+      toast({ description: "Callback logged successfully", duration: 1000 });
+      setCallbackDate("");
+      setCallbackCaller("");
+      setCallbackResponse("");
+    },
+    onError: () => {
+      toast({ description: "Failed to log callback", variant: "destructive" });
+    },
+  });
+
+  const handleNoteSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (noteContent.trim()) {
+      addNoteMutation.mutate(noteContent.trim());
+    }
+  };
+
+  const handleCallbackSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (callbackDate && callbackCaller.trim()) {
+      logCallbackMutation.mutate({
+        date: callbackDate,
+        caller: callbackCaller.trim(),
+        response: callbackResponse.trim(),
+      });
+    }
+  };
+
+  const getActivityIcon = (actionType: string) => {
+    switch (actionType) {
+      case "note_added":
+        return <StickyNote className="h-5 w-5 text-blue-600 dark:text-blue-400" />;
+      case "callback_logged":
+        return <Phone className="h-5 w-5 text-green-600 dark:text-green-400" />;
+      case "status_changed":
+        return <ArrowRightCircle className="h-5 w-5 text-purple-600 dark:text-purple-400" />;
+      case "assignment_changed":
+        return <UserPlus className="h-5 w-5 text-orange-600 dark:text-orange-400" />;
+      case "field_updated":
+        return <Edit className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />;
+      case "created":
+        return <Plus className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />;
+      default:
+        return <Activity className="h-5 w-5 text-gray-600 dark:text-gray-400" />;
+    }
+  };
+
+  const getActivityBgColor = (actionType: string) => {
+    switch (actionType) {
+      case "note_added":
+        return "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800";
+      case "callback_logged":
+        return "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800";
+      case "status_changed":
+        return "bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800";
+      case "assignment_changed":
+        return "bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800";
+      case "field_updated":
+        return "bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800";
+      case "created":
+        return "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800";
+      default:
+        return "bg-muted border-border";
+    }
+  };
+
+  const getActivityDescription = (entry: any) => {
+    const { actionType, payload } = entry;
+    
+    // Helper to resolve employee ID to name
+    const getEmployeeName = (employeeId: string | null) => {
+      if (!employeeId) return "Unassigned";
+      const employee = technicians.find(t => t.id === employeeId);
+      return employee ? employee.name : employeeId;
+    };
+    
+    switch (actionType) {
+      case "note_added":
+        return payload.note || "Added a note";
+      case "callback_logged":
+        return `Callback from ${payload.caller || "Unknown"} on ${payload.date ? format(new Date(payload.date), "MMM d, yyyy") : "Unknown date"}${payload.response ? `: ${payload.response}` : ""}`;
+      case "status_changed":
+        return `Changed status from ${payload.from || "Unknown"} to ${payload.to || "Unknown"}`;
+      case "assignment_changed":
+        const fromName = getEmployeeName(payload.from);
+        const toName = getEmployeeName(payload.to);
+        return `Assigned from ${fromName} to ${toName}`;
+      case "field_updated":
+        if (payload.field === "estimatedValue") {
+          const fromValue = payload.from ? `$${parseFloat(payload.from).toFixed(2)}` : "not set";
+          const toValue = payload.to ? `$${parseFloat(payload.to).toFixed(2)}` : "not set";
+          return `Updated estimated value from ${fromValue} to ${toValue}`;
+        } else if (payload.field === "projectedCloseDate") {
+          const fromDate = payload.from ? format(new Date(payload.from), "MMM d, yyyy") : "not set";
+          const toDate = payload.to ? format(new Date(payload.to), "MMM d, yyyy") : "not set";
+          return `Updated close date from ${fromDate} to ${toDate}`;
+        }
+        return `Updated ${payload.field || "field"}`;
+      case "created":
+        return "Lead created";
+      default:
+        return "Activity recorded";
+    }
+  };
+
+  return (
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent className="w-full sm:max-w-2xl overflow-hidden flex flex-col">
+        <SheetHeader>
+          <SheetTitle>{leadName} - Activity Timeline</SheetTitle>
+          <SheetDescription>
+            Track all interactions, notes, callbacks, and changes
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 flex flex-col overflow-hidden mt-4">
+          {/* Quick Action Forms */}
+          <Tabs defaultValue="note" className="w-full mb-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="note">Add Note</TabsTrigger>
+              <TabsTrigger value="callback">Log Callback</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="note">
+              <form onSubmit={handleNoteSubmit} className="space-y-3">
+                <Textarea
+                  placeholder="Add a note about this lead..."
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  rows={3}
+                  data-testid="textarea-add-note"
+                  className="resize-none"
+                />
+                <Button
+                  type="submit"
+                  disabled={!noteContent.trim() || addNoteMutation.isPending}
+                  className="w-full"
+                  data-testid="button-save-note"
+                >
+                  {addNoteMutation.isPending ? "Saving..." : "Save Note"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="callback">
+              <form onSubmit={handleCallbackSubmit} className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium">Callback Date</label>
+                  <Input
+                    type="date"
+                    value={callbackDate}
+                    onChange={(e) => setCallbackDate(e.target.value)}
+                    required
+                    data-testid="input-callback-date"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Who Called Back</label>
+                  <Input
+                    placeholder="Customer name or team member"
+                    value={callbackCaller}
+                    onChange={(e) => setCallbackCaller(e.target.value)}
+                    required
+                    data-testid="input-callback-caller"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Response/Notes</label>
+                  <Textarea
+                    placeholder="What was discussed..."
+                    value={callbackResponse}
+                    onChange={(e) => setCallbackResponse(e.target.value)}
+                    rows={3}
+                    data-testid="textarea-callback-response"
+                    className="resize-none"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={!callbackDate || !callbackCaller.trim() || logCallbackMutation.isPending}
+                  className="w-full"
+                  data-testid="button-log-callback"
+                >
+                  {logCallbackMutation.isPending ? "Logging..." : "Log Callback"}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+
+          {/* Activity Timeline */}
+          <div className="border-t pt-4 flex-1 overflow-hidden flex flex-col">
+            <h3 className="font-semibold mb-3">Activity History</h3>
+            <ScrollArea className="flex-1">
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Card key={i} className="p-4">
+                      <Skeleton className="h-4 w-3/4 mb-2" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </Card>
+                  ))}
+                </div>
+              ) : history.length === 0 ? (
+                <Card className="p-6">
+                  <p className="text-center text-muted-foreground">
+                    No activity yet. Add a note or log a callback to get started.
+                  </p>
+                </Card>
+              ) : (
+                <div className="space-y-3 pb-4">
+                  {history.map((entry) => (
+                    <Card
+                      key={entry.id}
+                      className={`p-4 border transition-all hover:shadow-md ${getActivityBgColor(entry.actionType)}`}
+                    >
+                      <div className="flex gap-3">
+                        <div className="flex-shrink-0 mt-1">{getActivityIcon(entry.actionType)}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-sm font-medium truncate">
+                              {entry.actor || "System"}
+                            </span>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {format(new Date(entry.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                            </span>
+                          </div>
+                          <p className="text-sm break-words">{getActivityDescription(entry)}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1012,6 +1341,7 @@ function LeadCard({
   onDeleteTask,
   calculateDaysToClose,
   formatCurrency,
+  technicians,
 }: {
   lead: Lead;
   isExpanded: boolean;
@@ -1028,12 +1358,21 @@ function LeadCard({
   onDeleteTask: (taskId: string) => void;
   calculateDaysToClose: (date: Date | string | null) => string | null;
   formatCurrency: (value: string | number | null | undefined) => string;
+  technicians: any[];
 }) {
   const [newAction, setNewAction] = useState("");
   const [newTask, setNewTask] = useState("");
   const [newTaskDate, setNewTaskDate] = useState("");
   const [quoteDetails, setQuoteDetails] = useState(lead.quoteDetails || "");
   const [quotePricing, setQuotePricing] = useState(lead.quotePricing || "");
+  const [isActivitySheetOpen, setIsActivitySheetOpen] = useState(false);
+  const [editedLead, setEditedLead] = useState({
+    estimatedValue: lead.estimatedValue || "",
+    projectedCloseDate: lead.projectedCloseDate ? format(new Date(lead.projectedCloseDate), "yyyy-MM-dd") : "",
+    customerType: lead.customerType || "",
+    leadSource: lead.leadSource || "",
+    assignedEmployeeId: lead.assignedEmployeeId || "",
+  });
 
   const isActive = !lead.won && !lead.lost;
   const actions = (lead.nextActions || []) as LeadAction[];
@@ -1046,7 +1385,8 @@ function LeadCard({
   const daysToClose = calculateDaysToClose(lead.projectedCloseDate);
 
   return (
-    <Card data-testid={`card-lead-${lead.id}`}>
+    <>
+      <Card data-testid={`card-lead-${lead.id}`}>
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -1178,6 +1518,11 @@ function LeadCard({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          <Button size="sm" variant="outline" className="touch-manipulation" onClick={() => setIsActivitySheetOpen(true)} data-testid="button-view-activity">
+            <MessageSquare className="h-4 w-4 sm:mr-1" />
+            <span className="sr-only sm:not-sr-only sm:inline ml-1">View Activity</span>
+          </Button>
 
           <Button size="sm" variant="ghost" onClick={onToggleExpand} data-testid={`button-expand-${lead.id}`}>
             {isExpanded ? "Hide Details" : "Show Details"}
@@ -1406,6 +1751,98 @@ function LeadCard({
               </AccordionContent>
             </AccordionItem>
 
+            {/* Lead Details Section */}
+            <AccordionItem value="details" data-testid={`accordion-details-${lead.id}`}>
+              <AccordionTrigger>Lead Details</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Estimated Value</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editedLead.estimatedValue}
+                        onChange={(e) => setEditedLead({ ...editedLead, estimatedValue: e.target.value })}
+                        disabled={!isActive}
+                        data-testid={`input-edit-value-${lead.id}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Projected Close Date</label>
+                      <Input
+                        type="date"
+                        value={editedLead.projectedCloseDate}
+                        onChange={(e) => setEditedLead({ ...editedLead, projectedCloseDate: e.target.value })}
+                        disabled={!isActive}
+                        data-testid={`input-edit-close-date-${lead.id}`}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Customer Type</label>
+                      <Input
+                        value={editedLead.customerType}
+                        onChange={(e) => setEditedLead({ ...editedLead, customerType: e.target.value })}
+                        placeholder="e.g., Residential, Commercial"
+                        disabled={!isActive}
+                        data-testid={`input-edit-customer-type-${lead.id}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Lead Source</label>
+                      <Input
+                        value={editedLead.leadSource}
+                        onChange={(e) => setEditedLead({ ...editedLead, leadSource: e.target.value })}
+                        placeholder="e.g., Referral, Website, Ad"
+                        disabled={!isActive}
+                        data-testid={`input-edit-lead-source-${lead.id}`}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Assigned Employee</label>
+                    <Select
+                      value={editedLead.assignedEmployeeId || undefined}
+                      onValueChange={(value) => setEditedLead({ ...editedLead, assignedEmployeeId: value })}
+                      disabled={!isActive}
+                    >
+                      <SelectTrigger data-testid={`select-edit-assigned-employee-${lead.id}`}>
+                        <SelectValue placeholder="None (Optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {technicians.map((tech) => (
+                          <SelectItem key={tech.id} value={tech.id}>
+                            {tech.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {isActive && (
+                    <Button
+                      onClick={() => {
+                        const updateData: any = {
+                          estimatedValue: editedLead.estimatedValue || undefined,
+                          customerType: editedLead.customerType || undefined,
+                          leadSource: editedLead.leadSource || undefined,
+                          assignedEmployeeId: editedLead.assignedEmployeeId || undefined,
+                        };
+                        if (editedLead.projectedCloseDate) {
+                          updateData.projectedCloseDate = new Date(editedLead.projectedCloseDate).toISOString();
+                        }
+                        onUpdate(updateData);
+                      }}
+                      data-testid={`button-save-details-${lead.id}`}
+                    >
+                      Save Details
+                    </Button>
+                  )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
             {/* Quote Section */}
             <AccordionItem value="quote" data-testid={`accordion-quote-${lead.id}`}>
               <AccordionTrigger>Quote</AccordionTrigger>
@@ -1449,6 +1886,14 @@ function LeadCard({
           </Accordion>
         )}
       </CardContent>
-    </Card>
+      </Card>
+
+      <ActivityTimelineSheet
+        leadId={lead.id}
+        leadName={lead.name}
+        isOpen={isActivitySheetOpen}
+        onClose={() => setIsActivitySheetOpen(false)}
+      />
+    </>
   );
 }
