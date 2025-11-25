@@ -983,6 +983,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               reject(err);
             } else {
               console.log('Admin session saved successfully, session ID:', req.sessionID);
+              console.log('Session cookie settings:', req.session.cookie);
+              console.log('Session data:', { isAdmin: (req.session as any).isAdmin });
               resolve();
             }
           });
@@ -1080,8 +1082,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Aggregated admin dashboard data (optimized single request)
   app.get("/api/admin/dashboard", async (req, res) => {
     try {
+      // Debug logging
+      console.log('Dashboard request - Session ID:', req.sessionID);
+      console.log('Dashboard request - Session data:', req.session);
+      console.log('Dashboard request - Cookies:', req.headers.cookie);
+      
       // Verify admin authentication
       if (!(req.session as any)?.isAdmin) {
+        console.log('Dashboard request REJECTED - isAdmin:', (req.session as any)?.isAdmin);
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
