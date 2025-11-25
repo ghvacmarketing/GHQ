@@ -4,16 +4,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { History, ChevronDown, ChevronUp, FileText, Calendar, User, ArrowLeft, Plus, Edit } from "lucide-react";
+import { History, ChevronDown, ChevronUp, FileText, Calendar, User, ArrowLeft, Plus, Edit, UserPlus } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Quote } from "@shared/schema";
+import ConvertQuoteToLeadDialog from "@/components/convert-quote-to-lead-dialog";
 import trelloIcon from "@assets/trello_1757379276597.png";
 import redlogo from "@assets/redlogo.webp";
 
 export default function QuotesHistory() {
   const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
+  const [convertQuote, setConvertQuote] = useState<Quote | null>(null);
+  const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -332,6 +335,23 @@ export default function QuotesHistory() {
                             </div>
                           </div>
                         )}
+
+                        {/* Convert to Lead Button */}
+                        <div className="mt-4 pt-4 border-t border-border">
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConvertQuote(quote);
+                              setIsConvertDialogOpen(true);
+                            }}
+                            variant="outline"
+                            className="w-full flex items-center justify-center space-x-2"
+                            data-testid={`button-convert-to-lead-${quote.id}`}
+                          >
+                            <UserPlus className="h-4 w-4" />
+                            <span>Convert to Sales Lead</span>
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -341,6 +361,24 @@ export default function QuotesHistory() {
           </div>
         </CardContent>
       </Card>
+
+      <ConvertQuoteToLeadDialog
+        quote={convertQuote}
+        isOpen={isConvertDialogOpen}
+        onClose={() => {
+          setIsConvertDialogOpen(false);
+          setConvertQuote(null);
+        }}
+        onSuccess={(leadId) => {
+          toast({
+            title: "Success",
+            description: "Quote converted to sales lead! Redirecting to Sales Prospects...",
+          });
+          setTimeout(() => {
+            setLocation("/sales-prospects");
+          }, 1500);
+        }}
+      />
     </main>
     </div>
   );

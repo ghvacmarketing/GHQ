@@ -129,34 +129,34 @@ export default function ConvertQuoteToLeadDialog({
     convertMutation.mutate();
   };
 
-  if (!quote) return null;
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen && !!quote} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Convert Quote to Sales Lead</DialogTitle>
-          <DialogDescription>
-            Fill in the missing information to create a sales lead from this quote
-          </DialogDescription>
-        </DialogHeader>
+        {quote && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Convert Quote to Sales Lead</DialogTitle>
+              <DialogDescription>
+                Fill in the missing information to create a sales lead from this quote
+              </DialogDescription>
+            </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          {/* Pre-filled from quote (read-only display) */}
-          <div className="bg-muted p-4 rounded-lg space-y-2">
-            <h4 className="font-medium text-sm text-muted-foreground">From Quote:</h4>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <span className="text-muted-foreground">Customer:</span> {quote.customerName}
+            <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+              {/* Pre-filled from quote (read-only display) */}
+              <div className="bg-muted p-4 rounded-lg space-y-2">
+                <h4 className="font-medium text-sm text-muted-foreground">From Quote:</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Customer:</span> {quote.customerName}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Estimated Value:</span> ${quote.total}
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Quote ID:</span> {quote.id.slice(0, 8)}
+                  </div>
+                </div>
               </div>
-              <div>
-                <span className="text-muted-foreground">Estimated Value:</span> ${quote.total}
-              </div>
-              <div className="col-span-2">
-                <span className="text-muted-foreground">Quote ID:</span> {quote.id.slice(0, 8)}
-              </div>
-            </div>
-          </div>
 
           {/* Additional information needed */}
           <div className="space-y-4">
@@ -283,6 +283,8 @@ export default function ConvertQuoteToLeadDialog({
             </Button>
           </DialogFooter>
         </form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

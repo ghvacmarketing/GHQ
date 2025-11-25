@@ -1056,12 +1056,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Price Book PDF routes (with increased body size limit)
   app.post("/api/price-book/upload", express.json({ limit: '50mb' }), async (req, res) => {
     try {
-      const { name, data, size, password } = req.body;
-      
-      // Authentication check
-      if (password !== "ghvacadmin") {
-        return res.status(401).json({ message: "Unauthorized" });
+      // Verify admin authentication via session
+      if (!(req.session as any)?.isAdmin) {
+        return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
+      
+      const { name, data, size } = req.body;
       
       if (!name || !data || !size) {
         return res.status(400).json({ message: "PDF name, data, and size are required" });
@@ -1121,11 +1121,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/price-book/pdf", async (req, res) => {
     try {
-      const { password } = req.body;
-      
-      // Authentication check
-      if (password !== "ghvacadmin") {
-        return res.status(401).json({ message: "Unauthorized" });
+      // Verify admin authentication via session
+      if (!(req.session as any)?.isAdmin) {
+        return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
       
       const success = await storage.deletePriceBookPdf();

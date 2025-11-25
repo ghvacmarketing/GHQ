@@ -994,7 +994,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
                 {filteredQuotes.map((quote) => (
                   <Card
                     key={quote.id}
-                    className="p-4 cursor-pointer hover:bg-accent transition-colors"
+                    className="w-full p-4 cursor-pointer hover:bg-accent transition-colors overflow-hidden"
                     onClick={() => handleImportQuote(quote)}
                     data-testid={`card-quote-${quote.id}`}
                   >
