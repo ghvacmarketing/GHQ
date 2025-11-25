@@ -992,7 +992,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const [
             settings,
-            quoteSummary,
+            quotes,
             technicians,
             categories,
             processes,
@@ -1002,7 +1002,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             phoneWhitelist
           ] = await Promise.all([
             googleSheetsService.fetchCellValues(),
-            storage.getQuoteSummary(),
+            storage.getAllQuotes(),
             storage.getAllTechnicians(),
             storage.getAllCategories(),
             storage.getAllProcesses(),
@@ -1018,6 +1018,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
             storage.getAllAnnouncements(),
             storage.getAllPhoneWhitelist()
           ]);
+
+          // Calculate quote summary (same logic as /api/quotes/summary endpoint)
+          const totalQuotes = quotes.length;
+          const statusCounts = quotes.reduce((acc, quote) => {
+            const status = quote.status || 'draft';
+            acc[status] = (acc[status] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+          const totalValue = quotes.reduce((sum, quote) => sum + parseFloat(quote.total), 0);
+          const recentQuotes = quotes
+            .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime())
+            .slice(0, 5)
+            .map(quote => ({
+              id: quote.id,
+              customerName: quote.customerName,
+              technician: quote.technician,
+              total: quote.total,
+              status: quote.status,
+              createdAt: quote.createdAt
+            }));
+          
+          const quoteSummary = {
+            totalQuotes,
+            statusCounts,
+            totalValue,
+            recentQuotes
+          };
 
           res.json({
             success: true,
@@ -1061,7 +1088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch all admin data in parallel for maximum performance
       const [
         settings,
-        quoteSummary,
+        quotes,
         technicians,
         categories,
         processes,
@@ -1071,7 +1098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         phoneWhitelist
       ] = await Promise.all([
         googleSheetsService.fetchCellValues(), // Served from cache
-        storage.getQuoteSummary(),
+        storage.getAllQuotes(),
         storage.getAllTechnicians(),
         storage.getAllCategories(),
         storage.getAllProcesses(),
@@ -1087,6 +1114,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getAllAnnouncements(),
         storage.getAllPhoneWhitelist()
       ]);
+
+      // Calculate quote summary (same logic as /api/quotes/summary endpoint)
+      const totalQuotes = quotes.length;
+      const statusCounts = quotes.reduce((acc, quote) => {
+        const status = quote.status || 'draft';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      const totalValue = quotes.reduce((sum, quote) => sum + parseFloat(quote.total), 0);
+      const recentQuotes = quotes
+        .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime())
+        .slice(0, 5)
+        .map(quote => ({
+          id: quote.id,
+          customerName: quote.customerName,
+          technician: quote.technician,
+          total: quote.total,
+          status: quote.status,
+          createdAt: quote.createdAt
+        }));
+      
+      const quoteSummary = {
+        totalQuotes,
+        statusCounts,
+        totalValue,
+        recentQuotes
+      };
 
       res.json({
         settings,
