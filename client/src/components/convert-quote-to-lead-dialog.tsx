@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -55,8 +55,8 @@ export default function ConvertQuoteToLeadDialog({
   });
 
   // Reset form when quote changes or dialog opens
-  useState(() => {
-    if (quote) {
+  useEffect(() => {
+    if (isOpen && quote) {
       setAddress(quote.jobNotes || "");
       setClientIssue("");
       setPhone("");
@@ -65,8 +65,18 @@ export default function ConvertQuoteToLeadDialog({
       setLeadSource("Quote Generated");
       setProjectedCloseDate("");
       setAssignedEmployeeId("");
+    } else if (!isOpen) {
+      // Clear all fields when dialog closes
+      setAddress("");
+      setClientIssue("");
+      setPhone("");
+      setEmail("");
+      setCustomerType("");
+      setLeadSource("Quote Generated");
+      setProjectedCloseDate("");
+      setAssignedEmployeeId("");
     }
-  });
+  }, [quote, isOpen]);
 
   // Convert quote to lead mutation
   const convertMutation = useMutation({

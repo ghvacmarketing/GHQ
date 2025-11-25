@@ -13,15 +13,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter, Navigation, MessageSquare, StickyNote, ArrowRightCircle, UserPlus, Activity } from "lucide-react";
+import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter, Navigation, MessageSquare, StickyNote, ArrowRightCircle, UserPlus, Activity, FileText, ExternalLink, Search } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { nanoid } from "nanoid";
-import type { Lead, LeadAction, LeadTask } from "@shared/schema";
+import type { Lead, LeadAction, LeadTask, Quote } from "@shared/schema";
 import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
+import { useLocation } from "wouter";
 
 // Extend Window interface for Google Maps
 declare global {
@@ -608,6 +609,28 @@ export default function SalesProspects() {
   );
 }
 
+// Quote Reference Link Component
+function QuoteReferenceLink({ quoteId }: { quoteId: string }) {
+  const [, setLocation] = useLocation();
+
+  const handleViewQuote = () => {
+    // Navigate to quote history page - the page should handle highlighting the quote
+    setLocation(`/quotes-history?quoteId=${quoteId}`);
+  };
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={handleViewQuote}
+      data-testid={`button-view-quote-${quoteId}`}
+    >
+      <ExternalLink className="h-3 w-3 mr-1" />
+      View Quote
+    </Button>
+  );
+}
+
 // Create Lead Form Component
 function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => void; technicians: any[] }) {
   const { toast } = useToast();
@@ -623,6 +646,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
     customerType: "",
     leadSource: "",
     assignedEmployeeId: "",
+    quoteId: "",
   });
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [emailError, setEmailError] = useState("");
@@ -630,8 +654,50 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
   const addressContainerRef = useRef<HTMLDivElement>(null);
   const autocompleteElementRef = useRef<any>(null);
   const [selectedAddress, setSelectedAddress] = useState("");
+  const [isImportQuoteDialogOpen, setIsImportQuoteDialogOpen] = useState(false);
+  const [quoteSearchTerm, setQuoteSearchTerm] = useState("");
+
+  // Fetch all quotes for import
+  const { data: quotesData, isLoading: isLoadingQuotes } = useQuery<{ quotes: Quote[] }>({
+    queryKey: ["/api/quotes"],
+    enabled: isImportQuoteDialogOpen,
+  });
 
   const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || "";
+
+  // Filter quotes based on search term
+  const allQuotes = quotesData?.quotes || [];
+  const filteredQuotes = allQuotes.filter((quote) => {
+    if (!quoteSearchTerm.trim()) return true;
+    const searchLower = quoteSearchTerm.toLowerCase();
+    return (
+      quote.customerName.toLowerCase().includes(searchLower) ||
+      quote.id.toLowerCase().includes(searchLower) ||
+      quote.technician.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Handle importing data from a selected quote
+  const handleImportQuote = (quote: Quote) => {
+    setFormData({
+      name: quote.customerName,
+      phone: "", // Will be filled by user
+      email: "", // Will be filled by user
+      address: quote.jobNotes || "",
+      estimatedValue: quote.total.toString(),
+      status: "Quote Sent",
+      clientIssue: `Quote #${quote.id.slice(0, 8)} - ${(quote.parts as any[]).map(p => p.description).join(', ')}`,
+      projectedCloseDate: "",
+      customerType: "",
+      leadSource: "Quote Generated",
+      assignedEmployeeId: "",
+      quoteId: quote.id,
+    });
+    setSelectedAddress(quote.jobNotes || "");
+    setIsImportQuoteDialogOpen(false);
+    setQuoteSearchTerm("");
+    toast({ description: `Quote data imported for ${quote.customerName}`, duration: 2000 });
+  };
 
   // Load Google Places API and initialize new PlaceAutocompleteElement
   useEffect(() => {
@@ -836,6 +902,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
     const submitData: any = {
       ...formData,
       estimatedValue: formData.estimatedValue ? formData.estimatedValue : undefined,
+      quoteId: formData.quoteId || undefined,
     };
 
     // Convert date string to Date object if present
@@ -857,6 +924,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
       customerType: "",
       leadSource: "",
       assignedEmployeeId: "",
+      quoteId: "",
     });
     setSelectedAddress("");
     // Reinitialize the autocomplete element to clear it
@@ -868,159 +936,277 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="text-sm font-medium">Name *</label>
-        <Input
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          required
-          data-testid="input-lead-name"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-medium">Phone</label>
-          <Input
-            type="tel"
-            value={formData.phone}
-            onChange={handlePhoneChange}
-            placeholder="(555) 123-4567"
-            data-testid="input-lead-phone"
-            className={phoneError ? "border-red-500" : ""}
-          />
-          {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
-        </div>
-        <div>
-          <label className="text-sm font-medium">Email</label>
-          <Input
-            type="email"
-            value={formData.email}
-            onChange={handleEmailChange}
-            placeholder="email@example.com"
-            data-testid="input-lead-email"
-            className={emailError ? "border-red-500" : ""}
-          />
-          {emailError && <p className="text-xs text-red-500 mt-1">{emailError}</p>}
-        </div>
-      </div>
-
-      <div>
-        <label className="text-sm font-medium">Address</label>
-        <div className="flex gap-2 items-center">
-          <div 
-            ref={addressContainerRef} 
-            className="flex-1"
-            data-testid="autocomplete-address-container"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={getCurrentLocation}
-            disabled={isGettingLocation}
-            title="Use current location"
-            data-testid="button-geolocation"
+    <div className="space-y-4">
+      {/* Import from Quote Button */}
+      <Dialog open={isImportQuoteDialogOpen} onOpenChange={setIsImportQuoteDialogOpen}>
+        <DialogTrigger asChild>
+          <Button 
+            type="button" 
+            variant="outline" 
+            className="w-full" 
+            data-testid="button-import-from-quote"
           >
-            <Navigation className={`h-4 w-4 ${isGettingLocation ? 'animate-spin' : ''}`} />
+            <FileText className="h-4 w-4 mr-2" />
+            Import from Existing Quote
           </Button>
-        </div>
-        {selectedAddress && (
-          <p className="text-xs text-muted-foreground mt-1">Selected: {selectedAddress}</p>
-        )}
-      </div>
+        </DialogTrigger>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col" data-testid="dialog-import-quote">
+          <DialogHeader>
+            <DialogTitle>Import from Quote</DialogTitle>
+            <DialogDescription>
+              Search for an existing quote to pre-fill the lead form
+            </DialogDescription>
+          </DialogHeader>
 
-      <div className="grid grid-cols-2 gap-4">
+          {/* Search Input */}
+          <div className="flex items-center gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by customer name, quote ID, or technician..."
+                value={quoteSearchTerm}
+                onChange={(e) => setQuoteSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-quotes"
+              />
+            </div>
+          </div>
+
+          {/* Quotes List */}
+          <ScrollArea className="flex-1 pr-4">
+            {isLoadingQuotes ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Card key={i} className="p-4">
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </Card>
+                ))}
+              </div>
+            ) : filteredQuotes.length === 0 ? (
+              <Card className="p-6">
+                <p className="text-center text-muted-foreground">
+                  {quoteSearchTerm ? "No quotes found matching your search" : "No quotes available"}
+                </p>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {filteredQuotes.map((quote) => (
+                  <Card
+                    key={quote.id}
+                    className="p-4 cursor-pointer hover:bg-accent transition-colors"
+                    onClick={() => handleImportQuote(quote)}
+                    data-testid={`card-quote-${quote.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold truncate" data-testid={`text-quote-customer-${quote.id}`}>
+                            {quote.customerName}
+                          </h4>
+                          <Badge variant="outline" className="text-xs">
+                            {quote.id.slice(0, 8)}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <p>Technician: {quote.technician}</p>
+                          <p>Total: ${parseFloat(quote.total).toFixed(2)}</p>
+                          {quote.createdAt && (
+                            <p className="text-xs">
+                              Created: {format(new Date(quote.createdAt), "MMM dd, yyyy")}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleImportQuote(quote);
+                        }}
+                        data-testid={`button-select-quote-${quote.id}`}
+                      >
+                        Select
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Show quote reference if imported */}
+      {formData.quoteId && (
+        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3" data-testid="quote-reference-banner">
+          <div className="flex items-center gap-2 text-sm">
+            <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <span className="font-medium text-blue-900 dark:text-blue-100">
+              Imported from Quote #{formData.quoteId.slice(0, 8)}
+            </span>
+          </div>
+          <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+            You can edit all fields before creating the lead
+          </p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="text-sm font-medium">Estimated Value</label>
+          <label className="text-sm font-medium">Name *</label>
           <Input
-            type="number"
-            step="0.01"
-            value={formData.estimatedValue}
-            onChange={(e) => setFormData({ ...formData, estimatedValue: e.target.value })}
-            data-testid="input-lead-value"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            required
+            data-testid="input-lead-name"
           />
         </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium">Phone</label>
+            <Input
+              type="tel"
+              value={formData.phone}
+              onChange={handlePhoneChange}
+              placeholder="(555) 123-4567"
+              data-testid="input-lead-phone"
+              className={phoneError ? "border-red-500" : ""}
+            />
+            {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
+          </div>
+          <div>
+            <label className="text-sm font-medium">Email</label>
+            <Input
+              type="email"
+              value={formData.email}
+              onChange={handleEmailChange}
+              placeholder="email@example.com"
+              data-testid="input-lead-email"
+              className={emailError ? "border-red-500" : ""}
+            />
+            {emailError && <p className="text-xs text-red-500 mt-1">{emailError}</p>}
+          </div>
+        </div>
+
         <div>
-          <label className="text-sm font-medium">Status</label>
-          <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-            <SelectTrigger data-testid="select-lead-status">
-              <SelectValue />
+          <label className="text-sm font-medium">Address</label>
+          <div className="flex gap-2 items-center">
+            <div 
+              ref={addressContainerRef} 
+              className="flex-1"
+              data-testid="autocomplete-address-container"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={getCurrentLocation}
+              disabled={isGettingLocation}
+              title="Use current location"
+              data-testid="button-geolocation"
+            >
+              <Navigation className={`h-4 w-4 ${isGettingLocation ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+          {selectedAddress && (
+            <p className="text-xs text-muted-foreground mt-1">Selected: {selectedAddress}</p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium">Estimated Value</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={formData.estimatedValue}
+              onChange={(e) => setFormData({ ...formData, estimatedValue: e.target.value })}
+              data-testid="input-lead-value"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Status</label>
+            <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+              <SelectTrigger data-testid="select-lead-status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="New">New</SelectItem>
+                <SelectItem value="Contacted">Contacted</SelectItem>
+                <SelectItem value="Quote Sent">Quote Sent</SelectItem>
+                <SelectItem value="Negotiating">Negotiating</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium">Client Issue</label>
+          <Textarea
+            value={formData.clientIssue}
+            onChange={(e) => setFormData({ ...formData, clientIssue: e.target.value })}
+            data-testid="textarea-lead-issue"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium">Projected Close Date</label>
+            <Input
+              type="date"
+              value={formData.projectedCloseDate}
+              onChange={(e) => setFormData({ ...formData, projectedCloseDate: e.target.value })}
+              data-testid="input-lead-close-date"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Customer Type</label>
+            <Input
+              value={formData.customerType}
+              onChange={(e) => setFormData({ ...formData, customerType: e.target.value })}
+              placeholder="e.g., Residential, Commercial"
+              data-testid="input-lead-customer-type"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium">Lead Source</label>
+          <Input
+            value={formData.leadSource}
+            onChange={(e) => setFormData({ ...formData, leadSource: e.target.value })}
+            placeholder="e.g., Referral, Website, Ad"
+            data-testid="input-lead-source"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium">Assigned Employee</label>
+          <Select 
+            value={formData.assignedEmployeeId || undefined} 
+            onValueChange={(value) => setFormData({ ...formData, assignedEmployeeId: value })}
+          >
+            <SelectTrigger data-testid="select-assigned-employee">
+              <SelectValue placeholder="None (Optional)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="New">New</SelectItem>
-              <SelectItem value="Contacted">Contacted</SelectItem>
-              <SelectItem value="Quote Sent">Quote Sent</SelectItem>
-              <SelectItem value="Negotiating">Negotiating</SelectItem>
+              {technicians.map((tech) => (
+                <SelectItem key={tech.id} value={tech.id}>
+                  {tech.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
-      </div>
 
-      <div>
-        <label className="text-sm font-medium">Client Issue</label>
-        <Textarea
-          value={formData.clientIssue}
-          onChange={(e) => setFormData({ ...formData, clientIssue: e.target.value })}
-          data-testid="textarea-lead-issue"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-medium">Projected Close Date</label>
-          <Input
-            type="date"
-            value={formData.projectedCloseDate}
-            onChange={(e) => setFormData({ ...formData, projectedCloseDate: e.target.value })}
-            data-testid="input-lead-close-date"
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium">Customer Type</label>
-          <Input
-            value={formData.customerType}
-            onChange={(e) => setFormData({ ...formData, customerType: e.target.value })}
-            placeholder="e.g., Residential, Commercial"
-            data-testid="input-lead-customer-type"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="text-sm font-medium">Lead Source</label>
-        <Input
-          value={formData.leadSource}
-          onChange={(e) => setFormData({ ...formData, leadSource: e.target.value })}
-          placeholder="e.g., Referral, Website, Ad"
-          data-testid="input-lead-source"
-        />
-      </div>
-
-      <div>
-        <label className="text-sm font-medium">Assigned Employee</label>
-        <Select 
-          value={formData.assignedEmployeeId || undefined} 
-          onValueChange={(value) => setFormData({ ...formData, assignedEmployeeId: value })}
-        >
-          <SelectTrigger data-testid="select-assigned-employee">
-            <SelectValue placeholder="None (Optional)" />
-          </SelectTrigger>
-          <SelectContent>
-            {technicians.map((tech) => (
-              <SelectItem key={tech.id} value={tech.id}>
-                {tech.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <Button type="submit" className="w-full" data-testid="button-submit-lead">
-        Create Lead
-      </Button>
-    </form>
+        <Button type="submit" className="w-full" data-testid="button-submit-lead">
+          Create Lead
+        </Button>
+      </form>
+    </div>
   );
 }
 
@@ -1478,6 +1664,21 @@ function LeadCard({
           <p className="text-sm text-muted-foreground mt-2" data-testid={`text-issue-${lead.id}`}>
             {lead.clientIssue}
           </p>
+        )}
+
+        {/* Quote Reference Display */}
+        {lead.quoteId && (
+          <div className="mt-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3" data-testid={`quote-reference-${lead.id}`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  Created from Quote #{lead.quoteId.slice(0, 8)}
+                </span>
+              </div>
+              <QuoteReferenceLink quoteId={lead.quoteId} />
+            </div>
+          </div>
         )}
       </CardHeader>
 
