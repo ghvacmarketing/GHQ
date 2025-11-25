@@ -1614,8 +1614,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return count + recentCompleted.length;
       }, 0);
 
-      // Build sales funnel
-      const salesFunnel = {
+      // Build status breakdown for sales funnel
+      const statusBreakdown = {
         New: { count: 0, value: 0 },
         Contacted: { count: 0, value: 0 },
         'Quote Sent': { count: 0, value: 0 },
@@ -1628,9 +1628,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const status = lead.status || 'New';
         const value = parseFloat(lead.estimatedValue || '0');
         
-        if (salesFunnel[status as keyof typeof salesFunnel]) {
-          salesFunnel[status as keyof typeof salesFunnel].count++;
-          salesFunnel[status as keyof typeof salesFunnel].value += value;
+        if (statusBreakdown[status as keyof typeof statusBreakdown]) {
+          statusBreakdown[status as keyof typeof statusBreakdown].count++;
+          statusBreakdown[status as keyof typeof statusBreakdown].value += value;
         }
       });
 
@@ -1640,7 +1640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conversionRate: conversionRate.toFixed(1),
         pendingActions,
         recentCompletions,
-        salesFunnel
+        statusBreakdown
       });
     } catch (error) {
       console.error('Error calculating metrics:', error);

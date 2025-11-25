@@ -392,25 +392,25 @@ export default function SalesProspects() {
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground">New</div>
                   <div className="text-2xl font-bold" data-testid="text-funnel-new">
-                    {metrics.statusBreakdown?.New || 0}
+                    {metrics.statusBreakdown?.New?.count || 0}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground">Contacted</div>
                   <div className="text-2xl font-bold" data-testid="text-funnel-contacted">
-                    {metrics.statusBreakdown?.Contacted || 0}
+                    {metrics.statusBreakdown?.Contacted?.count || 0}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground">Quote Sent</div>
                   <div className="text-2xl font-bold" data-testid="text-funnel-quote-sent">
-                    {metrics.statusBreakdown?.["Quote Sent"] || 0}
+                    {metrics.statusBreakdown?.["Quote Sent"]?.count || 0}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground">Negotiating</div>
                   <div className="text-2xl font-bold" data-testid="text-funnel-negotiating">
-                    {metrics.statusBreakdown?.Negotiating || 0}
+                    {metrics.statusBreakdown?.Negotiating?.count || 0}
                   </div>
                 </div>
                 <div className="text-center bg-green-50 dark:bg-green-900/20 p-2 rounded">
@@ -419,7 +419,7 @@ export default function SalesProspects() {
                     {metrics.statusBreakdown?.Won?.count || 0}
                   </div>
                   <div className="text-xs text-muted-foreground" data-testid="text-funnel-won-value">
-                    {metrics.statusBreakdown?.Won?.value || "$0.00"}
+                    ${(metrics.statusBreakdown?.Won?.value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
                 <div className="text-center bg-red-50 dark:bg-red-900/20 p-2 rounded">
