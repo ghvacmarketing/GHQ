@@ -988,7 +988,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         });
         
-        res.json({ success: true });
+        // Fetch and return dashboard data immediately to avoid session timing issues
+        try {
+          const [
+            settings,
+            quoteSummary,
+            technicians,
+            categories,
+            processes,
+            appSettings,
+            cacheMetadata,
+            announcements,
+            phoneWhitelist
+          ] = await Promise.all([
+            googleSheetsService.fetchCellValues(),
+            storage.getQuoteSummary(),
+            storage.getAllTechnicians(),
+            storage.getAllCategories(),
+            storage.getAllProcesses(),
+            storage.getAllSettings(),
+            (async () => {
+              const cache = googleSheetsService.getCacheMetadata();
+              return {
+                cached: cache.cached,
+                timestamp: cache.timestamp,
+                age: cache.age
+              };
+            })(),
+            storage.getAllAnnouncements(),
+            storage.getAllPhoneWhitelist()
+          ]);
+
+          res.json({
+            success: true,
+            dashboardData: {
+              settings,
+              quoteSummary,
+              technicians,
+              categories,
+              processes,
+              appSettings,
+              cacheMetadata,
+              announcements,
+              phoneWhitelist
+            }
+          });
+        } catch (dashboardError) {
+          console.error('Error fetching dashboard data during login:', dashboardError);
+          // Still return success but indicate dashboard data fetch failed
+          res.json({ 
+            success: true, 
+            dashboardError: "Failed to load dashboard data. Please refresh the page." 
+          });
+        }
       } else {
         res.status(401).json({ success: false, message: "Invalid password" });
       }
@@ -1018,7 +1070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         announcements,
         phoneWhitelist
       ] = await Promise.all([
-        googleSheetsService.getSettings(), // Served from cache
+        googleSheetsService.fetchCellValues(), // Served from cache
         storage.getQuoteSummary(),
         storage.getAllTechnicians(),
         storage.getAllCategories(),

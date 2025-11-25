@@ -35,43 +35,36 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
       const result = await response.json();
       
       if (result.success) {
-        toast({
-          title: "Access Granted",
-          description: "Loading admin dashboard...",
-        });
-        
-        // Wait for session cookie to be fully established
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Load all admin data with optimized single request
-        try {
-          const dashboardResponse = await fetch('/api/admin/dashboard', {
-            credentials: 'include'
+        // Check if dashboard data was included in login response (eliminates session timing issues)
+        if (result.dashboardData) {
+          // Populate React Query cache with all data from login response
+          queryClient.setQueryData(["/api/settings"], result.dashboardData.settings);
+          queryClient.setQueryData(["/api/quotes/summary"], result.dashboardData.quoteSummary);
+          queryClient.setQueryData(["/api/technicians"], result.dashboardData.technicians);
+          queryClient.setQueryData(['/api/categories'], result.dashboardData.categories);
+          queryClient.setQueryData(['/api/processes'], result.dashboardData.processes);
+          queryClient.setQueryData(['/api/app-settings'], result.dashboardData.appSettings);
+          queryClient.setQueryData(['/api/admin/cache-metadata'], result.dashboardData.cacheMetadata);
+          queryClient.setQueryData(['/api/announcements'], result.dashboardData.announcements);
+          queryClient.setQueryData(['/api/phone-whitelist'], result.dashboardData.phoneWhitelist);
+          
+          toast({
+            title: "Access Granted",
+            description: "Welcome to the admin dashboard.",
           });
           
-          if (!dashboardResponse.ok) {
-            throw new Error('Session not established');
-          }
-          
-          const dashboardData = await dashboardResponse.json();
-          
-          // Populate React Query cache with all data from single request
-          queryClient.setQueryData(["/api/settings"], dashboardData.settings);
-          queryClient.setQueryData(["/api/quotes/summary"], dashboardData.quoteSummary);
-          queryClient.setQueryData(["/api/technicians"], dashboardData.technicians);
-          queryClient.setQueryData(['/api/categories'], dashboardData.categories);
-          queryClient.setQueryData(['/api/processes'], dashboardData.processes);
-          queryClient.setQueryData(['/api/app-settings'], dashboardData.appSettings);
-          queryClient.setQueryData(['/api/admin/cache-metadata'], dashboardData.cacheMetadata);
-          queryClient.setQueryData(['/api/announcements'], dashboardData.announcements);
-          queryClient.setQueryData(['/api/phone-whitelist'], dashboardData.phoneWhitelist);
-          
           onLogin();
-        } catch (error) {
-          console.error('Session verification failed:', error);
+        } else if (result.dashboardError) {
+          // Dashboard data fetch failed - don't proceed to avoid inconsistent auth state
+          toast({
+            title: "Dashboard Error",
+            description: result.dashboardError,
+            variant: "destructive",
+          });
+        } else {
           toast({
             title: "Session Error",
-            description: "Failed to establish admin session. Please try again.",
+            description: "Login succeeded but dashboard data is missing. Please try again.",
             variant: "destructive",
           });
         }
