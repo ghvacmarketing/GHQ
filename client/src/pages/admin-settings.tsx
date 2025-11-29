@@ -15,7 +15,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit, Settings2, Users, FolderOpen, ReceiptText, Bell, Download, Upload, Database, Code } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, adminApiRequest } from "@/lib/queryClient";
 import type { Quote, Category, Process, Setting, Announcement, PhoneWhitelist } from "@shared/schema";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -34,61 +34,49 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
       const response = await apiRequest("POST", "/api/admin/login", { password });
       const result = await response.json();
       
-      if (result.success) {
-        // Check if dashboard data was included in login response
+      if (result.success && result.adminToken) {
+        // Store admin token for subsequent requests
+        localStorage.setItem('adminToken', result.adminToken);
+        
+        // Dashboard data is included in login response - use it directly
         if (result.dashboardData) {
-          // Wait for session cookie to propagate, then verify it works with a test request
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Populate React Query cache with data from login response
+          queryClient.setQueryData(["/api/settings"], result.dashboardData.settings);
+          queryClient.setQueryData(["/api/quotes/summary"], result.dashboardData.quoteSummary);
+          queryClient.setQueryData(["/api/technicians"], result.dashboardData.technicians);
+          queryClient.setQueryData(['/api/categories'], result.dashboardData.categories);
+          queryClient.setQueryData(['/api/processes'], result.dashboardData.processes);
+          queryClient.setQueryData(['/api/app-settings'], result.dashboardData.appSettings);
+          queryClient.setQueryData(['/api/admin/cache-metadata'], result.dashboardData.cacheMetadata);
+          queryClient.setQueryData(['/api/announcements'], result.dashboardData.announcements);
+          queryClient.setQueryData(['/api/phone-whitelist'], result.dashboardData.phoneWhitelist);
           
-          try {
-            // Verify session cookie works by making authenticated request
-            const verifyResponse = await fetch('/api/admin/dashboard', {
-              credentials: 'include'
-            });
-            
-            if (!verifyResponse.ok) {
-              throw new Error('Session verification failed');
-            }
-            
-            // Session verified - populate cache and proceed
-            queryClient.setQueryData(["/api/settings"], result.dashboardData.settings);
-            queryClient.setQueryData(["/api/quotes/summary"], result.dashboardData.quoteSummary);
-            queryClient.setQueryData(["/api/technicians"], result.dashboardData.technicians);
-            queryClient.setQueryData(['/api/categories'], result.dashboardData.categories);
-            queryClient.setQueryData(['/api/processes'], result.dashboardData.processes);
-            queryClient.setQueryData(['/api/app-settings'], result.dashboardData.appSettings);
-            queryClient.setQueryData(['/api/admin/cache-metadata'], result.dashboardData.cacheMetadata);
-            queryClient.setQueryData(['/api/announcements'], result.dashboardData.announcements);
-            queryClient.setQueryData(['/api/phone-whitelist'], result.dashboardData.phoneWhitelist);
-            
-            toast({
-              title: "Access Granted",
-              description: "Welcome to the admin dashboard.",
-            });
-            
-            onLogin();
-          } catch (verifyError) {
-            console.error('Session verification failed:', verifyError);
-            toast({
-              title: "Session Error",
-              description: "Session cookie not working. Please try logging in again.",
-              variant: "destructive",
-            });
-          }
+          toast({
+            title: "Access Granted",
+            description: "Welcome to the admin dashboard.",
+          });
+          
+          onLogin();
         } else if (result.dashboardError) {
-          // Dashboard data fetch failed - don't proceed to avoid inconsistent auth state
           toast({
             title: "Dashboard Error",
             description: result.dashboardError,
             variant: "destructive",
           });
+          onLogin(); // Still proceed since we have the token
         } else {
           toast({
-            title: "Session Error",
-            description: "Login succeeded but dashboard data is missing. Please try again.",
+            title: "Login Error",
+            description: "Failed to load dashboard data. Please try again.",
             variant: "destructive",
           });
         }
+      } else if (result.success) {
+        toast({
+          title: "Login Error",
+          description: "Authentication failed. Please try again.",
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Access Denied",
@@ -250,7 +238,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
   const handleRefresh = async () => {
     try {
       // Call the server endpoint to invalidate cache and fetch fresh data
-      const response = await apiRequest("POST", "/api/admin/refresh-sheets", {});
+      const response = await adminApiRequest("POST", "/api/admin/refresh-sheets", {});
       const result = await response.json();
       
       // Invalidate all related queries to force refetch with fresh data
@@ -302,7 +290,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
   // Email settings mutation
   const saveEmailSettingsMutation = useMutation({
     mutationFn: async (emailSettings: { fromEmail: string; notificationEmails: string[] }) => {
-      const response = await apiRequest("POST", "/api/admin/settings", { emailSettings });
+      const response = await adminApiRequest("POST", "/api/admin/settings", { emailSettings });
       return response.json();
     },
     onSuccess: () => {
@@ -324,7 +312,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
   // Technician mutations
   const createTechnicianMutation = useMutation({
     mutationFn: async (techData: { name: string; email: string }) => {
-      const response = await apiRequest("POST", "/api/technicians", techData);
+      const response = await adminApiRequest("POST", "/api/technicians", techData);
       return response.json();
     },
     onSuccess: () => {
@@ -348,7 +336,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
 
   const deleteTechnicianMutation = useMutation({
     mutationFn: async (techId: string) => {
-      const response = await apiRequest("DELETE", `/api/technicians/${techId}`);
+      const response = await adminApiRequest("DELETE", `/api/technicians/${techId}`);
       return response.json();
     },
     onSuccess: () => {
@@ -395,7 +383,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
   const createAnnouncementMutation = useMutation({
     mutationFn: async (data: { title: string; message: string; buttonText: string; isActive: boolean }) => {
       const version = Date.now().toString();
-      const response = await apiRequest('POST', '/api/announcement', { 
+      const response = await adminApiRequest('POST', '/api/announcement', { 
         ...data, 
         version
       });
@@ -424,7 +412,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
   const updateAnnouncementMutation = useMutation({
     mutationFn: async (data: { id: string; title: string; message: string; buttonText: string; isActive: boolean }) => {
       const { id, ...updateData } = data;
-      const response = await apiRequest('PATCH', `/api/announcement/${id}`, updateData);
+      const response = await adminApiRequest('PATCH', `/api/announcement/${id}`, updateData);
       return response.json();
     },
     onSuccess: () => {
@@ -446,7 +434,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
 
   const deleteAnnouncementMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest('DELETE', `/api/announcement/${id}`, {});
+      const response = await adminApiRequest('DELETE', `/api/announcement/${id}`, {});
       return response.json();
     },
     onSuccess: () => {
@@ -473,7 +461,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
   // Phone whitelist mutations
   const addPhoneWhitelistMutation = useMutation({
     mutationFn: async (data: { phoneNumber: string; name: string }) => {
-      const response = await apiRequest('POST', '/api/phone-whitelist', data);
+      const response = await adminApiRequest('POST', '/api/phone-whitelist', data);
       return response.json();
     },
     onSuccess: () => {
@@ -496,7 +484,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
 
   const deletePhoneWhitelistMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest('DELETE', `/api/phone-whitelist/${id}`, {});
+      const response = await adminApiRequest('DELETE', `/api/phone-whitelist/${id}`, {});
       return response.json();
     },
     onSuccess: () => {
@@ -594,7 +582,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
       const lastOrder = categories.length > 0 
         ? Math.max(...categories.map(c => parseInt(c.order)))
         : 0;
-      const response = await apiRequest('POST', '/api/categories', { name, order: String(lastOrder + 1) });
+      const response = await adminApiRequest('POST', '/api/categories', { name, order: String(lastOrder + 1) });
       return response.json();
     },
     onSuccess: () => {
@@ -606,7 +594,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
 
   const updateCategoryMutation = useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const response = await apiRequest('PATCH', `/api/categories/${id}`, { name });
+      const response = await adminApiRequest('PATCH', `/api/categories/${id}`, { name });
       return response.json();
     },
     onSuccess: () => {
@@ -618,7 +606,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
 
   const deleteCategoryMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest('DELETE', `/api/categories/${id}`);
+      const response = await adminApiRequest('DELETE', `/api/categories/${id}`);
       return response.json();
     },
     onSuccess: () => {
@@ -655,7 +643,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
         reader.onload = async () => {
           try {
             const base64Data = (reader.result as string).split(',')[1];
-            const response = await apiRequest('POST', '/api/price-book/upload', {
+            const response = await adminApiRequest('POST', '/api/price-book/upload', {
               name: file.name,
               data: base64Data,
               size: file.size

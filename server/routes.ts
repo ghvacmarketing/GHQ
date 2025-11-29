@@ -13,37 +13,43 @@ import { voiceService } from "./services/voice";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
 import { eq } from "drizzle-orm";
-import { randomUUID } from "crypto";
+import { randomUUID, createHmac } from "crypto";
+
+// Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
+const adminTokens = new Map<string, { createdAt: number }>();
+const TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+
+function generateAdminToken(): string {
+  const token = randomUUID();
+  adminTokens.set(token, { createdAt: Date.now() });
+  return token;
+}
+
+function validateAdminToken(token: string | undefined): boolean {
+  if (!token) return false;
+  const tokenData = adminTokens.get(token);
+  if (!tokenData) return false;
+  if (Date.now() - tokenData.createdAt > TOKEN_EXPIRY) {
+    adminTokens.delete(token);
+    return false;
+  }
+  return true;
+}
+
+// Middleware to check admin authentication via token (Authorization header)
+function requireAdminAuth(req: any, res: any, next: any) {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  
+  if (!validateAdminToken(token || undefined)) {
+    return res.status(401).json({ message: "Unauthorized - Admin access required" });
+  }
+  next();
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Trust proxy for Replit's infrastructure (enables secure cookies behind HTTPS proxy)
+  // Trust proxy for Replit's infrastructure
   app.set('trust proxy', 1);
-  
-  // Detect if running on Replit (behind HTTPS proxy in iframe)
-  const isReplit = !!process.env.REPL_ID;
-  
-  // Session management with connect-pg-simple
-  const PgSession = connectPgSimple(session);
-  
-  app.use(
-    session({
-      store: new PgSession({
-        pool: pool, // Use the actual PostgreSQL pool object
-        tableName: 'session',
-        createTableIfMissing: false, // We already created the table via schema
-      }),
-      secret: process.env.SESSION_SECRET || 'ghvac-secret-key-change-in-production',
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
-        httpOnly: true,
-        // Replit runs in iframe - need sameSite=none + secure=true for cookies to work
-        secure: isReplit || process.env.NODE_ENV === 'production',
-        sameSite: isReplit ? 'none' : 'lax',
-      },
-    })
-  );
 
   // Add compression middleware for better performance
   app.use(compression());
@@ -972,25 +978,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
       
       if (password === adminPassword) {
-        // Set admin session flag
-        (req.session as any).isAdmin = true;
+        // Generate admin token for this session
+        const adminToken = generateAdminToken();
         
-        // Save the session to ensure it's written to the database before responding
-        await new Promise<void>((resolve, reject) => {
-          req.session.save((err) => {
-            if (err) {
-              console.error('Session save error:', err);
-              reject(err);
-            } else {
-              console.log('Admin session saved successfully, session ID:', req.sessionID);
-              console.log('Session cookie settings:', req.session.cookie);
-              console.log('Session data:', { isAdmin: (req.session as any).isAdmin });
-              resolve();
-            }
-          });
-        });
-        
-        // Fetch and return dashboard data immediately to avoid session timing issues
+        // Fetch and return dashboard data with the token
         try {
           const [
             settings,
@@ -1050,6 +1041,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           res.json({
             success: true,
+            adminToken, // Token for subsequent admin requests
             dashboardData: {
               settings,
               quoteSummary,
@@ -1064,9 +1056,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         } catch (dashboardError) {
           console.error('Error fetching dashboard data during login:', dashboardError);
-          // Still return success but indicate dashboard data fetch failed
+          // Still return success with token but indicate dashboard data fetch failed
           res.json({ 
-            success: true, 
+            success: true,
+            adminToken,
             dashboardError: "Failed to load dashboard data. Please refresh the page." 
           });
         }
@@ -1082,14 +1075,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Aggregated admin dashboard data (optimized single request)
   app.get("/api/admin/dashboard", async (req, res) => {
     try {
-      // Debug logging
-      console.log('Dashboard request - Session ID:', req.sessionID);
-      console.log('Dashboard request - Session data:', req.session);
-      console.log('Dashboard request - Cookies:', req.headers.cookie);
-      
       // Verify admin authentication
-      if (!(req.session as any)?.isAdmin) {
-        console.log('Dashboard request REJECTED - isAdmin:', (req.session as any)?.isAdmin);
+      // Check admin token from Authorization header
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!validateAdminToken(token || undefined)) {
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
@@ -1171,7 +1161,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/price-book/upload", express.json({ limit: '50mb' }), async (req, res) => {
     try {
       // Verify admin authentication via session
-      if (!(req.session as any)?.isAdmin) {
+      // Check admin token from Authorization header
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!validateAdminToken(token || undefined)) {
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
       
@@ -1236,7 +1229,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/price-book/pdf", async (req, res) => {
     try {
       // Verify admin authentication via session
-      if (!(req.session as any)?.isAdmin) {
+      // Check admin token from Authorization header
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!validateAdminToken(token || undefined)) {
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
       
@@ -1269,7 +1265,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/announcements", async (req, res) => {
     try {
       // Verify admin authentication via session
-      if (!(req.session as any)?.isAdmin) {
+      // Check admin token from Authorization header
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!validateAdminToken(token || undefined)) {
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
@@ -1285,7 +1284,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/announcement", async (req, res) => {
     try {
       // Verify admin authentication via session
-      if (!(req.session as any)?.isAdmin) {
+      // Check admin token from Authorization header
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!validateAdminToken(token || undefined)) {
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
@@ -1304,7 +1306,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/announcement/:id", async (req, res) => {
     try {
       // Verify admin authentication via session
-      if (!(req.session as any)?.isAdmin) {
+      // Check admin token from Authorization header
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!validateAdminToken(token || undefined)) {
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
@@ -1332,7 +1337,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/announcement/:id", async (req, res) => {
     try {
       // Verify admin authentication via session
-      if (!(req.session as any)?.isAdmin) {
+      // Check admin token from Authorization header
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!validateAdminToken(token || undefined)) {
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
@@ -1353,7 +1361,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/phone-whitelist", async (req, res) => {
     try {
       // Verify admin authentication via session
-      if (!(req.session as any)?.isAdmin) {
+      // Check admin token from Authorization header
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!validateAdminToken(token || undefined)) {
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
@@ -1369,7 +1380,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/phone-whitelist", async (req, res) => {
     try {
       // Verify admin authentication via session
-      if (!(req.session as any)?.isAdmin) {
+      // Check admin token from Authorization header
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!validateAdminToken(token || undefined)) {
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
@@ -1388,7 +1402,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/phone-whitelist/:id", async (req, res) => {
     try {
       // Verify admin authentication via session
-      if (!(req.session as any)?.isAdmin) {
+      // Check admin token from Authorization header
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!validateAdminToken(token || undefined)) {
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
@@ -1554,7 +1571,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/backup", async (req, res) => {
     try {
       // Verify admin authentication via session
-      if (!(req.session as any)?.isAdmin) {
+      // Check admin token from Authorization header
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!validateAdminToken(token || undefined)) {
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
@@ -1602,7 +1622,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/restore", upload.single('backup'), async (req, res) => {
     try {
       // Verify admin authentication via session
-      if (!(req.session as any)?.isAdmin) {
+      // Check admin token from Authorization header
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!validateAdminToken(token || undefined)) {
         return res.status(401).json({ message: "Unauthorized - Admin access required" });
       }
 
