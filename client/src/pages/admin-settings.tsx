@@ -15,7 +15,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, RefreshCw, Eye, EyeOff, ExternalLink, Trash2, FileText, FolderKanban, Plus, Edit, Settings2, Users, FolderOpen, ReceiptText, Bell, Download, Upload, Database, Code } from "lucide-react";
-import { apiRequest, adminApiRequest } from "@/lib/queryClient";
+import { apiRequest, adminApiRequest, getAdminQueryFn } from "@/lib/queryClient";
 import type { Quote, Category, Process, Setting, Announcement, PhoneWhitelist } from "@shared/schema";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -371,9 +371,10 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
     queryKey: ['/api/app-settings'],
   });
 
-  // Fetch announcements
+  // Fetch announcements (requires admin token)
   const { data: announcements = [] } = useQuery<Announcement[]>({
     queryKey: ['/api/announcements'],
+    queryFn: getAdminQueryFn({ on401: 'throw' }),
   });
 
   // Get active announcement
@@ -453,9 +454,10 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
     },
   });
 
-  // Fetch phone whitelist
+  // Fetch phone whitelist (requires admin token)
   const { data: phoneWhitelist = [] } = useQuery<PhoneWhitelist[]>({
     queryKey: ['/api/phone-whitelist'],
+    queryFn: getAdminQueryFn({ on401: 'throw' }),
   });
 
   // Phone whitelist mutations
