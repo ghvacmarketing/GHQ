@@ -1668,7 +1668,7 @@ function LeadCard({
 
         {/* Row 5: Quote Reference */}
         {lead.quoteId && (
-          <div className="mt-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md p-2" data-testid={`quote-reference-${lead.id}`}>
+          <div className="mt-3 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md p-2 bg-[#fcfcfc]" data-testid={`quote-reference-${lead.id}`}>
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 min-w-0">
                 <FileText className="h-3 w-3 text-blue-600 dark:text-blue-400 flex-shrink-0" />
