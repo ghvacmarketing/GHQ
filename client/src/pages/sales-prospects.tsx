@@ -1637,7 +1637,7 @@ function LeadCard({
         {(lead.estimatedValue || lead.projectedCloseDate) && (
           <div className="flex flex-wrap items-center gap-2 mt-2">
             {lead.estimatedValue && (
-              <Badge variant="secondary" className="text-xs font-medium" data-testid={`text-value-${lead.id}`}>
+              <Badge variant="secondary" className="text-xs font-medium bg-[#ededed]" data-testid={`text-value-${lead.id}`}>
                 <DollarSign className="h-3 w-3 mr-1" />
                 {formatCurrency(lead.estimatedValue)}
               </Badge>
