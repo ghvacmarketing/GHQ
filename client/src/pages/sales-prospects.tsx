@@ -1584,7 +1584,7 @@ function LeadCard({
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-xl mb-2 break-words" data-testid={`text-lead-name-${lead.id}`}>
+            <CardTitle className="mb-2 break-words text-[16px]" data-testid={`text-lead-name-${lead.id}`}>
               {lead.name}
             </CardTitle>
 
