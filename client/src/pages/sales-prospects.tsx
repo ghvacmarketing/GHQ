@@ -131,80 +131,6 @@ export default function SalesProspects() {
     },
   });
 
-  // Add action mutation
-  const addActionMutation = useMutation({
-    mutationFn: async ({ leadId, text }: { leadId: string; text: string }) => {
-      const res = await apiRequest("POST", `/api/leads/${leadId}/actions`, { text });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
-      toast({ description: "Action added", duration: 1000 });
-    },
-  });
-
-  // Toggle action mutation
-  const toggleActionMutation = useMutation({
-    mutationFn: async ({ leadId, actionId }: { leadId: string; actionId: string }) => {
-      const res = await apiRequest("PATCH", `/api/leads/${leadId}/actions/${actionId}`, {});
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
-    },
-  });
-
-  // Delete action mutation
-  const deleteActionMutation = useMutation({
-    mutationFn: async ({ leadId, actionId }: { leadId: string; actionId: string }) => {
-      await apiRequest("DELETE", `/api/leads/${leadId}/actions/${actionId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
-      toast({ description: "Action deleted", duration: 1000 });
-    },
-  });
-
-  // Add task mutation
-  const addTaskMutation = useMutation({
-    mutationFn: async ({ leadId, text, scheduledDate }: { leadId: string; text: string; scheduledDate: string }) => {
-      const res = await apiRequest("POST", `/api/leads/${leadId}/tasks`, { text, scheduledDate });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
-      toast({ description: "Task added", duration: 1000 });
-    },
-  });
-
-  // Toggle task mutation
-  const toggleTaskMutation = useMutation({
-    mutationFn: async ({ leadId, taskId }: { leadId: string; taskId: string }) => {
-      const res = await apiRequest("PATCH", `/api/leads/${leadId}/tasks/${taskId}`, {});
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
-    },
-  });
-
-  // Delete task mutation
-  const deleteTaskMutation = useMutation({
-    mutationFn: async ({ leadId, taskId }: { leadId: string; taskId: string }) => {
-      await apiRequest("DELETE", `/api/leads/${leadId}/tasks/${taskId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
-      toast({ description: "Task deleted", duration: 1000 });
-    },
-  });
-
   // CSV Import mutation
   const importCSVMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -599,12 +525,6 @@ export default function SalesProspects() {
                 onDelete={() => deleteLeadMutation.mutate(lead.id)}
                 onMarkWon={() => markWonMutation.mutate(lead.id)}
                 onMarkLost={() => markLostMutation.mutate(lead.id)}
-                onAddAction={(text) => addActionMutation.mutate({ leadId: lead.id, text })}
-                onToggleAction={(actionId) => toggleActionMutation.mutate({ leadId: lead.id, actionId })}
-                onDeleteAction={(actionId) => deleteActionMutation.mutate({ leadId: lead.id, actionId })}
-                onAddTask={(text, scheduledDate) => addTaskMutation.mutate({ leadId: lead.id, text, scheduledDate })}
-                onToggleTask={(taskId) => toggleTaskMutation.mutate({ leadId: lead.id, taskId })}
-                onDeleteTask={(taskId) => deleteTaskMutation.mutate({ leadId: lead.id, taskId })}
                 calculateDaysToClose={calculateDaysToClose}
                 formatCurrency={formatCurrency}
                 technicians={technicians}
@@ -1527,12 +1447,6 @@ function LeadCard({
   onDelete,
   onMarkWon,
   onMarkLost,
-  onAddAction,
-  onToggleAction,
-  onDeleteAction,
-  onAddTask,
-  onToggleTask,
-  onDeleteTask,
   calculateDaysToClose,
   formatCurrency,
   technicians,
@@ -1544,34 +1458,24 @@ function LeadCard({
   onDelete: () => void;
   onMarkWon: () => void;
   onMarkLost: () => void;
-  onAddAction: (text: string) => void;
-  onToggleAction: (actionId: string) => void;
-  onDeleteAction: (actionId: string) => void;
-  onAddTask: (text: string, scheduledDate: string) => void;
-  onToggleTask: (taskId: string) => void;
-  onDeleteTask: (taskId: string) => void;
   calculateDaysToClose: (date: Date | string | null) => string | null;
   formatCurrency: (value: string | number | null | undefined) => string;
   technicians: any[];
 }) {
-  const [newAction, setNewAction] = useState("");
-  const [newTask, setNewTask] = useState("");
-  const [newTaskDate, setNewTaskDate] = useState("");
-  const [quoteDetails, setQuoteDetails] = useState(lead.quoteDetails || "");
-  const [quotePricing, setQuotePricing] = useState(lead.quotePricing || "");
   const [activeTab, setActiveTab] = useState("details");
   const [noteContent, setNoteContent] = useState("");
   const [callbackDate, setCallbackDate] = useState("");
   const [callbackCaller, setCallbackCaller] = useState("");
   const [callbackResponse, setCallbackResponse] = useState("");
   const { toast } = useToast();
-  // Reset to details tab when sheet closes
+  
   const handleSheetClose = (open: boolean) => {
     if (!open) {
       onToggleExpand();
       setActiveTab("details");
     }
   };
+  
   const [editedLead, setEditedLead] = useState({
     estimatedValue: lead.estimatedValue || "",
     projectedCloseDate: lead.projectedCloseDate ? format(new Date(lead.projectedCloseDate), "yyyy-MM-dd") : "",
@@ -1581,13 +1485,6 @@ function LeadCard({
   });
 
   const isActive = !lead.won && !lead.lost;
-  const actions = (lead.nextActions || []) as LeadAction[];
-  const tasks = (lead.scheduledTasks || []) as LeadTask[];
-  const activeActions = actions.filter((a) => !a.completed);
-  const completedActions = actions.filter((a) => a.completed);
-  const upcomingTasks = tasks.filter((t) => !t.completed);
-  const completedTasks = tasks.filter((t) => t.completed);
-
   const daysToClose = calculateDaysToClose(lead.projectedCloseDate);
 
   // Fetch lead history for Activity tab
@@ -1835,17 +1732,8 @@ function LeadCard({
 
           <ScrollArea className="flex-1 px-4 py-3">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="w-full mb-4 grid grid-cols-5">
+              <TabsList className="w-full mb-4 grid grid-cols-2">
                 <TabsTrigger value="details" className="text-xs">Details</TabsTrigger>
-                <TabsTrigger value="actions" className="text-xs">
-                  Actions
-                  {activeActions.length > 0 && <Badge variant="secondary" className="ml-1 h-4 text-[10px] px-1">{activeActions.length}</Badge>}
-                </TabsTrigger>
-                <TabsTrigger value="tasks" className="text-xs">
-                  Tasks
-                  {upcomingTasks.length > 0 && <Badge variant="secondary" className="ml-1 h-4 text-[10px] px-1">{upcomingTasks.length}</Badge>}
-                </TabsTrigger>
-                <TabsTrigger value="quote" className="text-xs">Quote</TabsTrigger>
                 <TabsTrigger value="activity" className="text-xs">
                   <MessageSquare className="h-3 w-3 mr-1" />
                   Log
@@ -1990,221 +1878,6 @@ function LeadCard({
                     </Button>
                   )}
                 </div>
-              </TabsContent>
-
-              {/* Actions Tab */}
-              <TabsContent value="actions" className="space-y-4">
-                {isActive && (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add new action..."
-                      value={newAction}
-                      onChange={(e) => setNewAction(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && newAction.trim()) {
-                          onAddAction(newAction.trim());
-                          setNewAction("");
-                        }
-                      }}
-                      className="h-9"
-                      data-testid={`input-new-action-${lead.id}`}
-                    />
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        if (newAction.trim()) {
-                          onAddAction(newAction.trim());
-                          setNewAction("");
-                        }
-                      }}
-                      data-testid={`button-add-action-${lead.id}`}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-
-                {activeActions.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">Active</div>
-                    {activeActions.map((action) => (
-                      <div key={action.id} className="flex items-center gap-2 p-2 bg-muted/50 rounded" data-testid={`action-${action.id}`}>
-                        <input
-                          type="checkbox"
-                          checked={false}
-                          onChange={() => onToggleAction(action.id)}
-                          className="h-4 w-4"
-                          data-testid={`checkbox-action-${action.id}`}
-                        />
-                        <span className="flex-1 text-sm">{action.text}</span>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDeleteAction(action.id)} data-testid={`button-delete-action-${action.id}`}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {completedActions.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium text-muted-foreground">Completed</div>
-                    {completedActions.map((action) => (
-                      <div key={action.id} className="flex items-center gap-2 p-2 rounded" data-testid={`action-${action.id}`}>
-                        <input
-                          type="checkbox"
-                          checked={true}
-                          onChange={() => onToggleAction(action.id)}
-                          className="h-4 w-4"
-                          data-testid={`checkbox-action-${action.id}`}
-                        />
-                        <span className="flex-1 text-sm line-through text-muted-foreground">{action.text}</span>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDeleteAction(action.id)} data-testid={`button-delete-action-${action.id}`}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {activeActions.length === 0 && completedActions.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">No actions yet</p>
-                )}
-              </TabsContent>
-
-              {/* Tasks Tab */}
-              <TabsContent value="tasks" className="space-y-4">
-                {isActive && (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Task description..."
-                      value={newTask}
-                      onChange={(e) => setNewTask(e.target.value)}
-                      className="h-9 flex-1"
-                      data-testid={`input-new-task-${lead.id}`}
-                    />
-                    <Input
-                      type="date"
-                      value={newTaskDate}
-                      onChange={(e) => setNewTaskDate(e.target.value)}
-                      className="h-9 w-[130px]"
-                      data-testid={`input-new-task-date-${lead.id}`}
-                    />
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        if (newTask.trim() && newTaskDate) {
-                          onAddTask(newTask.trim(), newTaskDate);
-                          setNewTask("");
-                          setNewTaskDate("");
-                        }
-                      }}
-                      data-testid={`button-add-task-${lead.id}`}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-
-                {upcomingTasks.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">Upcoming</div>
-                    {upcomingTasks.map((task) => {
-                      const taskDate = new Date(task.scheduledDate);
-                      const isOverdue = taskDate < new Date();
-                      const isToday = format(taskDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
-
-                      return (
-                        <div
-                          key={task.id}
-                          className={`flex items-center gap-2 p-2 rounded ${
-                            isOverdue ? "bg-red-50 dark:bg-red-900/20" : isToday ? "bg-yellow-50 dark:bg-yellow-900/20" : "bg-muted/50"
-                          }`}
-                          data-testid={`task-${task.id}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={false}
-                            onChange={() => onToggleTask(task.id)}
-                            className="h-4 w-4"
-                            data-testid={`checkbox-task-${task.id}`}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm truncate">{task.text}</div>
-                            <div className="text-xs text-muted-foreground">{format(taskDate, "MMM dd, yyyy")}</div>
-                          </div>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDeleteTask(task.id)} data-testid={`button-delete-task-${task.id}`}>
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {completedTasks.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium text-muted-foreground">Completed</div>
-                    {completedTasks.map((task) => (
-                      <div key={task.id} className="flex items-center gap-2 p-2 rounded" data-testid={`task-${task.id}`}>
-                        <input
-                          type="checkbox"
-                          checked={true}
-                          onChange={() => onToggleTask(task.id)}
-                          className="h-4 w-4"
-                          data-testid={`checkbox-task-${task.id}`}
-                        />
-                        <div className="flex-1 min-w-0 line-through text-muted-foreground">
-                          <div className="text-sm truncate">{task.text}</div>
-                          <div className="text-xs">{format(new Date(task.scheduledDate), "MMM dd, yyyy")}</div>
-                        </div>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDeleteTask(task.id)} data-testid={`button-delete-task-${task.id}`}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {upcomingTasks.length === 0 && completedTasks.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">No tasks yet</p>
-                )}
-              </TabsContent>
-
-              {/* Quote Tab */}
-              <TabsContent value="quote" className="space-y-4">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Quote Details</label>
-                  <Textarea
-                    value={quoteDetails}
-                    onChange={(e) => setQuoteDetails(e.target.value)}
-                    placeholder="Quote details and specifications..."
-                    rows={4}
-                    disabled={!isActive}
-                    data-testid={`textarea-quote-details-${lead.id}`}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Quote Pricing</label>
-                  <Textarea
-                    value={quotePricing}
-                    onChange={(e) => setQuotePricing(e.target.value)}
-                    placeholder="Pricing breakdown..."
-                    rows={4}
-                    disabled={!isActive}
-                    data-testid={`textarea-quote-pricing-${lead.id}`}
-                  />
-                </div>
-                {isActive && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      onUpdate({ quoteDetails, quotePricing });
-                    }}
-                    data-testid={`button-save-quote-${lead.id}`}
-                  >
-                    Save Quote
-                  </Button>
-                )}
               </TabsContent>
 
               {/* Activity Tab */}
