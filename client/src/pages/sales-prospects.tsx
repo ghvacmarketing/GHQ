@@ -1582,39 +1582,39 @@ function LeadCard({
     <>
       <Card data-testid={`card-lead-${lead.id}`}>
       <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <CardTitle className="text-xl mb-2" data-testid={`text-lead-name-${lead.id}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-xl mb-2 break-words" data-testid={`text-lead-name-${lead.id}`}>
               {lead.name}
             </CardTitle>
 
             <div className="space-y-1 text-sm text-muted-foreground">
               {lead.phone && (
                 <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  <a href={`tel:${lead.phone}`} className="hover:underline" data-testid={`link-phone-${lead.id}`}>
+                  <Phone className="h-4 w-4 flex-shrink-0" />
+                  <a href={`tel:${lead.phone}`} className="hover:underline truncate" data-testid={`link-phone-${lead.id}`}>
                     {lead.phone}
                   </a>
                 </div>
               )}
               {lead.email && (
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  <a href={`mailto:${lead.email}`} className="hover:underline" data-testid={`link-email-${lead.id}`}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Mail className="h-4 w-4 flex-shrink-0" />
+                  <a href={`mailto:${lead.email}`} className="hover:underline truncate" data-testid={`link-email-${lead.id}`}>
                     {lead.email}
                   </a>
                 </div>
               )}
               {lead.address && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  <span data-testid={`text-address-${lead.id}`}>{lead.address}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <MapPin className="h-4 w-4 flex-shrink-0" />
+                  <span className="break-words" data-testid={`text-address-${lead.id}`}>{lead.address}</span>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 items-end min-w-[120px]">
+          <div className="flex flex-col gap-2 items-end flex-shrink-0">
             {isActive ? (
               <Select
                 value={lead.status}
