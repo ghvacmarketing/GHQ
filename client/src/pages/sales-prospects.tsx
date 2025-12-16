@@ -1683,9 +1683,9 @@ function LeadCard({
       </CardHeader>
 
       <CardContent className="pt-0">
-        {/* Action Buttons - Grid layout on mobile, flex on desktop */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          {/* Left: Icon buttons */}
+        {/* Action Buttons - Compact view */}
+        <div className="flex items-center justify-between gap-2">
+          {/* Left: Quick action buttons */}
           <div className="flex items-center gap-1">
             {isActive && (
               <>
@@ -1697,320 +1697,176 @@ function LeadCard({
                 </Button>
               </>
             )}
-
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button size="icon" variant="outline" className="h-8 w-8 touch-manipulation" title="Delete" data-testid={`button-delete-${lead.id}`}>
-                  <Trash2 className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Lead?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the lead and all associated data.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel data-testid={`button-cancel-delete-${lead.id}`}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={onDelete} data-testid={`button-confirm-delete-${lead.id}`}>
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
             <Button size="icon" variant="outline" className="h-8 w-8 touch-manipulation" onClick={() => setIsActivitySheetOpen(true)} title="View Activity" data-testid="button-view-activity">
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
             </Button>
           </div>
 
-          {/* Right: Expand/Collapse */}
+          {/* Right: Open full details */}
           <Button size="sm" variant="ghost" className="text-xs h-8" onClick={onToggleExpand} data-testid={`button-expand-${lead.id}`}>
-            {isExpanded ? "Hide" : "Details"}
+            Details
           </Button>
         </div>
+      </CardContent>
 
-        {isExpanded && (
-          <Accordion type="multiple" className="w-full">
-            {/* Actions Section */}
-            <AccordionItem value="actions" data-testid={`accordion-actions-${lead.id}`}>
-              <AccordionTrigger>
-                Actions
-                {activeActions.length > 0 && (
-                  <Badge variant="secondary" className="ml-2">
-                    {activeActions.length}
+      {/* Full-screen Lead Details Sheet */}
+      <Sheet open={isExpanded} onOpenChange={(open) => !open && onToggleExpand()}>
+        <SheetContent side="bottom" className="h-[95vh] p-0 flex flex-col">
+          <SheetHeader className="px-4 py-3 border-b flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <SheetTitle className="text-lg truncate">{lead.name}</SheetTitle>
+                <SheetDescription className="text-xs">
+                  {lead.phone && <span className="mr-3">{lead.phone}</span>}
+                  {lead.email && <span className="truncate">{lead.email}</span>}
+                </SheetDescription>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {isActive ? (
+                  <Select
+                    value={lead.status}
+                    onValueChange={(value) => onUpdate({ status: value })}
+                  >
+                    <SelectTrigger className="h-8 w-[110px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="New">New</SelectItem>
+                      <SelectItem value="Contacted">Contacted</SelectItem>
+                      <SelectItem value="Quote Sent">Quote Sent</SelectItem>
+                      <SelectItem value="Negotiating">Negotiating</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Badge variant={lead.won ? "default" : "destructive"} className="text-xs">
+                    {lead.status}
                   </Badge>
                 )}
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-3">
-                  {isActive && (
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Add new action..."
-                        value={newAction}
-                        onChange={(e) => setNewAction(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && newAction.trim()) {
-                            onAddAction(newAction.trim());
-                            setNewAction("");
-                          }
-                        }}
-                        data-testid={`input-new-action-${lead.id}`}
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          if (newAction.trim()) {
-                            onAddAction(newAction.trim());
-                            setNewAction("");
-                          }
-                        }}
-                        data-testid={`button-add-action-${lead.id}`}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
+              </div>
+            </div>
+          </SheetHeader>
 
-                  {activeActions.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium">Active Actions</div>
-                      {activeActions.map((action) => (
-                        <div key={action.id} className="flex items-center gap-2" data-testid={`action-${action.id}`}>
-                          <input
-                            type="checkbox"
-                            checked={false}
-                            onChange={() => onToggleAction(action.id)}
-                            className="h-4 w-4"
-                            data-testid={`checkbox-action-${action.id}`}
-                          />
-                          <span className="flex-1">{action.text}</span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => onDeleteAction(action.id)}
-                            data-testid={`button-delete-action-${action.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+          <ScrollArea className="flex-1 px-4 py-3">
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="w-full mb-4">
+                <TabsTrigger value="details" className="flex-1 text-xs">Details</TabsTrigger>
+                <TabsTrigger value="actions" className="flex-1 text-xs">
+                  Actions
+                  {activeActions.length > 0 && <Badge variant="secondary" className="ml-1 h-4 text-[10px] px-1">{activeActions.length}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="tasks" className="flex-1 text-xs">
+                  Tasks
+                  {upcomingTasks.length > 0 && <Badge variant="secondary" className="ml-1 h-4 text-[10px] px-1">{upcomingTasks.length}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="quote" className="flex-1 text-xs">Quote</TabsTrigger>
+              </TabsList>
 
-                  {completedActions.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium">Completed Actions</div>
-                      {completedActions.map((action) => (
-                        <div key={action.id} className="flex items-center gap-2" data-testid={`action-${action.id}`}>
-                          <input
-                            type="checkbox"
-                            checked={true}
-                            onChange={() => onToggleAction(action.id)}
-                            className="h-4 w-4"
-                            data-testid={`checkbox-action-${action.id}`}
-                          />
-                          <span className="flex-1 line-through text-muted-foreground">{action.text}</span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => onDeleteAction(action.id)}
-                            data-testid={`button-delete-action-${action.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+              {/* Details Tab */}
+              <TabsContent value="details" className="space-y-4">
+                {/* Contact Info */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium">Contact Information</h4>
+                  <div className="grid gap-2 text-sm">
+                    {lead.phone && (
+                      <a href={`tel:${lead.phone}`} className="flex items-center gap-2 hover:underline">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        {lead.phone}
+                      </a>
+                    )}
+                    {lead.email && (
+                      <a href={`mailto:${lead.email}`} className="flex items-center gap-2 hover:underline">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        {lead.email}
+                      </a>
+                    )}
+                    {lead.address && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span>{lead.address}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </AccordionContent>
-            </AccordionItem>
 
-            {/* Tasks Section */}
-            <AccordionItem value="tasks" data-testid={`accordion-tasks-${lead.id}`}>
-              <AccordionTrigger>
-                Tasks
-                {upcomingTasks.length > 0 && (
-                  <Badge variant="secondary" className="ml-2">
-                    {upcomingTasks.length}
-                  </Badge>
+                {/* Client Issue */}
+                {lead.clientIssue && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Client Issue</h4>
+                    <p className="text-sm text-muted-foreground">{lead.clientIssue}</p>
+                  </div>
                 )}
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-3">
-                  {isActive && (
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Task description..."
-                        value={newTask}
-                        onChange={(e) => setNewTask(e.target.value)}
-                        data-testid={`input-new-task-${lead.id}`}
-                      />
-                      <Input
-                        type="date"
-                        value={newTaskDate}
-                        onChange={(e) => setNewTaskDate(e.target.value)}
-                        data-testid={`input-new-task-date-${lead.id}`}
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          if (newTask.trim() && newTaskDate) {
-                            onAddTask(newTask.trim(), newTaskDate);
-                            setNewTask("");
-                            setNewTaskDate("");
-                          }
-                        }}
-                        data-testid={`button-add-task-${lead.id}`}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+
+                {/* Quote Reference */}
+                {lead.quoteId && (
+                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium">Quote #{lead.quoteId.slice(0, 8)}</span>
+                      </div>
+                      <QuoteReferenceLink quoteId={lead.quoteId} />
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {upcomingTasks.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium">Upcoming Tasks</div>
-                      {upcomingTasks.map((task) => {
-                        const taskDate = new Date(task.scheduledDate);
-                        const isOverdue = taskDate < new Date();
-                        const isToday =
-                          format(taskDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
-
-                        return (
-                          <div
-                            key={task.id}
-                            className={`flex items-center gap-2 p-2 rounded ${
-                              isOverdue
-                                ? "bg-red-50 dark:bg-red-900/20"
-                                : isToday
-                                ? "bg-yellow-50 dark:bg-yellow-900/20"
-                                : ""
-                            }`}
-                            data-testid={`task-${task.id}`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={false}
-                              onChange={() => onToggleTask(task.id)}
-                              className="h-4 w-4"
-                              data-testid={`checkbox-task-${task.id}`}
-                            />
-                            <div className="flex-1">
-                              <div>{task.text}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {format(taskDate, "MMM dd, yyyy")}
-                              </div>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => onDeleteTask(task.id)}
-                              data-testid={`button-delete-task-${task.id}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {completedTasks.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium">Completed Tasks</div>
-                      {completedTasks.map((task) => (
-                        <div key={task.id} className="flex items-center gap-2" data-testid={`task-${task.id}`}>
-                          <input
-                            type="checkbox"
-                            checked={true}
-                            onChange={() => onToggleTask(task.id)}
-                            className="h-4 w-4"
-                            data-testid={`checkbox-task-${task.id}`}
-                          />
-                          <div className="flex-1 line-through text-muted-foreground">
-                            <div>{task.text}</div>
-                            <div className="text-xs">
-                              {format(new Date(task.scheduledDate), "MMM dd, yyyy")}
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => onDeleteTask(task.id)}
-                            data-testid={`button-delete-task-${task.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* Lead Details Section */}
-            <AccordionItem value="details" data-testid={`accordion-details-${lead.id}`}>
-              <AccordionTrigger>Lead Details</AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
+                {/* Lead Details Form */}
+                <div className="space-y-3 pt-2 border-t">
+                  <h4 className="text-sm font-medium">Lead Details</h4>
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-medium">Estimated Value</label>
+                      <label className="text-xs font-medium text-muted-foreground">Estimated Value</label>
                       <Input
                         type="number"
                         step="0.01"
                         value={editedLead.estimatedValue}
                         onChange={(e) => setEditedLead({ ...editedLead, estimatedValue: e.target.value })}
                         disabled={!isActive}
+                        className="h-9"
                         data-testid={`input-edit-value-${lead.id}`}
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Projected Close Date</label>
+                      <label className="text-xs font-medium text-muted-foreground">Close Date</label>
                       <Input
                         type="date"
                         value={editedLead.projectedCloseDate}
                         onChange={(e) => setEditedLead({ ...editedLead, projectedCloseDate: e.target.value })}
                         disabled={!isActive}
+                        className="h-9"
                         data-testid={`input-edit-close-date-${lead.id}`}
                       />
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium">Customer Type</label>
+                      <label className="text-xs font-medium text-muted-foreground">Customer Type</label>
                       <Input
                         value={editedLead.customerType}
                         onChange={(e) => setEditedLead({ ...editedLead, customerType: e.target.value })}
-                        placeholder="e.g., Residential, Commercial"
+                        placeholder="Residential, Commercial"
                         disabled={!isActive}
+                        className="h-9"
                         data-testid={`input-edit-customer-type-${lead.id}`}
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Lead Source</label>
+                      <label className="text-xs font-medium text-muted-foreground">Lead Source</label>
                       <Input
                         value={editedLead.leadSource}
                         onChange={(e) => setEditedLead({ ...editedLead, leadSource: e.target.value })}
-                        placeholder="e.g., Referral, Website, Ad"
+                        placeholder="Referral, Website, Ad"
                         disabled={!isActive}
+                        className="h-9"
                         data-testid={`input-edit-lead-source-${lead.id}`}
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Assigned Employee</label>
+                    <label className="text-xs font-medium text-muted-foreground">Assigned Employee</label>
                     <Select
                       value={editedLead.assignedEmployeeId || undefined}
                       onValueChange={(value) => setEditedLead({ ...editedLead, assignedEmployeeId: value })}
                       disabled={!isActive}
                     >
-                      <SelectTrigger data-testid={`select-edit-assigned-employee-${lead.id}`}>
+                      <SelectTrigger className="h-9" data-testid={`select-edit-assigned-employee-${lead.id}`}>
                         <SelectValue placeholder="None (Optional)" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2024,6 +1880,7 @@ function LeadCard({
                   </div>
                   {isActive && (
                     <Button
+                      size="sm"
                       onClick={() => {
                         const updateData: any = {
                           estimatedValue: editedLead.estimatedValue || undefined,
@@ -2042,52 +1899,257 @@ function LeadCard({
                     </Button>
                   )}
                 </div>
-              </AccordionContent>
-            </AccordionItem>
+              </TabsContent>
 
-            {/* Quote Section */}
-            <AccordionItem value="quote" data-testid={`accordion-quote-${lead.id}`}>
-              <AccordionTrigger>Quote</AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium">Quote Details</label>
-                    <Textarea
-                      value={quoteDetails}
-                      onChange={(e) => setQuoteDetails(e.target.value)}
-                      placeholder="Quote details and specifications..."
-                      rows={4}
-                      disabled={!isActive}
-                      data-testid={`textarea-quote-details-${lead.id}`}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Quote Pricing</label>
-                    <Textarea
-                      value={quotePricing}
-                      onChange={(e) => setQuotePricing(e.target.value)}
-                      placeholder="Pricing breakdown..."
-                      rows={4}
-                      disabled={!isActive}
-                      data-testid={`textarea-quote-pricing-${lead.id}`}
-                    />
-                  </div>
-                  {isActive && (
-                    <Button
-                      onClick={() => {
-                        onUpdate({ quoteDetails, quotePricing });
+              {/* Actions Tab */}
+              <TabsContent value="actions" className="space-y-4">
+                {isActive && (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Add new action..."
+                      value={newAction}
+                      onChange={(e) => setNewAction(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newAction.trim()) {
+                          onAddAction(newAction.trim());
+                          setNewAction("");
+                        }
                       }}
-                      data-testid={`button-save-quote-${lead.id}`}
+                      className="h-9"
+                      data-testid={`input-new-action-${lead.id}`}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (newAction.trim()) {
+                          onAddAction(newAction.trim());
+                          setNewAction("");
+                        }
+                      }}
+                      data-testid={`button-add-action-${lead.id}`}
                     >
-                      Save Quote
+                      <Plus className="h-4 w-4" />
                     </Button>
-                  )}
+                  </div>
+                )}
+
+                {activeActions.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">Active</div>
+                    {activeActions.map((action) => (
+                      <div key={action.id} className="flex items-center gap-2 p-2 bg-muted/50 rounded" data-testid={`action-${action.id}`}>
+                        <input
+                          type="checkbox"
+                          checked={false}
+                          onChange={() => onToggleAction(action.id)}
+                          className="h-4 w-4"
+                          data-testid={`checkbox-action-${action.id}`}
+                        />
+                        <span className="flex-1 text-sm">{action.text}</span>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDeleteAction(action.id)} data-testid={`button-delete-action-${action.id}`}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {completedActions.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-muted-foreground">Completed</div>
+                    {completedActions.map((action) => (
+                      <div key={action.id} className="flex items-center gap-2 p-2 rounded" data-testid={`action-${action.id}`}>
+                        <input
+                          type="checkbox"
+                          checked={true}
+                          onChange={() => onToggleAction(action.id)}
+                          className="h-4 w-4"
+                          data-testid={`checkbox-action-${action.id}`}
+                        />
+                        <span className="flex-1 text-sm line-through text-muted-foreground">{action.text}</span>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDeleteAction(action.id)} data-testid={`button-delete-action-${action.id}`}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {activeActions.length === 0 && completedActions.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">No actions yet</p>
+                )}
+              </TabsContent>
+
+              {/* Tasks Tab */}
+              <TabsContent value="tasks" className="space-y-4">
+                {isActive && (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Task description..."
+                      value={newTask}
+                      onChange={(e) => setNewTask(e.target.value)}
+                      className="h-9 flex-1"
+                      data-testid={`input-new-task-${lead.id}`}
+                    />
+                    <Input
+                      type="date"
+                      value={newTaskDate}
+                      onChange={(e) => setNewTaskDate(e.target.value)}
+                      className="h-9 w-[130px]"
+                      data-testid={`input-new-task-date-${lead.id}`}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (newTask.trim() && newTaskDate) {
+                          onAddTask(newTask.trim(), newTaskDate);
+                          setNewTask("");
+                          setNewTaskDate("");
+                        }
+                      }}
+                      data-testid={`button-add-task-${lead.id}`}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {upcomingTasks.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">Upcoming</div>
+                    {upcomingTasks.map((task) => {
+                      const taskDate = new Date(task.scheduledDate);
+                      const isOverdue = taskDate < new Date();
+                      const isToday = format(taskDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+
+                      return (
+                        <div
+                          key={task.id}
+                          className={`flex items-center gap-2 p-2 rounded ${
+                            isOverdue ? "bg-red-50 dark:bg-red-900/20" : isToday ? "bg-yellow-50 dark:bg-yellow-900/20" : "bg-muted/50"
+                          }`}
+                          data-testid={`task-${task.id}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={false}
+                            onChange={() => onToggleTask(task.id)}
+                            className="h-4 w-4"
+                            data-testid={`checkbox-task-${task.id}`}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm truncate">{task.text}</div>
+                            <div className="text-xs text-muted-foreground">{format(taskDate, "MMM dd, yyyy")}</div>
+                          </div>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDeleteTask(task.id)} data-testid={`button-delete-task-${task.id}`}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {completedTasks.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-muted-foreground">Completed</div>
+                    {completedTasks.map((task) => (
+                      <div key={task.id} className="flex items-center gap-2 p-2 rounded" data-testid={`task-${task.id}`}>
+                        <input
+                          type="checkbox"
+                          checked={true}
+                          onChange={() => onToggleTask(task.id)}
+                          className="h-4 w-4"
+                          data-testid={`checkbox-task-${task.id}`}
+                        />
+                        <div className="flex-1 min-w-0 line-through text-muted-foreground">
+                          <div className="text-sm truncate">{task.text}</div>
+                          <div className="text-xs">{format(new Date(task.scheduledDate), "MMM dd, yyyy")}</div>
+                        </div>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDeleteTask(task.id)} data-testid={`button-delete-task-${task.id}`}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {upcomingTasks.length === 0 && completedTasks.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">No tasks yet</p>
+                )}
+              </TabsContent>
+
+              {/* Quote Tab */}
+              <TabsContent value="quote" className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Quote Details</label>
+                  <Textarea
+                    value={quoteDetails}
+                    onChange={(e) => setQuoteDetails(e.target.value)}
+                    placeholder="Quote details and specifications..."
+                    rows={4}
+                    disabled={!isActive}
+                    data-testid={`textarea-quote-details-${lead.id}`}
+                  />
                 </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        )}
-      </CardContent>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Quote Pricing</label>
+                  <Textarea
+                    value={quotePricing}
+                    onChange={(e) => setQuotePricing(e.target.value)}
+                    placeholder="Pricing breakdown..."
+                    rows={4}
+                    disabled={!isActive}
+                    data-testid={`textarea-quote-pricing-${lead.id}`}
+                  />
+                </div>
+                {isActive && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      onUpdate({ quoteDetails, quotePricing });
+                    }}
+                    data-testid={`button-save-quote-${lead.id}`}
+                  >
+                    Save Quote
+                  </Button>
+                )}
+              </TabsContent>
+            </Tabs>
+          </ScrollArea>
+
+          {/* Footer with delete button */}
+          <div className="px-4 py-3 border-t flex-shrink-0 flex items-center justify-between">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" data-testid={`button-delete-${lead.id}`}>
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete Lead
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Lead?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the lead and all associated data.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid={`button-cancel-delete-${lead.id}`}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={onDelete} data-testid={`button-confirm-delete-${lead.id}`}>
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <Button size="sm" variant="outline" onClick={() => setIsActivitySheetOpen(true)}>
+              <MessageSquare className="h-4 w-4 mr-1" />
+              Activity Log
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
       </Card>
       <ActivityTimelineSheet
         leadId={lead.id}
