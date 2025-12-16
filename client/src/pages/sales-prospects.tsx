@@ -1559,7 +1559,19 @@ function LeadCard({
   const [newTaskDate, setNewTaskDate] = useState("");
   const [quoteDetails, setQuoteDetails] = useState(lead.quoteDetails || "");
   const [quotePricing, setQuotePricing] = useState(lead.quotePricing || "");
-  const [isActivitySheetOpen, setIsActivitySheetOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("details");
+  const [noteContent, setNoteContent] = useState("");
+  const [callbackDate, setCallbackDate] = useState("");
+  const [callbackCaller, setCallbackCaller] = useState("");
+  const [callbackResponse, setCallbackResponse] = useState("");
+  const { toast } = useToast();
+  // Reset to details tab when sheet closes
+  const handleSheetClose = (open: boolean) => {
+    if (!open) {
+      onToggleExpand();
+      setActiveTab("details");
+    }
+  };
   const [editedLead, setEditedLead] = useState({
     estimatedValue: lead.estimatedValue || "",
     projectedCloseDate: lead.projectedCloseDate ? format(new Date(lead.projectedCloseDate), "yyyy-MM-dd") : "",
@@ -1577,6 +1589,81 @@ function LeadCard({
   const completedTasks = tasks.filter((t) => t.completed);
 
   const daysToClose = calculateDaysToClose(lead.projectedCloseDate);
+
+  // Fetch lead history for Activity tab
+  const { data: history = [], isLoading: isLoadingHistory } = useQuery<any[]>({
+    queryKey: ["/api/leads", lead.id, "history"],
+    enabled: isExpanded && activeTab === "activity",
+  });
+
+  // Add note mutation
+  const addNoteMutation = useMutation({
+    mutationFn: async (note: string) => {
+      const res = await apiRequest("POST", `/api/leads/${lead.id}/history`, {
+        actionType: "note_added",
+        payload: { note },
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id, "history"] });
+      toast({ description: "Note added", duration: 1000 });
+      setNoteContent("");
+    },
+  });
+
+  // Log callback mutation
+  const logCallbackMutation = useMutation({
+    mutationFn: async (data: { date: string; caller: string; response: string }) => {
+      const res = await apiRequest("POST", `/api/leads/${lead.id}/history`, {
+        actionType: "callback_logged",
+        payload: data,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id, "history"] });
+      toast({ description: "Callback logged", duration: 1000 });
+      setCallbackDate("");
+      setCallbackCaller("");
+      setCallbackResponse("");
+    },
+  });
+
+  const getActivityIcon = (actionType: string) => {
+    switch (actionType) {
+      case "note_added": return <StickyNote className="h-4 w-4 text-blue-600" />;
+      case "callback_logged": return <Phone className="h-4 w-4 text-green-600" />;
+      case "status_changed": return <ArrowRightCircle className="h-4 w-4 text-purple-600" />;
+      case "assignment_changed": return <UserPlus className="h-4 w-4 text-orange-600" />;
+      case "field_updated": return <Edit className="h-4 w-4 text-yellow-600" />;
+      case "created": return <Plus className="h-4 w-4 text-emerald-600" />;
+      default: return <Activity className="h-4 w-4 text-gray-600" />;
+    }
+  };
+
+  const getActivityDescription = (entry: any) => {
+    const { actionType, payload } = entry;
+    const getEmployeeName = (employeeId: string | null) => {
+      if (!employeeId) return "Unassigned";
+      const employee = technicians.find(t => t.id === employeeId);
+      return employee ? employee.name : employeeId;
+    };
+    switch (actionType) {
+      case "note_added": return payload.note || "Added a note";
+      case "callback_logged": return `Callback from ${payload.caller || "Unknown"}${payload.response ? `: ${payload.response}` : ""}`;
+      case "status_changed": return `Status: ${payload.from || "?"} → ${payload.to || "?"}`;
+      case "assignment_changed": return `Assigned: ${getEmployeeName(payload.from)} → ${getEmployeeName(payload.to)}`;
+      case "field_updated": return `Updated ${payload.field || "field"}`;
+      case "created": return "Lead created";
+      default: return "Activity recorded";
+    }
+  };
+
+  const handleOpenWithActivity = () => {
+    setActiveTab("activity");
+    onToggleExpand();
+  };
 
   return (
     <>
@@ -1697,7 +1784,7 @@ function LeadCard({
                 </Button>
               </>
             )}
-            <Button size="icon" variant="outline" className="h-8 w-8 touch-manipulation" onClick={() => setIsActivitySheetOpen(true)} title="View Activity" data-testid="button-view-activity">
+            <Button size="icon" variant="outline" className="h-8 w-8 touch-manipulation" onClick={handleOpenWithActivity} title="View Activity" data-testid="button-view-activity">
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
             </Button>
           </div>
@@ -1710,7 +1797,7 @@ function LeadCard({
       </CardContent>
 
       {/* Full-screen Lead Details Sheet */}
-      <Sheet open={isExpanded} onOpenChange={(open) => !open && onToggleExpand()}>
+      <Sheet open={isExpanded} onOpenChange={handleSheetClose}>
         <SheetContent side="bottom" className="h-[95vh] p-0 flex flex-col">
           <SheetHeader className="px-4 py-3 border-b flex-shrink-0">
             <div className="flex items-center justify-between">
@@ -1747,18 +1834,22 @@ function LeadCard({
           </SheetHeader>
 
           <ScrollArea className="flex-1 px-4 py-3">
-            <Tabs defaultValue="details" className="w-full">
-              <TabsList className="w-full mb-4">
-                <TabsTrigger value="details" className="flex-1 text-xs">Details</TabsTrigger>
-                <TabsTrigger value="actions" className="flex-1 text-xs">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="w-full mb-4 grid grid-cols-5">
+                <TabsTrigger value="details" className="text-xs">Details</TabsTrigger>
+                <TabsTrigger value="actions" className="text-xs">
                   Actions
                   {activeActions.length > 0 && <Badge variant="secondary" className="ml-1 h-4 text-[10px] px-1">{activeActions.length}</Badge>}
                 </TabsTrigger>
-                <TabsTrigger value="tasks" className="flex-1 text-xs">
+                <TabsTrigger value="tasks" className="text-xs">
                   Tasks
                   {upcomingTasks.length > 0 && <Badge variant="secondary" className="ml-1 h-4 text-[10px] px-1">{upcomingTasks.length}</Badge>}
                 </TabsTrigger>
-                <TabsTrigger value="quote" className="flex-1 text-xs">Quote</TabsTrigger>
+                <TabsTrigger value="quote" className="text-xs">Quote</TabsTrigger>
+                <TabsTrigger value="activity" className="text-xs">
+                  <MessageSquare className="h-3 w-3 mr-1" />
+                  Log
+                </TabsTrigger>
               </TabsList>
 
               {/* Details Tab */}
@@ -2115,11 +2206,112 @@ function LeadCard({
                   </Button>
                 )}
               </TabsContent>
+
+              {/* Activity Tab */}
+              <TabsContent value="activity" className="space-y-4">
+                {/* Add Note Form */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium">Add Note</h4>
+                  <Textarea
+                    placeholder="Add a note about this lead..."
+                    value={noteContent}
+                    onChange={(e) => setNoteContent(e.target.value)}
+                    rows={2}
+                    className="resize-none"
+                    data-testid="textarea-add-note"
+                  />
+                  <Button
+                    size="sm"
+                    disabled={!noteContent.trim() || addNoteMutation.isPending}
+                    onClick={() => noteContent.trim() && addNoteMutation.mutate(noteContent.trim())}
+                    data-testid="button-save-note"
+                  >
+                    {addNoteMutation.isPending ? "Saving..." : "Save Note"}
+                  </Button>
+                </div>
+
+                {/* Log Callback Form */}
+                <div className="space-y-2 pt-3 border-t">
+                  <h4 className="text-sm font-medium">Log Callback</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      type="date"
+                      value={callbackDate}
+                      onChange={(e) => setCallbackDate(e.target.value)}
+                      className="h-9"
+                      data-testid="input-callback-date"
+                    />
+                    <Input
+                      placeholder="Who called"
+                      value={callbackCaller}
+                      onChange={(e) => setCallbackCaller(e.target.value)}
+                      className="h-9"
+                      data-testid="input-callback-caller"
+                    />
+                  </div>
+                  <Textarea
+                    placeholder="What was discussed..."
+                    value={callbackResponse}
+                    onChange={(e) => setCallbackResponse(e.target.value)}
+                    rows={2}
+                    className="resize-none"
+                    data-testid="textarea-callback-response"
+                  />
+                  <Button
+                    size="sm"
+                    disabled={!callbackDate || !callbackCaller.trim() || logCallbackMutation.isPending}
+                    onClick={() => callbackDate && callbackCaller.trim() && logCallbackMutation.mutate({
+                      date: callbackDate,
+                      caller: callbackCaller.trim(),
+                      response: callbackResponse.trim(),
+                    })}
+                    data-testid="button-log-callback"
+                  >
+                    {logCallbackMutation.isPending ? "Logging..." : "Log Callback"}
+                  </Button>
+                </div>
+
+                {/* Activity History */}
+                <div className="pt-3 border-t">
+                  <h4 className="text-sm font-medium mb-3">Activity History</h4>
+                  {isLoadingHistory ? (
+                    <div className="space-y-2">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="p-3 bg-muted/50 rounded">
+                          <Skeleton className="h-4 w-3/4 mb-2" />
+                          <Skeleton className="h-3 w-1/2" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : history.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No activity yet. Add a note or log a callback to get started.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {history.map((entry) => (
+                        <div key={entry.id} className="flex gap-2 p-2 bg-muted/30 rounded text-sm">
+                          <div className="flex-shrink-0 mt-0.5">{getActivityIcon(entry.actionType)}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium text-xs">{entry.actor || "System"}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {format(new Date(entry.createdAt), "MMM d, h:mm a")}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{getActivityDescription(entry)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
             </Tabs>
           </ScrollArea>
 
-          {/* Footer with delete button */}
-          <div className="px-4 py-3 border-t flex-shrink-0 flex items-center justify-between">
+          {/* Footer with delete button only */}
+          <div className="px-4 py-3 border-t flex-shrink-0 flex items-center justify-center">
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" data-testid={`button-delete-${lead.id}`}>
@@ -2142,21 +2334,10 @@ function LeadCard({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-
-            <Button size="sm" variant="outline" onClick={() => setIsActivitySheetOpen(true)}>
-              <MessageSquare className="h-4 w-4 mr-1" />
-              Activity Log
-            </Button>
           </div>
         </SheetContent>
       </Sheet>
       </Card>
-      <ActivityTimelineSheet
-        leadId={lead.id}
-        leadName={lead.name}
-        isOpen={isActivitySheetOpen}
-        onClose={() => setIsActivitySheetOpen(false)}
-      />
     </>
   );
 }
