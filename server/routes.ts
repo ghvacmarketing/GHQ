@@ -1826,9 +1826,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leads/metrics", async (req, res) => {
     try {
       const allLeads = await storage.getAllLeads();
-      const activeLeads = allLeads.filter(lead => !lead.won && !lead.lost);
-      const wonLeads = allLeads.filter(lead => lead.won);
-      const lostLeads = allLeads.filter(lead => lead.lost);
+      // Filter active leads: exclude both by boolean flags AND by status field for data consistency
+      const activeLeads = allLeads.filter(lead => 
+        !lead.won && !lead.lost && lead.status !== "Won" && lead.status !== "Lost"
+      );
+      const wonLeads = allLeads.filter(lead => lead.won || lead.status === "Won");
+      const lostLeads = allLeads.filter(lead => lead.lost || lead.status === "Lost");
 
       // Calculate pipeline value
       const pipelineValue = activeLeads.reduce((sum, lead) => {
