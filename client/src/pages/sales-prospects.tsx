@@ -506,9 +506,9 @@ export default function SalesProspects() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap gap-2">
-            <label htmlFor="csv-upload" className="flex-1 sm:flex-initial">
-              <Button variant="outline" size="sm" className="w-full sm:w-auto" asChild data-testid="button-import-csv">
+          <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2">
+            <label htmlFor="csv-upload">
+              <Button variant="outline" size="sm" className="w-full" asChild data-testid="button-import-csv">
                 <span>
                   <Upload className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Import CSV</span>
@@ -524,16 +524,17 @@ export default function SalesProspects() {
               />
             </label>
 
-            <Button variant="outline" size="sm" className="flex-1 sm:flex-initial" onClick={handleExport} data-testid="button-export-csv">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleExport} data-testid="button-export-csv">
               <Download className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Export CSV</span>
             </Button>
 
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="flex-1 sm:flex-initial" data-testid="button-create-lead">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Lead
+                <Button size="sm" className="w-full sm:w-auto" data-testid="button-create-lead">
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">New Lead</span>
+                  <span className="sm:hidden">New</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto" data-testid="dialog-create-lead">
