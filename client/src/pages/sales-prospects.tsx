@@ -1237,7 +1237,7 @@ function ActivityTimelineSheet({
   const [callbackResponse, setCallbackResponse] = useState("");
 
   // Fetch technicians for employee name resolution
-  const { data: technicians = [] } = useQuery<Technician[]>({
+  const { data: technicians = [] } = useQuery<any[]>({
     queryKey: ["/api/technicians"],
   });
 
