@@ -320,7 +320,6 @@ export default function SalesProspects() {
           </div>
         </div>
       </header>
-
       <div className="container mx-auto p-4 max-w-7xl">
         {/* Dashboard Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
@@ -1677,7 +1676,7 @@ function LeadCard({
 
         {/* Quote Reference Display */}
         {lead.quoteId && (
-          <div className="mt-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3" data-testid={`quote-reference-${lead.id}`}>
+          <div className="mt-4 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 bg-[#fcfcfc]" data-testid={`quote-reference-${lead.id}`}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
@@ -2097,7 +2096,6 @@ function LeadCard({
         )}
       </CardContent>
       </Card>
-
       <ActivityTimelineSheet
         leadId={lead.id}
         leadName={lead.name}
