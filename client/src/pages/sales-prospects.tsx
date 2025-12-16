@@ -1581,46 +1581,19 @@ function LeadCard({
   return (
     <>
       <Card data-testid={`card-lead-${lead.id}`}>
-      <CardHeader>
+      <CardHeader className="pb-3">
+        {/* Row 1: Name + Status */}
         <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <CardTitle className="mb-2 break-words text-[16px]" data-testid={`text-lead-name-${lead.id}`}>
-              {lead.name}
-            </CardTitle>
-
-            <div className="space-y-1 text-sm text-muted-foreground">
-              {lead.phone && (
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 flex-shrink-0" />
-                  <a href={`tel:${lead.phone}`} className="hover:underline truncate" data-testid={`link-phone-${lead.id}`}>
-                    {lead.phone}
-                  </a>
-                </div>
-              )}
-              {lead.email && (
-                <div className="flex items-center gap-2 min-w-0">
-                  <Mail className="h-4 w-4 flex-shrink-0" />
-                  <a href={`mailto:${lead.email}`} className="hover:underline truncate" data-testid={`link-email-${lead.id}`}>
-                    {lead.email}
-                  </a>
-                </div>
-              )}
-              {lead.address && (
-                <div className="flex items-center gap-2 min-w-0">
-                  <MapPin className="h-4 w-4 flex-shrink-0" />
-                  <span className="break-words" data-testid={`text-address-${lead.id}`}>{lead.address}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 items-end flex-shrink-0">
+          <CardTitle className="break-words text-base leading-tight flex-1 min-w-0" data-testid={`text-lead-name-${lead.id}`}>
+            {lead.name}
+          </CardTitle>
+          <div className="flex-shrink-0">
             {isActive ? (
               <Select
                 value={lead.status}
                 onValueChange={(value) => onUpdate({ status: value })}
               >
-                <SelectTrigger className="w-full min-w-[120px] h-9" data-testid={`select-status-${lead.id}`}>
+                <SelectTrigger className="h-8 min-w-[100px] text-xs" data-testid={`select-status-${lead.id}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1631,56 +1604,75 @@ function LeadCard({
                 </SelectContent>
               </Select>
             ) : (
-              <Badge variant={lead.won ? "default" : "destructive"} className="px-3 py-1" data-testid={`badge-status-${lead.id}`}>
+              <Badge variant={lead.won ? "default" : "destructive"} className="text-xs" data-testid={`badge-status-${lead.id}`}>
                 {lead.status}
               </Badge>
             )}
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-4 mt-4">
-          {lead.estimatedValue && (
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-              <span className="font-semibold text-[14px]" data-testid={`text-value-${lead.id}`}>
-                {formatCurrency(lead.estimatedValue)}
-              </span>
-            </div>
+        {/* Row 2: Contact Info - Compact inline */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2">
+          {lead.phone && (
+            <a href={`tel:${lead.phone}`} className="flex items-center gap-1 hover:underline" data-testid={`link-phone-${lead.id}`}>
+              <Phone className="h-3 w-3" />
+              <span>{lead.phone}</span>
+            </a>
           )}
+          {lead.email && (
+            <a href={`mailto:${lead.email}`} className="flex items-center gap-1 hover:underline truncate max-w-[180px]" data-testid={`link-email-${lead.id}`}>
+              <Mail className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">{lead.email}</span>
+            </a>
+          )}
+          {lead.address && (
+            <span className="flex items-center gap-1" data-testid={`text-address-${lead.id}`}>
+              <MapPin className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate max-w-[200px]">{lead.address}</span>
+            </span>
+          )}
+        </div>
 
-          {lead.projectedCloseDate && (
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span data-testid={`text-close-date-${lead.id}`}>
-                {format(new Date(lead.projectedCloseDate), "MMM dd, yyyy")}
+        {/* Row 3: Value + Date - Compact badges */}
+        {(lead.estimatedValue || lead.projectedCloseDate) && (
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            {lead.estimatedValue && (
+              <Badge variant="secondary" className="text-xs font-medium" data-testid={`text-value-${lead.id}`}>
+                <DollarSign className="h-3 w-3 mr-1" />
+                {formatCurrency(lead.estimatedValue)}
+              </Badge>
+            )}
+            {lead.projectedCloseDate && (
+              <Badge variant="outline" className="text-xs" data-testid={`text-close-date-${lead.id}`}>
+                <Calendar className="h-3 w-3 mr-1" />
+                {format(new Date(lead.projectedCloseDate), "MMM dd")}
                 {daysToClose && (
                   <span
-                    className={`ml-2 text-xs ${
-                      daysToClose.includes("Overdue") ? "text-red-600" : "text-muted-foreground"
-                    }`}
+                    className={`ml-1 ${daysToClose.includes("Overdue") ? "text-red-600" : ""}`}
                     data-testid={`text-days-to-close-${lead.id}`}
                   >
                     ({daysToClose})
                   </span>
                 )}
-              </span>
-            </div>
-          )}
-        </div>
+              </Badge>
+            )}
+          </div>
+        )}
 
+        {/* Row 4: Client Issue */}
         {lead.clientIssue && (
-          <p className="text-sm text-muted-foreground mt-2" data-testid={`text-issue-${lead.id}`}>
+          <p className="text-xs text-muted-foreground mt-2 line-clamp-2" data-testid={`text-issue-${lead.id}`}>
             {lead.clientIssue}
           </p>
         )}
 
-        {/* Quote Reference Display */}
+        {/* Row 5: Quote Reference */}
         {lead.quoteId && (
-          <div className="mt-4 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 bg-[#fcfcfc]" data-testid={`quote-reference-${lead.id}`}>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                <span className="text-sm font-medium text-blue-900 dark:text-blue-100 truncate">
+          <div className="mt-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md p-2" data-testid={`quote-reference-${lead.id}`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <FileText className="h-3 w-3 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                <span className="text-xs font-medium text-blue-900 dark:text-blue-100">
                   Quote #{lead.quoteId.slice(0, 8)}
                 </span>
               </div>
@@ -1690,51 +1682,52 @@ function LeadCard({
         )}
       </CardHeader>
 
-      <CardContent>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {isActive && (
-            <>
-              <Button size="sm" variant="outline" className="touch-manipulation" onClick={onMarkWon} data-testid={`button-mark-won-${lead.id}`}>
-                <CheckCircle2 className="h-4 w-4 sm:mr-1" />
-                <span className="sr-only sm:not-sr-only sm:inline ml-1">Mark Won</span>
-              </Button>
-              <Button size="sm" variant="outline" className="touch-manipulation" onClick={onMarkLost} data-testid={`button-mark-lost-${lead.id}`}>
-                <X className="h-4 w-4 sm:mr-1" />
-                <span className="sr-only sm:not-sr-only sm:inline ml-1">Mark Lost</span>
-              </Button>
-            </>
-          )}
+      <CardContent className="pt-0">
+        {/* Action Buttons - Grid layout on mobile, flex on desktop */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          {/* Left: Icon buttons */}
+          <div className="flex items-center gap-1">
+            {isActive && (
+              <>
+                <Button size="icon" variant="outline" className="h-8 w-8 touch-manipulation" onClick={onMarkWon} title="Mark Won" data-testid={`button-mark-won-${lead.id}`}>
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                </Button>
+                <Button size="icon" variant="outline" className="h-8 w-8 touch-manipulation" onClick={onMarkLost} title="Mark Lost" data-testid={`button-mark-lost-${lead.id}`}>
+                  <X className="h-4 w-4 text-red-600" />
+                </Button>
+              </>
+            )}
 
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button size="sm" variant="outline" className="touch-manipulation" data-testid={`button-delete-${lead.id}`}>
-                <Trash2 className="h-4 w-4 sm:mr-1" />
-                <span className="sr-only sm:not-sr-only sm:inline ml-1">Delete</span>
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Lead?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the lead and all associated data.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel data-testid={`button-cancel-delete-${lead.id}`}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={onDelete} data-testid={`button-confirm-delete-${lead.id}`}>
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="icon" variant="outline" className="h-8 w-8 touch-manipulation" title="Delete" data-testid={`button-delete-${lead.id}`}>
+                  <Trash2 className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Lead?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the lead and all associated data.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid={`button-cancel-delete-${lead.id}`}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={onDelete} data-testid={`button-confirm-delete-${lead.id}`}>
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
-          <Button size="sm" variant="outline" className="touch-manipulation" onClick={() => setIsActivitySheetOpen(true)} data-testid="button-view-activity">
-            <MessageSquare className="h-4 w-4 sm:mr-1" />
-            <span className="sr-only sm:not-sr-only sm:inline ml-1">View Activity</span>
-          </Button>
+            <Button size="icon" variant="outline" className="h-8 w-8 touch-manipulation" onClick={() => setIsActivitySheetOpen(true)} title="View Activity" data-testid="button-view-activity">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </div>
 
-          <Button size="sm" variant="ghost" onClick={onToggleExpand} data-testid={`button-expand-${lead.id}`}>
-            {isExpanded ? "Hide Details" : "Show Details"}
+          {/* Right: Expand/Collapse */}
+          <Button size="sm" variant="ghost" className="text-xs h-8" onClick={onToggleExpand} data-testid={`button-expand-${lead.id}`}>
+            {isExpanded ? "Hide" : "Details"}
           </Button>
         </div>
 
