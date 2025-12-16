@@ -478,31 +478,39 @@ export default function SalesProspects() {
             </Select>
           </div>
 
-          {/* Desktop Filter Buttons */}
-          <div className="hidden md:flex md:flex-wrap gap-2">
-            {["All Active", "New", "Contacted", "Quote Sent", "Negotiating", "Won", "Lost"].map((filter) => {
-              const count = (() => {
-                if (filter === "All Active") return allLeads.filter((l) => !l.won && !l.lost).length;
-                if (filter === "Won") return allLeads.filter((l) => l.won).length;
-                if (filter === "Lost") return allLeads.filter((l) => l.lost).length;
-                return allLeads.filter((l) => l.status === filter && !l.won && !l.lost).length;
-              })();
+          {/* Desktop Filter Dropdown */}
+          <div className="hidden md:block w-full max-w-xs">
+            <Select value={activeFilter} onValueChange={setActiveFilter}>
+              <SelectTrigger className="w-full" data-testid="select-filter-desktop">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  <SelectValue />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {["All Active", "New", "Contacted", "Quote Sent", "Negotiating", "Won", "Lost"].map((filter) => {
+                  const count = (() => {
+                    if (filter === "All Active") return allLeads.filter((l) => !l.won && !l.lost).length;
+                    if (filter === "Won") return allLeads.filter((l) => l.won).length;
+                    if (filter === "Lost") return allLeads.filter((l) => l.lost).length;
+                    return allLeads.filter((l) => l.status === filter && !l.won && !l.lost).length;
+                  })();
 
-              return (
-                <Button
-                  key={filter}
-                  size="sm"
-                  variant={activeFilter === filter ? "default" : "outline"}
-                  onClick={() => setActiveFilter(filter)}
-                  data-testid={`button-filter-${filter.toLowerCase().replace(/\s+/g, "-")}`}
-                >
-                  {filter}
-                  <Badge variant="secondary" className="ml-2" data-testid={`badge-count-${filter.toLowerCase().replace(/\s+/g, "-")}`}>
-                    {count}
-                  </Badge>
-                </Button>
-              );
-            })}
+                  return (
+                    <SelectItem 
+                      key={filter} 
+                      value={filter}
+                      data-testid={`select-filter-option-desktop-${filter.toLowerCase().replace(/\s+/g, "-")}`}
+                    >
+                      <div className="flex items-center justify-between w-full gap-3">
+                        <span>{filter}</span>
+                        <Badge variant="secondary" className="text-xs">{count}</Badge>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Action Buttons */}
@@ -616,7 +624,7 @@ function QuoteReferenceLink({ quoteId }: { quoteId: string }) {
 
   const handleViewQuote = () => {
     // Navigate to quote history page - the page should handle highlighting the quote
-    setLocation(`/quotes-history?quoteId=${quoteId}`);
+    setLocation(`/history?quoteId=${quoteId}`);
   };
 
   return (
@@ -1670,11 +1678,11 @@ function LeadCard({
         {/* Quote Reference Display */}
         {lead.quoteId && (
           <div className="mt-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3" data-testid={`quote-reference-${lead.id}`}>
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                  Created from Quote #{lead.quoteId.slice(0, 8)}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                <span className="text-sm font-medium text-blue-900 dark:text-blue-100 truncate">
+                  Quote #{lead.quoteId.slice(0, 8)}
                 </span>
               </div>
               <QuoteReferenceLink quoteId={lead.quoteId} />
