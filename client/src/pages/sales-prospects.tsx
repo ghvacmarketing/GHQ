@@ -1231,11 +1231,13 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
               </div>
             </PopoverTrigger>
             <PopoverContent 
-              className="w-[var(--radix-popover-trigger-width)] p-0 max-h-64 overflow-y-auto" 
+              className="w-80 p-0" 
               align="start"
+              side="bottom"
+              sideOffset={4}
               onOpenAutoFocus={(e) => e.preventDefault()}
             >
-              <div>
+              <ScrollArea className="max-h-64">
                 {isSearchingCustomers ? (
                   <div className="p-3 space-y-2">
                     <Skeleton className="h-10 w-full" />
@@ -1247,7 +1249,6 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
                   </div>
                 ) : (
                   customerSearchResults.map((customer) => {
-                    // Strip surrounding quotes from display name
                     const cleanName = customer.displayName.replace(/^["']|["']$/g, '');
                     return (
                     <div
@@ -1283,7 +1284,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
                   );
                   })
                 )}
-              </div>
+              </ScrollArea>
             </PopoverContent>
           </Popover>
           <div className="flex items-center justify-between mt-2">

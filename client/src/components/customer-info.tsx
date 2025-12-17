@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { User, Search, Database, Loader2 } from "lucide-react";
 import type { Technician, Customer } from "@shared/schema";
 
@@ -123,11 +124,13 @@ export default function CustomerInfo({
                 </div>
               </PopoverTrigger>
               <PopoverContent 
-                className="w-[var(--radix-popover-trigger-width)] p-0 max-h-60 overflow-y-auto" 
+                className="w-80 p-0" 
                 align="start"
+                side="bottom"
+                sideOffset={4}
                 onOpenAutoFocus={(e) => e.preventDefault()}
               >
-                <div>
+                <ScrollArea className="max-h-60">
                   {searchResults.map((customer) => {
                     const cleanName = customer.displayName.replace(/^["']|["']$/g, '');
                     return (
@@ -148,7 +151,7 @@ export default function CustomerInfo({
                     </div>
                   );
                   })}
-                </div>
+                </ScrollArea>
               </PopoverContent>
             </Popover>
             <div className="flex items-center justify-between mt-2">
