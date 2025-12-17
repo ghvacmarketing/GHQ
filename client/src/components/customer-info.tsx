@@ -124,12 +124,9 @@ export default function CustomerInfo({
                 </div>
               </PopoverTrigger>
               <PopoverContent 
-                className="w-[min(calc(100vw-4rem),320px)] p-0" 
-                align="center"
+                className="p-0" 
+                align="start"
                 side="bottom"
-                sideOffset={4}
-                avoidCollisions={true}
-                collisionPadding={16}
                 onOpenAutoFocus={(e) => e.preventDefault()}
               >
                 <ScrollArea className="max-h-60">

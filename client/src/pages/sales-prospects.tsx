@@ -620,7 +620,7 @@ export default function SalesProspects() {
                   <span className="sm:hidden">New</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[92vw] max-w-[500px] max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6" data-testid="dialog-create-lead">
+              <DialogContent className="max-w-[500px]" data-testid="dialog-create-lead">
                 <DialogHeader>
                   <DialogTitle>Create New Lead</DialogTitle>
                   <DialogDescription>Add a new sales prospect to track</DialogDescription>
@@ -1231,12 +1231,9 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
               </div>
             </PopoverTrigger>
             <PopoverContent 
-              className="w-[min(calc(100vw-4rem),320px)] p-0" 
-              align="center"
+              className="p-0" 
+              align="start"
               side="bottom"
-              sideOffset={4}
-              avoidCollisions={true}
-              collisionPadding={16}
               onOpenAutoFocus={(e) => e.preventDefault()}
             >
               <ScrollArea className="max-h-64">
