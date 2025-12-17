@@ -620,7 +620,7 @@ export default function SalesProspects() {
                   <span className="sm:hidden">New</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto" data-testid="dialog-create-lead">
+              <DialogContent className="w-[calc(100vw-2rem)] max-w-[500px] max-h-[90vh] overflow-y-auto overflow-x-hidden" data-testid="dialog-create-lead">
                 <DialogHeader>
                   <DialogTitle>Create New Lead</DialogTitle>
                   <DialogDescription>Add a new sales prospect to track</DialogDescription>
