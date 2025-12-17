@@ -51,9 +51,9 @@ type MetricsData = {
 
 export default function SalesProspects() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [activeFilter, setActiveFilter] = useState<string>("All Active");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("all");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
 
   // Queries
@@ -79,7 +79,6 @@ export default function SalesProspects() {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
       toast({ description: "Lead created successfully", duration: 1000 });
-      setIsCreateDialogOpen(false);
     },
   });
 
@@ -612,22 +611,11 @@ export default function SalesProspects() {
               <span className="hidden sm:inline">Export CSV</span>
             </Button>
 
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="w-full sm:w-auto" data-testid="button-create-lead">
-                  <Plus className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">New Lead</span>
-                  <span className="sm:hidden">New</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-[500px]" data-testid="dialog-create-lead">
-                <DialogHeader>
-                  <DialogTitle>Create New Lead</DialogTitle>
-                  <DialogDescription>Add a new sales prospect to track</DialogDescription>
-                </DialogHeader>
-                <CreateLeadForm onSubmit={(data) => createLeadMutation.mutate(data)} technicians={technicians} />
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" className="w-full sm:w-auto" onClick={() => setLocation('/sales-prospects/create')} data-testid="button-create-lead">
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">New Lead</span>
+              <span className="sm:hidden">New</span>
+            </Button>
           </div>
         </div>
 
