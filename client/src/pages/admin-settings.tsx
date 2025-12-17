@@ -180,6 +180,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
   const [restoreMode, setRestoreMode] = useState<'replace' | 'merge'>('replace');
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
+  const [customerCsvFile, setCustomerCsvFile] = useState<File | null>(null);
 
   // Fetch current settings from Google Sheets
   const { data: currentSettings, refetch, isLoading } = useQuery({
@@ -500,6 +501,80 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
       toast({
         title: 'Delete Failed',
         description: 'Failed to remove phone number. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Customer Database - fetch stats
+  const { data: customerStats, refetch: refetchCustomerStats } = useQuery<{
+    totalCustomers: number;
+    lastImportDate: string | null;
+    lastImportFilename: string | null;
+    totalImports: number;
+  }>({
+    queryKey: ['/api/customers/stats'],
+  });
+
+  // Customer Database - import history
+  const { data: customerImportHistory = [], refetch: refetchCustomerImportHistory } = useQuery<{
+    id: string;
+    filename: string;
+    fileHash: string;
+    status: string;
+    totalRows: string | null;
+    createdCount: string | null;
+    updatedCount: string | null;
+    skippedCount: string | null;
+    errorCount: string | null;
+    importedAt: string;
+  }[]>({
+    queryKey: ['/api/customers/import/history'],
+    queryFn: getAdminQueryFn({ on401: 'throw' }),
+  });
+
+  // Customer import mutation
+  const customerImportMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const adminToken = localStorage.getItem('adminToken');
+      const response = await fetch('/api/customers/import', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Import failed');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      refetchCustomerStats();
+      refetchCustomerImportHistory();
+      setCustomerCsvFile(null);
+      
+      if (data.skipped) {
+        toast({
+          title: 'File Already Imported',
+          description: data.message,
+        });
+      } else {
+        toast({
+          title: 'Import Complete',
+          description: data.message,
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Import Failed',
+        description: error.message || 'Failed to import customer CSV.',
         variant: 'destructive',
       });
     },
@@ -2093,6 +2168,125 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
                           </Button>
                         </div>
                       </div>
+                    </CardContent>
+                  </Card>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Customer Database */}
+              <AccordionItem value="customer-database" className="border rounded-lg px-4 bg-card">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center">
+                    <Users className="h-5 w-5 mr-3 text-primary" />
+                    <span className="font-semibold">Customer Database</span>
+                    <Badge variant="secondary" className="ml-2">{customerStats?.totalCustomers || 0}</Badge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <Card className="border-0 shadow-none">
+                    <CardContent className="pt-6 space-y-6">
+                      {/* Stats */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 border rounded-lg bg-muted/30">
+                          <div className="text-2xl font-bold">{customerStats?.totalCustomers || 0}</div>
+                          <div className="text-sm text-muted-foreground">Total Customers</div>
+                        </div>
+                        <div className="p-4 border rounded-lg bg-muted/30">
+                          <div className="text-2xl font-bold">{customerStats?.totalImports || 0}</div>
+                          <div className="text-sm text-muted-foreground">Imports</div>
+                        </div>
+                      </div>
+
+                      {customerStats?.lastImportDate && (
+                        <div className="text-sm text-muted-foreground">
+                          Last import: {new Date(customerStats.lastImportDate).toLocaleDateString()} ({customerStats.lastImportFilename})
+                        </div>
+                      )}
+
+                      {/* Import Section */}
+                      <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold text-lg">Import Customers from CSV</h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Upload a FieldEdge export file to sync customer data
+                            </p>
+                          </div>
+                          <Upload className="h-8 w-8 text-primary" />
+                        </div>
+
+                        <div className="space-y-2 text-sm">
+                          <p className="font-medium">Expected CSV columns:</p>
+                          <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-2">
+                            <li>Display Name (required)</li>
+                            <li>Customer Type</li>
+                            <li>Full Address</li>
+                            <li>Phone</li>
+                            <li>Email</li>
+                            <li>Lead Source</li>
+                          </ul>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="customer-csv">Select CSV File</Label>
+                            <Input
+                              id="customer-csv"
+                              type="file"
+                              accept=".csv"
+                              onChange={(e) => setCustomerCsvFile(e.target.files?.[0] || null)}
+                              data-testid="input-customer-csv"
+                            />
+                            {customerCsvFile && (
+                              <p className="text-sm text-muted-foreground">
+                                Selected: {customerCsvFile.name}
+                              </p>
+                            )}
+                          </div>
+
+                          <Button
+                            onClick={() => customerCsvFile && customerImportMutation.mutate(customerCsvFile)}
+                            disabled={!customerCsvFile || customerImportMutation.isPending}
+                            className="w-full"
+                            data-testid="button-import-customers"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {customerImportMutation.isPending ? 'Importing...' : 'Import Customers'}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Import History */}
+                      {customerImportHistory.length > 0 && (
+                        <div className="space-y-3">
+                          <h4 className="font-medium">Import History</h4>
+                          <div className="space-y-2 max-h-60 overflow-y-auto">
+                            {customerImportHistory.map((batch) => (
+                              <div key={batch.id} className="p-3 border rounded-lg text-sm">
+                                <div className="flex justify-between items-start">
+                                  <div className="font-medium">{batch.filename}</div>
+                                  <Badge variant={batch.status === 'completed' ? 'default' : 'secondary'}>
+                                    {batch.status}
+                                  </Badge>
+                                </div>
+                                <div className="text-muted-foreground mt-1">
+                                  {new Date(batch.importedAt).toLocaleString()}
+                                </div>
+                                {batch.totalRows && (
+                                  <div className="flex gap-3 mt-2 text-xs">
+                                    <span className="text-green-600">+{batch.createdCount || 0} new</span>
+                                    <span className="text-blue-600">{batch.updatedCount || 0} updated</span>
+                                    <span className="text-muted-foreground">{batch.skippedCount || 0} skipped</span>
+                                    {Number(batch.errorCount) > 0 && (
+                                      <span className="text-red-600">{batch.errorCount} errors</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </AccordionContent>
