@@ -2504,6 +2504,231 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =============================================================================
+  // CUSTOMER DATABASE ROUTES (FieldEdge CSV Import)
+  // =============================================================================
+
+  // Search customers by name, email, phone, or address
+  app.get("/api/customers/search", async (req, res) => {
+    try {
+      const term = req.query.term as string;
+      if (!term || term.length < 2) {
+        return res.json([]);
+      }
+      const customers = await storage.searchCustomers(term);
+      res.json(customers);
+    } catch (error) {
+      console.error('Error searching customers:', error);
+      res.status(500).json({ message: "Error searching customers" });
+    }
+  });
+
+  // Get all customers (paginated)
+  app.get("/api/customers", async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const offset = (page - 1) * limit;
+      
+      const allCustomers = await storage.getAllCustomers();
+      const total = allCustomers.length;
+      const customers = allCustomers.slice(offset, offset + limit);
+      
+      res.json({
+        customers,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      res.status(500).json({ message: "Error fetching customers" });
+    }
+  });
+
+  // Get customer by ID
+  app.get("/api/customers/:id", async (req, res) => {
+    try {
+      const customer = await storage.getCustomer(req.params.id);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+      res.json(customer);
+    } catch (error) {
+      console.error('Error fetching customer:', error);
+      res.status(500).json({ message: "Error fetching customer" });
+    }
+  });
+
+  // Import customers from CSV (admin only)
+  app.post("/api/customers/import", requireAdminAuth, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const fileContent = req.file.buffer.toString('utf-8');
+      const filename = req.file.originalname;
+      
+      // Calculate file hash for duplicate detection
+      const fileHash = createHmac('sha256', 'customer-import')
+        .update(fileContent)
+        .digest('hex');
+
+      // Check if this exact file was already imported
+      const existingBatch = await storage.getCustomerImportBatchByFileHash(fileHash);
+      if (existingBatch) {
+        return res.json({
+          message: "This exact file was already imported",
+          batch: existingBatch,
+          skipped: true
+        });
+      }
+
+      // Create import batch record
+      const batch = await storage.createCustomerImportBatch({
+        filename,
+        fileHash,
+        status: "processing",
+      });
+
+      // Parse CSV using the streaming parser
+      const { parse } = await import('csv-parse/sync');
+      const records = parse(fileContent, {
+        columns: true,
+        skip_empty_lines: true,
+        relax_quotes: true,
+        relax_column_count: true,
+        trim: true,
+      });
+
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+      let errors = 0;
+      const errorDetails: string[] = [];
+
+      for (let i = 0; i < records.length; i++) {
+        const record = records[i];
+        try {
+          // Map CSV columns to customer fields
+          // CSV: Display Name, Customer Type, Full Address, Phone, Email, Lead Source
+          const displayName = (record['Display Name'] || '').trim();
+          
+          if (!displayName) {
+            skipped++;
+            continue;
+          }
+
+          // Clean phone number - remove non-digits but keep as string
+          let phone = (record['Phone'] || '').trim();
+          if (phone) {
+            const digits = phone.replace(/\D/g, '');
+            if (digits.length === 10) {
+              phone = `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+            } else if (digits.length === 11 && digits.startsWith('1')) {
+              phone = `(${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
+            }
+          }
+
+          const customerData = {
+            displayName,
+            customerType: (record['Customer Type'] || '').trim() || null,
+            fullAddress: (record['Full Address'] || '').trim() || null,
+            phone: phone || null,
+            email: (record['Email'] || '').trim() || null,
+            leadSource: (record['Lead Source'] || '').trim() || null,
+            importBatchId: batch.id,
+            checksum: createHmac('sha256', 'customer-row')
+              .update(JSON.stringify({
+                displayName,
+                customerType: record['Customer Type'] || '',
+                fullAddress: record['Full Address'] || '',
+                phone: phone || '',
+                email: record['Email'] || '',
+                leadSource: record['Lead Source'] || '',
+              }))
+              .digest('hex'),
+          };
+
+          const result = await storage.upsertCustomerByChecksum(customerData);
+          
+          if (result.action === 'created') created++;
+          else if (result.action === 'updated') updated++;
+          else skipped++;
+          
+        } catch (rowError: any) {
+          errors++;
+          if (errorDetails.length < 10) {
+            errorDetails.push(`Row ${i + 2}: ${rowError.message}`);
+          }
+        }
+      }
+
+      // Update batch with final counts
+      await storage.updateCustomerImportBatch(batch.id, {
+        status: "completed",
+        totalRows: String(records.length),
+        createdCount: String(created),
+        updatedCount: String(updated),
+        skippedCount: String(skipped),
+        errorCount: String(errors),
+        errorDetails: errorDetails.length > 0 ? errorDetails.join('\n') : null,
+      });
+
+      const updatedBatch = await storage.getCustomerImportBatch(batch.id);
+
+      res.json({
+        message: `Import completed: ${created} created, ${updated} updated, ${skipped} skipped, ${errors} errors`,
+        batch: updatedBatch,
+        summary: {
+          total: records.length,
+          created,
+          updated,
+          skipped,
+          errors,
+        }
+      });
+    } catch (error: any) {
+      console.error('Error importing customers:', error);
+      res.status(500).json({ message: "Error importing customers: " + error.message });
+    }
+  });
+
+  // Get customer import history (admin only)
+  app.get("/api/customers/import/history", requireAdminAuth, async (req, res) => {
+    try {
+      const batches = await storage.getAllCustomerImportBatches();
+      res.json(batches);
+    } catch (error) {
+      console.error('Error fetching import history:', error);
+      res.status(500).json({ message: "Error fetching import history" });
+    }
+  });
+
+  // Get customer database stats
+  app.get("/api/customers/stats", async (req, res) => {
+    try {
+      const allCustomers = await storage.getAllCustomers();
+      const batches = await storage.getAllCustomerImportBatches();
+      
+      const lastImport = batches.length > 0 ? batches[0] : null;
+      
+      res.json({
+        totalCustomers: allCustomers.length,
+        lastImportDate: lastImport?.importedAt || null,
+        lastImportFilename: lastImport?.filename || null,
+        totalImports: batches.length,
+      });
+    } catch (error) {
+      console.error('Error fetching customer stats:', error);
+      res.status(500).json({ message: "Error fetching customer stats" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
