@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter, Navigation, MessageSquare, StickyNote, ArrowRightCircle, UserPlus, Activity, FileText, ExternalLink, Search } from "lucide-react";
+import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter, Navigation, MessageSquare, StickyNote, ArrowRightCircle, UserPlus, Activity, FileText, ExternalLink, Search, Users } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -50,6 +50,7 @@ type MetricsData = {
 export default function SalesProspects() {
   const { toast } = useToast();
   const [activeFilter, setActiveFilter] = useState<string>("All Active");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
 
@@ -153,13 +154,73 @@ export default function SalesProspects() {
     },
   });
 
-  // Filter leads based on active filter
+  // Filter leads based on active filter and selected employee
   const filteredLeads = allLeads.filter((lead) => {
+    // First apply employee filter
+    if (selectedEmployeeId !== "all" && lead.assignedEmployeeId !== selectedEmployeeId) {
+      return false;
+    }
+    // Then apply status filter
     if (activeFilter === "All Active") return !lead.won && !lead.lost;
     if (activeFilter === "Won") return lead.won;
     if (activeFilter === "Lost") return lead.lost;
     return lead.status === activeFilter && !lead.won && !lead.lost;
   });
+
+  // Get selected employee name
+  const selectedEmployeeName = selectedEmployeeId === "all" 
+    ? null 
+    : technicians.find((t) => t.id === selectedEmployeeId)?.name || "Unknown";
+
+  // Calculate employee-specific metrics when an employee is selected
+  const employeeFilteredLeads = selectedEmployeeId === "all" 
+    ? allLeads 
+    : allLeads.filter((l) => l.assignedEmployeeId === selectedEmployeeId);
+
+  // Calculate metrics from filtered leads (used for display)
+  const calculateMetricsFromLeads = (leads: Lead[]): MetricsData => {
+    const activeLeads = leads.filter((l) => !l.won && !l.lost);
+    const closed = leads.filter((l) => l.won || l.lost);
+    const won = leads.filter((l) => l.won);
+    
+    return {
+      activeLeads: activeLeads.length,
+      pipelineValue: activeLeads.reduce((sum, l) => sum + parseFloat(l.estimatedValue || "0"), 0).toFixed(2),
+      conversionRate: closed.length > 0 ? ((won.length / closed.length) * 100).toFixed(1) : "0",
+      pendingActions: 0, // Not available client-side
+      statusBreakdown: {
+        New: { 
+          count: leads.filter((l) => l.status === "New" && !l.won && !l.lost).length,
+          value: leads.filter((l) => l.status === "New" && !l.won && !l.lost).reduce((sum, l) => sum + parseFloat(l.estimatedValue || "0"), 0)
+        },
+        Contacted: { 
+          count: leads.filter((l) => l.status === "Contacted" && !l.won && !l.lost).length,
+          value: leads.filter((l) => l.status === "Contacted" && !l.won && !l.lost).reduce((sum, l) => sum + parseFloat(l.estimatedValue || "0"), 0)
+        },
+        "Quote Sent": { 
+          count: leads.filter((l) => l.status === "Quote Sent" && !l.won && !l.lost).length,
+          value: leads.filter((l) => l.status === "Quote Sent" && !l.won && !l.lost).reduce((sum, l) => sum + parseFloat(l.estimatedValue || "0"), 0)
+        },
+        Negotiating: { 
+          count: leads.filter((l) => l.status === "Negotiating" && !l.won && !l.lost).length,
+          value: leads.filter((l) => l.status === "Negotiating" && !l.won && !l.lost).reduce((sum, l) => sum + parseFloat(l.estimatedValue || "0"), 0)
+        },
+        Won: { 
+          count: won.length,
+          value: won.reduce((sum, l) => sum + parseFloat(l.estimatedValue || "0"), 0)
+        },
+        Lost: { 
+          count: leads.filter((l) => l.lost).length,
+          value: leads.filter((l) => l.lost).reduce((sum, l) => sum + parseFloat(l.estimatedValue || "0"), 0)
+        },
+      }
+    };
+  };
+
+  // Use employee-filtered metrics when an employee is selected, otherwise use global metrics from API
+  const displayMetrics: MetricsData | undefined = selectedEmployeeId === "all" 
+    ? metrics 
+    : calculateMetricsFromLeads(employeeFilteredLeads);
 
   // Calculate days to close
   const calculateDaysToClose = (date: Date | string | null) => {
@@ -247,9 +308,28 @@ export default function SalesProspects() {
         </div>
       </header>
       <div className="container mx-auto p-4 max-w-7xl">
+        {/* Employee Filter Header */}
+        {selectedEmployeeName && (
+          <div className="mb-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Showing stats for: <strong>{selectedEmployeeName}</strong></span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="ml-auto h-7 text-xs"
+                onClick={() => setSelectedEmployeeId("all")}
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Dashboard Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-          {isLoadingMetrics ? (
+          {isLoadingMetrics && selectedEmployeeId === "all" ? (
             <>
               {[1, 2, 3, 4].map((i) => (
                 <Card key={i}>
@@ -270,7 +350,7 @@ export default function SalesProspects() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl sm:text-3xl font-bold" data-testid="text-active-leads">
-                    {metrics?.activeLeads || 0}
+                    {displayMetrics?.activeLeads || 0}
                   </div>
                 </CardContent>
               </Card>
@@ -281,7 +361,7 @@ export default function SalesProspects() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl sm:text-3xl font-bold truncate" data-testid="text-pipeline-value">
-                    ${parseFloat(metrics?.pipelineValue || "0").toLocaleString()}
+                    ${parseFloat(displayMetrics?.pipelineValue || "0").toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
@@ -292,18 +372,18 @@ export default function SalesProspects() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl sm:text-3xl font-bold" data-testid="text-conversion-rate">
-                    {metrics?.conversionRate || "0"}%
+                    {displayMetrics?.conversionRate || "0"}%
                   </div>
                 </CardContent>
               </Card>
 
               <Card data-testid="card-metric-actions">
                 <CardHeader className="pb-2">
-                  <CardDescription className="text-xs sm:text-sm">Pending Actions</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">{selectedEmployeeId !== "all" ? "Won Deals" : "Pending Actions"}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl sm:text-3xl font-bold" data-testid="text-pending-actions">
-                    {metrics?.pendingActions || 0}
+                    {selectedEmployeeId !== "all" ? (displayMetrics?.statusBreakdown?.Won?.count || 0) : (metrics?.pendingActions || 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -312,12 +392,12 @@ export default function SalesProspects() {
         </div>
 
         {/* Sales Funnel */}
-        {!isLoadingMetrics && metrics && (
+        {(displayMetrics || !isLoadingMetrics) && (
           <Card className="mb-6" data-testid="card-sales-funnel">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
-                Sales Funnel
+                {selectedEmployeeName ? `${selectedEmployeeName}'s Funnel` : "Sales Funnel"}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -325,40 +405,40 @@ export default function SalesProspects() {
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground">New</div>
                   <div className="text-2xl font-bold" data-testid="text-funnel-new">
-                    {metrics.statusBreakdown?.New?.count || 0}
+                    {displayMetrics?.statusBreakdown?.New?.count || 0}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground">Contacted</div>
                   <div className="text-2xl font-bold" data-testid="text-funnel-contacted">
-                    {metrics.statusBreakdown?.Contacted?.count || 0}
+                    {displayMetrics?.statusBreakdown?.Contacted?.count || 0}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground">Quote Sent</div>
                   <div className="text-2xl font-bold" data-testid="text-funnel-quote-sent">
-                    {metrics.statusBreakdown?.["Quote Sent"]?.count || 0}
+                    {displayMetrics?.statusBreakdown?.["Quote Sent"]?.count || 0}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground">Negotiating</div>
                   <div className="text-2xl font-bold" data-testid="text-funnel-negotiating">
-                    {metrics.statusBreakdown?.Negotiating?.count || 0}
+                    {displayMetrics?.statusBreakdown?.Negotiating?.count || 0}
                   </div>
                 </div>
                 <div className="text-center bg-green-50 dark:bg-green-900/20 p-2 rounded">
                   <div className="text-sm text-muted-foreground">Won</div>
                   <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-funnel-won">
-                    {metrics.statusBreakdown?.Won?.count || 0}
+                    {displayMetrics?.statusBreakdown?.Won?.count || 0}
                   </div>
                   <div className="text-xs text-muted-foreground" data-testid="text-funnel-won-value">
-                    ${(metrics.statusBreakdown?.Won?.value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${(displayMetrics?.statusBreakdown?.Won?.value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
                 <div className="text-center bg-red-50 dark:bg-red-900/20 p-2 rounded">
                   <div className="text-sm text-muted-foreground">Lost</div>
                   <div className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="text-funnel-lost">
-                    {metrics.statusBreakdown?.Lost?.count || 0}
+                    {displayMetrics?.statusBreakdown?.Lost?.count || 0}
                   </div>
                 </div>
               </div>
@@ -368,8 +448,8 @@ export default function SalesProspects() {
 
         {/* Filter & Actions */}
         <div className="space-y-3 mb-6">
-          {/* Mobile Filter Dropdown */}
-          <div className="md:hidden">
+          {/* Mobile Filter Dropdowns */}
+          <div className="md:hidden grid grid-cols-2 gap-2">
             <Select value={activeFilter} onValueChange={setActiveFilter}>
               <SelectTrigger className="w-full" data-testid="select-filter-mobile">
                 <div className="flex items-center gap-2">
@@ -379,11 +459,14 @@ export default function SalesProspects() {
               </SelectTrigger>
               <SelectContent>
                 {["All Active", "New", "Contacted", "Quote Sent", "Negotiating", "Won", "Lost"].map((filter) => {
+                  const employeeFilteredLeads = selectedEmployeeId === "all" 
+                    ? allLeads 
+                    : allLeads.filter((l) => l.assignedEmployeeId === selectedEmployeeId);
                   const count = (() => {
-                    if (filter === "All Active") return allLeads.filter((l) => !l.won && !l.lost).length;
-                    if (filter === "Won") return allLeads.filter((l) => l.won).length;
-                    if (filter === "Lost") return allLeads.filter((l) => l.lost).length;
-                    return allLeads.filter((l) => l.status === filter && !l.won && !l.lost).length;
+                    if (filter === "All Active") return employeeFilteredLeads.filter((l) => !l.won && !l.lost).length;
+                    if (filter === "Won") return employeeFilteredLeads.filter((l) => l.won).length;
+                    if (filter === "Lost") return employeeFilteredLeads.filter((l) => l.lost).length;
+                    return employeeFilteredLeads.filter((l) => l.status === filter && !l.won && !l.lost).length;
                   })();
 
                   return (
@@ -401,41 +484,106 @@ export default function SalesProspects() {
                 })}
               </SelectContent>
             </Select>
-          </div>
-
-          {/* Desktop Filter Dropdown */}
-          <div className="hidden md:block w-full max-w-xs">
-            <Select value={activeFilter} onValueChange={setActiveFilter}>
-              <SelectTrigger className="w-full" data-testid="select-filter-desktop">
+            
+            <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <SelectTrigger className="w-full" data-testid="select-employee-mobile">
                 <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4" />
+                  <Users className="h-4 w-4" />
                   <SelectValue />
                 </div>
               </SelectTrigger>
               <SelectContent>
-                {["All Active", "New", "Contacted", "Quote Sent", "Negotiating", "Won", "Lost"].map((filter) => {
-                  const count = (() => {
-                    if (filter === "All Active") return allLeads.filter((l) => !l.won && !l.lost).length;
-                    if (filter === "Won") return allLeads.filter((l) => l.won).length;
-                    if (filter === "Lost") return allLeads.filter((l) => l.lost).length;
-                    return allLeads.filter((l) => l.status === filter && !l.won && !l.lost).length;
-                  })();
-
+                <SelectItem value="all" data-testid="select-employee-option-all">
+                  All Employees
+                </SelectItem>
+                {technicians.map((tech) => {
+                  const techLeadCount = allLeads.filter((l) => l.assignedEmployeeId === tech.id).length;
                   return (
                     <SelectItem 
-                      key={filter} 
-                      value={filter}
-                      data-testid={`select-filter-option-desktop-${filter.toLowerCase().replace(/\s+/g, "-")}`}
+                      key={tech.id} 
+                      value={tech.id}
+                      data-testid={`select-employee-option-${tech.id}`}
                     >
                       <div className="flex items-center justify-between w-full gap-3">
-                        <span>{filter}</span>
-                        <Badge variant="secondary" className="text-xs">{count}</Badge>
+                        <span>{tech.name}</span>
+                        <Badge variant="secondary" className="text-xs">{techLeadCount}</Badge>
                       </div>
                     </SelectItem>
                   );
                 })}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Desktop Filter Dropdowns */}
+          <div className="hidden md:flex gap-2">
+            <div className="w-full max-w-xs">
+              <Select value={activeFilter} onValueChange={setActiveFilter}>
+                <SelectTrigger className="w-full" data-testid="select-filter-desktop">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    <SelectValue />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {["All Active", "New", "Contacted", "Quote Sent", "Negotiating", "Won", "Lost"].map((filter) => {
+                    const employeeFilteredLeads = selectedEmployeeId === "all" 
+                      ? allLeads 
+                      : allLeads.filter((l) => l.assignedEmployeeId === selectedEmployeeId);
+                    const count = (() => {
+                      if (filter === "All Active") return employeeFilteredLeads.filter((l) => !l.won && !l.lost).length;
+                      if (filter === "Won") return employeeFilteredLeads.filter((l) => l.won).length;
+                      if (filter === "Lost") return employeeFilteredLeads.filter((l) => l.lost).length;
+                      return employeeFilteredLeads.filter((l) => l.status === filter && !l.won && !l.lost).length;
+                    })();
+
+                    return (
+                      <SelectItem 
+                        key={filter} 
+                        value={filter}
+                        data-testid={`select-filter-option-desktop-${filter.toLowerCase().replace(/\s+/g, "-")}`}
+                      >
+                        <div className="flex items-center justify-between w-full gap-3">
+                          <span>{filter}</span>
+                          <Badge variant="secondary" className="text-xs">{count}</Badge>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="w-full max-w-xs">
+              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                <SelectTrigger className="w-full" data-testid="select-employee-desktop">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <SelectValue />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" data-testid="select-employee-option-desktop-all">
+                    All Employees
+                  </SelectItem>
+                  {technicians.map((tech) => {
+                    const techLeadCount = allLeads.filter((l) => l.assignedEmployeeId === tech.id).length;
+                    return (
+                      <SelectItem 
+                        key={tech.id} 
+                        value={tech.id}
+                        data-testid={`select-employee-option-desktop-${tech.id}`}
+                      >
+                        <div className="flex items-center justify-between w-full gap-3">
+                          <span>{tech.name}</span>
+                          <Badge variant="secondary" className="text-xs">{techLeadCount}</Badge>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Action Buttons */}
