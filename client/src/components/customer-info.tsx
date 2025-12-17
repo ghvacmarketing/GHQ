@@ -153,18 +153,18 @@ export default function CustomerInfo({
                 </ScrollArea>
               </PopoverContent>
             </Popover>
-            <div className="flex items-center justify-between mt-2">
+            <div className="flex flex-wrap items-center justify-between gap-1 mt-2">
               <p className="text-xs text-muted-foreground">
-                Find existing customers from FieldEdge
+                Find customers from FieldEdge
               </p>
-              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer shrink-0">
                 <Checkbox
                   checked={searchAllFields}
                   onCheckedChange={(checked) => setSearchAllFields(checked === true)}
                   className="h-3.5 w-3.5"
                   data-testid="checkbox-search-all-fields"
                 />
-                Search all fields
+                All fields
               </label>
             </div>
           </div>

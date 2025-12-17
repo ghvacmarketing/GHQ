@@ -1286,18 +1286,18 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
               </ScrollArea>
             </PopoverContent>
           </Popover>
-          <div className="flex items-center justify-between mt-2">
+          <div className="flex flex-wrap items-center justify-between gap-1 mt-2">
             <p className="text-xs text-muted-foreground">
-              Type at least 2 characters to search
+              Type 2+ chars to search
             </p>
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer shrink-0">
               <Checkbox
                 checked={searchAllFields}
                 onCheckedChange={(checked) => setSearchAllFields(checked === true)}
                 className="h-3.5 w-3.5"
                 data-testid="checkbox-search-all-fields-lead"
               />
-              Search all fields
+              All fields
             </label>
           </div>
         </div>
@@ -1339,18 +1339,19 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
           </div>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <label className="text-sm font-medium">Address</label>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center min-w-0">
             <div 
               ref={addressContainerRef} 
-              className="flex-1"
+              className="flex-1 min-w-0"
               data-testid="autocomplete-address-container"
             />
             <Button
               type="button"
               variant="outline"
               size="icon"
+              className="shrink-0"
               onClick={getCurrentLocation}
               disabled={isGettingLocation}
               title="Use current location"
