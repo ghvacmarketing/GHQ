@@ -354,3 +354,49 @@ export type InsertLeadHistory = z.infer<typeof insertLeadHistorySchema>;
 export type LeadHistory = typeof leadHistory.$inferSelect;
 export type InsertImportBatch = z.infer<typeof insertImportBatchSchema>;
 export type ImportBatch = typeof importBatches.$inferSelect;
+
+// Customer Database (imported from FieldEdge CSV)
+export const customers = pgTable("customers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  displayName: text("display_name").notNull(),
+  customerType: text("customer_type"), // Residential, Commercial, etc.
+  fullAddress: text("full_address"),
+  phone: text("phone"),
+  email: text("email"),
+  leadSource: text("lead_source"),
+  // Import tracking
+  checksum: text("checksum"), // Hash of row data for change detection
+  importBatchId: varchar("import_batch_id"),
+  lastSyncedAt: timestamp("last_synced_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const customerImportBatches = pgTable("customer_import_batches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  filename: text("filename"),
+  fileHash: text("file_hash"), // Hash of entire file to detect duplicate uploads
+  importedAt: timestamp("imported_at").defaultNow(),
+  status: text("status").notNull().default("processing"), // processing, completed, failed
+  totalRows: text("total_rows").default("0"),
+  createdCount: text("created_count").default("0"),
+  updatedCount: text("updated_count").default("0"),
+  skippedCount: text("skipped_count").default("0"),
+  errorCount: text("error_count").default("0"),
+  errorDetails: text("error_details"),
+});
+
+export const insertCustomerSchema = createInsertSchema(customers).omit({
+  id: true,
+  createdAt: true,
+  lastSyncedAt: true,
+});
+
+export const insertCustomerImportBatchSchema = createInsertSchema(customerImportBatches).omit({
+  id: true,
+  importedAt: true,
+});
+
+export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
+export type Customer = typeof customers.$inferSelect;
+export type InsertCustomerImportBatch = z.infer<typeof insertCustomerImportBatchSchema>;
+export type CustomerImportBatch = typeof customerImportBatches.$inferSelect;

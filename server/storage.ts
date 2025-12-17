@@ -1,7 +1,7 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, or, and } from "drizzle-orm";
+import { eq, or, and, ilike, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Quote operations
@@ -96,6 +96,22 @@ export interface IStorage {
   createImportBatch(batch: InsertImportBatch): Promise<ImportBatch>;
   getImportBatch(id: string): Promise<ImportBatch | undefined>;
   getAllImportBatches(): Promise<ImportBatch[]>;
+  
+  // Customer Database operations (FieldEdge imports)
+  getCustomer(id: string): Promise<Customer | undefined>;
+  getAllCustomers(): Promise<Customer[]>;
+  searchCustomers(term: string): Promise<Customer[]>;
+  createCustomer(customer: InsertCustomer): Promise<Customer>;
+  updateCustomer(id: string, customer: Partial<Customer>): Promise<Customer | undefined>;
+  upsertCustomerByChecksum(customer: InsertCustomer): Promise<{ action: 'created' | 'updated' | 'skipped'; customer: Customer }>;
+  getCustomerByChecksum(checksum: string): Promise<Customer | undefined>;
+  
+  // Customer Import Batch operations
+  createCustomerImportBatch(batch: InsertCustomerImportBatch): Promise<CustomerImportBatch>;
+  updateCustomerImportBatch(id: string, batch: Partial<CustomerImportBatch>): Promise<CustomerImportBatch | undefined>;
+  getCustomerImportBatch(id: string): Promise<CustomerImportBatch | undefined>;
+  getCustomerImportBatchByFileHash(fileHash: string): Promise<CustomerImportBatch | undefined>;
+  getAllCustomerImportBatches(): Promise<CustomerImportBatch[]>;
   
   // Backup operations
   clearAllData(): Promise<void>;
@@ -603,9 +619,149 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(importBatches).orderBy(importBatches.importedAt);
   }
 
+  // Customer Database operations (FieldEdge imports)
+  async getCustomer(id: string): Promise<Customer | undefined> {
+    const [customer] = await db.select().from(customers).where(eq(customers.id, id));
+    return customer || undefined;
+  }
+
+  async getAllCustomers(): Promise<Customer[]> {
+    return await db.select().from(customers).orderBy(customers.displayName);
+  }
+
+  async searchCustomers(term: string): Promise<Customer[]> {
+    if (!term || term.trim().length < 2) {
+      return [];
+    }
+    const searchTerm = `%${term.trim()}%`;
+    const results = await db
+      .select()
+      .from(customers)
+      .where(
+        or(
+          ilike(customers.displayName, searchTerm),
+          ilike(customers.email, searchTerm),
+          ilike(customers.fullAddress, searchTerm),
+          ilike(customers.phone, searchTerm)
+        )
+      )
+      .limit(50);
+    return results;
+  }
+
+  async createCustomer(insertCustomer: InsertCustomer): Promise<Customer> {
+    const [customer] = await db
+      .insert(customers)
+      .values(insertCustomer)
+      .returning();
+    return customer;
+  }
+
+  async updateCustomer(id: string, updateData: Partial<Customer>): Promise<Customer | undefined> {
+    const [customer] = await db
+      .update(customers)
+      .set({ ...updateData, lastSyncedAt: new Date() })
+      .where(eq(customers.id, id))
+      .returning();
+    return customer || undefined;
+  }
+
+  async getCustomerByChecksum(checksum: string): Promise<Customer | undefined> {
+    const [customer] = await db
+      .select()
+      .from(customers)
+      .where(eq(customers.checksum, checksum));
+    return customer || undefined;
+  }
+
+  async upsertCustomerByChecksum(insertCustomer: InsertCustomer): Promise<{ action: 'created' | 'updated' | 'skipped'; customer: Customer }> {
+    // If no checksum, just create
+    if (!insertCustomer.checksum) {
+      const customer = await this.createCustomer(insertCustomer);
+      return { action: 'created', customer };
+    }
+
+    // Check for existing customer with same checksum (no changes needed)
+    const existingByChecksum = await this.getCustomerByChecksum(insertCustomer.checksum);
+    if (existingByChecksum) {
+      return { action: 'skipped', customer: existingByChecksum };
+    }
+
+    // Look for existing customer by displayName + address to update
+    const existing = await db
+      .select()
+      .from(customers)
+      .where(
+        and(
+          eq(customers.displayName, insertCustomer.displayName),
+          insertCustomer.fullAddress 
+            ? eq(customers.fullAddress, insertCustomer.fullAddress)
+            : sql`${customers.fullAddress} IS NULL`
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      // Update existing customer
+      const updated = await this.updateCustomer(existing[0].id, {
+        ...insertCustomer,
+        lastSyncedAt: new Date(),
+      });
+      return { action: 'updated', customer: updated! };
+    }
+
+    // Create new customer
+    const customer = await this.createCustomer(insertCustomer);
+    return { action: 'created', customer };
+  }
+
+  // Customer Import Batch operations
+  async createCustomerImportBatch(insertBatch: InsertCustomerImportBatch): Promise<CustomerImportBatch> {
+    const [batch] = await db
+      .insert(customerImportBatches)
+      .values(insertBatch)
+      .returning();
+    return batch;
+  }
+
+  async updateCustomerImportBatch(id: string, updateData: Partial<CustomerImportBatch>): Promise<CustomerImportBatch | undefined> {
+    const [batch] = await db
+      .update(customerImportBatches)
+      .set(updateData)
+      .where(eq(customerImportBatches.id, id))
+      .returning();
+    return batch || undefined;
+  }
+
+  async getCustomerImportBatch(id: string): Promise<CustomerImportBatch | undefined> {
+    const [batch] = await db
+      .select()
+      .from(customerImportBatches)
+      .where(eq(customerImportBatches.id, id));
+    return batch || undefined;
+  }
+
+  async getCustomerImportBatchByFileHash(fileHash: string): Promise<CustomerImportBatch | undefined> {
+    const [batch] = await db
+      .select()
+      .from(customerImportBatches)
+      .where(eq(customerImportBatches.fileHash, fileHash));
+    return batch || undefined;
+  }
+
+  async getAllCustomerImportBatches(): Promise<CustomerImportBatch[]> {
+    const batches = await db
+      .select()
+      .from(customerImportBatches)
+      .orderBy(customerImportBatches.importedAt);
+    return batches.reverse(); // Most recent first
+  }
+
   // Backup operations
   async clearAllData(): Promise<void> {
     // Clear all tables except sessions (preserve active sessions)
+    await db.delete(customerImportBatches);
+    await db.delete(customers);
     await db.delete(importBatches);
     await db.delete(leadHistory);
     await db.delete(leads);
