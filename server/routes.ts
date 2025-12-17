@@ -2549,6 +2549,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get customer database stats (must be before /:id to avoid route conflict)
+  app.get("/api/customers/stats", async (req, res) => {
+    try {
+      const allCustomers = await storage.getAllCustomers();
+      const batches = await storage.getAllCustomerImportBatches();
+      
+      const lastImport = batches.length > 0 ? batches[0] : null;
+      
+      res.json({
+        totalCustomers: allCustomers.length,
+        lastImportDate: lastImport?.importedAt || null,
+        lastImportFilename: lastImport?.filename || null,
+        totalImports: batches.length,
+      });
+    } catch (error) {
+      console.error('Error fetching customer stats:', error);
+      res.status(500).json({ message: "Error fetching customer stats" });
+    }
+  });
+
+  // Get customer import history (must be before /:id to avoid route conflict)
+  app.get("/api/customers/import/history", requireAdminAuth, async (req, res) => {
+    try {
+      const batches = await storage.getAllCustomerImportBatches();
+      res.json(batches);
+    } catch (error) {
+      console.error('Error fetching import history:', error);
+      res.status(500).json({ message: "Error fetching import history" });
+    }
+  });
+
   // Get customer by ID
   app.get("/api/customers/:id", async (req, res) => {
     try {
@@ -2565,11 +2596,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Import customers from CSV (admin only)
   app.post("/api/customers/import", requireAdminAuth, upload.single('file'), async (req, res) => {
+    const startTime = Date.now();
+    console.log('[Customer Import] Starting import...');
+    
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
 
+      console.log(`[Customer Import] File received: ${req.file.originalname}, size: ${req.file.size} bytes`);
+      
       const fileContent = req.file.buffer.toString('utf-8');
       const filename = req.file.originalname;
       
@@ -2596,6 +2632,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Parse CSV using the streaming parser
+      console.log('[Customer Import] Parsing CSV...');
+      const parseStart = Date.now();
       const { parse } = await import('csv-parse/sync');
       const records = parse(fileContent, {
         columns: true,
@@ -2604,15 +2642,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         relax_column_count: true,
         trim: true,
       });
+      console.log(`[Customer Import] Parsed ${records.length} records in ${Date.now() - parseStart}ms`);
 
       let created = 0;
       let updated = 0;
       let skipped = 0;
       let errors = 0;
       const errorDetails: string[] = [];
+      const processStart = Date.now();
 
       for (let i = 0; i < records.length; i++) {
-        const record = records[i];
+        // Log progress every 100 records
+        if (i > 0 && i % 100 === 0) {
+          console.log(`[Customer Import] Processed ${i}/${records.length} records (${Math.round(i/records.length*100)}%)`);
+        }
+        const record = records[i] as Record<string, string>;
         try {
           // Map CSV columns to customer fields
           // CSV: Display Name, Customer Type, Full Address, Phone, Email, Lead Source
@@ -2668,6 +2712,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      console.log(`[Customer Import] Processing complete in ${Date.now() - processStart}ms: ${created} created, ${updated} updated, ${skipped} skipped, ${errors} errors`);
+
       // Update batch with final counts
       await storage.updateCustomerImportBatch(batch.id, {
         status: "completed",
@@ -2681,6 +2727,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedBatch = await storage.getCustomerImportBatch(batch.id);
 
+      console.log(`[Customer Import] Total time: ${Date.now() - startTime}ms`);
+      
       res.json({
         message: `Import completed: ${created} created, ${updated} updated, ${skipped} skipped, ${errors} errors`,
         batch: updatedBatch,
@@ -2693,39 +2741,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
     } catch (error: any) {
-      console.error('Error importing customers:', error);
+      console.error('[Customer Import] Error:', error);
       res.status(500).json({ message: "Error importing customers: " + error.message });
-    }
-  });
-
-  // Get customer import history (admin only)
-  app.get("/api/customers/import/history", requireAdminAuth, async (req, res) => {
-    try {
-      const batches = await storage.getAllCustomerImportBatches();
-      res.json(batches);
-    } catch (error) {
-      console.error('Error fetching import history:', error);
-      res.status(500).json({ message: "Error fetching import history" });
-    }
-  });
-
-  // Get customer database stats
-  app.get("/api/customers/stats", async (req, res) => {
-    try {
-      const allCustomers = await storage.getAllCustomers();
-      const batches = await storage.getAllCustomerImportBatches();
-      
-      const lastImport = batches.length > 0 ? batches[0] : null;
-      
-      res.json({
-        totalCustomers: allCustomers.length,
-        lastImportDate: lastImport?.importedAt || null,
-        lastImportFilename: lastImport?.filename || null,
-        totalImports: batches.length,
-      });
-    } catch (error) {
-      console.error('Error fetching customer stats:', error);
-      res.status(500).json({ message: "Error fetching customer stats" });
     }
   });
 
