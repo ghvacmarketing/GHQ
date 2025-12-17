@@ -100,7 +100,7 @@ export interface IStorage {
   // Customer Database operations (FieldEdge imports)
   getCustomer(id: string): Promise<Customer | undefined>;
   getAllCustomers(): Promise<Customer[]>;
-  searchCustomers(term: string): Promise<Customer[]>;
+  searchCustomers(term: string, searchAll?: boolean): Promise<Customer[]>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
   updateCustomer(id: string, customer: Partial<Customer>): Promise<Customer | undefined>;
   upsertCustomerByChecksum(customer: InsertCustomer): Promise<{ action: 'created' | 'updated' | 'skipped'; customer: Customer }>;
@@ -630,22 +630,26 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(customers).orderBy(customers.displayName);
   }
 
-  async searchCustomers(term: string): Promise<Customer[]> {
+  async searchCustomers(term: string, searchAll: boolean = false): Promise<Customer[]> {
     if (!term || term.trim().length < 2) {
       return [];
     }
     const searchTerm = `%${term.trim()}%`;
-    const results = await db
-      .select()
-      .from(customers)
-      .where(
-        or(
+    
+    // Default: search by name only. If searchAll is true, also search phone, email, address
+    const whereCondition = searchAll
+      ? or(
           ilike(customers.displayName, searchTerm),
           ilike(customers.email, searchTerm),
           ilike(customers.fullAddress, searchTerm),
           ilike(customers.phone, searchTerm)
         )
-      )
+      : ilike(customers.displayName, searchTerm);
+    
+    const results = await db
+      .select()
+      .from(customers)
+      .where(whereCondition)
       .limit(50);
     return results;
   }

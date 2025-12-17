@@ -2508,14 +2508,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CUSTOMER DATABASE ROUTES (FieldEdge CSV Import)
   // =============================================================================
 
-  // Search customers by name, email, phone, or address
+  // Search customers - default searches name only, searchAll=true searches all fields
   app.get("/api/customers/search", async (req, res) => {
     try {
       const term = req.query.term as string;
+      const searchAll = req.query.searchAll === 'true';
       if (!term || term.length < 2) {
         return res.json([]);
       }
-      const customers = await storage.searchCustomers(term);
+      const customers = await storage.searchCustomers(term, searchAll);
       res.json(customers);
     } catch (error) {
       console.error('Error searching customers:', error);
