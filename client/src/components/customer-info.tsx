@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { User, Search, Database, Loader2 } from "lucide-react";
 import type { Technician, Customer } from "@shared/schema";
 
@@ -32,6 +33,7 @@ export default function CustomerInfo({
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [importedCustomer, setImportedCustomer] = useState<Customer | null>(null);
+  const [searchAllFields, setSearchAllFields] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -41,10 +43,14 @@ export default function CustomerInfo({
   }, [customerSearchTerm]);
 
   const { data: searchResults = [], isFetching } = useQuery<Customer[]>({
-    queryKey: ["/api/customers/search", debouncedSearch],
+    queryKey: ["/api/customers/search", debouncedSearch, searchAllFields],
     queryFn: async () => {
       if (debouncedSearch.length < 2) return [];
-      const res = await fetch(`/api/customers/search?term=${encodeURIComponent(debouncedSearch)}`);
+      const params = new URLSearchParams({
+        term: debouncedSearch,
+        ...(searchAllFields && { searchAll: 'true' })
+      });
+      const res = await fetch(`/api/customers/search?${params}`);
       if (!res.ok) throw new Error("Failed to search customers");
       return res.json();
     },
@@ -93,7 +99,7 @@ export default function CustomerInfo({
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Type to search by name, phone, or address..."
+                    placeholder={searchAllFields ? "Search name, phone, email, address..." : "Search by name..."}
                     value={customerSearchTerm}
                     onChange={(e) => {
                       setCustomerSearchTerm(e.target.value);
@@ -141,9 +147,20 @@ export default function CustomerInfo({
                 </div>
               </PopoverContent>
             </Popover>
-            <p className="text-xs text-muted-foreground mt-1">
-              Find existing customers from the imported FieldEdge database
-            </p>
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-xs text-muted-foreground">
+                Find existing customers from FieldEdge
+              </p>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                <Checkbox
+                  checked={searchAllFields}
+                  onCheckedChange={(checked) => setSearchAllFields(checked === true)}
+                  className="h-3.5 w-3.5"
+                  data-testid="checkbox-search-all-fields"
+                />
+                Search all fields
+              </label>
+            </div>
           </div>
 
           <div>
