@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter, Navigation, MessageSquare, StickyNote, ArrowRightCircle, UserPlus, Activity, FileText, ExternalLink, Search, Users } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
@@ -20,7 +21,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { nanoid } from "nanoid";
-import type { Lead, LeadAction, LeadTask, Quote } from "@shared/schema";
+import type { Lead, LeadAction, LeadTask, Quote, Customer } from "@shared/schema";
 import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
 import { useLocation } from "wouter";
 
@@ -732,6 +733,53 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
   const [selectedAddress, setSelectedAddress] = useState("");
   const [isImportQuoteDialogOpen, setIsImportQuoteDialogOpen] = useState(false);
   const [quoteSearchTerm, setQuoteSearchTerm] = useState("");
+  
+  // Customer lookup state
+  const [customerSearchTerm, setCustomerSearchTerm] = useState("");
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
+  const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
+  const [importedCustomerId, setImportedCustomerId] = useState<string | null>(null);
+  const [importedCustomerName, setImportedCustomerName] = useState("");
+
+  // Debounce customer search (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCustomerSearch(customerSearchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearchTerm]);
+
+  // Customer search query
+  const { data: customerSearchResults = [], isFetching: isSearchingCustomers } = useQuery<Customer[]>({
+    queryKey: ["/api/customers/search", debouncedCustomerSearch],
+    queryFn: async () => {
+      if (debouncedCustomerSearch.length < 2) return [];
+      const res = await fetch(`/api/customers/search?term=${encodeURIComponent(debouncedCustomerSearch)}`);
+      if (!res.ok) throw new Error("Failed to search customers");
+      return res.json();
+    },
+    enabled: debouncedCustomerSearch.length >= 2,
+    refetchOnWindowFocus: false,
+  });
+
+  // Handle customer selection
+  const handleSelectCustomer = (customer: Customer) => {
+    setFormData({
+      ...formData,
+      name: customer.displayName,
+      phone: customer.phone ? formatPhoneNumber(customer.phone) : "",
+      email: customer.email || "",
+      address: customer.fullAddress || "",
+      customerType: customer.customerType || formData.customerType,
+      leadSource: customer.leadSource || formData.leadSource,
+    });
+    setSelectedAddress(customer.fullAddress || "");
+    setImportedCustomerId(customer.id);
+    setImportedCustomerName(customer.displayName);
+    setCustomerSearchTerm("");
+    setIsCustomerPopoverOpen(false);
+    toast({ description: `Customer "${customer.displayName}" imported from database`, duration: 2000 });
+  };
 
   // Fetch all quotes for import
   const { data: quotesData, isLoading: isLoadingQuotes } = useQuery<{ quotes: Quote[] }>({
@@ -1009,6 +1057,10 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
     }
     setEmailError("");
     setPhoneError("");
+    // Reset customer import state
+    setImportedCustomerId(null);
+    setImportedCustomerName("");
+    setCustomerSearchTerm("");
   };
 
   return (
@@ -1129,7 +1181,101 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
         </div>
       )}
 
+      {/* Show customer reference if imported */}
+      {importedCustomerId && (
+        <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-3" data-testid="customer-reference-banner">
+          <div className="flex items-center gap-2 text-sm">
+            <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <span className="font-medium text-green-900 dark:text-green-100">
+              Customer imported from database: {importedCustomerName}
+            </span>
+          </div>
+          <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+            You can edit all fields before creating the lead
+          </p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Customer Lookup */}
+        <div>
+          <label className="text-sm font-medium">Search Existing Customer</label>
+          <Popover open={isCustomerPopoverOpen && customerSearchTerm.length >= 2} onOpenChange={setIsCustomerPopoverOpen}>
+            <PopoverTrigger asChild>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name, phone, email, or address..."
+                  value={customerSearchTerm}
+                  onChange={(e) => {
+                    setCustomerSearchTerm(e.target.value);
+                    if (e.target.value.length >= 2) {
+                      setIsCustomerPopoverOpen(true);
+                    }
+                  }}
+                  onFocus={() => {
+                    if (customerSearchTerm.length >= 2) {
+                      setIsCustomerPopoverOpen(true);
+                    }
+                  }}
+                  className="pl-10"
+                  data-testid="input-customer-search"
+                />
+              </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+              <div className="max-h-64 overflow-y-auto">
+                {isSearchingCustomers ? (
+                  <div className="p-3 space-y-2">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                ) : customerSearchResults.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground text-center">
+                    No customers found
+                  </div>
+                ) : (
+                  customerSearchResults.map((customer) => (
+                    <div
+                      key={customer.id}
+                      className="p-3 hover:bg-accent cursor-pointer border-b last:border-b-0"
+                      onClick={() => handleSelectCustomer(customer)}
+                      data-testid={`customer-result-${customer.id}`}
+                    >
+                      <div className="font-medium text-sm">{customer.displayName}</div>
+                      <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                        {customer.phone && (
+                          <span className="flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            {customer.phone}
+                          </span>
+                        )}
+                        {customer.email && (
+                          <span className="flex items-center gap-1">
+                            <Mail className="h-3 w-3" />
+                            {customer.email}
+                          </span>
+                        )}
+                        {customer.fullAddress && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {customer.fullAddress.length > 30 
+                              ? customer.fullAddress.substring(0, 30) + "..." 
+                              : customer.fullAddress}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+          <p className="text-xs text-muted-foreground mt-1">
+            Type at least 2 characters to search
+          </p>
+        </div>
+
         <div>
           <label className="text-sm font-medium">Name *</label>
           <Input
