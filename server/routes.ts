@@ -2651,8 +2651,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const customerList: any[] = [];
       let parseSkipped = 0;
 
+      // Helper to strip surrounding quotes from strings
+      const stripQuotes = (str: string) => {
+        const trimmed = str.trim();
+        if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || 
+            (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+          return trimmed.slice(1, -1).trim();
+        }
+        return trimmed;
+      };
+
       for (const record of records as Record<string, string>[]) {
-        const displayName = (record['Display Name'] || '').trim();
+        const displayName = stripQuotes(record['Display Name'] || '');
         
         if (!displayName) {
           parseSkipped++;
@@ -2660,7 +2670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Clean phone number
-        let phone = (record['Phone'] || '').trim();
+        let phone = stripQuotes(record['Phone'] || '');
         if (phone) {
           const digits = phone.replace(/\D/g, '');
           if (digits.length === 10) {
@@ -2672,11 +2682,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         customerList.push({
           displayName,
-          customerType: (record['Customer Type'] || '').trim() || null,
-          fullAddress: (record['Full Address'] || '').trim() || null,
+          customerType: stripQuotes(record['Customer Type'] || '') || null,
+          fullAddress: stripQuotes(record['Full Address'] || '') || null,
           phone: phone || null,
-          email: (record['Email'] || '').trim() || null,
-          leadSource: (record['Lead Source'] || '').trim() || null,
+          email: stripQuotes(record['Email'] || '') || null,
+          leadSource: stripQuotes(record['Lead Source'] || '') || null,
           importBatchId: batch.id,
           checksum: createHmac('sha256', 'customer-row')
             .update(JSON.stringify({

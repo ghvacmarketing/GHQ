@@ -770,9 +770,10 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
 
   // Handle customer selection
   const handleSelectCustomer = (customer: Customer) => {
+    const cleanName = customer.displayName.replace(/^["']|["']$/g, '');
     setFormData({
       ...formData,
-      name: customer.displayName,
+      name: cleanName,
       phone: customer.phone ? formatPhoneNumber(customer.phone) : "",
       email: customer.email || "",
       address: customer.fullAddress || "",
@@ -781,10 +782,10 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
     });
     setSelectedAddress(customer.fullAddress || "");
     setImportedCustomerId(customer.id);
-    setImportedCustomerName(customer.displayName);
+    setImportedCustomerName(cleanName);
     setCustomerSearchTerm("");
     setIsCustomerPopoverOpen(false);
-    toast({ description: `Customer "${customer.displayName}" imported from database`, duration: 2000 });
+    toast({ description: `Customer "${cleanName}" imported from database`, duration: 2000 });
   };
 
   // Fetch all quotes for import
@@ -1230,11 +1231,11 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
               </div>
             </PopoverTrigger>
             <PopoverContent 
-              className="w-[var(--radix-popover-trigger-width)] p-0" 
+              className="w-[var(--radix-popover-trigger-width)] p-0 max-h-64 overflow-y-auto" 
               align="start"
               onOpenAutoFocus={(e) => e.preventDefault()}
             >
-              <div className="max-h-64 overflow-y-auto">
+              <div>
                 {isSearchingCustomers ? (
                   <div className="p-3 space-y-2">
                     <Skeleton className="h-10 w-full" />
@@ -1245,14 +1246,17 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
                     No customers found
                   </div>
                 ) : (
-                  customerSearchResults.map((customer) => (
+                  customerSearchResults.map((customer) => {
+                    // Strip surrounding quotes from display name
+                    const cleanName = customer.displayName.replace(/^["']|["']$/g, '');
+                    return (
                     <div
                       key={customer.id}
                       className="p-3 hover:bg-accent cursor-pointer border-b last:border-b-0"
                       onClick={() => handleSelectCustomer(customer)}
                       data-testid={`customer-result-${customer.id}`}
                     >
-                      <div className="font-medium text-sm">{customer.displayName}</div>
+                      <div className="font-medium text-sm">{cleanName}</div>
                       <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 mt-1">
                         {customer.phone && (
                           <span className="flex items-center gap-1">
@@ -1276,7 +1280,8 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
                         )}
                       </div>
                     </div>
-                  ))
+                  );
+                  })
                 )}
               </div>
             </PopoverContent>

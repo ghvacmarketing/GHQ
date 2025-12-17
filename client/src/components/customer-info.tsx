@@ -59,8 +59,9 @@ export default function CustomerInfo({
   });
 
   const handleSelectCustomer = (customer: Customer) => {
-    onUpdate({ customerName: customer.displayName });
-    setImportedCustomer(customer);
+    const cleanName = customer.displayName.replace(/^["']|["']$/g, '');
+    onUpdate({ customerName: cleanName });
+    setImportedCustomer({ ...customer, displayName: cleanName });
     setCustomerSearchTerm("");
     setIsPopoverOpen(false);
   };
@@ -122,19 +123,21 @@ export default function CustomerInfo({
                 </div>
               </PopoverTrigger>
               <PopoverContent 
-                className="w-[var(--radix-popover-trigger-width)] p-0" 
+                className="w-[var(--radix-popover-trigger-width)] p-0 max-h-60 overflow-y-auto" 
                 align="start"
                 onOpenAutoFocus={(e) => e.preventDefault()}
               >
-                <div className="max-h-60 overflow-y-auto">
-                  {searchResults.map((customer) => (
+                <div>
+                  {searchResults.map((customer) => {
+                    const cleanName = customer.displayName.replace(/^["']|["']$/g, '');
+                    return (
                     <div
                       key={customer.id}
                       className="p-3 hover:bg-accent cursor-pointer border-b last:border-b-0"
                       onClick={() => handleSelectCustomer(customer)}
                       data-testid={`customer-result-${customer.id}`}
                     >
-                      <div className="font-medium">{customer.displayName}</div>
+                      <div className="font-medium">{cleanName}</div>
                       <div className="text-xs text-muted-foreground space-y-0.5">
                         {customer.phone && <div>{customer.phone}</div>}
                         {customer.email && <div>{customer.email}</div>}
@@ -143,7 +146,8 @@ export default function CustomerInfo({
                         )}
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               </PopoverContent>
             </Popover>
