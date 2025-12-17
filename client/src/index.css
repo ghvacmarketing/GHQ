@@ -165,3 +165,36 @@
     transform: scale(1);
   }
 }
+
+/* Google Places Autocomplete Element Styling */
+gmp-place-autocomplete {
+  --gmpx-color-surface: #ffffff !important;
+  --gmpx-color-on-surface: #1a1a1a !important;
+  --gmpx-color-on-surface-variant: #6b7280 !important;
+  --gmpx-color-primary: #711419 !important;
+  --gmpx-color-outline: #e8e8e8 !important;
+  display: block;
+  width: 100%;
+}
+
+gmp-place-autocomplete::part(input) {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+  border: 1px solid #e8e8e8 !important;
+  border-radius: 0.5rem !important;
+  padding: 0.5rem 0.75rem !important;
+  min-height: 44px !important;
+  font-size: 0.875rem !important;
+  font-family: 'Poppins', sans-serif !important;
+  width: 100% !important;
+}
+
+gmp-place-autocomplete::part(input):focus {
+  outline: none !important;
+  border-color: #711419 !important;
+  box-shadow: 0 0 0 2px rgba(113, 20, 25, 0.2) !important;
+}
+
+gmp-place-autocomplete::part(input)::placeholder {
+  color: #9ca3af !important;
+}
