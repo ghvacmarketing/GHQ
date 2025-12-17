@@ -1844,7 +1844,7 @@ function LeadCard({
       {/* Full-screen Lead Details Sheet */}
       <Sheet open={isExpanded} onOpenChange={handleSheetClose}>
         <SheetContent side="bottom" className="h-[95vh] p-0 flex flex-col">
-          <SheetHeader className="px-4 py-3 border-b flex-shrink-0">
+          <SheetHeader className="px-4 py-3 border-b flex-shrink-0 pr-12">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <SheetTitle className="text-lg truncate">{lead.name}</SheetTitle>
