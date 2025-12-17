@@ -1231,7 +1231,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
               </div>
             </PopoverTrigger>
             <PopoverContent 
-              className="w-64 p-0" 
+              className="w-[calc(100vw-3rem)] max-w-sm p-0" 
               align="start"
               side="bottom"
               sideOffset={4}
