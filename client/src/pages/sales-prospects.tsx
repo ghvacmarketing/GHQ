@@ -1231,10 +1231,12 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
               </div>
             </PopoverTrigger>
             <PopoverContent 
-              className="w-[calc(100vw-3rem)] max-w-sm p-0" 
-              align="start"
+              className="w-[min(calc(100vw-4rem),320px)] p-0" 
+              align="center"
               side="bottom"
               sideOffset={4}
+              avoidCollisions={true}
+              collisionPadding={16}
               onOpenAutoFocus={(e) => e.preventDefault()}
             >
               <ScrollArea className="max-h-64">
