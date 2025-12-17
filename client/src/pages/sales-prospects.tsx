@@ -1203,7 +1203,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 overflow-x-hidden">
         {/* Customer Lookup */}
         <div>
           <label className="text-sm font-medium">Search Existing Customer</label>
@@ -1312,8 +1312,8 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="min-w-0">
             <label className="text-sm font-medium">Phone</label>
             <Input
               type="tel"
@@ -1325,7 +1325,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
             />
             {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-sm font-medium">Email</label>
             <Input
               type="email"
@@ -1364,8 +1364,8 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="min-w-0">
             <label className="text-sm font-medium">Estimated Value</label>
             <Input
               type="number"
@@ -1375,7 +1375,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
               data-testid="input-lead-value"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-sm font-medium">Status</label>
             <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
               <SelectTrigger data-testid="select-lead-status">
@@ -1400,8 +1400,8 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="min-w-0">
             <label className="text-sm font-medium">Projected Close Date</label>
             <Input
               type="date"
@@ -1410,7 +1410,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
               data-testid="input-lead-close-date"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-sm font-medium">Customer Type</label>
             <Input
               value={formData.customerType}
