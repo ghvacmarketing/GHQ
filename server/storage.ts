@@ -105,6 +105,7 @@ export interface IStorage {
   updateCustomer(id: string, customer: Partial<Customer>): Promise<Customer | undefined>;
   upsertCustomerByChecksum(customer: InsertCustomer): Promise<{ action: 'created' | 'updated' | 'skipped'; customer: Customer }>;
   getCustomerByChecksum(checksum: string): Promise<Customer | undefined>;
+  batchImportCustomers(customerList: InsertCustomer[]): Promise<{ created: number; updated: number; skipped: number; errors: number }>;
   
   // Customer Import Batch operations
   createCustomerImportBatch(batch: InsertCustomerImportBatch): Promise<CustomerImportBatch>;
@@ -713,6 +714,101 @@ export class DatabaseStorage implements IStorage {
     // Create new customer
     const customer = await this.createCustomer(insertCustomer);
     return { action: 'created', customer };
+  }
+
+  async batchImportCustomers(customerList: InsertCustomer[]): Promise<{ created: number; updated: number; skipped: number; errors: number }> {
+    if (customerList.length === 0) {
+      return { created: 0, updated: 0, skipped: 0, errors: 0 };
+    }
+
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    // Step 1: Get all existing checksums in one query for fast lookup
+    const existingCustomers = await db.select({
+      id: customers.id,
+      checksum: customers.checksum,
+      displayName: customers.displayName,
+      fullAddress: customers.fullAddress,
+    }).from(customers);
+
+    // Build lookup maps
+    const checksumMap = new Map<string, string>(); // checksum -> id
+    const nameAddressMap = new Map<string, string>(); // "name|address" -> id
+    
+    for (const c of existingCustomers) {
+      if (c.checksum) {
+        checksumMap.set(c.checksum, c.id);
+      }
+      nameAddressMap.set(`${c.displayName}|${c.fullAddress || ''}`, c.id);
+    }
+
+    // Step 2: Categorize records
+    const toCreate: InsertCustomer[] = [];
+    const toUpdate: { id: string; data: InsertCustomer }[] = [];
+
+    for (const customer of customerList) {
+      try {
+        if (!customer.displayName) {
+          skipped++;
+          continue;
+        }
+
+        // Check if identical checksum exists (skip)
+        if (customer.checksum && checksumMap.has(customer.checksum)) {
+          skipped++;
+          continue;
+        }
+
+        // Check if customer exists by name+address (update)
+        const key = `${customer.displayName}|${customer.fullAddress || ''}`;
+        const existingId = nameAddressMap.get(key);
+        
+        if (existingId) {
+          toUpdate.push({ id: existingId, data: customer });
+        } else {
+          toCreate.push(customer);
+        }
+      } catch (e) {
+        errors++;
+      }
+    }
+
+    // Step 3: Batch insert new customers (in chunks of 100)
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < toCreate.length; i += BATCH_SIZE) {
+      const batch = toCreate.slice(i, i + BATCH_SIZE);
+      try {
+        await db.insert(customers).values(batch);
+        created += batch.length;
+      } catch (e) {
+        // If batch fails, try individual inserts
+        for (const customer of batch) {
+          try {
+            await db.insert(customers).values(customer);
+            created++;
+          } catch (innerE) {
+            errors++;
+          }
+        }
+      }
+    }
+
+    // Step 4: Update existing customers (individual updates for now, could be optimized further)
+    for (const { id, data } of toUpdate) {
+      try {
+        await db.update(customers)
+          .set({ ...data, lastSyncedAt: new Date() })
+          .where(eq(customers.id, id));
+        updated++;
+      } catch (e) {
+        errors++;
+      }
+    }
+
+    return { created, updated, skipped, errors };
   }
 
   // Customer Import Batch operations

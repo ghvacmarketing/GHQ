@@ -2644,75 +2644,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log(`[Customer Import] Parsed ${records.length} records in ${Date.now() - parseStart}ms`);
 
-      let created = 0;
-      let updated = 0;
-      let skipped = 0;
-      let errors = 0;
-      const errorDetails: string[] = [];
-      const processStart = Date.now();
+      // Transform all records first (fast, in-memory)
+      console.log('[Customer Import] Transforming records...');
+      const transformStart = Date.now();
+      const customerList: any[] = [];
+      let parseSkipped = 0;
 
-      for (let i = 0; i < records.length; i++) {
-        // Log progress every 100 records
-        if (i > 0 && i % 100 === 0) {
-          console.log(`[Customer Import] Processed ${i}/${records.length} records (${Math.round(i/records.length*100)}%)`);
+      for (const record of records as Record<string, string>[]) {
+        const displayName = (record['Display Name'] || '').trim();
+        
+        if (!displayName) {
+          parseSkipped++;
+          continue;
         }
-        const record = records[i] as Record<string, string>;
-        try {
-          // Map CSV columns to customer fields
-          // CSV: Display Name, Customer Type, Full Address, Phone, Email, Lead Source
-          const displayName = (record['Display Name'] || '').trim();
-          
-          if (!displayName) {
-            skipped++;
-            continue;
-          }
 
-          // Clean phone number - remove non-digits but keep as string
-          let phone = (record['Phone'] || '').trim();
-          if (phone) {
-            const digits = phone.replace(/\D/g, '');
-            if (digits.length === 10) {
-              phone = `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
-            } else if (digits.length === 11 && digits.startsWith('1')) {
-              phone = `(${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
-            }
-          }
-
-          const customerData = {
-            displayName,
-            customerType: (record['Customer Type'] || '').trim() || null,
-            fullAddress: (record['Full Address'] || '').trim() || null,
-            phone: phone || null,
-            email: (record['Email'] || '').trim() || null,
-            leadSource: (record['Lead Source'] || '').trim() || null,
-            importBatchId: batch.id,
-            checksum: createHmac('sha256', 'customer-row')
-              .update(JSON.stringify({
-                displayName,
-                customerType: record['Customer Type'] || '',
-                fullAddress: record['Full Address'] || '',
-                phone: phone || '',
-                email: record['Email'] || '',
-                leadSource: record['Lead Source'] || '',
-              }))
-              .digest('hex'),
-          };
-
-          const result = await storage.upsertCustomerByChecksum(customerData);
-          
-          if (result.action === 'created') created++;
-          else if (result.action === 'updated') updated++;
-          else skipped++;
-          
-        } catch (rowError: any) {
-          errors++;
-          if (errorDetails.length < 10) {
-            errorDetails.push(`Row ${i + 2}: ${rowError.message}`);
+        // Clean phone number
+        let phone = (record['Phone'] || '').trim();
+        if (phone) {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.length === 10) {
+            phone = `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+          } else if (digits.length === 11 && digits.startsWith('1')) {
+            phone = `(${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
           }
         }
+
+        customerList.push({
+          displayName,
+          customerType: (record['Customer Type'] || '').trim() || null,
+          fullAddress: (record['Full Address'] || '').trim() || null,
+          phone: phone || null,
+          email: (record['Email'] || '').trim() || null,
+          leadSource: (record['Lead Source'] || '').trim() || null,
+          importBatchId: batch.id,
+          checksum: createHmac('sha256', 'customer-row')
+            .update(JSON.stringify({
+              displayName,
+              customerType: record['Customer Type'] || '',
+              fullAddress: record['Full Address'] || '',
+              phone: phone || '',
+              email: record['Email'] || '',
+              leadSource: record['Lead Source'] || '',
+            }))
+            .digest('hex'),
+        });
       }
+      console.log(`[Customer Import] Transformed ${customerList.length} valid records in ${Date.now() - transformStart}ms (${parseSkipped} empty rows skipped)`);
 
-      console.log(`[Customer Import] Processing complete in ${Date.now() - processStart}ms: ${created} created, ${updated} updated, ${skipped} skipped, ${errors} errors`);
+      // Batch import all customers at once
+      console.log('[Customer Import] Starting batch database import...');
+      const processStart = Date.now();
+      const result = await storage.batchImportCustomers(customerList);
+      
+      const created = result.created;
+      const updated = result.updated;
+      const skipped = result.skipped + parseSkipped;
+      const errors = result.errors;
+
+      console.log(`[Customer Import] Batch import complete in ${Date.now() - processStart}ms: ${created} created, ${updated} updated, ${skipped} skipped, ${errors} errors`);
 
       // Update batch with final counts
       await storage.updateCustomerImportBatch(batch.id, {
@@ -2722,7 +2711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedCount: String(updated),
         skippedCount: String(skipped),
         errorCount: String(errors),
-        errorDetails: errorDetails.length > 0 ? errorDetails.join('\n') : null,
+        errorDetails: errors > 0 ? `${errors} records failed to import` : null,
       });
 
       const updatedBatch = await storage.getCustomerImportBatch(batch.id);
