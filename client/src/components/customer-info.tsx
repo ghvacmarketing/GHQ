@@ -124,7 +124,7 @@ export default function CustomerInfo({
                 </div>
               </PopoverTrigger>
               <PopoverContent 
-                className="w-80 p-0" 
+                className="w-64 p-0" 
                 align="start"
                 side="bottom"
                 sideOffset={4}
