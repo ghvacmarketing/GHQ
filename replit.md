@@ -86,6 +86,15 @@ Preferred communication style: Simple, everyday language.
   - **Geolocation**: HTML5 Geolocation + reverse geocoding to auto-populate address from current location
   - **Date Handling**: Zod schema transforms accept both string and Date formats for projectedCloseDate, closedAt, and lastImportedAt fields
 - **Security**: SESSION_SECRET environment variable is required at startup to prevent use of insecure default secrets.
+- **Customer Database** (Added Dec 2025): FieldEdge CSV import system for syncing customer data.
+  - **CSV Import**: Admin uploads FieldEdge export CSV with columns: Display Name, Customer Type, Full Address, Phone, Email, Lead Source
+  - **Checksum-based upsert**: Each row is hashed (SHA256) to detect changes; unchanged records are skipped, modified records are updated, new records are created
+  - **File hash deduplication**: Identical CSV files are detected and skipped to prevent duplicate imports
+  - **Import tracking**: CustomerImportBatches table stores import history with counts (created, updated, skipped, errors)
+  - **Customer search**: Real-time search across displayName, phone, email, fullAddress fields using ILIKE queries
+  - **Lead form integration**: Customer lookup dropdown in lead creation form with debounced search (300ms); selecting a customer auto-fills name, phone, email, address, customerType, and leadSource fields
+  - **Quote generator integration**: Customer lookup in CustomerInfo component fills customer name and displays address in info banner for reference
+  - **Admin UI**: Customer Database section in admin settings with stats, CSV upload, and import history
 
 ## External Dependencies
 
