@@ -17,7 +17,9 @@ import { randomUUID, createHmac } from "crypto";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
-const TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+// Token expiry: configurable via env var (in days), defaults to 90 days for convenience
+const TOKEN_EXPIRY_DAYS = parseInt(process.env.ADMIN_TOKEN_EXPIRY_DAYS || '90', 10);
+const TOKEN_EXPIRY = TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
 function generateAdminToken(): string {
   const token = randomUUID();
