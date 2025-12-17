@@ -1223,7 +1223,11 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
                 />
               </div>
             </PopoverTrigger>
-            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+            <PopoverContent 
+              className="w-[var(--radix-popover-trigger-width)] p-0" 
+              align="start"
+              onOpenAutoFocus={(e) => e.preventDefault()}
+            >
               <div className="max-h-64 overflow-y-auto">
                 {isSearchingCustomers ? (
                   <div className="p-3 space-y-2">

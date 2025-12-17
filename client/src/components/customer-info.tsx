@@ -115,7 +115,11 @@ export default function CustomerInfo({
                   )}
                 </div>
               </PopoverTrigger>
-              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+              <PopoverContent 
+                className="w-[var(--radix-popover-trigger-width)] p-0" 
+                align="start"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
                 <div className="max-h-60 overflow-y-auto">
                   {searchResults.map((customer) => (
                     <div
