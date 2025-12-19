@@ -440,6 +440,7 @@ export default function QuoteGenerator() {
                   { label: "Price Book", path: "/price-book" },
                   { label: "Processes and Systems", path: "/processes" },
                   { label: "Sales Prospects", path: "/sales-prospects" },
+                  { label: "Installation", path: "/installation" },
                 ]}
               />
             </div>
