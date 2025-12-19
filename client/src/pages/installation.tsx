@@ -150,7 +150,7 @@ function HorizontalScrollContainer({ children, className, isDraggingCard }: Hori
       <div
         ref={containerRef}
         className={cn(
-          "flex gap-4 overflow-x-auto pb-4 scroll-smooth",
+          "flex gap-4 overflow-x-auto pb-4 kanban-scroll-container",
           !isDraggingCard && "cursor-grab",
           isDragging && "cursor-grabbing",
           className
@@ -162,8 +162,9 @@ function HorizontalScrollContainer({ children, className, isDraggingCard }: Hori
         onMouseLeave={handleMouseLeave}
         data-testid="kanban-board"
       >
+        <div className="kanban-spacer" aria-hidden="true" />
         {children}
-        <div className="flex-shrink-0 w-4" aria-hidden="true" />
+        <div className="kanban-spacer" aria-hidden="true" />
       </div>
       {showRightFade && (
         <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
@@ -302,7 +303,7 @@ function KanbanColumn({ step, leads, technicians, onCardClick }: KanbanColumnPro
   }, [leads]);
 
   return (
-    <div className="flex-shrink-0 w-72 sm:w-80">
+    <div className="flex-shrink-0 w-72 sm:w-80 snap-start sm:snap-center">
       <Card className={`h-full bg-gray-50 transition-colors ${isOver ? 'ring-2 ring-primary ring-opacity-50' : ''}`}>
         <CardHeader className="pb-2 pt-3 px-3">
           <div className="flex items-center justify-between">
@@ -801,7 +802,7 @@ export default function Installation() {
         </div>
 
         <Tabs value={activeView} onValueChange={(v) => setActiveView(v as "kanban" | "calendar")} className="mb-4">
-          <TabsList className="grid w-full max-w-xs grid-cols-2" data-testid="tabs-view-switcher">
+          <TabsList className="grid w-full max-w-sm grid-cols-2 h-12" data-testid="tabs-view-switcher">
             <TabsTrigger value="kanban" className="min-h-[44px]" data-testid="tab-kanban">
               <LayoutGrid className="h-4 w-4 mr-2" />
               Kanban
@@ -816,7 +817,7 @@ export default function Installation() {
             {isLoadingLeads ? (
               <HorizontalScrollContainer>
                 {INSTALL_STEPS.map((step) => (
-                  <div key={step} className="flex-shrink-0 w-72 sm:w-80">
+                  <div key={step} className="flex-shrink-0 w-72 sm:w-80 snap-start sm:snap-center">
                     <Card className="h-[400px]">
                       <CardHeader className="pb-2 pt-3 px-3">
                         <Skeleton className="h-5 w-32" />
