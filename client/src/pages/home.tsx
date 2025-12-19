@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { FileText, History, Settings, BookOpen, Shield, AlertCircle, Book, UserCog } from "lucide-react";
+import { FileText, History, Settings, BookOpen, Shield, AlertCircle, Book, UserCog, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -57,6 +57,13 @@ export default function Home() {
       testId: "link-sales-prospects"
     },
     {
+      title: "Installation",
+      description: "Track installation job pipeline",
+      icon: Wrench,
+      href: "/installation",
+      testId: "link-installation"
+    },
+    {
       title: "Admin",
       description: "System configuration and integrations",
       icon: Shield,
@@ -86,6 +93,7 @@ export default function Home() {
                   { label: "Price Book", path: "/price-book" },
                   { label: "Processes and Systems", path: "/processes" },
                   { label: "Sales Prospects", path: "/sales-prospects" },
+                  { label: "Installation", path: "/installation" },
                 ]}
               />
             </div>
