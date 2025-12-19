@@ -30,13 +30,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Search, MapPin, DollarSign, Calendar, User, StickyNote, GripVertical, Phone, Mail, FileText, ExternalLink } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { ArrowLeft, Search, MapPin, DollarSign, Calendar, CalendarDays, User, StickyNote, GripVertical, Phone, Mail, FileText, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, getDay } from "date-fns";
+import { cn } from "@/lib/utils";
 import type { Lead, Technician, Quote } from "@shared/schema";
 
 const INSTALL_STEPS = [
@@ -235,14 +239,152 @@ function KanbanColumn({ step, leads, technicians, onCardClick }: KanbanColumnPro
   );
 }
 
+interface CalendarViewProps {
+  leads: Lead[];
+  onCardClick: (lead: Lead) => void;
+}
+
+function CalendarView({ leads, onCardClick }: CalendarViewProps) {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const startDayOfWeek = getDay(monthStart);
+
+  const getLeadDate = (lead: Lead): { date: Date; hasInstallDate: boolean } | null => {
+    if (lead.installDate) {
+      const date = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
+      return { date, hasInstallDate: true };
+    }
+    if (lead.installEnteredAt) {
+      const date = typeof lead.installEnteredAt === "string" ? parseISO(lead.installEnteredAt) : lead.installEnteredAt;
+      return { date, hasInstallDate: false };
+    }
+    if (lead.closedAt) {
+      const date = typeof lead.closedAt === "string" ? parseISO(lead.closedAt) : lead.closedAt;
+      return { date, hasInstallDate: false };
+    }
+    return null;
+  };
+
+  const leadsByDate = useMemo(() => {
+    const map: Record<string, { lead: Lead; hasInstallDate: boolean }[]> = {};
+    leads.forEach((lead) => {
+      const dateInfo = getLeadDate(lead);
+      if (dateInfo && isSameMonth(dateInfo.date, currentMonth)) {
+        const key = format(dateInfo.date, "yyyy-MM-dd");
+        if (!map[key]) map[key] = [];
+        map[key].push({ lead, hasInstallDate: dateInfo.hasInstallDate });
+      }
+    });
+    return map;
+  }, [leads, currentMonth]);
+
+  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+          className="min-h-[44px] min-w-[44px]"
+          data-testid="button-prev-month"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <h2 className="text-lg font-semibold" data-testid="text-current-month">
+          {format(currentMonth, "MMMM yyyy")}
+        </h2>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+          className="min-h-[44px] min-w-[44px]"
+          data-testid="button-next-month"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {weekDays.map((day) => (
+          <div
+            key={day}
+            className="text-center text-xs font-medium text-muted-foreground py-2"
+          >
+            {day}
+          </div>
+        ))}
+
+        {Array.from({ length: startDayOfWeek }).map((_, idx) => (
+          <div key={`empty-${idx}`} className="min-h-[80px] sm:min-h-[100px]" />
+        ))}
+
+        {daysInMonth.map((day) => {
+          const dateKey = format(day, "yyyy-MM-dd");
+          const dayLeads = leadsByDate[dateKey] || [];
+          const isToday = isSameDay(day, new Date());
+
+          return (
+            <div
+              key={dateKey}
+              className={cn(
+                "min-h-[80px] sm:min-h-[100px] border rounded-md p-1 bg-card",
+                isToday && "ring-2 ring-primary"
+              )}
+              data-testid={`calendar-day-${dateKey}`}
+            >
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                {format(day, "d")}
+              </div>
+              <div className="space-y-1 overflow-y-auto max-h-[60px] sm:max-h-[80px]">
+                {dayLeads.map(({ lead, hasInstallDate }) => (
+                  <button
+                    key={lead.id}
+                    onClick={() => onCardClick(lead)}
+                    className={cn(
+                      "w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate min-h-[28px] flex items-center",
+                      hasInstallDate
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-yellow-400 text-yellow-900"
+                    )}
+                    data-testid={`calendar-job-${lead.id}`}
+                  >
+                    <span className="truncate">{lead.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-primary" />
+          <span>Scheduled (Install Date)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-yellow-400" />
+          <span>Needs Date</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Installation() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("all");
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
-  const [editForm, setEditForm] = useState({ installStep: "", clientIssue: "", assignedEmployeeId: "" });
+  const [editForm, setEditForm] = useState({ installStep: "", clientIssue: "", assignedEmployeeId: "", installDate: undefined as Date | undefined });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { installStep?: string; installOrder?: number }>>({});
+  const [activeView, setActiveView] = useState<"kanban" | "calendar">("kanban");
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -257,7 +399,6 @@ export default function Installation() {
     queryKey: ["/api/technicians"],
   });
 
-  // Filter to only show sales people for installation board
   const salesPeople = useMemo(() => {
     return technicians.filter((tech) => 
       tech.name.toLowerCase().includes("chandler") || 
@@ -418,6 +559,18 @@ export default function Installation() {
         });
       }
     } else {
+      // Validate: require install date when moving to or past "Assign to Sub-Contractor"
+      const targetStepIndex = INSTALL_STEPS.indexOf(targetStep);
+      const assignToSubContractorIndex = INSTALL_STEPS.indexOf("Assign to Sub-Contractor");
+      if (targetStepIndex >= assignToSubContractorIndex && !draggedLead.installDate) {
+        toast({
+          title: "Install Date Required",
+          description: "Please click on the job card and set an install date before moving to 'Assign to Sub-Contractor' or beyond.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       let newOrder: number;
       if (overCardId) {
         const overIndex = targetColumnLeads.findIndex((l) => l.id === overCardId);
@@ -440,21 +593,39 @@ export default function Installation() {
 
   const openEditDialog = (lead: Lead) => {
     setEditingLead(lead);
+    const installDateValue = lead.installDate
+      ? (typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate)
+      : undefined;
     setEditForm({
       installStep: lead.installStep || INSTALL_STEPS[0],
       clientIssue: lead.clientIssue || "",
       assignedEmployeeId: lead.assignedEmployeeId || "unassigned",
+      installDate: installDateValue,
     });
   };
 
   const handleSaveEdit = () => {
     if (!editingLead) return;
+    
+    // Require install date when moving to or past "Assign to Sub-Contractor"
+    const stepIndex = INSTALL_STEPS.indexOf(editForm.installStep as InstallStep);
+    const assignToSubContractorIndex = INSTALL_STEPS.indexOf("Assign to Sub-Contractor");
+    if (stepIndex >= assignToSubContractorIndex && !editForm.installDate) {
+      toast({
+        title: "Install Date Required",
+        description: "Please set an install date before moving to 'Assign to Sub-Contractor' or beyond.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     updateLeadMutation.mutate({
       id: editingLead.id,
       data: {
         installStep: editForm.installStep,
         clientIssue: editForm.clientIssue,
         assignedEmployeeId: editForm.assignedEmployeeId === "unassigned" ? null : editForm.assignedEmployeeId,
+        installDate: editForm.installDate ? editForm.installDate.toISOString() : null,
       },
     });
     setEditingLead(null);
@@ -527,70 +698,96 @@ export default function Installation() {
           </div>
         </div>
 
-        {isLoadingLeads ? (
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {INSTALL_STEPS.map((step) => (
-              <div key={step} className="flex-shrink-0 w-72 sm:w-80">
-                <Card className="h-[400px]">
-                  <CardHeader className="pb-2 pt-3 px-3">
-                    <Skeleton className="h-5 w-32" />
-                  </CardHeader>
-                  <CardContent className="px-2">
-                    <Skeleton className="h-24 w-full mb-2" />
-                    <Skeleton className="h-24 w-full mb-2" />
-                  </CardContent>
-                </Card>
+        <Tabs value={activeView} onValueChange={(v) => setActiveView(v as "kanban" | "calendar")} className="mb-4">
+          <TabsList className="grid w-full max-w-xs grid-cols-2" data-testid="tabs-view-switcher">
+            <TabsTrigger value="kanban" className="min-h-[44px]" data-testid="tab-kanban">
+              <LayoutGrid className="h-4 w-4 mr-2" />
+              Kanban
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="min-h-[44px]" data-testid="tab-calendar">
+              <CalendarDays className="h-4 w-4 mr-2" />
+              Calendar
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="kanban" className="mt-4">
+            {isLoadingLeads ? (
+              <div className="flex gap-4 overflow-x-auto pb-4">
+                {INSTALL_STEPS.map((step) => (
+                  <div key={step} className="flex-shrink-0 w-72 sm:w-80">
+                    <Card className="h-[400px]">
+                      <CardHeader className="pb-2 pt-3 px-3">
+                        <Skeleton className="h-5 w-32" />
+                      </CardHeader>
+                      <CardContent className="px-2">
+                        <Skeleton className="h-24 w-full mb-2" />
+                        <Skeleton className="h-24 w-full mb-2" />
+                      </CardContent>
+                    </Card>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : filteredLeads.length === 0 ? (
-          <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground text-center" data-testid="text-empty-state">
-              No installation jobs found in Won status.
-            </p>
-          </div>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-4 overflow-x-auto pb-4" data-testid="kanban-board">
-              {INSTALL_STEPS.map((step) => (
-                <KanbanColumn
-                  key={step}
-                  step={step}
-                  leads={leadsByStep[step]}
-                  technicians={salesPeople}
-                  onCardClick={openEditDialog}
-                />
-              ))}
-            </div>
-            <DragOverlay>
-              {activeLead && (
-                <Card className="w-72 sm:w-80 bg-white shadow-lg">
-                  <CardContent className="p-3">
-                    <div className="flex items-start gap-2">
-                      <div className="p-1">
-                        <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-sm truncate">{activeLead.name}</h4>
-                        {activeLead.address && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                            <MapPin className="h-3 w-3" />
-                            <span className="truncate">{activeLead.address}</span>
+            ) : filteredLeads.length === 0 ? (
+              <div className="flex items-center justify-center h-64">
+                <p className="text-muted-foreground text-center" data-testid="text-empty-state">
+                  No installation jobs found in Won status.
+                </p>
+              </div>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCorners}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="flex gap-4 overflow-x-auto pb-4" data-testid="kanban-board">
+                  {INSTALL_STEPS.map((step) => (
+                    <KanbanColumn
+                      key={step}
+                      step={step}
+                      leads={leadsByStep[step]}
+                      technicians={salesPeople}
+                      onCardClick={openEditDialog}
+                    />
+                  ))}
+                </div>
+                <DragOverlay>
+                  {activeLead && (
+                    <Card className="w-72 sm:w-80 bg-white shadow-lg">
+                      <CardContent className="p-3">
+                        <div className="flex items-start gap-2">
+                          <div className="p-1">
+                            <GripVertical className="h-4 w-4 text-muted-foreground" />
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </DragOverlay>
-          </DndContext>
-        )}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-sm truncate">{activeLead.name}</h4>
+                            {activeLead.address && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                                <MapPin className="h-3 w-3" />
+                                <span className="truncate">{activeLead.address}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </DragOverlay>
+              </DndContext>
+            )}
+          </TabsContent>
+
+          <TabsContent value="calendar" className="mt-4">
+            {isLoadingLeads ? (
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-[400px] w-full" />
+              </div>
+            ) : (
+              <CalendarView leads={filteredLeads} onCardClick={openEditDialog} />
+            )}
+          </TabsContent>
+        </Tabs>
       </main>
 
       <Dialog open={!!editingLead} onOpenChange={(open) => !open && setEditingLead(null)}>
@@ -716,6 +913,35 @@ export default function Installation() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="installDate">Installation Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="installDate"
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal min-h-[44px]",
+                        !editForm.installDate && "text-muted-foreground"
+                      )}
+                      data-testid="button-install-date"
+                    >
+                      <CalendarDays className="mr-2 h-4 w-4" />
+                      {editForm.installDate ? format(editForm.installDate, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={editForm.installDate}
+                      onSelect={(date) => setEditForm({ ...editForm, installDate: date })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="assignedEmployee">Assigned Employee</Label>
                 <Select
