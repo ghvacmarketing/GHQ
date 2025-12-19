@@ -91,7 +91,7 @@ const TIER_INFO: Record<string, { description: string }> = {
   Ultimate: { description: "Top-tier efficiency, maximum comfort" },
 };
 
-const PACKAGE_LEVEL_ORDER = ["Budget", "Good", "Better", "Best"];
+const PACKAGE_LEVEL_ORDER = ["Best", "Better", "Good", "Budget"];
 
 const TONNAGE_OPTIONS = ["1.5 Ton", "2 Ton", "2.5 Ton", "3 Ton", "3.5 Ton", "4 Ton", "5 Ton"];
 
