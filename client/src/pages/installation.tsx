@@ -30,14 +30,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Search, MapPin, DollarSign, Calendar, User, StickyNote, GripVertical } from "lucide-react";
+import { ArrowLeft, Search, MapPin, DollarSign, Calendar, User, StickyNote, GripVertical, Phone, Mail, FileText, ExternalLink } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
-import type { Lead, Technician } from "@shared/schema";
+import type { Lead, Technician, Quote } from "@shared/schema";
 
 const INSTALL_STEPS = [
   "Define Scope of Work",
@@ -255,6 +255,17 @@ export default function Installation() {
 
   const { data: technicians = [] } = useQuery<Technician[]>({
     queryKey: ["/api/technicians"],
+  });
+
+  const { data: linkedQuote, isLoading: isLoadingQuote } = useQuery<Quote>({
+    queryKey: ["/api/quotes", editingLead?.quoteId],
+    queryFn: async () => {
+      if (!editingLead?.quoteId) return null;
+      const res = await fetch(`/api/quotes/${editingLead.quoteId}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!editingLead?.quoteId,
   });
 
   const clearOptimisticUpdate = useCallback((leadId: string) => {
@@ -575,62 +586,163 @@ export default function Installation() {
       </main>
 
       <Dialog open={!!editingLead} onOpenChange={(open) => !open && setEditingLead(null)}>
-        <DialogContent className="sm:max-w-md" data-testid="dialog-edit-job">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" data-testid="dialog-edit-job">
           <DialogHeader>
-            <DialogTitle>Edit Job: {editingLead?.name}</DialogTitle>
+            <DialogTitle className="text-lg">{editingLead?.name}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="installStep">Installation Step</Label>
-              <Select
-                value={editForm.installStep}
-                onValueChange={(value) => setEditForm({ ...editForm, installStep: value })}
-              >
-                <SelectTrigger id="installStep" className="min-h-[44px]" data-testid="select-install-step">
-                  <SelectValue placeholder="Select step" />
-                </SelectTrigger>
-                <SelectContent>
-                  {INSTALL_STEPS.map((step) => (
-                    <SelectItem key={step} value={step}>
-                      {step}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          
+          <div className="space-y-4 py-2">
+            <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Client Details</h4>
+              <div className="grid gap-2 text-sm">
+                {editingLead?.phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <a href={`tel:${editingLead.phone}`} className="text-primary hover:underline">{editingLead.phone}</a>
+                  </div>
+                )}
+                {editingLead?.email && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <a href={`mailto:${editingLead.email}`} className="text-primary hover:underline truncate">{editingLead.email}</a>
+                  </div>
+                )}
+                {editingLead?.address && (
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <span>{editingLead.address}</span>
+                  </div>
+                )}
+                {editingLead?.estimatedValue && (
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">${Number(editingLead.estimatedValue).toLocaleString()}</span>
+                  </div>
+                )}
+                {editingLead?.projectedCloseDate && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span>Target: {format(parseISO(editingLead.projectedCloseDate.toString()), "MMM d, yyyy")}</span>
+                  </div>
+                )}
+                {editingLead?.customerType && (
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span>{editingLead.customerType}</span>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="assignedEmployee">Assigned Employee</Label>
-              <Select
-                value={editForm.assignedEmployeeId}
-                onValueChange={(value) => setEditForm({ ...editForm, assignedEmployeeId: value })}
-              >
-                <SelectTrigger id="assignedEmployee" className="min-h-[44px]" data-testid="select-assigned-employee">
-                  <SelectValue placeholder="Select employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
-                  {technicians.map((tech) => (
-                    <SelectItem key={tech.id} value={tech.id}>
-                      {tech.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={editForm.clientIssue}
-                onChange={(e) => setEditForm({ ...editForm, clientIssue: e.target.value })}
-                placeholder="Add notes about this job..."
-                rows={4}
-                className="min-h-[88px]"
-                data-testid="textarea-notes"
-              />
+
+            {editingLead?.quoteId && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                <h4 className="text-sm font-semibold text-blue-800 uppercase tracking-wide flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Linked Quote
+                </h4>
+                {isLoadingQuote ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                ) : linkedQuote ? (
+                  <div className="text-sm space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Quote ID:</span>
+                      <span className="font-mono text-xs">{linkedQuote.id.slice(0, 8)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Total:</span>
+                      <span className="font-semibold">${Number(linkedQuote.total).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Status:</span>
+                      <Badge variant={linkedQuote.status === "accepted" ? "default" : "secondary"}>
+                        {linkedQuote.status}
+                      </Badge>
+                    </div>
+                    {linkedQuote.parts && (linkedQuote.parts as any[]).length > 0 && (
+                      <div className="mt-2 pt-2 border-t">
+                        <span className="text-muted-foreground text-xs">Parts:</span>
+                        <ul className="list-disc list-inside text-xs text-muted-foreground mt-1">
+                          {(linkedQuote.parts as any[]).slice(0, 3).map((part: any, i: number) => (
+                            <li key={i} className="truncate">{part.description}</li>
+                          ))}
+                          {(linkedQuote.parts as any[]).length > 3 && (
+                            <li className="text-muted-foreground">+{(linkedQuote.parts as any[]).length - 3} more</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                    <Link href={`/quote/edit/${linkedQuote.id}`}>
+                      <Button variant="outline" size="sm" className="w-full mt-2 min-h-[36px]" data-testid="button-view-quote">
+                        <ExternalLink className="h-3 w-3 mr-2" />
+                        View Full Quote
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Quote not found</p>
+                )}
+              </div>
+            )}
+
+            <div className="border-t pt-4 space-y-4">
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Edit Job</h4>
+              
+              <div className="space-y-2">
+                <Label htmlFor="installStep">Installation Step</Label>
+                <Select
+                  value={editForm.installStep}
+                  onValueChange={(value) => setEditForm({ ...editForm, installStep: value })}
+                >
+                  <SelectTrigger id="installStep" className="min-h-[44px]" data-testid="select-install-step">
+                    <SelectValue placeholder="Select step" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INSTALL_STEPS.map((step) => (
+                      <SelectItem key={step} value={step}>
+                        {step}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignedEmployee">Assigned Employee</Label>
+                <Select
+                  value={editForm.assignedEmployeeId}
+                  onValueChange={(value) => setEditForm({ ...editForm, assignedEmployeeId: value })}
+                >
+                  <SelectTrigger id="assignedEmployee" className="min-h-[44px]" data-testid="select-assigned-employee">
+                    <SelectValue placeholder="Select employee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Unassigned</SelectItem>
+                    {technicians.map((tech) => (
+                      <SelectItem key={tech.id} value={tech.id}>
+                        {tech.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  value={editForm.clientIssue}
+                  onChange={(e) => setEditForm({ ...editForm, clientIssue: e.target.value })}
+                  placeholder="Add notes about this job..."
+                  rows={3}
+                  className="min-h-[80px]"
+                  data-testid="textarea-notes"
+                />
+              </div>
             </div>
           </div>
-          <DialogFooter>
+          
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setEditingLead(null)} className="min-h-[44px]" data-testid="button-cancel">
               Cancel
             </Button>
