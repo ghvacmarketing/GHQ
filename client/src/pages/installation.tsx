@@ -1,10 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
   DndContext,
   DragEndEvent,
-  DragOverEvent,
   DragOverlay,
   DragStartEvent,
   PointerSensor,
@@ -12,6 +11,7 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  useDroppable,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -52,6 +52,22 @@ const INSTALL_STEPS = [
 
 type InstallStep = typeof INSTALL_STEPS[number];
 
+const COLUMN_PREFIX = "column-";
+
+function getColumnId(step: InstallStep): string {
+  return `${COLUMN_PREFIX}${step}`;
+}
+
+function getStepFromColumnId(columnId: string): InstallStep | null {
+  if (columnId.startsWith(COLUMN_PREFIX)) {
+    const step = columnId.slice(COLUMN_PREFIX.length) as InstallStep;
+    if (INSTALL_STEPS.includes(step)) {
+      return step;
+    }
+  }
+  return null;
+}
+
 interface JobCardProps {
   lead: Lead;
   technicians: Technician[];
@@ -66,7 +82,14 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
     setNodeRef,
     transform,
     transition,
-  } = useSortable({ id: lead.id });
+  } = useSortable({ 
+    id: lead.id,
+    data: {
+      type: "card",
+      lead,
+      step: lead.installStep || INSTALL_STEPS[0],
+    }
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -159,13 +182,23 @@ interface KanbanColumnProps {
 }
 
 function KanbanColumn({ step, leads, technicians, onCardClick }: KanbanColumnProps) {
+  const columnId = getColumnId(step);
+  
+  const { setNodeRef, isOver } = useDroppable({
+    id: columnId,
+    data: {
+      type: "column",
+      step,
+    }
+  });
+
   const sortedLeads = useMemo(() => {
     return [...leads].sort((a, b) => (a.installOrder || 0) - (b.installOrder || 0));
   }, [leads]);
 
   return (
     <div className="flex-shrink-0 w-72 sm:w-80">
-      <Card className="h-full bg-gray-50">
+      <Card className={`h-full bg-gray-50 transition-colors ${isOver ? 'ring-2 ring-primary ring-opacity-50' : ''}`}>
         <CardHeader className="pb-2 pt-3 px-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold truncate" data-testid={`column-title-${step}`}>
@@ -178,21 +211,23 @@ function KanbanColumn({ step, leads, technicians, onCardClick }: KanbanColumnPro
         </CardHeader>
         <CardContent className="px-2 pb-2">
           <ScrollArea className="h-[calc(100vh-280px)] pr-2">
-            <SortableContext items={sortedLeads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
-              {sortedLeads.map((lead) => (
-                <JobCard
-                  key={lead.id}
-                  lead={lead}
-                  technicians={technicians}
-                  onClick={() => onCardClick(lead)}
-                />
-              ))}
-            </SortableContext>
-            {leads.length === 0 && (
-              <div className="text-center text-sm text-muted-foreground py-8" data-testid={`column-empty-${step}`}>
-                No jobs
-              </div>
-            )}
+            <div ref={setNodeRef} className="min-h-[100px]">
+              <SortableContext items={sortedLeads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+                {sortedLeads.map((lead) => (
+                  <JobCard
+                    key={lead.id}
+                    lead={lead}
+                    technicians={technicians}
+                    onClick={() => onCardClick(lead)}
+                  />
+                ))}
+              </SortableContext>
+              {leads.length === 0 && (
+                <div className="text-center text-sm text-muted-foreground py-8" data-testid={`column-empty-${step}`}>
+                  No jobs
+                </div>
+              )}
+            </div>
           </ScrollArea>
         </CardContent>
       </Card>
@@ -207,6 +242,7 @@ export default function Installation() {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [editForm, setEditForm] = useState({ installStep: "", clientIssue: "", assignedEmployeeId: "" });
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { installStep?: string; installOrder?: number }>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -221,28 +257,47 @@ export default function Installation() {
     queryKey: ["/api/technicians"],
   });
 
+  const clearOptimisticUpdate = useCallback((leadId: string) => {
+    setOptimisticUpdates((prev) => {
+      const next = { ...prev };
+      delete next[leadId];
+      return next;
+    });
+  }, []);
+
   const updateLeadMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Lead> }) => {
       const res = await apiRequest("PATCH", `/api/leads/${id}`, data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      clearOptimisticUpdate(variables.id);
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      toast({ description: "Job updated successfully", duration: 1000 });
     },
-    onError: () => {
+    onError: (_, variables) => {
+      clearOptimisticUpdate(variables.id);
       toast({ description: "Failed to update job", variant: "destructive" });
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
     },
   });
 
+  const leadsWithOptimisticUpdates = useMemo(() => {
+    return allLeads.map((lead) => {
+      const update = optimisticUpdates[lead.id];
+      if (update) {
+        return { ...lead, ...update };
+      }
+      return lead;
+    });
+  }, [allLeads, optimisticUpdates]);
+
   const installationLeads = useMemo(() => {
-    return allLeads.filter((lead) => {
+    return leadsWithOptimisticUpdates.filter((lead) => {
       if (lead.status !== "Won") return false;
       if (!lead.tags || !Array.isArray(lead.tags)) return false;
       return lead.tags.some((tag) => tag.toLowerCase() === "installation");
     });
-  }, [allLeads]);
+  }, [leadsWithOptimisticUpdates]);
 
   const filteredLeads = useMemo(() => {
     return installationLeads.filter((lead) => {
@@ -293,63 +348,75 @@ export default function Installation() {
     const activeLeadId = active.id as string;
     const overId = over.id as string;
 
-    const activeLead = filteredLeads.find((l) => l.id === activeLeadId);
-    if (!activeLead) return;
+    const draggedLead = filteredLeads.find((l) => l.id === activeLeadId);
+    if (!draggedLead) return;
 
+    const currentStep = (draggedLead.installStep as InstallStep) || INSTALL_STEPS[0];
     let targetStep: InstallStep | null = null;
-    let targetLeads: Lead[] = [];
+    let overCardId: string | null = null;
 
-    for (const step of INSTALL_STEPS) {
-      const leadsInStep = leadsByStep[step];
-      if (leadsInStep.some((l) => l.id === overId)) {
-        targetStep = step;
-        targetLeads = leadsInStep;
-        break;
-      }
-    }
-
-    if (!targetStep) {
-      if (INSTALL_STEPS.includes(overId as InstallStep)) {
-        targetStep = overId as InstallStep;
-        targetLeads = leadsByStep[targetStep];
+    const stepFromColumn = getStepFromColumnId(overId);
+    if (stepFromColumn) {
+      targetStep = stepFromColumn;
+    } else {
+      const overLead = filteredLeads.find((l) => l.id === overId);
+      if (overLead) {
+        targetStep = (overLead.installStep as InstallStep) || INSTALL_STEPS[0];
+        overCardId = overId;
       }
     }
 
     if (!targetStep) return;
 
-    const currentStep = (activeLead.installStep as InstallStep) || INSTALL_STEPS[0];
     const sameColumn = currentStep === targetStep;
+    const currentColumnLeads = [...leadsByStep[currentStep]].sort((a, b) => (a.installOrder || 0) - (b.installOrder || 0));
+    const targetColumnLeads = sameColumn 
+      ? currentColumnLeads 
+      : [...leadsByStep[targetStep]].sort((a, b) => (a.installOrder || 0) - (b.installOrder || 0));
 
     if (sameColumn) {
-      const oldIndex = targetLeads.findIndex((l) => l.id === activeLeadId);
-      const newIndex = targetLeads.findIndex((l) => l.id === overId);
+      if (!overCardId || activeLeadId === overCardId) return;
+
+      const oldIndex = currentColumnLeads.findIndex((l) => l.id === activeLeadId);
+      const newIndex = currentColumnLeads.findIndex((l) => l.id === overCardId);
+
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+      const reordered = arrayMove(currentColumnLeads, oldIndex, newIndex);
       
-      if (oldIndex !== newIndex && newIndex !== -1) {
-        const reordered = arrayMove(targetLeads, oldIndex, newIndex);
-        reordered.forEach((lead, index) => {
-          updateLeadMutation.mutate({
-            id: lead.id,
-            data: { installOrder: index },
-          });
+      const updates: Record<string, { installOrder: number }> = {};
+      reordered.forEach((lead, index) => {
+        if ((lead.installOrder || 0) !== index) {
+          updates[lead.id] = { installOrder: index };
+        }
+      });
+
+      if (Object.keys(updates).length > 0) {
+        setOptimisticUpdates((prev) => ({ ...prev, ...updates }));
+
+        Object.entries(updates).forEach(([id, data]) => {
+          updateLeadMutation.mutate({ id, data });
         });
       }
     } else {
-      const maxOrder = Math.max(...targetLeads.map((l) => l.installOrder || 0), -1);
+      let newOrder: number;
+      if (overCardId) {
+        const overIndex = targetColumnLeads.findIndex((l) => l.id === overCardId);
+        newOrder = overIndex >= 0 ? overIndex : targetColumnLeads.length;
+      } else {
+        newOrder = targetColumnLeads.length;
+      }
+
+      setOptimisticUpdates((prev) => ({
+        ...prev,
+        [activeLeadId]: { installStep: targetStep, installOrder: newOrder },
+      }));
+
       updateLeadMutation.mutate({
         id: activeLeadId,
-        data: { installStep: targetStep, installOrder: maxOrder + 1 },
+        data: { installStep: targetStep, installOrder: newOrder },
       });
     }
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeLeadId = active.id as string;
-    const overId = over.id as string;
-
-    if (activeLeadId === overId) return;
   };
 
   const openEditDialog = (lead: Lead) => {
@@ -469,7 +536,6 @@ export default function Installation() {
             collisionDetection={closestCorners}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
-            onDragOver={handleDragOver}
           >
             <div className="flex gap-4 overflow-x-auto pb-4" data-testid="kanban-board">
               {INSTALL_STEPS.map((step) => (

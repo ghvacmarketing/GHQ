@@ -85,6 +85,16 @@ Preferred communication style: Simple, everyday language.
   - **Address Autocomplete**: Integrated with Geoapify API for dropdown address suggestions (requires VITE_GEOAPIFY_API_KEY env var)
   - **Geolocation**: HTML5 Geolocation + reverse geocoding to auto-populate address from current location
   - **Date Handling**: Zod schema transforms accept both string and Date formats for projectedCloseDate, closedAt, and lastImportedAt fields
+- **Installation Pipeline** (Added Dec 2025): Kanban board for tracking installation jobs through the workflow.
+  - **Data source**: Shows leads with `status === "Won"` AND `tags` includes "installation"
+  - **Database fields**: `installStep` (current column) and `installOrder` (position within column) added to leads table
+  - **8 Kanban columns**: Define Scope of Work → Assign to Sub-Contractor → Order Equipment & Materials → Waiting on Equipment & Material → Warehouse: Equipment Arrived → Spec Out Project → Warehouse: Stage Equipment & Materials → Schedule Job
+  - **Drag and drop**: Uses @dnd-kit for smooth drag-and-drop between columns and reordering within columns
+  - **Optimistic updates**: Instant visual feedback with server persistence and rollback on error
+  - **Card details**: Customer name, address, estimated value, target date, assigned employee, tags, notes preview
+  - **Edit dialog**: Click any card to edit install step, notes, and assigned employee
+  - **Filters**: Search by customer/address, filter by assigned employee
+  - **Mobile-first**: Horizontally scrollable board with touch-friendly 44px targets
 - **Security**: SESSION_SECRET environment variable is required at startup to prevent use of insecure default secrets.
 - **Customer Database** (Added Dec 2025): FieldEdge CSV import system for syncing customer data.
   - **CSV Import**: Admin uploads FieldEdge export CSV with columns: Display Name, Customer Type, Full Address, Phone, Email, Lead Source
