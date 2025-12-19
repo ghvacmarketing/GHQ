@@ -1,29 +1,76 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, Check, ChevronRight, Plus, Minus, ShoppingCart, Trash2, X, Info } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Plus, Minus, ShoppingCart, Trash2, X, Info, FileText, Copy, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
 import type { Equipment, EquipmentCategory, ProposalEquipment } from "@shared/schema";
 
+const CART_STORAGE_KEY = 'ghvac-proposal-cart';
+const CUSTOMER_STORAGE_KEY = 'ghvac-proposal-customer';
+
+function loadCartFromStorage(): ProposalEquipment[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(CART_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('Failed to load cart from storage:', e);
+  }
+  return [];
+}
+
+function loadCustomerFromStorage(): { name: string; address: string; notes: string } {
+  if (typeof window === 'undefined') return { name: '', address: '', notes: '' };
+  try {
+    const stored = localStorage.getItem(CUSTOMER_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('Failed to load customer from storage:', e);
+  }
+  return { name: '', address: '', notes: '' };
+}
+
 export default function ProposalBuilder() {
+  const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
-  const [cart, setCart] = useState<ProposalEquipment[]>([]);
+  const [cart, setCart] = useState<ProposalEquipment[]>(() => loadCartFromStorage());
   const [cartOpen, setCartOpen] = useState(false);
-  const [customerName, setCustomerName] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
+  const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
+  const [customerName, setCustomerName] = useState(() => loadCustomerFromStorage().name);
+  const [customerAddress, setCustomerAddress] = useState(() => loadCustomerFromStorage().address);
+  const [customerNotes, setCustomerNotes] = useState(() => loadCustomerFromStorage().notes);
+  const [generatedQuote, setGeneratedQuote] = useState<string | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+  }, [cart]);
+
+  useEffect(() => {
+    localStorage.setItem(CUSTOMER_STORAGE_KEY, JSON.stringify({
+      name: customerName,
+      address: customerAddress,
+      notes: customerNotes,
+    }));
+  }, [customerName, customerAddress, customerNotes]);
 
   const { data: categories, isLoading } = useQuery<EquipmentCategory[]>({
     queryKey: ['/api/equipment'],
@@ -100,6 +147,101 @@ export default function ProposalBuilder() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(price);
+  };
+
+  const clearCart = () => {
+    setCart([]);
+    setCustomerName('');
+    setCustomerAddress('');
+    setCustomerNotes('');
+    toast({
+      title: "Cart Cleared",
+      description: "All items have been removed from your proposal.",
+    });
+  };
+
+  const generateQuote = () => {
+    if (cart.length === 0) return;
+    
+    const date = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    const totalLaborHours = cart.reduce((sum, item) => {
+      return sum + ((item.laborHours || 0) * item.quantity);
+    }, 0);
+
+    let quoteText = `GIESBRECHT HVAC - EQUIPMENT PROPOSAL\n`;
+    quoteText += `${'='.repeat(45)}\n\n`;
+    quoteText += `Date: ${date}\n`;
+    if (customerName) quoteText += `Customer: ${customerName}\n`;
+    if (customerAddress) quoteText += `Address: ${customerAddress}\n`;
+    quoteText += `\n${'-'.repeat(45)}\n`;
+    quoteText += `EQUIPMENT SELECTED:\n`;
+    quoteText += `${'-'.repeat(45)}\n\n`;
+
+    cart.forEach((item, index) => {
+      quoteText += `${index + 1}. ${item.description}\n`;
+      quoteText += `   Brand: ${item.brand} | Model: ${item.model}\n`;
+      const specs = [];
+      if (item.tonnage) specs.push(item.tonnage);
+      if (item.btu) specs.push(item.btu);
+      if (item.seer) specs.push(item.seer);
+      if (item.afue) specs.push(item.afue);
+      if (item.hspf) specs.push(item.hspf);
+      if (specs.length > 0) {
+        quoteText += `   Specs: ${specs.join(' | ')}\n`;
+      }
+      if (item.warranty) {
+        quoteText += `   Warranty: ${item.warranty}\n`;
+      }
+      quoteText += `   Qty: ${item.quantity} x ${formatPrice(item.price)} = ${formatPrice(item.price * item.quantity)}\n\n`;
+    });
+
+    quoteText += `${'-'.repeat(45)}\n`;
+    quoteText += `SUMMARY:\n`;
+    quoteText += `${'-'.repeat(45)}\n`;
+    quoteText += `Equipment Subtotal: ${formatPrice(cartTotal)}\n`;
+    quoteText += `Estimated Labor: ${totalLaborHours} hours\n`;
+    quoteText += `\n`;
+    quoteText += `* Final price will include labor, materials,\n`;
+    quoteText += `  applicable taxes, and warranty coverage.\n`;
+
+    if (customerNotes) {
+      quoteText += `\n${'-'.repeat(45)}\n`;
+      quoteText += `NOTES:\n`;
+      quoteText += `${'-'.repeat(45)}\n`;
+      quoteText += `${customerNotes}\n`;
+    }
+
+    quoteText += `\n${'-'.repeat(45)}\n`;
+    quoteText += `This is an informal proposal and pricing\n`;
+    quoteText += `is subject to change. Contact us for a\n`;
+    quoteText += `formal quote with exact pricing.\n`;
+    quoteText += `\n`;
+    quoteText += `Thank you for choosing Giesbrecht HVAC!\n`;
+
+    setGeneratedQuote(quoteText);
+    setQuoteDialogOpen(true);
+  };
+
+  const copyQuoteToClipboard = async () => {
+    if (!generatedQuote) return;
+    try {
+      await navigator.clipboard.writeText(generatedQuote);
+      toast({
+        title: "Copied!",
+        description: "Quote copied to clipboard.",
+      });
+    } catch (err) {
+      toast({
+        title: "Copy Failed",
+        description: "Please select and copy the text manually.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -216,18 +358,58 @@ export default function ProposalBuilder() {
                   )}
                 </ScrollArea>
                 {cart.length > 0 && (
-                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-card border-t">
-                    <div className="flex justify-between items-center mb-3">
+                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-card border-t space-y-3">
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Customer Name (optional)"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="h-10"
+                        data-testid="input-customer-name"
+                      />
+                      <Input
+                        placeholder="Address (optional)"
+                        value={customerAddress}
+                        onChange={(e) => setCustomerAddress(e.target.value)}
+                        className="h-10"
+                        data-testid="input-customer-address"
+                      />
+                      <Textarea
+                        placeholder="Notes (optional)"
+                        value={customerNotes}
+                        onChange={(e) => setCustomerNotes(e.target.value)}
+                        className="min-h-[60px] resize-none"
+                        data-testid="input-customer-notes"
+                      />
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-center">
                       <span className="text-lg font-medium">Equipment Total</span>
                       <span className="text-xl font-bold text-primary">{formatPrice(cartTotal)}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground text-center mb-3">
+                    <p className="text-xs text-muted-foreground text-center">
                       <Info className="h-3 w-3 inline mr-1" />
                       Final price will include labor, materials, and applicable taxes
                     </p>
-                    <Button className="w-full min-h-[44px]" data-testid="button-continue-proposal">
-                      Continue to Quote Details
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1 min-h-[44px]"
+                        onClick={clearCart}
+                        data-testid="button-clear-cart"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Clear
+                      </Button>
+                      <Button
+                        className="flex-1 min-h-[44px]"
+                        onClick={generateQuote}
+                        data-testid="button-generate-quote"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Generate Quote
+                      </Button>
+                    </div>
                   </div>
                 )}
               </SheetContent>
@@ -456,6 +638,39 @@ export default function ProposalBuilder() {
           </div>
         )}
       </main>
+
+      <Dialog open={quoteDialogOpen} onOpenChange={setQuoteDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Equipment Proposal
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <pre className="text-xs sm:text-sm whitespace-pre-wrap font-mono bg-muted p-4 rounded-lg">
+              {generatedQuote}
+            </pre>
+          </ScrollArea>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setQuoteDialogOpen(false)}
+              className="w-full sm:w-auto min-h-[44px]"
+            >
+              Close
+            </Button>
+            <Button
+              onClick={copyQuoteToClipboard}
+              className="w-full sm:w-auto min-h-[44px]"
+              data-testid="button-copy-quote"
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              Copy to Clipboard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
