@@ -13,6 +13,7 @@ import ProcessBuilderVoice from "@/pages/process-builder-voice";
 import PriceBook from "@/pages/price-book";
 import SalesProspects from "@/pages/sales-prospects";
 import CreateLeadPage from "@/pages/create-lead";
+import Installation from "@/pages/installation";
 import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import { lazy, Suspense, useState, useEffect } from "react";
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/processes/new/voice" component={ProcessBuilderVoice} />
       <Route path="/sales-prospects" component={SalesProspects} />
       <Route path="/sales-prospects/create" component={CreateLeadPage} />
+      <Route path="/installation" component={Installation} />
       <Route path="/admin" component={AdminSettingsWrapper} />
       <Route component={NotFound} />
     </Switch>
