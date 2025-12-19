@@ -257,6 +257,14 @@ export default function Installation() {
     queryKey: ["/api/technicians"],
   });
 
+  // Filter to only show sales people (Chandler and Earnest) for installation board
+  const salesPeople = useMemo(() => {
+    return technicians.filter((tech) => 
+      tech.name.toLowerCase().includes("chandler") || 
+      tech.name.toLowerCase().includes("earnest")
+    );
+  }, [technicians]);
+
   const { data: linkedQuote, isLoading: isLoadingQuote } = useQuery<Quote>({
     queryKey: ["/api/quotes", editingLead?.quoteId],
     queryFn: async () => {
@@ -509,7 +517,7 @@ export default function Installation() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Employees</SelectItem>
-                {technicians.map((tech) => (
+                {salesPeople.map((tech) => (
                   <SelectItem key={tech.id} value={tech.id}>
                     {tech.name}
                   </SelectItem>
@@ -554,7 +562,7 @@ export default function Installation() {
                   key={step}
                   step={step}
                   leads={leadsByStep[step]}
-                  technicians={technicians}
+                  technicians={salesPeople}
                   onCardClick={openEditDialog}
                 />
               ))}
@@ -719,7 +727,7 @@ export default function Installation() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {technicians.map((tech) => (
+                    {salesPeople.map((tech) => (
                       <SelectItem key={tech.id} value={tech.id}>
                         {tech.name}
                       </SelectItem>
