@@ -257,11 +257,12 @@ export default function Installation() {
     queryKey: ["/api/technicians"],
   });
 
-  // Filter to only show sales people (Chandler and Earnest) for installation board
+  // Filter to only show sales people for installation board
   const salesPeople = useMemo(() => {
     return technicians.filter((tech) => 
       tech.name.toLowerCase().includes("chandler") || 
-      tech.name.toLowerCase().includes("earnest")
+      tech.name.toLowerCase().includes("earnest") ||
+      tech.name.toLowerCase().includes("tucker")
     );
   }, [technicians]);
 

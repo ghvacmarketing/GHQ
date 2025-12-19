@@ -884,8 +884,9 @@ export class DatabaseStorage implements IStorage {
     if (existingTechs.length === 0) {
       const defaultTechnicians = [
         { name: "Brian", email: "brian@ghvac.com" },
-        { name: "Zack", email: "zack@ghvac.com" },
-        { name: "Sutton", email: "sutton@ghvac.com" },
+        { name: "Chandler", email: "chandler@ghvac.com" },
+        { name: "Earnest", email: "earnest@ghvac.com" },
+        { name: "Tucker", email: "tucker@ghvac.com" },
       ];
 
       for (const tech of defaultTechnicians) {
