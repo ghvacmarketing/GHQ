@@ -405,3 +405,53 @@ export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 export type Customer = typeof customers.$inferSelect;
 export type InsertCustomerImportBatch = z.infer<typeof insertCustomerImportBatchSchema>;
 export type CustomerImportBatch = typeof customerImportBatches.$inferSelect;
+
+// Equipment types for Proposal Builder (sourced from Google Sheets)
+export type Equipment = {
+  id: string;
+  category: string; // e.g., "Air Conditioners", "Heat Pumps", "Furnaces", "Package Units", "Mini Splits"
+  subcategory?: string; // e.g., "Single Stage", "Two Stage", "Variable Speed"
+  brand: string;
+  model: string;
+  description: string;
+  tonnage?: string; // e.g., "2 Ton", "3 Ton", "4 Ton"
+  btu?: string; // e.g., "24000 BTU"
+  seer?: string; // e.g., "14 SEER", "18 SEER"
+  afue?: string; // For furnaces - e.g., "80%", "96%"
+  hspf?: string; // For heat pumps
+  voltage?: string; // e.g., "208/230V"
+  price: number;
+  laborHours?: number;
+  warranty?: string;
+  notes?: string;
+};
+
+export type EquipmentCategory = {
+  name: string;
+  subcategories: string[];
+  equipment: Equipment[];
+};
+
+// Proposal types for the proposal builder
+export type ProposalEquipment = Equipment & {
+  quantity: number;
+};
+
+export type Proposal = {
+  id: string;
+  customerName: string;
+  customerAddress?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  salesPerson: string;
+  equipment: ProposalEquipment[];
+  accessories?: ProposalEquipment[];
+  laborHours: number;
+  subtotal: number;
+  laborCost: number;
+  tax: number;
+  total: number;
+  notes?: string;
+  isLocked: boolean; // Whether this is a guaranteed quote or preliminary proposal
+  createdAt: Date;
+};
