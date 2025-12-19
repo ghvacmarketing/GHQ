@@ -435,7 +435,7 @@ export default function Installation() {
     setEditForm({
       installStep: lead.installStep || INSTALL_STEPS[0],
       clientIssue: lead.clientIssue || "",
-      assignedEmployeeId: lead.assignedEmployeeId || "",
+      assignedEmployeeId: lead.assignedEmployeeId || "unassigned",
     });
   };
 
@@ -446,7 +446,7 @@ export default function Installation() {
       data: {
         installStep: editForm.installStep,
         clientIssue: editForm.clientIssue,
-        assignedEmployeeId: editForm.assignedEmployeeId || null,
+        assignedEmployeeId: editForm.assignedEmployeeId === "unassigned" ? null : editForm.assignedEmployeeId,
       },
     });
     setEditingLead(null);
@@ -718,7 +718,7 @@ export default function Installation() {
                     <SelectValue placeholder="Select employee" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
                     {technicians.map((tech) => (
                       <SelectItem key={tech.id} value={tech.id}>
                         {tech.name}
