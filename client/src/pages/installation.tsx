@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
@@ -72,6 +72,106 @@ function getStepFromColumnId(columnId: string): InstallStep | null {
   return null;
 }
 
+interface HorizontalScrollContainerProps {
+  children: ReactNode;
+  className?: string;
+  isDraggingCard?: boolean;
+}
+
+function HorizontalScrollContainer({ children, className, isDraggingCard }: HorizontalScrollContainerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [showLeftFade, setShowLeftFade] = useState(false);
+  const [showRightFade, setShowRightFade] = useState(true);
+
+  const updateFades = useCallback(() => {
+    if (!containerRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = containerRef.current;
+    setShowLeftFade(scrollLeft > 10);
+    setShowRightFade(scrollLeft < scrollWidth - clientWidth - 10);
+  }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    updateFades();
+    container.addEventListener('scroll', updateFades);
+    window.addEventListener('resize', updateFades);
+    return () => {
+      container.removeEventListener('scroll', updateFades);
+      window.removeEventListener('resize', updateFades);
+    };
+  }, [updateFades]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isDraggingCard) return;
+    if ((e.target as HTMLElement).closest('[data-no-drag]')) return;
+    const container = containerRef.current;
+    if (!container) return;
+    setIsDragging(true);
+    setStartX(e.pageX - container.offsetLeft);
+    setScrollLeft(container.scrollLeft);
+    container.style.cursor = 'grabbing';
+    container.style.userSelect = 'none';
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || isDraggingCard) return;
+    e.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+    const x = e.pageX - container.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    container.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    const container = containerRef.current;
+    if (container) {
+      container.style.cursor = 'grab';
+      container.style.userSelect = '';
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (isDragging) {
+      handleMouseUp();
+    }
+  };
+
+  return (
+    <div className="relative">
+      {showLeftFade && (
+        <div className="absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+      )}
+      <div
+        ref={containerRef}
+        className={cn(
+          "flex gap-4 overflow-x-auto pb-4 scroll-smooth",
+          !isDraggingCard && "cursor-grab",
+          isDragging && "cursor-grabbing",
+          className
+        )}
+        style={{ scrollbarWidth: 'thin' }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        data-testid="kanban-board"
+      >
+        {children}
+        <div className="flex-shrink-0 w-4" aria-hidden="true" />
+      </div>
+      {showRightFade && (
+        <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+      )}
+    </div>
+  );
+}
+
 interface JobCardProps {
   lead: Lead;
   technicians: Technician[];
@@ -111,6 +211,7 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
       className="mb-2 cursor-pointer hover:shadow-md transition-shadow bg-white touch-manipulation"
       onClick={onClick}
       data-testid={`card-job-${lead.id}`}
+      data-no-drag
     >
       <CardContent className="p-3">
         <div className="flex items-start gap-2">
@@ -713,7 +814,7 @@ export default function Installation() {
 
           <TabsContent value="kanban" className="mt-4">
             {isLoadingLeads ? (
-              <div className="flex gap-4 overflow-x-auto pb-4">
+              <HorizontalScrollContainer>
                 {INSTALL_STEPS.map((step) => (
                   <div key={step} className="flex-shrink-0 w-72 sm:w-80">
                     <Card className="h-[400px]">
@@ -727,7 +828,7 @@ export default function Installation() {
                     </Card>
                   </div>
                 ))}
-              </div>
+              </HorizontalScrollContainer>
             ) : filteredLeads.length === 0 ? (
               <div className="flex items-center justify-center h-64">
                 <p className="text-muted-foreground text-center" data-testid="text-empty-state">
@@ -741,7 +842,7 @@ export default function Installation() {
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
               >
-                <div className="flex gap-4 overflow-x-auto pb-4" data-testid="kanban-board">
+                <HorizontalScrollContainer isDraggingCard={!!activeId}>
                   {INSTALL_STEPS.map((step) => (
                     <KanbanColumn
                       key={step}
@@ -751,7 +852,7 @@ export default function Installation() {
                       onCardClick={openEditDialog}
                     />
                   ))}
-                </div>
+                </HorizontalScrollContainer>
                 <DragOverlay>
                   {activeLead && (
                     <Card className="w-72 sm:w-80 bg-white shadow-lg">
