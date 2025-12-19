@@ -37,6 +37,7 @@ export default function CreateLeadPage() {
     address: "",
     estimatedValue: "",
     status: "New",
+    jobType: "",
     clientIssue: "",
     projectedCloseDate: "",
     customerType: "",
@@ -132,6 +133,7 @@ export default function CreateLeadPage() {
       address: quote.jobNotes || "",
       estimatedValue: quote.total.toString(),
       status: "Quote Sent",
+      jobType: "",
       clientIssue: `Quote #${quote.id.slice(0, 8)} - ${(quote.parts as any[]).map(p => p.description).join(', ')}`,
       projectedCloseDate: "",
       customerType: "",
@@ -348,11 +350,22 @@ export default function CreateLeadPage() {
       return;
     }
 
+    const tags: string[] = [];
+    if (formData.jobType === "installation") {
+      tags.push("installation");
+    }
+    if (formData.jobType === "maintenance") {
+      tags.push("maintenance");
+    }
+
     const submitData: any = {
       ...formData,
       estimatedValue: formData.estimatedValue ? formData.estimatedValue : undefined,
       quoteId: formData.quoteId || undefined,
+      tags: tags.length > 0 ? tags : undefined,
     };
+
+    delete submitData.jobType;
 
     if (formData.projectedCloseDate) {
       submitData.projectedCloseDate = new Date(formData.projectedCloseDate).toISOString();
@@ -671,6 +684,23 @@ export default function CreateLeadPage() {
                   <SelectItem value="Negotiating">Negotiating</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium block mb-1.5">Job Type</label>
+              <Select value={formData.jobType} onValueChange={(value) => setFormData({ ...formData, jobType: value })}>
+                <SelectTrigger className="min-h-[44px] min-w-0 w-full" data-testid="select-job-type">
+                  <SelectValue placeholder="Select job type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="installation">Installation</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              {formData.jobType === "installation" && (
+                <p className="text-xs text-muted-foreground mt-1">This lead will appear on the Installation board when Won</p>
+              )}
             </div>
 
             <div>
