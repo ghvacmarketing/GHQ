@@ -100,6 +100,47 @@ const BRAND_OPTIONS = ["All Brands", "Trane", "Carrier", "RunTru", "Ameristar"];
 const OUTDOOR_UNIT_TYPES = ["Air Conditioner", "Heat Pump"];
 const INDOOR_UNIT_TYPES = ["Gas Furnace", "Air Handler"];
 
+const formatPrice = (price: number) => '$' + price.toLocaleString();
+
+function calculateCustomBuildEstimate(
+  outdoorUnit: PricebookComponent | null,
+  coil: PricebookComponent | null,
+  indoorUnit: PricebookComponent | null,
+  thermostat: PricebookComponent | null
+): number {
+  let total = 0;
+  
+  if (outdoorUnit) {
+    if (outdoorUnit.componentType === "Heat Pump") {
+      total += 4500;
+    } else {
+      total += 3500;
+    }
+  }
+  
+  if (coil) {
+    total += 800;
+  }
+  
+  if (indoorUnit) {
+    if (indoorUnit.componentType === "Air Handler") {
+      total += 2000;
+    } else {
+      total += 1800;
+    }
+  }
+  
+  if (thermostat) {
+    if (thermostat.unitName.toLowerCase().includes('smart') || thermostat.unitName.toLowerCase().includes('wifi')) {
+      total += 350;
+    } else {
+      total += 250;
+    }
+  }
+  
+  return total;
+}
+
 function extractTonnageFromModel(model: string): string | null {
   const match = model.match(/0?(18|24|30|36|42|48|60)/);
   if (!match) return null;
@@ -294,6 +335,30 @@ export default function ProposalBuilder() {
     return cart.reduce((sum, item) => sum + item.quantity, 0);
   }, [cart]);
 
+  const cartTotal = useMemo(() => {
+    return cart.reduce((sum, item) => {
+      if (item.isCustomBuild) {
+        return sum + calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat) * item.quantity;
+      } else {
+        return sum + (parseFloat(item.totalInvestment) || 0) * item.quantity;
+      }
+    }, 0);
+  }, [cart]);
+
+  const cartMonthlyTotal = useMemo(() => {
+    return cart.reduce((sum, item) => {
+      if (item.isCustomBuild) {
+        return sum + Math.round(calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat) / 67) * item.quantity;
+      } else {
+        return sum + (parseFloat(item.monthlyPayment) || 0) * item.quantity;
+      }
+    }, 0);
+  }, [cart]);
+
+  const hasEstimatedItems = useMemo(() => {
+    return cart.some(item => item.isCustomBuild);
+  }, [cart]);
+
   const currentStep = useMemo(() => {
     if (!selectedUnitType) return 1;
     if (!selectedTier) return 2;
@@ -419,75 +484,53 @@ export default function ProposalBuilder() {
       day: 'numeric',
     });
 
-    let quoteText = `GIESBRECHT HVAC - EQUIPMENT PROPOSAL\n`;
-    quoteText += `${'='.repeat(50)}\n\n`;
+    let quoteText = `GHVAC EQUIPMENT PROPOSAL\n`;
+    quoteText += `${'='.repeat(40)}\n\n`;
     quoteText += `Date: ${date}\n`;
-    if (customerName) quoteText += `Customer: ${customerName}\n`;
+    if (customerName) quoteText += `Prepared for: ${customerName}\n`;
     if (customerAddress) quoteText += `Address: ${customerAddress}\n`;
-    quoteText += `\n${'-'.repeat(50)}\n`;
-    quoteText += `PACKAGES SELECTED:\n`;
-    quoteText += `${'-'.repeat(50)}\n\n`;
+    quoteText += `\nEQUIPMENT SUMMARY\n`;
+    quoteText += `${'-'.repeat(40)}\n\n`;
 
     cart.forEach((item, index) => {
       if (item.isCustomBuild) {
-        // Custom build format
-        quoteText += `${index + 1}. CUSTOM BUILD - ${item.tonnage}\n`;
-        quoteText += `   ${'-'.repeat(30)}\n`;
-        quoteText += `   Outdoor Unit: ${item.outdoorUnit.brand} ${item.outdoorUnit.model}\n`;
-        quoteText += `     ${item.outdoorUnit.unitName} - ${item.outdoorUnit.description}\n\n`;
-        quoteText += `   Evaporator Coil: ${item.coil.brand} ${item.coil.model}\n`;
-        quoteText += `     ${item.coil.unitName}\n\n`;
-        quoteText += `   Indoor Unit: ${item.indoorUnit.brand} ${item.indoorUnit.model}\n`;
-        quoteText += `     ${item.indoorUnit.unitName} - ${item.indoorUnit.description}\n\n`;
-        quoteText += `   Thermostat: ${item.thermostat.brand} ${item.thermostat.model}\n`;
-        quoteText += `     ${item.thermostat.unitName}\n`;
-        quoteText += `   ${'-'.repeat(30)}\n`;
-        quoteText += `   Qty: ${item.quantity}\n\n`;
+        const itemPrice = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat) * item.quantity;
+        quoteText += `${index + 1}. Custom Build - ${item.tonnage} System\n`;
+        quoteText += `   - ${item.outdoorUnit.brand} ${item.outdoorUnit.unitName}\n`;
+        quoteText += `   - ${item.coil.brand} ${item.coil.unitName}\n`;
+        quoteText += `   - ${item.indoorUnit.brand} ${item.indoorUnit.unitName}\n`;
+        quoteText += `   - ${item.thermostat.brand} ${item.thermostat.unitName}\n`;
+        quoteText += `   Price: ${formatPrice(itemPrice)} (Estimated)\n`;
+        if (item.quantity > 1) quoteText += `   Qty: ${item.quantity}\n`;
+        quoteText += `\n`;
       } else {
-        // Preset package format
         const unitTypeName = UNIT_TYPE_INFO[item.unitType]?.name || item.unitType;
-        quoteText += `${index + 1}. ${item.packageLevel.toUpperCase()} PACKAGE\n`;
-        quoteText += `   System: ${unitTypeName}\n`;
-        quoteText += `   Tier: ${item.tier} | Size: ${item.extractedTonnage}\n`;
-        quoteText += `   Qty: ${item.quantity}\n\n`;
-        quoteText += `   COMPONENTS:\n`;
-        quoteText += `   • Outdoor Unit: ${item.outdoorBrand} ${item.outdoorModel}\n`;
-        quoteText += `     ${item.outdoorName}\n`;
-        if (item.coilModel) {
-          quoteText += `   • Evaporator Coil: ${item.coilModel}\n`;
-          quoteText += `     ${item.coilName}\n`;
-        }
-        if (item.indoorHeatModel) {
-          quoteText += `   • Indoor Unit: ${item.indoorHeatModel}\n`;
-          quoteText += `     ${item.indoorHeatName}\n`;
-        }
-        if (item.thermostatModel) {
-          quoteText += `   • Thermostat: ${item.thermostatModel}\n`;
-          quoteText += `     ${item.thermostatName}\n`;
-        }
+        const itemPrice = (parseFloat(item.totalInvestment) || 0) * item.quantity;
+        quoteText += `${index + 1}. ${item.packageLevel} Package - ${item.extractedTonnage}\n`;
+        quoteText += `   ${unitTypeName} (${item.tier})\n`;
+        quoteText += `   - ${item.outdoorBrand} ${item.outdoorName}\n`;
+        if (item.indoorHeatName) quoteText += `   - ${item.indoorHeatName}\n`;
+        if (item.thermostatName) quoteText += `   - ${item.thermostatName}\n`;
+        quoteText += `   Price: ${formatPrice(itemPrice)}\n`;
+        if (item.quantity > 1) quoteText += `   Qty: ${item.quantity}\n`;
         quoteText += `\n`;
       }
     });
 
-    quoteText += `${'-'.repeat(50)}\n`;
-    quoteText += `SUMMARY:\n`;
-    quoteText += `${'-'.repeat(50)}\n`;
-    quoteText += `Total Packages: ${cartItemCount}\n`;
-    quoteText += `\n`;
-    quoteText += `* Pricing to be calculated using Quote Generator\n`;
-
-    if (customerNotes) {
-      quoteText += `\n${'-'.repeat(50)}\n`;
-      quoteText += `NOTES:\n`;
-      quoteText += `${'-'.repeat(50)}\n`;
-      quoteText += `${customerNotes}\n`;
+    quoteText += `${'-'.repeat(40)}\n`;
+    quoteText += `TOTAL INVESTMENT: ${formatPrice(cartTotal)}${hasEstimatedItems ? ' *' : ''}\n`;
+    quoteText += `Monthly Payment: ${formatPrice(cartMonthlyTotal)}/mo (with approved financing)\n`;
+    if (hasEstimatedItems) {
+      quoteText += `* Includes estimated pricing for custom builds\n`;
     }
 
-    quoteText += `\n${'-'.repeat(50)}\n`;
-    quoteText += `This is an informal proposal.\n`;
-    quoteText += `Contact us for a formal quote with pricing.\n`;
-    quoteText += `\n`;
-    quoteText += `Thank you for choosing Giesbrecht HVAC!\n`;
+    if (customerNotes) {
+      quoteText += `\nNotes:\n${customerNotes}\n`;
+    }
+
+    quoteText += `\n${'-'.repeat(40)}\n`;
+    quoteText += `Thank you for considering GHVAC!\n`;
+    quoteText += `This proposal is valid for 30 days.\n`;
 
     setGeneratedQuote(quoteText);
     setQuoteDialogOpen(true);
@@ -713,6 +756,14 @@ export default function ProposalBuilder() {
                                   <p className="text-xs text-muted-foreground">
                                     {item.indoorUnit.brand} {item.indoorUnit.componentType}
                                   </p>
+                                  <div className="mt-2 pt-2 border-t">
+                                    <div className="flex items-center gap-1">
+                                      <Badge variant="outline" className="text-xs">Est.</Badge>
+                                      <span className="font-bold text-sm text-primary">
+                                        {formatPrice(calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat) * item.quantity)}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </>
                               ) : (
                                 <>
@@ -733,6 +784,14 @@ export default function ProposalBuilder() {
                                   <p className="text-xs text-muted-foreground mt-1">
                                     {item.outdoorBrand} {item.outdoorModel}
                                   </p>
+                                  <div className="mt-2 pt-2 border-t">
+                                    <p className="font-bold text-sm text-primary">
+                                      {formatPrice((parseFloat(item.totalInvestment) || 0) * item.quantity)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatPrice((parseFloat(item.monthlyPayment) || 0) * item.quantity)}/mo
+                                    </p>
+                                  </div>
                                 </>
                               )}
                             </div>
@@ -777,9 +836,18 @@ export default function ProposalBuilder() {
                       />
                     </div>
                     <Separator />
-                    <p className="text-xs text-muted-foreground text-center">
-                      Pricing to be calculated using Quote Generator
-                    </p>
+                    <div className="bg-muted p-3 rounded-lg">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium">
+                          Total Investment {hasEstimatedItems && <Badge variant="outline" className="ml-1 text-xs">Includes Est.</Badge>}
+                        </span>
+                        <span className="text-xl font-bold text-primary">{formatPrice(cartTotal)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm text-muted-foreground">
+                        <span>Monthly Payment</span>
+                        <span>{formatPrice(cartMonthlyTotal)}/mo</span>
+                      </div>
+                    </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
@@ -995,11 +1063,21 @@ export default function ProposalBuilder() {
                           </div>
                         )}
                         <CardHeader className="pb-2">
-                          <div className="flex items-center gap-2">
-                            <Badge className={`${getPackageLevelColor(pkg.packageLevel)} text-white`}>
-                              {pkg.packageLevel}
-                            </Badge>
-                            <span className="text-sm text-muted-foreground">{pkg.outdoorBrand}</span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Badge className={`${getPackageLevelColor(pkg.packageLevel)} text-white`}>
+                                {pkg.packageLevel}
+                              </Badge>
+                              <span className="text-sm text-muted-foreground">{pkg.outdoorBrand}</span>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xl font-bold text-primary">
+                                {formatPrice(parseFloat(pkg.totalInvestment) || 0)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatPrice(parseFloat(pkg.monthlyPayment) || 0)}/mo financing
+                              </p>
+                            </div>
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
@@ -1128,10 +1206,17 @@ export default function ProposalBuilder() {
                     <h2 className="text-xl font-semibold">Build Your {customTonnage} System</h2>
                     <p className="text-muted-foreground">Select one component from each category</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-sm">
-                      <span className="font-medium">{[selectedOutdoorUnit, selectedCoil, selectedIndoorUnit, selectedThermostat].filter(Boolean).length}</span>
-                      <span className="text-muted-foreground"> / 4 selected</span>
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                    <div className="text-right">
+                      <div className="flex items-center gap-2 justify-end">
+                        <Badge variant="outline" className="text-xs">Estimated</Badge>
+                        <span className="text-xl font-bold text-primary">
+                          {formatPrice(calculateCustomBuildEstimate(selectedOutdoorUnit, selectedCoil, selectedIndoorUnit, selectedThermostat))}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {[selectedOutdoorUnit, selectedCoil, selectedIndoorUnit, selectedThermostat].filter(Boolean).length} / 4 components
+                      </p>
                     </div>
                     <Button
                       className="min-h-[44px]"
@@ -1246,35 +1331,159 @@ export default function ProposalBuilder() {
       </main>
 
       <Dialog open={quoteDialogOpen} onOpenChange={setQuoteDialogOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Equipment Proposal
-            </DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh]">
-            <pre className="text-xs sm:text-sm whitespace-pre-wrap font-mono bg-muted p-4 rounded-lg">
-              {generatedQuote}
-            </pre>
+        <DialogContent className="sm:max-w-3xl max-h-[95vh] p-0 overflow-hidden">
+          <div className="bg-gradient-to-r from-red-700 to-red-800 text-white p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img
+                  src={redlogo}
+                  alt="GHVAC"
+                  className="h-10 sm:h-12 w-auto bg-white rounded-md p-1"
+                />
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold">GHVAC Tools</h1>
+                  <p className="text-sm text-red-100">Equipment Proposal</p>
+                </div>
+              </div>
+              <Badge className="bg-white/20 text-white border-white/30">
+                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </Badge>
+            </div>
+          </div>
+          
+          <ScrollArea className="max-h-[calc(95vh-200px)] p-4 sm:p-6">
+            {(customerName || customerAddress) && (
+              <div className="mb-6 p-4 bg-muted rounded-lg">
+                <h3 className="text-sm font-semibold text-muted-foreground mb-2">PREPARED FOR</h3>
+                {customerName && <p className="font-medium text-lg">{customerName}</p>}
+                {customerAddress && <p className="text-muted-foreground">{customerAddress}</p>}
+              </div>
+            )}
+
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-muted-foreground mb-3">EQUIPMENT SUMMARY</h3>
+              <div className="space-y-3">
+                {cart.map((item, index) => {
+                  if (item.isCustomBuild) {
+                    const itemPrice = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat) * item.quantity;
+                    return (
+                      <div key={item.id} className="border rounded-lg p-4 bg-card">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge className="bg-green-500 text-white text-xs">
+                                <Wrench className="h-3 w-3 mr-1" />
+                                Custom Build
+                              </Badge>
+                              <span className="text-sm text-muted-foreground">{item.tonnage}</span>
+                              {item.quantity > 1 && <Badge variant="outline">x{item.quantity}</Badge>}
+                            </div>
+                            <div className="text-sm space-y-1 text-muted-foreground">
+                              <p>• {item.outdoorUnit.brand} {item.outdoorUnit.unitName}</p>
+                              <p>• {item.coil.brand} {item.coil.unitName}</p>
+                              <p>• {item.indoorUnit.brand} {item.indoorUnit.unitName}</p>
+                              <p>• {item.thermostat.brand} {item.thermostat.unitName}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant="outline" className="mb-1 text-xs">Estimated</Badge>
+                            <p className="text-xl font-bold text-primary">{formatPrice(itemPrice)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    const itemPrice = (parseFloat(item.totalInvestment) || 0) * item.quantity;
+                    const monthlyPrice = (parseFloat(item.monthlyPayment) || 0) * item.quantity;
+                    return (
+                      <div key={item.id} className="border rounded-lg p-4 bg-card">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge className={`${getPackageLevelColor(item.packageLevel)} text-white text-xs`}>
+                                {item.packageLevel}
+                              </Badge>
+                              <span className="text-sm text-muted-foreground">{item.extractedTonnage}</span>
+                              {item.quantity > 1 && <Badge variant="outline">x{item.quantity}</Badge>}
+                            </div>
+                            <p className="font-medium">{UNIT_TYPE_INFO[item.unitType]?.name || item.unitType}</p>
+                            <p className="text-sm text-muted-foreground">{item.tier} Tier</p>
+                            <div className="text-sm space-y-1 text-muted-foreground mt-2">
+                              <p>• {item.outdoorBrand} {item.outdoorName}</p>
+                              {item.indoorHeatName && <p>• {item.indoorHeatName}</p>}
+                              {item.thermostatName && <p>• {item.thermostatName}</p>}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xl font-bold text-primary">{formatPrice(itemPrice)}</p>
+                            <p className="text-sm text-muted-foreground">{formatPrice(monthlyPrice)}/mo</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                })}
+              </div>
+            </div>
+
+            <Separator className="my-6" />
+
+            <div className="bg-muted rounded-lg p-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium">{formatPrice(cartTotal)}</span>
+              </div>
+              {hasEstimatedItems && (
+                <p className="text-xs text-muted-foreground mb-2">* Includes estimated pricing for custom builds</p>
+              )}
+              <Separator className="my-3" />
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-bold">Total Investment</span>
+                <span className="text-2xl font-bold text-primary">{formatPrice(cartTotal)}</span>
+              </div>
+              <div className="flex justify-between items-center mt-1">
+                <span className="text-sm text-muted-foreground">Monthly Payment (with approved financing)</span>
+                <span className="text-sm font-medium">{formatPrice(cartMonthlyTotal)}/mo</span>
+              </div>
+            </div>
+
+            {customerNotes && (
+              <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-2">Notes</h3>
+                <p className="text-sm text-amber-700 dark:text-amber-300">{customerNotes}</p>
+              </div>
+            )}
+
+            <div className="mt-6 p-4 bg-muted/50 rounded-lg text-center">
+              <p className="text-xs text-muted-foreground">
+                This proposal is valid for 30 days. Prices are subject to change.
+                Financing terms are subject to credit approval.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Thank you for considering GHVAC!
+              </p>
+            </div>
           </ScrollArea>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setQuoteDialogOpen(false)}
-              className="w-full sm:w-auto min-h-[44px]"
-            >
-              Close
-            </Button>
-            <Button
-              onClick={copyQuoteToClipboard}
-              className="w-full sm:w-auto min-h-[44px]"
-              data-testid="button-copy-quote"
-            >
-              <Copy className="h-4 w-4 mr-2" />
-              Copy to Clipboard
-            </Button>
-          </DialogFooter>
+          
+          <div className="border-t p-4 bg-card">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setQuoteDialogOpen(false)}
+                className="flex-1 min-h-[44px]"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={copyQuoteToClipboard}
+                className="flex-1 min-h-[44px]"
+                data-testid="button-copy-quote"
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy to Clipboard
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
