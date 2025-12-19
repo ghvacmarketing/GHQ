@@ -2142,7 +2142,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Lead not found" });
       }
       
-      const updatedLead = await storage.updateLead(req.params.id, req.body);
+      // Convert date string fields to Date objects for Drizzle
+      const updateData = { ...req.body };
+      if (updateData.installDate && typeof updateData.installDate === 'string') {
+        updateData.installDate = new Date(updateData.installDate);
+      }
+      if (updateData.projectedCloseDate && typeof updateData.projectedCloseDate === 'string') {
+        updateData.projectedCloseDate = new Date(updateData.projectedCloseDate);
+      }
+      if (updateData.closedAt && typeof updateData.closedAt === 'string') {
+        updateData.closedAt = new Date(updateData.closedAt);
+      }
+      
+      const updatedLead = await storage.updateLead(req.params.id, updateData);
       
       // Track changes to key fields in history
       const actor = (req.session as any)?.user?.phone || "system";
