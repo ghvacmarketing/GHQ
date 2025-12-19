@@ -261,8 +261,7 @@ export default function Installation() {
   const salesPeople = useMemo(() => {
     return technicians.filter((tech) => 
       tech.name.toLowerCase().includes("chandler") || 
-      tech.name.toLowerCase().includes("earnest") ||
-      tech.name.toLowerCase().includes("tucker")
+      tech.name.toLowerCase().includes("earnest")
     );
   }, [technicians]);
 
