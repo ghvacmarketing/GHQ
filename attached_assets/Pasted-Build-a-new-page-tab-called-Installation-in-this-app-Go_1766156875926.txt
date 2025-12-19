@@ -1,0 +1,130 @@
+Build a new page/tab called “Installation” in this app.
+
+Goal
+
+Create an Installation Pipeline Kanban board that automatically shows all jobs that are in “Won” AND are tagged “installation” (or jobType = installation). This page is for tracking where each install project is in the install process.
+
+Where to add it
+
+Add a new route/page: client/src/pages/installation.tsx (or match existing routing pattern)
+
+Add a navigation item in the main menu/dropdown: Installation
+
+The page must match the existing app theme and styling (same fonts, spacing, card style, colors).
+
+Data rules (important)
+
+Source the jobs from the same data source the app uses for “Won” / quotes / prospects.
+
+Only include records where:
+
+stage === "Won" (or whatever the app uses to represent “Won”), AND
+
+job is installation via either:
+
+tags includes "installation", OR
+
+jobType === "installation" (support whichever exists; if both exist, use either).
+
+If the app doesn’t currently store a “pipeline step” for installation, add one:
+
+field like installStep (string) and optional installOrder (number for ordering within a column)
+
+Kanban columns (exact steps)
+
+Create these columns left → right (as separate swimlanes):
+
+Define Scope of Work
+
+Assign to Sub-Contractor
+
+Order Equipment & Materials
+
+Waiting on Equipment & Material
+
+Warehouse: Equipment Arrived
+
+Spec Out Project
+
+Warehouse: Stage Equipment & Materials
+
+Schedule Job
+
+Card design (what each job card shows)
+
+Each card should show (if available in data):
+
+Customer / Project name
+
+Address (or city if address missing)
+
+Project total (price)
+
+Target install date (if present)
+
+Assigned tech / PM (if present)
+
+Small badges for tags (include “installation”)
+
+A quick “notes” preview (optional)
+
+Cards should be clickable to open a detail drawer/modal to edit:
+
+installStep
+
+notes
+
+assignedTo
+
+target dates
+
+checklist items (optional, can be v2)
+
+Interaction requirements
+
+Implement drag-and-drop between columns (Trello style)
+
+When a card is dropped in a new column, update installStep in the database and persist it.
+
+Keep ordering within the column (use installOrder if you add it).
+
+Use optimistic UI updates (instant move, then save).
+
+Add top controls:
+
+Search by customer/address
+
+Filter by assignedTo (if possible)
+
+Filter by date range (optional)
+
+Empty state: “No installation jobs found in Won.”
+
+Tech constraints
+
+Use the existing stack (React + TS) and the same component system already used (shadcn/ui if present).
+
+For drag/drop use @dnd-kit (preferred) or another lightweight library that works well in React.
+
+Reuse existing API helpers/services already in the repo.
+
+Don’t break existing pages/routes.
+
+Acceptance criteria
+
+I can click Installation in the nav and see the board.
+
+It shows only Won + installation jobs.
+
+I can drag a job from one step to another and refreshing the page keeps it there (saved).
+
+The UI matches the current theme.
+
+Before coding, scan the codebase for:
+
+how “Won” is represented
+
+where tags/jobType live
+
+how jobs/quotes are fetched and updated
+Then implement using the same patterns.

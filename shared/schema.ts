@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, boolean, json } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, timestamp, boolean, json, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -280,6 +280,9 @@ export const leads = pgTable("leads", {
   deletedBy: text("deleted_by"),
   updatedAt: timestamp("updated_at").defaultNow(),
   tags: json("tags").$type<string[]>().notNull().default([]),
+  // Installation pipeline fields
+  installStep: text("install_step"), // Kanban column for installation tracking
+  installOrder: integer("install_order").default(0), // Order within column
 });
 
 // Lead History / Audit Trail
