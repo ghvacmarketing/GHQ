@@ -7,6 +7,7 @@ import connectPgSimple from "connect-pg-simple";
 import { storage } from "./storage";
 import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
+import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
@@ -563,6 +564,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(technicians);
     } catch (error) {
       res.status(500).json({ message: "Error fetching technicians" });
+    }
+  });
+
+  // Get equipment for proposal builder (from Google Sheets or defaults)
+  app.get("/api/equipment", async (req, res) => {
+    try {
+      const forceRefresh = req.query.refresh === 'true';
+      const categories = await equipmentSheetsService.fetchEquipment(forceRefresh);
+      res.json(categories);
+    } catch (error) {
+      console.error('Error fetching equipment:', error);
+      res.status(500).json({ message: "Error fetching equipment" });
+    }
+  });
+
+  // Get equipment cache metadata
+  app.get("/api/equipment/cache-metadata", async (req, res) => {
+    try {
+      const metadata = equipmentSheetsService.getCacheMetadata();
+      res.json(metadata);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching cache metadata" });
     }
   });
 
