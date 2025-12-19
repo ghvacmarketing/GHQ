@@ -1,28 +1,85 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, Check, ChevronRight, Plus, Minus, ShoppingCart, Trash2, X, Info, FileText, Copy, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
-import type { Equipment, EquipmentCategory, ProposalEquipment } from "@shared/schema";
+import packagesData from "@assets/pricebook-packages.json";
 
 const CART_STORAGE_KEY = 'ghvac-proposal-cart';
 const CUSTOMER_STORAGE_KEY = 'ghvac-proposal-customer';
 
-function loadCartFromStorage(): ProposalEquipment[] {
+type PricebookPackage = {
+  unitType: string;
+  tier: string;
+  tonnage: string;
+  packageLevel: string;
+  monthlyPayment: string;
+  totalInvestment: string;
+  outdoorBrand: string;
+  outdoorModel: string;
+  outdoorName: string;
+  coilModel: string;
+  coilName: string;
+  indoorHeatModel: string;
+  indoorHeatName: string;
+  thermostatModel: string;
+  thermostatName: string;
+  accessoryModels: string;
+};
+
+type CartPackage = PricebookPackage & {
+  id: string;
+  extractedTonnage: string;
+  quantity: number;
+};
+
+const packages: PricebookPackage[] = packagesData as PricebookPackage[];
+
+const UNIT_TYPE_INFO: Record<string, { name: string; description: string; icon: typeof Package }> = {
+  SGA: { name: "Air Conditioner + Gas Furnace", description: "Split Gas Air system for heating and cooling", icon: Thermometer },
+  SHP: { name: "Heat Pump System", description: "All-electric heating and cooling solution", icon: Zap },
+  STA: { name: "Heat Pump + Gas Furnace", description: "Dual fuel system for maximum efficiency", icon: Award },
+};
+
+const TIER_INFO: Record<string, { description: string }> = {
+  Essential: { description: "Standard efficiency, reliable performance" },
+  Premium: { description: "High efficiency, enhanced features" },
+  Ultimate: { description: "Top-tier efficiency, maximum comfort" },
+};
+
+const PACKAGE_LEVEL_ORDER = ["Budget", "Good", "Better", "Best"];
+
+function extractTonnageFromModel(model: string): string | null {
+  const match = model.match(/0?(18|24|30|36|42|48|60)/);
+  if (!match) return null;
+  const tonnageMap: Record<string, string> = {
+    "18": "1.5 Ton",
+    "24": "2 Ton",
+    "30": "2.5 Ton",
+    "36": "3 Ton",
+    "42": "3.5 Ton",
+    "48": "4 Ton",
+    "60": "5 Ton",
+  };
+  return tonnageMap[match[1]] || null;
+}
+
+function generatePackageId(pkg: PricebookPackage, tonnage: string): string {
+  return `${pkg.unitType}-${pkg.tier}-${tonnage}-${pkg.packageLevel}-${pkg.outdoorModel}`;
+}
+
+function loadCartFromStorage(): CartPackage[] {
   if (typeof window === 'undefined') return [];
   try {
     const stored = localStorage.getItem(CART_STORAGE_KEY);
@@ -50,9 +107,10 @@ function loadCustomerFromStorage(): { name: string; address: string; notes: stri
 
 export default function ProposalBuilder() {
   const { toast } = useToast();
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
-  const [cart, setCart] = useState<ProposalEquipment[]>(() => loadCartFromStorage());
+  const [selectedUnitType, setSelectedUnitType] = useState<string | null>(null);
+  const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [selectedTonnage, setSelectedTonnage] = useState<string | null>(null);
+  const [cart, setCart] = useState<CartPackage[]>(() => loadCartFromStorage());
   const [cartOpen, setCartOpen] = useState(false);
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
   const [customerName, setCustomerName] = useState(() => loadCustomerFromStorage().name);
@@ -72,81 +130,93 @@ export default function ProposalBuilder() {
     }));
   }, [customerName, customerAddress, customerNotes]);
 
-  const { data: categories, isLoading } = useQuery<EquipmentCategory[]>({
-    queryKey: ['/api/equipment'],
-  });
+  const unitTypes = useMemo(() => {
+    return Array.from(new Set(packages.map(p => p.unitType)));
+  }, []);
 
-  const currentCategory = useMemo(() => {
-    if (!categories || !selectedCategory) return null;
-    return categories.find(c => c.name === selectedCategory);
-  }, [categories, selectedCategory]);
+  const tiersForUnitType = useMemo(() => {
+    if (!selectedUnitType) return [];
+    return Array.from(new Set(packages.filter(p => p.unitType === selectedUnitType).map(p => p.tier)));
+  }, [selectedUnitType]);
 
-  const filteredEquipment = useMemo(() => {
-    if (!currentCategory) return [];
-    if (!selectedSubcategory || selectedSubcategory === 'all') {
-      return currentCategory.equipment;
-    }
-    return currentCategory.equipment.filter(e => e.subcategory === selectedSubcategory);
-  }, [currentCategory, selectedSubcategory]);
+  const tonnagesForSelection = useMemo(() => {
+    if (!selectedUnitType || !selectedTier) return [];
+    const filteredPackages = packages.filter(
+      p => p.unitType === selectedUnitType && p.tier === selectedTier
+    );
+    const tonnages = new Set<string>();
+    filteredPackages.forEach(pkg => {
+      const tonnage = extractTonnageFromModel(pkg.outdoorModel);
+      if (tonnage) tonnages.add(tonnage);
+    });
+    return Array.from(tonnages).sort((a, b) => {
+      const numA = parseInt(a);
+      const numB = parseInt(b);
+      return numA - numB;
+    });
+  }, [selectedUnitType, selectedTier]);
 
-  const cartTotal = useMemo(() => {
-    return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  }, [cart]);
+  const packageOptions = useMemo(() => {
+    if (!selectedUnitType || !selectedTier || !selectedTonnage) return [];
+    const tonnageCode = selectedTonnage.replace(" Ton", "").padStart(2, "0") + (selectedTonnage === "2 Ton" ? "4" : selectedTonnage === "3 Ton" ? "6" : selectedTonnage === "4 Ton" ? "8" : "0");
+    const tonnagePattern = selectedTonnage === "2 Ton" ? "024" : selectedTonnage === "3 Ton" ? "036" : selectedTonnage === "4 Ton" ? "048" : "060";
+    
+    const filtered = packages.filter(pkg => {
+      if (pkg.unitType !== selectedUnitType || pkg.tier !== selectedTier) return false;
+      const extracted = extractTonnageFromModel(pkg.outdoorModel);
+      return extracted === selectedTonnage;
+    });
+    
+    return filtered.sort((a, b) => {
+      return PACKAGE_LEVEL_ORDER.indexOf(a.packageLevel) - PACKAGE_LEVEL_ORDER.indexOf(b.packageLevel);
+    });
+  }, [selectedUnitType, selectedTier, selectedTonnage]);
 
   const cartItemCount = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.quantity, 0);
   }, [cart]);
 
-  const addToCart = (equipment: Equipment) => {
+  const currentStep = useMemo(() => {
+    if (!selectedUnitType) return 1;
+    if (!selectedTier) return 2;
+    if (!selectedTonnage) return 3;
+    return 4;
+  }, [selectedUnitType, selectedTier, selectedTonnage]);
+
+  const addToCart = (pkg: PricebookPackage) => {
+    const extractedTonnage = selectedTonnage || extractTonnageFromModel(pkg.outdoorModel) || "Unknown";
+    const id = generatePackageId(pkg, extractedTonnage);
+    
     setCart(prev => {
-      const existing = prev.find(item => item.id === equipment.id);
+      const existing = prev.find(item => item.id === id);
       if (existing) {
         return prev.map(item =>
-          item.id === equipment.id
+          item.id === id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
-      return [...prev, { ...equipment, quantity: 1 }];
+      return [...prev, { ...pkg, id, extractedTonnage, quantity: 1 }];
+    });
+
+    toast({
+      title: "Added to Proposal",
+      description: `${pkg.outdoorBrand} ${pkg.packageLevel} package added.`,
     });
   };
 
-  const removeFromCart = (equipmentId: string) => {
-    setCart(prev => prev.filter(item => item.id !== equipmentId));
-  };
-
-  const updateQuantity = (equipmentId: string, delta: number) => {
-    setCart(prev => {
-      return prev.map(item => {
-        if (item.id === equipmentId) {
-          const newQty = item.quantity + delta;
-          if (newQty <= 0) return null;
-          return { ...item, quantity: newQty };
-        }
-        return item;
-      }).filter(Boolean) as ProposalEquipment[];
-    });
-  };
-
-  const getItemInCart = (equipmentId: string) => {
-    return cart.find(item => item.id === equipmentId);
+  const removeFromCart = (packageId: string) => {
+    setCart(prev => prev.filter(item => item.id !== packageId));
   };
 
   const handleBack = () => {
-    if (selectedSubcategory) {
-      setSelectedSubcategory(null);
-    } else if (selectedCategory) {
-      setSelectedCategory(null);
+    if (selectedTonnage) {
+      setSelectedTonnage(null);
+    } else if (selectedTier) {
+      setSelectedTier(null);
+    } else if (selectedUnitType) {
+      setSelectedUnitType(null);
     }
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price);
   };
 
   const clearCart = () => {
@@ -156,7 +226,7 @@ export default function ProposalBuilder() {
     setCustomerNotes('');
     toast({
       title: "Cart Cleared",
-      description: "All items have been removed from your proposal.",
+      description: "All packages have been removed from your proposal.",
     });
   };
 
@@ -169,57 +239,56 @@ export default function ProposalBuilder() {
       day: 'numeric',
     });
 
-    const totalLaborHours = cart.reduce((sum, item) => {
-      return sum + ((item.laborHours || 0) * item.quantity);
-    }, 0);
-
     let quoteText = `GIESBRECHT HVAC - EQUIPMENT PROPOSAL\n`;
-    quoteText += `${'='.repeat(45)}\n\n`;
+    quoteText += `${'='.repeat(50)}\n\n`;
     quoteText += `Date: ${date}\n`;
     if (customerName) quoteText += `Customer: ${customerName}\n`;
     if (customerAddress) quoteText += `Address: ${customerAddress}\n`;
-    quoteText += `\n${'-'.repeat(45)}\n`;
-    quoteText += `EQUIPMENT SELECTED:\n`;
-    quoteText += `${'-'.repeat(45)}\n\n`;
+    quoteText += `\n${'-'.repeat(50)}\n`;
+    quoteText += `PACKAGES SELECTED:\n`;
+    quoteText += `${'-'.repeat(50)}\n\n`;
 
     cart.forEach((item, index) => {
-      quoteText += `${index + 1}. ${item.description}\n`;
-      quoteText += `   Brand: ${item.brand} | Model: ${item.model}\n`;
-      const specs = [];
-      if (item.tonnage) specs.push(item.tonnage);
-      if (item.btu) specs.push(item.btu);
-      if (item.seer) specs.push(item.seer);
-      if (item.afue) specs.push(item.afue);
-      if (item.hspf) specs.push(item.hspf);
-      if (specs.length > 0) {
-        quoteText += `   Specs: ${specs.join(' | ')}\n`;
+      const unitTypeName = UNIT_TYPE_INFO[item.unitType]?.name || item.unitType;
+      quoteText += `${index + 1}. ${item.packageLevel.toUpperCase()} PACKAGE\n`;
+      quoteText += `   System: ${unitTypeName}\n`;
+      quoteText += `   Tier: ${item.tier} | Size: ${item.extractedTonnage}\n`;
+      quoteText += `   Qty: ${item.quantity}\n\n`;
+      quoteText += `   COMPONENTS:\n`;
+      quoteText += `   • Outdoor Unit: ${item.outdoorBrand} ${item.outdoorModel}\n`;
+      quoteText += `     ${item.outdoorName}\n`;
+      if (item.coilModel) {
+        quoteText += `   • Evaporator Coil: ${item.coilModel}\n`;
+        quoteText += `     ${item.coilName}\n`;
       }
-      if (item.warranty) {
-        quoteText += `   Warranty: ${item.warranty}\n`;
+      if (item.indoorHeatModel) {
+        quoteText += `   • Indoor Unit: ${item.indoorHeatModel}\n`;
+        quoteText += `     ${item.indoorHeatName}\n`;
       }
-      quoteText += `   Qty: ${item.quantity} x ${formatPrice(item.price)} = ${formatPrice(item.price * item.quantity)}\n\n`;
+      if (item.thermostatModel) {
+        quoteText += `   • Thermostat: ${item.thermostatModel}\n`;
+        quoteText += `     ${item.thermostatName}\n`;
+      }
+      quoteText += `\n`;
     });
 
-    quoteText += `${'-'.repeat(45)}\n`;
+    quoteText += `${'-'.repeat(50)}\n`;
     quoteText += `SUMMARY:\n`;
-    quoteText += `${'-'.repeat(45)}\n`;
-    quoteText += `Equipment Subtotal: ${formatPrice(cartTotal)}\n`;
-    quoteText += `Estimated Labor: ${totalLaborHours} hours\n`;
+    quoteText += `${'-'.repeat(50)}\n`;
+    quoteText += `Total Packages: ${cartItemCount}\n`;
     quoteText += `\n`;
-    quoteText += `* Final price will include labor, materials,\n`;
-    quoteText += `  applicable taxes, and warranty coverage.\n`;
+    quoteText += `* Pricing to be calculated using Quote Generator\n`;
 
     if (customerNotes) {
-      quoteText += `\n${'-'.repeat(45)}\n`;
+      quoteText += `\n${'-'.repeat(50)}\n`;
       quoteText += `NOTES:\n`;
-      quoteText += `${'-'.repeat(45)}\n`;
+      quoteText += `${'-'.repeat(50)}\n`;
       quoteText += `${customerNotes}\n`;
     }
 
-    quoteText += `\n${'-'.repeat(45)}\n`;
-    quoteText += `This is an informal proposal and pricing\n`;
-    quoteText += `is subject to change. Contact us for a\n`;
-    quoteText += `formal quote with exact pricing.\n`;
+    quoteText += `\n${'-'.repeat(50)}\n`;
+    quoteText += `This is an informal proposal.\n`;
+    quoteText += `Contact us for a formal quote with pricing.\n`;
     quoteText += `\n`;
     quoteText += `Thank you for choosing Giesbrecht HVAC!\n`;
 
@@ -241,6 +310,16 @@ export default function ProposalBuilder() {
         description: "Please select and copy the text manually.",
         variant: "destructive",
       });
+    }
+  };
+
+  const getPackageLevelColor = (level: string) => {
+    switch (level) {
+      case "Budget": return "bg-gray-500";
+      case "Good": return "bg-blue-500";
+      case "Better": return "bg-purple-500";
+      case "Best": return "bg-amber-500";
+      default: return "bg-gray-500";
     }
   };
 
@@ -294,15 +373,15 @@ export default function ProposalBuilder() {
                 <SheetHeader>
                   <SheetTitle className="flex items-center gap-2">
                     <ShoppingCart className="h-5 w-5" />
-                    Proposal Cart ({cartItemCount} items)
+                    Proposal Cart ({cartItemCount} packages)
                   </SheetTitle>
                 </SheetHeader>
-                <ScrollArea className="h-[calc(100vh-200px)] mt-4">
+                <ScrollArea className="h-[calc(100vh-280px)] mt-4">
                   {cart.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
                       <p>Your proposal is empty</p>
-                      <p className="text-sm">Add equipment to get started</p>
+                      <p className="text-sm">Add packages to get started</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -310,13 +389,23 @@ export default function ProposalBuilder() {
                         <Card key={item.id} className="p-3" data-testid={`cart-item-${item.id}`}>
                           <div className="flex justify-between items-start gap-2">
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{item.description}</p>
-                              <p className="text-xs text-muted-foreground">{item.brand} {item.model}</p>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {item.tonnage && <Badge variant="secondary" className="text-xs">{item.tonnage}</Badge>}
-                                {item.seer && <Badge variant="secondary" className="text-xs">{item.seer}</Badge>}
-                                {item.afue && <Badge variant="secondary" className="text-xs">{item.afue}</Badge>}
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge className={`${getPackageLevelColor(item.packageLevel)} text-white text-xs`}>
+                                  {item.packageLevel}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  x{item.quantity}
+                                </Badge>
                               </div>
+                              <p className="font-medium text-sm">
+                                {UNIT_TYPE_INFO[item.unitType]?.name || item.unitType}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {item.tier} • {item.extractedTonnage}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {item.outdoorBrand} {item.outdoorModel}
+                              </p>
                             </div>
                             <Button
                               variant="ghost"
@@ -327,30 +416,6 @@ export default function ProposalBuilder() {
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                          </div>
-                          <div className="flex items-center justify-between mt-3">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => updateQuantity(item.id, -1)}
-                                data-testid={`button-decrease-${item.id}`}
-                              >
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="w-8 text-center font-medium">{item.quantity}</span>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => updateQuantity(item.id, 1)}
-                                data-testid={`button-increase-${item.id}`}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            <p className="font-semibold">{formatPrice(item.price * item.quantity)}</p>
                           </div>
                         </Card>
                       ))}
@@ -383,13 +448,8 @@ export default function ProposalBuilder() {
                       />
                     </div>
                     <Separator />
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-medium">Equipment Total</span>
-                      <span className="text-xl font-bold text-primary">{formatPrice(cartTotal)}</span>
-                    </div>
                     <p className="text-xs text-muted-foreground text-center">
-                      <Info className="h-3 w-3 inline mr-1" />
-                      Final price will include labor, materials, and applicable taxes
+                      Pricing to be calculated using Quote Generator
                     </p>
                     <div className="flex gap-2">
                       <Button
@@ -421,7 +481,7 @@ export default function ProposalBuilder() {
 
       <main className="p-3 sm:p-4">
         <div className="flex items-center gap-2 mb-4">
-          {(selectedCategory || selectedSubcategory) ? (
+          {currentStep > 1 ? (
             <Button
               variant="ghost"
               size="sm"
@@ -440,188 +500,219 @@ export default function ProposalBuilder() {
               </Button>
             </Link>
           )}
-          <div className="text-sm text-muted-foreground">
-            {selectedCategory && (
-              <span className="inline-flex items-center">
+          <div className="text-sm text-muted-foreground flex items-center">
+            <span className="font-medium">Step {currentStep} of 4</span>
+            {selectedUnitType && (
+              <>
                 <ChevronRight className="h-3 w-3 mx-1" />
-                {selectedCategory}
-              </span>
+                <span>{UNIT_TYPE_INFO[selectedUnitType]?.name.split(' + ')[0] || selectedUnitType}</span>
+              </>
             )}
-            {selectedSubcategory && selectedSubcategory !== 'all' && (
-              <span className="inline-flex items-center">
+            {selectedTier && (
+              <>
                 <ChevronRight className="h-3 w-3 mx-1" />
-                {selectedSubcategory}
-              </span>
+                <span>{selectedTier}</span>
+              </>
+            )}
+            {selectedTonnage && (
+              <>
+                <ChevronRight className="h-3 w-3 mx-1" />
+                <span>{selectedTonnage}</span>
+              </>
             )}
           </div>
         </div>
 
-        {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <Skeleton key={i} className="h-32 rounded-lg" />
-            ))}
-          </div>
-        ) : !selectedCategory ? (
+        {currentStep === 1 && (
           <div>
-            <h2 className="text-xl font-semibold mb-4">Select Equipment Category</h2>
+            <h2 className="text-xl font-semibold mb-2">Select System Type</h2>
+            <p className="text-muted-foreground mb-4">Choose the type of HVAC system</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {categories?.map(category => (
-                <Card
-                  key={category.name}
-                  className="cursor-pointer hover:border-primary transition-colors"
-                  onClick={() => setSelectedCategory(category.name)}
-                  data-testid={`category-${category.name.toLowerCase().replace(/\s+/g, '-')}`}
-                >
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center justify-between">
-                      {category.name}
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      {category.equipment.length} items
-                    </p>
-                    {category.subcategories.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {category.subcategories.slice(0, 3).map(sub => (
-                          <Badge key={sub} variant="secondary" className="text-xs">
-                            {sub}
-                          </Badge>
-                        ))}
-                        {category.subcategories.length > 3 && (
-                          <Badge variant="secondary" className="text-xs">
-                            +{category.subcategories.length - 3}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        ) : currentCategory && currentCategory.subcategories.length > 0 && !selectedSubcategory ? (
-          <div>
-            <h2 className="text-xl font-semibold mb-4">{selectedCategory}</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Card
-                className="cursor-pointer hover:border-primary transition-colors"
-                onClick={() => setSelectedSubcategory('all')}
-                data-testid="subcategory-all"
-              >
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center justify-between">
-                    View All
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    {currentCategory.equipment.length} items
-                  </p>
-                </CardContent>
-              </Card>
-              {currentCategory.subcategories.map(sub => (
-                <Card
-                  key={sub}
-                  className="cursor-pointer hover:border-primary transition-colors"
-                  onClick={() => setSelectedSubcategory(sub)}
-                  data-testid={`subcategory-${sub.toLowerCase().replace(/\s+/g, '-')}`}
-                >
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center justify-between">
-                      {sub}
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      {currentCategory.equipment.filter(e => e.subcategory === sub).length} items
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div>
-            <h2 className="text-xl font-semibold mb-4">
-              {selectedCategory}
-              {selectedSubcategory && selectedSubcategory !== 'all' && ` - ${selectedSubcategory}`}
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredEquipment.map(equipment => {
-                const inCart = getItemInCart(equipment.id);
+              {unitTypes.map(unitType => {
+                const info = UNIT_TYPE_INFO[unitType];
+                const IconComponent = info?.icon || Package;
                 return (
                   <Card
-                    key={equipment.id}
-                    className={`relative ${inCart ? 'border-primary ring-1 ring-primary' : ''}`}
-                    data-testid={`equipment-${equipment.id}`}
+                    key={unitType}
+                    className="cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => setSelectedUnitType(unitType)}
+                    data-testid={`unit-type-${unitType.toLowerCase()}`}
                   >
-                    {inCart && (
-                      <div className="absolute top-2 right-2">
-                        <Badge className="bg-primary">
-                          <Check className="h-3 w-3 mr-1" />
-                          {inCart.quantity} in cart
-                        </Badge>
-                      </div>
-                    )}
                     <CardHeader className="pb-2">
-                      <div className="pr-20">
-                        <p className="text-xs text-muted-foreground">{equipment.brand}</p>
-                        <CardTitle className="text-base">{equipment.model}</CardTitle>
-                      </div>
+                      <CardTitle className="text-lg flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <IconComponent className="h-5 w-5 text-primary" />
+                          <span>{info?.name || unitType}</span>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                        {equipment.description}
+                      <p className="text-sm text-muted-foreground">
+                        {info?.description || `${unitType} system packages`}
                       </p>
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {equipment.tonnage && (
-                          <Badge variant="outline" className="text-xs">{equipment.tonnage}</Badge>
-                        )}
-                        {equipment.btu && (
-                          <Badge variant="outline" className="text-xs">{equipment.btu}</Badge>
-                        )}
-                        {equipment.seer && (
-                          <Badge variant="outline" className="text-xs">{equipment.seer}</Badge>
-                        )}
-                        {equipment.afue && (
-                          <Badge variant="outline" className="text-xs">{equipment.afue}</Badge>
-                        )}
-                        {equipment.hspf && (
-                          <Badge variant="outline" className="text-xs">{equipment.hspf}</Badge>
-                        )}
-                        {equipment.warranty && (
-                          <Badge variant="secondary" className="text-xs">{equipment.warranty}</Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-xl font-bold text-primary">
-                          {formatPrice(equipment.price)}
-                        </p>
-                        <Button
-                          size="sm"
-                          className="min-h-[44px]"
-                          onClick={() => addToCart(equipment)}
-                          data-testid={`button-add-${equipment.id}`}
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add
-                        </Button>
-                      </div>
-                      {equipment.laborHours && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Est. labor: {equipment.laborHours} hours
-                        </p>
-                      )}
+                      <Badge variant="secondary" className="mt-2">
+                        {unitType}
+                      </Badge>
                     </CardContent>
                   </Card>
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {currentStep === 2 && (
+          <div>
+            <h2 className="text-xl font-semibold mb-2">Select Tier</h2>
+            <p className="text-muted-foreground mb-4">Choose your preferred quality tier</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {tiersForUnitType.map(tier => {
+                const info = TIER_INFO[tier];
+                return (
+                  <Card
+                    key={tier}
+                    className="cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => setSelectedTier(tier)}
+                    data-testid={`tier-${tier.toLowerCase()}`}
+                  >
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg flex items-center justify-between">
+                        {tier}
+                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        {info?.description || `${tier} tier packages`}
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {currentStep === 3 && (
+          <div>
+            <h2 className="text-xl font-semibold mb-2">Select Tonnage</h2>
+            <p className="text-muted-foreground mb-4">Choose the system capacity</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {tonnagesForSelection.map(tonnage => (
+                <Card
+                  key={tonnage}
+                  className="cursor-pointer hover:border-primary transition-colors"
+                  onClick={() => setSelectedTonnage(tonnage)}
+                  data-testid={`tonnage-${tonnage.replace(' ', '-').toLowerCase()}`}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      {tonnage}
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      {parseInt(tonnage) * 12000} BTU
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {currentStep === 4 && (
+          <div>
+            <h2 className="text-xl font-semibold mb-2">Select Package</h2>
+            <p className="text-muted-foreground mb-4">
+              Choose from available {selectedTier} packages for {selectedTonnage}
+            </p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {packageOptions.map((pkg, index) => {
+                const isInCart = cart.some(item => 
+                  item.unitType === pkg.unitType && 
+                  item.tier === pkg.tier && 
+                  item.packageLevel === pkg.packageLevel &&
+                  item.extractedTonnage === selectedTonnage
+                );
+                return (
+                  <Card
+                    key={`${pkg.packageLevel}-${pkg.outdoorModel}-${index}`}
+                    className={`relative ${isInCart ? 'border-primary ring-1 ring-primary' : ''}`}
+                    data-testid={`package-${pkg.packageLevel.toLowerCase()}`}
+                  >
+                    {isInCart && (
+                      <div className="absolute top-2 right-2">
+                        <Badge className="bg-primary">
+                          <Check className="h-3 w-3 mr-1" />
+                          In Cart
+                        </Badge>
+                      </div>
+                    )}
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge className={`${getPackageLevelColor(pkg.packageLevel)} text-white`}>
+                          {pkg.packageLevel}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">{pkg.outdoorBrand}</span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2 text-sm">
+                        <div className="p-2 bg-muted rounded-md">
+                          <p className="font-medium text-xs text-muted-foreground mb-1">Outdoor Unit</p>
+                          <p className="font-medium">{pkg.outdoorBrand} {pkg.outdoorModel}</p>
+                          <p className="text-muted-foreground text-xs">{pkg.outdoorName}</p>
+                        </div>
+                        
+                        {pkg.coilModel && (
+                          <div className="p-2 bg-muted rounded-md">
+                            <p className="font-medium text-xs text-muted-foreground mb-1">Evaporator Coil</p>
+                            <p className="font-medium">{pkg.coilModel}</p>
+                            <p className="text-muted-foreground text-xs">{pkg.coilName}</p>
+                          </div>
+                        )}
+                        
+                        {pkg.indoorHeatModel && (
+                          <div className="p-2 bg-muted rounded-md">
+                            <p className="font-medium text-xs text-muted-foreground mb-1">Indoor Unit / Furnace</p>
+                            <p className="font-medium">{pkg.indoorHeatModel}</p>
+                            <p className="text-muted-foreground text-xs">{pkg.indoorHeatName}</p>
+                          </div>
+                        )}
+                        
+                        {pkg.thermostatModel && (
+                          <div className="p-2 bg-muted rounded-md">
+                            <p className="font-medium text-xs text-muted-foreground mb-1">Thermostat</p>
+                            <p className="font-medium">{pkg.thermostatModel}</p>
+                            <p className="text-muted-foreground text-xs">{pkg.thermostatName}</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <Button
+                        className="w-full min-h-[44px]"
+                        onClick={() => addToCart(pkg)}
+                        data-testid={`button-add-${pkg.packageLevel.toLowerCase()}`}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Add to Proposal
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+            
+            {packageOptions.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No packages found for this combination</p>
+                <p className="text-sm">Try a different tonnage or tier</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -633,7 +724,7 @@ export default function ProposalBuilder() {
               data-testid="button-view-cart"
             >
               <ShoppingCart className="h-5 w-5 mr-2" />
-              View Proposal ({cartItemCount} items) - {formatPrice(cartTotal)}
+              View Proposal ({cartItemCount} packages)
             </Button>
           </div>
         )}
