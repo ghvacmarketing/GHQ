@@ -387,7 +387,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between max-w-4xl mx-auto">
         <Button
           variant="outline"
           size="sm"
@@ -411,7 +411,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 max-w-4xl">
+      <div className="grid grid-cols-7 gap-1 max-w-4xl mx-auto">
         {weekDays.map((day) => (
           <div
             key={day}
@@ -464,7 +464,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
         })}
       </div>
 
-      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+      <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground max-w-4xl mx-auto">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-primary" />
           <span>Scheduled (Install Date)</span>
