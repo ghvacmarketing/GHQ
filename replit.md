@@ -115,6 +115,12 @@ Preferred communication style: Simple, everyday language.
     - Service file: `server/services/customer-sync.ts`
     - Environment variable: `FIELDEDGE_CUSTOMER_SHEET_ID` for sheet configuration
 - **Persistent Admin API Key** (Added Dec 2025): `ADMIN_API_KEY` environment variable for automated integrations. Used alongside dynamic session tokens for admin auth.
+- **Global Password Gate** (Added Dec 2025): Application-wide access control separate from admin authentication.
+  - Requires `GLOBAL_PASSWORD` secret to enable (gate is skipped if not set)
+  - Users must enter password on first visit; authentication stored in localStorage for 90 days
+  - `SKIP_GLOBAL_AUTH=true` env var disables gate for development
+  - Frontend component: `client/src/components/GlobalPasswordGate.tsx`
+  - API endpoints: `POST /api/global/verify`, `GET /api/global/auth-required`
 
 ## External Dependencies
 
