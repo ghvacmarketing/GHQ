@@ -291,8 +291,8 @@ export default function Home() {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-rose-400 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
-                          <action.icon className="h-5 w-5 text-white" />
+                        <div className="w-10 h-10 rounded-lg bg-[#7d7d7d] flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                          <action.icon className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-foreground text-sm" data-testid={`text-${action.testId}-title`}>
