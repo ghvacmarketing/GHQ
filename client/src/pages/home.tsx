@@ -291,7 +291,7 @@ export default function Home() {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#7d7d7d] flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                        <div className="w-10 h-10 rounded-lg bg-white border-2 border-[#E3E3E3] flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
                           <action.icon className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1 min-w-0">
