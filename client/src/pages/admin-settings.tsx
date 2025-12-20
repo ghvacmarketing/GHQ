@@ -538,7 +538,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
     status: {
       lastSyncTime: string | null;
       lastCheckTime: string | null;
-      lastSyncResult: { created: number; updated: number; skipped: number; errors: number } | null;
+      lastSyncResult: { created: number; updated: number; deleted: number; skipped: number; errors: number } | null;
       lastError: string | null;
       dataHash: string | null;
       syncCount: number;
@@ -2284,7 +2284,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
 
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div className="p-3 border rounded bg-background">
-                            <div className="font-medium">Last Append</div>
+                            <div className="font-medium">Last Sync</div>
                             <div className="text-muted-foreground">
                               {customerSyncStatus?.status?.lastSyncTime 
                                 ? new Date(customerSyncStatus.status.lastSyncTime).toLocaleString()
@@ -2307,7 +2307,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
                             <div className="font-medium">Last Result</div>
                             <div className="text-muted-foreground">
                               {customerSyncStatus?.status?.lastSyncResult 
-                                ? `+${customerSyncStatus.status.lastSyncResult.created} / ↻${customerSyncStatus.status.lastSyncResult.updated}`
+                                ? `+${customerSyncStatus.status.lastSyncResult.created} / ↻${customerSyncStatus.status.lastSyncResult.updated}${customerSyncStatus.status.lastSyncResult.deleted ? ` / -${customerSyncStatus.status.lastSyncResult.deleted}` : ''}`
                                 : 'N/A'}
                             </div>
                           </div>

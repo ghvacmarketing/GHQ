@@ -5,6 +5,7 @@ import { InsertCustomer } from "@shared/schema";
 interface SyncResult {
   created: number;
   updated: number;
+  deleted: number;
   skipped: number;
   errors: number;
 }
@@ -29,11 +30,14 @@ interface SheetRow {
   [key: string]: string | undefined;
 }
 
+const SYNC_STATUS_KEY = 'customer_sync_status';
+
 class CustomerSyncService {
   private apiKey: string;
   private sheetId: string;
   private baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
   private autoSyncInterval: NodeJS.Timeout | null = null;
+  private statusLoaded: boolean = false;
   
   private syncStatus: SyncStatus = {
     lastSyncTime: null,
@@ -51,6 +55,48 @@ class CustomerSyncService {
     
     if (!this.apiKey) {
       console.warn('Google Sheets API key not configured for customer sync');
+    }
+    
+    this.loadStatusFromDatabase();
+  }
+
+  private async loadStatusFromDatabase(): Promise<void> {
+    try {
+      const setting = await storage.getSetting(SYNC_STATUS_KEY);
+      if (setting?.value) {
+        const parsed = JSON.parse(setting.value);
+        this.syncStatus = {
+          lastSyncTime: parsed.lastSyncTime ? new Date(parsed.lastSyncTime) : null,
+          lastCheckTime: parsed.lastCheckTime ? new Date(parsed.lastCheckTime) : null,
+          lastSyncResult: parsed.lastSyncResult || null,
+          lastError: parsed.lastError || null,
+          dataHash: parsed.dataHash || null,
+          syncCount: parsed.syncCount || 0,
+          lastSyncCountReset: parsed.lastSyncCountReset ? new Date(parsed.lastSyncCountReset) : new Date(),
+        };
+        console.log('Customer sync status loaded from database');
+      }
+      this.statusLoaded = true;
+    } catch (error) {
+      console.error('Failed to load customer sync status from database:', error);
+      this.statusLoaded = true;
+    }
+  }
+
+  private async saveStatusToDatabase(): Promise<void> {
+    try {
+      const statusJson = JSON.stringify({
+        lastSyncTime: this.syncStatus.lastSyncTime?.toISOString() || null,
+        lastCheckTime: this.syncStatus.lastCheckTime?.toISOString() || null,
+        lastSyncResult: this.syncStatus.lastSyncResult,
+        lastError: this.syncStatus.lastError,
+        dataHash: this.syncStatus.dataHash,
+        syncCount: this.syncStatus.syncCount,
+        lastSyncCountReset: this.syncStatus.lastSyncCountReset.toISOString(),
+      });
+      await storage.setSetting(SYNC_STATUS_KEY, statusJson);
+    } catch (error) {
+      console.error('Failed to save customer sync status to database:', error);
     }
   }
 
@@ -171,7 +217,7 @@ class CustomerSyncService {
       if (rows.length === 0) {
         console.log('No customer data to sync');
         this.syncStatus.lastError = null;
-        return { created: 0, updated: 0, skipped: 0, errors: 0 };
+        return { created: 0, updated: 0, deleted: 0, skipped: 0, errors: 0 };
       }
 
       const newDataHash = this.calculateDataHash(rows);
@@ -190,15 +236,37 @@ class CustomerSyncService {
       
       const result = await storage.batchImportCustomers(customers);
       
+      const validChecksums = customers
+        .map(c => c.checksum)
+        .filter((checksum): checksum is string => !!checksum);
+      
+      let deleted = 0;
+      if (validChecksums.length > 0) {
+        deleted = await storage.deleteCustomersNotInChecksums(validChecksums);
+        if (deleted > 0) {
+          console.log(`Deleted ${deleted} customers not in source sheet`);
+        }
+      }
+      
+      const fullResult: SyncResult = {
+        created: result.created,
+        updated: result.updated,
+        deleted,
+        skipped: result.skipped,
+        errors: result.errors,
+      };
+      
       this.syncStatus.lastSyncTime = new Date();
-      this.syncStatus.lastSyncResult = result;
+      this.syncStatus.lastSyncResult = fullResult;
       this.syncStatus.lastError = null;
       this.syncStatus.dataHash = newDataHash;
       this.syncStatus.syncCount++;
       
-      console.log(`Customer sync complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.errors} errors`);
+      await this.saveStatusToDatabase();
       
-      return result;
+      console.log(`Customer sync complete: ${fullResult.created} created, ${fullResult.updated} updated, ${fullResult.deleted} deleted, ${fullResult.skipped} skipped, ${fullResult.errors} errors`);
+      
+      return fullResult;
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -206,6 +274,8 @@ class CustomerSyncService {
       
       this.syncStatus.lastCheckTime = new Date();
       this.syncStatus.lastError = errorMessage;
+      
+      await this.saveStatusToDatabase();
       
       throw error;
     }

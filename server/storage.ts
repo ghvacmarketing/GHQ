@@ -1,7 +1,7 @@
 import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, or, and, ilike, sql } from "drizzle-orm";
+import { eq, or, and, ilike, sql, notInArray } from "drizzle-orm";
 
 export interface IStorage {
   // Quote operations
@@ -106,6 +106,7 @@ export interface IStorage {
   upsertCustomerByChecksum(customer: InsertCustomer): Promise<{ action: 'created' | 'updated' | 'skipped'; customer: Customer }>;
   getCustomerByChecksum(checksum: string): Promise<Customer | undefined>;
   batchImportCustomers(customerList: InsertCustomer[]): Promise<{ created: number; updated: number; skipped: number; errors: number }>;
+  deleteCustomersNotInChecksums(checksums: string[]): Promise<number>;
   
   // Customer Import Batch operations
   createCustomerImportBatch(batch: InsertCustomerImportBatch): Promise<CustomerImportBatch>;
@@ -135,7 +136,7 @@ export class DatabaseStorage implements IStorage {
   async createQuote(insertQuote: InsertQuote): Promise<Quote> {
     const [quote] = await db
       .insert(quotes)
-      .values([insertQuote])
+      .values(insertQuote)
       .returning();
     return quote;
   }
@@ -217,7 +218,7 @@ export class DatabaseStorage implements IStorage {
   async createProcess(insertProcess: InsertProcess): Promise<Process> {
     const [process] = await db
       .insert(processes)
-      .values([insertProcess])
+      .values(insertProcess)
       .returning();
     return process;
   }
@@ -813,6 +814,18 @@ export class DatabaseStorage implements IStorage {
     }
 
     return { created, updated, skipped, errors };
+  }
+
+  async deleteCustomersNotInChecksums(checksums: string[]): Promise<number> {
+    if (checksums.length === 0) {
+      return 0;
+    }
+
+    const result = await db
+      .delete(customers)
+      .where(notInArray(customers.checksum, checksums));
+    
+    return result.rowCount || 0;
   }
 
   // Customer Import Batch operations
