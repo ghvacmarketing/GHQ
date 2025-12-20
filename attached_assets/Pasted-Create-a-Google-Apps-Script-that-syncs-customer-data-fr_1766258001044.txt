@@ -1,0 +1,155 @@
+Create a Google Apps Script that syncs customer data from a Google Sheet to a web application's CSV import endpoint with status tracking.
+
+SPREADSHEET DETAILS:
+- URL: https://docs.google.com/spreadsheets/d/1POeQRuDUTia0BUYsVmEsBOqW6BDBvfL5qyKv-GQICU0/edit?gid=0#gid=0
+- Sheet is replaced (not appended) every 10 minutes by a Python script
+- Contains customer data exported from FieldEdge
+
+WEBAPP ENDPOINT DETAILS:
+- Endpoint: POST /api/customers/import
+- Authentication: Required - Bearer token in Authorization header
+- Content-Type: multipart/form-data
+- File field name: 'file'
+- Filename to use: 'fieldedge_auto_sync.csv'
+- Expected response: 200 status with JSON containing {created, updated, skipped, errors}
+- Full URL format: https://[DOMAIN]/api/customers/import
+
+REQUIREMENTS:
+1. Run automatically every 12 minutes via time-based trigger (offset from Python's 10-min schedule)
+2. Calculate SHA-256 hash of current sheet data to detect changes
+3. Compare hash to last successful sync - skip if data unchanged
+4. Convert sheet data to properly formatted CSV:
+   - Escape double quotes (replace " with "")
+   - Wrap all cells in quotes
+   - Use comma delimiters
+   - Include header row
+5. Create multipart/form-data upload with CSV as blob
+6. Include Authorization header with bearer token: "Bearer [TOKEN]"
+7. Store hash only after successful sync (200 response)
+8. Create/update "Sync Log" sheet with columns: [Timestamp, Status, Details]
+9. Keep only last 100 log entries (auto-trim older rows)
+10. Handle all errors gracefully without breaking future syncs
+
+STATUS TRACKING SHEET:
+- Create a "Sync Settings" sheet with the following information displayed:
+  - Last Successful Sync: [Timestamp] - [X] rows processed (created + updated count from response)
+  - Last Check (No Changes): [Timestamp]
+  - Total Syncs Today: [Count]
+  - Last Error: [Timestamp and error message if any]
+- Update this sheet after every sync attempt
+- Format as a clean dashboard the client can view
+- Use cell formatting: Bold headers, readable timestamps
+- Layout example:
+  Row 1: "Auto Sync Status Dashboard"
+  Row 3: "Last Successful Sync:" | [timestamp]
+  Row 4: "Rows Added:" | [count]
+  Row 5: "Last Check (No Changes):" | [timestamp]
+  Row 6: "Total Syncs Today:" | [count]
+  Row 7: "Last Error:" | [timestamp + message or "None"]
+
+CONFIGURATION NEEDED:
+- Create script properties for:
+  - WEBAPP_URL: Full base URL of webapp (e.g., "https://yourdomain.com")
+  - API_TOKEN: Admin authentication token
+  - lastSyncHash: Auto-managed, stores hash of last successful sync
+
+CODE STRUCTURE:
+Main function: syncToWebapp()
+- Get script properties (PropertiesService.getScriptProperties())
+- Read all sheet data (getDataRange().getValues())
+- Calculate hash (Utilities.computeDigest with SHA_256)
+- Compare to stored hash
+  - If NO CHANGE: Update "Last Check (No Changes)" timestamp in Sync Settings
+  - If CHANGED: Continue with sync
+- Convert data array to CSV string with proper escaping
+- Create blob (Utilities.newBlob)
+- Build formData payload with file
+- Add Authorization header with bearer token
+- POST via UrlFetchApp.fetch with muteHttpExceptions: true
+- Parse JSON response
+- If successful (200):
+  - Update stored hash
+  - Update "Last Successful Sync" timestamp in Sync Settings
+  - Calculate and display rows processed (created + updated from response)
+  - Increment daily sync counter
+- Log to "Sync Log" sheet with timestamp, status, response details
+- Trim log sheet to 100 rows if needed
+- Update Sync Settings sheet with current status
+
+Helper function: updateSyncSettings(status, details)
+- Create "Sync Settings" sheet if doesn't exist
+- Update appropriate rows based on sync outcome:
+  - "synced" → Update last successful sync time and row count
+  - "no_change" → Update last check time
+  - "error" → Update last error with timestamp and message
+- Increment daily counter (reset at midnight check)
+- Apply formatting for readability
+
+EDGE CASES TO HANDLE:
+- First run with no previous hash (treat as changed, sync)
+- Sync Settings sheet doesn't exist (create with formatted headers)
+- Sync Log sheet doesn't exist (create with headers)
+- Empty sheet or no data rows
+- HTTP errors (4xx, 5xx) - log but don't update hash or success timestamp
+- Network timeouts or exceptions
+- Malformed response JSON
+- Sheet data contains quotes, commas, newlines (proper CSV escaping)
+- Script execution quota limits
+- Daily counter reset logic (check if last sync was previous day)
+
+ERROR HANDLING:
+- Wrap entire function in try/catch
+- Use muteHttpExceptions to get error responses
+- Log all errors to Sync Log sheet AND Sync Settings "Last Error"
+- Don't update lastSyncHash on any error
+- Don't update "Last Successful Sync" on error
+- DO update "Last Check" even if error occurs (shows script is running)
+- Include response codes and messages in logs
+- Continue logging even if main sync fails
+
+LOGGING DETAILS:
+Sync Log sheet columns: Timestamp | Status | Details
+Status values: "SYNCED", "NO_CHANGE", "ERROR", "HTTP_ERROR"
+Details include: response JSON on success, error messages on failure, hash comparison results
+
+Sync Settings sheet updates:
+- Every sync attempt updates "Last Check" time
+- Successful syncs update "Last Successful Sync" time and row count
+- Errors update "Last Error" field
+- Daily counter increments on each actual sync (not on "no change")
+
+OUTPUT REQUIRED:
+1. Complete Google Apps Script code with:
+   - Detailed inline comments
+   - Configuration section at top
+   - Helper function for CSV conversion
+   - Helper function for updating Sync Settings sheet
+   - Helper function for logging to Sync Log
+   - Main syncToWebapp function
+   - Proper error handling throughout
+   - Daily counter reset logic
+
+2. Setup instructions:
+   - How to open Script Editor from the Google Sheet
+   - Where to paste the code
+   - How to set script properties (File > Project properties > Script properties)
+   - Required property keys and example values
+   - How to create time-based trigger (12-minute interval)
+   - How to run manually for testing
+   - How to view execution logs (View > Logs)
+   - How to check Sync Log sheet for detailed history
+   - How to view Sync Settings sheet for at-a-glance status
+
+3. Testing checklist:
+   - Verify script properties are set
+   - Run manually once and check logs
+   - Verify Sync Settings sheet created with proper formatting
+   - Verify Sync Log sheet created
+   - Check webapp received the data
+   - Verify Sync Settings shows last successful sync time and row count
+   - Run again without changes - verify "Last Check (No Changes)" updates
+   - Change sheet data and run - verify "Last Successful Sync" updates
+   - Confirm trigger is running automatically
+   - Check that daily counter increments properly
+
+Make the code production-ready, well-commented, and include all necessary setup steps. The Sync Settings sheet should be clean and easy for the client to view at a glance. The client needs this to work reliably without manual intervention and wants to quickly see sync status without digging through logs.

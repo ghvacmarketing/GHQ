@@ -40,10 +40,18 @@ function validateAdminToken(token: string | undefined): boolean {
 }
 
 // Middleware to check admin authentication via token (Authorization header)
+// Supports both dynamic session tokens AND a persistent ADMIN_API_KEY for automated integrations
 function requireAdminAuth(req: any, res: any, next: any) {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   
+  // Check for persistent API key first (for automated integrations like Google Apps Script sync)
+  const persistentApiKey = process.env.ADMIN_API_KEY;
+  if (persistentApiKey && token === persistentApiKey) {
+    return next();
+  }
+  
+  // Fall back to dynamic session token validation
   if (!validateAdminToken(token || undefined)) {
     return res.status(401).json({ message: "Unauthorized - Admin access required" });
   }
