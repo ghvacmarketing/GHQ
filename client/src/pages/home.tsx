@@ -9,7 +9,7 @@ import redlogo from "@assets/redlogo.webp";
 import { useQuery } from "@tanstack/react-query";
 import type { Quote, Lead } from "@shared/schema";
 import { useMemo } from "react";
-import { isThisWeek } from "date-fns";
+import { isThisWeek, subDays, isAfter } from "date-fns";
 
 export default function Home() {
   const { data: quotesData, isLoading: isLoadingQuotes } = useQuery<{ quotes: Quote[] }>({
@@ -42,9 +42,17 @@ export default function Home() {
       return false;
     }).length;
 
-    const wonDeals = leads.filter(l => l.status === 'Won').length;
+    const thirtyDaysAgo = subDays(new Date(), 30);
+    const wonDealsLast30Days = leads.filter(l => {
+      if (l.status !== 'Won') return false;
+      if (l.closedAt) {
+        const closedDate = new Date(l.closedAt);
+        return isAfter(closedDate, thirtyDaysAgo);
+      }
+      return false;
+    }).length;
 
-    return { pendingQuotes, activeLeads, installsThisWeek, wonDeals };
+    return { pendingQuotes, activeLeads, installsThisWeek, wonDealsLast30Days };
   }, [quotes, leads]);
 
   const isLoadingStats = isLoadingQuotes || isLoadingLeads;
@@ -198,10 +206,10 @@ export default function Home() {
                 <Skeleton className="h-8 w-12 mx-auto mb-1" />
               ) : (
                 <p className="text-2xl font-bold text-purple-700" data-testid="stat-won-deals">
-                  {summaryStats.wonDeals}
+                  {summaryStats.wonDealsLast30Days}
                 </p>
               )}
-              <p className="text-xs text-purple-600 font-medium">Won Deals</p>
+              <p className="text-xs text-purple-600 font-medium">Won (30 days)</p>
             </CardContent>
           </Card>
         </div>
@@ -224,7 +232,7 @@ export default function Home() {
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
-                          <action.icon className="h-5 w-5 text-white" />
+                          <action.icon className="h-5 w-5 text-primary-foreground" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-foreground text-sm" data-testid={`text-${action.testId}-title`}>
@@ -258,8 +266,8 @@ export default function Home() {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
-                          <action.icon className="h-5 w-5 text-white" />
+                        <div className="w-10 h-10 rounded-lg border-2 border-primary bg-primary/10 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                          <action.icon className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-foreground text-sm" data-testid={`text-${action.testId}-title`}>
@@ -293,8 +301,8 @@ export default function Home() {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-slate-500 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
-                          <action.icon className="h-5 w-5 text-white" />
+                        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                          <action.icon className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-foreground text-sm" data-testid={`text-${action.testId}-title`}>
@@ -320,8 +328,8 @@ export default function Home() {
               >
                 <CardContent className="p-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-gray-400 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
-                      <Shield className="h-4 w-4 text-white" />
+                    <div className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                      <Shield className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-foreground text-sm" data-testid="text-link-admin-title">
