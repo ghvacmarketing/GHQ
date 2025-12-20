@@ -17,6 +17,7 @@ import Installation from "@/pages/installation";
 import ProposalBuilder from "@/pages/proposal-builder";
 import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
+import GlobalPasswordGate from "@/components/GlobalPasswordGate";
 import { lazy, Suspense, useState, useEffect } from "react";
 import type { Announcement } from "@shared/schema";
 
@@ -93,7 +94,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AppContent />
+        <GlobalPasswordGate>
+          <AppContent />
+        </GlobalPasswordGate>
       </TooltipProvider>
     </QueryClientProvider>
   );

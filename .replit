@@ -45,3 +45,6 @@ integrations = ["javascript_mem_db:1.0.0", "javascript_openai:1.0.0", "javascrip
 
 [userenv.shared]
 FIELDEDGE_CUSTOMER_SHEET_ID = "1POeQRuDUTia0BUYsVmEsBOqW6BDBvfL5qyKv-GQICU0"
+
+[userenv.development]
+SKIP_GLOBAL_AUTH = "true"

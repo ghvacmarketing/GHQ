@@ -1005,6 +1005,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Global app password verification (separate from admin)
+  app.post("/api/global/verify", async (req, res) => {
+    try {
+      const { password } = req.body;
+      const globalPassword = process.env.GLOBAL_PASSWORD;
+      const skipAuth = process.env.SKIP_GLOBAL_AUTH === 'true';
+      
+      // Skip verification only if explicitly disabled or no password is set
+      if (skipAuth || !globalPassword) {
+        return res.json({ success: true, skipAuth: true });
+      }
+      
+      // Require password match
+      if (password === globalPassword) {
+        res.json({ success: true });
+      } else {
+        res.status(401).json({ success: false, message: "Invalid password" });
+      }
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Verification failed" });
+    }
+  });
+
+  // Check if global auth is required (for client to know if it should show gate)
+  app.get("/api/global/auth-required", async (req, res) => {
+    const globalPassword = process.env.GLOBAL_PASSWORD;
+    const skipAuth = process.env.SKIP_GLOBAL_AUTH === 'true';
+    res.json({ required: !!globalPassword && !skipAuth });
+  });
+
   // Admin authentication endpoint
   app.post("/api/admin/login", async (req, res) => {
     try {
