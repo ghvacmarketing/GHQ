@@ -164,52 +164,52 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8" data-testid="summary-stats">
-          <Card className="bg-blue-50 border-blue-200">
+          <Card className="bg-primary/5 border-primary/20">
             <CardContent className="p-3 text-center">
               {isLoadingStats ? (
                 <Skeleton className="h-8 w-12 mx-auto mb-1" />
               ) : (
-                <p className="text-2xl font-bold text-blue-700" data-testid="stat-pending-quotes">
+                <p className="text-2xl font-bold text-primary" data-testid="stat-pending-quotes">
                   {summaryStats.pendingQuotes}
                 </p>
               )}
-              <p className="text-xs text-blue-600 font-medium">Pending Quotes</p>
+              <p className="text-xs text-primary/80 font-medium">Pending Quotes</p>
             </CardContent>
           </Card>
-          <Card className="bg-green-50 border-green-200">
+          <Card className="bg-primary/10 border-primary/30">
             <CardContent className="p-3 text-center">
               {isLoadingStats ? (
                 <Skeleton className="h-8 w-12 mx-auto mb-1" />
               ) : (
-                <p className="text-2xl font-bold text-green-700" data-testid="stat-active-leads">
+                <p className="text-2xl font-bold text-primary" data-testid="stat-active-leads">
                   {summaryStats.activeLeads}
                 </p>
               )}
-              <p className="text-xs text-green-600 font-medium">Active Leads</p>
+              <p className="text-xs text-primary/80 font-medium">Active Leads</p>
             </CardContent>
           </Card>
-          <Card className="bg-orange-50 border-orange-200">
+          <Card className="bg-primary/15 border-primary/40">
             <CardContent className="p-3 text-center">
               {isLoadingStats ? (
                 <Skeleton className="h-8 w-12 mx-auto mb-1" />
               ) : (
-                <p className="text-2xl font-bold text-orange-700" data-testid="stat-installs-week">
+                <p className="text-2xl font-bold text-primary" data-testid="stat-installs-week">
                   {summaryStats.installsThisWeek}
                 </p>
               )}
-              <p className="text-xs text-orange-600 font-medium">Installs This Week</p>
+              <p className="text-xs text-primary/80 font-medium">Installs This Week</p>
             </CardContent>
           </Card>
-          <Card className="bg-purple-50 border-purple-200">
+          <Card className="bg-primary/20 border-primary/50">
             <CardContent className="p-3 text-center">
               {isLoadingStats ? (
                 <Skeleton className="h-8 w-12 mx-auto mb-1" />
               ) : (
-                <p className="text-2xl font-bold text-purple-700" data-testid="stat-won-deals">
+                <p className="text-2xl font-bold text-primary" data-testid="stat-won-deals">
                   {summaryStats.wonDealsLast30Days}
                 </p>
               )}
-              <p className="text-xs text-purple-600 font-medium">Won (30 days)</p>
+              <p className="text-xs text-primary/80 font-medium">Won (30 days)</p>
             </CardContent>
           </Card>
         </div>
@@ -266,8 +266,8 @@ export default function Home() {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg border-2 border-primary bg-primary/10 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
-                          <action.icon className="h-5 w-5 text-primary" />
+                        <div className="w-10 h-10 rounded-lg bg-primary/70 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                          <action.icon className="h-5 w-5 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-foreground text-sm" data-testid={`text-${action.testId}-title`}>
