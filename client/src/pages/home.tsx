@@ -1,26 +1,54 @@
 import { Link } from "wouter";
-import { FileText, History, Settings, BookOpen, Shield, AlertCircle, Book, UserCog, Wrench, ClipboardList } from "lucide-react";
+import { FileText, History, Settings, BookOpen, Shield, Book, UserCog, Wrench, ClipboardList, Users, Calendar, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
 import { useQuery } from "@tanstack/react-query";
-import type { Quote } from "@shared/schema";
+import type { Quote, Lead } from "@shared/schema";
+import { useMemo } from "react";
+import { isThisWeek, parseISO } from "date-fns";
 
 export default function Home() {
-  const { data: quotesData } = useQuery<{ quotes: Quote[] }>({
+  const { data: quotesData, isLoading: isLoadingQuotes } = useQuery<{ quotes: Quote[] }>({
     queryKey: ['/api/quotes'],
   });
 
-  const { data: processes = [] } = useQuery<any[]>({
-    queryKey: ['/api/processes'],
+  const { data: leadsData, isLoading: isLoadingLeads } = useQuery<Lead[]>({
+    queryKey: ['/api/leads'],
   });
 
   const quotes = quotesData?.quotes || [];
+  const leads = leadsData || [];
 
-  const actions = [
+  const summaryStats = useMemo(() => {
+    const pendingQuotes = quotes.filter(q => q.status === 'draft' || q.status === 'sent').length;
+    const activeLeads = leads.filter(l => l.status === 'New' || l.status === 'Contacted' || l.status === 'Qualified').length;
+    
+    const installationLeads = leads.filter(lead => {
+      if (lead.status !== "Won") return false;
+      if (!lead.tags || !Array.isArray(lead.tags)) return false;
+      return lead.tags.some(tag => tag.toLowerCase() === "installation");
+    });
+    
+    const installsThisWeek = installationLeads.filter(lead => {
+      if (lead.installDate) {
+        const date = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
+        return isThisWeek(date);
+      }
+      return false;
+    }).length;
+
+    const wonDeals = leads.filter(l => l.status === 'Won').length;
+
+    return { pendingQuotes, activeLeads, installsThisWeek, wonDeals };
+  }, [quotes, leads]);
+
+  const isLoadingStats = isLoadingQuotes || isLoadingLeads;
+
+  const sellActions = [
     {
       title: "New Quote",
       description: "Generate a quick quote",
@@ -36,6 +64,33 @@ export default function Home() {
       testId: "link-quote-history"
     },
     {
+      title: "Proposal Builder",
+      description: "Build proposals with customers step-by-step",
+      icon: ClipboardList,
+      href: "/proposal",
+      testId: "link-proposal-builder"
+    },
+    {
+      title: "Sales Prospects",
+      description: "Track leads and follow-up activities",
+      icon: UserCog,
+      href: "/sales-prospects",
+      testId: "link-sales-prospects"
+    },
+  ];
+
+  const installActions = [
+    {
+      title: "Installation Pipeline",
+      description: "Track installation job pipeline",
+      icon: Wrench,
+      href: "/installation",
+      testId: "link-installation"
+    },
+  ];
+
+  const referenceActions = [
+    {
       title: "Price Book",
       description: "View current pricing and parts catalog",
       icon: Book,
@@ -49,39 +104,10 @@ export default function Home() {
       href: "/processes",
       testId: "link-processes"
     },
-    {
-      title: "Sales Prospects",
-      description: "Track leads and follow-up activities",
-      icon: UserCog,
-      href: "/sales-prospects",
-      testId: "link-sales-prospects"
-    },
-    {
-      title: "Installation",
-      description: "Track installation job pipeline",
-      icon: Wrench,
-      href: "/installation",
-      testId: "link-installation"
-    },
-    {
-      title: "Proposal Builder",
-      description: "Build proposals with customers step-by-step",
-      icon: ClipboardList,
-      href: "/proposal",
-      testId: "link-proposal-builder"
-    },
-    {
-      title: "Admin",
-      description: "System configuration and integrations",
-      icon: Shield,
-      href: "/admin",
-      testId: "link-admin"
-    }
   ];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="flex items-center justify-between p-3 sm:p-4">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
@@ -119,44 +145,192 @@ export default function Home() {
           </div>
         </div>
       </header>
-      {/* Dashboard */}
-      <main className="container mx-auto px-4 py-6 max-w-md md:max-w-2xl lg:max-w-5xl">
-        {/* Hero Section */}
-        <div className="text-center mb-12" data-testid="hero-section">
-          <h1 className="text-4xl md:text-5xl font-bold text-primary mb-2" data-testid="text-hero-title">
+
+      <main className="container mx-auto px-4 py-6 max-w-md md:max-w-2xl lg:max-w-4xl">
+        <div className="text-center mb-8" data-testid="hero-section">
+          <h1 className="text-3xl md:text-4xl font-bold text-primary mb-1" data-testid="text-hero-title">
             GHVAC Tools
           </h1>
-          <p className="text-muted-foreground text-sm md:text-base">Field technician solutions</p>
+          <p className="text-muted-foreground text-sm">Field technician solutions</p>
         </div>
 
-        {/* Action Cards */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold mb-4" data-testid="text-quick-actions-title">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {actions.map((action) => (
-              <Link key={action.href} href={action.href}>
-                <Card 
-                  className="transition-all hover:shadow-lg hover:border-primary/50 cursor-pointer group"
-                  data-testid={action.testId}
-                >
-                  <CardContent className="p-5">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110">
-                        <action.icon className="h-6 w-6 text-white" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8" data-testid="summary-stats">
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="p-3 text-center">
+              {isLoadingStats ? (
+                <Skeleton className="h-8 w-12 mx-auto mb-1" />
+              ) : (
+                <p className="text-2xl font-bold text-blue-700" data-testid="stat-pending-quotes">
+                  {summaryStats.pendingQuotes}
+                </p>
+              )}
+              <p className="text-xs text-blue-600 font-medium">Pending Quotes</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-green-50 border-green-200">
+            <CardContent className="p-3 text-center">
+              {isLoadingStats ? (
+                <Skeleton className="h-8 w-12 mx-auto mb-1" />
+              ) : (
+                <p className="text-2xl font-bold text-green-700" data-testid="stat-active-leads">
+                  {summaryStats.activeLeads}
+                </p>
+              )}
+              <p className="text-xs text-green-600 font-medium">Active Leads</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-orange-50 border-orange-200">
+            <CardContent className="p-3 text-center">
+              {isLoadingStats ? (
+                <Skeleton className="h-8 w-12 mx-auto mb-1" />
+              ) : (
+                <p className="text-2xl font-bold text-orange-700" data-testid="stat-installs-week">
+                  {summaryStats.installsThisWeek}
+                </p>
+              )}
+              <p className="text-xs text-orange-600 font-medium">Installs This Week</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-purple-50 border-purple-200">
+            <CardContent className="p-3 text-center">
+              {isLoadingStats ? (
+                <Skeleton className="h-8 w-12 mx-auto mb-1" />
+              ) : (
+                <p className="text-2xl font-bold text-purple-700" data-testid="stat-won-deals">
+                  {summaryStats.wonDeals}
+                </p>
+              )}
+              <p className="text-xs text-purple-600 font-medium">Won Deals</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground" data-testid="text-sell-section">
+                Sell
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {sellActions.map((action) => (
+                <Link key={action.href} href={action.href}>
+                  <Card 
+                    className="transition-all hover:shadow-md hover:border-primary/50 cursor-pointer group"
+                    data-testid={action.testId}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                          <action.icon className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground text-sm" data-testid={`text-${action.testId}-title`}>
+                            {action.title}
+                          </h3>
+                          <p className="text-xs text-muted-foreground truncate" data-testid={`text-${action.testId}-description`}>
+                            {action.description}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground mb-1" data-testid={`text-${action.testId}-title`}>
-                          {action.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground" data-testid={`text-${action.testId}-description`}>
-                          {action.description}
-                        </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Wrench className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground" data-testid="text-install-section">
+                Install
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {installActions.map((action) => (
+                <Link key={action.href} href={action.href}>
+                  <Card 
+                    className="transition-all hover:shadow-md hover:border-primary/50 cursor-pointer group"
+                    data-testid={action.testId}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                          <action.icon className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground text-sm" data-testid={`text-${action.testId}-title`}>
+                            {action.title}
+                          </h3>
+                          <p className="text-xs text-muted-foreground truncate" data-testid={`text-${action.testId}-description`}>
+                            {action.description}
+                          </p>
+                        </div>
                       </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Book className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground" data-testid="text-reference-section">
+                Reference
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {referenceActions.map((action) => (
+                <Link key={action.href} href={action.href}>
+                  <Card 
+                    className="transition-all hover:shadow-md hover:border-primary/50 cursor-pointer group"
+                    data-testid={action.testId}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-slate-500 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                          <action.icon className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground text-sm" data-testid={`text-${action.testId}-title`}>
+                            {action.title}
+                          </h3>
+                          <p className="text-xs text-muted-foreground truncate" data-testid={`text-${action.testId}-description`}>
+                            {action.description}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-4 border-t">
+            <Link href="/admin">
+              <Card 
+                className="transition-all hover:shadow-md hover:border-primary/50 cursor-pointer group max-w-xs"
+                data-testid="link-admin"
+              >
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-gray-400 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                      <Shield className="h-4 w-4 text-white" />
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-foreground text-sm" data-testid="text-link-admin-title">
+                        Admin Settings
+                      </h3>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
         </div>
       </main>
