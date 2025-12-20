@@ -146,8 +146,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertQuoteSchema.parse(req.body);
       const quote = await storage.createQuote(validatedData);
       
-      // Send email notification
-      if (quote.emailSent !== false) {
+      // Send email notification (only if not already sent)
+      if (!quote.emailSent) {
         const emailSent = await emailService.sendQuoteNotification({
           customerName: quote.customerName,
           technician: quote.technician,
