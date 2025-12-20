@@ -530,6 +530,7 @@ export default function CreateLeadPage() {
                   className="p-0 w-[var(--radix-popover-trigger-width)]" 
                   align="start"
                   side="bottom"
+                  avoidCollisions={false}
                   onOpenAutoFocus={(e) => e.preventDefault()}
                 >
                   <ScrollArea className="max-h-64">

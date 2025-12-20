@@ -127,6 +127,7 @@ export default function CustomerInfo({
                 className="p-0" 
                 align="start"
                 side="bottom"
+                avoidCollisions={false}
                 onOpenAutoFocus={(e) => e.preventDefault()}
               >
                 <ScrollArea className="max-h-60">

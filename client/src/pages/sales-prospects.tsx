@@ -1224,6 +1224,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
               className="p-0" 
               align="start"
               side="bottom"
+              avoidCollisions={false}
               onOpenAutoFocus={(e) => e.preventDefault()}
             >
               <ScrollArea className="max-h-64">
