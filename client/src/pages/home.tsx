@@ -166,77 +166,113 @@ export default function Home() {
           <p className="text-muted-foreground text-sm">Field technician solutions</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8" data-testid="summary-stats">
-          <Card className="col-span-2 sm:col-span-2 text-center" data-testid="card-metric-pipeline">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">Pipeline Value</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {isLoadingStats ? (
-                <Skeleton className="h-8 w-20 mx-auto" />
-              ) : (
-                <div className="text-2xl sm:text-3xl font-bold" data-testid="stat-pipeline-value">
-                  ${summaryStats.pipelineValue.toLocaleString()}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="text-center" data-testid="card-metric-quotes">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">Pending Quotes</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {isLoadingStats ? (
-                <Skeleton className="h-8 w-12 mx-auto" />
-              ) : (
-                <div className="text-2xl font-bold" data-testid="stat-pending-quotes">
-                  {summaryStats.pendingQuotes}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="text-center" data-testid="card-metric-leads">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">Active Leads</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {isLoadingStats ? (
-                <Skeleton className="h-8 w-12 mx-auto" />
-              ) : (
-                <div className="text-2xl font-bold" data-testid="stat-active-leads">
-                  {summaryStats.activeLeads}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="text-center" data-testid="card-metric-installs">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">Installs This Week</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {isLoadingStats ? (
-                <Skeleton className="h-8 w-12 mx-auto" />
-              ) : (
-                <div className="text-2xl font-bold" data-testid="stat-installs-week">
-                  {summaryStats.installsThisWeek}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="text-center" data-testid="card-metric-won">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">Won (30 days)</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {isLoadingStats ? (
-                <Skeleton className="h-8 w-12 mx-auto" />
-              ) : (
-                <div className="text-2xl font-bold" data-testid="stat-won-deals">
-                  {summaryStats.wonDealsLast30Days}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className="mb-8" data-testid="summary-stats">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Card className="text-center hidden md:block" data-testid="card-metric-quotes">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-xs">Pending Quotes</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {isLoadingStats ? (
+                    <Skeleton className="h-8 w-12 mx-auto" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="stat-pending-quotes">
+                      {summaryStats.pendingQuotes}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="text-center" data-testid="card-metric-pipeline">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-xs">Pipeline Value</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {isLoadingStats ? (
+                    <Skeleton className="h-8 w-20 mx-auto" />
+                  ) : (
+                    <div className="text-2xl sm:text-3xl font-bold" data-testid="stat-pipeline-value">
+                      ${summaryStats.pipelineValue.toLocaleString()}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="text-center hidden md:block" data-testid="card-metric-leads">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-xs">Active Leads</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {isLoadingStats ? (
+                    <Skeleton className="h-8 w-12 mx-auto" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="stat-active-leads">
+                      {summaryStats.activeLeads}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            <div className="w-full grid grid-cols-2 gap-3 md:hidden">
+              <Card className="text-center" data-testid="card-metric-quotes-mobile">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-xs">Pending Quotes</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {isLoadingStats ? (
+                    <Skeleton className="h-8 w-12 mx-auto" />
+                  ) : (
+                    <div className="text-2xl font-bold">
+                      {summaryStats.pendingQuotes}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="text-center" data-testid="card-metric-leads-mobile">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-xs">Active Leads</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {isLoadingStats ? (
+                    <Skeleton className="h-8 w-12 mx-auto" />
+                  ) : (
+                    <div className="text-2xl font-bold">
+                      {summaryStats.activeLeads}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            <div className="w-full grid grid-cols-2 gap-3">
+              <Card className="text-center" data-testid="card-metric-installs">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-xs">Installs This Week</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {isLoadingStats ? (
+                    <Skeleton className="h-8 w-12 mx-auto" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="stat-installs-week">
+                      {summaryStats.installsThisWeek}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="text-center" data-testid="card-metric-won">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-xs">Won (30 days)</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {isLoadingStats ? (
+                    <Skeleton className="h-8 w-12 mx-auto" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="stat-won-deals">
+                      {summaryStats.wonDealsLast30Days}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-6">
