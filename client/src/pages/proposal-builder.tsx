@@ -688,7 +688,7 @@ export default function ProposalBuilder() {
                 currentPageTitle="Proposal Builder"
                 items={[
                   { label: "Home", path: "/" },
-                  { label: "Quote Generator", path: "/quote" },
+                  { label: "Service Quote", path: "/quote" },
                   { label: "Price Book", path: "/price-book" },
                   { label: "Processes and Systems", path: "/processes" },
                   { label: "Sales Prospects", path: "/sales-prospects" },

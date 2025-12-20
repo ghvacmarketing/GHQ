@@ -62,7 +62,7 @@ export default function Home() {
 
   const sellActions = [
     {
-      title: "New Quote",
+      title: "New Service Quote",
       description: "Generate a quick quote",
       icon: FileText,
       href: "/quote",
@@ -134,7 +134,7 @@ export default function Home() {
                 currentPageTitle="Home"
                 items={[
                   { label: "Home", path: "/" },
-                  { label: "Quote Generator", path: "/quote" },
+                  { label: "Service Quote", path: "/quote" },
                   { label: "Price Book", path: "/price-book" },
                   { label: "Processes and Systems", path: "/processes" },
                   { label: "Sales Prospects", path: "/sales-prospects" },

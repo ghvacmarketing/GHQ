@@ -113,7 +113,7 @@ export default function QuoteActions({
             data-testid="button-start-over"
           >
             <RotateCcw className="h-4 w-4" />
-            <span>Start New Quote</span>
+            <span>Start New Service Quote</span>
           </Button>
         </>
       )}
