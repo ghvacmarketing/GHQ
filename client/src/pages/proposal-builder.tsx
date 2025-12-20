@@ -878,12 +878,12 @@ export default function ProposalBuilder() {
 
       <main className="p-3 sm:p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="preset" className="min-h-[44px]" data-testid="tab-preset-packages">
+          <TabsList className="grid w-full max-w-sm grid-cols-2 h-12 py-0 px-[3px] mx-auto mb-4" data-testid="tabs-view-switcher">
+            <TabsTrigger value="preset" className="min-h-[44px] pt-0 pb-0" data-testid="tab-preset-packages">
               <Package className="h-4 w-4 mr-2" />
               Preset Packages
             </TabsTrigger>
-            <TabsTrigger value="custom" className="min-h-[44px]" data-testid="tab-build-your-own">
+            <TabsTrigger value="custom" className="min-h-[44px] pt-0 pb-0" data-testid="tab-build-your-own">
               <Wrench className="h-4 w-4 mr-2" />
               Build Your Own
             </TabsTrigger>
