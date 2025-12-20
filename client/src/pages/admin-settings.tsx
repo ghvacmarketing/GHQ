@@ -533,6 +533,19 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
     queryFn: getAdminQueryFn({ on401: 'throw' }),
   });
 
+  // Customer Database - auto-sync status
+  const { data: customerSyncStatus, refetch: refetchSyncStatus } = useQuery<{
+    lastSyncTime: string | null;
+    lastCheckTime: string | null;
+    lastSyncResult: { created: number; updated: number; skipped: number; errors: number } | null;
+    lastError: string | null;
+    dataHash: string | null;
+    syncCount: number;
+    lastSyncCountReset: string;
+  }>({
+    queryKey: ['/api/customers/sync/status'],
+  });
+
   // Customer import mutation
   const customerImportMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -577,6 +590,52 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
         description: error.message || 'Failed to import customer CSV.',
         variant: 'destructive',
       });
+    },
+  });
+
+  // Customer sync mutation
+  const triggerSyncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await adminApiRequest("POST", "/api/customers/sync/trigger");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.noChange) {
+        toast({
+          title: "No Changes",
+          description: "Customer data is already up to date.",
+        });
+      } else {
+        toast({
+          title: "Sync Complete",
+          description: `Created: ${data.result?.created || 0}, Updated: ${data.result?.updated || 0}`,
+        });
+      }
+      refetchSyncStatus();
+      refetchCustomerStats();
+    },
+    onError: (error) => {
+      toast({
+        title: "Sync Failed",
+        description: error instanceof Error ? error.message : "Failed to sync customers",
+        variant: "destructive",
+      });
+      refetchSyncStatus();
+    },
+  });
+
+  // Reset sync hash mutation
+  const resetSyncHashMutation = useMutation({
+    mutationFn: async () => {
+      const response = await adminApiRequest("POST", "/api/customers/sync/reset");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Hash Reset",
+        description: "Next sync will process all data.",
+      });
+      refetchSyncStatus();
     },
   });
 
@@ -2202,6 +2261,84 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
                           Last import: {new Date(customerStats.lastImportDate).toLocaleDateString()} ({customerStats.lastImportFilename})
                         </div>
                       )}
+
+                      {/* Auto-Sync Status */}
+                      <div className="space-y-4 p-4 border rounded-lg bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold text-lg flex items-center gap-2">
+                              <RefreshCw className="h-5 w-5 text-green-600" />
+                              Auto-Sync (Google Sheets)
+                            </h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Automatically syncs from FieldEdge sheet every 10 minutes
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                            Active
+                          </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div className="p-3 border rounded bg-background">
+                            <div className="font-medium">Last Sync</div>
+                            <div className="text-muted-foreground">
+                              {customerSyncStatus?.lastSyncTime 
+                                ? new Date(customerSyncStatus.lastSyncTime).toLocaleString()
+                                : 'Never'}
+                            </div>
+                          </div>
+                          <div className="p-3 border rounded bg-background">
+                            <div className="font-medium">Last Check</div>
+                            <div className="text-muted-foreground">
+                              {customerSyncStatus?.lastCheckTime 
+                                ? new Date(customerSyncStatus.lastCheckTime).toLocaleString()
+                                : 'Never'}
+                            </div>
+                          </div>
+                          <div className="p-3 border rounded bg-background">
+                            <div className="font-medium">Syncs Today</div>
+                            <div className="text-muted-foreground">{customerSyncStatus?.syncCount || 0}</div>
+                          </div>
+                          <div className="p-3 border rounded bg-background">
+                            <div className="font-medium">Last Result</div>
+                            <div className="text-muted-foreground">
+                              {customerSyncStatus?.lastSyncResult 
+                                ? `+${customerSyncStatus.lastSyncResult.created} / ↻${customerSyncStatus.lastSyncResult.updated}`
+                                : 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {customerSyncStatus?.lastError && (
+                          <div className="p-3 border border-red-200 bg-red-50 dark:bg-red-950 rounded text-sm text-red-700 dark:text-red-300">
+                            <span className="font-medium">Error:</span> {customerSyncStatus.lastError}
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => triggerSyncMutation.mutate()}
+                            disabled={triggerSyncMutation.isPending}
+                            variant="outline"
+                            className="flex-1"
+                            data-testid="button-trigger-sync"
+                          >
+                            <RefreshCw className={`h-4 w-4 mr-2 ${triggerSyncMutation.isPending ? 'animate-spin' : ''}`} />
+                            {triggerSyncMutation.isPending ? 'Syncing...' : 'Sync Now'}
+                          </Button>
+                          <Button
+                            onClick={() => resetSyncHashMutation.mutate()}
+                            disabled={resetSyncHashMutation.isPending}
+                            variant="ghost"
+                            size="sm"
+                            title="Force full re-sync next time"
+                            data-testid="button-reset-sync-hash"
+                          >
+                            Reset
+                          </Button>
+                        </div>
+                      </div>
 
                       {/* Import Section */}
                       <div className="space-y-4 p-4 border rounded-lg bg-muted/30">

@@ -15,6 +15,7 @@ import { twilioService } from "./sms";
 import { pool, db } from "./db";
 import { eq } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
+import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAutoSync } from "./services/customer-sync";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -2615,6 +2616,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get customer sync status (must be before /:id to avoid route conflict)
+  app.get("/api/customers/sync/status", requireAdminAuth, async (req, res) => {
+    try {
+      const status = getCustomerSyncStatus();
+      res.json({ status });
+    } catch (error) {
+      console.error('Error getting sync status:', error);
+      res.status(500).json({ message: "Error getting sync status" });
+    }
+  });
+
+  // Manually trigger customer sync (must be before /:id to avoid route conflict)
+  app.post("/api/customers/sync/trigger", requireAdminAuth, async (req, res) => {
+    try {
+      const result = await syncCustomersFromSheet();
+      
+      if (result === 'no_change') {
+        return res.json({ message: "No changes detected", noChange: true });
+      }
+      
+      res.json({ message: "Sync completed", result });
+    } catch (error) {
+      console.error('Error triggering sync:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ message: "Sync failed", error: errorMessage });
+    }
+  });
+
+  // Reset sync hash to force full re-sync (must be before /:id to avoid route conflict)
+  app.post("/api/customers/sync/reset", requireAdminAuth, async (req, res) => {
+    try {
+      resetSyncHash();
+      res.json({ message: "Sync hash reset. Next sync will process all data." });
+    } catch (error) {
+      console.error('Error resetting sync hash:', error);
+      res.status(500).json({ message: "Error resetting sync hash" });
+    }
+  });
+
   // Get customer import history (must be before /:id to avoid route conflict)
   app.get("/api/customers/import/history", requireAdminAuth, async (req, res) => {
     try {
@@ -2792,6 +2832,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+
+  // Start customer auto-sync (every 10 minutes)
+  startAutoSync(10);
+  console.log('Customer auto-sync started (every 10 minutes)');
+
   return httpServer;
 }
 

@@ -105,6 +105,16 @@ Preferred communication style: Simple, everyday language.
   - **Lead form integration**: Customer lookup dropdown in lead creation form with debounced search (300ms); selecting a customer auto-fills name, phone, email, address, customerType, and leadSource fields
   - **Quote generator integration**: Customer lookup in CustomerInfo component fills customer name and displays address in info banner for reference
   - **Admin UI**: Customer Database section in admin settings with stats, CSV upload, and import history
+  - **Auto-Sync from Google Sheets** (Added Dec 2025):
+    - Automatic sync every 10 minutes from FieldEdge Google Sheet (ID: 1POeQRuDUTia0BUYsVmEsBOqW6BDBvfL5qyKv-GQICU0)
+    - Uses dataset-level SHA256 hash to detect changes and skip redundant syncs
+    - Per-row checksums for efficient duplicate detection during import
+    - Sync status tracking: lastSyncTime, lastCheckTime, lastSyncResult, lastError, daily sync counter
+    - Admin UI shows real-time sync status with "Sync Now" button and "Reset" to force full re-sync
+    - API endpoints: GET /api/customers/sync/status, POST /api/customers/sync/trigger, POST /api/customers/sync/reset
+    - Service file: `server/services/customer-sync.ts`
+    - Environment variable: `FIELDEDGE_CUSTOMER_SHEET_ID` for sheet configuration
+- **Persistent Admin API Key** (Added Dec 2025): `ADMIN_API_KEY` environment variable for automated integrations. Used alongside dynamic session tokens for admin auth.
 
 ## External Dependencies
 
