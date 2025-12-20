@@ -167,13 +167,13 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8" data-testid="summary-stats">
-          <Card className="col-span-2 sm:col-span-2" data-testid="card-metric-pipeline">
+          <Card className="col-span-2 sm:col-span-2 text-center" data-testid="card-metric-pipeline">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Pipeline Value</CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
               {isLoadingStats ? (
-                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-8 w-20 mx-auto" />
               ) : (
                 <div className="text-2xl sm:text-3xl font-bold" data-testid="stat-pipeline-value">
                   ${summaryStats.pipelineValue.toLocaleString()}
@@ -181,13 +181,13 @@ export default function Home() {
               )}
             </CardContent>
           </Card>
-          <Card data-testid="card-metric-quotes">
+          <Card className="text-center" data-testid="card-metric-quotes">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Pending Quotes</CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
               {isLoadingStats ? (
-                <Skeleton className="h-8 w-12" />
+                <Skeleton className="h-8 w-12 mx-auto" />
               ) : (
                 <div className="text-2xl font-bold" data-testid="stat-pending-quotes">
                   {summaryStats.pendingQuotes}
@@ -195,13 +195,13 @@ export default function Home() {
               )}
             </CardContent>
           </Card>
-          <Card data-testid="card-metric-leads">
+          <Card className="text-center" data-testid="card-metric-leads">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Active Leads</CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
               {isLoadingStats ? (
-                <Skeleton className="h-8 w-12" />
+                <Skeleton className="h-8 w-12 mx-auto" />
               ) : (
                 <div className="text-2xl font-bold" data-testid="stat-active-leads">
                   {summaryStats.activeLeads}
@@ -209,13 +209,13 @@ export default function Home() {
               )}
             </CardContent>
           </Card>
-          <Card data-testid="card-metric-installs">
+          <Card className="text-center" data-testid="card-metric-installs">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Installs This Week</CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
               {isLoadingStats ? (
-                <Skeleton className="h-8 w-12" />
+                <Skeleton className="h-8 w-12 mx-auto" />
               ) : (
                 <div className="text-2xl font-bold" data-testid="stat-installs-week">
                   {summaryStats.installsThisWeek}
@@ -223,13 +223,13 @@ export default function Home() {
               )}
             </CardContent>
           </Card>
-          <Card data-testid="card-metric-won">
+          <Card className="text-center" data-testid="card-metric-won">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Won (30 days)</CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
               {isLoadingStats ? (
-                <Skeleton className="h-8 w-12" />
+                <Skeleton className="h-8 w-12 mx-auto" />
               ) : (
                 <div className="text-2xl font-bold" data-testid="stat-won-deals">
                   {summaryStats.wonDealsLast30Days}
