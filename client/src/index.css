@@ -207,11 +207,11 @@ gmp-place-autocomplete::part(input)::placeholder {
 
 @media (min-width: 640px) {
   .kanban-scroll-container {
-    scroll-padding-inline: max(24px, calc((100vw - 320px) / 2));
+    scroll-padding-inline: 24px;
   }
 }
 
-/* Spacer for kanban board - provides centering room on larger screens */
+/* Spacer for kanban board - small padding on edges */
 .kanban-spacer {
   flex-shrink: 0;
   width: 12px;
@@ -219,6 +219,6 @@ gmp-place-autocomplete::part(input)::placeholder {
 
 @media (min-width: 640px) {
   .kanban-spacer {
-    width: max(24px, calc((100vw - 320px) / 2));
+    width: 24px;
   }
 }
