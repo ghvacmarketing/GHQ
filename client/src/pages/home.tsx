@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { FileText, History, Settings, BookOpen, Shield, Book, UserCog, Wrench, ClipboardList } from "lucide-react";
+import { FileText, History, Settings, BookOpen, Book, UserCog, Wrench, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -166,8 +166,8 @@ export default function Home() {
           <p className="text-muted-foreground text-sm">Field technician solutions</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8" data-testid="summary-stats">
-          <Card className="col-span-2 sm:col-span-1" data-testid="card-metric-pipeline">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8" data-testid="summary-stats">
+          <Card className="col-span-2 sm:col-span-2" data-testid="card-metric-pipeline">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Pipeline Value</CardDescription>
             </CardHeader>
@@ -175,7 +175,7 @@ export default function Home() {
               {isLoadingStats ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
-                <div className="text-2xl font-bold truncate" data-testid="stat-pipeline-value">
+                <div className="text-2xl sm:text-3xl font-bold" data-testid="stat-pipeline-value">
                   ${summaryStats.pipelineValue.toLocaleString()}
                 </div>
               )}
@@ -336,27 +336,6 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="pt-4 border-t">
-            <Link href="/admin">
-              <Card 
-                className="transition-all hover:shadow-md hover:border-primary/50 cursor-pointer group max-w-xs"
-                data-testid="link-admin"
-              >
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
-                      <Shield className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-foreground text-sm" data-testid="text-link-admin-title">
-                        Admin Settings
-                      </h3>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
         </div>
       </main>
     </div>
