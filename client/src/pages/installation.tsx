@@ -411,7 +411,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1 max-w-4xl">
         {weekDays.map((day) => (
           <div
             key={day}
@@ -422,7 +422,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
         ))}
 
         {Array.from({ length: startDayOfWeek }).map((_, idx) => (
-          <div key={`empty-${idx}`} className="min-h-[80px] sm:min-h-[100px]" />
+          <div key={`empty-${idx}`} className="min-h-[80px] sm:min-h-[100px] lg:min-h-[110px]" />
         ))}
 
         {daysInMonth.map((day) => {
@@ -434,7 +434,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
             <div
               key={dateKey}
               className={cn(
-                "min-h-[80px] sm:min-h-[100px] border rounded-md p-1 bg-card",
+                "min-h-[80px] sm:min-h-[100px] lg:min-h-[110px] border rounded-md p-1 bg-card",
                 isToday && "ring-2 ring-primary"
               )}
               data-testid={`calendar-day-${dateKey}`}
@@ -442,7 +442,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
               <div className="text-xs font-medium text-muted-foreground mb-1">
                 {format(day, "d")}
               </div>
-              <div className="space-y-1 overflow-y-auto max-h-[60px] sm:max-h-[80px]">
+              <div className="space-y-1 overflow-y-auto max-h-[60px] sm:max-h-[80px] lg:max-h-[90px]">
                 {dayLeads.map(({ lead, hasInstallDate }) => (
                   <button
                     key={lead.id}
