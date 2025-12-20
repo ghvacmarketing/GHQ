@@ -1,7 +1,7 @@
 import { Link } from "wouter";
-import { FileText, History, Settings, BookOpen, Shield, Book, UserCog, Wrench, ClipboardList, Users, Calendar, TrendingUp } from "lucide-react";
+import { FileText, History, Settings, BookOpen, Shield, Book, UserCog, Wrench, ClipboardList, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
@@ -52,7 +52,10 @@ export default function Home() {
       return false;
     }).length;
 
-    return { pendingQuotes, activeLeads, installsThisWeek, wonDealsLast30Days };
+    const activePipelineLeads = leads.filter(l => !l.won && !l.lost);
+    const pipelineValue = activePipelineLeads.reduce((sum, l) => sum + parseFloat(l.estimatedValue || "0"), 0);
+
+    return { pendingQuotes, activeLeads, installsThisWeek, wonDealsLast30Days, pipelineValue };
   }, [quotes, leads]);
 
   const isLoadingStats = isLoadingQuotes || isLoadingLeads;
@@ -163,53 +166,75 @@ export default function Home() {
           <p className="text-muted-foreground text-sm">Field technician solutions</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8" data-testid="summary-stats">
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="p-3 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8" data-testid="summary-stats">
+          <Card className="col-span-2 sm:col-span-1" data-testid="card-metric-pipeline">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs">Pipeline Value</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
               {isLoadingStats ? (
-                <Skeleton className="h-8 w-12 mx-auto mb-1" />
+                <Skeleton className="h-8 w-20" />
               ) : (
-                <p className="text-2xl font-bold text-primary" data-testid="stat-pending-quotes">
+                <div className="text-2xl font-bold truncate" data-testid="stat-pipeline-value">
+                  ${summaryStats.pipelineValue.toLocaleString()}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card data-testid="card-metric-quotes">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs">Pending Quotes</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {isLoadingStats ? (
+                <Skeleton className="h-8 w-12" />
+              ) : (
+                <div className="text-2xl font-bold" data-testid="stat-pending-quotes">
                   {summaryStats.pendingQuotes}
-                </p>
+                </div>
               )}
-              <p className="text-xs text-primary/80 font-medium">Pending Quotes</p>
             </CardContent>
           </Card>
-          <Card className="bg-primary/10 border-primary/30">
-            <CardContent className="p-3 text-center">
+          <Card data-testid="card-metric-leads">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs">Active Leads</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
               {isLoadingStats ? (
-                <Skeleton className="h-8 w-12 mx-auto mb-1" />
+                <Skeleton className="h-8 w-12" />
               ) : (
-                <p className="text-2xl font-bold text-primary" data-testid="stat-active-leads">
+                <div className="text-2xl font-bold" data-testid="stat-active-leads">
                   {summaryStats.activeLeads}
-                </p>
+                </div>
               )}
-              <p className="text-xs text-primary/80 font-medium">Active Leads</p>
             </CardContent>
           </Card>
-          <Card className="bg-primary/15 border-primary/40">
-            <CardContent className="p-3 text-center">
+          <Card data-testid="card-metric-installs">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs">Installs This Week</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
               {isLoadingStats ? (
-                <Skeleton className="h-8 w-12 mx-auto mb-1" />
+                <Skeleton className="h-8 w-12" />
               ) : (
-                <p className="text-2xl font-bold text-primary" data-testid="stat-installs-week">
+                <div className="text-2xl font-bold" data-testid="stat-installs-week">
                   {summaryStats.installsThisWeek}
-                </p>
+                </div>
               )}
-              <p className="text-xs text-primary/80 font-medium">Installs This Week</p>
             </CardContent>
           </Card>
-          <Card className="bg-primary/20 border-primary/50">
-            <CardContent className="p-3 text-center">
+          <Card data-testid="card-metric-won">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs">Won (30 days)</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
               {isLoadingStats ? (
-                <Skeleton className="h-8 w-12 mx-auto mb-1" />
+                <Skeleton className="h-8 w-12" />
               ) : (
-                <p className="text-2xl font-bold text-primary" data-testid="stat-won-deals">
+                <div className="text-2xl font-bold" data-testid="stat-won-deals">
                   {summaryStats.wonDealsLast30Days}
-                </p>
+                </div>
               )}
-              <p className="text-xs text-primary/80 font-medium">Won (30 days)</p>
             </CardContent>
           </Card>
         </div>
@@ -266,8 +291,8 @@ export default function Home() {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-primary/70 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
-                          <action.icon className="h-5 w-5 text-white" />
+                        <div className="w-10 h-10 rounded-lg bg-primary/60 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                          <action.icon className="h-5 w-5 text-primary-foreground" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-foreground text-sm" data-testid={`text-${action.testId}-title`}>
