@@ -166,7 +166,7 @@ export default function Home() {
           <p className="text-muted-foreground text-sm">Field technician solutions</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8 justify-items-center" data-testid="summary-stats">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8" data-testid="summary-stats">
           <Card className="col-span-2 sm:col-span-2 text-center" data-testid="card-metric-pipeline">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Pipeline Value</CardDescription>
