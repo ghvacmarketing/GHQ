@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { FileText, History, Settings, BookOpen, Shield, Book, UserCog, Wrench, ClipboardList, TrendingUp } from "lucide-react";
+import { FileText, History, Settings, BookOpen, Shield, Book, UserCog, Wrench, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -241,12 +241,9 @@ export default function Home() {
 
         <div className="space-y-6">
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground" data-testid="text-sell-section">
-                Sell
-              </h2>
-            </div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3" data-testid="text-sell-section">
+              Sell
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {sellActions.map((action) => (
                 <Link key={action.href} href={action.href}>
@@ -276,12 +273,9 @@ export default function Home() {
           </div>
 
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Wrench className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground" data-testid="text-install-section">
-                Install
-              </h2>
-            </div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3" data-testid="text-install-section">
+              Install
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {installActions.map((action) => (
                 <Link key={action.href} href={action.href}>
@@ -311,12 +305,9 @@ export default function Home() {
           </div>
 
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Book className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground" data-testid="text-reference-section">
-                Reference
-              </h2>
-            </div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3" data-testid="text-reference-section">
+              Reference
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {referenceActions.map((action) => (
                 <Link key={action.href} href={action.href}>
