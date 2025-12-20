@@ -9,7 +9,7 @@ import redlogo from "@assets/redlogo.webp";
 import { useQuery } from "@tanstack/react-query";
 import type { Quote, Lead } from "@shared/schema";
 import { useMemo } from "react";
-import { isThisWeek, parseISO } from "date-fns";
+import { isThisWeek } from "date-fns";
 
 export default function Home() {
   const { data: quotesData, isLoading: isLoadingQuotes } = useQuery<{ quotes: Quote[] }>({
@@ -29,13 +29,14 @@ export default function Home() {
     
     const installationLeads = leads.filter(lead => {
       if (lead.status !== "Won") return false;
-      if (!lead.tags || !Array.isArray(lead.tags)) return false;
-      return lead.tags.some(tag => tag.toLowerCase() === "installation");
+      const tags = lead.tags as string[] | null;
+      if (!tags || !Array.isArray(tags)) return false;
+      return tags.some(tag => tag.toLowerCase() === "installation");
     });
     
     const installsThisWeek = installationLeads.filter(lead => {
       if (lead.installDate) {
-        const date = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
+        const date = new Date(lead.installDate);
         return isThisWeek(date);
       }
       return false;
