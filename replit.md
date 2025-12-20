@@ -1,135 +1,47 @@
 # HVAC Service Pricing & Quoting App
 
 ## Overview
-
-This is a mobile-first web application designed for HVAC technicians to generate professional quotes on-site and manage service processes. It features a no-authentication approach for immediate access to pricing data, part selection from integrated Google Sheets, custom component addition, and generation of copyable quotes. The system automates email notifications to managers and creates Trello cards for follow-up and parts ordering. A "Processes and Systems" module provides a searchable wiki for saved procedures, with manual and voice-guided creation options, and PDF export functionality. The app is rebranded as "GHVAC Tools" and aims to streamline field operations and improve service efficiency.
+This mobile-first web application, rebranded as "GHVAC Tools," streamlines HVAC service operations by enabling technicians to generate professional quotes on-site. Key features include no-authentication access to pricing, part selection from Google Sheets, custom component addition, and automated quote generation. It integrates with Trello for follow-ups and parts ordering, sends email notifications, and includes a "Processes and Systems" module for searchable, voice-guided operational procedures. The application aims to enhance field efficiency and service management.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
 ### Frontend
 - **Framework**: React 18 with TypeScript and Vite
-- **UI**: Radix UI, shadcn/ui, Tailwind CSS (with theming)
+- **UI**: Radix UI, shadcn/ui, Tailwind CSS (theming), mobile-first, responsive, PWA support
 - **State Management**: TanStack Query (React Query)
 - **Routing**: Wouter
-- **Design**: Mobile-first, responsive, PWA support (service worker, manifest)
 
 ### Backend
 - **Runtime**: Node.js with Express.js
 - **Language**: TypeScript (ES modules)
-- **Database**: PostgreSQL with Drizzle ORM (Neon Database for cloud)
+- **Database**: PostgreSQL with Drizzle ORM (Neon Database)
 - **API**: RESTful endpoints
-- **Storage Pattern**: In-memory storage with interface for future database migration
-- **Authentication**: Designed for future extensibility, currently uses SMS Magic Link authentication with Twilio and a phone whitelist, and a developer backdoor using `REPLIT_ACCESS_TOKEN`.
+- **Authentication**: SMS Magic Link via Twilio (phone whitelist), developer backdoor, future extensibility.
 
 ### Key Design Decisions
-- **Monorepo**: Shared TypeScript types and Zod schemas, unified build, path aliases.
-- **Pricing**: Google Sheets as source of truth, server-side caching, real-time updates, custom parts support.
-- **Google Sheets Caching** (Added Nov 2025):
-  - **Server-side in-memory cache** with 24-hour TTL for optimal performance
-  - **Client-side session cache** via React Query (staleTime: Infinity)
-  - First load fetches from Google Sheets, subsequent loads served from cache (instant)
-  - Manual "Refresh Data" button in admin to force fresh fetch
-  - **Resilient cache restoration**: If refresh fails (API error, timeout, etc.), previous cache is preserved and served
-  - Cache only expires after 24 hours or successful refresh
-  - Cache metadata displayed in admin UI showing last sync time and age
-  - Dramatically reduces Google Sheets API quota usage and improves load times
-  - **NO FALLBACK DEFAULTS**: System will throw error if Google Sheets sync fails AND no cache exists, preventing incorrect quotes with outdated pricing
-- **Admin Settings Performance Optimization** (Added Nov 2025):
-  - Split admin page into lightweight `AdminLogin` component (instant render) and heavy `AdminDashboard` component (loads after auth)
-  - Login page now renders instantly (<50ms) without query setup overhead
-  - All admin data prefetches in parallel immediately upon successful login
-  - Dashboard appears with cached data already loaded (instant for repeat visits)
-  - Removed redundant authentication checks from queries since AdminDashboard only renders after auth verification
-- **Quote Generation**: Text-based output, server-side calculation (subtotals, labor, tax, totals), warranty logic. The `laborHours` field is persisted in the database to ensure accurate recalculation when editing quotes.
-- **Pricing Formula** (Updated Nov 2025):
-  - **Selling Price = Direct Cost ÷ (1 - (Overhead% + Profit% + Financing% + Commission%))**
-  - Direct Cost = Parts + Material Shrinkage + Labor + Labor Benefits + Sales Tax + Warranty Reserve
-  - All percentages (overhead, profit, financing, commission) are included in the divisor to calculate selling price
-  - This ensures all costs and margins are properly accounted for in the final customer price
-- **Warranty Calculation Logic** (Updated Nov 2025): 
-  - GHVAC covers specific parts at 100%: control board, evaporator coil, and compressor (identified by description matching)
-  - Dual selling price calculation: (1) Full Selling Price with ALL parts for transparency, (2) Customer Selling Price excluding GHVAC-covered parts
-  - Warranty coverage percentages (25%-90% by year) represent what the customer PAYS, not what they save
-  - Customer total = Customer Selling Price × Warranty Coverage %
-  - This ensures proper accounting of markup, overhead, tax, and profit on GHVAC-covered components
-- **Quote Editing Protection**: Quotes can only be edited when status is "draft" and not pushed to Trello. Non-editable quotes display a warning banner with context-aware messaging and disable all form fields to prevent accidental changes. This ensures data integrity for quotes being tracked in external systems.
-- **Quote Breakdown Display**: Toggleable detailed breakdown in quote summary showing all intermediate calculations. Default view displays simple summary (subtotal, labor, tax, total). Expandable view reveals complete calculation breakdown including parts subtotal, free parts, material shrinkage, labor benefits, warranty reserve, direct cost, overhead allocation, profit allocation, financing cost, and commission. Works identically in both quote creation and edit flows.
-- **Developer Tools**: Admin-accessible section displaying live quote calculation formulas with actual values from current Google Sheets settings. Shows step-by-step calculation logic including material costs, labor calculations, taxes, warranty reserve, and selling price formula with all percentage allocations (overhead, profit, financing, commission). Explicitly labeled as "Live Formula" to clarify values come from Google Sheets, not hard-coded constants.
-- **Processes and Systems Module**: Searchable wiki, manual and voice-guided process creation (using OpenAI Whisper for transcription and GPT for formatting/extraction with configurable cleanup intensity), PDF export (jsPDF), PostgreSQL storage with JSON column for steps.
-  - **Rich Text Editor** (Added Nov 2025): Process descriptions use Tiptap rich text editor with mobile-friendly toolbar for formatting (bold, italic, headings, lists), inline images (base64-encoded, 5MB limit), links, and file references to attached documents. File references are clickable and open the full-screen viewer. Editor has enhanced border visibility (border-2 with muted-foreground/30) for better UX. Process list cards display plain text previews using stripHtml() to avoid showing raw HTML tags. Helpful info tip guides users to paste markdown-formatted text from AI tools or other sources for easy content creation.
-  - **Backward Compatibility System** (Added Nov 2025): Comprehensive conversion and preservation logic for legacy content:
-    - `containsHtmlTags()`: Detects actual HTML tags (p, div, span, strong, em, a, br, h1-6, ul, ol, li, etc.) vs plain text with angle brackets
-    - `convertToHtml()`: Converts legacy markdown/plain text to HTML for Tiptap rendering
-      - Preserves legacy inline HTML like "Inspect <strong>filter</strong> monthly"
-      - Escapes plain text with angle brackets like "Replace <filter> monthly" or "L1 < L2 > L3"
-      - Converts markdown links [text](url) to HTML <a> tags with proper escaping
-      - Converts plain URLs to clickable links
-      - Handles special characters (<, >, &, ", ') correctly
-    - `stripHtml()`: Strips HTML for PDF export while preserving structure
-      - Returns plain text as-is if no HTML tags detected (preserves angle brackets in legacy content)
-      - Converts structural tags to text equivalents: <p> → \n\n, <br> → \n, <li> → •
-      - Appends link URLs in parentheses: "text (url)"
-      - Normalizes whitespace in multi-line links to prevent PDF formatting issues
-    - Ensures all legacy content (plain text, markdown, inline HTML) renders correctly in both view and edit modes
-    - Preserves formatting in PDF exports while maintaining readability
-- **PDF Management**: Secure storage and viewing of Price Book PDFs in PostgreSQL, admin-controlled upload with password protection and size validation.
-- **App Configuration**: Separate API endpoints for Google Sheets pricing and database-backed application settings.
-- **Announcement System**: Admin-configurable modal for user notifications with version tracking via localStorage. Supports full CRUD operations (create, edit, delete) with automatic active/inactive management. Markdown support for links (plain URLs and [text](url) format) with URL sanitization for security.
-- **Sales Prospects** (Added Nov 2025): Full CRM pipeline with lead management, notes, actions, tasks, and CSV import/export. Enhanced form validation including:
-  - **Phone Formatting**: Auto-formats to (XXX) XXX-XXXX as user types with real-time validation
-  - **Email Validation**: Regex-based validation with visual error feedback
-  - **Address Autocomplete**: Integrated with Geoapify API for dropdown address suggestions (requires VITE_GEOAPIFY_API_KEY env var)
-  - **Geolocation**: HTML5 Geolocation + reverse geocoding to auto-populate address from current location
-  - **Date Handling**: Zod schema transforms accept both string and Date formats for projectedCloseDate, closedAt, and lastImportedAt fields
-- **Installation Pipeline** (Added Dec 2025): Kanban board for tracking installation jobs through the workflow.
-  - **Data source**: Shows leads with `status === "Won"` AND `tags` includes "installation"
-  - **Database fields**: `installStep` (current column) and `installOrder` (position within column) added to leads table
-  - **8 Kanban columns**: Define Scope of Work → Assign to Sub-Contractor → Order Equipment & Materials → Waiting on Equipment & Material → Warehouse: Equipment Arrived → Spec Out Project → Warehouse: Stage Equipment & Materials → Schedule Job
-  - **Drag and drop**: Uses @dnd-kit for smooth drag-and-drop between columns and reordering within columns
-  - **Optimistic updates**: Instant visual feedback with server persistence and rollback on error
-  - **Card details**: Customer name, address, estimated value, target date, assigned employee, tags, notes preview
-  - **Edit dialog**: Click any card to edit install step, notes, and assigned employee
-  - **Filters**: Search by customer/address, filter by assigned employee
-  - **Mobile-first**: Horizontally scrollable board with touch-friendly 44px targets
-- **Security**: SESSION_SECRET environment variable is required at startup to prevent use of insecure default secrets.
-- **Customer Database** (Added Dec 2025): FieldEdge CSV import system for syncing customer data.
-  - **CSV Import**: Admin uploads FieldEdge export CSV with columns: Display Name, Customer Type, Full Address, Phone, Email, Lead Source
-  - **Checksum-based upsert**: Each row is hashed (SHA256) to detect changes; unchanged records are skipped, modified records are updated, new records are created
-  - **File hash deduplication**: Identical CSV files are detected and skipped to prevent duplicate imports
-  - **Import tracking**: CustomerImportBatches table stores import history with counts (created, updated, skipped, errors)
-  - **Customer search**: Real-time search across displayName, phone, email, fullAddress fields using ILIKE queries
-  - **Lead form integration**: Customer lookup dropdown in lead creation form with debounced search (300ms); selecting a customer auto-fills name, phone, email, address, customerType, and leadSource fields
-  - **Quote generator integration**: Customer lookup in CustomerInfo component fills customer name and displays address in info banner for reference
-  - **Admin UI**: Customer Database section in admin settings with stats, CSV upload, and import history
-  - **Auto-Sync from Google Sheets** (Added Dec 2025):
-    - Automatic sync every 10 minutes from FieldEdge Google Sheet (ID: 1POeQRuDUTia0BUYsVmEsBOqW6BDBvfL5qyKv-GQICU0)
-    - Uses dataset-level SHA256 hash to detect changes and skip redundant syncs
-    - Per-row checksums for efficient duplicate detection during import
-    - Sync status tracking: lastSyncTime, lastCheckTime, lastSyncResult, lastError, daily sync counter
-    - Admin UI shows real-time sync status with "Sync Now" button and "Reset" to force full re-sync
-    - API endpoints: GET /api/customers/sync/status, POST /api/customers/sync/trigger, POST /api/customers/sync/reset
-    - Service file: `server/services/customer-sync.ts`
-    - Environment variable: `FIELDEDGE_CUSTOMER_SHEET_ID` for sheet configuration
-- **Persistent Admin API Key** (Added Dec 2025): `ADMIN_API_KEY` environment variable for automated integrations. Used alongside dynamic session tokens for admin auth.
-- **Global Password Gate** (Added Dec 2025): Application-wide access control separate from admin authentication.
-  - Requires `GLOBAL_PASSWORD` secret to enable (gate is skipped if not set)
-  - Users must enter password on first visit; authentication stored in localStorage for 90 days
-  - `SKIP_GLOBAL_AUTH=true` env var disables gate for development
-  - Frontend component: `client/src/components/GlobalPasswordGate.tsx`
-  - API endpoints: `POST /api/global/verify`, `GET /api/global/auth-required`
+- **Monorepo**: Shared TypeScript types and Zod schemas, unified build.
+- **Pricing**: Google Sheets as source of truth with server-side in-memory caching (24-hour TTL) and client-side session caching for performance and reduced API usage. Includes custom parts and real-time updates.
+- **Admin Settings Optimization**: Split into `AdminLogin` and `AdminDashboard` for faster initial render and prefetching of data post-authentication.
+- **Quote Generation**: Text-based output with server-side calculation of subtotals, labor, tax, and totals. Includes sophisticated pricing formulas considering overhead, profit, financing, and commission, plus detailed warranty logic for GHVAC-covered parts. Quotes are editable only when in "draft" status. Toggleable detailed breakdown of calculations is available.
+- **Developer Tools**: Admin-accessible section displaying live quote calculation formulas with values from Google Sheets settings.
+- **Processes and Systems Module**: Searchable wiki supporting manual and voice-guided (OpenAI Whisper/GPT) process creation. Features a Tiptap rich text editor for descriptions (with inline images, links, file references), PDF export (jsPDF), and robust backward compatibility for legacy content.
+- **PDF Management**: Secure storage and viewing of Price Book PDFs in PostgreSQL.
+- **Announcement System**: Admin-configurable modal for user notifications with Markdown support.
+- **Sales Prospects**: CRM pipeline with lead management, notes, tasks, CSV import/export, phone/email validation, Geoapify address autocomplete, and HTML5 geolocation.
+- **Installation Pipeline**: Kanban board for tracking installation jobs, integrating with sales leads. Features drag-and-drop, optimistic updates, and mobile-first design.
+- **Customer Database**: FieldEdge CSV import system with checksum-based upsert for syncing customer data. Auto-syncs from Google Sheets every 10 minutes with two-way sync (add, update, delete). Integrates customer lookup into lead forms and quote generation.
+- **Security**: Requires `SESSION_SECRET` and `ADMIN_API_KEY` environment variables. Implements a `GLOBAL_PASSWORD` gate for application-wide access control, configurable via environment variables.
 
 ## External Dependencies
-
-- **Google Sheets API**: For parts pricing and application settings.
-- **SendGrid**: For email notifications.
-- **Trello API**: For automated workflow management (parts ordering, follow-ups).
-- **Neon Database**: Serverless PostgreSQL hosting.
-- **OpenAI API (Whisper & GPT)**: For voice transcription, intelligent text formatting, and extraction in the Processes module.
-- **Twilio**: For SMS Magic Link authentication.
-- **Geoapify API**: For address autocomplete and reverse geocoding in Sales Prospects. Requires `VITE_GEOAPIFY_API_KEY` environment variable. Free tier: 3,000 requests/day. Sign up at https://www.geoapify.com/
-- **react-pdf**: For PDF viewing.
-- **jsPDF**: For generating PDF exports of processes.
+- **Google Sheets API**: Parts pricing and application settings.
+- **SendGrid**: Email notifications.
+- **Trello API**: Workflow management.
+- **Neon Database**: PostgreSQL hosting.
+- **OpenAI API (Whisper & GPT)**: Voice transcription and intelligent text formatting/extraction.
+- **Twilio**: SMS Magic Link authentication.
+- **Geoapify API**: Address autocomplete and reverse geocoding.
+- **react-pdf**: PDF viewing.
+- **jsPDF**: PDF export generation.
