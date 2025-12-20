@@ -2284,7 +2284,7 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
 
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div className="p-3 border rounded bg-background">
-                            <div className="font-medium">Last Sync</div>
+                            <div className="font-medium">Last Append</div>
                             <div className="text-muted-foreground">
                               {customerSyncStatus?.status?.lastSyncTime 
                                 ? new Date(customerSyncStatus.status.lastSyncTime).toLocaleString()

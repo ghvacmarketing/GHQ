@@ -116,7 +116,6 @@ class CustomerSyncService {
       email: row["Email"]?.trim() || null,
       leadSource: row["Lead Source"]?.trim() || null,
       checksum,
-      importSource: 'google-sheets',
     };
   }
 
