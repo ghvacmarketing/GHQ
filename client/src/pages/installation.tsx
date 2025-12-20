@@ -802,7 +802,7 @@ export default function Installation() {
         </div>
 
         <Tabs value={activeView} onValueChange={(v) => setActiveView(v as "kanban" | "calendar")} className="mb-4">
-          <TabsList className="grid w-full max-w-sm grid-cols-2 h-12 py-0 px-[3px] mx-0" data-testid="tabs-view-switcher">
+          <TabsList className="grid w-full max-w-sm grid-cols-2 h-12 py-0 px-[3px] mx-auto" data-testid="tabs-view-switcher">
             <TabsTrigger value="kanban" className="min-h-[44px] pt-0 pb-0" data-testid="tab-kanban">
               <LayoutGrid className="h-4 w-4 mr-2" />
               Kanban
