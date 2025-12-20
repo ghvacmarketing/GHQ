@@ -535,15 +535,18 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
 
   // Customer Database - auto-sync status
   const { data: customerSyncStatus, refetch: refetchSyncStatus } = useQuery<{
-    lastSyncTime: string | null;
-    lastCheckTime: string | null;
-    lastSyncResult: { created: number; updated: number; skipped: number; errors: number } | null;
-    lastError: string | null;
-    dataHash: string | null;
-    syncCount: number;
-    lastSyncCountReset: string;
+    status: {
+      lastSyncTime: string | null;
+      lastCheckTime: string | null;
+      lastSyncResult: { created: number; updated: number; skipped: number; errors: number } | null;
+      lastError: string | null;
+      dataHash: string | null;
+      syncCount: number;
+      lastSyncCountReset: string;
+    };
   }>({
     queryKey: ['/api/customers/sync/status'],
+    queryFn: getAdminQueryFn({ on401: 'throw' }),
   });
 
   // Customer import mutation
@@ -2283,36 +2286,36 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
                           <div className="p-3 border rounded bg-background">
                             <div className="font-medium">Last Sync</div>
                             <div className="text-muted-foreground">
-                              {customerSyncStatus?.lastSyncTime 
-                                ? new Date(customerSyncStatus.lastSyncTime).toLocaleString()
+                              {customerSyncStatus?.status?.lastSyncTime 
+                                ? new Date(customerSyncStatus.status.lastSyncTime).toLocaleString()
                                 : 'Never'}
                             </div>
                           </div>
                           <div className="p-3 border rounded bg-background">
                             <div className="font-medium">Last Check</div>
                             <div className="text-muted-foreground">
-                              {customerSyncStatus?.lastCheckTime 
-                                ? new Date(customerSyncStatus.lastCheckTime).toLocaleString()
+                              {customerSyncStatus?.status?.lastCheckTime 
+                                ? new Date(customerSyncStatus.status.lastCheckTime).toLocaleString()
                                 : 'Never'}
                             </div>
                           </div>
                           <div className="p-3 border rounded bg-background">
                             <div className="font-medium">Syncs Today</div>
-                            <div className="text-muted-foreground">{customerSyncStatus?.syncCount || 0}</div>
+                            <div className="text-muted-foreground">{customerSyncStatus?.status?.syncCount || 0}</div>
                           </div>
                           <div className="p-3 border rounded bg-background">
                             <div className="font-medium">Last Result</div>
                             <div className="text-muted-foreground">
-                              {customerSyncStatus?.lastSyncResult 
-                                ? `+${customerSyncStatus.lastSyncResult.created} / ↻${customerSyncStatus.lastSyncResult.updated}`
+                              {customerSyncStatus?.status?.lastSyncResult 
+                                ? `+${customerSyncStatus.status.lastSyncResult.created} / ↻${customerSyncStatus.status.lastSyncResult.updated}`
                                 : 'N/A'}
                             </div>
                           </div>
                         </div>
 
-                        {customerSyncStatus?.lastError && (
+                        {customerSyncStatus?.status?.lastError && (
                           <div className="p-3 border border-red-200 bg-red-50 dark:bg-red-950 rounded text-sm text-red-700 dark:text-red-300">
-                            <span className="font-medium">Error:</span> {customerSyncStatus.lastError}
+                            <span className="font-medium">Error:</span> {customerSyncStatus.status.lastError}
                           </div>
                         )}
 
