@@ -2764,7 +2764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...existingActions,
           {
             id: Date.now().toString(),
-            action: `Transferred from Service: ${notes}`,
+            text: `Transferred from Service: ${notes}`,
             createdAt: now.toISOString(),
             completed: false,
           }

@@ -490,6 +490,8 @@ export default function ServicePipeline() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { serviceStep?: string; serviceOrder?: number }>>({});
   const [activeView, setActiveView] = useState<"kanban" | "calendar">("kanban");
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const [transferNotes, setTransferNotes] = useState("");
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -536,6 +538,24 @@ export default function ServicePipeline() {
       clearOptimisticUpdate(variables.id);
       toast({ description: "Failed to update job", variant: "destructive" });
       queryClient.invalidateQueries({ queryKey: ["/api/service-leads"] });
+    },
+  });
+
+  const transferToInstallationMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
+      const res = await apiRequest("POST", `/api/leads/${id}/transfer-to-installation`, { notes });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ description: "Job transferred to Installation Department" });
+      setEditingLead(null);
+      setShowTransferDialog(false);
+      setTransferNotes("");
+      queryClient.invalidateQueries({ queryKey: ["/api/service-leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/installation-leads"] });
+    },
+    onError: () => {
+      toast({ description: "Failed to transfer job", variant: "destructive" });
     },
   });
 
@@ -992,6 +1012,18 @@ export default function ServicePipeline() {
                 />
               </div>
             </div>
+
+            <div className="border-t pt-4">
+              <Button
+                variant="outline"
+                className="w-full min-h-[44px] border-orange-300 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
+                onClick={() => setShowTransferDialog(true)}
+                data-testid="button-push-to-installation"
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Push to Installation Department
+              </Button>
+            </div>
           </div>
           
           <DialogFooter className="gap-2 sm:gap-0">
@@ -1000,6 +1032,63 @@ export default function ServicePipeline() {
             </Button>
             <Button onClick={handleSaveEdit} className="min-h-[44px]" data-testid="button-service-save">
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-transfer-confirmation">
+          <DialogHeader>
+            <DialogTitle>Transfer to Installation Department</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              This will transfer <strong>{editingLead?.name}</strong> from the Service Department to the Installation Department. 
+              All job details, notes, and history will be preserved.
+            </p>
+            
+            <div className="space-y-2">
+              <Label htmlFor="transferNotes">Transfer Notes (optional)</Label>
+              <Textarea
+                id="transferNotes"
+                value={transferNotes}
+                onChange={(e) => setTransferNotes(e.target.value)}
+                placeholder="Add any notes about why this job is being transferred..."
+                rows={3}
+                className="min-h-[80px]"
+                data-testid="textarea-transfer-notes"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowTransferDialog(false);
+                setTransferNotes("");
+              }} 
+              className="min-h-[44px]"
+              data-testid="button-transfer-cancel"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (editingLead) {
+                  transferToInstallationMutation.mutate({ 
+                    id: editingLead.id, 
+                    notes: transferNotes || undefined 
+                  });
+                }
+              }}
+              disabled={transferToInstallationMutation.isPending}
+              className="min-h-[44px] bg-orange-600 hover:bg-orange-700"
+              data-testid="button-transfer-confirm"
+            >
+              {transferToInstallationMutation.isPending ? "Transferring..." : "Transfer to Installation"}
             </Button>
           </DialogFooter>
         </DialogContent>
