@@ -358,6 +358,16 @@ interface CalendarViewProps {
   onCardClick: (lead: Lead) => void;
 }
 
+interface EventBar {
+  lead: Lead;
+  hasInstallDate: boolean;
+  weekIndex: number;
+  startCol: number;
+  span: number;
+  isStart: boolean;
+  isEnd: boolean;
+}
+
 function CalendarView({ leads, onCardClick }: CalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -365,6 +375,9 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
   const monthEnd = endOfMonth(currentMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const startDayOfWeek = getDay(monthStart);
+
+  const totalCells = startDayOfWeek + daysInMonth.length;
+  const numWeeks = Math.ceil(totalCells / 7);
 
   const getLeadDateRange = (lead: Lead): { startDate: Date; endDate: Date | null; hasInstallDate: boolean } | null => {
     if (lead.installDate) {
@@ -388,43 +401,78 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
     return null;
   };
 
-  const leadsByDate = useMemo(() => {
-    const map: Record<string, { lead: Lead; hasInstallDate: boolean; isRangeStart?: boolean; isRangeEnd?: boolean; isRangeMiddle?: boolean }[]> = {};
+  const getCellIndex = (date: Date): number => {
+    const dayOfMonth = date.getDate();
+    return startDayOfWeek + dayOfMonth - 1;
+  };
+
+  const eventBars = useMemo(() => {
+    const bars: EventBar[] = [];
+    
     leads.forEach((lead) => {
       const dateRange = getLeadDateRange(lead);
       if (!dateRange) return;
       
       const { startDate, endDate, hasInstallDate } = dateRange;
       
-      if (endDate) {
-        const rangeDays = eachDayOfInterval({ start: startDate, end: endDate });
-        rangeDays.forEach((day, index) => {
-          if (isSameMonth(day, currentMonth)) {
-            const key = format(day, "yyyy-MM-dd");
-            if (!map[key]) map[key] = [];
-            const isFirstInMonth = index === 0 || !isSameMonth(rangeDays[index - 1], currentMonth);
-            const isLastInMonth = index === rangeDays.length - 1 || !isSameMonth(rangeDays[index + 1], currentMonth);
-            map[key].push({ 
-              lead, 
-              hasInstallDate,
-              isRangeStart: isFirstInMonth,
-              isRangeEnd: isLastInMonth,
-              isRangeMiddle: !isFirstInMonth && !isLastInMonth
-            });
-          }
+      const effectiveStart = isSameMonth(startDate, currentMonth) ? startDate : monthStart;
+      const effectiveEnd = endDate 
+        ? (isSameMonth(endDate, currentMonth) ? endDate : monthEnd)
+        : (isSameMonth(startDate, currentMonth) ? startDate : null);
+      
+      if (!effectiveEnd) return;
+      if (!isSameMonth(effectiveStart, currentMonth) && !isSameMonth(effectiveEnd, currentMonth)) return;
+      
+      const startCellIndex = getCellIndex(effectiveStart);
+      const endCellIndex = getCellIndex(effectiveEnd);
+      
+      const startWeek = Math.floor(startCellIndex / 7);
+      const endWeek = Math.floor(endCellIndex / 7);
+      
+      for (let week = startWeek; week <= endWeek; week++) {
+        const weekStartCell = week * 7;
+        const weekEndCell = weekStartCell + 6;
+        
+        const barStartCell = Math.max(startCellIndex, weekStartCell);
+        const barEndCell = Math.min(endCellIndex, weekEndCell);
+        
+        const startCol = barStartCell - weekStartCell;
+        const span = barEndCell - barStartCell + 1;
+        
+        bars.push({
+          lead,
+          hasInstallDate,
+          weekIndex: week,
+          startCol,
+          span,
+          isStart: barStartCell === startCellIndex && isSameMonth(startDate, currentMonth),
+          isEnd: barEndCell === endCellIndex && (!endDate || isSameMonth(endDate, currentMonth)),
         });
-      } else {
-        if (isSameMonth(startDate, currentMonth)) {
-          const key = format(startDate, "yyyy-MM-dd");
-          if (!map[key]) map[key] = [];
-          map[key].push({ lead, hasInstallDate });
-        }
       }
     });
-    return map;
-  }, [leads, currentMonth]);
+    
+    return bars;
+  }, [leads, currentMonth, startDayOfWeek]);
 
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const weeks = useMemo(() => {
+    const result: Date[][] = [];
+    for (let w = 0; w < numWeeks; w++) {
+      const weekDates: Date[] = [];
+      for (let d = 0; d < 7; d++) {
+        const cellIndex = w * 7 + d;
+        const dayIndex = cellIndex - startDayOfWeek;
+        if (dayIndex >= 0 && dayIndex < daysInMonth.length) {
+          weekDates.push(daysInMonth[dayIndex]);
+        } else {
+          weekDates.push(null as any);
+        }
+      }
+      result.push(weekDates);
+    }
+    return result;
+  }, [numWeeks, startDayOfWeek, daysInMonth]);
 
   return (
     <div className="space-y-4">
@@ -452,57 +500,73 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 max-w-4xl mx-auto">
-        {weekDays.map((day) => (
-          <div
-            key={day}
-            className="text-center text-xs font-medium text-muted-foreground py-2"
-          >
-            {day}
-          </div>
-        ))}
-
-        {Array.from({ length: startDayOfWeek }).map((_, idx) => (
-          <div key={`empty-${idx}`} className="min-h-[80px] sm:min-h-[100px] lg:min-h-[110px]" />
-        ))}
-
-        {daysInMonth.map((day) => {
-          const dateKey = format(day, "yyyy-MM-dd");
-          const dayLeads = leadsByDate[dateKey] || [];
-          const isToday = isSameDay(day, new Date());
-
-          return (
+      <div className="max-w-4xl mx-auto">
+        <div className="grid grid-cols-7 gap-0 border-b">
+          {weekDays.map((day) => (
             <div
-              key={dateKey}
-              className={cn(
-                "min-h-[80px] sm:min-h-[100px] lg:min-h-[110px] border rounded-md p-1 bg-card",
-                isToday && "ring-2 ring-primary"
-              )}
-              data-testid={`calendar-day-${dateKey}`}
+              key={day}
+              className="text-center text-xs font-medium text-muted-foreground py-2 border-r last:border-r-0"
             >
-              <div className="text-xs font-medium text-muted-foreground mb-1">
-                {format(day, "d")}
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {weeks.map((weekDates, weekIndex) => {
+          const weekBars = eventBars.filter(bar => bar.weekIndex === weekIndex);
+          
+          return (
+            <div key={weekIndex} className="relative">
+              <div className="grid grid-cols-7 gap-0">
+                {weekDates.map((day, dayIndex) => {
+                  const isToday = day && isSameDay(day, new Date());
+                  return (
+                    <div
+                      key={dayIndex}
+                      className={cn(
+                        "min-h-[80px] sm:min-h-[100px] border-r border-b last:border-r-0 p-1 bg-card",
+                        isToday && "ring-2 ring-primary ring-inset",
+                        !day && "bg-muted/30"
+                      )}
+                      data-testid={day ? `calendar-day-${format(day, "yyyy-MM-dd")}` : undefined}
+                    >
+                      {day && (
+                        <div className="text-xs font-medium text-muted-foreground">
+                          {format(day, "d")}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <div className="space-y-1 overflow-y-auto max-h-[60px] sm:max-h-[80px] lg:max-h-[90px]">
-                {dayLeads.map(({ lead, hasInstallDate, isRangeStart, isRangeEnd, isRangeMiddle }) => (
-                  <button
-                    key={lead.id}
-                    onClick={() => onCardClick(lead)}
-                    className={cn(
-                      "w-full text-left text-[10px] sm:text-xs px-1 py-0.5 min-h-[28px] flex items-center",
-                      hasInstallDate
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-yellow-400 text-yellow-900",
-                      isRangeStart && !isRangeEnd && "rounded-l rounded-r-none",
-                      isRangeEnd && !isRangeStart && "rounded-r rounded-l-none",
-                      isRangeMiddle && "rounded-none",
-                      (!isRangeStart && !isRangeEnd && !isRangeMiddle) && "rounded",
-                      (isRangeStart && isRangeEnd) && "rounded"
-                    )}
-                    data-testid={`calendar-job-${lead.id}`}
+              
+              <div className="absolute top-6 left-0 right-0 space-y-1 pointer-events-none px-0.5">
+                {weekBars.map((bar, barIndex) => (
+                  <div
+                    key={`${bar.lead.id}-${weekIndex}-${barIndex}`}
+                    className="pointer-events-auto"
+                    style={{
+                      marginLeft: `calc(${bar.startCol} * (100% / 7) + 2px)`,
+                      width: `calc(${bar.span} * (100% / 7) - 4px)`,
+                    }}
                   >
-                    <span className="truncate">{lead.name}</span>
-                  </button>
+                    <button
+                      onClick={() => onCardClick(bar.lead)}
+                      className={cn(
+                        "w-full text-left text-[10px] sm:text-xs px-2 py-1 min-h-[24px] flex items-center cursor-pointer hover:opacity-90 transition-opacity",
+                        bar.hasInstallDate
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-yellow-400 text-yellow-900",
+                        bar.isStart && bar.isEnd && "rounded",
+                        bar.isStart && !bar.isEnd && "rounded-l",
+                        bar.isEnd && !bar.isStart && "rounded-r",
+                        !bar.isStart && !bar.isEnd && "rounded-none"
+                      )}
+                      data-testid={`calendar-job-${bar.lead.id}`}
+                    >
+                      <span className="truncate font-medium">{bar.lead.name}</span>
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
