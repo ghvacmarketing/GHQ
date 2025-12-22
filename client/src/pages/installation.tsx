@@ -33,6 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { ArrowLeft, ArrowRight, Search, MapPin, DollarSign, Calendar, CalendarDays, User, StickyNote, GripVertical, Phone, Mail, FileText, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Package, Wrench } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
@@ -592,22 +593,77 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
                       width: `calc(${bar.span} * (100% / 7) - 4px)`,
                     }}
                   >
-                    <button
-                      onClick={() => onCardClick(bar.lead)}
-                      className={cn(
-                        "w-full text-left text-[10px] sm:text-xs px-2 py-1 min-h-[24px] flex items-center cursor-pointer hover:opacity-90 transition-opacity",
-                        bar.hasInstallDate
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-yellow-400 text-yellow-900",
-                        bar.isStart && bar.isEnd && "rounded",
-                        bar.isStart && !bar.isEnd && "rounded-l",
-                        bar.isEnd && !bar.isStart && "rounded-r",
-                        !bar.isStart && !bar.isEnd && "rounded-none"
-                      )}
-                      data-testid={`calendar-job-${bar.lead.id}`}
-                    >
-                      <span className="truncate font-medium">{bar.lead.name}</span>
-                    </button>
+                    <HoverCard openDelay={200} closeDelay={100}>
+                      <HoverCardTrigger asChild>
+                        <button
+                          onClick={() => onCardClick(bar.lead)}
+                          className={cn(
+                            "w-full text-left text-[10px] sm:text-xs px-2 py-1 min-h-[24px] flex items-center cursor-pointer hover:opacity-90 transition-opacity",
+                            bar.hasInstallDate
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-yellow-400 text-yellow-900",
+                            bar.isStart && bar.isEnd && "rounded",
+                            bar.isStart && !bar.isEnd && "rounded-l",
+                            bar.isEnd && !bar.isStart && "rounded-r",
+                            !bar.isStart && !bar.isEnd && "rounded-none"
+                          )}
+                          data-testid={`calendar-job-${bar.lead.id}`}
+                        >
+                          <span className="truncate font-medium">{bar.lead.name}</span>
+                        </button>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-72 p-3" side="right" align="start">
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-sm">{bar.lead.name}</h4>
+                          {bar.lead.address && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <MapPin className="h-3 w-3 flex-shrink-0" />
+                              <span>{bar.lead.address}</span>
+                            </div>
+                          )}
+                          {bar.lead.phone && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Phone className="h-3 w-3 flex-shrink-0" />
+                              <span>{bar.lead.phone}</span>
+                            </div>
+                          )}
+                          {bar.lead.estimatedValue && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <DollarSign className="h-3 w-3 flex-shrink-0" />
+                              <span>${parseFloat(bar.lead.estimatedValue).toLocaleString()}</span>
+                            </div>
+                          )}
+                          {bar.lead.installDate && (
+                            <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                              <CalendarDays className="h-3 w-3 flex-shrink-0" />
+                              <span>
+                                {(() => {
+                                  const startDate = typeof bar.lead.installDate === "string" ? parseISO(bar.lead.installDate) : bar.lead.installDate;
+                                  const endDateRaw = bar.lead.installEndDate;
+                                  if (endDateRaw) {
+                                    const endDate = typeof endDateRaw === "string" ? parseISO(endDateRaw) : endDateRaw;
+                                    if (endDate > startDate) {
+                                      return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
+                                    }
+                                  }
+                                  return format(startDate, "MMM d, yyyy");
+                                })()}
+                              </span>
+                            </div>
+                          )}
+                          {bar.lead.installStep && (
+                            <Badge variant="outline" className="text-[10px] mt-1">
+                              {bar.lead.installStep}
+                            </Badge>
+                          )}
+                          {bar.lead.clientIssue && (
+                            <p className="text-xs text-muted-foreground border-t pt-2 mt-2 line-clamp-2">
+                              {bar.lead.clientIssue}
+                            </p>
+                          )}
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
                   </div>
                 ))}
               </div>

@@ -33,6 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { ArrowLeft, Search, MapPin, DollarSign, Calendar, CalendarDays, User, StickyNote, GripVertical, Phone, Mail, FileText, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Package, Wrench } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
@@ -456,19 +457,61 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
               </div>
               <div className="space-y-1 overflow-y-auto max-h-[60px] sm:max-h-[80px] lg:max-h-[90px]">
                 {dayLeads.map(({ lead, isRepairDate }) => (
-                  <button
-                    key={lead.id}
-                    onClick={() => onCardClick(lead)}
-                    className={cn(
-                      "w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate min-h-[28px] flex items-center",
-                      isRepairDate
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-yellow-400 text-yellow-900"
-                    )}
-                    data-testid={`service-calendar-job-${lead.id}`}
-                  >
-                    <span className="truncate">{lead.name}</span>
-                  </button>
+                  <HoverCard key={lead.id} openDelay={200} closeDelay={100}>
+                    <HoverCardTrigger asChild>
+                      <button
+                        onClick={() => onCardClick(lead)}
+                        className={cn(
+                          "w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate min-h-[28px] flex items-center",
+                          isRepairDate
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-yellow-400 text-yellow-900"
+                        )}
+                        data-testid={`service-calendar-job-${lead.id}`}
+                      >
+                        <span className="truncate">{lead.name}</span>
+                      </button>
+                    </HoverCardTrigger>
+                    <HoverCardContent className="w-72 p-3" side="right" align="start">
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-sm">{lead.name}</h4>
+                        {lead.address && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                            <span>{lead.address}</span>
+                          </div>
+                        )}
+                        {lead.phone && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Phone className="h-3 w-3 flex-shrink-0" />
+                            <span>{lead.phone}</span>
+                          </div>
+                        )}
+                        {lead.estimatedValue && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <DollarSign className="h-3 w-3 flex-shrink-0" />
+                            <span>${parseFloat(lead.estimatedValue).toLocaleString()}</span>
+                          </div>
+                        )}
+                        {lead.repairDate && (
+                          <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                            <CalendarDays className="h-3 w-3 flex-shrink-0" />
+                            <span>Repair: {format(typeof lead.repairDate === "string" ? parseISO(lead.repairDate) : lead.repairDate, "MMM d, yyyy")}</span>
+                          </div>
+                        )}
+                        {lead.serviceStep && (
+                          <Badge variant="outline" className="text-[10px] mt-1">
+                            {lead.serviceStep}
+                          </Badge>
+                        )}
+                        {lead.clientIssue && (
+                          <p className="text-xs text-muted-foreground border-t pt-2 mt-2 line-clamp-2">
+                            {lead.clientIssue}
+                          </p>
+                        )}
+                      </div>
+                    </HoverCardContent>
+                  </HoverCard>
                 ))}
               </div>
             </div>
