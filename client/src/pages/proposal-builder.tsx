@@ -119,47 +119,47 @@ function calculateCustomBuildEstimate(
   
   if (outdoorUnit) {
     if (outdoorUnit.sellingPrice) {
-      // Trane with pricing: fixed 50% gross margin
+      // Trane with pricing: 50% gross margin (low) to 100% markup (high)
       totalLow += outdoorUnit.sellingPrice;
-      totalHigh += outdoorUnit.sellingPrice;
+      totalHigh += outdoorUnit.sellingPrice * 2;
     } else {
-      // Non-Trane: 50-100% markup range
+      // Non-Trane: same 50-100% range
       const basePrice = outdoorUnit.componentType === "Heat Pump" ? 4500 : 3500;
-      totalLow += Math.round(basePrice * 0.75); // Low end
-      totalHigh += basePrice; // High end
+      totalLow += basePrice;
+      totalHigh += basePrice * 2;
     }
   }
   
   if (coil) {
     if (coil.sellingPrice) {
       totalLow += coil.sellingPrice;
-      totalHigh += coil.sellingPrice;
+      totalHigh += coil.sellingPrice * 2;
     } else {
       const basePrice = 800;
-      totalLow += Math.round(basePrice * 0.75);
-      totalHigh += basePrice;
+      totalLow += basePrice;
+      totalHigh += basePrice * 2;
     }
   }
   
   if (indoorUnit) {
     if (indoorUnit.sellingPrice) {
       totalLow += indoorUnit.sellingPrice;
-      totalHigh += indoorUnit.sellingPrice;
+      totalHigh += indoorUnit.sellingPrice * 2;
     } else {
       const basePrice = indoorUnit?.componentType === "Air Handler" ? 2000 : 1800;
-      totalLow += Math.round(basePrice * 0.75);
-      totalHigh += basePrice;
+      totalLow += basePrice;
+      totalHigh += basePrice * 2;
     }
   }
   
   if (thermostat) {
     if (thermostat.sellingPrice) {
       totalLow += thermostat.sellingPrice;
-      totalHigh += thermostat.sellingPrice;
+      totalHigh += thermostat.sellingPrice * 2;
     } else {
       const basePrice = (thermostat.unitName.toLowerCase().includes('smart') || thermostat.unitName.toLowerCase().includes('wifi')) ? 350 : 250;
-      totalLow += Math.round(basePrice * 0.75);
-      totalHigh += basePrice;
+      totalLow += basePrice;
+      totalHigh += basePrice * 2;
     }
   }
   
