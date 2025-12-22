@@ -2697,13 +2697,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Lead not found" });
       }
 
-      const { serviceStep, serviceOrder, clientIssue, assignedEmployeeId } = req.body;
+      const { serviceStep, serviceOrder, clientIssue, assignedEmployeeId, repairDate } = req.body;
       const updates: any = { updatedAt: new Date() };
       
       if (serviceStep !== undefined) updates.serviceStep = serviceStep;
       if (serviceOrder !== undefined) updates.serviceOrder = serviceOrder;
       if (clientIssue !== undefined) updates.clientIssue = clientIssue;
       if (assignedEmployeeId !== undefined) updates.assignedEmployeeId = assignedEmployeeId === 'unassigned' ? null : assignedEmployeeId;
+      if (repairDate !== undefined) updates.repairDate = repairDate ? new Date(repairDate) : null;
 
       const updatedLead = await storage.updateServiceLead(req.params.id, updates);
       res.json(updatedLead);

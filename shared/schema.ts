@@ -291,6 +291,7 @@ export const leads = pgTable("leads", {
   serviceStep: text("service_step"), // Kanban column for service tracking
   serviceOrder: integer("service_order").default(0), // Order within column
   serviceEnteredAt: timestamp("service_entered_at"), // When lead entered service board
+  repairDate: timestamp("repair_date"), // Scheduled repair date for service jobs (single day, not range)
   // Pipeline transfer tracking
   currentPipeline: text("current_pipeline"), // 'service' or 'installation' - tracks which board lead is currently on
   transferredFromPipeline: text("transferred_from_pipeline"), // If transferred, which pipeline it came from
@@ -347,6 +348,11 @@ export const insertLeadSchema = createInsertSchema(leads).omit({
     return val;
   }),
   lastImportedAt: z.union([z.string(), z.date()]).optional().transform((val) => {
+    if (!val) return undefined;
+    if (typeof val === 'string') return new Date(val);
+    return val;
+  }),
+  repairDate: z.union([z.string(), z.date()]).optional().transform((val) => {
     if (!val) return undefined;
     if (typeof val === 'string') return new Date(val);
     return val;

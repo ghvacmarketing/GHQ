@@ -361,26 +361,34 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const startDayOfWeek = getDay(monthStart);
 
-  const getLeadDate = (lead: Lead): { date: Date; hasServiceDate: boolean } | null => {
+  const getLeadDate = (lead: Lead): { date: Date; isWon: boolean } | null => {
+    // Won jobs: use repairDate if set, or closedAt
+    if (lead.won || lead.status === "Won") {
+      if (lead.repairDate) {
+        const date = typeof lead.repairDate === "string" ? parseISO(lead.repairDate) : lead.repairDate;
+        return { date, isWon: true };
+      }
+      if (lead.closedAt) {
+        const date = typeof lead.closedAt === "string" ? parseISO(lead.closedAt) : lead.closedAt;
+        return { date, isWon: true };
+      }
+    }
+    // Non-won jobs: use serviceEnteredAt
     if (lead.serviceEnteredAt) {
       const date = typeof lead.serviceEnteredAt === "string" ? parseISO(lead.serviceEnteredAt) : lead.serviceEnteredAt;
-      return { date, hasServiceDate: true };
-    }
-    if (lead.closedAt) {
-      const date = typeof lead.closedAt === "string" ? parseISO(lead.closedAt) : lead.closedAt;
-      return { date, hasServiceDate: false };
+      return { date, isWon: false };
     }
     return null;
   };
 
   const leadsByDate = useMemo(() => {
-    const map: Record<string, { lead: Lead; hasServiceDate: boolean }[]> = {};
+    const map: Record<string, { lead: Lead; isWon: boolean }[]> = {};
     leads.forEach((lead) => {
       const dateInfo = getLeadDate(lead);
       if (dateInfo && isSameMonth(dateInfo.date, currentMonth)) {
         const key = format(dateInfo.date, "yyyy-MM-dd");
         if (!map[key]) map[key] = [];
-        map[key].push({ lead, hasServiceDate: dateInfo.hasServiceDate });
+        map[key].push({ lead, isWon: dateInfo.isWon });
       }
     });
     return map;
@@ -446,15 +454,15 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
                 {format(day, "d")}
               </div>
               <div className="space-y-1 overflow-y-auto max-h-[60px] sm:max-h-[80px] lg:max-h-[90px]">
-                {dayLeads.map(({ lead, hasServiceDate }) => (
+                {dayLeads.map(({ lead, isWon }) => (
                   <button
                     key={lead.id}
                     onClick={() => onCardClick(lead)}
                     className={cn(
                       "w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate min-h-[28px] flex items-center",
-                      hasServiceDate
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-yellow-400 text-yellow-900"
+                      isWon
+                        ? "bg-yellow-400 text-yellow-900"
+                        : "bg-primary text-primary-foreground"
                     )}
                     data-testid={`service-calendar-job-${lead.id}`}
                   >
@@ -470,11 +478,11 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
       <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground max-w-4xl mx-auto">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-primary" />
-          <span>Service Entry Date</span>
+          <span>In Progress</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-yellow-400" />
-          <span>Closed Date</span>
+          <span>Won (Repair Date)</span>
         </div>
       </div>
     </div>
@@ -486,7 +494,7 @@ export default function ServicePipeline() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("all");
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
-  const [editForm, setEditForm] = useState({ serviceStep: "", clientIssue: "", assignedEmployeeId: "" });
+  const [editForm, setEditForm] = useState({ serviceStep: "", clientIssue: "", assignedEmployeeId: "", repairDate: null as Date | null });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { serviceStep?: string; serviceOrder?: number }>>({});
   const [activeView, setActiveView] = useState<"kanban" | "calendar">("kanban");
@@ -695,6 +703,7 @@ export default function ServicePipeline() {
       serviceStep: lead.serviceStep || SERVICE_STEPS[0],
       clientIssue: lead.clientIssue || "",
       assignedEmployeeId: lead.assignedEmployeeId || "unassigned",
+      repairDate: lead.repairDate ? (typeof lead.repairDate === "string" ? new Date(lead.repairDate) : lead.repairDate) : null,
     });
   };
 
@@ -707,6 +716,7 @@ export default function ServicePipeline() {
         serviceStep: editForm.serviceStep,
         clientIssue: editForm.clientIssue,
         assignedEmployeeId: editForm.assignedEmployeeId === "unassigned" ? null : editForm.assignedEmployeeId,
+        repairDate: editForm.repairDate,
       },
     });
     setEditingLead(null);
@@ -1010,6 +1020,44 @@ export default function ServicePipeline() {
                   className="min-h-[80px]"
                   data-testid="textarea-service-notes"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Repair Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full min-h-[44px] justify-start text-left font-normal",
+                        !editForm.repairDate && "text-muted-foreground"
+                      )}
+                      data-testid="button-service-repair-date"
+                    >
+                      <CalendarDays className="mr-2 h-4 w-4" />
+                      {editForm.repairDate ? format(editForm.repairDate, "PPP") : "Select repair date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={editForm.repairDate || undefined}
+                      onSelect={(date) => setEditForm({ ...editForm, repairDate: date || null })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                {editForm.repairDate && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-muted-foreground"
+                    onClick={() => setEditForm({ ...editForm, repairDate: null })}
+                    data-testid="button-clear-repair-date"
+                  >
+                    Clear date
+                  </Button>
+                )}
               </div>
             </div>
 
