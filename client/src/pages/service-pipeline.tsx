@@ -51,10 +51,9 @@ const SERVICE_STEPS = [
   "Quote Drafting",
   "Review & Send",
   "Awaiting Customer",
-  "Approved → Schedule",
-  "Scheduled / In Progress",
-  "Blocked",
-  "Ready To Close",
+  "Approved",
+  "Parts Ordered",
+  "Parts Arrived",
   "Invoice Sent",
   "Waiting On Payment",
   "Closed (Paid)",
@@ -361,34 +360,28 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const startDayOfWeek = getDay(monthStart);
 
-  const getLeadDate = (lead: Lead): { date: Date; isWon: boolean } | null => {
-    // Won jobs: use repairDate if set, or closedAt
-    if (lead.won || lead.status === "Won") {
-      if (lead.repairDate) {
-        const date = typeof lead.repairDate === "string" ? parseISO(lead.repairDate) : lead.repairDate;
-        return { date, isWon: true };
-      }
-      if (lead.closedAt) {
-        const date = typeof lead.closedAt === "string" ? parseISO(lead.closedAt) : lead.closedAt;
-        return { date, isWon: true };
-      }
+  const getLeadDate = (lead: Lead): { date: Date; isRepairDate: boolean } | null => {
+    // If repair date is set, show on that date in red
+    if (lead.repairDate) {
+      const date = typeof lead.repairDate === "string" ? parseISO(lead.repairDate) : lead.repairDate;
+      return { date, isRepairDate: true };
     }
-    // Non-won jobs: use serviceEnteredAt
+    // Otherwise show on service entered date in yellow (in progress)
     if (lead.serviceEnteredAt) {
       const date = typeof lead.serviceEnteredAt === "string" ? parseISO(lead.serviceEnteredAt) : lead.serviceEnteredAt;
-      return { date, isWon: false };
+      return { date, isRepairDate: false };
     }
     return null;
   };
 
   const leadsByDate = useMemo(() => {
-    const map: Record<string, { lead: Lead; isWon: boolean }[]> = {};
+    const map: Record<string, { lead: Lead; isRepairDate: boolean }[]> = {};
     leads.forEach((lead) => {
       const dateInfo = getLeadDate(lead);
       if (dateInfo && isSameMonth(dateInfo.date, currentMonth)) {
         const key = format(dateInfo.date, "yyyy-MM-dd");
         if (!map[key]) map[key] = [];
-        map[key].push({ lead, isWon: dateInfo.isWon });
+        map[key].push({ lead, isRepairDate: dateInfo.isRepairDate });
       }
     });
     return map;
@@ -454,15 +447,15 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
                 {format(day, "d")}
               </div>
               <div className="space-y-1 overflow-y-auto max-h-[60px] sm:max-h-[80px] lg:max-h-[90px]">
-                {dayLeads.map(({ lead, isWon }) => (
+                {dayLeads.map(({ lead, isRepairDate }) => (
                   <button
                     key={lead.id}
                     onClick={() => onCardClick(lead)}
                     className={cn(
                       "w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate min-h-[28px] flex items-center",
-                      isWon
-                        ? "bg-yellow-400 text-yellow-900"
-                        : "bg-primary text-primary-foreground"
+                      isRepairDate
+                        ? "bg-red-500 text-white"
+                        : "bg-yellow-400 text-yellow-900"
                     )}
                     data-testid={`service-calendar-job-${lead.id}`}
                   >
@@ -477,12 +470,12 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
 
       <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground max-w-4xl mx-auto">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-primary" />
+          <div className="w-3 h-3 rounded bg-yellow-400" />
           <span>In Progress</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-yellow-400" />
-          <span>Won (Repair Date)</span>
+          <div className="w-3 h-3 rounded bg-red-500" />
+          <span>Repair Date</span>
         </div>
       </div>
     </div>
