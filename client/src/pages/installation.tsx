@@ -967,10 +967,10 @@ export default function Installation() {
                                   <span className="text-xs text-muted-foreground">{item.tonnage}</span>
                                 </div>
                                 <div className="text-xs text-muted-foreground space-y-0.5">
-                                  <p>• {item.outdoor?.brand} {item.outdoor?.name}</p>
-                                  <p>• {item.coil?.brand} {item.coil?.name}</p>
-                                  <p>• {item.indoor?.brand} {item.indoor?.name}</p>
-                                  <p>• {item.thermostat?.brand} {item.thermostat?.name}</p>
+                                  <p>• {item.outdoor?.brand} {item.outdoor?.name} {item.outdoor?.model && <span className="font-mono">({item.outdoor.model})</span>}</p>
+                                  <p>• {item.coil?.brand} {item.coil?.name} {item.coil?.model && <span className="font-mono">({item.coil.model})</span>}</p>
+                                  <p>• {item.indoor?.brand} {item.indoor?.name} {item.indoor?.model && <span className="font-mono">({item.indoor.model})</span>}</p>
+                                  <p>• {item.thermostat?.brand} {item.thermostat?.name} {item.thermostat?.model && <span className="font-mono">({item.thermostat.model})</span>}</p>
                                 </div>
                                 <p className="text-sm font-medium text-primary mt-1">
                                   ${item.priceLow?.toLocaleString()} - ${item.priceHigh?.toLocaleString()}
@@ -984,9 +984,9 @@ export default function Installation() {
                                 </div>
                                 <p className="font-medium text-sm mt-1">{item.unitTypeName} ({item.tier})</p>
                                 <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                                  <p>• {item.outdoor?.brand} {item.outdoor?.name}</p>
-                                  {item.indoor?.name && <p>• {item.indoor.name}</p>}
-                                  {item.thermostat?.name && <p>• {item.thermostat.name}</p>}
+                                  <p>• {item.outdoor?.brand} {item.outdoor?.name} {item.outdoor?.model && <span className="font-mono">({item.outdoor.model})</span>}</p>
+                                  {item.indoor?.name && <p>• {item.indoor.name} {item.indoor?.model && <span className="font-mono">({item.indoor.model})</span>}</p>}
+                                  {item.thermostat?.name && <p>• {item.thermostat.name} {item.thermostat?.model && <span className="font-mono">({item.thermostat.model})</span>}</p>}
                                 </div>
                                 <p className="text-sm font-medium text-primary mt-1">
                                   ${item.totalPrice?.toLocaleString()}
