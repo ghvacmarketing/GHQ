@@ -189,6 +189,16 @@ function extractTonnageFromModel(model: string): string | null {
   return tonnageMap[match[1]] || null;
 }
 
+function getPackageTonnageDisplay(pkg: PricebookPackage): string {
+  if (pkg.tonnage) {
+    const tonNum = parseFloat(pkg.tonnage);
+    if (!isNaN(tonNum)) {
+      return `${tonNum} Ton`;
+    }
+  }
+  return extractTonnageFromModel(pkg.outdoorModel) || "Unknown";
+}
+
 function generatePackageId(pkg: PricebookPackage, tonnage: string): string {
   return `${pkg.unitType}-${pkg.tier}-${tonnage}-${pkg.packageLevel}-${pkg.outdoorModel}`;
 }
@@ -461,12 +471,12 @@ export default function ProposalBuilder() {
     );
     const tonnages = new Set<string>();
     filteredPackages.forEach(pkg => {
-      const tonnage = extractTonnageFromModel(pkg.outdoorModel);
-      if (tonnage) tonnages.add(tonnage);
+      const tonnage = getPackageTonnageDisplay(pkg);
+      if (tonnage && tonnage !== "Unknown") tonnages.add(tonnage);
     });
     return Array.from(tonnages).sort((a, b) => {
-      const numA = parseInt(a);
-      const numB = parseInt(b);
+      const numA = parseFloat(a);
+      const numB = parseFloat(b);
       return numA - numB;
     });
   }, [selectedUnitType, selectedTier]);
@@ -476,8 +486,8 @@ export default function ProposalBuilder() {
     
     const filtered = packages.filter(pkg => {
       if (pkg.unitType !== selectedUnitType || pkg.tier !== selectedTier) return false;
-      const extracted = extractTonnageFromModel(pkg.outdoorModel);
-      return extracted === selectedTonnage;
+      const pkgTonnage = getPackageTonnageDisplay(pkg);
+      return pkgTonnage === selectedTonnage;
     });
     
     return filtered.sort((a, b) => {
@@ -599,7 +609,7 @@ export default function ProposalBuilder() {
   }, [customTonnage]);
 
   const addToCart = (pkg: PricebookPackage) => {
-    const extractedTonnage = selectedTonnage || extractTonnageFromModel(pkg.outdoorModel) || "Unknown";
+    const extractedTonnage = selectedTonnage || getPackageTonnageDisplay(pkg);
     const id = generatePackageId(pkg, extractedTonnage);
     
     setCart(prev => {
