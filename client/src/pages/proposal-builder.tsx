@@ -1685,13 +1685,6 @@ export default function ProposalBuilder() {
               )}
             </div>
 
-            {(customerName || customerAddress) && (
-              <div className="mb-6 p-4 bg-muted rounded-lg">
-                <h3 className="text-sm font-semibold text-muted-foreground mb-2">PREPARED FOR</h3>
-                {customerName && <p className="font-medium text-lg">{customerName}</p>}
-                {customerAddress && <p className="text-muted-foreground">{customerAddress}</p>}
-              </div>
-            )}
 
             <div className="mb-6">
               <h3 className="text-sm font-semibold text-muted-foreground mb-3">EQUIPMENT SUMMARY</h3>
