@@ -294,6 +294,7 @@ export default function ProposalBuilder() {
       monthlyLow: number;
       monthlyHigh: number;
       notes?: string;
+      hasCustomBuilds?: boolean;
     }) => {
       const res = await apiRequest("POST", "/api/proposals/accept", data);
       return res.json();
@@ -330,10 +331,10 @@ export default function ProposalBuilder() {
   };
 
   const handleAcceptQuote = () => {
-    if (!customerName) {
+    if (!selectedCustomer) {
       toast({
         title: "Customer Required",
-        description: "Please select or enter a customer name to accept this quote.",
+        description: "Please search and select a customer before accepting this quote.",
         variant: "destructive",
       });
       return;
@@ -411,6 +412,7 @@ export default function ProposalBuilder() {
       monthlyLow: cartMonthlyTotalRange.low,
       monthlyHigh: cartMonthlyTotalRange.high,
       notes: customerNotes || undefined,
+      hasCustomBuilds: hasEstimatedItems,
     });
   };
 
@@ -1048,30 +1050,6 @@ export default function ProposalBuilder() {
                 </ScrollArea>
                 {cart.length > 0 && (
                   <div className="absolute bottom-0 left-0 right-0 p-4 bg-card border-t space-y-3">
-                    <div className="space-y-2">
-                      <Input
-                        placeholder="Customer Name (optional)"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className="h-10"
-                        data-testid="input-customer-name"
-                      />
-                      <Input
-                        placeholder="Address (optional)"
-                        value={customerAddress}
-                        onChange={(e) => setCustomerAddress(e.target.value)}
-                        className="h-10"
-                        data-testid="input-customer-address"
-                      />
-                      <Textarea
-                        placeholder="Notes (optional)"
-                        value={customerNotes}
-                        onChange={(e) => setCustomerNotes(e.target.value)}
-                        className="min-h-[60px] resize-none"
-                        data-testid="input-customer-notes"
-                      />
-                    </div>
-                    <Separator />
                     <div className="bg-muted p-3 rounded-lg">
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-sm font-medium">
@@ -1841,7 +1819,7 @@ export default function ProposalBuilder() {
               </Button>
               <Button
                 onClick={handleAcceptQuote}
-                disabled={!customerName || acceptQuoteMutation.isPending}
+                disabled={!selectedCustomer || acceptQuoteMutation.isPending}
                 className="flex-1 min-h-[44px] bg-green-600 hover:bg-green-700"
                 data-testid="button-accept-quote"
               >

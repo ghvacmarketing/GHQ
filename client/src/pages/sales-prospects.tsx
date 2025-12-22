@@ -2141,12 +2141,25 @@ function LeadCard({
                           </div>
                           {details.pricing && (
                             <div className="pt-2 border-t border-green-200 dark:border-green-700">
-                              <p className="text-sm font-bold text-green-800 dark:text-green-200">
-                                Total: ${details.pricing.totalLow?.toLocaleString()} - ${details.pricing.totalHigh?.toLocaleString()}
-                              </p>
-                              <p className="text-xs text-green-700 dark:text-green-300">
-                                Monthly: ${details.pricing.monthlyLow?.toLocaleString()} - ${details.pricing.monthlyHigh?.toLocaleString()}/mo
-                              </p>
+                              {details.hasCustomBuilds ? (
+                                <>
+                                  <p className="text-sm font-bold text-green-800 dark:text-green-200">
+                                    Total: ${details.pricing.totalLow?.toLocaleString()} - ${details.pricing.totalHigh?.toLocaleString()}
+                                  </p>
+                                  <p className="text-xs text-green-700 dark:text-green-300">
+                                    Monthly: ${details.pricing.monthlyLow?.toLocaleString()} - ${details.pricing.monthlyHigh?.toLocaleString()}/mo
+                                  </p>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-sm font-bold text-green-800 dark:text-green-200">
+                                    Total: ${details.pricing.totalHigh?.toLocaleString()}
+                                  </p>
+                                  <p className="text-xs text-green-700 dark:text-green-300">
+                                    Monthly: ${details.pricing.monthlyHigh?.toLocaleString()}/mo
+                                  </p>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>

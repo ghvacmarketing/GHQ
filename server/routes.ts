@@ -2199,7 +2199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/proposals/accept - Accept a proposal and create a Won lead
   app.post("/api/proposals/accept", async (req, res) => {
     try {
-      const { customerName, phone, email, address, estimatedValue, equipmentDetails, totalLow, totalHigh, monthlyLow, monthlyHigh, notes } = req.body;
+      const { customerName, phone, email, address, estimatedValue, equipmentDetails, totalLow, totalHigh, monthlyLow, monthlyHigh, notes, hasCustomBuilds } = req.body;
       
       if (!customerName) {
         return res.status(400).json({ message: "Customer name is required" });
@@ -2220,6 +2220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quoteDetailsJson = JSON.stringify({
         acceptedAt: new Date().toISOString(),
         equipment: equipmentDetails || [],
+        hasCustomBuilds: hasCustomBuilds || false,
         pricing: {
           totalLow: totalLow || 0,
           totalHigh: totalHigh || 0,
