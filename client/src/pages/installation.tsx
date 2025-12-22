@@ -265,26 +265,34 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
               </div>
             </div>
             <div className="flex flex-wrap gap-1 mt-1">
-              {isFromService ? (
+              {isFromService && (
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex items-center gap-0.5 bg-orange-50 text-orange-700 border-orange-200">
                   <Wrench className="h-2.5 w-2.5" />
                   <ArrowRight className="h-2 w-2" />
                   <Package className="h-2.5 w-2.5" />
                 </Badge>
-              ) : lead.tags && lead.tags.length > 0 ? (
-                <>
-                  {lead.tags.slice(0, 2).map((tag, idx) => (
-                    <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">
-                      {tag}
-                    </Badge>
-                  ))}
-                  {lead.tags.length > 2 && (
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                      +{lead.tags.length - 2}
-                    </Badge>
-                  )}
-                </>
-              ) : null}
+              )}
+              {(() => {
+                const displayTags = lead.tags?.filter(t => 
+                  t.toLowerCase() !== "service" && t.toLowerCase() !== "installation"
+                ) || [];
+                if (displayTags.length === 0) return null;
+                const maxTags = isFromService ? 1 : 2;
+                return (
+                  <>
+                    {displayTags.slice(0, maxTags).map((tag, idx) => (
+                      <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {tag}
+                      </Badge>
+                    ))}
+                    {displayTags.length > maxTags && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        +{displayTags.length - maxTags}
+                      </Badge>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
