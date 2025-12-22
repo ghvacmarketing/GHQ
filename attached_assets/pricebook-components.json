@@ -39,7 +39,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "168",
     "totalInvestment": "11201",
-    "sourcePage": "33"
+    "sourcePage": "33",
+    "equipmentCost": 1046.53,
+    "sellingPrice": 2093
   },
   {
     "unitType": "SGA",
@@ -53,7 +55,9 @@
     "description": "Programming",
     "monthlyPayment": "168",
     "totalInvestment": "11201",
-    "sourcePage": "33"
+    "sourcePage": "33",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -95,7 +99,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "150",
     "totalInvestment": "10003",
-    "sourcePage": "33"
+    "sourcePage": "33",
+    "equipmentCost": 1046.53,
+    "sellingPrice": 2093
   },
   {
     "unitType": "SGA",
@@ -109,7 +115,9 @@
     "description": "Programming; 33/79",
     "monthlyPayment": "150",
     "totalInvestment": "10003",
-    "sourcePage": "33"
+    "sourcePage": "33",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -165,7 +173,9 @@
     "description": "Programming; 34/79",
     "monthlyPayment": "118",
     "totalInvestment": "7874",
-    "sourcePage": "34"
+    "sourcePage": "34",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -249,7 +259,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "178",
     "totalInvestment": "11867",
-    "sourcePage": "29"
+    "sourcePage": "29",
+    "equipmentCost": 670.35,
+    "sellingPrice": 1341
   },
   {
     "unitType": "SGA",
@@ -263,7 +275,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "178",
     "totalInvestment": "11867",
-    "sourcePage": "29"
+    "sourcePage": "29",
+    "equipmentCost": 1125.45,
+    "sellingPrice": 2251
   },
   {
     "unitType": "SGA",
@@ -277,7 +291,9 @@
     "description": "Programming",
     "monthlyPayment": "178",
     "totalInvestment": "11867",
-    "sourcePage": "29"
+    "sourcePage": "29",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -389,7 +405,9 @@
     "description": "Programming; 30/79",
     "monthlyPayment": "126",
     "totalInvestment": "8402",
-    "sourcePage": "30"
+    "sourcePage": "30",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -431,7 +449,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "158",
     "totalInvestment": "10578",
-    "sourcePage": "30"
+    "sourcePage": "30",
+    "equipmentCost": 1125.45,
+    "sellingPrice": 2251
   },
   {
     "unitType": "SGA",
@@ -445,7 +465,9 @@
     "description": "Programming",
     "monthlyPayment": "158",
     "totalInvestment": "10578",
-    "sourcePage": "30"
+    "sourcePage": "30",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -543,7 +565,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "193",
     "totalInvestment": "12902",
-    "sourcePage": "25"
+    "sourcePage": "25",
+    "equipmentCost": 1179.78,
+    "sellingPrice": 2360
   },
   {
     "unitType": "SGA",
@@ -557,7 +581,9 @@
     "description": "Programming; 25/79",
     "monthlyPayment": "193",
     "totalInvestment": "12902",
-    "sourcePage": "25"
+    "sourcePage": "25",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -613,7 +639,9 @@
     "description": "Programming; 26/79",
     "monthlyPayment": "137",
     "totalInvestment": "9127",
-    "sourcePage": "26"
+    "sourcePage": "26",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -655,7 +683,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "170",
     "totalInvestment": "11329",
-    "sourcePage": "26"
+    "sourcePage": "26",
+    "equipmentCost": 1179.78,
+    "sellingPrice": 2360
   },
   {
     "unitType": "SGA",
@@ -669,7 +699,9 @@
     "description": "Programming",
     "monthlyPayment": "170",
     "totalInvestment": "11329",
-    "sourcePage": "26"
+    "sourcePage": "26",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -767,7 +799,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "203",
     "totalInvestment": "13546",
-    "sourcePage": "23"
+    "sourcePage": "23",
+    "equipmentCost": 1209.5,
+    "sellingPrice": 2419
   },
   {
     "unitType": "SGA",
@@ -781,7 +815,9 @@
     "description": "Programming; 23/79",
     "monthlyPayment": "203",
     "totalInvestment": "13546",
-    "sourcePage": "23"
+    "sourcePage": "23",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -837,7 +873,9 @@
     "description": "Programming; 24/79",
     "monthlyPayment": "146",
     "totalInvestment": "9768",
-    "sourcePage": "24"
+    "sourcePage": "24",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -879,7 +917,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "180",
     "totalInvestment": "12035",
-    "sourcePage": "24"
+    "sourcePage": "24",
+    "equipmentCost": 1209.5,
+    "sellingPrice": 2419
   },
   {
     "unitType": "SGA",
@@ -893,7 +933,9 @@
     "description": "Programming",
     "monthlyPayment": "180",
     "totalInvestment": "12035",
-    "sourcePage": "24"
+    "sourcePage": "24",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -935,7 +977,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "227",
     "totalInvestment": "15198",
-    "sourcePage": "20"
+    "sourcePage": "20",
+    "equipmentCost": 1624.63,
+    "sellingPrice": 3249
   },
   {
     "unitType": "SGA",
@@ -949,7 +993,9 @@
     "description": "10 Year warranty on functional parts with registration",
     "monthlyPayment": "227",
     "totalInvestment": "15198",
-    "sourcePage": "20"
+    "sourcePage": "20",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -991,7 +1037,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "182",
     "totalInvestment": "12173",
-    "sourcePage": "20"
+    "sourcePage": "20",
+    "equipmentCost": 1046.53,
+    "sellingPrice": 2093
   },
   {
     "unitType": "SGA",
@@ -1005,7 +1053,9 @@
     "description": "Programming; 20/79",
     "monthlyPayment": "182",
     "totalInvestment": "12173",
-    "sourcePage": "20"
+    "sourcePage": "20",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1047,7 +1097,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "160",
     "totalInvestment": "10699",
-    "sourcePage": "21"
+    "sourcePage": "21",
+    "equipmentCost": 1070.1,
+    "sellingPrice": 2140
   },
   {
     "unitType": "SGA",
@@ -1061,7 +1113,9 @@
     "description": "Programming; 21/79",
     "monthlyPayment": "160",
     "totalInvestment": "10699",
-    "sourcePage": "21"
+    "sourcePage": "21",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1103,7 +1157,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "168",
     "totalInvestment": "11201",
-    "sourcePage": "21"
+    "sourcePage": "21",
+    "equipmentCost": 1046.53,
+    "sellingPrice": 2093
   },
   {
     "unitType": "SGA",
@@ -1117,7 +1173,9 @@
     "description": "Programming",
     "monthlyPayment": "168",
     "totalInvestment": "11201",
-    "sourcePage": "21"
+    "sourcePage": "21",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1145,7 +1203,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "244",
     "totalInvestment": "16309",
-    "sourcePage": "17"
+    "sourcePage": "17",
+    "equipmentCost": 739.03,
+    "sellingPrice": 1478
   },
   {
     "unitType": "SGA",
@@ -1159,7 +1219,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "244",
     "totalInvestment": "16309",
-    "sourcePage": "17"
+    "sourcePage": "17",
+    "equipmentCost": 1723.03,
+    "sellingPrice": 3446
   },
   {
     "unitType": "SGA",
@@ -1173,7 +1235,9 @@
     "description": "10 Year warranty on functional parts with registration",
     "monthlyPayment": "244",
     "totalInvestment": "16309",
-    "sourcePage": "17"
+    "sourcePage": "17",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -1215,7 +1279,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "197",
     "totalInvestment": "13190",
-    "sourcePage": "17"
+    "sourcePage": "17",
+    "equipmentCost": 1179.78,
+    "sellingPrice": 2360
   },
   {
     "unitType": "SGA",
@@ -1229,7 +1295,9 @@
     "description": "Programming; 17/79",
     "monthlyPayment": "197",
     "totalInvestment": "13190",
-    "sourcePage": "17"
+    "sourcePage": "17",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1257,7 +1325,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "168",
     "totalInvestment": "11254",
-    "sourcePage": "18"
+    "sourcePage": "18",
+    "equipmentCost": 670.35,
+    "sellingPrice": 1341
   },
   {
     "unitType": "SGA",
@@ -1271,7 +1341,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "168",
     "totalInvestment": "11254",
-    "sourcePage": "18"
+    "sourcePage": "18",
+    "equipmentCost": 1125.45,
+    "sellingPrice": 2251
   },
   {
     "unitType": "SGA",
@@ -1285,7 +1357,9 @@
     "description": "Programming; 18/79",
     "monthlyPayment": "168",
     "totalInvestment": "11254",
-    "sourcePage": "18"
+    "sourcePage": "18",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1313,7 +1387,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "178",
     "totalInvestment": "11867",
-    "sourcePage": "18"
+    "sourcePage": "18",
+    "equipmentCost": 670.35,
+    "sellingPrice": 1341
   },
   {
     "unitType": "SGA",
@@ -1327,7 +1403,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "178",
     "totalInvestment": "11867",
-    "sourcePage": "18"
+    "sourcePage": "18",
+    "equipmentCost": 1125.45,
+    "sellingPrice": 2251
   },
   {
     "unitType": "SGA",
@@ -1341,7 +1419,9 @@
     "description": "Programming",
     "monthlyPayment": "178",
     "totalInvestment": "11867",
-    "sourcePage": "18"
+    "sourcePage": "18",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1369,7 +1449,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "258",
     "totalInvestment": "17249",
-    "sourcePage": "14"
+    "sourcePage": "14",
+    "equipmentCost": 746.2,
+    "sellingPrice": 1492
   },
   {
     "unitType": "SGA",
@@ -1383,7 +1465,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "258",
     "totalInvestment": "17249",
-    "sourcePage": "14"
+    "sourcePage": "14",
+    "equipmentCost": 1822.45,
+    "sellingPrice": 3645
   },
   {
     "unitType": "SGA",
@@ -1397,7 +1481,9 @@
     "description": "10 Year warranty on functional parts with registration",
     "monthlyPayment": "258",
     "totalInvestment": "17249",
-    "sourcePage": "14"
+    "sourcePage": "14",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -1425,7 +1511,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "210",
     "totalInvestment": "14023",
-    "sourcePage": "14"
+    "sourcePage": "14",
+    "equipmentCost": 739.03,
+    "sellingPrice": 1478
   },
   {
     "unitType": "SGA",
@@ -1439,7 +1527,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "210",
     "totalInvestment": "14023",
-    "sourcePage": "14"
+    "sourcePage": "14",
+    "equipmentCost": 1154.15,
+    "sellingPrice": 2308
   },
   {
     "unitType": "SGA",
@@ -1453,7 +1543,9 @@
     "description": "Programming; 14/79",
     "monthlyPayment": "210",
     "totalInvestment": "14023",
-    "sourcePage": "14"
+    "sourcePage": "14",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1481,7 +1573,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "179",
     "totalInvestment": "11987",
-    "sourcePage": "15"
+    "sourcePage": "15",
+    "equipmentCost": 739.03,
+    "sellingPrice": 1478
   },
   {
     "unitType": "SGA",
@@ -1495,7 +1589,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "179",
     "totalInvestment": "11987",
-    "sourcePage": "15"
+    "sourcePage": "15",
+    "equipmentCost": 1154.15,
+    "sellingPrice": 2308
   },
   {
     "unitType": "SGA",
@@ -1509,7 +1605,9 @@
     "description": "Programming; 15/79",
     "monthlyPayment": "179",
     "totalInvestment": "11987",
-    "sourcePage": "15"
+    "sourcePage": "15",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1551,7 +1649,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "193",
     "totalInvestment": "12902",
-    "sourcePage": "15"
+    "sourcePage": "15",
+    "equipmentCost": 1179.78,
+    "sellingPrice": 2360
   },
   {
     "unitType": "SGA",
@@ -1565,7 +1665,9 @@
     "description": "Programming",
     "monthlyPayment": "193",
     "totalInvestment": "12902",
-    "sourcePage": "15"
+    "sourcePage": "15",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1607,7 +1709,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "272",
     "totalInvestment": "18224",
-    "sourcePage": "12"
+    "sourcePage": "12",
+    "equipmentCost": 1875.75,
+    "sellingPrice": 3752
   },
   {
     "unitType": "SGA",
@@ -1621,7 +1725,9 @@
     "description": "10 Year warranty on functional parts with registration",
     "monthlyPayment": "272",
     "totalInvestment": "18224",
-    "sourcePage": "12"
+    "sourcePage": "12",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -1663,7 +1769,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "225",
     "totalInvestment": "15031",
-    "sourcePage": "12"
+    "sourcePage": "12",
+    "equipmentCost": 1209.5,
+    "sellingPrice": 2419
   },
   {
     "unitType": "SGA",
@@ -1677,7 +1785,9 @@
     "description": "Programming; 12/79",
     "monthlyPayment": "225",
     "totalInvestment": "15031",
-    "sourcePage": "12"
+    "sourcePage": "12",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1719,7 +1829,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "192",
     "totalInvestment": "12803",
-    "sourcePage": "13"
+    "sourcePage": "13",
+    "equipmentCost": 1209.5,
+    "sellingPrice": 2419
   },
   {
     "unitType": "SGA",
@@ -1733,7 +1845,9 @@
     "description": "Programming; 13/79",
     "monthlyPayment": "192",
     "totalInvestment": "12803",
-    "sourcePage": "13"
+    "sourcePage": "13",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1775,7 +1889,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "203",
     "totalInvestment": "13546",
-    "sourcePage": "13"
+    "sourcePage": "13",
+    "equipmentCost": 1209.5,
+    "sellingPrice": 2419
   },
   {
     "unitType": "SGA",
@@ -1789,7 +1905,9 @@
     "description": "Programming",
     "monthlyPayment": "203",
     "totalInvestment": "13546",
-    "sourcePage": "13"
+    "sourcePage": "13",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1817,7 +1935,9 @@
     "description": "",
     "monthlyPayment": "251",
     "totalInvestment": "16776",
-    "sourcePage": "9"
+    "sourcePage": "9",
+    "equipmentCost": 651.9,
+    "sellingPrice": 1304
   },
   {
     "unitType": "SGA",
@@ -1831,7 +1951,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "251",
     "totalInvestment": "16776",
-    "sourcePage": "9"
+    "sourcePage": "9",
+    "equipmentCost": 1624.63,
+    "sellingPrice": 3249
   },
   {
     "unitType": "SGA",
@@ -1845,7 +1967,9 @@
     "description": "10 Year warranty on functional parts with registration",
     "monthlyPayment": "251",
     "totalInvestment": "16776",
-    "sourcePage": "9"
+    "sourcePage": "9",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -1887,7 +2011,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "227",
     "totalInvestment": "15184",
-    "sourcePage": "9"
+    "sourcePage": "9",
+    "equipmentCost": 1624.63,
+    "sellingPrice": 3249
   },
   {
     "unitType": "SGA",
@@ -1901,7 +2027,9 @@
     "description": "10 Year warranty on functional parts with registration 9/79",
     "monthlyPayment": "227",
     "totalInvestment": "15184",
-    "sourcePage": "9"
+    "sourcePage": "9",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -1929,7 +2057,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "181",
     "totalInvestment": "12111",
-    "sourcePage": "10"
+    "sourcePage": "10",
+    "equipmentCost": 670.35,
+    "sellingPrice": 1341
   },
   {
     "unitType": "SGA",
@@ -1943,7 +2073,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "181",
     "totalInvestment": "12111",
-    "sourcePage": "10"
+    "sourcePage": "10",
+    "equipmentCost": 1046.53,
+    "sellingPrice": 2093
   },
   {
     "unitType": "SGA",
@@ -1957,7 +2089,9 @@
     "description": "Programming; 10/79",
     "monthlyPayment": "181",
     "totalInvestment": "12111",
-    "sourcePage": "10"
+    "sourcePage": "10",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -1999,7 +2133,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "210",
     "totalInvestment": "14055",
-    "sourcePage": "10"
+    "sourcePage": "10",
+    "equipmentCost": 1624.63,
+    "sellingPrice": 3249
   },
   {
     "unitType": "SGA",
@@ -2013,7 +2149,9 @@
     "description": "Programming",
     "monthlyPayment": "210",
     "totalInvestment": "14055",
-    "sourcePage": "10"
+    "sourcePage": "10",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -2055,7 +2193,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "262",
     "totalInvestment": "17548",
-    "sourcePage": "6"
+    "sourcePage": "6",
+    "equipmentCost": 1723.03,
+    "sellingPrice": 3446
   },
   {
     "unitType": "SGA",
@@ -2069,7 +2209,9 @@
     "description": "10 Year warranty on functional parts with registration",
     "monthlyPayment": "262",
     "totalInvestment": "17548",
-    "sourcePage": "6"
+    "sourcePage": "6",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -2097,7 +2239,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "244",
     "totalInvestment": "16309",
-    "sourcePage": "6"
+    "sourcePage": "6",
+    "equipmentCost": 739.03,
+    "sellingPrice": 1478
   },
   {
     "unitType": "SGA",
@@ -2111,7 +2255,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "244",
     "totalInvestment": "16309",
-    "sourcePage": "6"
+    "sourcePage": "6",
+    "equipmentCost": 1723.03,
+    "sellingPrice": 3446
   },
   {
     "unitType": "SGA",
@@ -2125,7 +2271,9 @@
     "description": "10 Year warranty on functional parts with registration 6/79",
     "monthlyPayment": "244",
     "totalInvestment": "16309",
-    "sourcePage": "6"
+    "sourcePage": "6",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -2153,7 +2301,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "191",
     "totalInvestment": "12741",
-    "sourcePage": "7"
+    "sourcePage": "7",
+    "equipmentCost": 670.35,
+    "sellingPrice": 1341
   },
   {
     "unitType": "SGA",
@@ -2167,7 +2317,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "191",
     "totalInvestment": "12741",
-    "sourcePage": "7"
+    "sourcePage": "7",
+    "equipmentCost": 1125.45,
+    "sellingPrice": 2251
   },
   {
     "unitType": "SGA",
@@ -2181,7 +2333,9 @@
     "description": "Programming; 7/79",
     "monthlyPayment": "191",
     "totalInvestment": "12741",
-    "sourcePage": "7"
+    "sourcePage": "7",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -2223,7 +2377,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "220",
     "totalInvestment": "14732",
-    "sourcePage": "7"
+    "sourcePage": "7",
+    "equipmentCost": 1723.03,
+    "sellingPrice": 3446
   },
   {
     "unitType": "SGA",
@@ -2237,7 +2393,9 @@
     "description": "Programming",
     "monthlyPayment": "220",
     "totalInvestment": "14732",
-    "sourcePage": "7"
+    "sourcePage": "7",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -2265,7 +2423,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "280",
     "totalInvestment": "18721",
-    "sourcePage": "3"
+    "sourcePage": "3",
+    "equipmentCost": 739.03,
+    "sellingPrice": 1478
   },
   {
     "unitType": "SGA",
@@ -2279,7 +2439,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "280",
     "totalInvestment": "18721",
-    "sourcePage": "3"
+    "sourcePage": "3",
+    "equipmentCost": 1777.35,
+    "sellingPrice": 3555
   },
   {
     "unitType": "SGA",
@@ -2293,7 +2455,9 @@
     "description": "10 Year warranty on functional parts with registration",
     "monthlyPayment": "280",
     "totalInvestment": "18721",
-    "sourcePage": "3"
+    "sourcePage": "3",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -2321,7 +2485,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "258",
     "totalInvestment": "17250",
-    "sourcePage": "3"
+    "sourcePage": "3",
+    "equipmentCost": 746.2,
+    "sellingPrice": 1492
   },
   {
     "unitType": "SGA",
@@ -2335,7 +2501,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "258",
     "totalInvestment": "17250",
-    "sourcePage": "3"
+    "sourcePage": "3",
+    "equipmentCost": 1822.45,
+    "sellingPrice": 3645
   },
   {
     "unitType": "SGA",
@@ -2349,7 +2517,9 @@
     "description": "10 Year warranty on functional parts with registration 3/79",
     "monthlyPayment": "258",
     "totalInvestment": "17250",
-    "sourcePage": "3"
+    "sourcePage": "3",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -2391,7 +2561,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "206",
     "totalInvestment": "13766",
-    "sourcePage": "4"
+    "sourcePage": "4",
+    "equipmentCost": 1179.78,
+    "sellingPrice": 2360
   },
   {
     "unitType": "SGA",
@@ -2405,7 +2577,9 @@
     "description": "Programming; 4/79",
     "monthlyPayment": "206",
     "totalInvestment": "13766",
-    "sourcePage": "4"
+    "sourcePage": "4",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -2433,7 +2607,9 @@
     "description": "10 year limited parts warranty with registration",
     "monthlyPayment": "236",
     "totalInvestment": "15751",
-    "sourcePage": "4"
+    "sourcePage": "4",
+    "equipmentCost": 739.03,
+    "sellingPrice": 1478
   },
   {
     "unitType": "SGA",
@@ -2447,7 +2623,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "236",
     "totalInvestment": "15751",
-    "sourcePage": "4"
+    "sourcePage": "4",
+    "equipmentCost": 1777.35,
+    "sellingPrice": 3555
   },
   {
     "unitType": "SGA",
@@ -2461,7 +2639,9 @@
     "description": "Programming",
     "monthlyPayment": "236",
     "totalInvestment": "15751",
-    "sourcePage": "4"
+    "sourcePage": "4",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -2503,7 +2683,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "302",
     "totalInvestment": "20202",
-    "sourcePage": "1"
+    "sourcePage": "1",
+    "equipmentCost": 1875.75,
+    "sellingPrice": 3752
   },
   {
     "unitType": "SGA",
@@ -2517,7 +2699,9 @@
     "description": "10 Year warranty on functional parts with registration",
     "monthlyPayment": "302",
     "totalInvestment": "20202",
-    "sourcePage": "1"
+    "sourcePage": "1",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -2559,7 +2743,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "275",
     "totalInvestment": "18401",
-    "sourcePage": "1"
+    "sourcePage": "1",
+    "equipmentCost": 1875.75,
+    "sellingPrice": 3752
   },
   {
     "unitType": "SGA",
@@ -2573,7 +2759,9 @@
     "description": "10 Year warranty on functional parts with registration 1/79",
     "monthlyPayment": "275",
     "totalInvestment": "18401",
-    "sourcePage": "1"
+    "sourcePage": "1",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -2615,7 +2803,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "216",
     "totalInvestment": "14411",
-    "sourcePage": "2"
+    "sourcePage": "2",
+    "equipmentCost": 1209.5,
+    "sellingPrice": 2419
   },
   {
     "unitType": "SGA",
@@ -2629,7 +2819,9 @@
     "description": "Programming; 2/79",
     "monthlyPayment": "216",
     "totalInvestment": "14411",
-    "sourcePage": "2"
+    "sourcePage": "2",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -2671,7 +2863,9 @@
     "description": "Two-Stage; Variable-Speed Blower Motor; Limited Lifetime Heat Exchanger Warranty; 10 Year Limited Parts Warranty; Rregistration Required",
     "monthlyPayment": "257",
     "totalInvestment": "17193",
-    "sourcePage": "2"
+    "sourcePage": "2",
+    "equipmentCost": 1875.75,
+    "sellingPrice": 3752
   },
   {
     "unitType": "SGA",
@@ -2685,7 +2879,9 @@
     "description": "Programming",
     "monthlyPayment": "257",
     "totalInvestment": "17193",
-    "sourcePage": "2"
+    "sourcePage": "2",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -3147,7 +3343,9 @@
     "description": "Heat Pump",
     "monthlyPayment": "166",
     "totalInvestment": "11076",
-    "sourcePage": "62"
+    "sourcePage": "62",
+    "equipmentCost": 2689.6,
+    "sellingPrice": 5379
   },
   {
     "unitType": "SHP",
@@ -3161,7 +3359,9 @@
     "description": "Heat Pump",
     "monthlyPayment": "173",
     "totalInvestment": "11571",
-    "sourcePage": "61"
+    "sourcePage": "61",
+    "equipmentCost": 2899.73,
+    "sellingPrice": 5799
   },
   {
     "unitType": "SHP",
@@ -3273,7 +3473,9 @@
     "description": "Programming; GOOD; Total Investment; *with approved credit",
     "monthlyPayment": "173",
     "totalInvestment": "11571",
-    "sourcePage": "61"
+    "sourcePage": "61",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -3287,7 +3489,9 @@
     "description": "GOOD; Total Investment; *with approved credit",
     "monthlyPayment": "234",
     "totalInvestment": "15647",
-    "sourcePage": "63"
+    "sourcePage": "63",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "SHP",
@@ -3819,7 +4023,9 @@
     "description": "Programming; BUDGET; Total Investment; *with approved credit",
     "monthlyPayment": "145",
     "totalInvestment": "9667",
-    "sourcePage": "61"
+    "sourcePage": "61",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -3847,7 +4053,9 @@
     "description": "",
     "monthlyPayment": "183",
     "totalInvestment": "12258",
-    "sourcePage": "59"
+    "sourcePage": "59",
+    "equipmentCost": 118.9,
+    "sellingPrice": 238
   },
   {
     "unitType": "SHP",
@@ -3875,7 +4083,9 @@
     "description": "Heat Pump",
     "monthlyPayment": "183",
     "totalInvestment": "12258",
-    "sourcePage": "59"
+    "sourcePage": "59",
+    "equipmentCost": 3098.58,
+    "sellingPrice": 6197
   },
   {
     "unitType": "SHP",
@@ -3889,7 +4099,9 @@
     "description": "Programming; GOOD; Total Investment; *with approved credit",
     "monthlyPayment": "183",
     "totalInvestment": "12258",
-    "sourcePage": "59"
+    "sourcePage": "59",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -3987,7 +4199,9 @@
     "description": "Programming; 63/79",
     "monthlyPayment": "161",
     "totalInvestment": "10723",
-    "sourcePage": "59"
+    "sourcePage": "59",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -4057,7 +4271,9 @@
     "description": "",
     "monthlyPayment": "201",
     "totalInvestment": "13463",
-    "sourcePage": "57"
+    "sourcePage": "57",
+    "equipmentCost": 166.05,
+    "sellingPrice": 332
   },
   {
     "unitType": "SHP",
@@ -4099,7 +4315,9 @@
     "description": "Heat Pump",
     "monthlyPayment": "193",
     "totalInvestment": "12892",
-    "sourcePage": "58"
+    "sourcePage": "58",
+    "equipmentCost": 3221.58,
+    "sellingPrice": 6443
   },
   {
     "unitType": "SHP",
@@ -4113,7 +4331,9 @@
     "description": "Heat Pump",
     "monthlyPayment": "201",
     "totalInvestment": "13463",
-    "sourcePage": "57"
+    "sourcePage": "57",
+    "equipmentCost": 3346.63,
+    "sellingPrice": 6693
   },
   {
     "unitType": "SHP",
@@ -4141,7 +4361,9 @@
     "description": "Programming; GOOD; Total Investment; *with approved credit",
     "monthlyPayment": "201",
     "totalInvestment": "13463",
-    "sourcePage": "57"
+    "sourcePage": "57",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -4309,7 +4531,9 @@
     "description": "Programming; 61/79",
     "monthlyPayment": "193",
     "totalInvestment": "12871",
-    "sourcePage": "57"
+    "sourcePage": "57",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -4337,7 +4561,9 @@
     "description": "",
     "monthlyPayment": "218",
     "totalInvestment": "14602",
-    "sourcePage": "55"
+    "sourcePage": "55",
+    "equipmentCost": 166.05,
+    "sellingPrice": 332
   },
   {
     "unitType": "SHP",
@@ -4351,7 +4577,9 @@
     "description": "Heat Pump",
     "monthlyPayment": "218",
     "totalInvestment": "14602",
-    "sourcePage": "55"
+    "sourcePage": "55",
+    "equipmentCost": 3594.68,
+    "sellingPrice": 7189
   },
   {
     "unitType": "SHP",
@@ -4365,7 +4593,9 @@
     "description": "Programming",
     "monthlyPayment": "218",
     "totalInvestment": "14602",
-    "sourcePage": "55"
+    "sourcePage": "55",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -4393,7 +4623,9 @@
     "description": "",
     "monthlyPayment": "213",
     "totalInvestment": "14219",
-    "sourcePage": "55"
+    "sourcePage": "55",
+    "equipmentCost": 166.05,
+    "sellingPrice": 332
   },
   {
     "unitType": "SHP",
@@ -4477,7 +4709,9 @@
     "description": "Programming; 60/79",
     "monthlyPayment": "151",
     "totalInvestment": "10114",
-    "sourcePage": "56"
+    "sourcePage": "56",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -4533,7 +4767,9 @@
     "description": "Programming",
     "monthlyPayment": "185",
     "totalInvestment": "12364",
-    "sourcePage": "56"
+    "sourcePage": "56",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -4589,7 +4825,9 @@
     "description": "Heat Pump",
     "monthlyPayment": "214",
     "totalInvestment": "14275",
-    "sourcePage": "53"
+    "sourcePage": "53",
+    "equipmentCost": 2899.73,
+    "sellingPrice": 5799
   },
   {
     "unitType": "SHP",
@@ -4617,7 +4855,9 @@
     "description": "Programming",
     "monthlyPayment": "214",
     "totalInvestment": "14275",
-    "sourcePage": "53"
+    "sourcePage": "53",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -4631,7 +4871,9 @@
     "description": "10 Year warranty on functional parts with registration GOOD; Total Investment; *with approved credit",
     "monthlyPayment": "214",
     "totalInvestment": "14275",
-    "sourcePage": "53"
+    "sourcePage": "53",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SHP",
@@ -4701,7 +4943,9 @@
     "description": "Programming; BUDGET; Total Investment; *with approved credit",
     "monthlyPayment": "196",
     "totalInvestment": "13119",
-    "sourcePage": "53"
+    "sourcePage": "53",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -4715,7 +4959,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "227",
     "totalInvestment": "15163",
-    "sourcePage": "51"
+    "sourcePage": "51",
+    "equipmentCost": 1739.43,
+    "sellingPrice": 3479
   },
   {
     "unitType": "SHP",
@@ -4757,7 +5003,9 @@
     "description": "Heat Pump",
     "monthlyPayment": "227",
     "totalInvestment": "15163",
-    "sourcePage": "51"
+    "sourcePage": "51",
+    "equipmentCost": 3098.58,
+    "sellingPrice": 6197
   },
   {
     "unitType": "SHP",
@@ -4785,7 +5033,9 @@
     "description": "Programming",
     "monthlyPayment": "227",
     "totalInvestment": "15163",
-    "sourcePage": "51"
+    "sourcePage": "51",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -4799,7 +5049,9 @@
     "description": "10 Year warranty on functional parts with registration GOOD; Total Investment; *with approved credit",
     "monthlyPayment": "227",
     "totalInvestment": "15163",
-    "sourcePage": "51"
+    "sourcePage": "51",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SHP",
@@ -4827,7 +5079,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "206",
     "totalInvestment": "13801",
-    "sourcePage": "51"
+    "sourcePage": "51",
+    "equipmentCost": 1597.98,
+    "sellingPrice": 3196
   },
   {
     "unitType": "SHP",
@@ -4883,7 +5137,9 @@
     "description": "Programming; BUDGET; Total Investment; *with approved credit",
     "monthlyPayment": "206",
     "totalInvestment": "13801",
-    "sourcePage": "51"
+    "sourcePage": "51",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -4897,7 +5153,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "254",
     "totalInvestment": "16954",
-    "sourcePage": "49"
+    "sourcePage": "49",
+    "equipmentCost": 2073.57,
+    "sellingPrice": 4147
   },
   {
     "unitType": "SHP",
@@ -4939,7 +5197,9 @@
     "description": "Heat Pump",
     "monthlyPayment": "254",
     "totalInvestment": "16954",
-    "sourcePage": "49"
+    "sourcePage": "49",
+    "equipmentCost": 3346.63,
+    "sellingPrice": 6693
   },
   {
     "unitType": "SHP",
@@ -4967,7 +5227,9 @@
     "description": "Programming",
     "monthlyPayment": "254",
     "totalInvestment": "16954",
-    "sourcePage": "49"
+    "sourcePage": "49",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -4981,7 +5243,9 @@
     "description": "10 Year warranty on functional parts with registration GOOD; Total Investment; *with approved credit",
     "monthlyPayment": "254",
     "totalInvestment": "16954",
-    "sourcePage": "49"
+    "sourcePage": "49",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SHP",
@@ -5009,7 +5273,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "232",
     "totalInvestment": "15523",
-    "sourcePage": "49"
+    "sourcePage": "49",
+    "equipmentCost": 2073.57,
+    "sellingPrice": 4147
   },
   {
     "unitType": "SHP",
@@ -5065,7 +5331,9 @@
     "description": "Programming; BUDGET; Total Investment; *with approved credit",
     "monthlyPayment": "232",
     "totalInvestment": "15523",
-    "sourcePage": "49"
+    "sourcePage": "49",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -5079,7 +5347,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "274",
     "totalInvestment": "18306",
-    "sourcePage": "48"
+    "sourcePage": "48",
+    "equipmentCost": 2300.1,
+    "sellingPrice": 4600
   },
   {
     "unitType": "SHP",
@@ -5121,7 +5391,9 @@
     "description": "Heat Pump",
     "monthlyPayment": "274",
     "totalInvestment": "18306",
-    "sourcePage": "48"
+    "sourcePage": "48",
+    "equipmentCost": 3594.68,
+    "sellingPrice": 7189
   },
   {
     "unitType": "SHP",
@@ -5149,7 +5421,9 @@
     "description": "Programming",
     "monthlyPayment": "274",
     "totalInvestment": "18306",
-    "sourcePage": "48"
+    "sourcePage": "48",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -5163,7 +5437,9 @@
     "description": "10 Year warranty on functional parts with registration GOOD; Total Investment; *with approved credit",
     "monthlyPayment": "274",
     "totalInvestment": "18306",
-    "sourcePage": "48"
+    "sourcePage": "48",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SHP",
@@ -5177,7 +5453,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "260",
     "totalInvestment": "17379",
-    "sourcePage": "48"
+    "sourcePage": "48",
+    "equipmentCost": 2300.1,
+    "sellingPrice": 4600
   },
   {
     "unitType": "SHP",
@@ -5233,7 +5511,9 @@
     "description": "Programming; BUDGET; Total Investment; *with approved credit",
     "monthlyPayment": "260",
     "totalInvestment": "17379",
-    "sourcePage": "48"
+    "sourcePage": "48",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -5289,7 +5569,9 @@
     "description": "10 Year warranty on functional parts with registration",
     "monthlyPayment": "250",
     "totalInvestment": "16745",
-    "sourcePage": "45"
+    "sourcePage": "45",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SHP",
@@ -5345,7 +5627,9 @@
     "description": "10 Year warranty on functional parts with registration 45/79",
     "monthlyPayment": "227",
     "totalInvestment": "15186",
-    "sourcePage": "45"
+    "sourcePage": "45",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SHP",
@@ -5373,7 +5657,9 @@
     "description": "",
     "monthlyPayment": "200",
     "totalInvestment": "13366",
-    "sourcePage": "46"
+    "sourcePage": "46",
+    "equipmentCost": 100.45,
+    "sellingPrice": 201
   },
   {
     "unitType": "SHP",
@@ -5387,7 +5673,9 @@
     "description": "Heat Pump with WeatherGuard; Top Financing Details:; 12 year registered limited warranty on 12.99% APR Payment based compressor on 120 Mos; 10 year on outdoor coil &amp; all other unctional parts",
     "monthlyPayment": "200",
     "totalInvestment": "13366",
-    "sourcePage": "46"
+    "sourcePage": "46",
+    "equipmentCost": 3247.2,
+    "sellingPrice": 6494
   },
   {
     "unitType": "SHP",
@@ -5401,7 +5689,9 @@
     "description": "Programming; 46/79",
     "monthlyPayment": "200",
     "totalInvestment": "13366",
-    "sourcePage": "46"
+    "sourcePage": "46",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -5429,7 +5719,9 @@
     "description": "",
     "monthlyPayment": "204",
     "totalInvestment": "13624",
-    "sourcePage": "46"
+    "sourcePage": "46",
+    "equipmentCost": 100.45,
+    "sellingPrice": 201
   },
   {
     "unitType": "SHP",
@@ -5457,7 +5749,9 @@
     "description": "Programming",
     "monthlyPayment": "204",
     "totalInvestment": "13624",
-    "sourcePage": "46"
+    "sourcePage": "46",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -5513,7 +5807,9 @@
     "description": "10 Year warranty on functional parts with registration",
     "monthlyPayment": "257",
     "totalInvestment": "17199",
-    "sourcePage": "42"
+    "sourcePage": "42",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SHP",
@@ -5569,7 +5865,9 @@
     "description": "10 Year warranty on functional parts with registration 42/79",
     "monthlyPayment": "242",
     "totalInvestment": "16176",
-    "sourcePage": "42"
+    "sourcePage": "42",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SHP",
@@ -5583,7 +5881,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "208",
     "totalInvestment": "13882",
-    "sourcePage": "43"
+    "sourcePage": "43",
+    "equipmentCost": 1597.98,
+    "sellingPrice": 3196
   },
   {
     "unitType": "SHP",
@@ -5611,7 +5911,9 @@
     "description": "Heat Pump with WeatherGuard; Top Financing Details:; 12 year registered limited warranty on 12.99% APR Payment based compressor on 120 Mos; 10 year on outdoor coil &amp; all other unctional parts",
     "monthlyPayment": "208",
     "totalInvestment": "13882",
-    "sourcePage": "43"
+    "sourcePage": "43",
+    "equipmentCost": 3445.03,
+    "sellingPrice": 6890
   },
   {
     "unitType": "SHP",
@@ -5625,7 +5927,9 @@
     "description": "Programming; 43/79",
     "monthlyPayment": "208",
     "totalInvestment": "13882",
-    "sourcePage": "43"
+    "sourcePage": "43",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -5681,7 +5985,9 @@
     "description": "Programming",
     "monthlyPayment": "218",
     "totalInvestment": "14569",
-    "sourcePage": "43"
+    "sourcePage": "43",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -5737,7 +6043,9 @@
     "description": "10 Year warranty on functional parts with registration",
     "monthlyPayment": "287",
     "totalInvestment": "19187",
-    "sourcePage": "39"
+    "sourcePage": "39",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SHP",
@@ -5793,7 +6101,9 @@
     "description": "10 Year warranty on functional parts with registration 39/79",
     "monthlyPayment": "269",
     "totalInvestment": "18016",
-    "sourcePage": "39"
+    "sourcePage": "39",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SHP",
@@ -5807,7 +6117,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "233",
     "totalInvestment": "15578",
-    "sourcePage": "40"
+    "sourcePage": "40",
+    "equipmentCost": 2073.57,
+    "sellingPrice": 4147
   },
   {
     "unitType": "SHP",
@@ -5835,7 +6147,9 @@
     "description": "Heat Pump with WeatherGuard; Top Financing Details:; 12 year registered limited warranty on 12.99% APR Payment based compressor on 120 Mos; 10 year on outdoor coil &amp; all other unctional parts",
     "monthlyPayment": "233",
     "totalInvestment": "15578",
-    "sourcePage": "40"
+    "sourcePage": "40",
+    "equipmentCost": 3694.1,
+    "sellingPrice": 7388
   },
   {
     "unitType": "SHP",
@@ -5849,7 +6163,9 @@
     "description": "Programming; 40/79",
     "monthlyPayment": "233",
     "totalInvestment": "15578",
-    "sourcePage": "40"
+    "sourcePage": "40",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -5863,7 +6179,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "246",
     "totalInvestment": "16428",
-    "sourcePage": "40"
+    "sourcePage": "40",
+    "equipmentCost": 2073.57,
+    "sellingPrice": 4147
   },
   {
     "unitType": "SHP",
@@ -5905,7 +6223,9 @@
     "description": "Programming",
     "monthlyPayment": "246",
     "totalInvestment": "16428",
-    "sourcePage": "40"
+    "sourcePage": "40",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SHP",
@@ -5961,7 +6281,9 @@
     "description": "10 Year warranty on functional parts with registration",
     "monthlyPayment": "317",
     "totalInvestment": "21210",
-    "sourcePage": "37"
+    "sourcePage": "37",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SHP",
@@ -6017,7 +6339,9 @@
     "description": "10 Year warranty on functional parts with registration 37/79",
     "monthlyPayment": "293",
     "totalInvestment": "19620",
-    "sourcePage": "37"
+    "sourcePage": "37",
+    "equipmentCost": 492,
+    "sellingPrice": 984
   },
   {
     "unitType": "SGA",
@@ -6059,7 +6383,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "160",
     "totalInvestment": "10685",
-    "sourcePage": "35"
+    "sourcePage": "35",
+    "equipmentCost": 1046.53,
+    "sellingPrice": 2093
   },
   {
     "unitType": "SGA",
@@ -6073,7 +6399,9 @@
     "description": "Programming",
     "monthlyPayment": "160",
     "totalInvestment": "10685",
-    "sourcePage": "35"
+    "sourcePage": "35",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -6115,7 +6443,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "148",
     "totalInvestment": "9880",
-    "sourcePage": "35"
+    "sourcePage": "35",
+    "equipmentCost": 1070.1,
+    "sellingPrice": 2140
   },
   {
     "unitType": "SGA",
@@ -6129,7 +6459,9 @@
     "description": "Programming; 35/79",
     "monthlyPayment": "148",
     "totalInvestment": "9880",
-    "sourcePage": "35"
+    "sourcePage": "35",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -6185,7 +6517,9 @@
     "description": "Programming; 36/79",
     "monthlyPayment": "113",
     "totalInvestment": "7554",
-    "sourcePage": "36"
+    "sourcePage": "36",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -6311,7 +6645,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "174",
     "totalInvestment": "11637",
-    "sourcePage": "31"
+    "sourcePage": "31",
+    "equipmentCost": 1125.45,
+    "sellingPrice": 2251
   },
   {
     "unitType": "SHP",
@@ -6339,7 +6675,9 @@
     "description": "Heat Pump",
     "monthlyPayment": "180",
     "totalInvestment": "12007",
-    "sourcePage": "60"
+    "sourcePage": "60",
+    "equipmentCost": 2999.15,
+    "sellingPrice": 5998
   },
   {
     "unitType": "SGA",
@@ -6353,7 +6691,9 @@
     "description": "Programming",
     "monthlyPayment": "174",
     "totalInvestment": "11637",
-    "sourcePage": "31"
+    "sourcePage": "31",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -6437,7 +6777,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "159",
     "totalInvestment": "10596",
-    "sourcePage": "31"
+    "sourcePage": "31",
+    "equipmentCost": 1125.45,
+    "sellingPrice": 2251
   },
   {
     "unitType": "SHP",
@@ -6493,7 +6835,9 @@
     "description": "Programming; 31/79",
     "monthlyPayment": "159",
     "totalInvestment": "10596",
-    "sourcePage": "31"
+    "sourcePage": "31",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -6549,7 +6893,9 @@
     "description": "Programming; 32/79",
     "monthlyPayment": "121",
     "totalInvestment": "8089",
-    "sourcePage": "32"
+    "sourcePage": "32",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -6647,7 +6993,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "187",
     "totalInvestment": "12468",
-    "sourcePage": "27"
+    "sourcePage": "27",
+    "equipmentCost": 1179.78,
+    "sellingPrice": 2360
   },
   {
     "unitType": "SGA",
@@ -6661,7 +7009,9 @@
     "description": "Programming",
     "monthlyPayment": "187",
     "totalInvestment": "12468",
-    "sourcePage": "27"
+    "sourcePage": "27",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -6703,7 +7053,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "165",
     "totalInvestment": "11043",
-    "sourcePage": "27"
+    "sourcePage": "27",
+    "equipmentCost": 1154.15,
+    "sellingPrice": 2308
   },
   {
     "unitType": "SGA",
@@ -6717,7 +7069,9 @@
     "description": "Programming; 27/79",
     "monthlyPayment": "165",
     "totalInvestment": "11043",
-    "sourcePage": "27"
+    "sourcePage": "27",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -6773,7 +7127,9 @@
     "description": "Programming; 28/79",
     "monthlyPayment": "132",
     "totalInvestment": "8807",
-    "sourcePage": "28"
+    "sourcePage": "28",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -6899,7 +7255,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "148",
     "totalInvestment": "9880",
-    "sourcePage": "22"
+    "sourcePage": "22",
+    "equipmentCost": 1070.1,
+    "sellingPrice": 2140
   },
   {
     "unitType": "SHP",
@@ -6927,7 +7285,9 @@
     "description": "Programming; 22/79",
     "monthlyPayment": "148",
     "totalInvestment": "9880",
-    "sourcePage": "22"
+    "sourcePage": "22",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -6997,7 +7357,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "160",
     "totalInvestment": "10685",
-    "sourcePage": "22"
+    "sourcePage": "22",
+    "equipmentCost": 1046.53,
+    "sellingPrice": 2093
   },
   {
     "unitType": "SHP",
@@ -7011,7 +7373,9 @@
     "description": "Heat Pump Financing Details; 12.99% APR Payment base",
     "monthlyPayment": "177",
     "totalInvestment": "11810",
-    "sourcePage": "54"
+    "sourcePage": "54",
+    "equipmentCost": 2689.6,
+    "sellingPrice": 5379
   },
   {
     "unitType": "SGA",
@@ -7025,7 +7389,9 @@
     "description": "Programming",
     "monthlyPayment": "160",
     "totalInvestment": "10685",
-    "sourcePage": "22"
+    "sourcePage": "22",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -7053,7 +7419,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "162",
     "totalInvestment": "10829",
-    "sourcePage": "52"
+    "sourcePage": "52",
+    "equipmentCost": 1597.98,
+    "sellingPrice": 3196
   },
   {
     "unitType": "SGA",
@@ -7095,7 +7463,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "155",
     "totalInvestment": "10384",
-    "sourcePage": "19"
+    "sourcePage": "19",
+    "equipmentCost": 1125.45,
+    "sellingPrice": 2251
   },
   {
     "unitType": "SHP",
@@ -7123,7 +7493,9 @@
     "description": "Programming; 19/79",
     "monthlyPayment": "155",
     "totalInvestment": "10384",
-    "sourcePage": "19"
+    "sourcePage": "19",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -7151,7 +7523,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "191",
     "totalInvestment": "12788",
-    "sourcePage": "52"
+    "sourcePage": "52",
+    "equipmentCost": 1597.98,
+    "sellingPrice": 3196
   },
   {
     "unitType": "SGA",
@@ -7193,7 +7567,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "178",
     "totalInvestment": "11869",
-    "sourcePage": "19"
+    "sourcePage": "19",
+    "equipmentCost": 1154.15,
+    "sellingPrice": 2308
   },
   {
     "unitType": "SHP",
@@ -7207,7 +7583,9 @@
     "description": "Heat Pump Financing Details; 12.99% APR Payment base",
     "monthlyPayment": "191",
     "totalInvestment": "12788",
-    "sourcePage": "52"
+    "sourcePage": "52",
+    "equipmentCost": 2999.15,
+    "sellingPrice": 5998
   },
   {
     "unitType": "SGA",
@@ -7221,7 +7599,9 @@
     "description": "Programming",
     "monthlyPayment": "178",
     "totalInvestment": "11869",
-    "sourcePage": "19"
+    "sourcePage": "19",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -7249,7 +7629,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "187",
     "totalInvestment": "12494",
-    "sourcePage": "50"
+    "sourcePage": "50",
+    "equipmentCost": 2073.57,
+    "sellingPrice": 4147
   },
   {
     "unitType": "SGA",
@@ -7291,7 +7673,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "165",
     "totalInvestment": "11043",
-    "sourcePage": "16"
+    "sourcePage": "16",
+    "equipmentCost": 1154.15,
+    "sellingPrice": 2308
   },
   {
     "unitType": "SHP",
@@ -7319,7 +7703,9 @@
     "description": "Programming; 16/79",
     "monthlyPayment": "165",
     "totalInvestment": "11043",
-    "sourcePage": "16"
+    "sourcePage": "16",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "SGA",
@@ -7347,7 +7733,9 @@
     "description": "Air Handler; 10 year limited parts warranty with registration",
     "monthlyPayment": "216",
     "totalInvestment": "14458",
-    "sourcePage": "50"
+    "sourcePage": "50",
+    "equipmentCost": 2073.57,
+    "sellingPrice": 4147
   },
   {
     "unitType": "SGA",
@@ -7389,7 +7777,9 @@
     "description": "Single-Stage; ECM blower motor; 10 Year Limited Parts Warranty; Limited Lifetime Heat Exchanger",
     "monthlyPayment": "187",
     "totalInvestment": "12468",
-    "sourcePage": "16"
+    "sourcePage": "16",
+    "equipmentCost": 1179.78,
+    "sellingPrice": 2360
   },
   {
     "unitType": "SHP",
@@ -7403,7 +7793,9 @@
     "description": "Heat Pump Financing Details; 12.99% APR Payment base",
     "monthlyPayment": "216",
     "totalInvestment": "14458",
-    "sourcePage": "50"
+    "sourcePage": "50",
+    "equipmentCost": 3221.58,
+    "sellingPrice": 6443
   },
   {
     "unitType": "SGA",
@@ -7417,7 +7809,9 @@
     "description": "Programming",
     "monthlyPayment": "187",
     "totalInvestment": "12468",
-    "sourcePage": "16"
+    "sourcePage": "16",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "PHP",
@@ -7459,7 +7853,9 @@
     "description": "XL824; Connected Control; $214/MO*",
     "monthlyPayment": "234",
     "totalInvestment": "15647",
-    "sourcePage": "63"
+    "sourcePage": "63",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "PHP",
@@ -7501,7 +7897,9 @@
     "description": "Wi-Fi Connected Control; 5/2 Simple and Easy; Programming; $169/MO*",
     "monthlyPayment": "210",
     "totalInvestment": "14051",
-    "sourcePage": "63"
+    "sourcePage": "63",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "PHP",
@@ -7585,7 +7983,9 @@
     "description": "Wi-Fi Connected Control; 5/2 Simple and Easy; Programming; 67/79",
     "monthlyPayment": "",
     "totalInvestment": "11270",
-    "sourcePage": "63"
+    "sourcePage": "63",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "PHP",
@@ -7627,7 +8027,9 @@
     "description": "XL824; Connected Control; $176/MO*",
     "monthlyPayment": "205",
     "totalInvestment": "13699",
-    "sourcePage": "64"
+    "sourcePage": "64",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "PHP",
@@ -7669,7 +8071,9 @@
     "description": "Wi-Fi Connected Control; 5/2 Simple and Easy; Programming; $146/MO*",
     "monthlyPayment": "184",
     "totalInvestment": "12283",
-    "sourcePage": "64"
+    "sourcePage": "64",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "PHP",
@@ -7753,7 +8157,9 @@
     "description": "Wi-Fi Connected Control; 5/2 Simple and Easy; Programming; 68/79",
     "monthlyPayment": "",
     "totalInvestment": "9737",
-    "sourcePage": "64"
+    "sourcePage": "64",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "PHP",
@@ -7795,7 +8201,9 @@
     "description": "XL824; Connected Control; $178/MO*",
     "monthlyPayment": "212",
     "totalInvestment": "14159",
-    "sourcePage": "65"
+    "sourcePage": "65",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "PHP",
@@ -7837,7 +8245,9 @@
     "description": "Wi-Fi Connected Control; 5/2 Simple and Easy; Programming; $152/MO*",
     "monthlyPayment": "192",
     "totalInvestment": "12845",
-    "sourcePage": "65"
+    "sourcePage": "65",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "PHP",
@@ -7921,7 +8331,9 @@
     "description": "Wi-Fi Connected Control; 5/2 Simple and Easy; Programming; 69/79",
     "monthlyPayment": "",
     "totalInvestment": "10128",
-    "sourcePage": "65"
+    "sourcePage": "65",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "PHP",
@@ -7963,7 +8375,9 @@
     "description": "XL824; Connected Control; $164/MO*",
     "monthlyPayment": "205",
     "totalInvestment": "13709",
-    "sourcePage": "66"
+    "sourcePage": "66",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "PHP",
@@ -8005,7 +8419,9 @@
     "description": "Wi-Fi Connected Control; 5/2 Simple and Easy; Programming; $144/MO*",
     "monthlyPayment": "187",
     "totalInvestment": "12499",
-    "sourcePage": "66"
+    "sourcePage": "66",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "PHP",
@@ -8089,7 +8505,9 @@
     "description": "Wi-Fi Connected Control; 5/2 Simple and Easy; Programming; 70/79",
     "monthlyPayment": "",
     "totalInvestment": "9643",
-    "sourcePage": "66"
+    "sourcePage": "66",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "PHP",
@@ -8131,7 +8549,9 @@
     "description": "XL824; Connected Control; $161/MO*",
     "monthlyPayment": "197",
     "totalInvestment": "13174",
-    "sourcePage": "67"
+    "sourcePage": "67",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "PHP",
@@ -8173,7 +8593,9 @@
     "description": "Wi-Fi Connected Control; 5/2 Simple and Easy; Programming; $135/MO*",
     "monthlyPayment": "182",
     "totalInvestment": "12170",
-    "sourcePage": "67"
+    "sourcePage": "67",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "PHP",
@@ -8257,7 +8679,9 @@
     "description": "Wi-Fi Connected Control; 5/2 Simple and Easy; Programming; 71/79",
     "monthlyPayment": "",
     "totalInvestment": "9025",
-    "sourcePage": "67"
+    "sourcePage": "67",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "PHP",
@@ -8299,7 +8723,9 @@
     "description": "XL824; Connected Control; $151/MO*",
     "monthlyPayment": "190",
     "totalInvestment": "12689",
-    "sourcePage": "68"
+    "sourcePage": "68",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "PHP",
@@ -8341,7 +8767,9 @@
     "description": "Wi-Fi Connected Control; 5/2 Simple and Easy; Programming; $129/MO*",
     "monthlyPayment": "178",
     "totalInvestment": "11869",
-    "sourcePage": "68"
+    "sourcePage": "68",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "PHP",
@@ -8425,7 +8853,9 @@
     "description": "Wi-Fi Connected Control; 5/2 Simple and Easy; Programming; 72/79",
     "monthlyPayment": "",
     "totalInvestment": "8622",
-    "sourcePage": "68"
+    "sourcePage": "68",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "GP",
@@ -8453,7 +8883,9 @@
     "description": "XL824; Connected Control; $199/MO*",
     "monthlyPayment": "219",
     "totalInvestment": "14633",
-    "sourcePage": "69"
+    "sourcePage": "69",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "GP",
@@ -8509,7 +8941,9 @@
     "description": "Wi-Fi Connected Control on 120 Mos; 5/2 Simple and Easy; Programming",
     "monthlyPayment": "199",
     "totalInvestment": "13281",
-    "sourcePage": "69"
+    "sourcePage": "69",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "GP",
@@ -8537,7 +8971,9 @@
     "description": "Wi-Fi Connected Control on 120 Mos; 5/2 Simple and Easy; Programming; 73/79",
     "monthlyPayment": "158",
     "totalInvestment": "10526",
-    "sourcePage": "69"
+    "sourcePage": "69",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "GP",
@@ -8565,7 +9001,9 @@
     "description": "XL824; Connected Control; $186/MO*",
     "monthlyPayment": "207",
     "totalInvestment": "13852",
-    "sourcePage": "70"
+    "sourcePage": "70",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "GP",
@@ -8621,7 +9059,9 @@
     "description": "Wi-Fi Connected Control on 120 Mos; 5/2 Simple and Easy; Programming",
     "monthlyPayment": "186",
     "totalInvestment": "12459",
-    "sourcePage": "70"
+    "sourcePage": "70",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "GP",
@@ -8649,7 +9089,9 @@
     "description": "Wi-Fi Connected Control on 120 Mos; 5/2 Simple and Easy; Programming; 74/79",
     "monthlyPayment": "150",
     "totalInvestment": "10024",
-    "sourcePage": "70"
+    "sourcePage": "70",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "GP",
@@ -8677,7 +9119,9 @@
     "description": "XL824; Connected Control; $181/MO*",
     "monthlyPayment": "202",
     "totalInvestment": "13515",
-    "sourcePage": "71"
+    "sourcePage": "71",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "GP",
@@ -8719,7 +9163,9 @@
     "description": "Wi-Fi Connected Control on 120 Mos; 5/2 Simple and Easy; Programming; $144/MO*",
     "monthlyPayment": "179",
     "totalInvestment": "11976",
-    "sourcePage": "71"
+    "sourcePage": "71",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "GP",
@@ -8789,7 +9235,9 @@
     "description": "Wi-Fi Connected Control on 120 Mos; 5/2 Simple and Easy; Programming; 75/79",
     "monthlyPayment": "",
     "totalInvestment": "9645",
-    "sourcePage": "71"
+    "sourcePage": "71",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "GP",
@@ -8817,7 +9265,9 @@
     "description": "XL824; Connected Control; $167/MO*",
     "monthlyPayment": "194",
     "totalInvestment": "12956",
-    "sourcePage": "72"
+    "sourcePage": "72",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "GP",
@@ -8859,7 +9309,9 @@
     "description": "Wi-Fi Connected Control on 120 Mos; 5/2 Simple and Easy; Programming; $130/MO*",
     "monthlyPayment": "176",
     "totalInvestment": "11744",
-    "sourcePage": "72"
+    "sourcePage": "72",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "GP",
@@ -8929,7 +9381,9 @@
     "description": "Wi-Fi Connected Control on 120 Mos; 5/2 Simple and Easy; Programming; 76/79",
     "monthlyPayment": "",
     "totalInvestment": "8703",
-    "sourcePage": "72"
+    "sourcePage": "72",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "GP",
@@ -8957,7 +9411,9 @@
     "description": "XL824; Connected Control; $162/MO*",
     "monthlyPayment": "190",
     "totalInvestment": "12679",
-    "sourcePage": "73"
+    "sourcePage": "73",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "GP",
@@ -8999,7 +9455,9 @@
     "description": "Wi-Fi Connected Control on 120 Mos; 5/2 Simple and Easy; Programming; $127/MO*",
     "monthlyPayment": "172",
     "totalInvestment": "11512",
-    "sourcePage": "73"
+    "sourcePage": "73",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "GP",
@@ -9069,7 +9527,9 @@
     "description": "Wi-Fi Connected Control on 120 Mos; 5/2 Simple and Easy; Programming; 77/79",
     "monthlyPayment": "",
     "totalInvestment": "8444",
-    "sourcePage": "73"
+    "sourcePage": "73",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "GP",
@@ -9097,7 +9557,9 @@
     "description": "XL824; Connected Control; $154/MO*",
     "monthlyPayment": "186",
     "totalInvestment": "12400",
-    "sourcePage": "74"
+    "sourcePage": "74",
+    "equipmentCost": 229.6,
+    "sellingPrice": 459
   },
   {
     "unitType": "GP",
@@ -9139,7 +9601,9 @@
     "description": "Wi-Fi Connected Control on 120 Mos; 5/2 Simple and Easy; Programming; $121/MO*",
     "monthlyPayment": "167",
     "totalInvestment": "11156",
-    "sourcePage": "74"
+    "sourcePage": "74",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   },
   {
     "unitType": "GP",
@@ -9209,6 +9673,8 @@
     "description": "Wi-Fi Connected Control on 120 Mos; 5/2 Simple and Easy; Programming; 78/79",
     "monthlyPayment": "",
     "totalInvestment": "8075",
-    "sourcePage": "74"
+    "sourcePage": "74",
+    "equipmentCost": 148.63,
+    "sellingPrice": 297
   }
 ]

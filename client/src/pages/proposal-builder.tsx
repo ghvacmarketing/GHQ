@@ -54,6 +54,8 @@ type PricebookComponent = {
   monthlyPayment: string;
   totalInvestment: string;
   sourcePage: string;
+  equipmentCost?: number;
+  sellingPrice?: number;
 };
 
 type CartPackage = PricebookPackage & {
@@ -80,8 +82,8 @@ const packages: PricebookPackage[] = packagesData as PricebookPackage[];
 const components: PricebookComponent[] = componentsData as PricebookComponent[];
 
 const UNIT_TYPE_INFO: Record<string, { name: string; description: string; icon: typeof Package }> = {
-  SGA: { name: "Air Conditioner + Gas Furnace", description: "Split Gas Air system for heating and cooling", icon: Thermometer },
-  SHP: { name: "Heat Pump System", description: "All-electric heating and cooling solution", icon: Zap },
+  SGA: { name: "SGA", description: "Split Gas Air system for heating and cooling", icon: Thermometer },
+  SHP: { name: "SHP", description: "All-electric heating and cooling solution", icon: Zap },
   STA: { name: "Heat Pump + Gas Furnace", description: "Dual fuel system for maximum efficiency", icon: Award },
 };
 
@@ -111,7 +113,9 @@ function calculateCustomBuildEstimate(
   let total = 0;
   
   if (outdoorUnit) {
-    if (outdoorUnit.componentType === "Heat Pump") {
+    if (outdoorUnit.sellingPrice) {
+      total += outdoorUnit.sellingPrice;
+    } else if (outdoorUnit.componentType === "Heat Pump") {
       total += 4500;
     } else {
       total += 3500;
@@ -119,11 +123,17 @@ function calculateCustomBuildEstimate(
   }
   
   if (coil) {
-    total += 800;
+    if (coil.sellingPrice) {
+      total += coil.sellingPrice;
+    } else {
+      total += 800;
+    }
   }
   
   if (indoorUnit) {
-    if (indoorUnit.componentType === "Air Handler") {
+    if (indoorUnit.sellingPrice) {
+      total += indoorUnit.sellingPrice;
+    } else if (indoorUnit.componentType === "Air Handler") {
       total += 2000;
     } else {
       total += 1800;
@@ -131,7 +141,9 @@ function calculateCustomBuildEstimate(
   }
   
   if (thermostat) {
-    if (thermostat.unitName.toLowerCase().includes('smart') || thermostat.unitName.toLowerCase().includes('wifi')) {
+    if (thermostat.sellingPrice) {
+      total += thermostat.sellingPrice;
+    } else if (thermostat.unitName.toLowerCase().includes('smart') || thermostat.unitName.toLowerCase().includes('wifi')) {
       total += 350;
     } else {
       total += 250;
