@@ -98,7 +98,7 @@ const TIER_INFO: Record<string, { description: string }> = {
   Essential: { description: "Standard efficiency, reliable performance" },
   Premium: { description: "High efficiency, enhanced features" },
   Ultimate: { description: "Top-tier efficiency, maximum comfort" },
-  Package: { description: "All-in-one packaged unit" },
+  Packaged: { description: "All-in-one packaged unit" },
 };
 
 const PACKAGE_LEVEL_ORDER = ["Best", "Better", "Good", "Budget"];
