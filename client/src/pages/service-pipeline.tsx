@@ -708,13 +708,9 @@ export default function ServicePipeline() {
                 currentPageTitle="Service Department"
                 items={[
                   { label: "Home", path: "/" },
-                  { label: "Service Quote", path: "/quote" },
-                  { label: "Price Book", path: "/price-book" },
-                  { label: "Processes and Systems", path: "/processes" },
                   { label: "Sales Prospects", path: "/sales-prospects" },
                   { label: "Installation Department", path: "/installation" },
                   { label: "Service Department", path: "/service-pipeline" },
-                  { label: "Proposal Builder", path: "/proposal" },
                 ]}
               />
             </div>
