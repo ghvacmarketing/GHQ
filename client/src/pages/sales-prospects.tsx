@@ -1379,6 +1379,8 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
                 <SelectItem value="Contacted">Contacted</SelectItem>
                 <SelectItem value="Quote Sent">Quote Sent</SelectItem>
                 <SelectItem value="Negotiating">Negotiating</SelectItem>
+                <SelectItem value="Won">Won</SelectItem>
+                <SelectItem value="Lost">Lost</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1918,6 +1920,8 @@ function LeadCard({
                   <SelectItem value="Contacted">Contacted</SelectItem>
                   <SelectItem value="Quote Sent">Quote Sent</SelectItem>
                   <SelectItem value="Negotiating">Negotiating</SelectItem>
+                  <SelectItem value="Won">Won</SelectItem>
+                  <SelectItem value="Lost">Lost</SelectItem>
                 </SelectContent>
               </Select>
             ) : (
