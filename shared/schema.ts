@@ -266,6 +266,7 @@ export const leads = pgTable("leads", {
   quoteDetails: text("quote_details"),
   quotePricing: text("quote_pricing"),
   customerType: text("customer_type"), // Residential, Commercial, etc.
+  jobType: text("job_type"), // Installation, Service, Maintenance, etc.
   leadSource: text("lead_source"),
   assignedEmployeeId: varchar("assigned_employee_id"), // Optional employee assignment
   quoteId: varchar("quote_id"), // Reference to source quote if lead was created from quote

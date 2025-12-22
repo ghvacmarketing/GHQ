@@ -713,6 +713,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
     clientIssue: "",
     projectedCloseDate: "",
     customerType: "",
+    jobType: "",
     leadSource: "",
     assignedEmployeeId: "",
     quoteId: "",
@@ -811,6 +812,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
       clientIssue: `Quote #${quote.id.slice(0, 8)} - ${(quote.parts as any[]).map(p => p.description).join(', ')}`,
       projectedCloseDate: "",
       customerType: "",
+      jobType: "",
       leadSource: "Quote Generated",
       assignedEmployeeId: "",
       quoteId: quote.id,
@@ -1044,6 +1046,7 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
       clientIssue: "",
       projectedCloseDate: "",
       customerType: "",
+      jobType: "",
       leadSource: "",
       assignedEmployeeId: "",
       quoteId: "",
@@ -1414,14 +1417,33 @@ function CreateLeadForm({ onSubmit, technicians }: { onSubmit: (data: any) => vo
           </div>
         </div>
 
-        <div>
-          <label className="text-sm font-medium">Lead Source</label>
-          <Input
-            value={formData.leadSource}
-            onChange={(e) => setFormData({ ...formData, leadSource: e.target.value })}
-            placeholder="e.g., Referral, Website, Ad"
-            data-testid="input-lead-source"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="min-w-0">
+            <label className="text-sm font-medium">Job Type</label>
+            <Select 
+              value={formData.jobType || ""} 
+              onValueChange={(value) => setFormData({ ...formData, jobType: value })}
+            >
+              <SelectTrigger data-testid="select-job-type">
+                <SelectValue placeholder="Select job type..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Installation">Installation</SelectItem>
+                <SelectItem value="Service">Service</SelectItem>
+                <SelectItem value="Maintenance">Maintenance</SelectItem>
+                <SelectItem value="Repair">Repair</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-0">
+            <label className="text-sm font-medium">Lead Source</label>
+            <Input
+              value={formData.leadSource}
+              onChange={(e) => setFormData({ ...formData, leadSource: e.target.value })}
+              placeholder="e.g., Referral, Website, Ad"
+              data-testid="input-lead-source"
+            />
+          </div>
         </div>
 
         <div>
@@ -1793,6 +1815,7 @@ function LeadCard({
     estimatedValue: lead.estimatedValue || "",
     projectedCloseDate: lead.projectedCloseDate ? format(new Date(lead.projectedCloseDate), "yyyy-MM-dd") : "",
     customerType: lead.customerType || "",
+    jobType: lead.jobType || "",
     leadSource: lead.leadSource || "",
     assignedEmployeeId: lead.assignedEmployeeId || "",
   });
@@ -2224,6 +2247,24 @@ function LeadCard({
                       />
                     </div>
                     <div>
+                      <label className="text-xs font-medium text-muted-foreground">Job Type</label>
+                      <Select 
+                        value={editedLead.jobType || ""} 
+                        onValueChange={(value) => setEditedLead({ ...editedLead, jobType: value })}
+                        disabled={!isActive}
+                      >
+                        <SelectTrigger className="h-9" data-testid={`select-edit-job-type-${lead.id}`}>
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Installation">Installation</SelectItem>
+                          <SelectItem value="Service">Service</SelectItem>
+                          <SelectItem value="Maintenance">Maintenance</SelectItem>
+                          <SelectItem value="Repair">Repair</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
                       <label className="text-xs font-medium text-muted-foreground">Lead Source</label>
                       <Input
                         value={editedLead.leadSource}
@@ -2261,6 +2302,7 @@ function LeadCard({
                         const updateData: any = {
                           estimatedValue: editedLead.estimatedValue || undefined,
                           customerType: editedLead.customerType || undefined,
+                          jobType: editedLead.jobType || undefined,
                           leadSource: editedLead.leadSource || undefined,
                           assignedEmployeeId: editedLead.assignedEmployeeId || undefined,
                         };
