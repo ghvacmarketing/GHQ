@@ -319,6 +319,14 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
               
               return null;
             })()}
+            {lead.installStep && (
+              <div className="mt-2 pt-2 border-t">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 border-blue-200">
+                  <Package className="h-2.5 w-2.5 mr-1" />
+                  {lead.installStep}
+                </Badge>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
