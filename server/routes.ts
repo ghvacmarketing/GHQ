@@ -2757,6 +2757,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "Won",
         won: true,
         tags: updatedTags,
+        
+        // Change job type from Service to Installation
+        jobType: "Installation",
       };
 
       // Add optional install dates if provided
