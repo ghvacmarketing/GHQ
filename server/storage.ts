@@ -88,6 +88,10 @@ export interface IStorage {
   deleteLead(id: string): Promise<boolean>;
   findDuplicateLead(phone?: string, email?: string, externalId?: string): Promise<Lead | undefined>;
   
+  // Service Pipeline operations
+  getServiceLeads(): Promise<Lead[]>;
+  updateServiceLead(id: string, updates: Partial<Lead>): Promise<Lead | undefined>;
+  
   // Lead History operations
   createLeadHistory(history: InsertLeadHistory): Promise<LeadHistory>;
   getLeadHistory(leadId: string): Promise<LeadHistory[]>;
@@ -582,6 +586,26 @@ export class DatabaseStorage implements IStorage {
       .where(or(...conditions))
       .limit(1);
     
+    return lead ? this.normalizeLead(lead) : undefined;
+  }
+
+  // Service Pipeline operations
+  async getServiceLeads(): Promise<Lead[]> {
+    const result = await db
+      .select()
+      .from(leads)
+      .orderBy(leads.serviceOrder);
+    return result
+      .filter(lead => lead.serviceStep !== null && lead.tags && Array.isArray(lead.tags) && lead.tags.some((tag: string) => tag.toLowerCase() === 'service'))
+      .map(lead => this.normalizeLead(lead));
+  }
+
+  async updateServiceLead(id: string, updates: Partial<Lead>): Promise<Lead | undefined> {
+    const [lead] = await db
+      .update(leads)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(leads.id, id))
+      .returning();
     return lead ? this.normalizeLead(lead) : undefined;
   }
 

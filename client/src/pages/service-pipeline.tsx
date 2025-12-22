@@ -43,29 +43,52 @@ import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameMo
 import { cn } from "@/lib/utils";
 import type { Lead, Technician, Quote } from "@shared/schema";
 
-const INSTALL_STEPS = [
-  "Define Scope of Work",
-  "Assign to Sub-Contractor",
-  "Order Equipment & Materials",
-  "Waiting on Equipment & Material",
-  "Warehouse: Equipment Arrived",
-  "Spec Out Project",
-  "Warehouse: Stage Equipment & Materials",
-  "Schedule Job",
+const SERVICE_STEPS = [
+  "Service Manager Inbox",
+  "Tech Support / Callbacks",
+  "Ongoing Service Issues",
+  "Create Repair Quotes",
+  "Kylee - Prepare Quote",
+  "Review Before Sending",
+  "Follow-Up On Quote | Brian",
+  "Follow-Up On Quote | App",
+  "Follow-Up On Quote | Christopher",
+  "Accepted Quotes",
+  "Transferred To Sales",
+  "Parts Needed to be Ordered",
+  "Waiting On Parts",
+  "Ready For Pick-Up",
+  "Take To Augusta",
+  "Parts Arrived",
+  "Return To Vendor",
+  "Pending Projects",
+  "Schedule",
+  "Assigned To Subcontractor",
+  "Follow up Work Required",
+  "Scheduled",
+  "Invoice & Collect Payment",
+  "Waiting On Payment",
+  "Completed Projects No Longer Under Warranty",
+  "Process Warranty",
+  "Completed Warranties",
+  "Maintenance Quotes",
+  "Incomplete Maintenance",
+  "Transferred to Installation",
+  "Declined Sales",
 ] as const;
 
-type InstallStep = typeof INSTALL_STEPS[number];
+type ServiceStep = typeof SERVICE_STEPS[number];
 
 const COLUMN_PREFIX = "column-";
 
-function getColumnId(step: InstallStep): string {
+function getColumnId(step: ServiceStep): string {
   return `${COLUMN_PREFIX}${step}`;
 }
 
-function getStepFromColumnId(columnId: string): InstallStep | null {
+function getStepFromColumnId(columnId: string): ServiceStep | null {
   if (columnId.startsWith(COLUMN_PREFIX)) {
-    const step = columnId.slice(COLUMN_PREFIX.length) as InstallStep;
-    if (INSTALL_STEPS.includes(step)) {
+    const step = columnId.slice(COLUMN_PREFIX.length) as ServiceStep;
+    if (SERVICE_STEPS.includes(step)) {
       return step;
     }
   }
@@ -160,7 +183,7 @@ function HorizontalScrollContainer({ children, className, isDraggingCard }: Hori
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        data-testid="kanban-board"
+        data-testid="service-kanban-board"
       >
         <div className="kanban-spacer" aria-hidden="true" />
         {children}
@@ -192,7 +215,7 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
     data: {
       type: "card",
       lead,
-      step: lead.installStep || INSTALL_STEPS[0],
+      step: lead.serviceStep || SERVICE_STEPS[0],
     }
   });
 
@@ -211,7 +234,7 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
       style={style}
       className="mb-2 cursor-pointer hover:shadow-md transition-shadow bg-white touch-manipulation"
       onClick={onClick}
-      data-testid={`card-job-${lead.id}`}
+      data-testid={`card-service-job-${lead.id}`}
       data-no-drag
     >
       <CardContent className="p-3">
@@ -221,12 +244,12 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
             {...listeners}
             className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
-            data-testid={`drag-handle-${lead.id}`}
+            data-testid={`service-drag-handle-${lead.id}`}
           >
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-sm truncate" data-testid={`text-job-name-${lead.id}`}>
+            <h4 className="font-semibold text-sm truncate" data-testid={`text-service-job-name-${lead.id}`}>
               {lead.name}
             </h4>
             {lead.address && (
@@ -281,7 +304,7 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
 }
 
 interface KanbanColumnProps {
-  step: InstallStep;
+  step: ServiceStep;
   leads: Lead[];
   technicians: Technician[];
   onCardClick: (lead: Lead) => void;
@@ -299,7 +322,7 @@ function KanbanColumn({ step, leads, technicians, onCardClick }: KanbanColumnPro
   });
 
   const sortedLeads = useMemo(() => {
-    return [...leads].sort((a, b) => (a.installOrder || 0) - (b.installOrder || 0));
+    return [...leads].sort((a, b) => (a.serviceOrder || 0) - (b.serviceOrder || 0));
   }, [leads]);
 
   return (
@@ -307,10 +330,10 @@ function KanbanColumn({ step, leads, technicians, onCardClick }: KanbanColumnPro
       <Card className={`h-full bg-gray-50 transition-colors ${isOver ? 'ring-2 ring-primary ring-opacity-50' : ''}`}>
         <CardHeader className="pb-2 pt-3 px-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold truncate" data-testid={`column-title-${step}`}>
+            <CardTitle className="text-sm font-semibold truncate" data-testid={`service-column-title-${step}`}>
               {step}
             </CardTitle>
-            <Badge variant="outline" className="ml-2 flex-shrink-0" data-testid={`column-count-${step}`}>
+            <Badge variant="outline" className="ml-2 flex-shrink-0" data-testid={`service-column-count-${step}`}>
               {leads.length}
             </Badge>
           </div>
@@ -329,7 +352,7 @@ function KanbanColumn({ step, leads, technicians, onCardClick }: KanbanColumnPro
                 ))}
               </SortableContext>
               {leads.length === 0 && (
-                <div className="text-center text-sm text-muted-foreground py-8" data-testid={`column-empty-${step}`}>
+                <div className="text-center text-sm text-muted-foreground py-8" data-testid={`service-column-empty-${step}`}>
                   No jobs
                 </div>
               )}
@@ -354,30 +377,26 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const startDayOfWeek = getDay(monthStart);
 
-  const getLeadDate = (lead: Lead): { date: Date; hasInstallDate: boolean } | null => {
-    if (lead.installDate) {
-      const date = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
-      return { date, hasInstallDate: true };
-    }
-    if (lead.installEnteredAt) {
-      const date = typeof lead.installEnteredAt === "string" ? parseISO(lead.installEnteredAt) : lead.installEnteredAt;
-      return { date, hasInstallDate: false };
+  const getLeadDate = (lead: Lead): { date: Date; hasServiceDate: boolean } | null => {
+    if (lead.serviceEnteredAt) {
+      const date = typeof lead.serviceEnteredAt === "string" ? parseISO(lead.serviceEnteredAt) : lead.serviceEnteredAt;
+      return { date, hasServiceDate: true };
     }
     if (lead.closedAt) {
       const date = typeof lead.closedAt === "string" ? parseISO(lead.closedAt) : lead.closedAt;
-      return { date, hasInstallDate: false };
+      return { date, hasServiceDate: false };
     }
     return null;
   };
 
   const leadsByDate = useMemo(() => {
-    const map: Record<string, { lead: Lead; hasInstallDate: boolean }[]> = {};
+    const map: Record<string, { lead: Lead; hasServiceDate: boolean }[]> = {};
     leads.forEach((lead) => {
       const dateInfo = getLeadDate(lead);
       if (dateInfo && isSameMonth(dateInfo.date, currentMonth)) {
         const key = format(dateInfo.date, "yyyy-MM-dd");
         if (!map[key]) map[key] = [];
-        map[key].push({ lead, hasInstallDate: dateInfo.hasInstallDate });
+        map[key].push({ lead, hasServiceDate: dateInfo.hasServiceDate });
       }
     });
     return map;
@@ -393,11 +412,11 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
           size="sm"
           onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
           className="min-h-[44px] min-w-[44px]"
-          data-testid="button-prev-month"
+          data-testid="button-service-prev-month"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <h2 className="text-lg font-semibold" data-testid="text-current-month">
+        <h2 className="text-lg font-semibold" data-testid="text-service-current-month">
           {format(currentMonth, "MMMM yyyy")}
         </h2>
         <Button
@@ -405,7 +424,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
           size="sm"
           onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
           className="min-h-[44px] min-w-[44px]"
-          data-testid="button-next-month"
+          data-testid="button-service-next-month"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -437,23 +456,23 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
                 "min-h-[80px] sm:min-h-[100px] lg:min-h-[110px] border rounded-md p-1 bg-card",
                 isToday && "ring-2 ring-primary"
               )}
-              data-testid={`calendar-day-${dateKey}`}
+              data-testid={`service-calendar-day-${dateKey}`}
             >
               <div className="text-xs font-medium text-muted-foreground mb-1">
                 {format(day, "d")}
               </div>
               <div className="space-y-1 overflow-y-auto max-h-[60px] sm:max-h-[80px] lg:max-h-[90px]">
-                {dayLeads.map(({ lead, hasInstallDate }) => (
+                {dayLeads.map(({ lead, hasServiceDate }) => (
                   <button
                     key={lead.id}
                     onClick={() => onCardClick(lead)}
                     className={cn(
                       "w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate min-h-[28px] flex items-center",
-                      hasInstallDate
+                      hasServiceDate
                         ? "bg-primary text-primary-foreground"
                         : "bg-yellow-400 text-yellow-900"
                     )}
-                    data-testid={`calendar-job-${lead.id}`}
+                    data-testid={`service-calendar-job-${lead.id}`}
                   >
                     <span className="truncate">{lead.name}</span>
                   </button>
@@ -467,25 +486,25 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
       <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground max-w-4xl mx-auto">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-primary" />
-          <span>Scheduled (Install Date)</span>
+          <span>Service Entry Date</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-yellow-400" />
-          <span>Needs Date</span>
+          <span>Closed Date</span>
         </div>
       </div>
     </div>
   );
 }
 
-export default function Installation() {
+export default function ServicePipeline() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("all");
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
-  const [editForm, setEditForm] = useState({ installStep: "", clientIssue: "", assignedEmployeeId: "", installDate: undefined as Date | undefined });
+  const [editForm, setEditForm] = useState({ serviceStep: "", clientIssue: "", assignedEmployeeId: "" });
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { installStep?: string; installOrder?: number }>>({});
+  const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { serviceStep?: string; serviceOrder?: number }>>({});
   const [activeView, setActiveView] = useState<"kanban" | "calendar">("kanban");
 
   const sensors = useSensors(
@@ -493,20 +512,13 @@ export default function Installation() {
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   );
 
-  const { data: allLeads = [], isLoading: isLoadingLeads } = useQuery<Lead[]>({
-    queryKey: ["/api/leads"],
+  const { data: serviceLeads = [], isLoading: isLoadingLeads } = useQuery<Lead[]>({
+    queryKey: ["/api/service-leads"],
   });
 
   const { data: technicians = [] } = useQuery<Technician[]>({
     queryKey: ["/api/technicians"],
   });
-
-  const salesPeople = useMemo(() => {
-    return technicians.filter((tech) => 
-      tech.name.toLowerCase().includes("chandler") || 
-      tech.name.toLowerCase().includes("earnest")
-    );
-  }, [technicians]);
 
   const { data: linkedQuote, isLoading: isLoadingQuote } = useQuery<Quote>({
     queryKey: ["/api/quotes", editingLead?.quoteId],
@@ -529,40 +541,32 @@ export default function Installation() {
 
   const updateLeadMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Lead> }) => {
-      const res = await apiRequest("PATCH", `/api/leads/${id}`, data);
+      const res = await apiRequest("PATCH", `/api/service-leads/${id}`, data);
       return res.json();
     },
     onSuccess: (_, variables) => {
       clearOptimisticUpdate(variables.id);
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-leads"] });
     },
     onError: (_, variables) => {
       clearOptimisticUpdate(variables.id);
       toast({ description: "Failed to update job", variant: "destructive" });
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-leads"] });
     },
   });
 
   const leadsWithOptimisticUpdates = useMemo(() => {
-    return allLeads.map((lead) => {
+    return serviceLeads.map((lead) => {
       const update = optimisticUpdates[lead.id];
       if (update) {
         return { ...lead, ...update };
       }
       return lead;
     });
-  }, [allLeads, optimisticUpdates]);
-
-  const installationLeads = useMemo(() => {
-    return leadsWithOptimisticUpdates.filter((lead) => {
-      if (lead.status !== "Won") return false;
-      if (!lead.tags || !Array.isArray(lead.tags)) return false;
-      return lead.tags.some((tag) => tag.toLowerCase() === "installation");
-    });
-  }, [leadsWithOptimisticUpdates]);
+  }, [serviceLeads, optimisticUpdates]);
 
   const filteredLeads = useMemo(() => {
-    return installationLeads.filter((lead) => {
+    return leadsWithOptimisticUpdates.filter((lead) => {
       if (selectedEmployeeId !== "all" && lead.assignedEmployeeId !== selectedEmployeeId) {
         return false;
       }
@@ -574,19 +578,19 @@ export default function Installation() {
       }
       return true;
     });
-  }, [installationLeads, selectedEmployeeId, searchQuery]);
+  }, [leadsWithOptimisticUpdates, selectedEmployeeId, searchQuery]);
 
   const leadsByStep = useMemo(() => {
-    const grouped: Record<InstallStep, Lead[]> = {} as Record<InstallStep, Lead[]>;
-    INSTALL_STEPS.forEach((step) => {
+    const grouped: Record<ServiceStep, Lead[]> = {} as Record<ServiceStep, Lead[]>;
+    SERVICE_STEPS.forEach((step) => {
       grouped[step] = [];
     });
     filteredLeads.forEach((lead) => {
-      const step = (lead.installStep as InstallStep) || INSTALL_STEPS[0];
-      if (INSTALL_STEPS.includes(step)) {
+      const step = (lead.serviceStep as ServiceStep) || SERVICE_STEPS[0];
+      if (SERVICE_STEPS.includes(step)) {
         grouped[step].push(lead);
       } else {
-        grouped[INSTALL_STEPS[0]].push(lead);
+        grouped[SERVICE_STEPS[0]].push(lead);
       }
     });
     return grouped;
@@ -613,8 +617,8 @@ export default function Installation() {
     const draggedLead = filteredLeads.find((l) => l.id === activeLeadId);
     if (!draggedLead) return;
 
-    const currentStep = (draggedLead.installStep as InstallStep) || INSTALL_STEPS[0];
-    let targetStep: InstallStep | null = null;
+    const currentStep = (draggedLead.serviceStep as ServiceStep) || SERVICE_STEPS[0];
+    let targetStep: ServiceStep | null = null;
     let overCardId: string | null = null;
 
     const stepFromColumn = getStepFromColumnId(overId);
@@ -623,7 +627,7 @@ export default function Installation() {
     } else {
       const overLead = filteredLeads.find((l) => l.id === overId);
       if (overLead) {
-        targetStep = (overLead.installStep as InstallStep) || INSTALL_STEPS[0];
+        targetStep = (overLead.serviceStep as ServiceStep) || SERVICE_STEPS[0];
         overCardId = overId;
       }
     }
@@ -631,10 +635,10 @@ export default function Installation() {
     if (!targetStep) return;
 
     const sameColumn = currentStep === targetStep;
-    const currentColumnLeads = [...leadsByStep[currentStep]].sort((a, b) => (a.installOrder || 0) - (b.installOrder || 0));
+    const currentColumnLeads = [...leadsByStep[currentStep]].sort((a, b) => (a.serviceOrder || 0) - (b.serviceOrder || 0));
     const targetColumnLeads = sameColumn 
       ? currentColumnLeads 
-      : [...leadsByStep[targetStep]].sort((a, b) => (a.installOrder || 0) - (b.installOrder || 0));
+      : [...leadsByStep[targetStep]].sort((a, b) => (a.serviceOrder || 0) - (b.serviceOrder || 0));
 
     if (sameColumn) {
       if (!overCardId || activeLeadId === overCardId) return;
@@ -646,10 +650,10 @@ export default function Installation() {
 
       const reordered = arrayMove(currentColumnLeads, oldIndex, newIndex);
       
-      const updates: Record<string, { installOrder: number }> = {};
+      const updates: Record<string, { serviceOrder: number }> = {};
       reordered.forEach((lead, index) => {
-        if ((lead.installOrder || 0) !== index) {
-          updates[lead.id] = { installOrder: index };
+        if ((lead.serviceOrder || 0) !== index) {
+          updates[lead.id] = { serviceOrder: index };
         }
       });
 
@@ -661,18 +665,6 @@ export default function Installation() {
         });
       }
     } else {
-      // Validate: require install date when moving to or past "Assign to Sub-Contractor"
-      const targetStepIndex = INSTALL_STEPS.indexOf(targetStep);
-      const assignToSubContractorIndex = INSTALL_STEPS.indexOf("Assign to Sub-Contractor");
-      if (targetStepIndex >= assignToSubContractorIndex && !draggedLead.installDate) {
-        toast({
-          title: "Install Date Required",
-          description: "Please click on the job card and set an install date before moving to 'Assign to Sub-Contractor' or beyond.",
-          variant: "destructive",
-        });
-        return;
-      }
-
       let newOrder: number;
       if (overCardId) {
         const overIndex = targetColumnLeads.findIndex((l) => l.id === overCardId);
@@ -683,51 +675,34 @@ export default function Installation() {
 
       setOptimisticUpdates((prev) => ({
         ...prev,
-        [activeLeadId]: { installStep: targetStep, installOrder: newOrder },
+        [activeLeadId]: { serviceStep: targetStep, serviceOrder: newOrder },
       }));
 
       updateLeadMutation.mutate({
         id: activeLeadId,
-        data: { installStep: targetStep, installOrder: newOrder },
+        data: { serviceStep: targetStep, serviceOrder: newOrder },
       });
     }
   };
 
   const openEditDialog = (lead: Lead) => {
     setEditingLead(lead);
-    const installDateValue = lead.installDate
-      ? (typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate)
-      : undefined;
     setEditForm({
-      installStep: lead.installStep || INSTALL_STEPS[0],
+      serviceStep: lead.serviceStep || SERVICE_STEPS[0],
       clientIssue: lead.clientIssue || "",
       assignedEmployeeId: lead.assignedEmployeeId || "unassigned",
-      installDate: installDateValue,
     });
   };
 
   const handleSaveEdit = () => {
     if (!editingLead) return;
     
-    // Require install date when moving to or past "Assign to Sub-Contractor"
-    const stepIndex = INSTALL_STEPS.indexOf(editForm.installStep as InstallStep);
-    const assignToSubContractorIndex = INSTALL_STEPS.indexOf("Assign to Sub-Contractor");
-    if (stepIndex >= assignToSubContractorIndex && !editForm.installDate) {
-      toast({
-        title: "Install Date Required",
-        description: "Please set an install date before moving to 'Assign to Sub-Contractor' or beyond.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     updateLeadMutation.mutate({
       id: editingLead.id,
       data: {
-        installStep: editForm.installStep,
+        serviceStep: editForm.serviceStep,
         clientIssue: editForm.clientIssue,
         assignedEmployeeId: editForm.assignedEmployeeId === "unassigned" ? null : editForm.assignedEmployeeId,
-        installDate: editForm.installDate ? editForm.installDate.toISOString() : null,
       },
     });
     setEditingLead(null);
@@ -742,11 +717,11 @@ export default function Installation() {
               src={redlogo}
               alt="Giesbrecht HVAC"
               className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
-              data-testid="img-company-logo"
+              data-testid="img-service-company-logo"
             />
             <div className="min-w-0">
               <NavDropdown
-                currentPageTitle="Installation"
+                currentPageTitle="Service Pipeline"
                 items={[
                   { label: "Home", path: "/" },
                   { label: "Service Quote", path: "/quote" },
@@ -769,7 +744,7 @@ export default function Installation() {
       <main className="p-3 sm:p-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
           <Link href="/">
-            <Button variant="ghost" size="sm" className="min-h-[44px] min-w-[44px]" data-testid="button-back">
+            <Button variant="ghost" size="sm" className="min-h-[44px] min-w-[44px]" data-testid="button-service-back">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
@@ -783,16 +758,16 @@ export default function Installation() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 w-full sm:w-64 min-h-[44px]"
-                data-testid="input-search"
+                data-testid="input-service-search"
               />
             </div>
             <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-              <SelectTrigger className="w-full sm:w-48 min-h-[44px]" data-testid="select-employee-filter">
+              <SelectTrigger className="w-full sm:w-48 min-h-[44px]" data-testid="select-service-employee-filter">
                 <SelectValue placeholder="Filter by employee" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Employees</SelectItem>
-                {salesPeople.map((tech) => (
+                {technicians.map((tech) => (
                   <SelectItem key={tech.id} value={tech.id}>
                     {tech.name}
                   </SelectItem>
@@ -803,12 +778,12 @@ export default function Installation() {
         </div>
 
         <Tabs value={activeView} onValueChange={(v) => setActiveView(v as "kanban" | "calendar")} className="mb-4">
-          <TabsList className="grid w-full max-w-sm grid-cols-2 h-12 py-0 px-[3px] mx-auto" data-testid="tabs-view-switcher">
-            <TabsTrigger value="kanban" className="min-h-[44px] pt-0 pb-0" data-testid="tab-kanban">
+          <TabsList className="grid w-full max-w-sm grid-cols-2 h-12 py-0 px-[3px] mx-auto" data-testid="tabs-service-view-switcher">
+            <TabsTrigger value="kanban" className="min-h-[44px] pt-0 pb-0" data-testid="tab-service-kanban">
               <LayoutGrid className="h-4 w-4 mr-2" />
               Kanban
             </TabsTrigger>
-            <TabsTrigger value="calendar" className="min-h-[44px] pt-0 pb-0" data-testid="tab-calendar">
+            <TabsTrigger value="calendar" className="min-h-[44px] pt-0 pb-0" data-testid="tab-service-calendar">
               <CalendarDays className="h-4 w-4 mr-2" />
               Calendar
             </TabsTrigger>
@@ -817,7 +792,7 @@ export default function Installation() {
           <TabsContent value="kanban" className="mt-4">
             {isLoadingLeads ? (
               <HorizontalScrollContainer>
-                {INSTALL_STEPS.map((step) => (
+                {SERVICE_STEPS.slice(0, 8).map((step) => (
                   <div key={step} className="flex-shrink-0 w-72 sm:w-80 snap-start sm:snap-center">
                     <Card className="h-[400px]">
                       <CardHeader className="pb-2 pt-3 px-3">
@@ -833,8 +808,8 @@ export default function Installation() {
               </HorizontalScrollContainer>
             ) : filteredLeads.length === 0 ? (
               <div className="flex items-center justify-center h-64">
-                <p className="text-muted-foreground text-center" data-testid="text-empty-state">
-                  No installation jobs found in Won status.
+                <p className="text-muted-foreground text-center" data-testid="text-service-empty-state">
+                  No service jobs found. Mark a lead as Won with a Service job type to add it here.
                 </p>
               </div>
             ) : (
@@ -845,12 +820,12 @@ export default function Installation() {
                 onDragEnd={handleDragEnd}
               >
                 <HorizontalScrollContainer isDraggingCard={!!activeId}>
-                  {INSTALL_STEPS.map((step) => (
+                  {SERVICE_STEPS.map((step) => (
                     <KanbanColumn
                       key={step}
                       step={step}
                       leads={leadsByStep[step]}
-                      technicians={salesPeople}
+                      technicians={technicians}
                       onCardClick={openEditDialog}
                     />
                   ))}
@@ -895,7 +870,7 @@ export default function Installation() {
       </main>
 
       <Dialog open={!!editingLead} onOpenChange={(open) => !open && setEditingLead(null)}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" data-testid="dialog-edit-job">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" data-testid="dialog-service-edit-job">
           <DialogHeader>
             <DialogTitle className="text-lg">{editingLead?.name}</DialogTitle>
           </DialogHeader>
@@ -943,96 +918,6 @@ export default function Installation() {
               </div>
             </div>
 
-            {/* Equipment Details from Proposal Builder */}
-            {editingLead?.quoteDetails && (() => {
-              try {
-                const details = JSON.parse(editingLead.quoteDetails);
-                if (details.equipment && details.equipment.length > 0) {
-                  return (
-                    <div className="space-y-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                      <h4 className="text-sm font-semibold text-green-800 dark:text-green-200 uppercase tracking-wide flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        Accepted Equipment
-                      </h4>
-                      <div className="space-y-3">
-                        {details.equipment.map((item: any, idx: number) => (
-                          <div key={idx} className="bg-white dark:bg-gray-900 rounded p-2 border">
-                            {item.type === "custom" ? (
-                              <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Badge className="bg-green-500 text-white text-xs">
-                                    <Wrench className="h-3 w-3 mr-1" />
-                                    Custom Build
-                                  </Badge>
-                                  <span className="text-xs text-muted-foreground">{item.tonnage}</span>
-                                </div>
-                                <div className="text-xs text-muted-foreground space-y-0.5">
-                                  <p>• {item.outdoor?.brand} {item.outdoor?.name}</p>
-                                  <p>• {item.coil?.brand} {item.coil?.name}</p>
-                                  <p>• {item.indoor?.brand} {item.indoor?.name}</p>
-                                  <p>• {item.thermostat?.brand} {item.thermostat?.name}</p>
-                                </div>
-                                <p className="text-sm font-medium text-primary mt-1">
-                                  ${item.priceLow?.toLocaleString()} - ${item.priceHigh?.toLocaleString()}
-                                </p>
-                              </div>
-                            ) : (
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-xs">{item.packageLevel}</Badge>
-                                  <span className="text-xs text-muted-foreground">{item.tonnage}</span>
-                                </div>
-                                <p className="font-medium text-sm mt-1">{item.unitTypeName} ({item.tier})</p>
-                                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                                  <p>• {item.outdoor?.brand} {item.outdoor?.name}</p>
-                                  {item.indoor?.name && <p>• {item.indoor.name}</p>}
-                                  {item.thermostat?.name && <p>• {item.thermostat.name}</p>}
-                                </div>
-                                <p className="text-sm font-medium text-primary mt-1">
-                                  ${item.totalPrice?.toLocaleString()}
-                                  {item.monthlyPayment > 0 && (
-                                    <span className="text-xs text-muted-foreground ml-2">
-                                      (${item.monthlyPayment?.toLocaleString()}/mo)
-                                    </span>
-                                  )}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      {details.pricing && (
-                        <div className="pt-2 border-t border-green-200 dark:border-green-700">
-                          {details.hasCustomBuilds ? (
-                            <>
-                              <p className="text-sm font-bold text-green-800 dark:text-green-200">
-                                Total: ${details.pricing.totalLow?.toLocaleString()} - ${details.pricing.totalHigh?.toLocaleString()}
-                              </p>
-                              <p className="text-xs text-green-700 dark:text-green-300">
-                                Monthly: ${details.pricing.monthlyLow?.toLocaleString()} - ${details.pricing.monthlyHigh?.toLocaleString()}/mo
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="text-sm font-bold text-green-800 dark:text-green-200">
-                                Total: ${details.pricing.totalHigh?.toLocaleString()}
-                              </p>
-                              <p className="text-xs text-green-700 dark:text-green-300">
-                                Monthly: ${details.pricing.monthlyHigh?.toLocaleString()}/mo
-                              </p>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-                return null;
-              } catch {
-                return null;
-              }
-            })()}
-
             {editingLead?.quoteId && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
                 <h4 className="text-sm font-semibold text-blue-800 uppercase tracking-wide flex items-center gap-2">
@@ -1060,21 +945,8 @@ export default function Installation() {
                         {linkedQuote.status}
                       </Badge>
                     </div>
-                    {linkedQuote.parts && (linkedQuote.parts as any[]).length > 0 && (
-                      <div className="mt-2 pt-2 border-t">
-                        <span className="text-muted-foreground text-xs">Parts:</span>
-                        <ul className="list-disc list-inside text-xs text-muted-foreground mt-1">
-                          {(linkedQuote.parts as any[]).slice(0, 3).map((part: any, i: number) => (
-                            <li key={i} className="truncate">{part.description}</li>
-                          ))}
-                          {(linkedQuote.parts as any[]).length > 3 && (
-                            <li className="text-muted-foreground">+{(linkedQuote.parts as any[]).length - 3} more</li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
                     <Link href={`/quote/edit/${linkedQuote.id}`}>
-                      <Button variant="outline" size="sm" className="w-full mt-2 min-h-[36px]" data-testid="button-view-quote">
+                      <Button variant="outline" size="sm" className="w-full mt-2 min-h-[36px]" data-testid="button-service-view-quote">
                         <ExternalLink className="h-3 w-3 mr-2" />
                         View Full Quote
                       </Button>
@@ -1087,19 +959,19 @@ export default function Installation() {
             )}
 
             <div className="border-t pt-4 space-y-4">
-              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Edit Job</h4>
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Edit Service Job</h4>
               
               <div className="space-y-2">
-                <Label htmlFor="installStep">Installation Step</Label>
+                <Label htmlFor="serviceStep">Service Step</Label>
                 <Select
-                  value={editForm.installStep}
-                  onValueChange={(value) => setEditForm({ ...editForm, installStep: value })}
+                  value={editForm.serviceStep}
+                  onValueChange={(value) => setEditForm({ ...editForm, serviceStep: value })}
                 >
-                  <SelectTrigger id="installStep" className="min-h-[44px]" data-testid="select-install-step">
+                  <SelectTrigger id="serviceStep" className="min-h-[44px]" data-testid="select-service-step">
                     <SelectValue placeholder="Select step" />
                   </SelectTrigger>
                   <SelectContent>
-                    {INSTALL_STEPS.map((step) => (
+                    {SERVICE_STEPS.map((step) => (
                       <SelectItem key={step} value={step}>
                         {step}
                       </SelectItem>
@@ -1109,45 +981,17 @@ export default function Installation() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="installDate">Installation Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="installDate"
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal min-h-[44px]",
-                        !editForm.installDate && "text-muted-foreground"
-                      )}
-                      data-testid="button-install-date"
-                    >
-                      <CalendarDays className="mr-2 h-4 w-4" />
-                      {editForm.installDate ? format(editForm.installDate, "PPP") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={editForm.installDate}
-                      onSelect={(date) => setEditForm({ ...editForm, installDate: date })}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="assignedEmployee">Assigned Employee</Label>
                 <Select
                   value={editForm.assignedEmployeeId}
                   onValueChange={(value) => setEditForm({ ...editForm, assignedEmployeeId: value })}
                 >
-                  <SelectTrigger id="assignedEmployee" className="min-h-[44px]" data-testid="select-assigned-employee">
+                  <SelectTrigger id="assignedEmployee" className="min-h-[44px]" data-testid="select-service-assigned-employee">
                     <SelectValue placeholder="Select employee" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {salesPeople.map((tech) => (
+                    {technicians.map((tech) => (
                       <SelectItem key={tech.id} value={tech.id}>
                         {tech.name}
                       </SelectItem>
@@ -1161,20 +1005,20 @@ export default function Installation() {
                   id="notes"
                   value={editForm.clientIssue}
                   onChange={(e) => setEditForm({ ...editForm, clientIssue: e.target.value })}
-                  placeholder="Add notes about this job..."
+                  placeholder="Add notes about this service job..."
                   rows={3}
                   className="min-h-[80px]"
-                  data-testid="textarea-notes"
+                  data-testid="textarea-service-notes"
                 />
               </div>
             </div>
           </div>
           
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setEditingLead(null)} className="min-h-[44px]" data-testid="button-cancel">
+            <Button variant="outline" onClick={() => setEditingLead(null)} className="min-h-[44px]" data-testid="button-service-cancel">
               Cancel
             </Button>
-            <Button onClick={handleSaveEdit} className="min-h-[44px]" data-testid="button-save">
+            <Button onClick={handleSaveEdit} className="min-h-[44px]" data-testid="button-service-save">
               Save Changes
             </Button>
           </DialogFooter>

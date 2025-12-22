@@ -938,6 +938,7 @@ export default function ProposalBuilder() {
                   { label: "Processes and Systems", path: "/processes" },
                   { label: "Sales Prospects", path: "/sales-prospects" },
                   { label: "Installation", path: "/installation" },
+                  { label: "Service Pipeline", path: "/service-pipeline" },
                   { label: "Proposal Builder", path: "/proposal" },
                 ]}
               />

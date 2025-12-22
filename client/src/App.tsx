@@ -14,6 +14,7 @@ import PriceBook from "@/pages/price-book";
 import SalesProspects from "@/pages/sales-prospects";
 import CreateLeadPage from "@/pages/create-lead";
 import Installation from "@/pages/installation";
+import ServicePipeline from "@/pages/service-pipeline";
 import ProposalBuilder from "@/pages/proposal-builder";
 import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
@@ -46,6 +47,7 @@ function Router() {
       <Route path="/sales-prospects" component={SalesProspects} />
       <Route path="/sales-prospects/create" component={CreateLeadPage} />
       <Route path="/installation" component={Installation} />
+      <Route path="/service-pipeline" component={ServicePipeline} />
       <Route path="/proposal" component={ProposalBuilder} />
       <Route path="/admin" component={AdminSettingsWrapper} />
       <Route component={NotFound} />

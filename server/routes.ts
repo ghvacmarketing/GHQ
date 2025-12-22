@@ -2403,12 +2403,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Lead not found" });
       }
 
-      const updatedLead = await storage.updateLead(req.params.id, {
+      const updateData: any = {
         won: true,
         lost: false,
         closedAt: new Date(),
         status: "Won"
-      });
+      };
+
+      // Check if jobType contains "Service" to add to service pipeline
+      const jobType = lead.jobType || "";
+      if (jobType.toLowerCase().includes("service")) {
+        updateData.serviceStep = "Service Manager Inbox";
+        updateData.serviceEnteredAt = new Date();
+        updateData.serviceOrder = 0;
+        // Add "Service" to tags if not already present
+        const currentTags = lead.tags || [];
+        if (!currentTags.some((tag: string) => tag.toLowerCase() === "service")) {
+          updateData.tags = [...currentTags, "Service"];
+        }
+      }
+
+      const updatedLead = await storage.updateLead(req.params.id, updateData);
       
       // Create history entry for marking won
       const actor = (req.session as any)?.user?.phone || "system";
@@ -2653,6 +2668,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error adding lead history:', error);
       res.status(500).json({ message: "Error adding lead history" });
+    }
+  });
+
+  // =============================================================================
+  // SERVICE PIPELINE ROUTES
+  // =============================================================================
+
+  // GET /api/service-leads - Get all leads in the service pipeline
+  app.get("/api/service-leads", async (req, res) => {
+    try {
+      const serviceLeads = await storage.getServiceLeads();
+      res.json(serviceLeads);
+    } catch (error) {
+      console.error('Error fetching service leads:', error);
+      res.status(500).json({ message: "Error fetching service leads" });
+    }
+  });
+
+  // PATCH /api/service-leads/:id - Update a service lead
+  app.patch("/api/service-leads/:id", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const { serviceStep, serviceOrder, clientIssue, assignedEmployeeId } = req.body;
+      const updates: any = { updatedAt: new Date() };
+      
+      if (serviceStep !== undefined) updates.serviceStep = serviceStep;
+      if (serviceOrder !== undefined) updates.serviceOrder = serviceOrder;
+      if (clientIssue !== undefined) updates.clientIssue = clientIssue;
+      if (assignedEmployeeId !== undefined) updates.assignedEmployeeId = assignedEmployeeId === 'unassigned' ? null : assignedEmployeeId;
+
+      const updatedLead = await storage.updateServiceLead(req.params.id, updates);
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error updating service lead:', error);
+      res.status(500).json({ message: "Error updating service lead" });
     }
   });
 
