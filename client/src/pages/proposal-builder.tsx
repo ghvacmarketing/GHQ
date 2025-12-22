@@ -90,8 +90,8 @@ const UNIT_TYPE_INFO: Record<string, { name: string; description: string; icon: 
   SGA: { name: "SGA", description: "Split Gas Air system for heating and cooling", icon: Thermometer },
   SHP: { name: "SHP", description: "All-electric heating and cooling solution", icon: Zap },
   STA: { name: "Heat Pump + Gas Furnace", description: "Dual fuel system for maximum efficiency", icon: Award },
-  PHP: { name: "Heat Pump Package", description: "All-in-one packaged heat pump unit", icon: Package },
-  GP: { name: "Gas Package", description: "All-in-one gas/electric package unit", icon: Package },
+  PHP: { name: "PHP", description: "All-in-one packaged heat pump unit", icon: Package },
+  GP: { name: "GP", description: "All-in-one gas/electric package unit", icon: Package },
 };
 
 const TIER_INFO: Record<string, { description: string }> = {
