@@ -1531,8 +1531,8 @@ export default function ProposalBuilder() {
       </main>
 
       <Dialog open={quoteDialogOpen} onOpenChange={setQuoteDialogOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[95vh] p-0 overflow-hidden">
-          <div className="bg-gradient-to-r from-red-700 to-red-800 text-white p-4 sm:p-6">
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] p-0 overflow-hidden flex flex-col">
+          <div className="bg-gradient-to-r from-red-700 to-red-800 text-white p-4 sm:p-6 shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <img
@@ -1551,7 +1551,7 @@ export default function ProposalBuilder() {
             </div>
           </div>
           
-          <ScrollArea className="max-h-[calc(95vh-200px)] p-4 sm:p-6">
+          <ScrollArea className="flex-1 min-h-0 p-4 sm:p-6">
             {/* Customer Search Section */}
             <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
               <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-3 flex items-center gap-2">
@@ -1763,7 +1763,7 @@ export default function ProposalBuilder() {
             </div>
           </ScrollArea>
           
-          <div className="border-t p-4 bg-card">
+          <div className="border-t p-4 bg-card shrink-0">
             <div className="flex flex-col sm:flex-row gap-2">
               <Button
                 variant="outline"
