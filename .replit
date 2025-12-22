@@ -48,3 +48,6 @@ FIELDEDGE_CUSTOMER_SHEET_ID = "1POeQRuDUTia0BUYsVmEsBOqW6BDBvfL5qyKv-GQICU0"
 
 [userenv.development]
 SKIP_GLOBAL_AUTH = "true"
+
+[userenv.production]
+SKIP_GLOBAL_AUTH = "true"
