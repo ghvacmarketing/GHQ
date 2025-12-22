@@ -422,20 +422,20 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
       if (!dateRange) return;
       
       const { startDate, endDate, hasInstallDate } = dateRange;
+      const effectiveEnd = endDate || startDate;
       
-      const effectiveStart = isSameMonth(startDate, currentMonth) ? startDate : monthStart;
-      const effectiveEnd = endDate 
-        ? (isSameMonth(endDate, currentMonth) ? endDate : monthEnd)
-        : (isSameMonth(startDate, currentMonth) ? startDate : null);
-      
-      if (!effectiveEnd) return;
-      if (!isSameMonth(effectiveStart, currentMonth) && !isSameMonth(effectiveEnd, currentMonth)) return;
+      // Check if event overlaps with current month at all
+      if (effectiveEnd < monthStart || startDate > monthEnd) return;
       
       const isMultiDay = endDate && endDate > startDate;
       
       if (isMultiDay) {
-        const startCellIndex = getCellIndex(effectiveStart);
-        const endCellIndex = getCellIndex(effectiveEnd);
+        // Clamp the event dates to the visible month
+        const visibleStart = startDate < monthStart ? monthStart : startDate;
+        const visibleEnd = effectiveEnd > monthEnd ? monthEnd : effectiveEnd;
+        
+        const startCellIndex = getCellIndex(visibleStart);
+        const endCellIndex = getCellIndex(visibleEnd);
         
         const startWeek = Math.floor(startCellIndex / 7);
         const endWeek = Math.floor(endCellIndex / 7);
@@ -456,14 +456,17 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
             weekIndex: week,
             startCol,
             span,
-            isStart: barStartCell === startCellIndex && isSameMonth(startDate, currentMonth),
-            isEnd: barEndCell === endCellIndex && isSameMonth(endDate, currentMonth),
+            isStart: isSameDay(visibleStart, startDate),
+            isEnd: isSameDay(visibleEnd, effectiveEnd),
           });
         }
       } else {
-        const dateKey = format(effectiveStart, "yyyy-MM-dd");
-        if (!singles[dateKey]) singles[dateKey] = [];
-        singles[dateKey].push({ lead, hasInstallDate });
+        // Single day event - only show if it's in the current month
+        if (isSameMonth(startDate, currentMonth)) {
+          const dateKey = format(startDate, "yyyy-MM-dd");
+          if (!singles[dateKey]) singles[dateKey] = [];
+          singles[dateKey].push({ lead, hasInstallDate });
+        }
       }
     });
     
