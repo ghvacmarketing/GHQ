@@ -256,6 +256,15 @@ export default function ProposalBuilder() {
     return Array.from(new Set(packages.filter(p => p.unitType === selectedUnitType).map(p => p.tier)));
   }, [selectedUnitType]);
 
+  // Auto-select tier if there's only one (skip step 2)
+  useEffect(() => {
+    if (selectedUnitType && tiersForUnitType.length === 1 && !selectedTier) {
+      setSelectedTier(tiersForUnitType[0]);
+    }
+  }, [selectedUnitType, tiersForUnitType, selectedTier]);
+
+  const hasSingleTier = tiersForUnitType.length === 1;
+
   const tonnagesForSelection = useMemo(() => {
     if (!selectedUnitType || !selectedTier) return [];
     const filteredPackages = packages.filter(
@@ -377,10 +386,12 @@ export default function ProposalBuilder() {
 
   const currentStep = useMemo(() => {
     if (!selectedUnitType) return 1;
-    if (!selectedTier) return 2;
-    if (!selectedTonnage) return 3;
-    return 4;
-  }, [selectedUnitType, selectedTier, selectedTonnage]);
+    if (!selectedTier) return hasSingleTier ? 2 : 2; // Will auto-select if single tier
+    if (!selectedTonnage) return hasSingleTier ? 2 : 3;
+    return hasSingleTier ? 3 : 4;
+  }, [selectedUnitType, selectedTier, selectedTonnage, hasSingleTier]);
+
+  const totalSteps = hasSingleTier ? 3 : 4;
 
   const customBuildStep = useMemo(() => {
     if (!customTonnage) return 1;
@@ -464,7 +475,13 @@ export default function ProposalBuilder() {
     if (selectedTonnage) {
       setSelectedTonnage(null);
     } else if (selectedTier) {
-      setSelectedTier(null);
+      // If single tier, go back to unit type selection
+      if (hasSingleTier) {
+        setSelectedTier(null);
+        setSelectedUnitType(null);
+      } else {
+        setSelectedTier(null);
+      }
     } else if (selectedUnitType) {
       setSelectedUnitType(null);
     }
@@ -935,7 +952,7 @@ export default function ProposalBuilder() {
                 </Link>
               )}
               <div className="text-sm text-muted-foreground flex items-center">
-                <span className="font-medium">Step {currentStep} of 4</span>
+                <span className="font-medium">Step {currentStep} of {totalSteps}</span>
                 {selectedUnitType && (
                   <>
                     <ChevronRight className="h-3 w-3 mx-1" />
@@ -996,7 +1013,7 @@ export default function ProposalBuilder() {
               </div>
             )}
 
-            {currentStep === 2 && (
+            {currentStep === 2 && !hasSingleTier && (
               <div>
                 <h2 className="text-xl font-semibold mb-2">Select Tier</h2>
                 <p className="text-muted-foreground mb-4">Choose your preferred quality tier</p>
@@ -1028,7 +1045,7 @@ export default function ProposalBuilder() {
               </div>
             )}
 
-            {currentStep === 3 && (
+            {((currentStep === 3 && !hasSingleTier) || (currentStep === 2 && hasSingleTier)) && (
               <div>
                 <h2 className="text-xl font-semibold mb-2">Select Tonnage</h2>
                 <p className="text-muted-foreground mb-4">Choose the system capacity</p>
@@ -1057,7 +1074,7 @@ export default function ProposalBuilder() {
               </div>
             )}
 
-            {currentStep === 4 && (
+            {((currentStep === 4 && !hasSingleTier) || (currentStep === 3 && hasSingleTier)) && (
               <div>
                 <h2 className="text-xl font-semibold mb-2">Select Package</h2>
                 <p className="text-muted-foreground mb-4">
@@ -1339,7 +1356,7 @@ export default function ProposalBuilder() {
           </TabsContent>
         </Tabs>
 
-        {cart.length > 0 && !cartOpen && activeTab === "preset" && currentStep < 4 && (
+        {cart.length > 0 && !cartOpen && activeTab === "preset" && currentStep < totalSteps && (
           <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80">
             <Button
               className="w-full min-h-[52px] shadow-lg"
