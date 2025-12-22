@@ -287,15 +287,19 @@ export default function ProposalBuilder() {
     });
   }, [selectedUnitType, selectedTier, selectedTonnage]);
 
-  // Filter outdoor units by tonnage (AC, Heat Pump have tonnage in model numbers)
+  // Filter outdoor units by tonnage (AC, Heat Pump have tonnage in model numbers) - dedupe by model
   const outdoorUnitOptions = useMemo(() => {
     if (!customTonnage) return [];
+    const seen = new Set<string>();
     return components.filter(comp => {
       const compTonnage = extractTonnageFromModel(comp.model);
       const matchesTonnage = compTonnage === customTonnage;
       const matchesType = OUTDOOR_UNIT_TYPES.includes(comp.componentType);
       const matchesBrand = outdoorBrandFilter === "All Brands" || comp.brand === outdoorBrandFilter;
-      return matchesTonnage && matchesType && matchesBrand;
+      if (!matchesTonnage || !matchesType || !matchesBrand) return false;
+      if (seen.has(comp.model)) return false;
+      seen.add(comp.model);
+      return true;
     });
   }, [customTonnage, outdoorBrandFilter]);
 
