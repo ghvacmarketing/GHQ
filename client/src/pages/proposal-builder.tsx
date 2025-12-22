@@ -288,7 +288,11 @@ export default function ProposalBuilder() {
       email?: string;
       address?: string;
       estimatedValue: number;
-      cartItems: { description: string }[];
+      equipmentDetails: unknown[];
+      totalLow: number;
+      totalHigh: number;
+      monthlyLow: number;
+      monthlyHigh: number;
       notes?: string;
     }) => {
       const res = await apiRequest("POST", "/api/proposals/accept", data);
@@ -335,14 +339,62 @@ export default function ProposalBuilder() {
       return;
     }
 
-    const cartItems = cart.map(item => {
+    const equipmentDetails = cart.map(item => {
       if (item.isCustomBuild) {
+        const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
         return {
-          description: `Custom ${item.tonnage} System: ${item.outdoorUnit.brand} ${item.outdoorUnit.unitName}, ${item.coil.brand} ${item.coil.unitName}, ${item.indoorUnit.brand} ${item.indoorUnit.unitName}, ${item.thermostat.brand} ${item.thermostat.unitName}`,
+          type: "custom",
+          tonnage: item.tonnage,
+          quantity: item.quantity,
+          priceLow: estimate.low * item.quantity,
+          priceHigh: estimate.high * item.quantity,
+          outdoor: {
+            brand: item.outdoorUnit.brand,
+            model: item.outdoorUnit.model,
+            name: item.outdoorUnit.unitName,
+          },
+          coil: {
+            brand: item.coil.brand,
+            model: item.coil.model,
+            name: item.coil.unitName,
+          },
+          indoor: {
+            brand: item.indoorUnit.brand,
+            model: item.indoorUnit.model,
+            name: item.indoorUnit.unitName,
+          },
+          thermostat: {
+            brand: item.thermostat.brand,
+            model: item.thermostat.model,
+            name: item.thermostat.unitName,
+          },
         };
       } else {
+        const itemPrice = (parseFloat(item.totalInvestment) || 0) * item.quantity;
+        const monthlyPrice = (parseFloat(item.monthlyPayment) || 0) * item.quantity;
         return {
-          description: `${item.outdoorBrand} ${item.packageLevel} Package - ${item.extractedTonnage} (${UNIT_TYPE_INFO[item.unitType]?.name || item.unitType})`,
+          type: "package",
+          unitType: item.unitType,
+          unitTypeName: UNIT_TYPE_INFO[item.unitType]?.name || item.unitType,
+          tier: item.tier,
+          tonnage: item.extractedTonnage,
+          packageLevel: item.packageLevel,
+          quantity: item.quantity,
+          totalPrice: itemPrice,
+          monthlyPayment: monthlyPrice,
+          outdoor: {
+            brand: item.outdoorBrand,
+            model: item.outdoorModel,
+            name: item.outdoorName,
+          },
+          indoor: item.indoorHeatName ? {
+            name: item.indoorHeatName,
+            model: item.indoorHeatModel,
+          } : null,
+          thermostat: item.thermostatName ? {
+            name: item.thermostatName,
+            model: item.thermostatModel,
+          } : null,
         };
       }
     });
@@ -353,7 +405,11 @@ export default function ProposalBuilder() {
       email: selectedCustomer?.email || undefined,
       address: customerAddress || undefined,
       estimatedValue: cartTotal,
-      cartItems,
+      equipmentDetails,
+      totalLow: cartTotalRange.low,
+      totalHigh: cartTotalRange.high,
+      monthlyLow: cartMonthlyTotalRange.low,
+      monthlyHigh: cartMonthlyTotalRange.high,
       notes: customerNotes || undefined,
     });
   };

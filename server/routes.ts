@@ -2199,15 +2199,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/proposals/accept - Accept a proposal and create a Won lead
   app.post("/api/proposals/accept", async (req, res) => {
     try {
-      const { customerName, phone, email, address, estimatedValue, cartItems, notes } = req.body;
+      const { customerName, phone, email, address, estimatedValue, equipmentDetails, totalLow, totalHigh, monthlyLow, monthlyHigh, notes } = req.body;
       
       if (!customerName) {
         return res.status(400).json({ message: "Customer name is required" });
       }
 
-      const cartDescription = cartItems && cartItems.length > 0
-        ? cartItems.map((item: { description: string }) => item.description).join(', ')
+      // Build a readable summary for clientIssue
+      const equipmentSummary = equipmentDetails && equipmentDetails.length > 0
+        ? equipmentDetails.map((item: any) => {
+            if (item.type === "custom") {
+              return `Custom ${item.tonnage} System: ${item.outdoor.brand} ${item.outdoor.name}`;
+            } else {
+              return `${item.outdoor.brand} ${item.packageLevel} ${item.unitTypeName} - ${item.tonnage}`;
+            }
+          }).join('; ')
         : 'Equipment proposal accepted';
+
+      // Build detailed quote info for quoteDetails field (JSON stored as text)
+      const quoteDetailsJson = JSON.stringify({
+        acceptedAt: new Date().toISOString(),
+        equipment: equipmentDetails || [],
+        pricing: {
+          totalLow: totalLow || 0,
+          totalHigh: totalHigh || 0,
+          monthlyLow: monthlyLow || 0,
+          monthlyHigh: monthlyHigh || 0,
+        },
+        notes: notes || null,
+      });
+
+      // Format pricing summary for quotePricing
+      const pricingSummary = totalLow && totalHigh
+        ? `$${totalLow.toLocaleString()} - $${totalHigh.toLocaleString()} (Monthly: $${monthlyLow?.toLocaleString() || 0} - $${monthlyHigh?.toLocaleString() || 0}/mo)`
+        : estimatedValue ? `$${Number(estimatedValue).toLocaleString()}` : null;
 
       const leadData = {
         name: customerName,
@@ -2219,11 +2244,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         won: true,
         installStep: "Define Scope of Work",
         installEnteredAt: new Date(),
-        clientIssue: cartDescription,
+        clientIssue: equipmentSummary,
+        quoteDetails: quoteDetailsJson,
+        quotePricing: pricingSummary,
+        customerType: "Installation",
         leadSource: "Proposal Builder",
         nextActions: [],
         scheduledTasks: [],
-        tags: [],
+        tags: ["Proposal"],
       };
 
       const validatedData = insertLeadSchema.parse(leadData);
@@ -2233,7 +2261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         leadId: lead.id,
         actor: "system",
         actionType: "created",
-        payload: { source: "Proposal Builder", status: "Won" }
+        payload: { source: "Proposal Builder", status: "Won", customerType: "Installation" }
       });
 
       res.json(lead);
