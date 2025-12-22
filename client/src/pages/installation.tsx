@@ -567,7 +567,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
                     <div
                       key={dayIndex}
                       className={cn(
-                        "min-h-[80px] sm:min-h-[100px] border-r border-b last:border-r-0 p-1 bg-card",
+                        "h-[100px] sm:h-[120px] border-r border-b last:border-r-0 p-1 bg-card overflow-hidden",
                         isToday && "ring-2 ring-primary ring-inset",
                         !day && "bg-muted/30"
                       )}
@@ -583,7 +583,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
                 })}
               </div>
               
-              <div className="absolute top-6 left-0 right-0 space-y-1 pointer-events-none px-0.5">
+              <div className="absolute top-6 left-0 right-0 bottom-1 space-y-1 pointer-events-none px-0.5 overflow-y-auto scrollbar-thin">
                 {weekBars.map((bar, barIndex) => (
                   <div
                     key={`${bar.lead.id}-${weekIndex}-${barIndex}`}

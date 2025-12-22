@@ -435,7 +435,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
         ))}
 
         {Array.from({ length: startDayOfWeek }).map((_, idx) => (
-          <div key={`empty-${idx}`} className="min-h-[80px] sm:min-h-[100px] lg:min-h-[110px]" />
+          <div key={`empty-${idx}`} className="h-[100px] sm:h-[120px] lg:h-[130px]" />
         ))}
 
         {daysInMonth.map((day) => {
@@ -447,7 +447,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
             <div
               key={dateKey}
               className={cn(
-                "min-h-[80px] sm:min-h-[100px] lg:min-h-[110px] border rounded-md p-1 bg-card",
+                "h-[100px] sm:h-[120px] lg:h-[130px] border rounded-md p-1 bg-card overflow-hidden",
                 isToday && "ring-2 ring-primary"
               )}
               data-testid={`service-calendar-day-${dateKey}`}
@@ -455,7 +455,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
               <div className="text-xs font-medium text-muted-foreground mb-1">
                 {format(day, "d")}
               </div>
-              <div className="space-y-1 overflow-y-auto max-h-[60px] sm:max-h-[80px] lg:max-h-[90px]">
+              <div className="space-y-1 overflow-y-auto h-[calc(100%-20px)] scrollbar-thin">
                 {dayLeads.map(({ lead, isRepairDate }) => (
                   <HoverCard key={lead.id} openDelay={200} closeDelay={100}>
                     <HoverCardTrigger asChild>
