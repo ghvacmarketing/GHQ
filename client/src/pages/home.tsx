@@ -69,13 +69,6 @@ export default function Home() {
       testId: "link-new-quote"
     },
     {
-      title: "Quote History",
-      description: "View and manage all your quotes",
-      icon: History,
-      href: "/history",
-      testId: "link-quote-history"
-    },
-    {
       title: "Proposal Builder",
       description: "Build proposals with customers step-by-step",
       icon: ClipboardList,
@@ -91,13 +84,20 @@ export default function Home() {
     },
   ];
 
-  const installActions = [
+  const installServiceActions = [
     {
       title: "Installation Department",
       description: "Track installation job pipeline",
       icon: Wrench,
       href: "/installation",
       testId: "link-installation"
+    },
+    {
+      title: "Service Department",
+      description: "Track service job pipeline",
+      icon: Wrench,
+      href: "/service-pipeline",
+      testId: "link-service"
     },
   ];
 
@@ -115,6 +115,13 @@ export default function Home() {
       icon: BookOpen,
       href: "/processes",
       testId: "link-processes"
+    },
+    {
+      title: "Quote History",
+      description: "View and manage all your quotes",
+      icon: History,
+      href: "/history",
+      testId: "link-quote-history"
     },
   ];
 
@@ -311,10 +318,10 @@ export default function Home() {
 
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3" data-testid="text-install-section">
-              Install
+              Install & Service
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {installActions.map((action) => (
+              {installServiceActions.map((action) => (
                 <Link key={action.href} href={action.href}>
                   <Card 
                     className="transition-all hover:shadow-md hover:border-primary/50 cursor-pointer group"
