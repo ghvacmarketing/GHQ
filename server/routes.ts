@@ -2285,6 +2285,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updateData.installDate && typeof updateData.installDate === 'string') {
         updateData.installDate = new Date(updateData.installDate);
       }
+      if (updateData.installEndDate && typeof updateData.installEndDate === 'string') {
+        updateData.installEndDate = new Date(updateData.installEndDate);
+      }
       if (updateData.projectedCloseDate && typeof updateData.projectedCloseDate === 'string') {
         updateData.projectedCloseDate = new Date(updateData.projectedCloseDate);
       }
