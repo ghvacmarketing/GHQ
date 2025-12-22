@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter, Navigation, MessageSquare, StickyNote, ArrowRightCircle, UserPlus, Activity, FileText, ExternalLink, Search, Users } from "lucide-react";
+import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter, Navigation, MessageSquare, StickyNote, ArrowRightCircle, UserPlus, Activity, FileText, ExternalLink, Search, Users, Package } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -2086,6 +2086,77 @@ function LeadCard({
                     <p className="text-sm text-muted-foreground">{lead.clientIssue}</p>
                   </div>
                 )}
+
+                {/* Equipment Details from Proposal Builder */}
+                {lead.quoteDetails && (() => {
+                  try {
+                    const details = JSON.parse(lead.quoteDetails);
+                    if (details.equipment && details.equipment.length > 0) {
+                      return (
+                        <div className="space-y-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md p-3">
+                          <h4 className="text-sm font-medium text-green-800 dark:text-green-200 flex items-center gap-2">
+                            <Package className="h-4 w-4" />
+                            Accepted Equipment
+                          </h4>
+                          <div className="space-y-3">
+                            {details.equipment.map((item: any, idx: number) => (
+                              <div key={idx} className="bg-white dark:bg-gray-900 rounded p-2 border">
+                                {item.type === "custom" ? (
+                                  <div>
+                                    <p className="font-medium text-sm">Custom Build - {item.tonnage}</p>
+                                    <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                      <p>• {item.outdoor?.brand} {item.outdoor?.name}</p>
+                                      <p>• {item.coil?.brand} {item.coil?.name}</p>
+                                      <p>• {item.indoor?.brand} {item.indoor?.name}</p>
+                                      <p>• {item.thermostat?.brand} {item.thermostat?.name}</p>
+                                    </div>
+                                    <p className="text-sm font-medium text-primary mt-1">
+                                      ${item.priceLow?.toLocaleString()} - ${item.priceHigh?.toLocaleString()}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className="text-xs">{item.packageLevel}</Badge>
+                                      <span className="text-xs text-muted-foreground">{item.tonnage}</span>
+                                    </div>
+                                    <p className="font-medium text-sm mt-1">{item.unitTypeName} ({item.tier})</p>
+                                    <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                      <p>• {item.outdoor?.brand} {item.outdoor?.name}</p>
+                                      {item.indoor?.name && <p>• {item.indoor.name}</p>}
+                                      {item.thermostat?.name && <p>• {item.thermostat.name}</p>}
+                                    </div>
+                                    <p className="text-sm font-medium text-primary mt-1">
+                                      ${item.totalPrice?.toLocaleString()}
+                                      {item.monthlyPayment > 0 && (
+                                        <span className="text-xs text-muted-foreground ml-2">
+                                          (${item.monthlyPayment?.toLocaleString()}/mo)
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          {details.pricing && (
+                            <div className="pt-2 border-t border-green-200 dark:border-green-700">
+                              <p className="text-sm font-bold text-green-800 dark:text-green-200">
+                                Total: ${details.pricing.totalLow?.toLocaleString()} - ${details.pricing.totalHigh?.toLocaleString()}
+                              </p>
+                              <p className="text-xs text-green-700 dark:text-green-300">
+                                Monthly: ${details.pricing.monthlyLow?.toLocaleString()} - ${details.pricing.monthlyHigh?.toLocaleString()}/mo
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  } catch {
+                    return null;
+                  }
+                })()}
 
                 {/* Quote Reference */}
                 {lead.quoteId && (

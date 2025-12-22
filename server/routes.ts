@@ -2251,7 +2251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         leadSource: "Proposal Builder",
         nextActions: [],
         scheduledTasks: [],
-        tags: ["Proposal"],
+        tags: ["Installation", "Proposal"],
       };
 
       const validatedData = insertLeadSchema.parse(leadData);
