@@ -266,27 +266,31 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
                 <span className="truncate">{assignedTechnician.name}</span>
               </div>
             )}
-            {(isFromService || displayTags.length > 0) && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {isFromService && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex items-center gap-0.5 bg-orange-50 text-orange-700 border-orange-200">
-                    <Wrench className="h-2.5 w-2.5" />
-                    <ArrowRight className="h-2 w-2" />
-                    <Package className="h-2.5 w-2.5" />
-                  </Badge>
-                )}
-                {displayTags.slice(0, 2).map((tag, idx) => (
-                  <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">
-                    {tag}
-                  </Badge>
-                ))}
-                {displayTags.length > 2 && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                    +{displayTags.length - 2}
-                  </Badge>
-                )}
-              </div>
-            )}
+            <div className="flex flex-wrap gap-1 mt-2">
+              {lead.installStep && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 flex items-center gap-1 border-primary text-primary">
+                  <Wrench className="h-2.5 w-2.5" />
+                  {lead.installStep}
+                </Badge>
+              )}
+              {isFromService && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex items-center gap-0.5 bg-orange-50 text-orange-700 border-orange-200">
+                  <Wrench className="h-2.5 w-2.5" />
+                  <ArrowRight className="h-2 w-2" />
+                  <Package className="h-2.5 w-2.5" />
+                </Badge>
+              )}
+              {displayTags.slice(0, 2).map((tag, idx) => (
+                <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">
+                  {tag}
+                </Badge>
+              ))}
+              {displayTags.length > 2 && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  +{displayTags.length - 2}
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
       </CardContent>
