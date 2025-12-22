@@ -2749,7 +2749,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { serviceStep, serviceOrder, clientIssue, assignedEmployeeId, repairDate } = req.body;
       const updates: any = { updatedAt: new Date() };
       
-      if (serviceStep !== undefined) updates.serviceStep = serviceStep;
+      // Service steps in order - repair date only allowed at "Parts Arrived" or later
+      const SERVICE_STEPS_ORDER = [
+        "Intake",
+        "Triage / Assign",
+        "Diag / Callback Needed",
+        "Quote Needed",
+        "Quote Drafting",
+        "Review & Send",
+        "Awaiting Customer",
+        "Approved",
+        "Parts Ordered",
+        "Parts Arrived",
+        "Invoice Sent",
+        "Waiting On Payment",
+        "Closed (Paid)",
+        "Lost / Declined",
+      ];
+      
+      const PARTS_ARRIVED_INDEX = SERVICE_STEPS_ORDER.indexOf("Parts Arrived");
+      
+      // Check if we're moving from "Parts Arrived" or later to before it
+      if (serviceStep !== undefined) {
+        const currentStepIndex = lead.serviceStep ? SERVICE_STEPS_ORDER.indexOf(lead.serviceStep) : -1;
+        const newStepIndex = SERVICE_STEPS_ORDER.indexOf(serviceStep);
+        
+        // If moving from Parts Arrived or later to before Parts Arrived, clear repair date
+        if (currentStepIndex >= PARTS_ARRIVED_INDEX && newStepIndex < PARTS_ARRIVED_INDEX && lead.repairDate) {
+          updates.repairDate = null;
+        }
+        
+        updates.serviceStep = serviceStep;
+      }
+      
       if (serviceOrder !== undefined) updates.serviceOrder = serviceOrder;
       if (clientIssue !== undefined) updates.clientIssue = clientIssue;
       if (assignedEmployeeId !== undefined) updates.assignedEmployeeId = assignedEmployeeId === 'unassigned' ? null : assignedEmployeeId;
