@@ -207,18 +207,22 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
 
   const isFromService = lead.transferredFromPipeline === "service" || 
     (lead.tags?.some(t => t.toLowerCase() === "service") && lead.tags?.some(t => t.toLowerCase() === "installation"));
+  
+  const displayTags = lead.tags?.filter(t => 
+    t.toLowerCase() !== "service" && t.toLowerCase() !== "installation"
+  ) || [];
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      className="mb-2 cursor-pointer hover:shadow-md transition-shadow bg-white touch-manipulation h-[100px]"
+      className="mb-2 cursor-pointer hover:shadow-md transition-shadow bg-white touch-manipulation"
       onClick={onClick}
       data-testid={`card-job-${lead.id}`}
       data-no-drag
     >
-      <CardContent className="p-3 h-full flex flex-col">
-        <div className="flex items-start gap-2 flex-1 min-h-0">
+      <CardContent className="p-3">
+        <div className="flex items-start gap-2">
           <div
             {...attributes}
             {...listeners}
@@ -228,72 +232,61 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
           >
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
-          <div className="flex-1 min-w-0 flex flex-col justify-between h-full">
-            <div>
-              <h4 className="font-semibold text-sm truncate" data-testid={`text-job-name-${lead.id}`}>
-                {lead.name}
-              </h4>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                {lead.estimatedValue && (
-                  <span className="flex items-center gap-0.5">
-                    <DollarSign className="h-3 w-3" />
-                    {parseFloat(lead.estimatedValue).toFixed(2)}
-                  </span>
-                )}
-                {lead.installDate && (
-                  <span className="flex items-center gap-0.5 text-green-600 font-medium">
-                    <CalendarDays className="h-3 w-3" />
-                    {(() => {
-                      const startDate = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
-                      const endDateRaw = lead.installEndDate;
-                      if (endDateRaw) {
-                        const endDate = typeof endDateRaw === "string" ? parseISO(endDateRaw) : endDateRaw;
-                        if (endDate > startDate) {
-                          return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
-                        }
+          <div className="flex-1 min-w-0">
+            <h4 className="font-semibold text-sm truncate" data-testid={`text-job-name-${lead.id}`}>
+              {lead.name}
+            </h4>
+            {lead.estimatedValue && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                <DollarSign className="h-3 w-3 flex-shrink-0" />
+                <span>${parseFloat(lead.estimatedValue).toFixed(2)}</span>
+              </div>
+            )}
+            {lead.installDate && (
+              <div className="flex items-center gap-1 text-xs text-green-600 font-medium mt-1">
+                <CalendarDays className="h-3 w-3 flex-shrink-0" />
+                <span>
+                  {(() => {
+                    const startDate = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
+                    const endDateRaw = lead.installEndDate;
+                    if (endDateRaw) {
+                      const endDate = typeof endDateRaw === "string" ? parseISO(endDateRaw) : endDateRaw;
+                      if (endDate > startDate) {
+                        return `${format(startDate, "M/d")} - ${format(endDate, "M/d")}`;
                       }
-                      return format(startDate, "MMM d");
-                    })()}
-                  </span>
+                    }
+                    return format(startDate, "MMM d");
+                  })()}
+                </span>
+              </div>
+            )}
+            {assignedTechnician && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                <User className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">{assignedTechnician.name}</span>
+              </div>
+            )}
+            {(isFromService || displayTags.length > 0) && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {isFromService && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex items-center gap-0.5 bg-orange-50 text-orange-700 border-orange-200">
+                    <Wrench className="h-2.5 w-2.5" />
+                    <ArrowRight className="h-2 w-2" />
+                    <Package className="h-2.5 w-2.5" />
+                  </Badge>
                 )}
-                {assignedTechnician && (
-                  <span className="flex items-center gap-0.5 truncate">
-                    <User className="h-3 w-3" />
-                    {assignedTechnician.name.split(' ')[0]}
-                  </span>
+                {displayTags.slice(0, 2).map((tag, idx) => (
+                  <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">
+                    {tag}
+                  </Badge>
+                ))}
+                {displayTags.length > 2 && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                    +{displayTags.length - 2}
+                  </Badge>
                 )}
               </div>
-            </div>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {isFromService && (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex items-center gap-0.5 bg-orange-50 text-orange-700 border-orange-200">
-                  <Wrench className="h-2.5 w-2.5" />
-                  <ArrowRight className="h-2 w-2" />
-                  <Package className="h-2.5 w-2.5" />
-                </Badge>
-              )}
-              {(() => {
-                const displayTags = lead.tags?.filter(t => 
-                  t.toLowerCase() !== "service" && t.toLowerCase() !== "installation"
-                ) || [];
-                if (displayTags.length === 0) return null;
-                const maxTags = isFromService ? 1 : 2;
-                return (
-                  <>
-                    {displayTags.slice(0, maxTags).map((tag, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">
-                        {tag}
-                      </Badge>
-                    ))}
-                    {displayTags.length > maxTags && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                        +{displayTags.length - maxTags}
-                      </Badge>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
+            )}
           </div>
         </div>
       </CardContent>
