@@ -241,10 +241,21 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
                 <span>${parseFloat(lead.estimatedValue).toFixed(2)}</span>
               </div>
             )}
-            {lead.projectedCloseDate && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                <Calendar className="h-3 w-3 flex-shrink-0" />
-                <span>{format(typeof lead.projectedCloseDate === "string" ? parseISO(lead.projectedCloseDate) : lead.projectedCloseDate, "MMM d, yyyy")}</span>
+            {lead.installDate && (
+              <div className="flex items-center gap-1 text-xs text-green-600 font-medium mt-1">
+                <CalendarDays className="h-3 w-3 flex-shrink-0" />
+                <span>
+                  {(() => {
+                    const startDate = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
+                    const endDate = (lead as any).installEndDate 
+                      ? (typeof (lead as any).installEndDate === "string" ? parseISO((lead as any).installEndDate) : (lead as any).installEndDate)
+                      : null;
+                    if (endDate) {
+                      return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
+                    }
+                    return format(startDate, "MMM d, yyyy");
+                  })()}
+                </span>
               </div>
             )}
             {assignedTechnician && (
@@ -354,30 +365,54 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const startDayOfWeek = getDay(monthStart);
 
-  const getLeadDate = (lead: Lead): { date: Date; hasInstallDate: boolean } | null => {
+  const getLeadDateRange = (lead: Lead): { startDate: Date; endDate: Date | null; hasInstallDate: boolean } | null => {
     if (lead.installDate) {
-      const date = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
-      return { date, hasInstallDate: true };
+      const startDate = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
+      const endDate = (lead as any).installEndDate 
+        ? (typeof (lead as any).installEndDate === "string" ? parseISO((lead as any).installEndDate) : (lead as any).installEndDate)
+        : null;
+      return { startDate, endDate, hasInstallDate: true };
     }
     if (lead.installEnteredAt) {
       const date = typeof lead.installEnteredAt === "string" ? parseISO(lead.installEnteredAt) : lead.installEnteredAt;
-      return { date, hasInstallDate: false };
+      return { startDate: date, endDate: null, hasInstallDate: false };
     }
     if (lead.closedAt) {
       const date = typeof lead.closedAt === "string" ? parseISO(lead.closedAt) : lead.closedAt;
-      return { date, hasInstallDate: false };
+      return { startDate: date, endDate: null, hasInstallDate: false };
     }
     return null;
   };
 
   const leadsByDate = useMemo(() => {
-    const map: Record<string, { lead: Lead; hasInstallDate: boolean }[]> = {};
+    const map: Record<string, { lead: Lead; hasInstallDate: boolean; isRangeStart?: boolean; isRangeEnd?: boolean; isRangeMiddle?: boolean }[]> = {};
     leads.forEach((lead) => {
-      const dateInfo = getLeadDate(lead);
-      if (dateInfo && isSameMonth(dateInfo.date, currentMonth)) {
-        const key = format(dateInfo.date, "yyyy-MM-dd");
-        if (!map[key]) map[key] = [];
-        map[key].push({ lead, hasInstallDate: dateInfo.hasInstallDate });
+      const dateRange = getLeadDateRange(lead);
+      if (!dateRange) return;
+      
+      const { startDate, endDate, hasInstallDate } = dateRange;
+      
+      if (endDate) {
+        const rangeDays = eachDayOfInterval({ start: startDate, end: endDate });
+        rangeDays.forEach((day, index) => {
+          if (isSameMonth(day, currentMonth)) {
+            const key = format(day, "yyyy-MM-dd");
+            if (!map[key]) map[key] = [];
+            map[key].push({ 
+              lead, 
+              hasInstallDate,
+              isRangeStart: index === 0,
+              isRangeEnd: index === rangeDays.length - 1,
+              isRangeMiddle: index > 0 && index < rangeDays.length - 1
+            });
+          }
+        });
+      } else {
+        if (isSameMonth(startDate, currentMonth)) {
+          const key = format(startDate, "yyyy-MM-dd");
+          if (!map[key]) map[key] = [];
+          map[key].push({ lead, hasInstallDate });
+        }
       }
     });
     return map;
@@ -443,19 +478,26 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
                 {format(day, "d")}
               </div>
               <div className="space-y-1 overflow-y-auto max-h-[60px] sm:max-h-[80px] lg:max-h-[90px]">
-                {dayLeads.map(({ lead, hasInstallDate }) => (
+                {dayLeads.map(({ lead, hasInstallDate, isRangeStart, isRangeEnd, isRangeMiddle }) => (
                   <button
                     key={lead.id}
                     onClick={() => onCardClick(lead)}
                     className={cn(
-                      "w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate min-h-[28px] flex items-center",
+                      "w-full text-left text-[10px] sm:text-xs px-1 py-0.5 min-h-[28px] flex items-center",
                       hasInstallDate
                         ? "bg-primary text-primary-foreground"
-                        : "bg-yellow-400 text-yellow-900"
+                        : "bg-yellow-400 text-yellow-900",
+                      isRangeStart && "rounded-l rounded-r-none",
+                      isRangeEnd && "rounded-r rounded-l-none",
+                      isRangeMiddle && "rounded-none",
+                      !isRangeStart && !isRangeEnd && !isRangeMiddle && "rounded"
                     )}
                     data-testid={`calendar-job-${lead.id}`}
                   >
-                    <span className="truncate">{lead.name}</span>
+                    <span className="truncate">
+                      {isRangeMiddle ? "..." : lead.name}
+                      {isRangeEnd && !isRangeStart && ` (end)`}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -483,7 +525,7 @@ export default function Installation() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("all");
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
-  const [editForm, setEditForm] = useState({ installStep: "", clientIssue: "", assignedEmployeeId: "", installDate: undefined as Date | undefined });
+  const [editForm, setEditForm] = useState({ installStep: "", clientIssue: "", assignedEmployeeId: "", installDate: undefined as Date | undefined, installEndDate: undefined as Date | undefined });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { installStep?: string; installOrder?: number }>>({});
   const [activeView, setActiveView] = useState<"kanban" | "calendar">("kanban");
@@ -698,11 +740,15 @@ export default function Installation() {
     const installDateValue = lead.installDate
       ? (typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate)
       : undefined;
+    const installEndDateValue = (lead as any).installEndDate
+      ? (typeof (lead as any).installEndDate === "string" ? parseISO((lead as any).installEndDate) : (lead as any).installEndDate)
+      : undefined;
     setEditForm({
       installStep: lead.installStep || INSTALL_STEPS[0],
       clientIssue: lead.clientIssue || "",
       assignedEmployeeId: lead.assignedEmployeeId || "unassigned",
       installDate: installDateValue,
+      installEndDate: installEndDateValue,
     });
   };
 
@@ -728,6 +774,7 @@ export default function Installation() {
         clientIssue: editForm.clientIssue,
         assignedEmployeeId: editForm.assignedEmployeeId === "unassigned" ? null : editForm.assignedEmployeeId,
         installDate: editForm.installDate ? editForm.installDate.toISOString() : null,
+        installEndDate: editForm.installEndDate ? editForm.installEndDate.toISOString() : null,
       },
     });
     setEditingLead(null);
@@ -1109,7 +1156,8 @@ export default function Installation() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="installDate">Installation Date</Label>
+                <Label htmlFor="installDate">Installation Date(s)</Label>
+                <p className="text-xs text-muted-foreground">Click a date for single day, or drag/click two dates for a range</p>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -1122,16 +1170,47 @@ export default function Installation() {
                       data-testid="button-install-date"
                     >
                       <CalendarDays className="mr-2 h-4 w-4" />
-                      {editForm.installDate ? format(editForm.installDate, "PPP") : "Pick a date"}
+                      {editForm.installDate 
+                        ? editForm.installEndDate 
+                          ? `${format(editForm.installDate, "MMM d")} - ${format(editForm.installEndDate, "MMM d, yyyy")}`
+                          : format(editForm.installDate, "PPP")
+                        : "Pick a date or range"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <CalendarComponent
-                      mode="single"
-                      selected={editForm.installDate}
-                      onSelect={(date) => setEditForm({ ...editForm, installDate: date })}
+                      mode="range"
+                      selected={editForm.installDate ? { from: editForm.installDate, to: editForm.installEndDate } : undefined}
+                      onSelect={(range) => {
+                        if (range) {
+                          setEditForm({ 
+                            ...editForm, 
+                            installDate: range.from, 
+                            installEndDate: range.to 
+                          });
+                        } else {
+                          setEditForm({ 
+                            ...editForm, 
+                            installDate: undefined, 
+                            installEndDate: undefined 
+                          });
+                        }
+                      }}
+                      numberOfMonths={1}
                       initialFocus
                     />
+                    {editForm.installEndDate && (
+                      <div className="p-2 border-t">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="w-full text-xs"
+                          onClick={() => setEditForm({ ...editForm, installEndDate: undefined })}
+                        >
+                          Clear end date (single day)
+                        </Button>
+                      </div>
+                    )}
                   </PopoverContent>
                 </Popover>
               </div>
