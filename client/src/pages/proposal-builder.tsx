@@ -905,7 +905,7 @@ export default function ProposalBuilder() {
             </TabsTrigger>
             <TabsTrigger 
               value="custom" 
-              className="min-h-[48px] rounded-lg font-semibold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-lg" 
+              className="min-h-[48px] rounded-lg font-semibold transition-all data-[state=active]:bg-[#d3b07d] data-[state=active]:text-white data-[state=active]:shadow-lg" 
               data-testid="tab-build-your-own"
             >
               <Wrench className="h-5 w-5 mr-2" />
@@ -1273,7 +1273,11 @@ export default function ProposalBuilder() {
                     "outdoor"
                   )}
 
-                  <Separator className="my-6" />
+                  <div className="my-6 flex items-center gap-3">
+                    <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
+                    <span className="text-[#d3b07d] text-xs font-medium uppercase tracking-wider">Next Component</span>
+                    <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
+                  </div>
 
                   {renderComponentSection(
                     "Evaporator Coil",
@@ -1285,7 +1289,11 @@ export default function ProposalBuilder() {
                     "coil"
                   )}
 
-                  <Separator className="my-6" />
+                  <div className="my-6 flex items-center gap-3">
+                    <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
+                    <span className="text-[#d3b07d] text-xs font-medium uppercase tracking-wider">Next Component</span>
+                    <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
+                  </div>
 
                   {renderComponentSection(
                     "Indoor Unit",
@@ -1297,7 +1305,11 @@ export default function ProposalBuilder() {
                     "indoor"
                   )}
 
-                  <Separator className="my-6" />
+                  <div className="my-6 flex items-center gap-3">
+                    <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
+                    <span className="text-[#d3b07d] text-xs font-medium uppercase tracking-wider">Next Component</span>
+                    <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
+                  </div>
 
                   {renderComponentSection(
                     "Thermostat / Control",
