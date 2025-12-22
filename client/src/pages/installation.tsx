@@ -204,19 +204,21 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
   };
 
   const assignedTechnician = technicians.find((t) => t.id === lead.assignedEmployeeId);
-  const notesPreview = lead.clientIssue ? lead.clientIssue.slice(0, 50) + (lead.clientIssue.length > 50 ? "..." : "") : null;
+
+  const isFromService = lead.transferredFromPipeline === "service" || 
+    (lead.tags?.some(t => t.toLowerCase() === "service") && lead.tags?.some(t => t.toLowerCase() === "installation"));
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      className="mb-2 cursor-pointer hover:shadow-md transition-shadow bg-white touch-manipulation"
+      className="mb-2 cursor-pointer hover:shadow-md transition-shadow bg-white touch-manipulation h-[100px]"
       onClick={onClick}
       data-testid={`card-job-${lead.id}`}
       data-no-drag
     >
-      <CardContent className="p-3">
-        <div className="flex items-start gap-2">
+      <CardContent className="p-3 h-full flex flex-col">
+        <div className="flex items-start gap-2 flex-1 min-h-0">
           <div
             {...attributes}
             {...listeners}
@@ -226,100 +228,64 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
           >
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-sm truncate" data-testid={`text-job-name-${lead.id}`}>
-              {lead.name}
-            </h4>
-            {lead.address && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                <MapPin className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">{lead.address}</span>
-              </div>
-            )}
-            {lead.estimatedValue && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                <DollarSign className="h-3 w-3 flex-shrink-0" />
-                <span>${parseFloat(lead.estimatedValue).toFixed(2)}</span>
-              </div>
-            )}
-            {lead.installDate && (
-              <div className="flex items-center gap-1 text-xs text-green-600 font-medium mt-1">
-                <CalendarDays className="h-3 w-3 flex-shrink-0" />
-                <span>
-                  {(() => {
-                    const startDate = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
-                    const endDateRaw = lead.installEndDate;
-                    if (endDateRaw) {
-                      const endDate = typeof endDateRaw === "string" ? parseISO(endDateRaw) : endDateRaw;
-                      if (endDate > startDate) {
-                        return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
+          <div className="flex-1 min-w-0 flex flex-col justify-between h-full">
+            <div>
+              <h4 className="font-semibold text-sm truncate" data-testid={`text-job-name-${lead.id}`}>
+                {lead.name}
+              </h4>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                {lead.estimatedValue && (
+                  <span className="flex items-center gap-0.5">
+                    <DollarSign className="h-3 w-3" />
+                    {parseFloat(lead.estimatedValue).toFixed(2)}
+                  </span>
+                )}
+                {lead.installDate && (
+                  <span className="flex items-center gap-0.5 text-green-600 font-medium">
+                    <CalendarDays className="h-3 w-3" />
+                    {(() => {
+                      const startDate = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
+                      const endDateRaw = lead.installEndDate;
+                      if (endDateRaw) {
+                        const endDate = typeof endDateRaw === "string" ? parseISO(endDateRaw) : endDateRaw;
+                        if (endDate > startDate) {
+                          return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
+                        }
                       }
-                    }
-                    return format(startDate, "MMM d, yyyy");
-                  })()}
-                </span>
+                      return format(startDate, "MMM d");
+                    })()}
+                  </span>
+                )}
+                {assignedTechnician && (
+                  <span className="flex items-center gap-0.5 truncate">
+                    <User className="h-3 w-3" />
+                    {assignedTechnician.name.split(' ')[0]}
+                  </span>
+                )}
               </div>
-            )}
-            {assignedTechnician && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                <User className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">{assignedTechnician.name}</span>
-              </div>
-            )}
-            {notesPreview && (
-              <div className="flex items-start gap-1 text-xs text-muted-foreground mt-1">
-                <StickyNote className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                <span className="line-clamp-2">{notesPreview}</span>
-              </div>
-            )}
-            {(() => {
-              const isFromService = lead.transferredFromPipeline === "service" || 
-                (lead.tags?.some(t => t.toLowerCase() === "service") && lead.tags?.some(t => t.toLowerCase() === "installation"));
-              const otherTags = lead.tags?.filter(t => t.toLowerCase() !== "service" && t.toLowerCase() !== "installation") || [];
-              
-              if (isFromService) {
-                return (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-orange-50 text-orange-700 border-orange-200">
-                      <Wrench className="h-2.5 w-2.5" />
-                      Service
-                      <ArrowRight className="h-2.5 w-2.5" />
-                      <Package className="h-2.5 w-2.5" />
-                      Installation
+            </div>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {isFromService ? (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex items-center gap-0.5 bg-orange-50 text-orange-700 border-orange-200">
+                  <Wrench className="h-2.5 w-2.5" />
+                  <ArrowRight className="h-2 w-2" />
+                  <Package className="h-2.5 w-2.5" />
+                </Badge>
+              ) : lead.tags && lead.tags.length > 0 ? (
+                <>
+                  {lead.tags.slice(0, 2).map((tag, idx) => (
+                    <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">
+                      {tag}
                     </Badge>
-                    {otherTags.slice(0, 2).map((tag, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">
-                        {tag}
-                      </Badge>
-                    ))}
-                    {otherTags.length > 2 && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                        +{otherTags.length - 2}
-                      </Badge>
-                    )}
-                  </div>
-                );
-              }
-              
-              if (lead.tags && lead.tags.length > 0) {
-                return (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {lead.tags.slice(0, 3).map((tag, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">
-                        {tag}
-                      </Badge>
-                    ))}
-                    {lead.tags.length > 3 && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                        +{lead.tags.length - 3}
-                      </Badge>
-                    )}
-                  </div>
-                );
-              }
-              
-              return null;
-            })()}
+                  ))}
+                  {lead.tags.length > 2 && (
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      +{lead.tags.length - 2}
+                    </Badge>
+                  )}
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
       </CardContent>
@@ -393,11 +359,19 @@ interface CalendarViewProps {
   onCardClick: (lead: Lead) => void;
 }
 
-interface DayEvent {
+interface EventBar {
   lead: Lead;
   hasInstallDate: boolean;
+  weekIndex: number;
+  startCol: number;
+  span: number;
   isStart: boolean;
   isEnd: boolean;
+}
+
+interface SingleDayEvent {
+  lead: Lead;
+  hasInstallDate: boolean;
 }
 
 function CalendarView({ leads, onCardClick }: CalendarViewProps) {
@@ -433,39 +407,67 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
     return null;
   };
 
-  const eventsByDay = useMemo(() => {
-    const byDay: Record<string, DayEvent[]> = {};
+  const getCellIndex = (date: Date): number => {
+    const dayOfMonth = date.getDate();
+    return startDayOfWeek + dayOfMonth - 1;
+  };
+
+  const { eventBars, singleDayEvents } = useMemo(() => {
+    const bars: EventBar[] = [];
+    const singles: Record<string, SingleDayEvent[]> = {};
     
     leads.forEach((lead) => {
       const dateRange = getLeadDateRange(lead);
       if (!dateRange) return;
       
       const { startDate, endDate, hasInstallDate } = dateRange;
-      const effectiveEnd = endDate || startDate;
       
-      const rangeStart = startDate < monthStart ? monthStart : startDate;
-      const rangeEnd = effectiveEnd > monthEnd ? monthEnd : effectiveEnd;
+      const effectiveStart = isSameMonth(startDate, currentMonth) ? startDate : monthStart;
+      const effectiveEnd = endDate 
+        ? (isSameMonth(endDate, currentMonth) ? endDate : monthEnd)
+        : (isSameMonth(startDate, currentMonth) ? startDate : null);
       
-      if (rangeStart > monthEnd || rangeEnd < monthStart) return;
+      if (!effectiveEnd) return;
+      if (!isSameMonth(effectiveStart, currentMonth) && !isSameMonth(effectiveEnd, currentMonth)) return;
       
-      const rangeDays = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
+      const isMultiDay = endDate && endDate > startDate;
       
-      rangeDays.forEach((day) => {
-        if (!isSameMonth(day, currentMonth)) return;
-        const dateKey = format(day, "yyyy-MM-dd");
-        if (!byDay[dateKey]) byDay[dateKey] = [];
+      if (isMultiDay) {
+        const startCellIndex = getCellIndex(effectiveStart);
+        const endCellIndex = getCellIndex(effectiveEnd);
         
-        byDay[dateKey].push({
-          lead,
-          hasInstallDate,
-          isStart: isSameDay(day, startDate),
-          isEnd: isSameDay(day, effectiveEnd),
-        });
-      });
+        const startWeek = Math.floor(startCellIndex / 7);
+        const endWeek = Math.floor(endCellIndex / 7);
+        
+        for (let week = startWeek; week <= endWeek; week++) {
+          const weekStartCell = week * 7;
+          const weekEndCell = weekStartCell + 6;
+          
+          const barStartCell = Math.max(startCellIndex, weekStartCell);
+          const barEndCell = Math.min(endCellIndex, weekEndCell);
+          
+          const startCol = barStartCell - weekStartCell;
+          const span = barEndCell - barStartCell + 1;
+          
+          bars.push({
+            lead,
+            hasInstallDate,
+            weekIndex: week,
+            startCol,
+            span,
+            isStart: barStartCell === startCellIndex && isSameMonth(startDate, currentMonth),
+            isEnd: barEndCell === endCellIndex && isSameMonth(endDate, currentMonth),
+          });
+        }
+      } else {
+        const dateKey = format(effectiveStart, "yyyy-MM-dd");
+        if (!singles[dateKey]) singles[dateKey] = [];
+        singles[dateKey].push({ lead, hasInstallDate });
+      }
     });
     
-    return byDay;
-  }, [leads, currentMonth, monthStart, monthEnd]);
+    return { eventBars: bars, singleDayEvents: singles };
+  }, [leads, currentMonth, startDayOfWeek, monthStart, monthEnd]);
 
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -486,6 +488,10 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
     }
     return result;
   }, [numWeeks, startDayOfWeek, daysInMonth]);
+  
+  const getMaxBarsInWeek = (weekIndex: number) => {
+    return eventBars.filter(bar => bar.weekIndex === weekIndex).length;
+  };
 
   return (
     <div className="space-y-4">
@@ -525,106 +531,189 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
           ))}
         </div>
 
-        {weeks.map((weekDates, weekIndex) => (
-          <div key={weekIndex} className="grid grid-cols-7 gap-0">
-            {weekDates.map((day, dayIndex) => {
-              const isToday = day && isSameDay(day, new Date());
-              const dateKey = day ? format(day, "yyyy-MM-dd") : "";
-              const dayEvents = day ? (eventsByDay[dateKey] || []) : [];
+        {weeks.map((weekDates, weekIndex) => {
+          const weekBars = eventBars.filter(bar => bar.weekIndex === weekIndex);
+          const barHeight = 24;
+          const barGap = 2;
+          const multiDayHeight = weekBars.length * (barHeight + barGap);
+          
+          return (
+            <div key={weekIndex} className="relative">
+              <div className="grid grid-cols-7 gap-0">
+                {weekDates.map((day, dayIndex) => {
+                  const isToday = day && isSameDay(day, new Date());
+                  const dateKey = day ? format(day, "yyyy-MM-dd") : "";
+                  const dayEvents = day ? (singleDayEvents[dateKey] || []) : [];
+                  
+                  return (
+                    <div
+                      key={dayIndex}
+                      className={cn(
+                        "h-[100px] sm:h-[120px] border-r border-b last:border-r-0 p-1 bg-card flex flex-col",
+                        isToday && "ring-2 ring-primary ring-inset",
+                        !day && "bg-muted/30"
+                      )}
+                      data-testid={day ? `calendar-day-${dateKey}` : undefined}
+                    >
+                      {day && (
+                        <>
+                          <div className="text-xs font-medium text-muted-foreground flex-shrink-0">
+                            {format(day, "d")}
+                          </div>
+                          <div 
+                            className="flex-1 overflow-y-auto space-y-0.5 scrollbar-thin"
+                            style={{ marginTop: multiDayHeight > 0 ? `${multiDayHeight + 4}px` : '2px' }}
+                          >
+                            {dayEvents.map((event, eventIndex) => (
+                              <HoverCard key={`${event.lead.id}-${eventIndex}`} openDelay={200} closeDelay={100}>
+                                <HoverCardTrigger asChild>
+                                  <button
+                                    onClick={() => onCardClick(event.lead)}
+                                    className={cn(
+                                      "w-full text-left text-[10px] sm:text-xs px-1.5 py-0.5 min-h-[22px] flex items-center cursor-pointer hover:opacity-90 transition-opacity rounded",
+                                      event.hasInstallDate
+                                        ? "bg-primary text-primary-foreground"
+                                        : "bg-yellow-400 text-yellow-900"
+                                    )}
+                                    data-testid={`calendar-job-${event.lead.id}`}
+                                  >
+                                    <span className="truncate font-medium">{event.lead.name}</span>
+                                  </button>
+                                </HoverCardTrigger>
+                                <HoverCardContent className="w-72 p-3" side="right" align="start">
+                                  <div className="space-y-2">
+                                    <h4 className="font-semibold text-sm">{event.lead.name}</h4>
+                                    {event.lead.address && (
+                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <MapPin className="h-3 w-3 flex-shrink-0" />
+                                        <span>{event.lead.address}</span>
+                                      </div>
+                                    )}
+                                    {event.lead.phone && (
+                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <Phone className="h-3 w-3 flex-shrink-0" />
+                                        <span>{event.lead.phone}</span>
+                                      </div>
+                                    )}
+                                    {event.lead.estimatedValue && (
+                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <DollarSign className="h-3 w-3 flex-shrink-0" />
+                                        <span>${parseFloat(event.lead.estimatedValue).toLocaleString()}</span>
+                                      </div>
+                                    )}
+                                    {event.lead.installStep && (
+                                      <Badge variant="outline" className="text-[10px] mt-1">
+                                        {event.lead.installStep}
+                                      </Badge>
+                                    )}
+                                    {event.lead.clientIssue && (
+                                      <p className="text-xs text-muted-foreground border-t pt-2 mt-2 line-clamp-2">
+                                        {event.lead.clientIssue}
+                                      </p>
+                                    )}
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
               
-              return (
-                <div
-                  key={dayIndex}
-                  className={cn(
-                    "h-[100px] sm:h-[120px] border-r border-b last:border-r-0 p-1 bg-card flex flex-col",
-                    isToday && "ring-2 ring-primary ring-inset",
-                    !day && "bg-muted/30"
-                  )}
-                  data-testid={day ? `calendar-day-${dateKey}` : undefined}
-                >
-                  {day && (
-                    <>
-                      <div className="text-xs font-medium text-muted-foreground flex-shrink-0">
-                        {format(day, "d")}
-                      </div>
-                      <div className="flex-1 overflow-y-auto space-y-0.5 mt-0.5 scrollbar-thin">
-                        {dayEvents.map((event, eventIndex) => (
-                          <HoverCard key={`${event.lead.id}-${eventIndex}`} openDelay={200} closeDelay={100}>
-                            <HoverCardTrigger asChild>
-                              <button
-                                onClick={() => onCardClick(event.lead)}
-                                className={cn(
-                                  "w-full text-left text-[10px] sm:text-xs px-1.5 py-0.5 min-h-[22px] flex items-center cursor-pointer hover:opacity-90 transition-opacity rounded",
-                                  event.hasInstallDate
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-yellow-400 text-yellow-900"
-                                )}
-                                data-testid={`calendar-job-${event.lead.id}`}
-                              >
-                                <span className="truncate font-medium">{event.lead.name}</span>
-                              </button>
-                            </HoverCardTrigger>
-                            <HoverCardContent className="w-72 p-3" side="right" align="start">
-                              <div className="space-y-2">
-                                <h4 className="font-semibold text-sm">{event.lead.name}</h4>
-                                {event.lead.address && (
-                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <MapPin className="h-3 w-3 flex-shrink-0" />
-                                    <span>{event.lead.address}</span>
-                                  </div>
-                                )}
-                                {event.lead.phone && (
-                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Phone className="h-3 w-3 flex-shrink-0" />
-                                    <span>{event.lead.phone}</span>
-                                  </div>
-                                )}
-                                {event.lead.estimatedValue && (
-                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <DollarSign className="h-3 w-3 flex-shrink-0" />
-                                    <span>${parseFloat(event.lead.estimatedValue).toLocaleString()}</span>
-                                  </div>
-                                )}
-                                {event.lead.installDate && (
-                                  <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
-                                    <CalendarDays className="h-3 w-3 flex-shrink-0" />
-                                    <span>
-                                      {(() => {
-                                        const startDate = typeof event.lead.installDate === "string" ? parseISO(event.lead.installDate) : event.lead.installDate;
-                                        const endDateRaw = event.lead.installEndDate;
-                                        if (endDateRaw) {
-                                          const endDate = typeof endDateRaw === "string" ? parseISO(endDateRaw) : endDateRaw;
-                                          if (endDate > startDate) {
-                                            return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
-                                          }
-                                        }
-                                        return format(startDate, "MMM d, yyyy");
-                                      })()}
-                                    </span>
-                                  </div>
-                                )}
-                                {event.lead.installStep && (
-                                  <Badge variant="outline" className="text-[10px] mt-1">
-                                    {event.lead.installStep}
-                                  </Badge>
-                                )}
-                                {event.lead.clientIssue && (
-                                  <p className="text-xs text-muted-foreground border-t pt-2 mt-2 line-clamp-2">
-                                    {event.lead.clientIssue}
-                                  </p>
-                                )}
+              {weekBars.length > 0 && (
+                <div className="absolute top-6 left-0 right-0 pointer-events-none px-0.5" style={{ height: `${multiDayHeight}px` }}>
+                  {weekBars.map((bar, barIndex) => (
+                    <div
+                      key={`${bar.lead.id}-${weekIndex}-${barIndex}`}
+                      className="pointer-events-auto absolute"
+                      style={{
+                        left: `calc(${bar.startCol} * (100% / 7) + 2px)`,
+                        width: `calc(${bar.span} * (100% / 7) - 4px)`,
+                        top: `${barIndex * (barHeight + barGap)}px`,
+                        height: `${barHeight}px`,
+                      }}
+                    >
+                      <HoverCard openDelay={200} closeDelay={100}>
+                        <HoverCardTrigger asChild>
+                          <button
+                            onClick={() => onCardClick(bar.lead)}
+                            className={cn(
+                              "w-full h-full text-left text-[10px] sm:text-xs px-2 flex items-center cursor-pointer hover:opacity-90 transition-opacity",
+                              bar.hasInstallDate
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-yellow-400 text-yellow-900",
+                              bar.isStart && bar.isEnd && "rounded",
+                              bar.isStart && !bar.isEnd && "rounded-l",
+                              bar.isEnd && !bar.isStart && "rounded-r",
+                              !bar.isStart && !bar.isEnd && "rounded-none"
+                            )}
+                            data-testid={`calendar-job-${bar.lead.id}`}
+                          >
+                            <span className="truncate font-medium">{bar.lead.name}</span>
+                          </button>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-72 p-3" side="right" align="start">
+                          <div className="space-y-2">
+                            <h4 className="font-semibold text-sm">{bar.lead.name}</h4>
+                            {bar.lead.address && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <MapPin className="h-3 w-3 flex-shrink-0" />
+                                <span>{bar.lead.address}</span>
                               </div>
-                            </HoverCardContent>
-                          </HoverCard>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                            )}
+                            {bar.lead.phone && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Phone className="h-3 w-3 flex-shrink-0" />
+                                <span>{bar.lead.phone}</span>
+                              </div>
+                            )}
+                            {bar.lead.estimatedValue && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <DollarSign className="h-3 w-3 flex-shrink-0" />
+                                <span>${parseFloat(bar.lead.estimatedValue).toLocaleString()}</span>
+                              </div>
+                            )}
+                            {bar.lead.installDate && (
+                              <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                                <CalendarDays className="h-3 w-3 flex-shrink-0" />
+                                <span>
+                                  {(() => {
+                                    const startDate = typeof bar.lead.installDate === "string" ? parseISO(bar.lead.installDate) : bar.lead.installDate;
+                                    const endDateRaw = bar.lead.installEndDate;
+                                    if (endDateRaw) {
+                                      const endDate = typeof endDateRaw === "string" ? parseISO(endDateRaw) : endDateRaw;
+                                      if (endDate > startDate) {
+                                        return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
+                                      }
+                                    }
+                                    return format(startDate, "MMM d, yyyy");
+                                  })()}
+                                </span>
+                              </div>
+                            )}
+                            {bar.lead.installStep && (
+                              <Badge variant="outline" className="text-[10px] mt-1">
+                                {bar.lead.installStep}
+                              </Badge>
+                            )}
+                            {bar.lead.clientIssue && (
+                              <p className="text-xs text-muted-foreground border-t pt-2 mt-2 line-clamp-2">
+                                {bar.lead.clientIssue}
+                              </p>
+                            )}
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground max-w-4xl mx-auto">
