@@ -894,13 +894,21 @@ export default function ProposalBuilder() {
 
       <main className="p-3 sm:p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-sm grid-cols-2 h-12 py-0 px-[3px] mx-auto mb-4" data-testid="tabs-view-switcher">
-            <TabsTrigger value="preset" className="min-h-[44px] pt-0 pb-0" data-testid="tab-preset-packages">
-              <Package className="h-4 w-4 mr-2" />
+          <TabsList className="grid w-full max-w-md grid-cols-2 h-14 p-1 mx-auto mb-6 bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl shadow-md" data-testid="tabs-view-switcher">
+            <TabsTrigger 
+              value="preset" 
+              className="min-h-[48px] rounded-lg font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-lg dark:data-[state=active]:bg-slate-900" 
+              data-testid="tab-preset-packages"
+            >
+              <Package className="h-5 w-5 mr-2" />
               Preset Packages
             </TabsTrigger>
-            <TabsTrigger value="custom" className="min-h-[44px] pt-0 pb-0" data-testid="tab-build-your-own">
-              <Wrench className="h-4 w-4 mr-2" />
+            <TabsTrigger 
+              value="custom" 
+              className="min-h-[48px] rounded-lg font-semibold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-lg" 
+              data-testid="tab-build-your-own"
+            >
+              <Wrench className="h-5 w-5 mr-2" />
               Build Your Own
             </TabsTrigger>
           </TabsList>
