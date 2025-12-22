@@ -2295,6 +2295,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.closedAt = new Date(updateData.closedAt);
       }
       
+      // Auto-set installStep to "Define Scope of Work" when a lead becomes eligible for Installation board
+      const isBecomingWon = (updateData.status === "Won" || updateData.won === true) && lead.status !== "Won";
+      const tagsToCheck = updateData.tags || lead.tags || [];
+      const hasInstallationTag = tagsToCheck.some((tag: string) => tag.toLowerCase() === "installation");
+      const noInstallStep = !lead.installStep && !updateData.installStep;
+      
+      if ((isBecomingWon || lead.status === "Won") && hasInstallationTag && noInstallStep) {
+        updateData.installStep = "Define Scope of Work";
+        updateData.installOrder = 0;
+        updateData.installEnteredAt = new Date();
+      }
+      
       const updatedLead = await storage.updateLead(req.params.id, updateData);
       
       // Track changes to key fields in history
