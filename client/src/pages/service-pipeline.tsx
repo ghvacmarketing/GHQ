@@ -279,6 +279,14 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
                 )}
               </div>
             )}
+            {lead.serviceStep && (
+              <div className="mt-2 pt-2 border-t">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 border-blue-200">
+                  <Wrench className="h-2.5 w-2.5 mr-1" />
+                  {lead.serviceStep}
+                </Badge>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
@@ -1015,43 +1023,62 @@ export default function ServicePipeline() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>Repair Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full min-h-[44px] justify-start text-left font-normal",
-                        !editForm.repairDate && "text-muted-foreground"
-                      )}
-                      data-testid="button-service-repair-date"
-                    >
-                      <CalendarDays className="mr-2 h-4 w-4" />
-                      {editForm.repairDate ? format(editForm.repairDate, "PPP") : "Select repair date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={editForm.repairDate || undefined}
-                      onSelect={(date) => setEditForm({ ...editForm, repairDate: date || null })}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                {editForm.repairDate && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-muted-foreground"
-                    onClick={() => setEditForm({ ...editForm, repairDate: null })}
-                    data-testid="button-clear-repair-date"
-                  >
-                    Clear date
-                  </Button>
-                )}
-              </div>
+              {/* Only show repair date picker when at "Parts Arrived" or later steps */}
+              {(() => {
+                const REPAIR_DATE_STEPS = ["Parts Arrived", "Invoice Sent", "Waiting On Payment", "Closed (Paid)"];
+                const canScheduleRepair = REPAIR_DATE_STEPS.includes(editForm.serviceStep);
+                
+                if (!canScheduleRepair) {
+                  return (
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground">Repair Date</Label>
+                      <p className="text-xs text-muted-foreground italic">
+                        Repair date can only be scheduled once the job reaches "Parts Arrived"
+                      </p>
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div className="space-y-2">
+                    <Label>Repair Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full min-h-[44px] justify-start text-left font-normal",
+                            !editForm.repairDate && "text-muted-foreground"
+                          )}
+                          data-testid="button-service-repair-date"
+                        >
+                          <CalendarDays className="mr-2 h-4 w-4" />
+                          {editForm.repairDate ? format(editForm.repairDate, "PPP") : "Select repair date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={editForm.repairDate || undefined}
+                          onSelect={(date) => setEditForm({ ...editForm, repairDate: date || null })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {editForm.repairDate && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-muted-foreground"
+                        onClick={() => setEditForm({ ...editForm, repairDate: null })}
+                        data-testid="button-clear-repair-date"
+                      >
+                        Clear date
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="border-t pt-4">
