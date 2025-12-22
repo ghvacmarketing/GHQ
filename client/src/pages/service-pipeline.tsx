@@ -552,7 +552,7 @@ export default function ServicePipeline() {
       setShowTransferDialog(false);
       setTransferNotes("");
       queryClient.invalidateQueries({ queryKey: ["/api/service-leads"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/installation-leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
     },
     onError: () => {
       toast({ description: "Failed to transfer job", variant: "destructive" });

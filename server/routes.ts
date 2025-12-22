@@ -2729,6 +2729,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { installDate, installEndDate, notes } = req.body;
       const now = new Date();
 
+      // Add "Installation" tag if not already present
+      const currentTags = lead.tags || [];
+      const hasInstallationTag = currentTags.some((tag: string) => tag.toLowerCase() === "installation");
+      const updatedTags = hasInstallationTag ? currentTags : [...currentTags, "Installation"];
+
       // Build the update data - transfer to installation pipeline
       const updateData: any = {
         // Clear service pipeline fields
@@ -2747,6 +2752,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Update timestamps
         updatedAt: now,
+        
+        // Ensure lead appears in Installation Department
+        status: "Won",
+        won: true,
+        tags: updatedTags,
       };
 
       // Add optional install dates if provided
