@@ -33,7 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { ArrowLeft, Search, MapPin, DollarSign, Calendar, CalendarDays, User, StickyNote, GripVertical, Phone, Mail, FileText, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
+import { ArrowLeft, Search, MapPin, DollarSign, Calendar, CalendarDays, User, StickyNote, GripVertical, Phone, Mail, FileText, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Package, Wrench } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
@@ -941,6 +941,96 @@ export default function Installation() {
                 )}
               </div>
             </div>
+
+            {/* Equipment Details from Proposal Builder */}
+            {editingLead?.quoteDetails && (() => {
+              try {
+                const details = JSON.parse(editingLead.quoteDetails);
+                if (details.equipment && details.equipment.length > 0) {
+                  return (
+                    <div className="space-y-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                      <h4 className="text-sm font-semibold text-green-800 dark:text-green-200 uppercase tracking-wide flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Accepted Equipment
+                      </h4>
+                      <div className="space-y-3">
+                        {details.equipment.map((item: any, idx: number) => (
+                          <div key={idx} className="bg-white dark:bg-gray-900 rounded p-2 border">
+                            {item.type === "custom" ? (
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge className="bg-green-500 text-white text-xs">
+                                    <Wrench className="h-3 w-3 mr-1" />
+                                    Custom Build
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">{item.tonnage}</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground space-y-0.5">
+                                  <p>• {item.outdoor?.brand} {item.outdoor?.name}</p>
+                                  <p>• {item.coil?.brand} {item.coil?.name}</p>
+                                  <p>• {item.indoor?.brand} {item.indoor?.name}</p>
+                                  <p>• {item.thermostat?.brand} {item.thermostat?.name}</p>
+                                </div>
+                                <p className="text-sm font-medium text-primary mt-1">
+                                  ${item.priceLow?.toLocaleString()} - ${item.priceHigh?.toLocaleString()}
+                                </p>
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs">{item.packageLevel}</Badge>
+                                  <span className="text-xs text-muted-foreground">{item.tonnage}</span>
+                                </div>
+                                <p className="font-medium text-sm mt-1">{item.unitTypeName} ({item.tier})</p>
+                                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                  <p>• {item.outdoor?.brand} {item.outdoor?.name}</p>
+                                  {item.indoor?.name && <p>• {item.indoor.name}</p>}
+                                  {item.thermostat?.name && <p>• {item.thermostat.name}</p>}
+                                </div>
+                                <p className="text-sm font-medium text-primary mt-1">
+                                  ${item.totalPrice?.toLocaleString()}
+                                  {item.monthlyPayment > 0 && (
+                                    <span className="text-xs text-muted-foreground ml-2">
+                                      (${item.monthlyPayment?.toLocaleString()}/mo)
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {details.pricing && (
+                        <div className="pt-2 border-t border-green-200 dark:border-green-700">
+                          {details.hasCustomBuilds ? (
+                            <>
+                              <p className="text-sm font-bold text-green-800 dark:text-green-200">
+                                Total: ${details.pricing.totalLow?.toLocaleString()} - ${details.pricing.totalHigh?.toLocaleString()}
+                              </p>
+                              <p className="text-xs text-green-700 dark:text-green-300">
+                                Monthly: ${details.pricing.monthlyLow?.toLocaleString()} - ${details.pricing.monthlyHigh?.toLocaleString()}/mo
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-sm font-bold text-green-800 dark:text-green-200">
+                                Total: ${details.pricing.totalHigh?.toLocaleString()}
+                              </p>
+                              <p className="text-xs text-green-700 dark:text-green-300">
+                                Monthly: ${details.pricing.monthlyHigh?.toLocaleString()}/mo
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                return null;
+              } catch {
+                return null;
+              }
+            })()}
 
             {editingLead?.quoteId && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
