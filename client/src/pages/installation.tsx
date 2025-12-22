@@ -543,7 +543,11 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
           const weekBars = eventBars.filter(bar => bar.weekIndex === weekIndex);
           const barHeight = 24;
           const barGap = 2;
-          const multiDayHeight = weekBars.length * (barHeight + barGap);
+          const totalBarsHeight = weekBars.length * (barHeight + barGap);
+          
+          const getBarsOverlappingDay = (dayCol: number) => {
+            return weekBars.filter(bar => dayCol >= bar.startCol && dayCol < bar.startCol + bar.span).length;
+          };
           
           return (
             <div key={weekIndex} className="relative">
@@ -552,6 +556,8 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
                   const isToday = day && isSameDay(day, new Date());
                   const dateKey = day ? format(day, "yyyy-MM-dd") : "";
                   const dayEvents = day ? (singleDayEvents[dateKey] || []) : [];
+                  const barsOverThisDay = getBarsOverlappingDay(dayIndex);
+                  const dayMultiDayHeight = barsOverThisDay * (barHeight + barGap);
                   
                   return (
                     <div
@@ -570,7 +576,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
                           </div>
                           <div 
                             className="flex-1 overflow-y-auto space-y-0.5 scrollbar-thin"
-                            style={{ marginTop: multiDayHeight > 0 ? `${multiDayHeight + 4}px` : '2px' }}
+                            style={{ marginTop: dayMultiDayHeight > 0 ? `${dayMultiDayHeight + 4}px` : '2px' }}
                           >
                             {dayEvents.map((event, eventIndex) => (
                               <HoverCard key={`${event.lead.id}-${eventIndex}`} openDelay={200} closeDelay={100}>
@@ -632,7 +638,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
               </div>
               
               {weekBars.length > 0 && (
-                <div className="absolute top-6 left-0 right-0 pointer-events-none px-0.5" style={{ height: `${multiDayHeight}px` }}>
+                <div className="absolute top-6 left-0 right-0 pointer-events-none px-0.5" style={{ height: `${totalBarsHeight}px` }}>
                   {weekBars.map((bar, barIndex) => (
                     <div
                       key={`${bar.lead.id}-${weekIndex}-${barIndex}`}
