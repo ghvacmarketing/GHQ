@@ -291,6 +291,10 @@ export const leads = pgTable("leads", {
   serviceStep: text("service_step"), // Kanban column for service tracking
   serviceOrder: integer("service_order").default(0), // Order within column
   serviceEnteredAt: timestamp("service_entered_at"), // When lead entered service board
+  // Pipeline transfer tracking
+  currentPipeline: text("current_pipeline"), // 'service' or 'installation' - tracks which board lead is currently on
+  transferredFromPipeline: text("transferred_from_pipeline"), // If transferred, which pipeline it came from
+  transferredAt: timestamp("transferred_at"), // When the transfer occurred
 });
 
 // Lead History / Audit Trail

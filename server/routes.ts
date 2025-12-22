@@ -2713,6 +2713,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/leads/:id/transfer-to-installation - Transfer a lead from Service to Installation Department
+  app.post("/api/leads/:id/transfer-to-installation", async (req, res) => {
+    try {
+      const lead = await storage.getLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      // Verify lead is in service pipeline
+      if (!lead.serviceStep) {
+        return res.status(400).json({ message: "Lead is not in the Service pipeline" });
+      }
+
+      const { installDate, installEndDate, notes } = req.body;
+      const now = new Date();
+
+      // Build the update data - transfer to installation pipeline
+      const updateData: any = {
+        // Clear service pipeline fields
+        serviceStep: null,
+        serviceOrder: null,
+        
+        // Set installation pipeline fields
+        installStep: "Define Scope of Work",
+        installOrder: 0,
+        installEnteredAt: now,
+        currentPipeline: "installation",
+        
+        // Track the transfer
+        transferredFromPipeline: "service",
+        transferredAt: now,
+        
+        // Update timestamps
+        updatedAt: now,
+      };
+
+      // Add optional install dates if provided
+      if (installDate) {
+        updateData.installDate = new Date(installDate);
+      }
+      if (installEndDate) {
+        updateData.installEndDate = new Date(installEndDate);
+      }
+
+      // Append transfer note to existing actions if provided
+      if (notes) {
+        const existingActions = lead.nextActions || [];
+        updateData.nextActions = [
+          ...existingActions,
+          {
+            id: Date.now().toString(),
+            action: `Transferred from Service: ${notes}`,
+            createdAt: now.toISOString(),
+            completed: false,
+          }
+        ];
+      }
+
+      const updatedLead = await storage.updateLead(req.params.id, updateData);
+      
+      // Create history entry for the transfer
+      const actor = (req.session as any)?.user?.phone || "system";
+      await storage.createLeadHistory({
+        leadId: req.params.id,
+        actor,
+        actionType: "pipeline_transfer",
+        payload: {
+          from: "service",
+          to: "installation",
+          previousServiceStep: lead.serviceStep,
+          notes: notes || null,
+        },
+      });
+
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error transferring lead to installation:', error);
+      res.status(500).json({ message: "Error transferring lead to installation" });
+    }
+  });
+
   // =============================================================================
   // CUSTOMER DATABASE ROUTES (FieldEdge CSV Import)
   // =============================================================================
