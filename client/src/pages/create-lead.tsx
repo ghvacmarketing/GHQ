@@ -697,7 +697,7 @@ export default function CreateLeadPage() {
                   <SelectItem value="Installation">Installation</SelectItem>
                   <SelectItem value="Service">Service</SelectItem>
                   <SelectItem value="Maintenance">Maintenance</SelectItem>
-                  <SelectItem value="Repair">Repair</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
               {formData.jobType === "Installation" && (
