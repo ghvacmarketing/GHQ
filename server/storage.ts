@@ -596,7 +596,17 @@ export class DatabaseStorage implements IStorage {
       .from(leads)
       .orderBy(leads.serviceOrder);
     return result
-      .filter(lead => lead.serviceStep !== null && lead.tags && Array.isArray(lead.tags) && lead.tags.some((tag: string) => tag.toLowerCase() === 'service'))
+      .filter(lead => {
+        // Must be a won lead with a service step
+        if (!lead.serviceStep) return false;
+        
+        // Check if it's a service lead by tag OR job type
+        const hasServiceTag = lead.tags && Array.isArray(lead.tags) && 
+          lead.tags.some((tag: string) => tag.toLowerCase() === 'service');
+        const isServiceJobType = lead.jobType && lead.jobType.toLowerCase() === 'service';
+        
+        return hasServiceTag || isServiceJobType;
+      })
       .map(lead => this.normalizeLead(lead));
   }
 

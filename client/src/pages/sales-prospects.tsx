@@ -116,6 +116,7 @@ export default function SalesProspects() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leads/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-leads"] });
       toast({ description: "Lead marked as won!", duration: 1000 });
     },
   });
