@@ -247,11 +247,12 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
                 <span>
                   {(() => {
                     const startDate = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
-                    const endDate = (lead as any).installEndDate 
-                      ? (typeof (lead as any).installEndDate === "string" ? parseISO((lead as any).installEndDate) : (lead as any).installEndDate)
-                      : null;
-                    if (endDate) {
-                      return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
+                    const endDateRaw = lead.installEndDate;
+                    if (endDateRaw) {
+                      const endDate = typeof endDateRaw === "string" ? parseISO(endDateRaw) : endDateRaw;
+                      if (endDate > startDate) {
+                        return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
+                      }
                     }
                     return format(startDate, "MMM d, yyyy");
                   })()}
@@ -368,9 +369,12 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
   const getLeadDateRange = (lead: Lead): { startDate: Date; endDate: Date | null; hasInstallDate: boolean } | null => {
     if (lead.installDate) {
       const startDate = typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate;
-      const endDate = (lead as any).installEndDate 
-        ? (typeof (lead as any).installEndDate === "string" ? parseISO((lead as any).installEndDate) : (lead as any).installEndDate)
-        : null;
+      const endDateRaw = lead.installEndDate;
+      let endDate: Date | null = null;
+      if (endDateRaw) {
+        endDate = typeof endDateRaw === "string" ? parseISO(endDateRaw) : endDateRaw;
+        if (endDate <= startDate) endDate = null;
+      }
       return { startDate, endDate, hasInstallDate: true };
     }
     if (lead.installEnteredAt) {
@@ -398,12 +402,14 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
           if (isSameMonth(day, currentMonth)) {
             const key = format(day, "yyyy-MM-dd");
             if (!map[key]) map[key] = [];
+            const isFirstInMonth = index === 0 || !isSameMonth(rangeDays[index - 1], currentMonth);
+            const isLastInMonth = index === rangeDays.length - 1 || !isSameMonth(rangeDays[index + 1], currentMonth);
             map[key].push({ 
               lead, 
               hasInstallDate,
-              isRangeStart: index === 0,
-              isRangeEnd: index === rangeDays.length - 1,
-              isRangeMiddle: index > 0 && index < rangeDays.length - 1
+              isRangeStart: isFirstInMonth,
+              isRangeEnd: isLastInMonth,
+              isRangeMiddle: !isFirstInMonth && !isLastInMonth
             });
           }
         });
@@ -487,17 +493,15 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
                       hasInstallDate
                         ? "bg-primary text-primary-foreground"
                         : "bg-yellow-400 text-yellow-900",
-                      isRangeStart && "rounded-l rounded-r-none",
-                      isRangeEnd && "rounded-r rounded-l-none",
+                      isRangeStart && !isRangeEnd && "rounded-l rounded-r-none",
+                      isRangeEnd && !isRangeStart && "rounded-r rounded-l-none",
                       isRangeMiddle && "rounded-none",
-                      !isRangeStart && !isRangeEnd && !isRangeMiddle && "rounded"
+                      (!isRangeStart && !isRangeEnd && !isRangeMiddle) && "rounded",
+                      (isRangeStart && isRangeEnd) && "rounded"
                     )}
                     data-testid={`calendar-job-${lead.id}`}
                   >
-                    <span className="truncate">
-                      {isRangeMiddle ? "..." : lead.name}
-                      {isRangeEnd && !isRangeStart && ` (end)`}
-                    </span>
+                    <span className="truncate">{lead.name}</span>
                   </button>
                 ))}
               </div>
@@ -740,8 +744,8 @@ export default function Installation() {
     const installDateValue = lead.installDate
       ? (typeof lead.installDate === "string" ? parseISO(lead.installDate) : lead.installDate)
       : undefined;
-    const installEndDateValue = (lead as any).installEndDate
-      ? (typeof (lead as any).installEndDate === "string" ? parseISO((lead as any).installEndDate) : (lead as any).installEndDate)
+    const installEndDateValue = lead.installEndDate
+      ? (typeof lead.installEndDate === "string" ? parseISO(lead.installEndDate) : lead.installEndDate)
       : undefined;
     setEditForm({
       installStep: lead.installStep || INSTALL_STEPS[0],
