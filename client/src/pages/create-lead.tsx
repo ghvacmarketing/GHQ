@@ -694,13 +694,17 @@ export default function CreateLeadPage() {
                   <SelectValue placeholder="Select job type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                  <SelectItem value="installation">Installation</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="Installation">Installation</SelectItem>
+                  <SelectItem value="Service">Service</SelectItem>
+                  <SelectItem value="Maintenance">Maintenance</SelectItem>
+                  <SelectItem value="Repair">Repair</SelectItem>
                 </SelectContent>
               </Select>
-              {formData.jobType === "installation" && (
+              {formData.jobType === "Installation" && (
                 <p className="text-xs text-muted-foreground mt-1">This lead will appear on the Installation board when Won</p>
+              )}
+              {formData.jobType === "Service" && (
+                <p className="text-xs text-muted-foreground mt-1">This lead will appear on the Service Pipeline when Won</p>
               )}
             </div>
 
