@@ -462,7 +462,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
                     className={cn(
                       "w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate min-h-[28px] flex items-center",
                       isRepairDate
-                        ? "bg-red-500 text-white"
+                        ? "bg-primary text-primary-foreground"
                         : "bg-yellow-400 text-yellow-900"
                     )}
                     data-testid={`service-calendar-job-${lead.id}`}
@@ -482,7 +482,7 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
           <span>In Progress</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-red-500" />
+          <div className="w-3 h-3 rounded bg-primary" />
           <span>Repair Date</span>
         </div>
       </div>
