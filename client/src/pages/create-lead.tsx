@@ -697,10 +697,10 @@ export default function CreateLeadPage() {
                 </SelectContent>
               </Select>
               {formData.jobType === "Installation" && (
-                <p className="text-xs text-muted-foreground mt-1">This lead will appear on the Installation board when Won</p>
+                <p className="text-xs text-muted-foreground mt-1">This lead will appear in Installation Department when Won</p>
               )}
               {formData.jobType === "Service" && (
-                <p className="text-xs text-muted-foreground mt-1">This lead will appear on the Service Pipeline when Won</p>
+                <p className="text-xs text-muted-foreground mt-1">This lead will appear in Service Department when Won</p>
               )}
             </div>
 

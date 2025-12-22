@@ -93,7 +93,7 @@ export default function Home() {
 
   const installActions = [
     {
-      title: "Installation Pipeline",
+      title: "Installation Department",
       description: "Track installation job pipeline",
       icon: Wrench,
       href: "/installation",
@@ -138,8 +138,8 @@ export default function Home() {
                   { label: "Price Book", path: "/price-book" },
                   { label: "Processes and Systems", path: "/processes" },
                   { label: "Sales Prospects", path: "/sales-prospects" },
-                  { label: "Installation", path: "/installation" },
-                  { label: "Service Pipeline", path: "/service-pipeline" },
+                  { label: "Installation Department", path: "/installation" },
+                  { label: "Service Department", path: "/service-pipeline" },
                   { label: "Proposal Builder", path: "/proposal" },
                 ]}
               />
