@@ -103,54 +103,67 @@ const OUTDOOR_UNIT_TYPES = ["Air Conditioner", "Heat Pump"];
 const INDOOR_UNIT_TYPES = ["Gas Furnace", "Air Handler"];
 
 const formatPrice = (price: number) => '$' + price.toLocaleString();
+const formatPriceRange = (low: number, high: number) => {
+  if (low === high) return '$' + low.toLocaleString();
+  return '$' + low.toLocaleString() + ' - $' + high.toLocaleString();
+};
 
 function calculateCustomBuildEstimate(
   outdoorUnit: PricebookComponent | null,
   coil: PricebookComponent | null,
   indoorUnit: PricebookComponent | null,
   thermostat: PricebookComponent | null
-): number {
-  let total = 0;
+): { low: number; high: number } {
+  let totalLow = 0;
+  let totalHigh = 0;
   
   if (outdoorUnit) {
     if (outdoorUnit.sellingPrice) {
-      total += outdoorUnit.sellingPrice;
-    } else if (outdoorUnit.componentType === "Heat Pump") {
-      total += 4500;
+      // Trane with pricing: fixed 50% gross margin
+      totalLow += outdoorUnit.sellingPrice;
+      totalHigh += outdoorUnit.sellingPrice;
     } else {
-      total += 3500;
+      // Non-Trane: 50-100% markup range
+      const basePrice = outdoorUnit.componentType === "Heat Pump" ? 4500 : 3500;
+      totalLow += Math.round(basePrice * 0.75); // Low end
+      totalHigh += basePrice; // High end
     }
   }
   
   if (coil) {
     if (coil.sellingPrice) {
-      total += coil.sellingPrice;
+      totalLow += coil.sellingPrice;
+      totalHigh += coil.sellingPrice;
     } else {
-      total += 800;
+      const basePrice = 800;
+      totalLow += Math.round(basePrice * 0.75);
+      totalHigh += basePrice;
     }
   }
   
   if (indoorUnit) {
     if (indoorUnit.sellingPrice) {
-      total += indoorUnit.sellingPrice;
-    } else if (indoorUnit.componentType === "Air Handler") {
-      total += 2000;
+      totalLow += indoorUnit.sellingPrice;
+      totalHigh += indoorUnit.sellingPrice;
     } else {
-      total += 1800;
+      const basePrice = indoorUnit?.componentType === "Air Handler" ? 2000 : 1800;
+      totalLow += Math.round(basePrice * 0.75);
+      totalHigh += basePrice;
     }
   }
   
   if (thermostat) {
     if (thermostat.sellingPrice) {
-      total += thermostat.sellingPrice;
-    } else if (thermostat.unitName.toLowerCase().includes('smart') || thermostat.unitName.toLowerCase().includes('wifi')) {
-      total += 350;
+      totalLow += thermostat.sellingPrice;
+      totalHigh += thermostat.sellingPrice;
     } else {
-      total += 250;
+      const basePrice = (thermostat.unitName.toLowerCase().includes('smart') || thermostat.unitName.toLowerCase().includes('wifi')) ? 350 : 250;
+      totalLow += Math.round(basePrice * 0.75);
+      totalHigh += basePrice;
     }
   }
   
-  return total;
+  return { low: totalLow, high: totalHigh };
 }
 
 function extractTonnageFromModel(model: string): string | null {
@@ -360,25 +373,36 @@ export default function ProposalBuilder() {
     return cart.reduce((sum, item) => sum + item.quantity, 0);
   }, [cart]);
 
-  const cartTotal = useMemo(() => {
-    return cart.reduce((sum, item) => {
+  const cartTotalRange = useMemo(() => {
+    return cart.reduce((acc, item) => {
       if (item.isCustomBuild) {
-        return sum + calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat) * item.quantity;
+        const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
+        return { low: acc.low + estimate.low * item.quantity, high: acc.high + estimate.high * item.quantity };
       } else {
-        return sum + (parseFloat(item.totalInvestment) || 0) * item.quantity;
+        const price = (parseFloat(item.totalInvestment) || 0) * item.quantity;
+        return { low: acc.low + price, high: acc.high + price };
       }
-    }, 0);
+    }, { low: 0, high: 0 });
   }, [cart]);
 
-  const cartMonthlyTotal = useMemo(() => {
-    return cart.reduce((sum, item) => {
+  const cartTotal = cartTotalRange.high; // Use high for backward compatibility
+
+  const cartMonthlyTotalRange = useMemo(() => {
+    return cart.reduce((acc, item) => {
       if (item.isCustomBuild) {
-        return sum + Math.round(calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat) / 67) * item.quantity;
+        const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
+        return { 
+          low: acc.low + Math.round(estimate.low / 67) * item.quantity, 
+          high: acc.high + Math.round(estimate.high / 67) * item.quantity 
+        };
       } else {
-        return sum + (parseFloat(item.monthlyPayment) || 0) * item.quantity;
+        const monthly = (parseFloat(item.monthlyPayment) || 0) * item.quantity;
+        return { low: acc.low + monthly, high: acc.high + monthly };
       }
-    }, 0);
+    }, { low: 0, high: 0 });
   }, [cart]);
+
+  const cartMonthlyTotal = cartMonthlyTotalRange.high; // Use high for backward compatibility
 
   const hasEstimatedItems = useMemo(() => {
     return cart.some(item => item.isCustomBuild);
@@ -527,13 +551,15 @@ export default function ProposalBuilder() {
 
     cart.forEach((item, index) => {
       if (item.isCustomBuild) {
-        const itemPrice = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat) * item.quantity;
+        const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
+        const priceLow = estimate.low * item.quantity;
+        const priceHigh = estimate.high * item.quantity;
         quoteText += `${index + 1}. Custom Build - ${item.tonnage} System\n`;
         quoteText += `   - ${item.outdoorUnit.brand} ${item.outdoorUnit.unitName}\n`;
         quoteText += `   - ${item.coil.brand} ${item.coil.unitName}\n`;
         quoteText += `   - ${item.indoorUnit.brand} ${item.indoorUnit.unitName}\n`;
         quoteText += `   - ${item.thermostat.brand} ${item.thermostat.unitName}\n`;
-        quoteText += `   Price: ${formatPrice(itemPrice)} (Estimated)\n`;
+        quoteText += `   Price: ${formatPriceRange(priceLow, priceHigh)} (Estimated)\n`;
         if (item.quantity > 1) quoteText += `   Qty: ${item.quantity}\n`;
         quoteText += `\n`;
       } else {
@@ -551,8 +577,8 @@ export default function ProposalBuilder() {
     });
 
     quoteText += `${'-'.repeat(40)}\n`;
-    quoteText += `TOTAL INVESTMENT: ${formatPrice(cartTotal)}${hasEstimatedItems ? ' *' : ''}\n`;
-    quoteText += `Monthly Payment: ${formatPrice(cartMonthlyTotal)}/mo (with approved financing)\n`;
+    quoteText += `TOTAL INVESTMENT: ${formatPriceRange(cartTotalRange.low, cartTotalRange.high)}${hasEstimatedItems ? ' *' : ''}\n`;
+    quoteText += `Monthly Payment: ${formatPriceRange(cartMonthlyTotalRange.low, cartMonthlyTotalRange.high)}/mo (with approved financing)\n`;
     if (hasEstimatedItems) {
       quoteText += `* Includes estimated pricing for custom builds\n`;
     }
@@ -793,7 +819,10 @@ export default function ProposalBuilder() {
                                     <div className="flex items-center gap-1">
                                       <Badge variant="outline" className="text-xs">Est.</Badge>
                                       <span className="font-bold text-sm text-primary">
-                                        {formatPrice(calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat) * item.quantity)}
+                                        {(() => {
+                                          const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
+                                          return formatPriceRange(estimate.low * item.quantity, estimate.high * item.quantity);
+                                        })()}
                                       </span>
                                     </div>
                                   </div>
@@ -1252,7 +1281,10 @@ export default function ProposalBuilder() {
                       <div className="flex items-center gap-2 justify-end">
                         <Badge variant="outline" className="text-xs">Estimated</Badge>
                         <span className="text-xl font-bold text-primary">
-                          {formatPrice(calculateCustomBuildEstimate(selectedOutdoorUnit, selectedCoil, selectedIndoorUnit, selectedThermostat))}
+                          {(() => {
+                            const estimate = calculateCustomBuildEstimate(selectedOutdoorUnit, selectedCoil, selectedIndoorUnit, selectedThermostat);
+                            return formatPriceRange(estimate.low, estimate.high);
+                          })()}
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -1418,7 +1450,9 @@ export default function ProposalBuilder() {
               <div className="space-y-3">
                 {cart.map((item, index) => {
                   if (item.isCustomBuild) {
-                    const itemPrice = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat) * item.quantity;
+                    const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
+                    const priceLow = estimate.low * item.quantity;
+                    const priceHigh = estimate.high * item.quantity;
                     return (
                       <div key={item.id} className="border rounded-lg p-4 bg-card">
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -1440,7 +1474,7 @@ export default function ProposalBuilder() {
                           </div>
                           <div className="text-right">
                             <Badge variant="outline" className="mb-1 text-xs">Estimated</Badge>
-                            <p className="text-xl font-bold text-primary">{formatPrice(itemPrice)}</p>
+                            <p className="text-xl font-bold text-primary">{formatPriceRange(priceLow, priceHigh)}</p>
                           </div>
                         </div>
                       </div>
@@ -1484,7 +1518,7 @@ export default function ProposalBuilder() {
             <div className="bg-muted rounded-lg p-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">{formatPrice(cartTotal)}</span>
+                <span className="font-medium">{formatPriceRange(cartTotalRange.low, cartTotalRange.high)}</span>
               </div>
               {hasEstimatedItems && (
                 <p className="text-xs text-muted-foreground mb-2">* Includes estimated pricing for custom builds</p>
@@ -1492,11 +1526,11 @@ export default function ProposalBuilder() {
               <Separator className="my-3" />
               <div className="flex justify-between items-center">
                 <span className="text-lg font-bold">Total Investment</span>
-                <span className="text-2xl font-bold text-primary">{formatPrice(cartTotal)}</span>
+                <span className="text-2xl font-bold text-primary">{formatPriceRange(cartTotalRange.low, cartTotalRange.high)}</span>
               </div>
               <div className="flex justify-between items-center mt-1">
                 <span className="text-sm text-muted-foreground">Monthly Payment (with approved financing)</span>
-                <span className="text-sm font-medium">{formatPrice(cartMonthlyTotal)}/mo</span>
+                <span className="text-sm font-medium">{formatPriceRange(cartMonthlyTotalRange.low, cartMonthlyTotalRange.high)}/mo</span>
               </div>
             </div>
 
