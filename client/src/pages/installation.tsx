@@ -393,12 +393,9 @@ interface CalendarViewProps {
   onCardClick: (lead: Lead) => void;
 }
 
-interface EventBar {
+interface DayEvent {
   lead: Lead;
   hasInstallDate: boolean;
-  weekIndex: number;
-  startCol: number;
-  span: number;
   isStart: boolean;
   isEnd: boolean;
 }
@@ -436,58 +433,39 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
     return null;
   };
 
-  const getCellIndex = (date: Date): number => {
-    const dayOfMonth = date.getDate();
-    return startDayOfWeek + dayOfMonth - 1;
-  };
-
-  const eventBars = useMemo(() => {
-    const bars: EventBar[] = [];
+  const eventsByDay = useMemo(() => {
+    const byDay: Record<string, DayEvent[]> = {};
     
     leads.forEach((lead) => {
       const dateRange = getLeadDateRange(lead);
       if (!dateRange) return;
       
       const { startDate, endDate, hasInstallDate } = dateRange;
+      const effectiveEnd = endDate || startDate;
       
-      const effectiveStart = isSameMonth(startDate, currentMonth) ? startDate : monthStart;
-      const effectiveEnd = endDate 
-        ? (isSameMonth(endDate, currentMonth) ? endDate : monthEnd)
-        : (isSameMonth(startDate, currentMonth) ? startDate : null);
+      const rangeStart = startDate < monthStart ? monthStart : startDate;
+      const rangeEnd = effectiveEnd > monthEnd ? monthEnd : effectiveEnd;
       
-      if (!effectiveEnd) return;
-      if (!isSameMonth(effectiveStart, currentMonth) && !isSameMonth(effectiveEnd, currentMonth)) return;
+      if (rangeStart > monthEnd || rangeEnd < monthStart) return;
       
-      const startCellIndex = getCellIndex(effectiveStart);
-      const endCellIndex = getCellIndex(effectiveEnd);
+      const rangeDays = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
       
-      const startWeek = Math.floor(startCellIndex / 7);
-      const endWeek = Math.floor(endCellIndex / 7);
-      
-      for (let week = startWeek; week <= endWeek; week++) {
-        const weekStartCell = week * 7;
-        const weekEndCell = weekStartCell + 6;
+      rangeDays.forEach((day) => {
+        if (!isSameMonth(day, currentMonth)) return;
+        const dateKey = format(day, "yyyy-MM-dd");
+        if (!byDay[dateKey]) byDay[dateKey] = [];
         
-        const barStartCell = Math.max(startCellIndex, weekStartCell);
-        const barEndCell = Math.min(endCellIndex, weekEndCell);
-        
-        const startCol = barStartCell - weekStartCell;
-        const span = barEndCell - barStartCell + 1;
-        
-        bars.push({
+        byDay[dateKey].push({
           lead,
           hasInstallDate,
-          weekIndex: week,
-          startCol,
-          span,
-          isStart: barStartCell === startCellIndex && isSameMonth(startDate, currentMonth),
-          isEnd: barEndCell === endCellIndex && (!endDate || isSameMonth(endDate, currentMonth)),
+          isStart: isSameDay(day, startDate),
+          isEnd: isSameDay(day, effectiveEnd),
         });
-      }
+      });
     });
     
-    return bars;
-  }, [leads, currentMonth, startDayOfWeek]);
+    return byDay;
+  }, [leads, currentMonth, monthStart, monthEnd]);
 
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -547,121 +525,106 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
           ))}
         </div>
 
-        {weeks.map((weekDates, weekIndex) => {
-          const weekBars = eventBars.filter(bar => bar.weekIndex === weekIndex);
-          
-          return (
-            <div key={weekIndex} className="relative">
-              <div className="grid grid-cols-7 gap-0">
-                {weekDates.map((day, dayIndex) => {
-                  const isToday = day && isSameDay(day, new Date());
-                  return (
-                    <div
-                      key={dayIndex}
-                      className={cn(
-                        "h-[100px] sm:h-[120px] border-r border-b last:border-r-0 p-1 bg-card overflow-hidden",
-                        isToday && "ring-2 ring-primary ring-inset",
-                        !day && "bg-muted/30"
-                      )}
-                      data-testid={day ? `calendar-day-${format(day, "yyyy-MM-dd")}` : undefined}
-                    >
-                      {day && (
-                        <div className="text-xs font-medium text-muted-foreground">
-                          {format(day, "d")}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+        {weeks.map((weekDates, weekIndex) => (
+          <div key={weekIndex} className="grid grid-cols-7 gap-0">
+            {weekDates.map((day, dayIndex) => {
+              const isToday = day && isSameDay(day, new Date());
+              const dateKey = day ? format(day, "yyyy-MM-dd") : "";
+              const dayEvents = day ? (eventsByDay[dateKey] || []) : [];
               
-              <div className="absolute top-6 left-0 right-0 bottom-1 space-y-1 pointer-events-none px-0.5 overflow-y-auto scrollbar-thin">
-                {weekBars.map((bar, barIndex) => (
-                  <div
-                    key={`${bar.lead.id}-${weekIndex}-${barIndex}`}
-                    className="pointer-events-auto"
-                    style={{
-                      marginLeft: `calc(${bar.startCol} * (100% / 7) + 2px)`,
-                      width: `calc(${bar.span} * (100% / 7) - 4px)`,
-                    }}
-                  >
-                    <HoverCard openDelay={200} closeDelay={100}>
-                      <HoverCardTrigger asChild>
-                        <button
-                          onClick={() => onCardClick(bar.lead)}
-                          className={cn(
-                            "w-full text-left text-[10px] sm:text-xs px-2 py-1 min-h-[24px] flex items-center cursor-pointer hover:opacity-90 transition-opacity",
-                            bar.hasInstallDate
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-yellow-400 text-yellow-900",
-                            bar.isStart && bar.isEnd && "rounded",
-                            bar.isStart && !bar.isEnd && "rounded-l",
-                            bar.isEnd && !bar.isStart && "rounded-r",
-                            !bar.isStart && !bar.isEnd && "rounded-none"
-                          )}
-                          data-testid={`calendar-job-${bar.lead.id}`}
-                        >
-                          <span className="truncate font-medium">{bar.lead.name}</span>
-                        </button>
-                      </HoverCardTrigger>
-                      <HoverCardContent className="w-72 p-3" side="right" align="start">
-                        <div className="space-y-2">
-                          <h4 className="font-semibold text-sm">{bar.lead.name}</h4>
-                          {bar.lead.address && (
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <MapPin className="h-3 w-3 flex-shrink-0" />
-                              <span>{bar.lead.address}</span>
-                            </div>
-                          )}
-                          {bar.lead.phone && (
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <Phone className="h-3 w-3 flex-shrink-0" />
-                              <span>{bar.lead.phone}</span>
-                            </div>
-                          )}
-                          {bar.lead.estimatedValue && (
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <DollarSign className="h-3 w-3 flex-shrink-0" />
-                              <span>${parseFloat(bar.lead.estimatedValue).toLocaleString()}</span>
-                            </div>
-                          )}
-                          {bar.lead.installDate && (
-                            <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
-                              <CalendarDays className="h-3 w-3 flex-shrink-0" />
-                              <span>
-                                {(() => {
-                                  const startDate = typeof bar.lead.installDate === "string" ? parseISO(bar.lead.installDate) : bar.lead.installDate;
-                                  const endDateRaw = bar.lead.installEndDate;
-                                  if (endDateRaw) {
-                                    const endDate = typeof endDateRaw === "string" ? parseISO(endDateRaw) : endDateRaw;
-                                    if (endDate > startDate) {
-                                      return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
-                                    }
-                                  }
-                                  return format(startDate, "MMM d, yyyy");
-                                })()}
-                              </span>
-                            </div>
-                          )}
-                          {bar.lead.installStep && (
-                            <Badge variant="outline" className="text-[10px] mt-1">
-                              {bar.lead.installStep}
-                            </Badge>
-                          )}
-                          {bar.lead.clientIssue && (
-                            <p className="text-xs text-muted-foreground border-t pt-2 mt-2 line-clamp-2">
-                              {bar.lead.clientIssue}
-                            </p>
-                          )}
-                        </div>
-                      </HoverCardContent>
-                    </HoverCard>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
+              return (
+                <div
+                  key={dayIndex}
+                  className={cn(
+                    "h-[100px] sm:h-[120px] border-r border-b last:border-r-0 p-1 bg-card flex flex-col",
+                    isToday && "ring-2 ring-primary ring-inset",
+                    !day && "bg-muted/30"
+                  )}
+                  data-testid={day ? `calendar-day-${dateKey}` : undefined}
+                >
+                  {day && (
+                    <>
+                      <div className="text-xs font-medium text-muted-foreground flex-shrink-0">
+                        {format(day, "d")}
+                      </div>
+                      <div className="flex-1 overflow-y-auto space-y-0.5 mt-0.5 scrollbar-thin">
+                        {dayEvents.map((event, eventIndex) => (
+                          <HoverCard key={`${event.lead.id}-${eventIndex}`} openDelay={200} closeDelay={100}>
+                            <HoverCardTrigger asChild>
+                              <button
+                                onClick={() => onCardClick(event.lead)}
+                                className={cn(
+                                  "w-full text-left text-[10px] sm:text-xs px-1.5 py-0.5 min-h-[22px] flex items-center cursor-pointer hover:opacity-90 transition-opacity rounded",
+                                  event.hasInstallDate
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-yellow-400 text-yellow-900"
+                                )}
+                                data-testid={`calendar-job-${event.lead.id}`}
+                              >
+                                <span className="truncate font-medium">{event.lead.name}</span>
+                              </button>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-72 p-3" side="right" align="start">
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-sm">{event.lead.name}</h4>
+                                {event.lead.address && (
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                                    <span>{event.lead.address}</span>
+                                  </div>
+                                )}
+                                {event.lead.phone && (
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Phone className="h-3 w-3 flex-shrink-0" />
+                                    <span>{event.lead.phone}</span>
+                                  </div>
+                                )}
+                                {event.lead.estimatedValue && (
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <DollarSign className="h-3 w-3 flex-shrink-0" />
+                                    <span>${parseFloat(event.lead.estimatedValue).toLocaleString()}</span>
+                                  </div>
+                                )}
+                                {event.lead.installDate && (
+                                  <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                                    <CalendarDays className="h-3 w-3 flex-shrink-0" />
+                                    <span>
+                                      {(() => {
+                                        const startDate = typeof event.lead.installDate === "string" ? parseISO(event.lead.installDate) : event.lead.installDate;
+                                        const endDateRaw = event.lead.installEndDate;
+                                        if (endDateRaw) {
+                                          const endDate = typeof endDateRaw === "string" ? parseISO(endDateRaw) : endDateRaw;
+                                          if (endDate > startDate) {
+                                            return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
+                                          }
+                                        }
+                                        return format(startDate, "MMM d, yyyy");
+                                      })()}
+                                    </span>
+                                  </div>
+                                )}
+                                {event.lead.installStep && (
+                                  <Badge variant="outline" className="text-[10px] mt-1">
+                                    {event.lead.installStep}
+                                  </Badge>
+                                )}
+                                {event.lead.clientIssue && (
+                                  <p className="text-xs text-muted-foreground border-t pt-2 mt-2 line-clamp-2">
+                                    {event.lead.clientIssue}
+                                  </p>
+                                )}
+                              </div>
+                            </HoverCardContent>
+                          </HoverCard>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground max-w-4xl mx-auto">
