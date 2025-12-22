@@ -1018,8 +1018,8 @@
     "monthlyPayment": "227",
     "totalInvestment": "15198",
     "sourcePage": "20",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -1274,8 +1274,8 @@
     "monthlyPayment": "244",
     "totalInvestment": "16309",
     "sourcePage": "17",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -1530,8 +1530,8 @@
     "monthlyPayment": "258",
     "totalInvestment": "17249",
     "sourcePage": "14",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -1786,8 +1786,8 @@
     "monthlyPayment": "272",
     "totalInvestment": "18224",
     "sourcePage": "12",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -2010,8 +2010,8 @@
     "monthlyPayment": "251",
     "totalInvestment": "16776",
     "sourcePage": "9",
-    "equipmentCost": 651.9,
-    "sellingPrice": 1304
+    "equipmentCost": 705.2,
+    "sellingPrice": 1410
   },
   {
     "unitType": "SGA",
@@ -2042,8 +2042,8 @@
     "monthlyPayment": "251",
     "totalInvestment": "16776",
     "sourcePage": "9",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -2104,8 +2104,8 @@
     "monthlyPayment": "227",
     "totalInvestment": "15184",
     "sourcePage": "9",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -2214,8 +2214,8 @@
     "monthlyPayment": "210",
     "totalInvestment": "14055",
     "sourcePage": "10",
-    "equipmentCost": 1624.63,
-    "sellingPrice": 3249
+    "equipmentCost": 1718.93,
+    "sellingPrice": 3438
   },
   {
     "unitType": "SGA",
@@ -2294,8 +2294,8 @@
     "monthlyPayment": "262",
     "totalInvestment": "17548",
     "sourcePage": "6",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -2358,8 +2358,8 @@
     "monthlyPayment": "244",
     "totalInvestment": "16309",
     "sourcePage": "6",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -2518,8 +2518,8 @@
     "monthlyPayment": "280",
     "totalInvestment": "18721",
     "sourcePage": "3",
-    "equipmentCost": 739.03,
-    "sellingPrice": 1478
+    "equipmentCost": 798.48,
+    "sellingPrice": 1597
   },
   {
     "unitType": "SGA",
@@ -2550,8 +2550,8 @@
     "monthlyPayment": "280",
     "totalInvestment": "18721",
     "sourcePage": "3",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -2582,8 +2582,8 @@
     "monthlyPayment": "258",
     "totalInvestment": "17250",
     "sourcePage": "3",
-    "equipmentCost": 746.2,
-    "sellingPrice": 1492
+    "equipmentCost": 807.7,
+    "sellingPrice": 1615
   },
   {
     "unitType": "SGA",
@@ -2614,8 +2614,8 @@
     "monthlyPayment": "258",
     "totalInvestment": "17250",
     "sourcePage": "3",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -2806,8 +2806,8 @@
     "monthlyPayment": "302",
     "totalInvestment": "20202",
     "sourcePage": "1",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -2870,8 +2870,8 @@
     "monthlyPayment": "275",
     "totalInvestment": "18401",
     "sourcePage": "1",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -3311,7 +3311,9 @@
     "description": "",
     "monthlyPayment": "190",
     "totalInvestment": "12689",
-    "sourcePage": "68"
+    "sourcePage": "68",
+    "equipmentCost": 108.65,
+    "sellingPrice": 217
   },
   {
     "unitType": "SHP",
@@ -3325,7 +3327,9 @@
     "description": "",
     "monthlyPayment": "197",
     "totalInvestment": "13174",
-    "sourcePage": "67"
+    "sourcePage": "67",
+    "equipmentCost": 121.98,
+    "sellingPrice": 244
   },
   {
     "unitType": "SHP",
@@ -3339,7 +3343,9 @@
     "description": "",
     "monthlyPayment": "212",
     "totalInvestment": "14159",
-    "sourcePage": "65"
+    "sourcePage": "65",
+    "equipmentCost": 128.13,
+    "sellingPrice": 256
   },
   {
     "unitType": "SHP",
@@ -3353,7 +3359,9 @@
     "description": "",
     "monthlyPayment": "234",
     "totalInvestment": "15647",
-    "sourcePage": "63"
+    "sourcePage": "63",
+    "equipmentCost": 179.38,
+    "sellingPrice": 359
   },
   {
     "unitType": "SHP",
@@ -3638,8 +3646,8 @@
     "monthlyPayment": "234",
     "totalInvestment": "15647",
     "sourcePage": "63",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "SHP",
@@ -5072,8 +5080,8 @@
     "monthlyPayment": "214",
     "totalInvestment": "14275",
     "sourcePage": "53",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SHP",
@@ -5260,8 +5268,8 @@
     "monthlyPayment": "227",
     "totalInvestment": "15163",
     "sourcePage": "51",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SHP",
@@ -5464,8 +5472,8 @@
     "monthlyPayment": "254",
     "totalInvestment": "16954",
     "sourcePage": "49",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SHP",
@@ -5668,8 +5676,8 @@
     "monthlyPayment": "274",
     "totalInvestment": "18306",
     "sourcePage": "48",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SHP",
@@ -5810,8 +5818,8 @@
     "monthlyPayment": "250",
     "totalInvestment": "16745",
     "sourcePage": "45",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SHP",
@@ -5874,8 +5882,8 @@
     "monthlyPayment": "227",
     "totalInvestment": "15186",
     "sourcePage": "45",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SHP",
@@ -6066,8 +6074,8 @@
     "monthlyPayment": "257",
     "totalInvestment": "17199",
     "sourcePage": "42",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SHP",
@@ -6130,8 +6138,8 @@
     "monthlyPayment": "242",
     "totalInvestment": "16176",
     "sourcePage": "42",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SHP",
@@ -6318,8 +6326,8 @@
     "monthlyPayment": "287",
     "totalInvestment": "19187",
     "sourcePage": "39",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SHP",
@@ -6382,8 +6390,8 @@
     "monthlyPayment": "269",
     "totalInvestment": "18016",
     "sourcePage": "39",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SHP",
@@ -6570,8 +6578,8 @@
     "monthlyPayment": "317",
     "totalInvestment": "21210",
     "sourcePage": "37",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SHP",
@@ -6634,8 +6642,8 @@
     "monthlyPayment": "293",
     "totalInvestment": "19620",
     "sourcePage": "37",
-    "equipmentCost": 492,
-    "sellingPrice": 984
+    "equipmentCost": 580.15,
+    "sellingPrice": 1160
   },
   {
     "unitType": "SGA",
@@ -8173,7 +8181,9 @@
     "description": "on 120 Mos",
     "monthlyPayment": "234",
     "totalInvestment": "15647",
-    "sourcePage": "63"
+    "sourcePage": "63",
+    "equipmentCost": 179.38,
+    "sellingPrice": 359
   },
   {
     "unitType": "PHP",
@@ -8188,8 +8198,8 @@
     "monthlyPayment": "234",
     "totalInvestment": "15647",
     "sourcePage": "63",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "PHP",
@@ -8351,7 +8361,9 @@
     "description": "on 120 Mos",
     "monthlyPayment": "205",
     "totalInvestment": "13699",
-    "sourcePage": "64"
+    "sourcePage": "64",
+    "equipmentCost": 179.38,
+    "sellingPrice": 359
   },
   {
     "unitType": "PHP",
@@ -8366,8 +8378,8 @@
     "monthlyPayment": "205",
     "totalInvestment": "13699",
     "sourcePage": "64",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "PHP",
@@ -8483,7 +8495,9 @@
     "description": "",
     "monthlyPayment": "",
     "totalInvestment": "9737",
-    "sourcePage": "64"
+    "sourcePage": "64",
+    "equipmentCost": 179.38,
+    "sellingPrice": 359
   },
   {
     "unitType": "PHP",
@@ -8529,7 +8543,9 @@
     "description": "on 120 Mos",
     "monthlyPayment": "212",
     "totalInvestment": "14159",
-    "sourcePage": "65"
+    "sourcePage": "65",
+    "equipmentCost": 128.13,
+    "sellingPrice": 256
   },
   {
     "unitType": "PHP",
@@ -8544,8 +8560,8 @@
     "monthlyPayment": "212",
     "totalInvestment": "14159",
     "sourcePage": "65",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "PHP",
@@ -8707,7 +8723,9 @@
     "description": "on 120 Mos",
     "monthlyPayment": "205",
     "totalInvestment": "13709",
-    "sourcePage": "66"
+    "sourcePage": "66",
+    "equipmentCost": 128.13,
+    "sellingPrice": 256
   },
   {
     "unitType": "PHP",
@@ -8722,8 +8740,8 @@
     "monthlyPayment": "205",
     "totalInvestment": "13709",
     "sourcePage": "66",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "PHP",
@@ -8885,7 +8903,9 @@
     "description": "on 120 Mos",
     "monthlyPayment": "197",
     "totalInvestment": "13174",
-    "sourcePage": "67"
+    "sourcePage": "67",
+    "equipmentCost": 121.98,
+    "sellingPrice": 244
   },
   {
     "unitType": "PHP",
@@ -8900,8 +8920,8 @@
     "monthlyPayment": "197",
     "totalInvestment": "13174",
     "sourcePage": "67",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "PHP",
@@ -9017,7 +9037,9 @@
     "description": "",
     "monthlyPayment": "",
     "totalInvestment": "9025",
-    "sourcePage": "67"
+    "sourcePage": "67",
+    "equipmentCost": 121.98,
+    "sellingPrice": 244
   },
   {
     "unitType": "PHP",
@@ -9063,7 +9085,9 @@
     "description": "on 120 Mos",
     "monthlyPayment": "190",
     "totalInvestment": "12689",
-    "sourcePage": "68"
+    "sourcePage": "68",
+    "equipmentCost": 108.65,
+    "sellingPrice": 217
   },
   {
     "unitType": "PHP",
@@ -9078,8 +9102,8 @@
     "monthlyPayment": "190",
     "totalInvestment": "12689",
     "sourcePage": "68",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "PHP",
@@ -9242,8 +9266,8 @@
     "monthlyPayment": "219",
     "totalInvestment": "14633",
     "sourcePage": "69",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "GP",
@@ -9364,8 +9388,8 @@
     "monthlyPayment": "207",
     "totalInvestment": "13852",
     "sourcePage": "70",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "GP",
@@ -9486,8 +9510,8 @@
     "monthlyPayment": "202",
     "totalInvestment": "13515",
     "sourcePage": "71",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "GP",
@@ -9636,8 +9660,8 @@
     "monthlyPayment": "194",
     "totalInvestment": "12956",
     "sourcePage": "72",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "GP",
@@ -9786,8 +9810,8 @@
     "monthlyPayment": "190",
     "totalInvestment": "12679",
     "sourcePage": "73",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "GP",
@@ -9936,8 +9960,8 @@
     "monthlyPayment": "186",
     "totalInvestment": "12400",
     "sourcePage": "74",
-    "equipmentCost": 229.6,
-    "sellingPrice": 459
+    "equipmentCost": 268.55,
+    "sellingPrice": 537
   },
   {
     "unitType": "GP",
