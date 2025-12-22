@@ -351,11 +351,8 @@ export default function CreateLeadPage() {
     }
 
     const tags: string[] = [];
-    if (formData.jobType === "installation") {
-      tags.push("installation");
-    }
-    if (formData.jobType === "maintenance") {
-      tags.push("maintenance");
+    if (formData.jobType) {
+      tags.push(formData.jobType);
     }
 
     const submitData: any = {
@@ -363,9 +360,8 @@ export default function CreateLeadPage() {
       estimatedValue: formData.estimatedValue ? formData.estimatedValue : undefined,
       quoteId: formData.quoteId || undefined,
       tags: tags.length > 0 ? tags : undefined,
+      jobType: formData.jobType || undefined,
     };
-
-    delete submitData.jobType;
 
     if (formData.projectedCloseDate) {
       submitData.projectedCloseDate = new Date(formData.projectedCloseDate).toISOString();
