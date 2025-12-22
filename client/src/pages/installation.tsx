@@ -33,7 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { ArrowLeft, Search, MapPin, DollarSign, Calendar, CalendarDays, User, StickyNote, GripVertical, Phone, Mail, FileText, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Package, Wrench } from "lucide-react";
+import { ArrowLeft, ArrowRight, Search, MapPin, DollarSign, Calendar, CalendarDays, User, StickyNote, GripVertical, Phone, Mail, FileText, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Package, Wrench } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
@@ -271,20 +271,54 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
                 <span className="line-clamp-2">{notesPreview}</span>
               </div>
             )}
-            {lead.tags && lead.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {lead.tags.slice(0, 3).map((tag, idx) => (
-                  <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">
-                    {tag}
-                  </Badge>
-                ))}
-                {lead.tags.length > 3 && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                    +{lead.tags.length - 3}
-                  </Badge>
-                )}
-              </div>
-            )}
+            {(() => {
+              const isFromService = lead.transferredFromPipeline === "service" || 
+                (lead.tags?.some(t => t.toLowerCase() === "service") && lead.tags?.some(t => t.toLowerCase() === "installation"));
+              const otherTags = lead.tags?.filter(t => t.toLowerCase() !== "service" && t.toLowerCase() !== "installation") || [];
+              
+              if (isFromService) {
+                return (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-orange-50 text-orange-700 border-orange-200">
+                      <Wrench className="h-2.5 w-2.5" />
+                      Service
+                      <ArrowRight className="h-2.5 w-2.5" />
+                      <Package className="h-2.5 w-2.5" />
+                      Installation
+                    </Badge>
+                    {otherTags.slice(0, 2).map((tag, idx) => (
+                      <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {tag}
+                      </Badge>
+                    ))}
+                    {otherTags.length > 2 && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        +{otherTags.length - 2}
+                      </Badge>
+                    )}
+                  </div>
+                );
+              }
+              
+              if (lead.tags && lead.tags.length > 0) {
+                return (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {lead.tags.slice(0, 3).map((tag, idx) => (
+                      <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {tag}
+                      </Badge>
+                    ))}
+                    {lead.tags.length > 3 && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        +{lead.tags.length - 3}
+                      </Badge>
+                    )}
+                  </div>
+                );
+              }
+              
+              return null;
+            })()}
           </div>
         </div>
       </CardContent>
