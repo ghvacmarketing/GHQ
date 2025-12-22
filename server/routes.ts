@@ -2307,6 +2307,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.installEnteredAt = new Date();
       }
       
+      // Clear department fields when changing from Won back to another status
+      const isLeavingWon = lead.status === "Won" && updateData.status && updateData.status !== "Won" && updateData.status !== "Lost";
+      if (isLeavingWon) {
+        // Clear installation department fields
+        if (lead.installStep) {
+          updateData.installStep = null;
+          updateData.installOrder = null;
+          updateData.installEnteredAt = null;
+          updateData.installDate = null;
+          updateData.installEndDate = null;
+        }
+        // Clear service department fields
+        if (lead.serviceStep) {
+          updateData.serviceStep = null;
+          updateData.serviceOrder = null;
+          updateData.repairDate = null;
+        }
+        // Reset won flag
+        updateData.won = false;
+      }
+      
       const updatedLead = await storage.updateLead(req.params.id, updateData);
       
       // Track changes to key fields in history

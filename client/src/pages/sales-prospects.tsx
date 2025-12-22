@@ -2043,26 +2043,22 @@ function LeadCard({
                 </SheetDescription>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                {isActive ? (
-                  <Select
-                    value={lead.status}
-                    onValueChange={(value) => onUpdate({ status: value })}
-                  >
-                    <SelectTrigger className="h-8 w-[110px] text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="New">New</SelectItem>
-                      <SelectItem value="Contacted">Contacted</SelectItem>
-                      <SelectItem value="Quote Sent">Quote Sent</SelectItem>
-                      <SelectItem value="Negotiating">Negotiating</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Badge variant={lead.won ? "default" : "destructive"} className="text-xs">
-                    {lead.status}
-                  </Badge>
-                )}
+                <Select
+                  value={lead.status}
+                  onValueChange={(value) => onUpdate({ status: value })}
+                >
+                  <SelectTrigger className="h-8 w-[110px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="New">New</SelectItem>
+                    <SelectItem value="Contacted">Contacted</SelectItem>
+                    <SelectItem value="Quote Sent">Quote Sent</SelectItem>
+                    <SelectItem value="Negotiating">Negotiating</SelectItem>
+                    <SelectItem value="Won">Won</SelectItem>
+                    <SelectItem value="Lost">Lost</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </SheetHeader>
