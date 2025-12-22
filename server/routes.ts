@@ -2774,8 +2774,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const currentStepIndex = lead.serviceStep ? SERVICE_STEPS_ORDER.indexOf(lead.serviceStep) : -1;
         const newStepIndex = SERVICE_STEPS_ORDER.indexOf(serviceStep);
         
+        console.log(`Service step change: "${lead.serviceStep}" (${currentStepIndex}) -> "${serviceStep}" (${newStepIndex}), PARTS_ARRIVED_INDEX=${PARTS_ARRIVED_INDEX}, hasRepairDate=${!!lead.repairDate}`);
+        
         // If moving from Parts Arrived or later to before Parts Arrived, clear repair date
         if (currentStepIndex >= PARTS_ARRIVED_INDEX && newStepIndex < PARTS_ARRIVED_INDEX && lead.repairDate) {
+          console.log(`Clearing repair date for lead ${lead.id} - moving from "${lead.serviceStep}" to "${serviceStep}"`);
           updates.repairDate = null;
         }
         
