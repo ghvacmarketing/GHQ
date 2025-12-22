@@ -2446,16 +2446,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "Won"
       };
 
-      // Check if jobType contains "Service" to add to service pipeline
+      const currentTags = lead.tags || [];
       const jobType = lead.jobType || "";
+      
+      // Check if this lead should go to Installation pipeline
+      const hasInstallationTag = currentTags.some((tag: string) => tag.toLowerCase() === "installation");
+      const isInstallationType = jobType.toLowerCase().includes("installation");
+      
+      if (hasInstallationTag || isInstallationType) {
+        // Set installation step to "Define Scope of Work"
+        updateData.installStep = "Define Scope of Work";
+        updateData.installEnteredAt = new Date();
+        updateData.installOrder = 0;
+        // Ensure Installation tag is present
+        if (!hasInstallationTag) {
+          updateData.tags = [...currentTags, "Installation"];
+        }
+      }
+      
+      // Check if jobType contains "Service" to add to service pipeline
       if (jobType.toLowerCase().includes("service")) {
         updateData.serviceStep = "Service Manager Inbox";
         updateData.serviceEnteredAt = new Date();
         updateData.serviceOrder = 0;
         // Add "Service" to tags if not already present
-        const currentTags = lead.tags || [];
         if (!currentTags.some((tag: string) => tag.toLowerCase() === "service")) {
-          updateData.tags = [...currentTags, "Service"];
+          updateData.tags = [...(updateData.tags || currentTags), "Service"];
         }
       }
 
