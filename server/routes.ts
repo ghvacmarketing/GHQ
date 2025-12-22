@@ -2196,6 +2196,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/proposals/accept - Accept a proposal and create a Won lead
+  app.post("/api/proposals/accept", async (req, res) => {
+    try {
+      const { customerName, phone, email, address, estimatedValue, cartItems, notes } = req.body;
+      
+      if (!customerName) {
+        return res.status(400).json({ message: "Customer name is required" });
+      }
+
+      const cartDescription = cartItems && cartItems.length > 0
+        ? cartItems.map((item: { description: string }) => item.description).join(', ')
+        : 'Equipment proposal accepted';
+
+      const leadData = {
+        name: customerName,
+        phone: phone || null,
+        email: email || null,
+        address: address || null,
+        estimatedValue: estimatedValue ? estimatedValue.toString() : null,
+        status: "Won",
+        won: true,
+        installStep: "Define Scope of Work",
+        installEnteredAt: new Date(),
+        clientIssue: cartDescription,
+        leadSource: "Proposal Builder",
+        nextActions: [],
+        scheduledTasks: [],
+        tags: [],
+      };
+
+      const validatedData = insertLeadSchema.parse(leadData);
+      const lead = await storage.createLead(validatedData);
+
+      await storage.createLeadHistory({
+        leadId: lead.id,
+        actor: "system",
+        actionType: "created",
+        payload: { source: "Proposal Builder", status: "Won" }
+      });
+
+      res.json(lead);
+    } catch (error) {
+      console.error('Error accepting proposal:', error);
+      res.status(500).json({ message: "Error accepting proposal" });
+    }
+  });
+
   // 11. PATCH /api/leads/:id - Update lead
   app.patch("/api/leads/:id", async (req, res) => {
     try {

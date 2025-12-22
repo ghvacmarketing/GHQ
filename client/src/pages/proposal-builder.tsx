@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2 } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,12 +13,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
 import packagesData from "@assets/pricebook-packages.json";
 import componentsData from "@assets/pricebook-components.json";
+import type { Customer } from "@shared/schema";
 
 const CART_STORAGE_KEY = 'ghvac-proposal-cart';
 const CUSTOMER_STORAGE_KEY = 'ghvac-proposal-customer';
@@ -239,6 +244,114 @@ export default function ProposalBuilder() {
   const [coilBrandFilter, setCoilBrandFilter] = useState<string>("All Brands");
   const [indoorBrandFilter, setIndoorBrandFilter] = useState<string>("All Brands");
   const [thermostatBrandFilter, setThermostatBrandFilter] = useState<string>("All Brands");
+
+  // Customer search state for Accept Quote
+  const [customerSearchTerm, setCustomerSearchTerm] = useState("");
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
+  const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [searchAllFields, setSearchAllFields] = useState(false);
+
+  // Debounce customer search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCustomerSearch(customerSearchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearchTerm]);
+
+  // Customer search query
+  const { data: customerSearchResults = [], isFetching: isSearchingCustomers } = useQuery<Customer[]>({
+    queryKey: ["/api/customers/search", debouncedCustomerSearch, searchAllFields],
+    queryFn: async () => {
+      if (debouncedCustomerSearch.length < 2) return [];
+      const params = new URLSearchParams({
+        term: debouncedCustomerSearch,
+        ...(searchAllFields && { searchAll: 'true' })
+      });
+      const res = await fetch(`/api/customers/search?${params}`);
+      if (!res.ok) throw new Error("Failed to search customers");
+      return res.json();
+    },
+    enabled: debouncedCustomerSearch.length >= 2,
+    refetchOnWindowFocus: false,
+  });
+
+  // Accept quote mutation
+  const acceptQuoteMutation = useMutation({
+    mutationFn: async (data: {
+      customerName: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      estimatedValue: number;
+      cartItems: { description: string }[];
+      notes?: string;
+    }) => {
+      const res = await apiRequest("POST", "/api/proposals/accept", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Proposal Accepted!",
+        description: "Lead created and added to installation pipeline.",
+      });
+      setQuoteDialogOpen(false);
+      clearCart();
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to accept proposal. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Accept quote error:", error);
+    },
+  });
+
+  const handleSelectCustomer = (customer: Customer) => {
+    const cleanName = customer.displayName.replace(/^["']|["']$/g, '');
+    setCustomerName(cleanName);
+    setCustomerAddress(customer.fullAddress || '');
+    setSelectedCustomer(customer);
+    setCustomerSearchTerm("");
+    setIsCustomerPopoverOpen(false);
+    toast({ description: `Customer "${cleanName}" selected`, duration: 2000 });
+  };
+
+  const handleAcceptQuote = () => {
+    if (!customerName) {
+      toast({
+        title: "Customer Required",
+        description: "Please select or enter a customer name to accept this quote.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const cartItems = cart.map(item => {
+      if (item.isCustomBuild) {
+        return {
+          description: `Custom ${item.tonnage} System: ${item.outdoorUnit.brand} ${item.outdoorUnit.unitName}, ${item.coil.brand} ${item.coil.unitName}, ${item.indoorUnit.brand} ${item.indoorUnit.unitName}, ${item.thermostat.brand} ${item.thermostat.unitName}`,
+        };
+      } else {
+        return {
+          description: `${item.outdoorBrand} ${item.packageLevel} Package - ${item.extractedTonnage} (${UNIT_TYPE_INFO[item.unitType]?.name || item.unitType})`,
+        };
+      }
+    });
+
+    acceptQuoteMutation.mutate({
+      customerName,
+      phone: selectedCustomer?.phone || undefined,
+      email: selectedCustomer?.email || undefined,
+      address: customerAddress || undefined,
+      estimatedValue: cartTotal,
+      cartItems,
+      notes: customerNotes || undefined,
+    });
+  };
 
   useEffect(() => {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
@@ -1437,6 +1550,102 @@ export default function ProposalBuilder() {
           </div>
           
           <ScrollArea className="max-h-[calc(95vh-200px)] p-4 sm:p-6">
+            {/* Customer Search Section */}
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-3 flex items-center gap-2">
+                <Search className="h-4 w-4" />
+                SEARCH CUSTOMER DATABASE
+              </h3>
+              <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={customerSearchTerm}
+                      onChange={(e) => {
+                        setCustomerSearchTerm(e.target.value);
+                        if (e.target.value.length >= 2) {
+                          setIsCustomerPopoverOpen(true);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (customerSearchTerm.length >= 2) {
+                          setIsCustomerPopoverOpen(true);
+                        }
+                      }}
+                      placeholder="Search by name, phone, email, or address..."
+                      className="pl-10 pr-10"
+                      data-testid="input-customer-search"
+                    />
+                    {isSearchingCustomers && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-[calc(100vw-4rem)] sm:w-[500px] p-0" align="start">
+                  <div className="p-2 border-b">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="searchAll"
+                        checked={searchAllFields}
+                        onCheckedChange={(checked) => setSearchAllFields(checked === true)}
+                      />
+                      <label htmlFor="searchAll" className="text-xs text-muted-foreground cursor-pointer">
+                        Search all fields (address, email, phone)
+                      </label>
+                    </div>
+                  </div>
+                  <ScrollArea className="max-h-64">
+                    {customerSearchResults.length === 0 && debouncedCustomerSearch.length >= 2 && !isSearchingCustomers && (
+                      <div className="p-4 text-center text-muted-foreground text-sm">
+                        No customers found for "{debouncedCustomerSearch}"
+                      </div>
+                    )}
+                    {customerSearchResults.map((customer) => (
+                      <div
+                        key={customer.id}
+                        className="p-3 hover:bg-muted cursor-pointer border-b last:border-0"
+                        onClick={() => handleSelectCustomer(customer)}
+                        data-testid={`customer-result-${customer.id}`}
+                      >
+                        <p className="font-medium">{customer.displayName}</p>
+                        <div className="text-sm text-muted-foreground space-y-0.5">
+                          {customer.fullAddress && <p className="truncate">{customer.fullAddress}</p>}
+                          {(customer.phone || customer.email) && (
+                            <p className="truncate">
+                              {customer.phone && <span>{customer.phone}</span>}
+                              {customer.phone && customer.email && <span> • </span>}
+                              {customer.email && <span>{customer.email}</span>}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+              {selectedCustomer && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    {selectedCustomer.displayName}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => {
+                      setSelectedCustomer(null);
+                      setCustomerName('');
+                      setCustomerAddress('');
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {(customerName || customerAddress) && (
               <div className="mb-6 p-4 bg-muted rounded-lg">
                 <h3 className="text-sm font-semibold text-muted-foreground mb-2">PREPARED FOR</h3>
@@ -1568,6 +1777,19 @@ export default function ProposalBuilder() {
               >
                 <Copy className="h-4 w-4 mr-2" />
                 Copy to Clipboard
+              </Button>
+              <Button
+                onClick={handleAcceptQuote}
+                disabled={!customerName || acceptQuoteMutation.isPending}
+                className="flex-1 min-h-[44px] bg-green-600 hover:bg-green-700"
+                data-testid="button-accept-quote"
+              >
+                {acceptQuoteMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                )}
+                Accept Quote
               </Button>
             </div>
           </div>
