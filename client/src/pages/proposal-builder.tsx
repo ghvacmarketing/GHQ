@@ -298,7 +298,9 @@ export default function ProposalBuilder() {
       });
       setQuoteDialogOpen(false);
       clearCart();
+      setSelectedCustomer(null);
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/installation"] });
     },
     onError: (error) => {
       toast({
