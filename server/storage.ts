@@ -613,15 +613,21 @@ export class DatabaseStorage implements IStorage {
   async updateServiceLead(id: string, updates: Partial<Lead>): Promise<Lead | undefined> {
     // Build the set object, explicitly including null values
     const setData: Record<string, any> = { updatedAt: new Date() };
-    for (const [key, value] of Object.entries(updates)) {
+    for (const key of Object.keys(updates)) {
+      const value = (updates as any)[key];
       setData[key] = value;
     }
+    
+    console.log('updateServiceLead setData:', JSON.stringify(setData, null, 2));
     
     const [lead] = await db
       .update(leads)
       .set(setData)
       .where(eq(leads.id, id))
       .returning();
+    
+    console.log('updateServiceLead result repairDate:', lead?.repairDate);
+    
     return lead ? this.normalizeLead(lead) : undefined;
   }
 
