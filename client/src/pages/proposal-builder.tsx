@@ -522,11 +522,13 @@ export default function ProposalBuilder() {
     if (!customTonnage || !customEquipmentType) return [];
     const seen = new Set<string>();
     const targetType = customEquipmentType === "SHP" ? "Heater Kit" : "Evaporator Coil";
+    // Extract numeric tonnage from "1.5 Ton" format
+    const numericTonnage = customTonnage.replace(" Ton", "");
     return components.filter(comp => {
       if (comp.unitType !== customEquipmentType) return false;
       if (comp.componentType !== targetType) return false;
-      // For heater kits, also match by tonnage
-      if (targetType === "Heater Kit" && comp.tonnage !== customTonnage) return false;
+      // For heater kits, also match by tonnage (compare numeric values)
+      if (targetType === "Heater Kit" && comp.tonnage !== numericTonnage) return false;
       const matchesBrand = coilBrandFilter === "All Brands" || comp.brand === coilBrandFilter;
       if (!matchesBrand) return false;
       if (seen.has(comp.model)) return false;
