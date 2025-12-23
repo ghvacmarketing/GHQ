@@ -1483,7 +1483,7 @@ export default function ProposalBuilder() {
                 {/* Mini-Split compact layout */}
                 {selectedUnitType === "Mini-Split" ? (
                   <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800 mb-4">
+                    <p className="text-sm text-muted-foreground bg-amber-50 p-3 rounded-lg border border-amber-200 mb-4">
                       Each package includes both the outdoor condenser and indoor wall-mounted unit for a complete ductless system.
                     </p>
                     {packageOptions.map((pkg, index) => {
@@ -1531,7 +1531,7 @@ export default function ProposalBuilder() {
                               {/* Main info */}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <Badge className="bg-blue-600 text-white font-bold text-sm px-3">
+                                  <Badge className="bg-amber-500 text-white font-bold text-sm px-3">
                                     {pkg.packageLevel}
                                   </Badge>
                                   <span className="text-sm font-medium">
