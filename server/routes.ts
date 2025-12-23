@@ -66,6 +66,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add compression middleware for better performance
   app.use(compression());
 
+  // Serve static assets from attached_assets directory (for SGA images, etc.)
+  app.use('/assets', express.static('attached_assets'));
+
   // Configure multer for file uploads
   const upload = multer({
     storage: multer.memoryStorage(),

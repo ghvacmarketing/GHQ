@@ -126,7 +126,8 @@
     "description": "Gas Furnace; 10 Year Limited Functional Parts with Rregistration 20 Year Limited Heat Exchanger Warranty",
     "monthlyPayment": "118",
     "totalInvestment": "7874",
-    "sourcePage": "34"
+    "sourcePage": "34",
+    "imageUrl": "sga_images/sga_square_furnace_a801x040am3sd.png"
   },
   {
     "unitType": "SGA",
@@ -198,7 +199,8 @@
     "totalInvestment": "11867",
     "sourcePage": "29",
     "equipmentCost": 2762.38,
-    "sellingPrice": 5524.76
+    "sellingPrice": 5524.76,
+    "imageUrl": "sga_images/sga_square_essential_3t_outdoor_5ttr5036a1000.png"
   },
   {
     "unitType": "SGA",
@@ -300,7 +302,8 @@
     "description": "Gas Furnace; 10 Year Limited Functional Parts with Rregistration 20 Year Limited Heat Exchanger Warranty",
     "monthlyPayment": "126",
     "totalInvestment": "8402",
-    "sourcePage": "30"
+    "sourcePage": "30",
+    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -520,7 +523,8 @@
     "totalInvestment": "13546",
     "sourcePage": "23",
     "equipmentCost": 3271.8,
-    "sellingPrice": 6543.6
+    "sellingPrice": 6543.6,
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -738,7 +742,8 @@
     "totalInvestment": "17249",
     "sourcePage": "14",
     "equipmentCost": 4266.05,
-    "sellingPrice": 8532.1
+    "sellingPrice": 8532.1,
+    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttv8x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -770,7 +775,8 @@
     "totalInvestment": "14023",
     "sourcePage": "14",
     "equipmentCost": 3748.43,
-    "sellingPrice": 7496.86
+    "sellingPrice": 7496.86,
+    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1016,7 +1022,8 @@
     "totalInvestment": "18721",
     "sourcePage": "3",
     "equipmentCost": 5004.05,
-    "sellingPrice": 10008.1
+    "sellingPrice": 10008.1,
+    "imageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1086,7 +1093,8 @@
     "priceLow": 6804,
     "priceHigh": 6804,
     "equipmentType": "SGA",
-    "series": "XL16c Series"
+    "series": "XL16c Series",
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1108,7 +1116,8 @@
     "priceLow": 7751,
     "priceHigh": 7751,
     "equipmentType": "SGA",
-    "series": "XL16c Series"
+    "series": "XL16c Series",
+    "imageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3807,7 +3816,8 @@
     "description": "",
     "monthlyPayment": "132",
     "totalInvestment": "8807",
-    "sourcePage": "28"
+    "sourcePage": "28",
+    "imageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png"
   },
   {
     "unitType": "SGA",

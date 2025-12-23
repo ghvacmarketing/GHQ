@@ -61,6 +61,7 @@ type PricebookComponent = {
   sourcePage: string;
   equipmentCost?: number;
   sellingPrice?: number;
+  imageUrl?: string;
 };
 
 type CartPackage = PricebookPackage & {
@@ -875,7 +876,17 @@ export default function ProposalBuilder() {
       data-testid={`${testIdPrefix}-${comp.model}`}
     >
       <CardContent className="p-3 sm:p-4">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-3">
+          {comp.imageUrl && (
+            <div className="flex-shrink-0">
+              <img 
+                src={`/assets/${comp.imageUrl}`}
+                alt={comp.model}
+                className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-md bg-gray-50"
+                loading="lazy"
+              />
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <Badge variant="secondary" className="text-xs">
