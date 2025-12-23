@@ -1501,9 +1501,7 @@ export default function ProposalBuilder() {
                         !item.isCustomBuild &&
                         item.unitType === pkg.unitType && 
                         item.tier === pkg.tier && 
-                        (selectedUnitType === "Mini-Split" 
-                          ? item.packageLevel === pkg.packageLevel 
-                          : item.extractedTonnage === getPackageTonnageDisplay(pkg))
+                        item.packageLevel === pkg.packageLevel
                       );
                       const isMiniSplit = selectedUnitType === "Mini-Split";
                       const btuValue = isMiniSplit ? parseInt(pkg.packageLevel.replace('K', '')) * 1000 : 0;
