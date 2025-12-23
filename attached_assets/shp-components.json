@@ -1,0 +1,691 @@
+[
+  {
+    "model": "5TWR4018A1000",
+    "tonnage": 1.5,
+    "type": "Outdoor Unit",
+    "cost": 2233.48,
+    "price": 4467
+  },
+  {
+    "model": "5TWR5018A1000",
+    "tonnage": 1.5,
+    "type": "Outdoor Unit",
+    "cost": 2939.7,
+    "price": 5879
+  },
+  {
+    "model": "5TWX5018A1000",
+    "tonnage": 1.5,
+    "type": "Outdoor Unit",
+    "cost": 3331.25,
+    "price": 6663
+  },
+  {
+    "model": "5TEM4B02AC21S",
+    "tonnage": 1.5,
+    "type": "Indoor Air Handler",
+    "cost": 1262.8,
+    "price": 2526
+  },
+  {
+    "model": "5TEM6B02AV21S",
+    "tonnage": 1.5,
+    "type": "Indoor Air Handler",
+    "cost": 1589.78,
+    "price": 3180
+  },
+  {
+    "model": "TCONT724AS42DA",
+    "tonnage": 1.5,
+    "type": "Thermostat/Controls",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "model": "BAYHTR1505BRK",
+    "tonnage": 1.5,
+    "type": "Heater Kit",
+    "cost": 108.65,
+    "price": 217
+  },
+  {
+    "model": "5TWR4024A1000",
+    "tonnage": 2,
+    "type": "Outdoor Unit",
+    "cost": 2310.35,
+    "price": 4621
+  },
+  {
+    "model": "5TWR5024A1000",
+    "tonnage": 2,
+    "type": "Outdoor Unit",
+    "cost": 3161.1,
+    "price": 6322
+  },
+  {
+    "model": "5TWR7024A1000",
+    "tonnage": 2,
+    "type": "Outdoor Unit",
+    "cost": 3406.08,
+    "price": 6812
+  },
+  {
+    "model": "5TWV0X24A1000",
+    "tonnage": 2,
+    "type": "Outdoor Unit",
+    "cost": 4547.93,
+    "price": 9096
+  },
+  {
+    "model": "5TWV8X24A1000",
+    "tonnage": 2,
+    "type": "Outdoor Unit",
+    "cost": 3809.93,
+    "price": 7620
+  },
+  {
+    "model": "5TWX5024A1000",
+    "tonnage": 2,
+    "type": "Outdoor Unit",
+    "cost": 3538.3,
+    "price": 7077
+  },
+  {
+    "model": "5TWX7024A1000",
+    "tonnage": 2,
+    "type": "Outdoor Unit",
+    "cost": 3533.18,
+    "price": 7066
+  },
+  {
+    "model": "5TAMXC03AV31D",
+    "tonnage": 2,
+    "type": "Indoor Air Handler",
+    "cost": 2229.38,
+    "price": 4459
+  },
+  {
+    "model": "5TEM4B02AC21S",
+    "tonnage": 2,
+    "type": "Indoor Air Handler",
+    "cost": 1262.8,
+    "price": 2526
+  },
+  {
+    "model": "5TEM6B02AV21S",
+    "tonnage": 2,
+    "type": "Indoor Air Handler",
+    "cost": 1589.78,
+    "price": 3180
+  },
+  {
+    "model": "5TEMCB",
+    "tonnage": 2,
+    "type": "Indoor Air Handler"
+  },
+  {
+    "model": "5TEMCB02AV21",
+    "tonnage": 2,
+    "type": "Indoor Air Handler",
+    "cost": 1685.1,
+    "price": 3370
+  },
+  {
+    "model": "TCONT724AS42DA",
+    "tonnage": 2,
+    "type": "Thermostat/Controls",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "model": "TLINK360A2VVUA",
+    "tonnage": 2,
+    "type": "Thermostat/Controls"
+  },
+  {
+    "model": "UX360B",
+    "tonnage": 2,
+    "type": "Thermostat/Controls"
+  },
+  {
+    "model": "BAYHTR1505BRK",
+    "tonnage": 2,
+    "type": "Heater Kit",
+    "cost": 108.65,
+    "price": 217
+  },
+  {
+    "model": "BAYEA1305BK1A",
+    "tonnage": 2,
+    "type": "Other (Trane)",
+    "cost": 124.03,
+    "price": 248
+  },
+  {
+    "model": "5TWR4030A1000",
+    "tonnage": 2.5,
+    "type": "Outdoor Unit",
+    "cost": 2387.23,
+    "price": 4774
+  },
+  {
+    "model": "5TWR5030A1000",
+    "tonnage": 2.5,
+    "type": "Outdoor Unit",
+    "cost": 3262.58,
+    "price": 6525
+  },
+  {
+    "model": "5TWX5030A1000",
+    "tonnage": 2.5,
+    "type": "Outdoor Unit",
+    "cost": 3638.75,
+    "price": 7278
+  },
+  {
+    "model": "5TEM4B03AC31S",
+    "tonnage": 2.5,
+    "type": "Indoor Air Handler",
+    "cost": 1341.73,
+    "price": 2683
+  },
+  {
+    "model": "5TEM6B03AV21S",
+    "tonnage": 2.5,
+    "type": "Indoor Air Handler",
+    "cost": 1690.23,
+    "price": 3380
+  },
+  {
+    "model": "TCONT724AS42DA",
+    "tonnage": 2.5,
+    "type": "Thermostat/Controls",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "model": "BAYHTR1508BRK",
+    "tonnage": 2.5,
+    "type": "Heater Kit",
+    "cost": 121.98,
+    "price": 244
+  },
+  {
+    "model": "27SPA630A003",
+    "tonnage": 2.5,
+    "type": "Other (Trane)"
+  },
+  {
+    "model": "A5HP4030A1000",
+    "tonnage": 2.5,
+    "type": "Other (Trane)",
+    "cost": 1896,
+    "price": 3792
+  },
+  {
+    "model": "5TWR4036A1000",
+    "tonnage": 3,
+    "type": "Outdoor Unit",
+    "cost": 2465.13,
+    "price": 4930
+  },
+  {
+    "model": "5TWR5036A1000",
+    "tonnage": 3,
+    "type": "Outdoor Unit",
+    "cost": 3367.13,
+    "price": 6734
+  },
+  {
+    "model": "5TWR7036A1000",
+    "tonnage": 3,
+    "type": "Outdoor Unit",
+    "cost": 3832.48,
+    "price": 7665
+  },
+  {
+    "model": "5TWV0X36A1000",
+    "tonnage": 3,
+    "type": "Outdoor Unit",
+    "cost": 4979.45,
+    "price": 9959
+  },
+  {
+    "model": "5TWV8X36A1000",
+    "tonnage": 3,
+    "type": "Outdoor Unit",
+    "cost": 4238.38,
+    "price": 8477
+  },
+  {
+    "model": "5TWX5036A1000",
+    "tonnage": 3,
+    "type": "Outdoor Unit",
+    "cost": 3744.33,
+    "price": 7489
+  },
+  {
+    "model": "5TWX7036A1000",
+    "tonnage": 3,
+    "type": "Outdoor Unit",
+    "cost": 3960.6,
+    "price": 7921
+  },
+  {
+    "model": "5TAMXC03AV31D",
+    "tonnage": 3,
+    "type": "Indoor Air Handler",
+    "cost": 2229.38,
+    "price": 4459
+  },
+  {
+    "model": "5TAMXD05AV41D",
+    "tonnage": 3,
+    "type": "Indoor Air Handler",
+    "cost": 2435.4,
+    "price": 4871
+  },
+  {
+    "model": "5TEM4B03AC31S",
+    "tonnage": 3,
+    "type": "Indoor Air Handler",
+    "cost": 1341.73,
+    "price": 2683
+  },
+  {
+    "model": "5TEM6B03AV21S",
+    "tonnage": 3,
+    "type": "Indoor Air Handler",
+    "cost": 1690.23,
+    "price": 3380
+  },
+  {
+    "model": "5TEM6D04AV31S",
+    "tonnage": 3,
+    "type": "Indoor Air Handler",
+    "cost": 1839.88,
+    "price": 3680
+  },
+  {
+    "model": "5TEMCB03AV31",
+    "tonnage": 3,
+    "type": "Indoor Air Handler",
+    "cost": 1783.5,
+    "price": 3567
+  },
+  {
+    "model": "TCONT724AS42DA",
+    "tonnage": 3,
+    "type": "Thermostat/Controls",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "model": "TLINK360A2VVUA",
+    "tonnage": 3,
+    "type": "Thermostat/Controls"
+  },
+  {
+    "model": "UX360B",
+    "tonnage": 3,
+    "type": "Thermostat/Controls"
+  },
+  {
+    "model": "BAYHTR1510BRK",
+    "tonnage": 3,
+    "type": "Heater Kit",
+    "cost": 128.13,
+    "price": 256
+  },
+  {
+    "model": "27SCA536A003",
+    "tonnage": 3,
+    "type": "Other (Trane)"
+  },
+  {
+    "model": "A5HP4036A1000",
+    "tonnage": 3,
+    "type": "Other (Trane)",
+    "cost": 1979,
+    "price": 3958
+  },
+  {
+    "model": "BAYEA1310BK1A",
+    "tonnage": 3,
+    "type": "Other (Trane)",
+    "cost": 162.98,
+    "price": 326
+  },
+  {
+    "model": "FJ5ANXB36L10",
+    "tonnage": 3,
+    "type": "Other (Trane)"
+  },
+  {
+    "model": "5TWR4042A1000",
+    "tonnage": 3.5,
+    "type": "Outdoor Unit",
+    "cost": 2570.7,
+    "price": 5141
+  },
+  {
+    "model": "5TWR5042A1000",
+    "tonnage": 3.5,
+    "type": "Outdoor Unit",
+    "cost": 3498.33,
+    "price": 6997
+  },
+  {
+    "model": "5TWX5042A1000",
+    "tonnage": 3.5,
+    "type": "Outdoor Unit",
+    "cost": 3875.53,
+    "price": 7751
+  },
+  {
+    "model": "5TEM4D05AC41S",
+    "tonnage": 3.5,
+    "type": "Indoor Air Handler",
+    "cost": 1495.48,
+    "price": 2991
+  },
+  {
+    "model": "5TEM6D05AV41S",
+    "tonnage": 3.5,
+    "type": "Indoor Air Handler",
+    "cost": 1970.05,
+    "price": 3940
+  },
+  {
+    "model": "5TEM6D06AV41S",
+    "tonnage": 3.5,
+    "type": "Indoor Air Handler",
+    "cost": 2194.53,
+    "price": 4389
+  },
+  {
+    "model": "TCONT724AS42DA",
+    "tonnage": 3.5,
+    "type": "Thermostat/Controls",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "model": "BAYHTR1510BRK",
+    "tonnage": 3.5,
+    "type": "Heater Kit",
+    "cost": 128.13,
+    "price": 256
+  },
+  {
+    "model": "BAYHTR1517BRK",
+    "tonnage": 3.5,
+    "type": "Heater Kit",
+    "cost": 179.38,
+    "price": 359
+  },
+  {
+    "model": "5TWR4048A1000",
+    "tonnage": 4,
+    "type": "Outdoor Unit",
+    "cost": 2670.13,
+    "price": 5340
+  },
+  {
+    "model": "5TWR5048A1000",
+    "tonnage": 4,
+    "type": "Outdoor Unit",
+    "cost": 3622.35,
+    "price": 7245
+  },
+  {
+    "model": "5TWR7048A1000",
+    "tonnage": 4,
+    "type": "Outdoor Unit",
+    "cost": 4250.68,
+    "price": 8501
+  },
+  {
+    "model": "5TWV0X48A1000",
+    "tonnage": 4,
+    "type": "Outdoor Unit",
+    "cost": 5401.75,
+    "price": 10804
+  },
+  {
+    "model": "5TWV8X48A1000",
+    "tonnage": 4,
+    "type": "Outdoor Unit",
+    "cost": 4661.7,
+    "price": 9323
+  },
+  {
+    "model": "5TWX5048A1000",
+    "tonnage": 4,
+    "type": "Outdoor Unit",
+    "cost": 3998.53,
+    "price": 7997
+  },
+  {
+    "model": "5TWX7048A1000",
+    "tonnage": 4,
+    "type": "Outdoor Unit",
+    "cost": 4378.8,
+    "price": 8758
+  },
+  {
+    "model": "5TAMXD06AV41D",
+    "tonnage": 4,
+    "type": "Indoor Air Handler",
+    "cost": 2564.55,
+    "price": 5129
+  },
+  {
+    "model": "5TAMXD07AV51D",
+    "tonnage": 4,
+    "type": "Indoor Air Handler",
+    "cost": 2824.9,
+    "price": 5650
+  },
+  {
+    "model": "5TEM4D06AC41S",
+    "tonnage": 4,
+    "type": "Indoor Air Handler",
+    "cost": 1576.45,
+    "price": 3153
+  },
+  {
+    "model": "5TEM6D06AV41S",
+    "tonnage": 4,
+    "type": "Indoor Air Handler",
+    "cost": 2194.53,
+    "price": 4389
+  },
+  {
+    "model": "5TEMCD06AV41",
+    "tonnage": 4,
+    "type": "Indoor Air Handler",
+    "cost": 2283.7,
+    "price": 4567
+  },
+  {
+    "model": "TCONT724AS42DA",
+    "tonnage": 4,
+    "type": "Thermostat/Controls",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "model": "TLINK360A2VVUA",
+    "tonnage": 4,
+    "type": "Thermostat/Controls"
+  },
+  {
+    "model": "UX360B",
+    "tonnage": 4,
+    "type": "Thermostat/Controls"
+  },
+  {
+    "model": "BAYHTR1510BRK",
+    "tonnage": 4,
+    "type": "Heater Kit",
+    "cost": 128.13,
+    "price": 256
+  },
+  {
+    "model": "BAYHTR1517BRK",
+    "tonnage": 4,
+    "type": "Heater Kit",
+    "cost": 179.38,
+    "price": 359
+  },
+  {
+    "model": "27SCA548A003",
+    "tonnage": 4,
+    "type": "Other (Trane)"
+  },
+  {
+    "model": "A5HP4048A1000",
+    "tonnage": 4,
+    "type": "Other (Trane)",
+    "cost": 2193,
+    "price": 4386
+  },
+  {
+    "model": "BAYEA2315BK1A",
+    "tonnage": 4,
+    "type": "Other (Trane)",
+    "cost": 177.33,
+    "price": 355
+  },
+  {
+    "model": "FJ5ANXC48L10",
+    "tonnage": 4,
+    "type": "Other (Trane)"
+  },
+  {
+    "model": "5TWR4060A1000",
+    "tonnage": 5,
+    "type": "Outdoor Unit",
+    "cost": 2871.03,
+    "price": 5742
+  },
+  {
+    "model": "5TWR5060A1000",
+    "tonnage": 5,
+    "type": "Outdoor Unit",
+    "cost": 3872.45,
+    "price": 7745
+  },
+  {
+    "model": "5TWR7060A1000",
+    "tonnage": 5,
+    "type": "Outdoor Unit",
+    "cost": 4669.9,
+    "price": 9340
+  },
+  {
+    "model": "5TWV0X60A1000",
+    "tonnage": 5,
+    "type": "Outdoor Unit",
+    "cost": 5825.08,
+    "price": 11650
+  },
+  {
+    "model": "5TWV8X60A1000",
+    "tonnage": 5,
+    "type": "Outdoor Unit",
+    "cost": 5086.05,
+    "price": 10172
+  },
+  {
+    "model": "5TWX5060A1000",
+    "tonnage": 5,
+    "type": "Outdoor Unit",
+    "cost": 4246.58,
+    "price": 8493
+  },
+  {
+    "model": "5TWX7060A1000",
+    "tonnage": 5,
+    "type": "Outdoor Unit",
+    "cost": 4797,
+    "price": 9594
+  },
+  {
+    "model": "5TAMXD07AV51D",
+    "tonnage": 5,
+    "type": "Indoor Air Handler",
+    "cost": 2824.9,
+    "price": 5650
+  },
+  {
+    "model": "5TEM4D07AC51S",
+    "tonnage": 5,
+    "type": "Indoor Air Handler",
+    "cost": 1835.78,
+    "price": 3672
+  },
+  {
+    "model": "5TEM6D07AV51S",
+    "tonnage": 5,
+    "type": "Indoor Air Handler",
+    "cost": 2434.38,
+    "price": 4869
+  },
+  {
+    "model": "5TEMCD07AV51",
+    "tonnage": 5,
+    "type": "Indoor Air Handler",
+    "cost": 2538.93,
+    "price": 5078
+  },
+  {
+    "model": "TCONT724AS42DA",
+    "tonnage": 5,
+    "type": "Thermostat/Controls",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "model": "TLINK360A2VVUA",
+    "tonnage": 5,
+    "type": "Thermostat/Controls"
+  },
+  {
+    "model": "UX360B",
+    "tonnage": 5,
+    "type": "Thermostat/Controls"
+  },
+  {
+    "model": "BAYHTR1517BRK",
+    "tonnage": 5,
+    "type": "Heater Kit",
+    "cost": 179.38,
+    "price": 359
+  },
+  {
+    "model": "27SCA560A003",
+    "tonnage": 5,
+    "type": "Other (Trane)"
+  },
+  {
+    "model": "A5HP4060A1000",
+    "tonnage": 5,
+    "type": "Other (Trane)",
+    "cost": 2406,
+    "price": 4812
+  },
+  {
+    "model": "BAYEA2315BK1A",
+    "tonnage": 5,
+    "type": "Other (Trane)",
+    "cost": 177.33,
+    "price": 355
+  },
+  {
+    "model": "FJ5ANXD60L00",
+    "tonnage": 5,
+    "type": "Other (Trane)"
+  }
+]
