@@ -147,8 +147,8 @@ function EquipmentImageGrid({
   
   if (!hasAnyImage) return null;
   
-  // Use "Heat Kit" label for PHP and SHP systems, "Indoor" for others
-  const indoorLabel = (unitType === 'PHP' || unitType === 'SHP') ? 'Heat Kit' : 'Indoor';
+  // Use "Heat Kit" label for PHP, "Air Handler" for SHP, "Indoor" for others
+  const indoorLabel = unitType === 'PHP' ? 'Heat Kit' : unitType === 'SHP' ? 'Air Handler' : 'Indoor';
   
   const imageItems = [
     { key: 'outdoor', url: images.outdoor, label: 'Outdoor' },
@@ -655,27 +655,28 @@ export default function ProposalBuilder() {
     });
   }, [customTonnage, customEquipmentType, outdoorBrandFilter, isPackageUnitType, allowedSgaModels, allowedShpModels]);
 
-  // Get unique coils/heater kits by equipment type - dedupe by model
-  // SGA uses Evaporator Coil, SHP/PHP uses Heater Kit
-  const coilOrHeaterLabel = (customEquipmentType === "SHP" || customEquipmentType === "PHP") ? "Heater Kit" : "Evaporator Coil";
-  const coilOrHeaterType = (customEquipmentType === "SHP" || customEquipmentType === "PHP") ? "Heater Kit" : "Evaporator Coil";
+  // Get unique coils/air handlers/heater kits by equipment type - dedupe by model
+  // SGA uses Evaporator Coil, SHP uses Air Handler, PHP uses Heater Kit
+  const coilOrHeaterLabel = customEquipmentType === "PHP" ? "Heater Kit" : customEquipmentType === "SHP" ? "Air Handler" : "Evaporator Coil";
   
   const coilOptions = useMemo(() => {
     if (!customTonnage || !customEquipmentType) return [];
     const seen = new Set<string>();
-    const targetType = (customEquipmentType === "SHP" || customEquipmentType === "PHP") ? "Heater Kit" : "Evaporator Coil";
+    // SGA uses Evaporator Coil, SHP uses Air Handler, PHP uses Heater Kit
+    const targetType = customEquipmentType === "PHP" ? "Heater Kit" : customEquipmentType === "SHP" ? "Air Handler" : "Evaporator Coil";
     // Extract numeric tonnage from "1.5 Ton" format
     const numericTonnage = customTonnage.replace(" Ton", "");
     const isSgaOrShp = customEquipmentType === "SGA" || customEquipmentType === "SHP";
+    // For SHP, Air Handler models are in indoorHeatModel field (use allowedShpModels.indoor)
     const allowedModels = customEquipmentType === "SGA" ? allowedSgaModels.coil : 
-                          customEquipmentType === "SHP" ? allowedShpModels.coil : null;
+                          customEquipmentType === "SHP" ? allowedShpModels.indoor : null;
     return components.filter(comp => {
       if (comp.unitType !== customEquipmentType) return false;
       // For SGA/SHP, only allow models that exist in preset packages
       if (isSgaOrShp && allowedModels && !allowedModels.has(comp.model)) return false;
       if (comp.componentType !== targetType) return false;
-      // For heater kits, also match by tonnage (compare numeric values)
-      if (targetType === "Heater Kit" && comp.tonnage !== numericTonnage) return false;
+      // For heater kits/air handlers, also match by tonnage (compare numeric values)
+      if ((targetType === "Heater Kit" || targetType === "Air Handler") && comp.tonnage !== numericTonnage) return false;
       const matchesBrand = coilBrandFilter === "All Brands" || comp.brand === coilBrandFilter;
       if (!matchesBrand) return false;
       if (seen.has(comp.model)) return false;
@@ -1750,7 +1751,7 @@ export default function ProposalBuilder() {
                                     )}
                                     <div className="flex-1">
                                       <p className="font-medium text-xs text-muted-foreground mb-1">
-                                        {(pkg.unitType === 'PHP' || pkg.unitType === 'SHP') ? 'Heat Kit' : 'Indoor Unit / Furnace'}
+                                        {pkg.unitType === 'PHP' ? 'Heat Kit' : pkg.unitType === 'SHP' ? 'Air Handler' : 'Indoor Unit / Furnace'}
                                       </p>
                                       <p className="font-medium">{pkg.indoorHeatModel}</p>
                                       <p className="text-muted-foreground text-xs">{pkg.indoorHeatName}</p>
@@ -2398,7 +2399,7 @@ export default function ProposalBuilder() {
                       Good: 'bg-blue-500',
                       Budget: 'bg-gray-500',
                     };
-                    const indoorLabel = (item.unitType === 'PHP' || item.unitType === 'SHP') ? 'Heat Kit' : 'Indoor Unit';
+                    const indoorLabel = item.unitType === 'PHP' ? 'Heat Kit' : item.unitType === 'SHP' ? 'Air Handler' : 'Indoor Unit';
                     const components = [
                       { label: 'Outdoor Unit', name: `${item.outdoorBrand} ${item.outdoorModel}`, image: item.outdoorImageUrl },
                       { label: 'Evaporator Coil', name: item.coilName || item.coilModel, image: item.coilImageUrl },
