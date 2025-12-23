@@ -544,12 +544,23 @@ export default function ProposalBuilder() {
     });
   }, [selectedUnitType, selectedTier]);
 
+  // Auto-select tonnage if there's only one option (e.g., "All" for Mini-Split)
+  const hasSingleTonnage = tonnagesForSelection.length === 1;
+  
+  useEffect(() => {
+    if (selectedTier && hasSingleTonnage && !selectedTonnage) {
+      setSelectedTonnage(tonnagesForSelection[0]);
+    }
+  }, [selectedTier, hasSingleTonnage, selectedTonnage, tonnagesForSelection]);
+
   const packageOptions = useMemo(() => {
     if (!selectedUnitType || !selectedTier || !selectedTonnage) return [];
     
     const filtered = packages.filter(pkg => {
       if (pkg.unitType !== selectedUnitType || pkg.tier !== selectedTier) return false;
       const pkgTonnage = getPackageTonnageDisplay(pkg);
+      // If tonnage is "All", show all packages for this unit type/tier
+      if (selectedTonnage === "All" || pkgTonnage === "All") return true;
       return pkgTonnage === selectedTonnage;
     });
     
@@ -697,12 +708,22 @@ export default function ProposalBuilder() {
 
   const currentStep = useMemo(() => {
     if (!selectedUnitType) return 1;
-    if (!selectedTier) return hasSingleTier ? 2 : 2; // Will auto-select if single tier
-    if (!selectedTonnage) return hasSingleTier ? 2 : 3;
-    return hasSingleTier ? 3 : 4;
-  }, [selectedUnitType, selectedTier, selectedTonnage, hasSingleTier]);
+    // Calculate step based on skipped steps
+    const skipTier = hasSingleTier;
+    const skipTonnage = hasSingleTonnage;
+    
+    if (!selectedTier) return 2; // Will auto-select if single tier
+    if (!selectedTonnage) {
+      if (skipTier) return 2;
+      return 3;
+    }
+    // Final step (package selection)
+    if (skipTier && skipTonnage) return 2;
+    if (skipTier || skipTonnage) return 3;
+    return 4;
+  }, [selectedUnitType, selectedTier, selectedTonnage, hasSingleTier, hasSingleTonnage]);
 
-  const totalSteps = hasSingleTier ? 3 : 4;
+  const totalSteps = (hasSingleTier && hasSingleTonnage) ? 2 : (hasSingleTier || hasSingleTonnage) ? 3 : 4;
 
   const customBuildStep = useMemo(() => {
     if (!customEquipmentType) return 1;
@@ -1389,7 +1410,7 @@ export default function ProposalBuilder() {
               </div>
             )}
 
-            {((currentStep === 3 && !hasSingleTier) || (currentStep === 2 && hasSingleTier)) && (
+            {selectedTier && !selectedTonnage && !hasSingleTonnage && (
               <div>
                 <h2 className="text-xl font-semibold mb-2">
                   {selectedUnitType === "Mini-Split" ? "Select BTU Size" : "Select Tonnage"}
@@ -1426,7 +1447,7 @@ export default function ProposalBuilder() {
               </div>
             )}
 
-            {((currentStep === 4 && !hasSingleTier) || (currentStep === 3 && hasSingleTier)) && (
+            {selectedTier && selectedTonnage && (
               <div>
                 <h2 className="text-xl font-semibold mb-2">Select Package</h2>
                 <p className="text-muted-foreground mb-4">
