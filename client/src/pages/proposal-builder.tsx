@@ -44,6 +44,8 @@ type PricebookPackage = {
   thermostatModel: string;
   thermostatName: string;
   accessoryModels: string;
+  outdoorImageUrl?: string;
+  furnaceImageUrl?: string;
 };
 
 type PricebookComponent = {
@@ -1377,9 +1379,21 @@ export default function ProposalBuilder() {
                         <CardContent className="space-y-3">
                           <div className="space-y-2 text-sm">
                             <div className="p-2 bg-muted rounded-md">
-                              <p className="font-medium text-xs text-muted-foreground mb-1">Outdoor Unit</p>
-                              <p className="font-medium">{pkg.outdoorBrand} {pkg.outdoorModel}</p>
-                              <p className="text-muted-foreground text-xs">{pkg.outdoorName}</p>
+                              <div className="flex gap-3">
+                                {pkg.outdoorImageUrl && (
+                                  <img 
+                                    src={`/assets/${pkg.outdoorImageUrl}`}
+                                    alt={pkg.outdoorModel}
+                                    className="w-16 h-16 object-contain rounded bg-white flex-shrink-0"
+                                    loading="lazy"
+                                  />
+                                )}
+                                <div className="flex-1">
+                                  <p className="font-medium text-xs text-muted-foreground mb-1">Outdoor Unit</p>
+                                  <p className="font-medium">{pkg.outdoorBrand} {pkg.outdoorModel}</p>
+                                  <p className="text-muted-foreground text-xs">{pkg.outdoorName}</p>
+                                </div>
+                              </div>
                             </div>
                             
                             {pkg.coilModel && (
@@ -1392,9 +1406,21 @@ export default function ProposalBuilder() {
                             
                             {pkg.indoorHeatModel && (
                               <div className="p-2 bg-muted rounded-md">
-                                <p className="font-medium text-xs text-muted-foreground mb-1">Indoor Unit / Furnace</p>
-                                <p className="font-medium">{pkg.indoorHeatModel}</p>
-                                <p className="text-muted-foreground text-xs">{pkg.indoorHeatName}</p>
+                                <div className="flex gap-3">
+                                  {pkg.furnaceImageUrl && (
+                                    <img 
+                                      src={`/assets/${pkg.furnaceImageUrl}`}
+                                      alt={pkg.indoorHeatModel}
+                                      className="w-16 h-16 object-contain rounded bg-white flex-shrink-0"
+                                      loading="lazy"
+                                    />
+                                  )}
+                                  <div className="flex-1">
+                                    <p className="font-medium text-xs text-muted-foreground mb-1">Indoor Unit / Furnace</p>
+                                    <p className="font-medium">{pkg.indoorHeatModel}</p>
+                                    <p className="text-muted-foreground text-xs">{pkg.indoorHeatName}</p>
+                                  </div>
+                                </div>
                               </div>
                             )}
                             

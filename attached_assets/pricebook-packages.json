@@ -1077,7 +1077,8 @@
     "indoorHeatName": "S8V2 Two-Stage Variable-Speed",
     "thermostatModel": "TLINK360A2VVUA",
     "thermostatName": "tLink 360 Smart Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1095,7 +1096,8 @@
     "indoorHeatName": "S8V2 Two-Stage Variable-Speed",
     "thermostatModel": "TLINK360A2VVUA",
     "thermostatName": "tLink 360 Smart Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1113,7 +1115,8 @@
     "indoorHeatName": "S8V2 Two-Stage Variable-Speed",
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1131,7 +1134,8 @@
     "indoorHeatName": "S8X1 Single-Stage",
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1401,7 +1405,8 @@
     "indoorHeatName": "S8X1 Single-Stage",
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_images/sga_square_essential_3t_outdoor_5ttr5036a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1473,7 +1478,8 @@
     "indoorHeatName": "S8V2 Two-Stage Variable-Speed",
     "thermostatModel": "TLINK360A2VVUA",
     "thermostatName": "tLink 360 Smart Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1491,7 +1497,8 @@
     "indoorHeatName": "S8X1 Single-Stage",
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1581,7 +1588,8 @@
     "indoorHeatName": "S8X1 Single-Stage",
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1833,7 +1841,8 @@
     "indoorHeatName": "S8X1 Single-Stage",
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_images/sga_square_essential_3t_outdoor_5ttr5036a1000.png"
   },
   {
     "unitType": "SGA",
@@ -2067,7 +2076,8 @@
     "indoorHeatName": "S8X1 Single-Stage",
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SGA",
