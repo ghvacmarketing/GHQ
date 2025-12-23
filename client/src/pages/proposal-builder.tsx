@@ -579,6 +579,21 @@ export default function ProposalBuilder() {
     });
   }, [selectedUnitType, selectedTier, selectedTonnage]);
 
+  // Custom build packages for Mini-Split and Ducting (show all packages)
+  const customBuildPackageOptions = useMemo(() => {
+    if (!customEquipmentType || (customEquipmentType !== "Mini-Split" && customEquipmentType !== "Ducting")) return [];
+    
+    const filtered = packages.filter(pkg => pkg.unitType === customEquipmentType && pkg.tier === "Standard");
+    
+    return filtered.sort((a, b) => {
+      // For BTU-based levels (Mini-Split: 6K, 9K, etc.) or tonnage-based (Ducting)
+      const aNum = parseFloat(a.packageLevel.replace('K', '').replace(' Ton', ''));
+      const bNum = parseFloat(b.packageLevel.replace('K', '').replace(' Ton', ''));
+      if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+      return 0;
+    });
+  }, [customEquipmentType, packages]);
+
   // Check if this is a package unit type (PHP or GP)
   const isPackageUnitType = customEquipmentType === "PHP" || customEquipmentType === "GP";
   
@@ -737,6 +752,8 @@ export default function ProposalBuilder() {
 
   const customBuildStep = useMemo(() => {
     if (!customEquipmentType) return 1;
+    // Mini-Split and Ducting skip tonnage selection (step 2)
+    if (customEquipmentType === "Mini-Split" || customEquipmentType === "Ducting") return 3;
     if (!customTonnage) return 2;
     return 3;
   }, [customEquipmentType, customTonnage]);
@@ -1789,7 +1806,7 @@ export default function ProposalBuilder() {
                 <h2 className="text-xl font-semibold mb-2">Select Equipment Type</h2>
                 <p className="text-muted-foreground mb-4">Choose the type of system you want to build</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {["SGA", "SHP", "PHP", "GP"].map(type => {
+                  {["SGA", "SHP", "PHP", "GP", "Mini-Split", "Ducting"].map(type => {
                     const typeInfo = UNIT_TYPE_INFO[type];
                     const TypeIcon = typeInfo?.icon || Package;
                     return (
@@ -1857,6 +1874,138 @@ export default function ProposalBuilder() {
 
             {customBuildStep === 3 && (
               <div>
+                {/* Mini-Split and Ducting compact layout */}
+                {(customEquipmentType === "Mini-Split" || customEquipmentType === "Ducting") ? (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-2">
+                      {customEquipmentType === "Mini-Split" ? "Select Mini-Split System" : "Select Duct System Size"}
+                    </h2>
+                    <p className="text-muted-foreground mb-4">
+                      {customEquipmentType === "Mini-Split" 
+                        ? "Choose the BTU capacity for your space"
+                        : "Choose the system size based on your home's tonnage"}
+                    </p>
+                    
+                    <div className="space-y-3">
+                      {customEquipmentType === "Mini-Split" ? (
+                        <p className="text-sm text-muted-foreground p-3 rounded-lg border mb-4" style={{ backgroundColor: '#d3b07d20', borderColor: '#d3b07d' }}>
+                          Each package includes both the outdoor condenser and indoor wall-mounted unit for a complete ductless system.
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground p-3 rounded-lg border mb-4" style={{ backgroundColor: '#d3b07d20', borderColor: '#d3b07d' }}>
+                          Complete duct system replacement includes removal of existing ducts, new ductwork installation, and system balancing with a 10-year workmanship guarantee.
+                        </p>
+                      )}
+                      {customBuildPackageOptions.map((pkg, index) => {
+                        const isInCart = cart.some(item => 
+                          !item.isCustomBuild &&
+                          item.unitType === pkg.unitType && 
+                          item.tier === pkg.tier && 
+                          item.packageLevel === pkg.packageLevel
+                        );
+                        const isMiniSplit = customEquipmentType === "Mini-Split";
+                        const btuValue = isMiniSplit ? parseInt(pkg.packageLevel.replace('K', '')) * 1000 : 0;
+                        return (
+                          <Card
+                            key={`${pkg.packageLevel}-${pkg.outdoorModel || pkg.tonnage}-${index}`}
+                            className={`relative overflow-hidden ${isInCart ? 'border-primary ring-1 ring-primary bg-primary/5' : ''}`}
+                            data-testid={`custom-package-${(isMiniSplit ? pkg.packageLevel : pkg.packageLevel).toString().toLowerCase().replace('.', '-').replace(' ', '-')}`}
+                          >
+                            <div className="p-4">
+                              <div className="flex items-start gap-4">
+                                {/* Image */}
+                                <div className="flex gap-3 flex-shrink-0">
+                                  {pkg.outdoorImageUrl && (
+                                    <div className="text-center">
+                                      <img 
+                                        src={`/assets/${pkg.outdoorImageUrl}`}
+                                        alt={isMiniSplit ? "Outdoor Condenser" : "Duct System"}
+                                        className="w-16 h-16 object-contain rounded-lg bg-white border shadow-sm"
+                                        loading="lazy"
+                                      />
+                                      {isMiniSplit && <p className="text-[10px] text-muted-foreground mt-1 font-medium">Outdoor</p>}
+                                    </div>
+                                  )}
+                                  {isMiniSplit && pkg.furnaceImageUrl && (
+                                    <div className="text-center">
+                                      <img 
+                                        src={`/assets/${pkg.furnaceImageUrl}`}
+                                        alt="Indoor Wall Unit"
+                                        className="w-16 h-16 object-contain rounded-lg bg-white border shadow-sm"
+                                        loading="lazy"
+                                      />
+                                      <p className="text-[10px] text-muted-foreground mt-1 font-medium">Indoor</p>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {/* Main info */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                    <Badge className="text-white font-bold text-sm px-3" style={{ backgroundColor: '#d3b07d' }}>
+                                      {pkg.packageLevel}
+                                    </Badge>
+                                    {isMiniSplit && (
+                                      <span className="text-sm font-medium">
+                                        {btuValue.toLocaleString()} BTU
+                                      </span>
+                                    )}
+                                    {isInCart && (
+                                      <Badge variant="outline" className="text-primary border-primary text-xs">
+                                        <Check className="h-3 w-3 mr-1" />
+                                        Added
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="font-medium text-sm truncate">
+                                    {isMiniSplit 
+                                      ? `Complete ${pkg.packageLevel} Mini-Split System`
+                                      : `Complete ${pkg.packageLevel} Duct System Replacement`}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {isMiniSplit 
+                                      ? "New insulated ducts, registers, test & balance, 10-year guarantee"
+                                      : "New insulated ducts, registers, test & balance, 10-year guarantee"}
+                                  </p>
+                                </div>
+                                
+                                {/* Price and Add */}
+                                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                  <div className="text-right">
+                                    <p className="font-bold text-lg text-primary">
+                                      ${parseFloat(pkg.totalInvestment).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      ${pkg.monthlyPayment}/mo
+                                    </p>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    className="min-h-[36px] min-w-[70px]"
+                                    onClick={() => addToCart(pkg)}
+                                    data-testid={`custom-button-add-${pkg.packageLevel.toLowerCase().replace(' ', '-')}`}
+                                  >
+                                    <ShoppingCart className="h-4 w-4 mr-1" />
+                                    Add
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                    
+                    {customBuildPackageOptions.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No packages found for {customEquipmentType}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Standard component selection for SGA, SHP, PHP, GP */
+                  <>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
                   <div>
                     <h2 className="text-xl font-semibold">Build Your {customEquipmentType} {customTonnage} System</h2>
@@ -2004,6 +2153,8 @@ export default function ProposalBuilder() {
                       Add Custom Build to Proposal
                     </Button>
                   </div>
+                )}
+                </>
                 )}
               </div>
             )}
