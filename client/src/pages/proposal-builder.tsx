@@ -254,6 +254,73 @@ function getEliteAirflowPrice(option: EliteAirflowOption, tonnage: string): numb
   return option.priceByTonnage[numTonnage] || 0;
 }
 
+// Calculate full Elite package pricing for HVAC
+function calculateHvacElitePricing(
+  basePrice: number, 
+  tonnage: string, 
+  selectedAirflowOptionId: string
+): ElitePackageData | null {
+  const airflowOption = HVAC_ELITE_AIRFLOW_OPTIONS.find(o => o.id === selectedAirflowOptionId);
+  if (!airflowOption) return null;
+
+  const coreBundlePrices: Record<string, number> = {};
+  let bundleTotal = 0;
+  for (const bundle of HVAC_ELITE_CORE_BUNDLES) {
+    const price = getEliteBundlePrice(bundle, tonnage);
+    coreBundlePrices[bundle.id] = price;
+    bundleTotal += price;
+  }
+
+  const airflowPrice = getEliteAirflowPrice(airflowOption, tonnage);
+  const originalTotal = basePrice + bundleTotal + airflowPrice;
+  const discountAmount = Math.round(originalTotal * (ELITE_DISCOUNT_PERCENT / 100));
+  const finalTotal = originalTotal - discountAmount;
+
+  return {
+    isElite: true,
+    selectedAirflowOptionId,
+    coreBundlePrices,
+    airflowPrice,
+    originalTotal,
+    discountAmount,
+    finalTotal
+  };
+}
+
+// Calculate full Elite package pricing for Crawlspace
+function calculateCrawlspaceElitePricing(basePrice: number): ElitePackageData {
+  const coreBundlePrices: Record<string, number> = {};
+  let bundleTotal = 0;
+  for (const bundle of CRAWLSPACE_ELITE_BUNDLES) {
+    const price = bundle.fixedPrice || 0;
+    coreBundlePrices[bundle.id] = price;
+    bundleTotal += price;
+  }
+
+  const originalTotal = basePrice + bundleTotal;
+  const discountAmount = Math.round(originalTotal * (ELITE_DISCOUNT_PERCENT / 100));
+  const finalTotal = originalTotal - discountAmount;
+
+  return {
+    isElite: true,
+    selectedAirflowOptionId: "", // Not applicable for crawlspace
+    coreBundlePrices,
+    airflowPrice: 0,
+    originalTotal,
+    discountAmount,
+    finalTotal
+  };
+}
+
+// Type guard helpers
+function isCrawlspaceItem(item: CartItem): item is CrawlspaceCartItem {
+  return 'isCrawlspace' in item && item.isCrawlspace === true;
+}
+
+function isCustomBuild(item: CartItem): item is CustomBuildCart {
+  return 'isCustomBuild' in item && item.isCustomBuild === true;
+}
+
 const formatPrice = (price: number) => '$' + price.toLocaleString();
 const formatPriceRange = (low: number, high: number) => {
   if (low === high) return '$' + low.toLocaleString();
@@ -552,7 +619,15 @@ export default function ProposalBuilder() {
     }
 
     const equipmentDetails = cart.map(item => {
-      if (item.isCustomBuild) {
+      if (isCrawlspaceItem(item)) {
+        return {
+          type: "crawlspace",
+          tierName: item.tier.name,
+          tierPrice: item.tier.price,
+          quantity: item.quantity,
+          totalPrice: item.tier.price * item.quantity,
+        };
+      } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
         return {
           type: "custom",
@@ -560,26 +635,26 @@ export default function ProposalBuilder() {
           quantity: item.quantity,
           priceLow: estimate.low * item.quantity,
           priceHigh: estimate.high * item.quantity,
-          outdoor: {
+          outdoor: item.outdoorUnit ? {
             brand: item.outdoorUnit.brand,
             model: item.outdoorUnit.model,
             name: item.outdoorUnit.unitName,
-          },
-          coil: {
+          } : null,
+          coil: item.coil ? {
             brand: item.coil.brand,
             model: item.coil.model,
             name: item.coil.unitName,
-          },
-          indoor: {
+          } : null,
+          indoor: item.indoorUnit ? {
             brand: item.indoorUnit.brand,
             model: item.indoorUnit.model,
             name: item.indoorUnit.unitName,
-          },
-          thermostat: {
+          } : null,
+          thermostat: item.thermostat ? {
             brand: item.thermostat.brand,
             model: item.thermostat.model,
             name: item.thermostat.unitName,
-          },
+          } : null,
         };
       } else {
         const itemPrice = (parseFloat(item.totalInvestment) || 0) * item.quantity;
@@ -879,7 +954,10 @@ export default function ProposalBuilder() {
 
   const cartTotalRange = useMemo(() => {
     return cart.reduce((acc, item) => {
-      if (item.isCustomBuild) {
+      if (isCrawlspaceItem(item)) {
+        const price = item.tier.price * item.quantity;
+        return { low: acc.low + price, high: acc.high + price };
+      } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
         return { low: acc.low + estimate.low * item.quantity, high: acc.high + estimate.high * item.quantity };
       } else {
@@ -893,7 +971,10 @@ export default function ProposalBuilder() {
 
   const cartMonthlyTotalRange = useMemo(() => {
     return cart.reduce((acc, item) => {
-      if (item.isCustomBuild) {
+      if (isCrawlspaceItem(item)) {
+        const monthly = Math.round(item.tier.price / 67) * item.quantity;
+        return { low: acc.low + monthly, high: acc.high + monthly };
+      } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
         return { 
           low: acc.low + Math.round(estimate.low / 67) * item.quantity, 
@@ -909,7 +990,7 @@ export default function ProposalBuilder() {
   const cartMonthlyTotal = cartMonthlyTotalRange.high; // Use high for backward compatibility
 
   const hasEstimatedItems = useMemo(() => {
-    return cart.some(item => item.isCustomBuild);
+    return cart.some(item => isCustomBuild(item));
   }, [cart]);
 
   const currentStep = useMemo(() => {
@@ -1093,15 +1174,22 @@ export default function ProposalBuilder() {
     quoteText += `${'-'.repeat(40)}\n\n`;
 
     cart.forEach((item, index) => {
-      if (item.isCustomBuild) {
+      if (isCrawlspaceItem(item)) {
+        const itemPrice = item.tier.price * item.quantity;
+        quoteText += `${index + 1}. Crawlspace Encapsulation - ${item.tier.name}\n`;
+        quoteText += `   ${item.tier.description}\n`;
+        quoteText += `   Price: ${formatPrice(itemPrice)}\n`;
+        if (item.quantity > 1) quoteText += `   Qty: ${item.quantity}\n`;
+        quoteText += `\n`;
+      } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
         const priceLow = estimate.low * item.quantity;
         const priceHigh = estimate.high * item.quantity;
         quoteText += `${index + 1}. Custom Build - ${item.tonnage} System\n`;
-        quoteText += `   - ${item.outdoorUnit.brand} ${item.outdoorUnit.unitName}\n`;
-        quoteText += `   - ${item.coil.brand} ${item.coil.unitName}\n`;
-        quoteText += `   - ${item.indoorUnit.brand} ${item.indoorUnit.unitName}\n`;
-        quoteText += `   - ${item.thermostat.brand} ${item.thermostat.unitName}\n`;
+        if (item.outdoorUnit) quoteText += `   - ${item.outdoorUnit.brand} ${item.outdoorUnit.unitName}\n`;
+        if (item.coil) quoteText += `   - ${item.coil.brand} ${item.coil.unitName}\n`;
+        if (item.indoorUnit) quoteText += `   - ${item.indoorUnit.brand} ${item.indoorUnit.unitName}\n`;
+        if (item.thermostat) quoteText += `   - ${item.thermostat.brand} ${item.thermostat.unitName}\n`;
         quoteText += `   Price: ${formatPriceRange(priceLow, priceHigh)} (Estimated)\n`;
         if (item.quantity > 1) quoteText += `   Qty: ${item.quantity}\n`;
         quoteText += `\n`;
@@ -1347,7 +1435,27 @@ export default function ProposalBuilder() {
                         <Card key={item.id} className="p-3" data-testid={`cart-item-${item.id}`}>
                           <div className="flex justify-between items-start gap-2">
                             <div className="flex-1 min-w-0">
-                              {item.isCustomBuild ? (
+                              {isCrawlspaceItem(item) ? (
+                                <>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Badge className="bg-teal-500 text-white text-xs">
+                                      Crawlspace
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                      x{item.quantity}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm">{item.tier.name} Encapsulation</p>
+                                    <p className="text-xs text-muted-foreground">{item.tier.description}</p>
+                                  </div>
+                                  <div className="mt-2 pt-2 border-t">
+                                    <p className="font-bold text-sm text-primary">
+                                      {formatPrice(item.tier.price * item.quantity)}
+                                    </p>
+                                  </div>
+                                </>
+                              ) : isCustomBuild(item) ? (
                                 <>
                                   <div className="flex items-center gap-2 mb-2">
                                     <Badge className="bg-green-500 text-white text-xs">
@@ -1361,23 +1469,27 @@ export default function ProposalBuilder() {
                                   <div className="flex gap-3">
                                     <EquipmentImageGrid
                                       images={{
-                                        outdoor: item.outdoorUnit.imageUrl,
-                                        coil: item.coil.imageUrl,
-                                        furnace: item.indoorUnit.imageUrl,
-                                        thermostat: item.thermostat.imageUrl
+                                        outdoor: item.outdoorUnit?.imageUrl,
+                                        coil: item.coil?.imageUrl,
+                                        furnace: item.indoorUnit?.imageUrl,
+                                        thermostat: item.thermostat?.imageUrl
                                       }}
                                       size="sm"
                                       showLabels
-                                      unitType={item.outdoorUnit.unitType}
+                                      unitType={item.outdoorUnit?.unitType}
                                     />
                                     <div className="flex-1 min-w-0">
                                       <p className="font-medium text-sm">{item.tonnage} System</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {item.outdoorUnit.brand} {item.outdoorUnit.componentType}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {item.indoorUnit.brand} {item.indoorUnit.componentType}
-                                      </p>
+                                      {item.outdoorUnit && (
+                                        <p className="text-xs text-muted-foreground">
+                                          {item.outdoorUnit.brand} {item.outdoorUnit.componentType}
+                                        </p>
+                                      )}
+                                      {item.indoorUnit && (
+                                        <p className="text-xs text-muted-foreground">
+                                          {item.indoorUnit.brand} {item.indoorUnit.componentType}
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="mt-2 pt-2 border-t">
@@ -2490,16 +2602,40 @@ export default function ProposalBuilder() {
               </h3>
               <div className="space-y-4">
                 {cart.map((item, index) => {
-                  if (item.isCustomBuild) {
+                  if (isCrawlspaceItem(item)) {
+                    const itemPrice = item.tier.price * item.quantity;
+                    return (
+                      <div key={item.id} className="rounded-xl border-2 border-teal-200 dark:border-teal-800 bg-gradient-to-br from-teal-50 to-white dark:from-teal-950 dark:to-gray-900 overflow-hidden shadow-sm">
+                        <div className="bg-teal-500 text-white px-4 py-2 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Package className="h-4 w-4" />
+                            <span className="font-semibold">Crawlspace Encapsulation</span>
+                            <span className="text-teal-100">•</span>
+                            <span className="text-teal-100">{item.tier.name}</span>
+                          </div>
+                          {item.quantity > 1 && <Badge className="bg-white/20 text-white">x{item.quantity}</Badge>}
+                        </div>
+                        <div className="p-4">
+                          <p className="text-sm text-muted-foreground mb-4">{item.tier.description}</p>
+                          <div className="bg-teal-100 dark:bg-teal-900/50 rounded-lg p-3 flex items-center justify-between">
+                            <div className="text-sm text-muted-foreground">
+                              {formatPrice(Math.round(itemPrice / 67))}/mo financing
+                            </div>
+                            <p className="text-2xl font-bold text-teal-700 dark:text-teal-300">{formatPrice(itemPrice)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  } else if (isCustomBuild(item)) {
                     const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
                     const priceLow = estimate.low * item.quantity;
                     const priceHigh = estimate.high * item.quantity;
                     const components = [
-                      { label: 'Outdoor Unit', brand: item.outdoorUnit.brand, name: item.outdoorUnit.unitName, image: item.outdoorUnit.imageUrl },
-                      { label: 'Evaporator Coil', brand: item.coil.brand, name: item.coil.unitName, image: item.coil.imageUrl },
-                      { label: 'Indoor Unit', brand: item.indoorUnit.brand, name: item.indoorUnit.unitName, image: item.indoorUnit.imageUrl },
-                      { label: 'Thermostat', brand: item.thermostat.brand, name: item.thermostat.unitName, image: item.thermostat.imageUrl },
-                    ];
+                      item.outdoorUnit ? { label: 'Outdoor Unit', brand: item.outdoorUnit.brand, name: item.outdoorUnit.unitName, image: item.outdoorUnit.imageUrl } : null,
+                      item.coil ? { label: 'Evaporator Coil', brand: item.coil.brand, name: item.coil.unitName, image: item.coil.imageUrl } : null,
+                      item.indoorUnit ? { label: 'Indoor Unit', brand: item.indoorUnit.brand, name: item.indoorUnit.unitName, image: item.indoorUnit.imageUrl } : null,
+                      item.thermostat ? { label: 'Thermostat', brand: item.thermostat.brand, name: item.thermostat.unitName, image: item.thermostat.imageUrl } : null,
+                    ].filter((c): c is NonNullable<typeof c> => c !== null);
                     return (
                       <div key={item.id} className="rounded-xl border-2 border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-white dark:from-green-950 dark:to-gray-900 overflow-hidden shadow-sm">
                         <div className="bg-green-500 text-white px-4 py-2 flex items-center justify-between">
