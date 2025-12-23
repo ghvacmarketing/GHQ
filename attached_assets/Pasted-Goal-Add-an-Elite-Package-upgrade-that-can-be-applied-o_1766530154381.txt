@@ -1,0 +1,197 @@
+Goal
+
+Add an “Elite Package” upgrade that can be applied on top of any base tier (Essential → Premium → Ultimate). Elite is not its own tier — it’s an upgrade bundle you can add to the cart.
+
+We need this for two categories:
+
+HVAC
+
+Crawlspace
+
+Elite should:
+
+Add/require certain bundled items
+
+Sum the base tier price + bundle prices
+
+Apply an Elite discount (20% for now)
+
+Show the customer the original total, discount, final total, and savings %
+
+A) HVAC: Elite Package logic
+Base Tier
+
+User selects an HVAC tier package (Essential / Premium / Ultimate). That tier already has a price.
+
+Elite Upgrade (can be toggled ON/OFF)
+
+Add an “Upgrade to Elite Package” option (toggle/button) that can be applied to whichever tier the user chose.
+
+Elite includes / requires the following bundles
+
+Elite requires 2 sets of things:
+
+1) Required “Core Elite Bundles” (always included)
+
+When Elite is ON, the cart must include:
+
+10-Year Maintenance
+
+10-Year Labor Warranty
+
+Install Upgrade Bundle (this is the bundle that covers Lineset + Drain + Low Voltage)
+
+Give this bundle a consistent name, like:
+“Install Upgrade Bundle (Lineset + Drain + Low Voltage)”
+
+2) Required “Airflow Option” (choose ONE)
+
+When Elite is ON, the user must select exactly one of these:
+
+New Ducting System
+OR
+
+Duct Cleaning + New Return + Re-Insulation
+
+So Elite is not “complete” unless one of these duct options is selected.
+
+Pricing & Savings display
+
+When Elite is ON and requirements are met:
+
+Compute Original Total = (HVAC Tier price) + (all Elite bundle item prices)
+
+Apply Elite Discount = Original Total × 20%
+
+Final Total = Original Total − Elite Discount
+
+Show savings:
+
+“You save $X”
+
+“You save 20%”
+
+If Elite is ON but requirements aren’t met (missing items or missing duct option), show an “Elite incomplete” status and don’t apply the discount yet.
+
+Cart behavior rules
+
+Elite items should behave like “bundle-required” items:
+
+If Elite is ON, required items should be auto-added or strongly prompted.
+
+If a user removes a required item while Elite is ON, show warning: “Elite requires this item” and mark Elite as incomplete until restored.
+
+Elite should be removable:
+
+Turning Elite OFF removes the Elite discount and (optionally) can remove Elite items or keep them (your choice). Best practice: ask or auto-remove bundle items.
+
+B) Crawlspace: Elite Package logic
+Base Tier (by mil thickness)
+
+These are your crawlspace “tiers”:
+
+10 mil = Essential
+
+12 mil = Premium
+
+20 mil = Ultimate
+
+User selects one of these tiers. That tier already has a price.
+
+Elite Upgrade for crawlspace
+
+Same concept: “Upgrade to Elite Package” toggle/button, can be applied to any crawlspace tier.
+
+Elite requires bundling these 3 items
+
+When Elite is ON, the cart must include:
+
+10-Year Crawlspace Maintenance
+
+Price: $229/year, includes 1 visit per year
+
+You can display this as “$229/yr” (recurring) or calculate a 10-year total if you prefer — but keep it consistent.
+
+Total Replacement Warranty (Parts + Labor)
+
+Crawlspace Inspection
+
+Pricing & Savings display
+
+Same method as HVAC:
+
+Original Total = Crawlspace tier price + required Elite items
+
+Discount = 20%
+
+Final Total = Original − Discount
+
+Show savings dollars and percent
+
+Elite discount only applies when all 3 items are present.
+
+C) UI / Flow requirements
+Where this appears
+
+In the quote builder or product selection screen, add an “Elite Package” section.
+
+It should show:
+
+Elite toggle
+
+Checklist of required items (auto-added or “Add” buttons)
+
+For HVAC only: radio selection for the duct option (choose one)
+
+Customer-facing summary
+
+When Elite is active:
+
+Show a small pricing breakdown:
+
+Base tier price
+
+Elite add-ons subtotal
+
+Original Total
+
+Elite Discount (20%)
+
+Final Total
+
+Savings ($ and %)
+
+D) Data structure guidance (for Replit AI)
+
+Treat everything as “products” in the cart:
+
+Base tier = product
+
+Each add-on = product
+
+Elite = a “bundle rule” that checks the cart for required items and applies a discount.
+
+You’ll need:
+
+A way to mark products by category (HVAC base, HVAC add-on, duct option, crawlspace base, crawlspace add-on)
+
+A rule engine that:
+
+Detects if Elite toggle is ON
+
+Verifies required items exist
+
+Applies discount if complete
+
+E) Default discount rule
+
+Elite Discount = 20% across everything in the Elite calculation (base + add-ons).
+(We may change this later.)
+
+If you paste this into Replit AI and it asks questions, the key decisions you can answer quickly are:
+
+Should Elite auto-add required items, or just prompt?
+
+Should turning Elite OFF remove the Elite items or keep them in cart?
+
+For crawlspace maintenance: show as $229/yr or convert to a 10-year upfront number?
