@@ -68,25 +68,46 @@ type PricebookComponent = {
   imageUrl?: string;
 };
 
+// Elite package metadata stored with cart items
+type ElitePackageData = {
+  isElite: true;
+  selectedAirflowOptionId: string;
+  coreBundlePrices: Record<string, number>; // bundle id -> price
+  airflowPrice: number;
+  originalTotal: number;
+  discountAmount: number;
+  finalTotal: number;
+};
+
 type CartPackage = PricebookPackage & {
   id: string;
   extractedTonnage: string;
   quantity: number;
   isCustomBuild?: false;
+  eliteData?: ElitePackageData;
 };
 
 type CustomBuildCart = {
   id: string;
   isCustomBuild: true;
   tonnage: string;
-  outdoorUnit: PricebookComponent;
-  coil: PricebookComponent;
-  indoorUnit: PricebookComponent;
-  thermostat: PricebookComponent;
+  outdoorUnit: PricebookComponent | null;
+  coil: PricebookComponent | null;
+  indoorUnit: PricebookComponent | null;
+  thermostat: PricebookComponent | null;
   quantity: number;
+  eliteData?: ElitePackageData;
 };
 
-type CartItem = CartPackage | CustomBuildCart;
+type CrawlspaceCartItem = {
+  id: string;
+  isCrawlspace: true;
+  tier: CrawlspaceTier;
+  quantity: number;
+  eliteData?: ElitePackageData;
+};
+
+type CartItem = CartPackage | CustomBuildCart | CrawlspaceCartItem;
 
 const packages: PricebookPackage[] = packagesData as PricebookPackage[];
 const components: PricebookComponent[] = componentsData as PricebookComponent[];
@@ -117,6 +138,121 @@ const BRAND_OPTIONS = ["All Brands", "Trane", "Carrier", "RunTru", "Ameristar"];
 
 const OUTDOOR_UNIT_TYPES = ["Air Conditioner", "Heat Pump"];
 const INDOOR_UNIT_TYPES = ["Gas Furnace", "Air Handler"];
+
+// Elite Package Configuration
+const ELITE_DISCOUNT_PERCENT = 20;
+
+type EliteBundle = {
+  id: string;
+  name: string;
+  description: string;
+  priceByTonnage?: Record<string, number>; // For tonnage-based pricing
+  fixedPrice?: number; // For flat pricing
+  benefits: string[];
+};
+
+type EliteAirflowOption = {
+  id: string;
+  name: string;
+  description: string;
+  priceByTonnage: Record<string, number>;
+};
+
+// HVAC Elite Core Bundles (always required when Elite is ON)
+const HVAC_ELITE_CORE_BUNDLES: EliteBundle[] = [
+  {
+    id: "10yr-maintenance",
+    name: "10-Year Maintenance Plan",
+    description: "Comprehensive annual maintenance for 10 years",
+    fixedPrice: 2290,
+    benefits: ["Annual system tune-ups", "Priority scheduling", "Filter replacements", "Performance optimization"]
+  },
+  {
+    id: "10yr-labor",
+    name: "10-Year Labor Warranty",
+    description: "Full labor coverage for repairs and service",
+    fixedPrice: 2000,
+    benefits: ["All labor costs covered", "No service call fees", "Factory-trained technicians", "Peace of mind protection"]
+  },
+  {
+    id: "install-upgrade",
+    name: "Install Upgrade Bundle",
+    description: "Premium installation with Lineset + Drain + Low Voltage",
+    priceByTonnage: { "1.5": 1000, "2": 1500, "2.5": 2000, "3": 2500, "3.5": 3000, "4": 4000, "5": 5000 },
+    benefits: ["New copper lineset", "Proper condensate drainage", "Low voltage wiring upgrade", "Professional installation"]
+  }
+];
+
+// HVAC Elite Airflow Options (must choose exactly one)
+const HVAC_ELITE_AIRFLOW_OPTIONS: EliteAirflowOption[] = [
+  {
+    id: "new-ducting",
+    name: "New Ducting System",
+    description: "Complete duct system replacement with 10-year warranty",
+    priceByTonnage: { "1.5": 7527, "2": 9353, "2.5": 11179, "3": 13005, "3.5": 14831, "4": 16657, "5": 20309 }
+  },
+  {
+    id: "duct-cleaning-upgrade",
+    name: "Duct Cleaning + New Return + Re-Insulation",
+    description: "Comprehensive duct service and upgrade package",
+    priceByTonnage: { "1.5": 1000, "2": 1500, "2.5": 2000, "3": 2500, "3.5": 3000, "4": 4000, "5": 5000 }
+  }
+];
+
+// Crawlspace Tiers
+type CrawlspaceTier = {
+  id: string;
+  name: string;
+  milThickness: number;
+  price: number;
+  description: string;
+};
+
+const CRAWLSPACE_TIERS: CrawlspaceTier[] = [
+  { id: "crawl-10mil", name: "Essential", milThickness: 10, price: 2000, description: "10 mil vapor barrier - Standard protection" },
+  { id: "crawl-12mil", name: "Premium", milThickness: 12, price: 4000, description: "12 mil vapor barrier - Enhanced durability" },
+  { id: "crawl-20mil", name: "Ultimate", milThickness: 20, price: 8000, description: "20 mil vapor barrier - Maximum protection" }
+];
+
+// Crawlspace Elite Bundles (all required when Elite is ON)
+const CRAWLSPACE_ELITE_BUNDLES: EliteBundle[] = [
+  {
+    id: "crawl-10yr-maintenance",
+    name: "10-Year Crawlspace Maintenance",
+    description: "Annual crawlspace inspection and maintenance for 10 years",
+    fixedPrice: 2290,
+    benefits: ["1 visit per year", "Moisture monitoring", "Barrier inspection", "Preventive maintenance"]
+  },
+  {
+    id: "crawl-replacement-warranty",
+    name: "Total Replacement Warranty",
+    description: "Complete parts and labor coverage",
+    fixedPrice: 1000,
+    benefits: ["Full parts coverage", "Labor included", "No deductibles", "Transferable warranty"]
+  },
+  {
+    id: "crawl-inspection",
+    name: "Crawlspace Inspection",
+    description: "Comprehensive initial inspection and assessment",
+    fixedPrice: 0,
+    benefits: ["Moisture testing", "Structural assessment", "Mold/mildew check", "Detailed report"]
+  }
+];
+
+// Helper to get price by tonnage (converts "2 Ton" to "2")
+function getEliteBundlePrice(bundle: EliteBundle, tonnage: string): number {
+  if (bundle.fixedPrice !== undefined) return bundle.fixedPrice;
+  if (bundle.priceByTonnage) {
+    const numTonnage = tonnage.replace(" Ton", "");
+    return bundle.priceByTonnage[numTonnage] || 0;
+  }
+  return 0;
+}
+
+function getEliteAirflowPrice(option: EliteAirflowOption, tonnage: string): number {
+  const numTonnage = tonnage.replace(" Ton", "");
+  return option.priceByTonnage[numTonnage] || 0;
+}
 
 const formatPrice = (price: number) => '$' + price.toLocaleString();
 const formatPriceRange = (low: number, high: number) => {
