@@ -1472,50 +1472,64 @@ export default function ProposalBuilder() {
             {selectedTier && selectedTonnage && (
               <div>
                 <h2 className="text-xl font-semibold mb-2">
-                  {selectedUnitType === "Mini-Split" ? "Select Mini-Split System" : "Select Package"}
+                  {selectedUnitType === "Mini-Split" ? "Select Mini-Split System" 
+                    : selectedUnitType === "Ducting" ? "Select Duct System Size"
+                    : "Select Package"}
                 </h2>
                 <p className="text-muted-foreground mb-4">
                   {selectedUnitType === "Mini-Split" 
                     ? "Choose the BTU capacity for your space"
+                    : selectedUnitType === "Ducting"
+                    ? "Choose the system size based on your home's tonnage"
                     : `Choose from available ${selectedTier} packages for ${selectedTonnage}`}
                 </p>
                 
-                {/* Mini-Split compact layout */}
-                {selectedUnitType === "Mini-Split" ? (
+                {/* Mini-Split and Ducting compact layout */}
+                {(selectedUnitType === "Mini-Split" || selectedUnitType === "Ducting") ? (
                   <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground bg-amber-50 p-3 rounded-lg border border-amber-200 mb-4">
-                      Each package includes both the outdoor condenser and indoor wall-mounted unit for a complete ductless system.
-                    </p>
+                    {selectedUnitType === "Mini-Split" ? (
+                      <p className="text-sm text-muted-foreground bg-amber-50 p-3 rounded-lg border border-amber-200 mb-4">
+                        Each package includes both the outdoor condenser and indoor wall-mounted unit for a complete ductless system.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground bg-amber-50 p-3 rounded-lg border border-amber-200 mb-4">
+                        Complete duct system replacement includes removal of existing ducts, new ductwork installation, and system balancing with a 10-year workmanship guarantee.
+                      </p>
+                    )}
                     {packageOptions.map((pkg, index) => {
                       const isInCart = cart.some(item => 
                         !item.isCustomBuild &&
                         item.unitType === pkg.unitType && 
                         item.tier === pkg.tier && 
-                        item.packageLevel === pkg.packageLevel
+                        (selectedUnitType === "Mini-Split" 
+                          ? item.packageLevel === pkg.packageLevel 
+                          : item.extractedTonnage === getPackageTonnageDisplay(pkg))
                       );
-                      const btuValue = parseInt(pkg.packageLevel.replace('K', '')) * 1000;
+                      const isMiniSplit = selectedUnitType === "Mini-Split";
+                      const btuValue = isMiniSplit ? parseInt(pkg.packageLevel.replace('K', '')) * 1000 : 0;
+                      const tonnageDisplay = getPackageTonnageDisplay(pkg);
                       return (
                         <Card
-                          key={`${pkg.packageLevel}-${pkg.outdoorModel}-${index}`}
+                          key={`${pkg.packageLevel}-${pkg.outdoorModel || pkg.tonnage}-${index}`}
                           className={`relative overflow-hidden ${isInCart ? 'border-primary ring-1 ring-primary bg-primary/5' : ''}`}
-                          data-testid={`package-${pkg.packageLevel.toLowerCase()}`}
+                          data-testid={`package-${(isMiniSplit ? pkg.packageLevel : pkg.tonnage).toString().toLowerCase().replace('.', '-')}`}
                         >
                           <div className="p-4">
                             <div className="flex items-start gap-4">
-                              {/* Images side by side */}
+                              {/* Image */}
                               <div className="flex gap-3 flex-shrink-0">
                                 {pkg.outdoorImageUrl && (
                                   <div className="text-center">
                                     <img 
                                       src={`/assets/${pkg.outdoorImageUrl}`}
-                                      alt="Outdoor Condenser"
+                                      alt={isMiniSplit ? "Outdoor Condenser" : "Duct System"}
                                       className="w-16 h-16 object-contain rounded-lg bg-white border shadow-sm"
                                       loading="lazy"
                                     />
-                                    <p className="text-[10px] text-muted-foreground mt-1 font-medium">Outdoor</p>
+                                    {isMiniSplit && <p className="text-[10px] text-muted-foreground mt-1 font-medium">Outdoor</p>}
                                   </div>
                                 )}
-                                {pkg.furnaceImageUrl && (
+                                {isMiniSplit && pkg.furnaceImageUrl && (
                                   <div className="text-center">
                                     <img 
                                       src={`/assets/${pkg.furnaceImageUrl}`}
@@ -1532,11 +1546,13 @@ export default function ProposalBuilder() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                                   <Badge className="bg-amber-500 text-white font-bold text-sm px-3">
-                                    {pkg.packageLevel}
+                                    {isMiniSplit ? pkg.packageLevel : tonnageDisplay}
                                   </Badge>
-                                  <span className="text-sm font-medium">
-                                    {btuValue.toLocaleString()} BTU
-                                  </span>
+                                  {isMiniSplit && (
+                                    <span className="text-sm font-medium">
+                                      {btuValue.toLocaleString()} BTU
+                                    </span>
+                                  )}
                                   {isInCart && (
                                     <Badge variant="outline" className="bg-primary/10 text-primary border-primary">
                                       <Check className="h-3 w-3 mr-1" />
@@ -1545,10 +1561,14 @@ export default function ProposalBuilder() {
                                   )}
                                 </div>
                                 <p className="text-sm text-muted-foreground">
-                                  {pkg.outdoorBrand} Complete System
+                                  {isMiniSplit 
+                                    ? `${pkg.outdoorBrand} Complete System`
+                                    : "Complete Duct Replacement"}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  Includes outdoor condenser + indoor wall unit
+                                  {isMiniSplit 
+                                    ? "Includes outdoor condenser + indoor wall unit"
+                                    : "Remove old ducts, install new system, test & balance"}
                                 </p>
                               </div>
                               
@@ -1564,7 +1584,7 @@ export default function ProposalBuilder() {
                                   size="sm"
                                   className="min-h-[40px] px-4"
                                   onClick={() => addToCart(pkg)}
-                                  data-testid={`button-add-${pkg.packageLevel.toLowerCase()}`}
+                                  data-testid={`button-add-${(isMiniSplit ? pkg.packageLevel : pkg.tonnage).toString().toLowerCase().replace('.', '-')}`}
                                 >
                                   <ShoppingCart className="h-4 w-4 mr-2" />
                                   Add
