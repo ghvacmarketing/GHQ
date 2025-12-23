@@ -1310,10 +1310,20 @@ export default function ProposalBuilder() {
         const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
         const itemPrice = finalPrice * item.quantity;
         quoteText += `${index + 1}. Crawlspace Encapsulation - ${item.tier.name}${item.eliteData ? ' (Elite Package)' : ''}\n`;
+        quoteText += `   ${item.tier.milThickness} Mil Vapor Barrier\n`;
         quoteText += `   ${item.tier.description}\n`;
-        quoteText += `   Price: ${formatPrice(itemPrice)}\n`;
         if (item.eliteData) {
-          quoteText += `   Elite Savings: ${formatPrice(item.eliteData.discountAmount * item.quantity)} (20% off)\n`;
+          quoteText += `   \n   ELITE PACKAGE INCLUDES:\n`;
+          CRAWLSPACE_ELITE_BUNDLES.forEach(bundle => {
+            const bundlePrice = bundle.fixedPrice || 0;
+            quoteText += `   - ${bundle.name}${bundlePrice > 0 ? ` (${formatPrice(bundlePrice)} value)` : ' (Included)'}\n`;
+          });
+          quoteText += `   \n   Base: ${formatPrice(basePrice)} + Bundles: ${formatPrice(Object.values(item.eliteData.coreBundlePrices).reduce((a, b) => a + b, 0))}\n`;
+          quoteText += `   20% Elite Discount: -${formatPrice(item.eliteData.discountAmount)}\n`;
+        }
+        quoteText += `   Total: ${formatPrice(itemPrice)}\n`;
+        if (item.eliteData) {
+          quoteText += `   YOU SAVE: ${formatPrice(item.eliteData.discountAmount * item.quantity)}\n`;
         }
         if (item.quantity > 1) quoteText += `   Qty: ${item.quantity}\n`;
         quoteText += `\n`;
@@ -1339,9 +1349,22 @@ export default function ProposalBuilder() {
         quoteText += `   - ${item.outdoorBrand} ${item.outdoorName}\n`;
         if (item.indoorHeatName) quoteText += `   - ${item.indoorHeatName}\n`;
         if (item.thermostatName) quoteText += `   - ${item.thermostatName}\n`;
-        quoteText += `   Price: ${formatPrice(itemPrice)}\n`;
         if (item.eliteData) {
-          quoteText += `   Elite Savings: ${formatPrice(item.eliteData.discountAmount * item.quantity)} (20% off)\n`;
+          quoteText += `   \n   ELITE PACKAGE INCLUDES:\n`;
+          HVAC_ELITE_CORE_BUNDLES.forEach(bundle => {
+            const bundlePrice = item.eliteData!.coreBundlePrices[bundle.id] || 0;
+            quoteText += `   - ${bundle.name} (${formatPrice(bundlePrice)} value)\n`;
+          });
+          const airflowOption = HVAC_ELITE_AIRFLOW_OPTIONS.find(o => o.id === item.eliteData!.selectedAirflowOptionId);
+          if (airflowOption) {
+            quoteText += `   - ${airflowOption.name} (${formatPrice(item.eliteData.airflowPrice)} value)\n`;
+          }
+          quoteText += `   \n   Base: ${formatPrice(basePrice)} + Bundles: ${formatPrice(Object.values(item.eliteData.coreBundlePrices).reduce((a, b) => a + b, 0) + item.eliteData.airflowPrice)}\n`;
+          quoteText += `   20% Elite Discount: -${formatPrice(item.eliteData.discountAmount)}\n`;
+        }
+        quoteText += `   Total: ${formatPrice(itemPrice)}\n`;
+        if (item.eliteData) {
+          quoteText += `   YOU SAVE: ${formatPrice(item.eliteData.discountAmount * item.quantity)}\n`;
         }
         if (item.quantity > 1) quoteText += `   Qty: ${item.quantity}\n`;
         quoteText += `\n`;
@@ -1351,6 +1374,9 @@ export default function ProposalBuilder() {
     quoteText += `${'-'.repeat(40)}\n`;
     quoteText += `TOTAL INVESTMENT: ${formatPriceRange(cartTotalRange.low, cartTotalRange.high)}${hasEstimatedItems ? ' *' : ''}\n`;
     quoteText += `Monthly Payment: ${formatPriceRange(cartMonthlyTotalRange.low, cartMonthlyTotalRange.high)}/mo (with approved financing)\n`;
+    if (cartEliteSavings > 0) {
+      quoteText += `\n*** TOTAL ELITE SAVINGS: ${formatPrice(cartEliteSavings)} ***\n`;
+    }
     if (hasEstimatedItems) {
       quoteText += `* Includes estimated pricing for custom builds\n`;
     }
