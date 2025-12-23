@@ -1,0 +1,5 @@
+file,pdf_page,type,aspect_ratio,area,rect
+minisplit_page1_1_indoor.png,1,indoor,2.6184210526315788,4454.77422451973,"110.5,95.3,218.5,136.5"
+minisplit_page1_2_outdoor.png,1,outdoor,0.9342105263157895,1589.3918087482452,"319.9,95.3,358.5,136.5"
+minisplit_page2_2_indoor.png,2,indoor,2.6184210526315788,4454.77422451973,"79.5,95.3,187.5,136.5"
+minisplit_page2_1_outdoor.png,2,outdoor,0.9342105263157895,1589.3918087482452,"39.4,95.3,77.9,136.5"
