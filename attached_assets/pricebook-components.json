@@ -2121,7 +2121,12 @@
     "totalInvestment": "12111",
     "sourcePage": "10",
     "equipmentCost": 2953.03,
-    "sellingPrice": 5906.06
+    "sellingPrice": 5906.06,
+    "cost": 2953.03,
+    "price": 5906,
+    "priceLow": 5906,
+    "priceHigh": 5906,
+    "equipmentType": "SGA"
   },
   {
     "unitType": "SGA",
@@ -2185,7 +2190,12 @@
     "totalInvestment": "14055",
     "sourcePage": "10",
     "equipmentCost": 3229.78,
-    "sellingPrice": 6459.56
+    "sellingPrice": 6459.56,
+    "cost": 3229.78,
+    "price": 6460,
+    "priceLow": 6460,
+    "priceHigh": 6460,
+    "equipmentType": "SGA"
   },
   {
     "unitType": "SGA",
@@ -2375,7 +2385,12 @@
     "totalInvestment": "12741",
     "sourcePage": "7",
     "equipmentCost": 3152.9,
-    "sellingPrice": 6305.8
+    "sellingPrice": 6305.8,
+    "cost": 3152.9,
+    "price": 6306,
+    "priceLow": 6306,
+    "priceHigh": 6306,
+    "equipmentType": "SGA"
   },
   {
     "unitType": "SGA",
@@ -2439,7 +2454,12 @@
     "totalInvestment": "14732",
     "sourcePage": "7",
     "equipmentCost": 3553.68,
-    "sellingPrice": 7107.36
+    "sellingPrice": 7107.36,
+    "cost": 3553.68,
+    "price": 7107,
+    "priceLow": 7107,
+    "priceHigh": 7107,
+    "equipmentType": "SGA"
   },
   {
     "unitType": "SGA",
@@ -2631,7 +2651,12 @@
     "totalInvestment": "13766",
     "sourcePage": "4",
     "equipmentCost": 3401.98,
-    "sellingPrice": 6803.96
+    "sellingPrice": 6803.96,
+    "cost": 3401.98,
+    "price": 6804,
+    "priceLow": 6804,
+    "priceHigh": 6804,
+    "equipmentType": "SGA"
   },
   {
     "unitType": "SGA",
@@ -2695,7 +2720,12 @@
     "totalInvestment": "15751",
     "sourcePage": "4",
     "equipmentCost": 3875.53,
-    "sellingPrice": 7751.06
+    "sellingPrice": 7751.06,
+    "cost": 3875.53,
+    "price": 7751,
+    "priceLow": 7751,
+    "priceHigh": 7751,
+    "equipmentType": "SGA"
   },
   {
     "unitType": "SGA",
@@ -2887,7 +2917,12 @@
     "totalInvestment": "14411",
     "sourcePage": "2",
     "equipmentCost": 3659.25,
-    "sellingPrice": 7318.5
+    "sellingPrice": 7318.5,
+    "cost": 3659.25,
+    "price": 7319,
+    "priceLow": 7319,
+    "priceHigh": 7319,
+    "equipmentType": "SGA"
   },
   {
     "unitType": "SGA",
@@ -2951,7 +2986,12 @@
     "totalInvestment": "17193",
     "sourcePage": "2",
     "equipmentCost": 4196.35,
-    "sellingPrice": 8392.7
+    "sellingPrice": 8392.7,
+    "cost": 4196.35,
+    "price": 8393,
+    "priceLow": 8393,
+    "priceHigh": 8393,
+    "equipmentType": "SGA"
   },
   {
     "unitType": "SGA",
@@ -10080,5 +10120,38 @@
     "sourcePage": "74",
     "equipmentCost": 174.25,
     "sellingPrice": 348.5
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "1.5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX5018A1000",
+    "brand": "Trane",
+    "cost": 2744.95,
+    "price": 5490,
+    "priceLow": 5490,
+    "priceHigh": 5490
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2.5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX5030A1000",
+    "brand": "Trane",
+    "cost": 3051.43,
+    "price": 6103,
+    "priceLow": 6103,
+    "priceHigh": 6103
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3.5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX5042A1000",
+    "brand": "Trane",
+    "cost": 3278.98,
+    "price": 6558,
+    "priceLow": 6558,
+    "priceHigh": 6558
   }
 ]
