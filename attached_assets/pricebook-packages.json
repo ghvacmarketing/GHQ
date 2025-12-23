@@ -893,9 +893,9 @@
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
     "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_1.5ton_budget_1_trane_5ttx5018a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b040m2psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb003as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_1.5ton_budget_3_trane_s8x1b040m2psc.png",
+    "coilImageUrl": "sga_ultimate_images/sga_ultimate_1.5ton_budget_2_ameristar_5txcb003as3hc.png",
+    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_1.5ton_budget_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -915,9 +915,9 @@
     "thermostatName": "tLink 360 Smart Thermostat",
     "accessoryModels": "",
     "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_2ton_best_1_trane_5ttv0x24a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_2ton_better_3_trane_s8v2a040m3pcb.png",
+    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_2ton_best_3_trane_s8v2a040m3pcb.png",
     "coilImageUrl": "sga_ultimate_images/sga_ultimate_2ton_best_2_trane_5txca002as3hcaa.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
+    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_2ton_best_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -938,8 +938,8 @@
     "accessoryModels": "",
     "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_2ton_better_1_trane_5ttv8x24a1000.png",
     "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_2ton_better_3_trane_s8v2a040m3pcb.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_ameristar_5txca002as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
+    "coilImageUrl": "sga_ultimate_images/sga_ultimate_2ton_better_2_ameristar_5txca002as3hc.png",
+    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_2ton_better_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -1003,9 +1003,9 @@
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
     "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_2.5ton_budget_1_trane_5ttx5030a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b060m4psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_2_trane_5txcb004as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_2.5ton_budget_3_trane_s8x1b060m4psc.png",
+    "coilImageUrl": "sga_ultimate_images/sga_ultimate_2.5ton_budget_2_ameristar_5txcb004as3hc.png",
+    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_2.5ton_budget_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -1025,9 +1025,9 @@
     "thermostatName": "tLink 360 Smart Thermostat",
     "accessoryModels": "",
     "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_3ton_best_1_trane_5ttv0x36a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_3_trane_s8v2b060m4pcb.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb003as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
+    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_3ton_best_3_trane_s8v2b060m4pcb.png",
+    "coilImageUrl": "sga_ultimate_images/sga_ultimate_3ton_best_2_trane_5txcb003as3hc.png",
+    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_3ton_best_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -1047,9 +1047,9 @@
     "thermostatName": "tLink 360 Smart Thermostat",
     "accessoryModels": "",
     "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_3ton_better_1_trane_5ttv8x36a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_3_trane_s8v2b060m4pcb.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb006as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
+    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_3ton_better_3_trane_s8v2b060m4pcb.png",
+    "coilImageUrl": "sga_ultimate_images/sga_ultimate_3ton_better_2_trane_5txcb006as3hc.png",
+    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_3ton_better_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -1113,9 +1113,9 @@
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
     "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_3.5ton_budget_1_trane_5ttx5042a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1c080m5psc.png",
+    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_3.5ton_budget_3_trane_s8x1c080m5psc.png",
     "coilImageUrl": "sga_ultimate_images/sga_ultimate_3.5ton_budget_2_ameristar_5txcc007as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_3.5ton_budget_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -1135,9 +1135,9 @@
     "thermostatName": "tLink 360 Smart Thermostat",
     "accessoryModels": "",
     "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_4ton_best_1_trane_5ttv0x48a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_3_trane_s8v2b080m4pcb.png",
+    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_4ton_best_3_trane_s8v2b080m4pcb.png",
     "coilImageUrl": "sga_ultimate_images/sga_ultimate_4ton_best_2_trane_5txcb006as3hcaa.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
+    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_4ton_best_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -1159,7 +1159,7 @@
     "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_4ton_better_1_trane_5ttv8x48a1000.png",
     "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_4ton_better_3_trane_s8v2c080m5pcb.png",
     "coilImageUrl": "sga_ultimate_images/sga_ultimate_4ton_better_2_trane_5txcc007as3hcaa.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
+    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_4ton_better_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -1223,9 +1223,9 @@
     "thermostatName": "tLink 360 Smart Thermostat",
     "accessoryModels": "",
     "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_5ton_best_1_trane_5ttv0x60a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_3_trane_s8v2c100m5pcb.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcc009as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
+    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_5ton_best_3_trane_s8v2c100m5pcb.png",
+    "coilImageUrl": "sga_ultimate_images/sga_ultimate_5ton_best_2_trane_5txcc009as3hc.png",
+    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_best_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -1245,8 +1245,8 @@
     "thermostatName": "tLink 360 Smart Thermostat",
     "accessoryModels": "",
     "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_1_trane_5ttv8x60a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_3_trane_s8v2c100m5pcb.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcc009as3hc.png",
+    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_3_trane_s8v2c100m5pcb.png",
+    "coilImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_2_trane_5txcc009as3hc.png",
     "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
   },
   {
@@ -1310,10 +1310,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b040m2psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb003as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_premium_images/sga_premium_1.5ton_good_1_trane_5ttr5018a1000.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_1.5ton_good_3_trane_s8x1b040m2psc.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_1.5ton_good_2_ameristar_5txcb003as3hc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_1.5ton_good_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -1332,8 +1332,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_1.5ton_budget_3_trane_s8x1a040m3psc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_1.5ton_budget_4_trane_tcont724as42da.png",
     "outdoorImageUrl": "sga_premium_images/sga_premium_1.5ton_budget_1_trane_5ttr4018a1000.png",
     "coilImageUrl": "sga_premium_images/sga_premium_1.5ton_budget_2_ameristar_5txca001as3hc.png"
   },
@@ -1354,10 +1354,10 @@
     "thermostatModel": "TLINK360A2VVUA",
     "thermostatName": "tLink 360 Smart Thermostat",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_2ton_better_1_trane_5ttv8x24a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_2ton_better_3_trane_s8v2a040m3pcb.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb003as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
+    "outdoorImageUrl": "sga_premium_images/sga_premium_2ton_best_1_trane_5ttv8x24a1000.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_2ton_best_3_trane_s8v2a040m3pcb.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_2ton_best_2_trane_5txcb003as3hc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_2ton_best_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -1376,10 +1376,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b040m2psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb003as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_premium_images/sga_premium_2ton_better_1_trane_5ttr7024a1000.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_2ton_better_3_trane_s8x1b040m2psc.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_2ton_better_2_trane_5txcb003as3hc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_2ton_better_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -1441,10 +1441,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate_4ton_best_2_trane_5txcb006as3hcaa.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_premium_images/sga_premium_2.5ton_good_1_trane_5ttr5030a1000.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_2.5ton_good_3_trane_s8x1b080m4psc.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_2.5ton_good_2_runtru_5txcb006as3hcaa.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_2.5ton_good_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -1463,9 +1463,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b060m4psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb003as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_2.5ton_budget_3_trane_s8x1b060m4psc.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_2.5ton_budget_2_ameristar_5txcb003as3hc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_2.5ton_budget_4_trane_tcont724as42da.png",
     "outdoorImageUrl": "sga_premium_images/sga_premium_2.5ton_budget_1_trane_5ttr4030a1000.png"
   },
   {
@@ -1485,10 +1485,10 @@
     "thermostatModel": "TLINK360A2VVUA",
     "thermostatName": "tLink 360 Smart Thermostat",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_3ton_better_1_trane_5ttv8x36a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_3_trane_s8v2b060m4pcb.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb006as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
+    "outdoorImageUrl": "sga_premium_images/sga_premium_3ton_best_1_trane_5ttv8x36a1000.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_3ton_best_3_trane_s8v2b060m4pcb.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_3ton_best_2_trane_5txcb006as3hc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_3ton_best_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -1507,10 +1507,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1c080m5psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb003as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_premium_images/sga_premium_3ton_better_1_trane_5ttr7036a1000.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_3ton_better_3_trane_s8x1c080m5psc.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_3ton_better_2_trane_5txcb003as3hc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_3ton_better_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -1572,10 +1572,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1c080m5psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate_3.5ton_budget_2_ameristar_5txcc007as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_premium_images/sga_premium_3.5ton_good_1_trane_5ttr5042a1000.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_3.5ton_good_3_trane_s8x1c080m5psc.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_3.5ton_good_2_ameristar_5txcc007as3hc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_3.5ton_good_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -1594,9 +1594,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb006as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_3.5ton_budget_3_trane_s8x1b080m4psc.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_3.5ton_budget_2_ameristar_5txcb006as3hc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_3.5ton_budget_4_trane_tcont724as42da.png",
     "outdoorImageUrl": "sga_premium_images/sga_premium_3.5ton_budget_1_trane_5ttr4042a1000.png"
   },
   {
@@ -1616,10 +1616,10 @@
     "thermostatModel": "TLINK360A2VVUA",
     "thermostatName": "tLink 360 Smart Thermostat",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_4ton_better_1_trane_5ttv8x48a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate_4ton_better_3_trane_s8v2c080m5pcb.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate_3.5ton_budget_2_ameristar_5txcc007as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
+    "outdoorImageUrl": "sga_premium_images/sga_premium_4ton_best_1_trane_5ttv8x48a1000.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_4ton_best_3_trane_s8v2c080m5pcb.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_4ton_best_2_trane_5txcc007as3hc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_4ton_best_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -1638,10 +1638,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb006as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_premium_images/sga_premium_4ton_better_1_trane_5ttr7048a1000.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_4ton_better_3_trane_s8x1b080m4psc.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_4ton_better_2_trane_5txcb006as3hc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_4ton_better_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -1703,10 +1703,10 @@
     "thermostatModel": "TLINK360A2VVUA",
     "thermostatName": "tLink 360 Smart Thermostat",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_1_trane_5ttv8x60a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_3_trane_s8v2c100m5pcb.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcc009as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
+    "outdoorImageUrl": "sga_premium_images/sga_premium_5ton_best_1_trane_5ttv8x60a1000.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_5ton_best_3_trane_s8v2c100m5pcb.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_5ton_best_2_trane_5txcc009as3hc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_5ton_best_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -1725,10 +1725,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1c100m5psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcc009as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_premium_images/sga_premium_5ton_better_1_trane_5ttr7060a1000.png",
+    "furnaceImageUrl": "sga_premium_images/sga_premium_5ton_better_3_trane_s8x1c100m5psc.png",
+    "coilImageUrl": "sga_premium_images/sga_premium_5ton_better_2_trane_5txcc009as3hc.png",
+    "thermostatImageUrl": "sga_premium_images/sga_premium_5ton_better_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",

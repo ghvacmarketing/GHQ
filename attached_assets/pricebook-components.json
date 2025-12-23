@@ -31,7 +31,7 @@
     "sourcePage": "33",
     "equipmentCost": 711.35,
     "sellingPrice": 1422.7,
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb003as3hc.png"
+    "imageUrl": "sga_ultimate_images/sga_ultimate_3ton_best_2_trane_5txcb003as3hc.png"
   },
   {
     "unitType": "SGA",
@@ -400,7 +400,7 @@
     "monthlyPayment": "193",
     "totalInvestment": "12902",
     "sourcePage": "25",
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcc009as3hc.png"
+    "imageUrl": "sga_ultimate_images/sga_ultimate_5ton_best_2_trane_5txcc009as3hc.png"
   },
   {
     "unitType": "SGA",
@@ -647,7 +647,7 @@
     "sourcePage": "20",
     "equipmentCost": 1718.93,
     "sellingPrice": 3437.86,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_2ton_better_3_trane_s8v2a040m3pcb.png"
+    "imageUrl": "sga_ultimate_images/sga_ultimate_2ton_best_3_trane_s8v2a040m3pcb.png"
   },
   {
     "unitType": "SGA",
@@ -664,7 +664,7 @@
     "sourcePage": "20",
     "equipmentCost": 580.15,
     "sellingPrice": 1160.3,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_4_trane_tlink360a2vvua.png"
+    "imageUrl": "sga_ultimate_images/sga_ultimate_5ton_best_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -681,7 +681,7 @@
     "sourcePage": "20",
     "equipmentCost": 3102.68,
     "sellingPrice": 6205.36,
-    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
+    "imageUrl": "sga_premium_images/sga_premium_2ton_better_1_trane_5ttr7024a1000.png"
   },
   {
     "unitType": "SGA",
@@ -698,7 +698,7 @@
     "sourcePage": "21",
     "equipmentCost": 1132.63,
     "sellingPrice": 2265.26,
-    "imageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png"
+    "imageUrl": "sga_premium_images/sga_premium_1.5ton_budget_3_trane_s8x1a040m3psc.png"
   },
   {
     "unitType": "SGA",
@@ -732,7 +732,7 @@
     "sourcePage": "17",
     "equipmentCost": 1822.45,
     "sellingPrice": 3644.9,
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_3_trane_s8v2b060m4pcb.png"
+    "imageUrl": "sga_ultimate_images/sga_ultimate_3ton_best_3_trane_s8v2b060m4pcb.png"
   },
   {
     "unitType": "SGA",
@@ -749,7 +749,7 @@
     "sourcePage": "17",
     "equipmentCost": 3425.55,
     "sellingPrice": 6851.1,
-    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
+    "imageUrl": "sga_premium_images/sga_premium_3ton_better_1_trane_5ttr7036a1000.png"
   },
   {
     "unitType": "SGA",
@@ -800,7 +800,7 @@
     "sourcePage": "14",
     "equipmentCost": 3748.43,
     "sellingPrice": 7496.86,
-    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
+    "imageUrl": "sga_premium_images/sga_premium_4ton_better_1_trane_5ttr7048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -817,7 +817,7 @@
     "sourcePage": "14",
     "equipmentCost": 1220.78,
     "sellingPrice": 2441.56,
-    "imageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png"
+    "imageUrl": "sga_premium_images/sga_premium_4ton_better_3_trane_s8x1b080m4psc.png"
   },
   {
     "unitType": "SGA",
@@ -851,7 +851,7 @@
     "sourcePage": "12",
     "equipmentCost": 1985.43,
     "sellingPrice": 3970.86,
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_3_trane_s8v2c100m5pcb.png"
+    "imageUrl": "sga_ultimate_images/sga_ultimate_5ton_best_3_trane_s8v2c100m5pcb.png"
   },
   {
     "unitType": "SGA",
@@ -868,7 +868,7 @@
     "sourcePage": "12",
     "equipmentCost": 4069.25,
     "sellingPrice": 8138.5,
-    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
+    "imageUrl": "sga_premium_images/sga_premium_5ton_better_1_trane_5ttr7060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -917,7 +917,7 @@
     "monthlyPayment": "227",
     "totalInvestment": "15184",
     "sourcePage": "9",
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_ameristar_5txca002as3hc.png"
+    "imageUrl": "sga_ultimate_images/sga_ultimate_2ton_better_2_ameristar_5txca002as3hc.png"
   },
   {
     "unitType": "SGA",
@@ -1094,7 +1094,7 @@
     "sourcePage": "3",
     "equipmentCost": 1880.88,
     "sellingPrice": 3761.76,
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_3_trane_s8v2b080m4pcb.png"
+    "imageUrl": "sga_ultimate_images/sga_ultimate_4ton_best_3_trane_s8v2b080m4pcb.png"
   },
   {
     "unitType": "SGA",
@@ -3594,7 +3594,7 @@
     "sourcePage": "35",
     "equipmentCost": 2328.8,
     "sellingPrice": 4657.6,
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "sga_premium_images/sga_premium_1.5ton_good_1_trane_5ttr5018a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3656,7 +3656,7 @@
     "sourcePage": "31",
     "equipmentCost": 2659.88,
     "sellingPrice": 5319.76,
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "sga_premium_images/sga_premium_2.5ton_good_1_trane_5ttr5030a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3845,7 +3845,7 @@
     "sourcePage": "27",
     "equipmentCost": 2892.55,
     "sellingPrice": 5785.1,
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "sga_premium_images/sga_premium_3.5ton_good_1_trane_5ttr5042a1000.png"
   },
   {
     "unitType": "SGA",
