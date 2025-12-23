@@ -15,7 +15,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_2ton_best_1_trane_5wcz5024a1000.png",
+    "thermostatImageUrl": "php_images/php_2ton_best_3_trane_tcont824as52da.png"
   },
   {
     "unitType": "PHP",
@@ -33,7 +35,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_2ton_better_1_trane_5wcc4024a1000.png",
+    "thermostatImageUrl": "php_images/php_2ton_better_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "PHP",
@@ -51,7 +55,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "CP-052A00-05N1",
     "thermostatName": "Carrier Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_2ton_good_1_carrier_50nt-b24---3.png",
+    "thermostatImageUrl": "php_images/php_2ton_good_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "PHP",
@@ -69,7 +75,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "CP-052A00-05N1",
     "thermostatName": "Carrier Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_2ton_budget_1_runtru_a5ph3024a1000.png",
+    "thermostatImageUrl": "php_images/php_2ton_budget_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "PHP",
@@ -87,7 +95,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_2_5ton_best_1_trane_5wcz5030a1000.png",
+    "thermostatImageUrl": "php_images/php_2_5ton_best_3_trane_tcont824as52da.png"
   },
   {
     "unitType": "PHP",
@@ -105,7 +115,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_2_5ton_better_1_trane_5wcc4030a1000.png",
+    "thermostatImageUrl": "php_images/php_2_5ton_better_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "PHP",
@@ -123,7 +135,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "CP-069A00-07N1",
     "thermostatName": "Carrier Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_2_5ton_good_1_carrier_50nt-b30---3.png",
+    "thermostatImageUrl": "php_images/php_2_5ton_good_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "PHP",
@@ -141,7 +155,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "CP-069A00-07N1",
     "thermostatName": "Carrier Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_2_5ton_budget_1_runtru_a5ph3030a1000.png",
+    "thermostatImageUrl": "php_images/php_2_5ton_budget_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "PHP",
@@ -159,7 +175,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_3ton_best_1_trane_5wcz5036a1000.png",
+    "thermostatImageUrl": "php_images/php_3ton_best_3_trane_tcont824as52da.png"
   },
   {
     "unitType": "PHP",
@@ -177,7 +195,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_3ton_better_1_trane_5wcc4036a1000.png",
+    "thermostatImageUrl": "php_images/php_3ton_better_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "PHP",
@@ -195,7 +215,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "CP-065A00-10N1",
     "thermostatName": "Carrier Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_3ton_good_1_carrier_50nt-b36---3.png",
+    "thermostatImageUrl": "php_images/php_3ton_good_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "PHP",
@@ -213,7 +235,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "CP-065A00-10N1",
     "thermostatName": "Carrier Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_3ton_budget_1_runtru_a5ph3036a1000.png",
+    "thermostatImageUrl": "php_images/php_3ton_budget_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "PHP",
@@ -231,7 +255,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_3_5ton_best_1_trane_5wcz5042a1000.png",
+    "thermostatImageUrl": "php_images/php_3_5ton_best_3_trane_tcont824as52da.png"
   },
   {
     "unitType": "PHP",
@@ -249,7 +275,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_3_5ton_better_1_trane_5wcc4042a1000.png",
+    "thermostatImageUrl": "php_images/php_3_5ton_better_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "PHP",
@@ -267,7 +295,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "CP-065A00-10N1",
     "thermostatName": "Carrier Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_3_5ton_good_1_carrier_50nt-b42---3.png",
+    "thermostatImageUrl": "php_images/php_3_5ton_good_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "PHP",
@@ -285,7 +315,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "CP-065A00-10N1",
     "thermostatName": "Carrier Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_3_5ton_budget_1_runtru_a5ph3042a1000.png",
+    "thermostatImageUrl": "php_images/php_3_5ton_budget_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "PHP",
@@ -303,7 +335,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_4ton_best_1_trane_5wcz5048a1000.png",
+    "thermostatImageUrl": "php_images/php_4ton_best_3_trane_tcont824as52da.png"
   },
   {
     "unitType": "PHP",
@@ -321,7 +355,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_4ton_better_1_trane_5wcc4048a1000.png",
+    "thermostatImageUrl": "php_images/php_4ton_better_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "PHP",
@@ -339,7 +375,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "CP-051A00-15F1",
     "thermostatName": "Carrier Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_4ton_good_1_carrier_50nt-b48---3.png",
+    "thermostatImageUrl": "php_images/php_4ton_good_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "PHP",
@@ -357,7 +395,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "CP-051A00-15F1",
     "thermostatName": "Carrier Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_4ton_budget_1_runtru_a5ph3048a1000.png",
+    "thermostatImageUrl": "php_images/php_4ton_budget_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "PHP",
@@ -375,7 +415,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_5ton_best_1_trane_5wcz5060a1000.png",
+    "thermostatImageUrl": "php_images/php_5ton_best_3_trane_tcont824as52da.png"
   },
   {
     "unitType": "PHP",
@@ -393,7 +435,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_5ton_better_1_trane_5wcc4060a1000.png",
+    "thermostatImageUrl": "php_images/php_5ton_better_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "PHP",
@@ -411,7 +455,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "CP-051A00-15F1",
     "thermostatName": "Carrier Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_5ton_good_1_carrier_50nt-b60---3.png",
+    "thermostatImageUrl": "php_images/php_5ton_good_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "PHP",
@@ -429,7 +475,9 @@
     "indoorHeatName": "Electric Heat Kit",
     "thermostatModel": "CP-051A00-15F1",
     "thermostatName": "Carrier Thermostat",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "php_images/php_5ton_budget_1_runtru_a5ph3060a1000.png",
+    "thermostatImageUrl": "php_images/php_5ton_budget_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "GP",
