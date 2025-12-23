@@ -97,6 +97,7 @@ const UNIT_TYPE_INFO: Record<string, { name: string; description: string; icon: 
   STA: { name: "Heat Pump + Gas Furnace", description: "Dual fuel system for maximum efficiency", icon: Award },
   PHP: { name: "PHP", description: "All-in-one packaged heat pump unit", icon: Package },
   GP: { name: "GP", description: "All-in-one gas/electric package unit", icon: Package },
+  "Mini-Split": { name: "Mini-Split", description: "Ductless single-zone heating & cooling", icon: Zap },
 };
 
 const TIER_INFO: Record<string, { description: string }> = {
@@ -104,6 +105,7 @@ const TIER_INFO: Record<string, { description: string }> = {
   Premium: { description: "High efficiency, enhanced features" },
   Ultimate: { description: "Top-tier efficiency, maximum comfort" },
   Packaged: { description: "All-in-one packaged unit" },
+  Standard: { description: "Single-zone ductless system" },
 };
 
 const PACKAGE_LEVEL_ORDER = ["Best", "Better", "Good", "Budget"];
@@ -1381,29 +1383,37 @@ export default function ProposalBuilder() {
 
             {((currentStep === 3 && !hasSingleTier) || (currentStep === 2 && hasSingleTier)) && (
               <div>
-                <h2 className="text-xl font-semibold mb-2">Select Tonnage</h2>
+                <h2 className="text-xl font-semibold mb-2">
+                  {selectedUnitType === "Mini-Split" ? "Select BTU Size" : "Select Tonnage"}
+                </h2>
                 <p className="text-muted-foreground mb-4">Choose the system capacity</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {tonnagesForSelection.map(tonnage => (
-                    <Card
-                      key={tonnage}
-                      className="cursor-pointer hover:border-primary transition-colors"
-                      onClick={() => setSelectedTonnage(tonnage)}
-                      data-testid={`tonnage-${tonnage.replace(' ', '-').toLowerCase()}`}
-                    >
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-lg flex items-center justify-between">
-                          {tonnage}
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground">
-                          {parseInt(tonnage) * 12000} BTU
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  {tonnagesForSelection.map(tonnage => {
+                    const isMiniSplit = selectedUnitType === "Mini-Split";
+                    const btuValue = isMiniSplit 
+                      ? parseInt(tonnage.replace('K', '')) * 1000 
+                      : parseInt(tonnage) * 12000;
+                    return (
+                      <Card
+                        key={tonnage}
+                        className="cursor-pointer hover:border-primary transition-colors"
+                        onClick={() => setSelectedTonnage(tonnage)}
+                        data-testid={`tonnage-${tonnage.replace(' ', '-').toLowerCase()}`}
+                      >
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-lg flex items-center justify-between">
+                            {isMiniSplit ? `${tonnage} BTU` : tonnage}
+                            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground">
+                            {btuValue.toLocaleString()} BTU
+                          </p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
             )}
