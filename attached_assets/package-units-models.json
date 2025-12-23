@@ -1,0 +1,362 @@
+[
+  {
+    "tonnage": "2",
+    "type": "SHP Package Unit",
+    "model": "5WCC4024A1000",
+    "cost": 4448.5,
+    "price": 8897
+  },
+  {
+    "tonnage": "2",
+    "type": "SHP Package Unit",
+    "model": "5WCZ5024A1000",
+    "cost": 4723.2,
+    "price": 9446
+  },
+  {
+    "tonnage": "2",
+    "type": "GP Package Unit",
+    "model": "5YCC4024A1060",
+    "cost": 4343.95,
+    "price": 8688
+  },
+  {
+    "tonnage": "2",
+    "type": "GP Package Unit",
+    "model": "5YCZ5024A1060",
+    "cost": 4807.25,
+    "price": 9615
+  },
+  {
+    "tonnage": "2",
+    "type": "SHP Heater Kit",
+    "model": "BAYHTRG105A",
+    "price": null
+  },
+  {
+    "tonnage": "2",
+    "type": "SHP Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "tonnage": "2",
+    "type": "SHP Thermostat/Controls",
+    "model": "TCONT824AS52DA",
+    "price": null
+  },
+  {
+    "tonnage": "2",
+    "type": "GP Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "tonnage": "2",
+    "type": "GP Thermostat/Controls",
+    "model": "TCONT824AS52DA",
+    "price": null
+  },
+  {
+    "tonnage": "2.5",
+    "type": "SHP Package Unit",
+    "model": "5WCC4030A1000",
+    "cost": 4561.25,
+    "price": 9123
+  },
+  {
+    "tonnage": "2.5",
+    "type": "SHP Package Unit",
+    "model": "5WCZ5030A1000",
+    "cost": 4917.95,
+    "price": 9836
+  },
+  {
+    "tonnage": "2.5",
+    "type": "GP Package Unit",
+    "model": "5YCC4030A1070",
+    "cost": 4501.8,
+    "price": 9004
+  },
+  {
+    "tonnage": "2.5",
+    "type": "GP Package Unit",
+    "model": "5YCZ5030A1070",
+    "cost": 4932.3,
+    "price": 9865
+  },
+  {
+    "tonnage": "2.5",
+    "type": "SHP Heater Kit",
+    "model": "BAYHTRG108A",
+    "price": null
+  },
+  {
+    "tonnage": "2.5",
+    "type": "SHP Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "tonnage": "2.5",
+    "type": "SHP Thermostat/Controls",
+    "model": "TCONT824AS52DA",
+    "price": null
+  },
+  {
+    "tonnage": "2.5",
+    "type": "GP Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "tonnage": "2.5",
+    "type": "GP Thermostat/Controls",
+    "model": "TCONT824AS52DA",
+    "price": null
+  },
+  {
+    "tonnage": "3",
+    "type": "SHP Package Unit",
+    "model": "5WCC4036A1000",
+    "cost": 4665.8,
+    "price": 9332
+  },
+  {
+    "tonnage": "3",
+    "type": "SHP Package Unit",
+    "model": "5WCZ5036A1000",
+    "cost": 5113.73,
+    "price": 10227
+  },
+  {
+    "tonnage": "3",
+    "type": "GP Package Unit",
+    "model": "5YCC4036A1070",
+    "cost": 4605.33,
+    "price": 9211
+  },
+  {
+    "tonnage": "3",
+    "type": "GP Package Unit",
+    "model": "5YCZ5036A1070",
+    "cost": 5055.3,
+    "price": 10111
+  },
+  {
+    "tonnage": "3",
+    "type": "SHP Heater Kit",
+    "model": "BAYHTRG110A",
+    "price": null
+  },
+  {
+    "tonnage": "3",
+    "type": "SHP Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "tonnage": "3",
+    "type": "SHP Thermostat/Controls",
+    "model": "TCONT824AS52DA",
+    "price": null
+  },
+  {
+    "tonnage": "3",
+    "type": "GP Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "tonnage": "3",
+    "type": "GP Thermostat/Controls",
+    "model": "TCONT824AS52DA",
+    "price": null
+  },
+  {
+    "tonnage": "3.5",
+    "type": "SHP Package Unit",
+    "model": "5WCC4042A1000",
+    "cost": 4820.58,
+    "price": 9641
+  },
+  {
+    "tonnage": "3.5",
+    "type": "SHP Package Unit",
+    "model": "5WCZ5042A1000",
+    "cost": 5314.63,
+    "price": 10629
+  },
+  {
+    "tonnage": "3.5",
+    "type": "GP Package Unit",
+    "model": "5YCC4042A1060",
+    "cost": 4708.85,
+    "price": 9418
+  },
+  {
+    "tonnage": "3.5",
+    "type": "GP Package Unit",
+    "model": "5YCZ5042A1090",
+    "cost": 5305.4,
+    "price": 10611
+  },
+  {
+    "tonnage": "3.5",
+    "type": "SHP Heater Kit",
+    "model": "BAYHTRG110A",
+    "price": null
+  },
+  {
+    "tonnage": "3.5",
+    "type": "SHP Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "tonnage": "3.5",
+    "type": "SHP Thermostat/Controls",
+    "model": "TCONT824AS52DA",
+    "price": null
+  },
+  {
+    "tonnage": "3.5",
+    "type": "GP Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "tonnage": "3.5",
+    "type": "GP Thermostat/Controls",
+    "model": "TCONT824AS52DA",
+    "price": null
+  },
+  {
+    "tonnage": "4",
+    "type": "SHP Package Unit",
+    "model": "5WCC4048A1000",
+    "cost": 4974.33,
+    "price": 9949
+  },
+  {
+    "tonnage": "4",
+    "type": "SHP Package Unit",
+    "model": "5WCZ5048A1000",
+    "cost": 5514.5,
+    "price": 11029
+  },
+  {
+    "tonnage": "4",
+    "type": "GP Package Unit",
+    "model": "5YCC4048A1070",
+    "cost": 4926.15,
+    "price": 9852
+  },
+  {
+    "tonnage": "4",
+    "type": "GP Package Unit",
+    "model": "5YCZ5048A1090",
+    "cost": 5455.05,
+    "price": 10910
+  },
+  {
+    "tonnage": "4",
+    "type": "SHP Heater Kit",
+    "model": "BAYHTRG115A",
+    "price": null
+  },
+  {
+    "tonnage": "4",
+    "type": "SHP Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "tonnage": "4",
+    "type": "SHP Thermostat/Controls",
+    "model": "TCONT824AS52DA",
+    "price": null
+  },
+  {
+    "tonnage": "4",
+    "type": "GP Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "tonnage": "4",
+    "type": "GP Thermostat/Controls",
+    "model": "TCONT824AS52DA",
+    "price": null
+  },
+  {
+    "tonnage": "5",
+    "type": "SHP Package Unit",
+    "model": "5WCC4060A1000",
+    "cost": 5293.1,
+    "price": 10586
+  },
+  {
+    "tonnage": "5",
+    "type": "SHP Package Unit",
+    "model": "5WCZ5060A1000",
+    "cost": 5914.25,
+    "price": 11829
+  },
+  {
+    "tonnage": "5",
+    "type": "GP Package Unit",
+    "model": "5YCC4060A1090",
+    "cost": 5294.13,
+    "price": 10588
+  },
+  {
+    "tonnage": "5",
+    "type": "GP Package Unit",
+    "model": "5YCZ5060A1115",
+    "cost": 5805.6,
+    "price": 11611
+  },
+  {
+    "tonnage": "5",
+    "type": "SHP Heater Kit",
+    "model": "BAYHTRG115A",
+    "price": null
+  },
+  {
+    "tonnage": "5",
+    "type": "SHP Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "tonnage": "5",
+    "type": "SHP Thermostat/Controls",
+    "model": "TCONT824AS52DA",
+    "price": null
+  },
+  {
+    "tonnage": "5",
+    "type": "GP Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "cost": 174.25,
+    "price": 349
+  },
+  {
+    "tonnage": "5",
+    "type": "GP Thermostat/Controls",
+    "model": "TCONT824AS52DA",
+    "price": null
+  }
+]
