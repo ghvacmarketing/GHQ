@@ -1563,12 +1563,12 @@ export default function ProposalBuilder() {
                                 <p className="text-sm text-muted-foreground">
                                   {isMiniSplit 
                                     ? `${pkg.outdoorBrand} Complete System`
-                                    : "Complete Duct Replacement"}
+                                    : pkg.outdoorName || "Complete Duct Replacement"}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">
                                   {isMiniSplit 
                                     ? "Includes outdoor condenser + indoor wall unit"
-                                    : "Remove old ducts, install new system, test & balance"}
+                                    : "New insulated ducts, registers, test & balance, 10-year guarantee"}
                                 </p>
                               </div>
                               
