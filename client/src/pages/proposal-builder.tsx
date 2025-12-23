@@ -707,7 +707,7 @@ export default function ProposalBuilder() {
   }, [customTonnage, customEquipmentType, indoorBrandFilter, allowedSgaModels, allowedShpModels]);
 
   // Get unique thermostats by equipment type - dedupe by model
-  // For SGA/SHP: only show models that exist in preset packages
+  // For SGA/SHP: only show models that exist in preset packages (thermostats may be labeled under different unit types in components)
   const thermostatOptions = useMemo(() => {
     if (!customTonnage || !customEquipmentType) return [];
     const seen = new Set<string>();
@@ -716,12 +716,15 @@ export default function ProposalBuilder() {
     const allowedModels = customEquipmentType === "SGA" ? allowedSgaModels.thermostat : 
                           customEquipmentType === "SHP" ? allowedShpModels.thermostat : null;
     return components.filter(comp => {
-      if (comp.unitType !== customEquipmentType) return false;
-      // For SGA/SHP, only allow models that exist in preset packages
-      if (isSgaOrShp && allowedModels && !allowedModels.has(comp.model)) return false;
       if (comp.componentType !== "Thermostat/Control") return false;
-      // For PHP/GP, match by tonnage
-      if (isPackageUnitType && comp.tonnage !== numericTonnage) return false;
+      // For SGA/SHP, filter by allowed models from presets (ignore unitType since thermostats are shared across unit types)
+      if (isSgaOrShp) {
+        if (!allowedModels || !allowedModels.has(comp.model)) return false;
+      } else {
+        // For PHP/GP, match by unit type and tonnage
+        if (comp.unitType !== customEquipmentType) return false;
+        if (comp.tonnage !== numericTonnage) return false;
+      }
       const matchesBrand = thermostatBrandFilter === "All Brands" || comp.brand === thermostatBrandFilter;
       if (!matchesBrand) return false;
       if (seen.has(comp.model)) return false;
