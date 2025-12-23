@@ -598,13 +598,18 @@ export default function ProposalBuilder() {
   const isPackageUnitType = customEquipmentType === "PHP" || customEquipmentType === "GP";
   
   // Filter outdoor units / package units by equipment type and tonnage - dedupe by model
+  // For SGA/SHP: only show Trane brand
   const outdoorUnitOptions = useMemo(() => {
     if (!customTonnage || !customEquipmentType) return [];
     const seen = new Set<string>();
     const numericTonnage = customTonnage.replace(" Ton", "");
+    const isSgaOrShp = customEquipmentType === "SGA" || customEquipmentType === "SHP";
     
     return components.filter(comp => {
       if (comp.unitType !== customEquipmentType) return false;
+      
+      // For SGA/SHP, only allow Trane brand
+      if (isSgaOrShp && comp.brand !== "Trane") return false;
       
       // For PHP/GP, look for Package Unit component type
       if (isPackageUnitType) {
@@ -637,8 +642,11 @@ export default function ProposalBuilder() {
     const targetType = (customEquipmentType === "SHP" || customEquipmentType === "PHP") ? "Heater Kit" : "Evaporator Coil";
     // Extract numeric tonnage from "1.5 Ton" format
     const numericTonnage = customTonnage.replace(" Ton", "");
+    const isSgaOrShp = customEquipmentType === "SGA" || customEquipmentType === "SHP";
     return components.filter(comp => {
       if (comp.unitType !== customEquipmentType) return false;
+      // For SGA/SHP, only allow Trane brand
+      if (isSgaOrShp && comp.brand !== "Trane") return false;
       if (comp.componentType !== targetType) return false;
       // For heater kits, also match by tonnage (compare numeric values)
       if (targetType === "Heater Kit" && comp.tonnage !== numericTonnage) return false;
@@ -651,11 +659,15 @@ export default function ProposalBuilder() {
   }, [customTonnage, customEquipmentType, coilBrandFilter]);
 
   // Get unique indoor units by equipment type - dedupe by model
+  // For SGA/SHP: only show Trane brand
   const indoorUnitOptions = useMemo(() => {
     if (!customTonnage || !customEquipmentType) return [];
     const seen = new Set<string>();
+    const isSgaOrShp = customEquipmentType === "SGA" || customEquipmentType === "SHP";
     return components.filter(comp => {
       if (comp.unitType !== customEquipmentType) return false;
+      // For SGA/SHP, only allow Trane brand
+      if (isSgaOrShp && comp.brand !== "Trane") return false;
       if (!INDOOR_UNIT_TYPES.includes(comp.componentType)) return false;
       const matchesBrand = indoorBrandFilter === "All Brands" || comp.brand === indoorBrandFilter;
       if (!matchesBrand) return false;
@@ -666,12 +678,16 @@ export default function ProposalBuilder() {
   }, [customTonnage, customEquipmentType, indoorBrandFilter]);
 
   // Get unique thermostats by equipment type - dedupe by model
+  // For SGA/SHP: only show Trane brand
   const thermostatOptions = useMemo(() => {
     if (!customTonnage || !customEquipmentType) return [];
     const seen = new Set<string>();
     const numericTonnage = customTonnage.replace(" Ton", "");
+    const isSgaOrShp = customEquipmentType === "SGA" || customEquipmentType === "SHP";
     return components.filter(comp => {
       if (comp.unitType !== customEquipmentType) return false;
+      // For SGA/SHP, only allow Trane brand
+      if (isSgaOrShp && comp.brand !== "Trane") return false;
       if (comp.componentType !== "Thermostat/Control") return false;
       // For PHP/GP, match by tonnage
       if (isPackageUnitType && comp.tonnage !== numericTonnage) return false;
