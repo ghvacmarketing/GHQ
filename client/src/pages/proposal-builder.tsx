@@ -675,8 +675,8 @@ export default function ProposalBuilder() {
       // For SGA/SHP, only allow models that exist in preset packages
       if (isSgaOrShp && allowedModels && !allowedModels.has(comp.model)) return false;
       if (comp.componentType !== targetType) return false;
-      // For heater kits/air handlers, also match by tonnage (compare numeric values)
-      if ((targetType === "Heater Kit" || targetType === "Air Handler") && comp.tonnage !== numericTonnage) return false;
+      // For PHP heater kits, match by tonnage (SHP Air Handlers don't have matching tonnages in data)
+      if (targetType === "Heater Kit" && comp.tonnage !== numericTonnage) return false;
       const matchesBrand = coilBrandFilter === "All Brands" || comp.brand === coilBrandFilter;
       if (!matchesBrand) return false;
       if (seen.has(comp.model)) return false;
