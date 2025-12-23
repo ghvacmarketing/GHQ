@@ -14,7 +14,7 @@
     "sourcePage": "33",
     "equipmentCost": 2560.45,
     "sellingPrice": 5120.9,
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "sga_essential_images/sga_essential_2ton_best_1_trane_5ttr5024a1000.png"
   },
   {
     "unitType": "SGA",
@@ -31,7 +31,7 @@
     "sourcePage": "33",
     "equipmentCost": 711.35,
     "sellingPrice": 1422.7,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_3ton_best_2_trane_5txcb003as3hc.png"
+    "imageUrl": "sga_essential_images/sga_essential_2_5ton_better_2_ameristar_5txcb003as3hc.png"
   },
   {
     "unitType": "SGA",
@@ -48,7 +48,7 @@
     "sourcePage": "33",
     "equipmentCost": 1107,
     "sellingPrice": 2214,
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b040m2psc.png"
+    "imageUrl": "sga_essential_images/sga_essential_2ton_better_3_trane_s8x1b040m2psc.png"
   },
   {
     "unitType": "SHP",
@@ -86,7 +86,8 @@
     "totalInvestment": "10003",
     "sourcePage": "33",
     "equipmentCost": 2036.68,
-    "sellingPrice": 4073.36
+    "sellingPrice": 4073.36,
+    "imageUrl": "sga_essential_images/sga_essential_2ton_better_1_trane_5ttr4024a1000.png"
   },
   {
     "unitType": "SGA",
@@ -103,7 +104,7 @@
     "sourcePage": "33",
     "equipmentCost": 699.05,
     "sellingPrice": 1398.1,
-    "imageUrl": "sga_premium_images/sga_premium_1.5ton_budget_2_ameristar_5txca001as3hc.png"
+    "imageUrl": "sga_essential_images/sga_essential_2ton_better_2_trane_5txca001as3hc.png"
   },
   {
     "unitType": "SGA",
@@ -117,7 +118,8 @@
     "description": "Air Conditioner; 10 year limited parts warranty Financing Details:; 10 year limited compressor and coil 12.99% APR Payment based warranty on 120 Mos; Must be registered within 60 days of nstallation",
     "monthlyPayment": "118",
     "totalInvestment": "7874",
-    "sourcePage": "34"
+    "sourcePage": "34",
+    "imageUrl": "sga_essential_images/sga_essential_2ton_budget_1_runtru_a5ac4024a1000.png"
   },
   {
     "unitType": "SGA",
@@ -132,7 +134,7 @@
     "monthlyPayment": "118",
     "totalInvestment": "7874",
     "sourcePage": "34",
-    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
+    "imageUrl": "sga_essential_images/sga_essential_2ton_budget_3_runtru_a801x040am3sd.png"
   },
   {
     "unitType": "SGA",
@@ -146,7 +148,8 @@
     "description": "10 year limited parts warranty (including compressor and coil) with timely Financing Details registration 12.99% APR Payment base on 120 Mo",
     "monthlyPayment": "148",
     "totalInvestment": "9911",
-    "sourcePage": "34"
+    "sourcePage": "34",
+    "imageUrl": "sga_essential_images/sga_essential_2ton_good_1_carrier_26sca524w003.png"
   },
   {
     "unitType": "SGA",
@@ -160,7 +163,8 @@
     "description": "10 year parts warranty with timely registration",
     "monthlyPayment": "148",
     "totalInvestment": "9911",
-    "sourcePage": "34"
+    "sourcePage": "34",
+    "imageUrl": "sga_essential_images/sga_essential_2ton_good_2_carrier_cvava2414xma.png"
   },
   {
     "unitType": "SGA",
@@ -174,7 +178,8 @@
     "description": "Gas Furnace; 10 year parts limited to original purchaser upon timely registration -Otherwise 5 years (Applies to residential installation only); 20 Year Heat Exchanger",
     "monthlyPayment": "148",
     "totalInvestment": "9911",
-    "sourcePage": "34"
+    "sourcePage": "34",
+    "imageUrl": "sga_essential_images/sga_essential_2_5ton_good_3_carrier_58sb0b045m14--12.png"
   },
   {
     "unitType": "SGA",
@@ -188,7 +193,8 @@
     "description": "5 Year Warranty",
     "monthlyPayment": "148",
     "totalInvestment": "9911",
-    "sourcePage": "34"
+    "sourcePage": "34",
+    "imageUrl": "sga_essential_images/sga_essential_5ton_best_4_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SGA",
@@ -205,7 +211,7 @@
     "sourcePage": "29",
     "equipmentCost": 2762.38,
     "sellingPrice": 5524.76,
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "sga_essential_images/sga_essential_3ton_best_1_trane_5ttr5036a1000.png"
   },
   {
     "unitType": "SGA",
@@ -222,7 +228,7 @@
     "sourcePage": "29",
     "equipmentCost": 724.68,
     "sellingPrice": 1449.36,
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_2_trane_5txcb004as3hc.png"
+    "imageUrl": "sga_essential_images/sga_essential_3ton_budget_2_runtru_5txcb004as3hc.png"
   },
   {
     "unitType": "SGA",
@@ -239,7 +245,7 @@
     "sourcePage": "29",
     "equipmentCost": 1190.03,
     "sellingPrice": 2380.06,
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b060m4psc.png"
+    "imageUrl": "sga_essential_images/sga_essential_3ton_good_3_trane_s8x1b060m4psc.png"
   },
   {
     "unitType": "SGA",
@@ -253,7 +259,8 @@
     "description": "10 year limited parts warranty (including compressor and coil) with timely Financing Details: registration 12.99% APR Payment based on 120 Mos",
     "monthlyPayment": "169",
     "totalInvestment": "11282",
-    "sourcePage": "29"
+    "sourcePage": "29",
+    "imageUrl": "sga_essential_images/sga_essential_3ton_better_1_carrier_26sca536w003.png"
   },
   {
     "unitType": "SGA",
@@ -267,7 +274,8 @@
     "description": "10 year parts warranty with timely registration",
     "monthlyPayment": "169",
     "totalInvestment": "11282",
-    "sourcePage": "29"
+    "sourcePage": "29",
+    "imageUrl": "sga_essential_images/sga_essential_3ton_better_2_carrier_cvava3617xma.png"
   },
   {
     "unitType": "SGA",
@@ -281,7 +289,8 @@
     "description": "Gas Furnace; 10 year parts limited to original purchaser upon timely registration Otherwise 5 years (Applies to residential nstallation only); 20 Year Heat Exchanger",
     "monthlyPayment": "169",
     "totalInvestment": "11282",
-    "sourcePage": "29"
+    "sourcePage": "29",
+    "imageUrl": "sga_essential_images/sga_essential_3ton_better_3_carrier_58sb0b070m17--16.png"
   },
   {
     "unitType": "SGA",
@@ -295,7 +304,8 @@
     "description": "Air Conditioner; 10 year limited parts warranty Financing Details:; 10 year limited compressor and coil 12.99% APR Payment based warranty on 120 Mos; Must be registered within 60 days of nstallation",
     "monthlyPayment": "126",
     "totalInvestment": "8402",
-    "sourcePage": "30"
+    "sourcePage": "30",
+    "imageUrl": "sga_essential_images/sga_essential_3ton_budget_1_runtru_a5ac4036a1000.png"
   },
   {
     "unitType": "SGA",
@@ -310,7 +320,7 @@
     "monthlyPayment": "126",
     "totalInvestment": "8402",
     "sourcePage": "30",
-    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
+    "imageUrl": "sga_essential_images/sga_essential_3ton_budget_3_runtru_a801x060bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -326,7 +336,8 @@
     "totalInvestment": "10578",
     "sourcePage": "30",
     "equipmentCost": 2186.33,
-    "sellingPrice": 4372.66
+    "sellingPrice": 4372.66,
+    "imageUrl": "sga_essential_images/sga_essential_3ton_good_1_trane_5ttr4036a1000.png"
   },
   {
     "unitType": "SGA",
@@ -340,7 +351,8 @@
     "description": "10 year limited parts warranty (including compressor and coil) with timely Financing Details registration 12.99% APR Payment base on 120 Mo",
     "monthlyPayment": "193",
     "totalInvestment": "12911",
-    "sourcePage": "25"
+    "sourcePage": "25",
+    "imageUrl": "sga_essential_images/sga_essential_4ton_best_1_carrier_26sca548w003.png"
   },
   {
     "unitType": "SGA",
@@ -354,7 +366,8 @@
     "description": "10 year parts warranty with timely registration",
     "monthlyPayment": "193",
     "totalInvestment": "12911",
-    "sourcePage": "25"
+    "sourcePage": "25",
+    "imageUrl": "sga_essential_images/sga_essential_4ton_best_2_carrier_cvava4821xma.png"
   },
   {
     "unitType": "SGA",
@@ -368,7 +381,8 @@
     "description": "Gas Furnace; 10 year parts limited to original purchaser upon timely registration -Otherwise 5 years (Applies to residential installation only); 20 Year Heat Exchanger",
     "monthlyPayment": "193",
     "totalInvestment": "12911",
-    "sourcePage": "25"
+    "sourcePage": "25",
+    "imageUrl": "sga_essential_images/sga_essential_4ton_best_3_carrier_58sb0b090m21--16.png"
   },
   {
     "unitType": "SGA",
@@ -385,7 +399,7 @@
     "sourcePage": "25",
     "equipmentCost": 3014.53,
     "sellingPrice": 6029.06,
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "sga_essential_images/sga_essential_4ton_better_1_trane_5ttr5048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -400,7 +414,7 @@
     "monthlyPayment": "193",
     "totalInvestment": "12902",
     "sourcePage": "25",
-    "imageUrl": "sga_ultimate_images/sga_ultimate_5ton_best_2_trane_5txcc009as3hc.png"
+    "imageUrl": "sga_essential_images/sga_essential_5ton_good_2_ameristar_5txcc009as3hc.png"
   },
   {
     "unitType": "SGA",
@@ -417,7 +431,7 @@
     "sourcePage": "25",
     "equipmentCost": 1247.43,
     "sellingPrice": 2494.86,
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1c080m5psc.png"
+    "imageUrl": "sga_essential_images/sga_essential_4ton_good_3_trane_s8x1c080m5psc.png"
   },
   {
     "unitType": "SGA",
@@ -431,7 +445,8 @@
     "description": "Air Conditioner; 10 year limited parts warranty Financing Details:; 10 year limited compressor and coil 12.99% APR Payment based warranty on 120 Mos; Must be registered within 60 days of nstallation",
     "monthlyPayment": "137",
     "totalInvestment": "9127",
-    "sourcePage": "26"
+    "sourcePage": "26",
+    "imageUrl": "sga_essential_images/sga_essential_4ton_budget_1_runtru_a5ac4048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -446,7 +461,7 @@
     "monthlyPayment": "137",
     "totalInvestment": "9127",
     "sourcePage": "26",
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb006as3hc.png"
+    "imageUrl": "sga_essential_images/sga_essential_4ton_budget_2_runtru_5txcb006as3hc.png"
   },
   {
     "unitType": "SGA",
@@ -461,7 +476,7 @@
     "monthlyPayment": "137",
     "totalInvestment": "9127",
     "sourcePage": "26",
-    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
+    "imageUrl": "sga_essential_images/sga_essential_4ton_budget_3_runtru_a801x080bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -477,7 +492,8 @@
     "totalInvestment": "11329",
     "sourcePage": "26",
     "equipmentCost": 2391.33,
-    "sellingPrice": 4782.66
+    "sellingPrice": 4782.66,
+    "imageUrl": "sga_essential_images/sga_essential_4ton_good_1_trane_5ttr4048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -491,7 +507,8 @@
     "description": "10 year limited parts warranty (including compressor and coil) with timely Financing Details registration 12.99% APR Payment base on 120 Mo",
     "monthlyPayment": "223",
     "totalInvestment": "14908",
-    "sourcePage": "23"
+    "sourcePage": "23",
+    "imageUrl": "sga_essential_images/sga_essential_5ton_best_1_carrier_26sca560w003.png"
   },
   {
     "unitType": "SGA",
@@ -505,7 +522,8 @@
     "description": "10 year parts warranty with timely registration",
     "monthlyPayment": "223",
     "totalInvestment": "14908",
-    "sourcePage": "23"
+    "sourcePage": "23",
+    "imageUrl": "sga_essential_images/sga_essential_5ton_best_2_carrier_cvava6021xma.png"
   },
   {
     "unitType": "SGA",
@@ -519,7 +537,8 @@
     "description": "Gas Furnace; 10 year parts limited to original purchaser upon timely registration -Otherwise 5 years (Applies to residential installation only); 20 Year Heat Exchanger",
     "monthlyPayment": "223",
     "totalInvestment": "14908",
-    "sourcePage": "23"
+    "sourcePage": "23",
+    "imageUrl": "sga_essential_images/sga_essential_5ton_best_3_carrier_58sb0b110m21--20.png"
   },
   {
     "unitType": "SGA",
@@ -536,7 +555,7 @@
     "sourcePage": "23",
     "equipmentCost": 3271.8,
     "sellingPrice": 6543.6,
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "sga_essential_images/sga_essential_5ton_better_1_trane_5ttr5060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -553,7 +572,7 @@
     "sourcePage": "23",
     "equipmentCost": 1279.2,
     "sellingPrice": 2558.4,
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1c100m5psc.png"
+    "imageUrl": "sga_essential_images/sga_essential_5ton_good_3_trane_s8x1c100m5psc.png"
   },
   {
     "unitType": "SGA",
@@ -567,7 +586,8 @@
     "description": "Air Conditioner; 10 year limited parts warranty Financing Details:; 10 year limited compressor and coil 12.99% APR Payment based warranty on 120 Mos; Must be registered within 60 days of nstallation",
     "monthlyPayment": "146",
     "totalInvestment": "9768",
-    "sourcePage": "24"
+    "sourcePage": "24",
+    "imageUrl": "sga_essential_images/sga_essential_5ton_budget_1_runtru_a5ac4060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -582,7 +602,7 @@
     "monthlyPayment": "146",
     "totalInvestment": "9768",
     "sourcePage": "24",
-    "imageUrl": "sga_ultimate_images/sga_ultimate_3.5ton_budget_2_ameristar_5txcc007as3hc.png"
+    "imageUrl": "sga_essential_images/sga_essential_5ton_budget_2_runtru_5txcc007as3hc.png"
   },
   {
     "unitType": "SGA",
@@ -597,7 +617,7 @@
     "monthlyPayment": "146",
     "totalInvestment": "9768",
     "sourcePage": "24",
-    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
+    "imageUrl": "sga_essential_images/sga_essential_5ton_budget_3_runtru_a801x100cm5sd.png"
   },
   {
     "unitType": "SGA",
@@ -613,7 +633,8 @@
     "totalInvestment": "12035",
     "sourcePage": "24",
     "equipmentCost": 2597.35,
-    "sellingPrice": 5194.7
+    "sellingPrice": 5194.7,
+    "imageUrl": "sga_essential_images/sga_essential_5ton_good_1_trane_5ttr4060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -630,7 +651,7 @@
     "sourcePage": "20",
     "equipmentCost": 3614.15,
     "sellingPrice": 7228.3,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_2ton_better_1_trane_5ttv8x24a1000.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_2ton_best_1_trane_5ttv8x24a1000.png"
   },
   {
     "unitType": "SGA",
@@ -647,7 +668,7 @@
     "sourcePage": "20",
     "equipmentCost": 1718.93,
     "sellingPrice": 3437.86,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_2ton_best_3_trane_s8v2a040m3pcb.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_2ton_best_3_trane_s8v2a040m3pcb.png"
   },
   {
     "unitType": "SGA",
@@ -664,7 +685,7 @@
     "sourcePage": "20",
     "equipmentCost": 580.15,
     "sellingPrice": 1160.3,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_5ton_best_4_trane_tlink360a2vvua.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_5ton_best_4_trane_tlink360a2vvua.png"
   },
   {
     "unitType": "SGA",
@@ -681,7 +702,7 @@
     "sourcePage": "20",
     "equipmentCost": 3102.68,
     "sellingPrice": 6205.36,
-    "imageUrl": "sga_premium_images/sga_premium_2ton_better_1_trane_5ttr7024a1000.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_2ton_better_1_trane_5ttr7024a1000.png"
   },
   {
     "unitType": "SGA",
@@ -698,7 +719,7 @@
     "sourcePage": "21",
     "equipmentCost": 1132.63,
     "sellingPrice": 2265.26,
-    "imageUrl": "sga_premium_images/sga_premium_1.5ton_budget_3_trane_s8x1a040m3psc.png"
+    "imageUrl": "sga_essential_images/sga_essential_1_5ton_better_3_trane_s8x1a040m3psc.png"
   },
   {
     "unitType": "SGA",
@@ -715,7 +736,7 @@
     "sourcePage": "17",
     "equipmentCost": 3941.13,
     "sellingPrice": 7882.26,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_3ton_better_1_trane_5ttv8x36a1000.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_3ton_best_1_trane_5ttv8x36a1000.png"
   },
   {
     "unitType": "SGA",
@@ -732,7 +753,7 @@
     "sourcePage": "17",
     "equipmentCost": 1822.45,
     "sellingPrice": 3644.9,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_3ton_best_3_trane_s8v2b060m4pcb.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_3ton_best_3_trane_s8v2b060m4pcb.png"
   },
   {
     "unitType": "SGA",
@@ -749,7 +770,7 @@
     "sourcePage": "17",
     "equipmentCost": 3425.55,
     "sellingPrice": 6851.1,
-    "imageUrl": "sga_premium_images/sga_premium_3ton_better_1_trane_5ttr7036a1000.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_3ton_better_1_trane_5ttr7036a1000.png"
   },
   {
     "unitType": "SGA",
@@ -766,7 +787,7 @@
     "sourcePage": "14",
     "equipmentCost": 4266.05,
     "sellingPrice": 8532.1,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_4ton_better_1_trane_5ttv8x48a1000.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_4ton_best_1_trane_5ttv8x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -783,7 +804,7 @@
     "sourcePage": "14",
     "equipmentCost": 1928.03,
     "sellingPrice": 3856.06,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_4ton_better_3_trane_s8v2c080m5pcb.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_4ton_best_3_trane_s8v2c080m5pcb.png"
   },
   {
     "unitType": "SGA",
@@ -800,7 +821,7 @@
     "sourcePage": "14",
     "equipmentCost": 3748.43,
     "sellingPrice": 7496.86,
-    "imageUrl": "sga_premium_images/sga_premium_4ton_better_1_trane_5ttr7048a1000.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_4ton_better_1_trane_5ttr7048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -817,7 +838,7 @@
     "sourcePage": "14",
     "equipmentCost": 1220.78,
     "sellingPrice": 2441.56,
-    "imageUrl": "sga_premium_images/sga_premium_4ton_better_3_trane_s8x1b080m4psc.png"
+    "imageUrl": "sga_essential_images/sga_essential_3_5ton_better_3_trane_s8x1b080m4psc.png"
   },
   {
     "unitType": "SGA",
@@ -834,7 +855,7 @@
     "sourcePage": "12",
     "equipmentCost": 4590.98,
     "sellingPrice": 9181.96,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_5ton_better_1_trane_5ttv8x60a1000.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_5ton_best_1_trane_5ttv8x60a1000.png"
   },
   {
     "unitType": "SGA",
@@ -851,7 +872,7 @@
     "sourcePage": "12",
     "equipmentCost": 1985.43,
     "sellingPrice": 3970.86,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_5ton_best_3_trane_s8v2c100m5pcb.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_5ton_best_3_trane_s8v2c100m5pcb.png"
   },
   {
     "unitType": "SGA",
@@ -868,7 +889,7 @@
     "sourcePage": "12",
     "equipmentCost": 4069.25,
     "sellingPrice": 8138.5,
-    "imageUrl": "sga_premium_images/sga_premium_5ton_better_1_trane_5ttr7060a1000.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_5ton_better_1_trane_5ttr7060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -917,7 +938,7 @@
     "monthlyPayment": "227",
     "totalInvestment": "15184",
     "sourcePage": "9",
-    "imageUrl": "sga_ultimate_images/sga_ultimate_2ton_better_2_ameristar_5txca002as3hc.png"
+    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_ameristar_5txca002as3hc.png"
   },
   {
     "unitType": "SGA",
@@ -1077,7 +1098,7 @@
     "sourcePage": "3",
     "equipmentCost": 798.48,
     "sellingPrice": 1596.96,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_4ton_best_2_trane_5txcb006as3hcaa.png"
+    "imageUrl": "sga_premium_images_v3/sga_premium_2_5ton_good_2_runtru_5txcb006as3hcaa.png"
   },
   {
     "unitType": "SGA",
@@ -1094,7 +1115,7 @@
     "sourcePage": "3",
     "equipmentCost": 1880.88,
     "sellingPrice": 3761.76,
-    "imageUrl": "sga_ultimate_images/sga_ultimate_4ton_best_3_trane_s8v2b080m4pcb.png"
+    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_3_trane_s8v2b080m4pcb.png"
   },
   {
     "unitType": "SGA",
@@ -3594,7 +3615,7 @@
     "sourcePage": "35",
     "equipmentCost": 2328.8,
     "sellingPrice": 4657.6,
-    "imageUrl": "sga_premium_images/sga_premium_1.5ton_good_1_trane_5ttr5018a1000.png"
+    "imageUrl": "sga_essential_images/sga_essential_1_5ton_best_1_trane_5ttr5018a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3611,7 +3632,7 @@
     "sourcePage": "35",
     "equipmentCost": 1956.73,
     "sellingPrice": 3913.46,
-    "imageUrl": "sga_premium_images/sga_premium_1.5ton_budget_1_trane_5ttr4018a1000.png"
+    "imageUrl": "sga_essential_images/sga_essential_1_5ton_better_1_trane_5ttr4018a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3625,7 +3646,8 @@
     "description": "Air Conditioner",
     "monthlyPayment": "113",
     "totalInvestment": "7554",
-    "sourcePage": "36"
+    "sourcePage": "36",
+    "imageUrl": "sga_essential_images/sga_essential_1_5ton_budget_1_ameristar_a5ac4018a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3639,7 +3661,8 @@
     "description": "10 year limited parts warranty (including compressor and coil) with timely Financing Details registration 12.99% APR Payment base on 120 Mo",
     "monthlyPayment": "145",
     "totalInvestment": "9683",
-    "sourcePage": "36"
+    "sourcePage": "36",
+    "imageUrl": "sga_essential_images/sga_essential_1_5ton_good_1_carrier_26sca518w003.png"
   },
   {
     "unitType": "SGA",
@@ -3656,7 +3679,7 @@
     "sourcePage": "31",
     "equipmentCost": 2659.88,
     "sellingPrice": 5319.76,
-    "imageUrl": "sga_premium_images/sga_premium_2.5ton_good_1_trane_5ttr5030a1000.png"
+    "imageUrl": "sga_essential_images/sga_essential_2_5ton_best_1_trane_5ttr5030a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3737,7 +3760,7 @@
     "sourcePage": "31",
     "equipmentCost": 2111.5,
     "sellingPrice": 4223,
-    "imageUrl": "sga_premium_images/sga_premium_2.5ton_budget_1_trane_5ttr4030a1000.png"
+    "imageUrl": "sga_essential_images/sga_essential_2_5ton_better_1_trane_5ttr4030a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3800,7 +3823,8 @@
     "description": "Air Conditioner",
     "monthlyPayment": "121",
     "totalInvestment": "8089",
-    "sourcePage": "32"
+    "sourcePage": "32",
+    "imageUrl": "sga_essential_images/sga_essential_2_5ton_budget_1_ameristar_a5ac4030a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3814,7 +3838,8 @@
     "description": "10 year limited parts warranty (including compressor and coil) with timely Financing Details registration 12.99% APR Payment base on 120 Mo",
     "monthlyPayment": "155",
     "totalInvestment": "10349",
-    "sourcePage": "32"
+    "sourcePage": "32",
+    "imageUrl": "sga_essential_images/sga_essential_2_5ton_good_1_carrier_26sca530w003.png"
   },
   {
     "unitType": "SGA",
@@ -3828,7 +3853,8 @@
     "description": "10 year parts warranty with timely registration",
     "monthlyPayment": "155",
     "totalInvestment": "10349",
-    "sourcePage": "32"
+    "sourcePage": "32",
+    "imageUrl": "sga_essential_images/sga_essential_2_5ton_good_2_carrier_cvava3014xma.png"
   },
   {
     "unitType": "SGA",
@@ -3845,7 +3871,7 @@
     "sourcePage": "27",
     "equipmentCost": 2892.55,
     "sellingPrice": 5785.1,
-    "imageUrl": "sga_premium_images/sga_premium_3.5ton_good_1_trane_5ttr5042a1000.png"
+    "imageUrl": "sga_essential_images/sga_essential_3_5ton_best_1_trane_5ttr5042a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3862,7 +3888,7 @@
     "sourcePage": "27",
     "equipmentCost": 2289.85,
     "sellingPrice": 4579.7,
-    "imageUrl": "sga_premium_images/sga_premium_3.5ton_budget_1_trane_5ttr4042a1000.png"
+    "imageUrl": "sga_essential_images/sga_essential_3_5ton_better_1_trane_5ttr4042a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3876,7 +3902,8 @@
     "description": "Air Conditioner",
     "monthlyPayment": "132",
     "totalInvestment": "8807",
-    "sourcePage": "28"
+    "sourcePage": "28",
+    "imageUrl": "sga_essential_images/sga_essential_3_5ton_budget_1_ameristar_a5ac4042a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3891,7 +3918,7 @@
     "monthlyPayment": "132",
     "totalInvestment": "8807",
     "sourcePage": "28",
-    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
+    "imageUrl": "sga_essential_images/sga_essential_3_5ton_budget_3_ameristar_a801x080cm5sd.png"
   },
   {
     "unitType": "SGA",
@@ -3905,7 +3932,8 @@
     "description": "10 year limited parts warranty (including compressor and coil) with timely Financing Details registration 12.99% APR Payment base on 120 Mo",
     "monthlyPayment": "185",
     "totalInvestment": "12345",
-    "sourcePage": "28"
+    "sourcePage": "28",
+    "imageUrl": "sga_essential_images/sga_essential_3_5ton_good_1_carrier_26sca542w003.png"
   },
   {
     "equipmentType": "SGA",
