@@ -127,11 +127,13 @@ const formatPriceRange = (low: number, high: number) => {
 function EquipmentImageGrid({ 
   images, 
   size = 'sm',
-  showLabels = false 
+  showLabels = false,
+  unitType
 }: { 
   images: { outdoor?: string; coil?: string; furnace?: string; thermostat?: string };
   size?: 'sm' | 'md' | 'lg';
   showLabels?: boolean;
+  unitType?: string;
 }) {
   const sizeClasses = {
     sm: 'w-10 h-10',
@@ -144,10 +146,13 @@ function EquipmentImageGrid({
   
   if (!hasAnyImage) return null;
   
+  // Use "Heat Kit" label for PHP and SHP systems, "Indoor" for others
+  const indoorLabel = (unitType === 'PHP' || unitType === 'SHP') ? 'Heat Kit' : 'Indoor';
+  
   const imageItems = [
     { key: 'outdoor', url: images.outdoor, label: 'Outdoor' },
     { key: 'coil', url: images.coil, label: 'Coil' },
-    { key: 'furnace', url: images.furnace, label: 'Indoor' },
+    { key: 'furnace', url: images.furnace, label: indoorLabel },
     { key: 'thermostat', url: images.thermostat, label: 'T-stat' },
   ].filter(item => item.url);
   
@@ -1121,6 +1126,7 @@ export default function ProposalBuilder() {
                                       }}
                                       size="sm"
                                       showLabels
+                                      unitType={item.outdoorUnit.unitType}
                                     />
                                     <div className="flex-1 min-w-0">
                                       <p className="font-medium text-sm">{item.tonnage} System</p>
@@ -1164,6 +1170,7 @@ export default function ProposalBuilder() {
                                       }}
                                       size="sm"
                                       showLabels
+                                      unitType={item.unitType}
                                     />
                                     <div className="flex-1 min-w-0">
                                       <p className="font-medium text-sm">
@@ -1517,7 +1524,9 @@ export default function ProposalBuilder() {
                                     />
                                   )}
                                   <div className="flex-1">
-                                    <p className="font-medium text-xs text-muted-foreground mb-1">Indoor Unit / Furnace</p>
+                                    <p className="font-medium text-xs text-muted-foreground mb-1">
+                                      {(pkg.unitType === 'PHP' || pkg.unitType === 'SHP') ? 'Heat Kit' : 'Indoor Unit / Furnace'}
+                                    </p>
                                     <p className="font-medium">{pkg.indoorHeatModel}</p>
                                     <p className="text-muted-foreground text-xs">{pkg.indoorHeatName}</p>
                                   </div>
@@ -2049,10 +2058,11 @@ export default function ProposalBuilder() {
                       Good: 'bg-blue-500',
                       Budget: 'bg-gray-500',
                     };
+                    const indoorLabel = (item.unitType === 'PHP' || item.unitType === 'SHP') ? 'Heat Kit' : 'Indoor Unit';
                     const components = [
                       { label: 'Outdoor Unit', name: `${item.outdoorBrand} ${item.outdoorModel}`, image: item.outdoorImageUrl },
                       { label: 'Evaporator Coil', name: item.coilName || item.coilModel, image: item.coilImageUrl },
-                      { label: 'Indoor Unit', name: item.indoorHeatName || item.indoorHeatModel, image: item.furnaceImageUrl },
+                      { label: indoorLabel, name: item.indoorHeatName || item.indoorHeatModel, image: item.furnaceImageUrl },
                       { label: 'Thermostat', name: item.thermostatName || item.thermostatModel, image: item.thermostatImageUrl },
                     ].filter(c => c.name);
                     return (
