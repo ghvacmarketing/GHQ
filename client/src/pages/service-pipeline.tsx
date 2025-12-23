@@ -20,6 +20,8 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Calendar as BigCalendar, dateFnsLocalizer, Views, type View } from "react-big-calendar";
+import "react-big-calendar/lib/css/react-big-calendar.css";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +42,8 @@ import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, getDay } from "date-fns";
+import { format, parseISO, parse, startOfWeek, getDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
+import { enUS } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { Lead, Technician, Quote } from "@shared/schema";
 
@@ -64,6 +67,16 @@ const SERVICE_STEPS = [
 type ServiceStep = typeof SERVICE_STEPS[number];
 
 const COLUMN_PREFIX = "column-";
+
+// Configure date-fns localizer for react-big-calendar
+const locales = { "en-US": enUS };
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: (date: Date) => startOfWeek(date, { weekStartsOn: 0 }),
+  getDay,
+  locales,
+});
 
 function getColumnId(step: ServiceStep): string {
   return `${COLUMN_PREFIX}${step}`;
@@ -358,175 +371,169 @@ function KanbanColumn({ step, leads, technicians, onCardClick }: KanbanColumnPro
 
 interface CalendarViewProps {
   leads: Lead[];
+  technicians: Technician[];
   onCardClick: (lead: Lead) => void;
+  onEventDrop?: (leadId: string, newDate: Date) => void;
 }
 
-function CalendarView({ leads, onCardClick }: CalendarViewProps) {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  lead: Lead;
+  isRepairDate: boolean;
+}
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const startDayOfWeek = getDay(monthStart);
+function CalendarView({ leads, technicians, onCardClick, onEventDrop }: CalendarViewProps) {
+  const [currentView, setCurrentView] = useState<View>(() => {
+    // Start with day view on mobile, week view on desktop
+    return window.innerWidth < 640 ? Views.DAY : Views.WEEK;
+  });
+  const [currentDate, setCurrentDate] = useState(new Date());
 
-  const getLeadDate = (lead: Lead): { date: Date; isRepairDate: boolean } | null => {
-    // If repair date is set, show on that date in red
-    if (lead.repairDate) {
-      const date = typeof lead.repairDate === "string" ? parseISO(lead.repairDate) : lead.repairDate;
-      return { date, isRepairDate: true };
-    }
-    // Otherwise show on service entered date in yellow (in progress)
-    if (lead.serviceEnteredAt) {
-      const date = typeof lead.serviceEnteredAt === "string" ? parseISO(lead.serviceEnteredAt) : lead.serviceEnteredAt;
-      return { date, isRepairDate: false };
-    }
-    return null;
-  };
+  // Handle responsive view switching
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 640 && currentView === Views.WEEK) {
+        setCurrentView(Views.DAY);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [currentView]);
 
-  const leadsByDate = useMemo(() => {
-    const map: Record<string, { lead: Lead; isRepairDate: boolean }[]> = {};
+  // Convert leads to calendar events
+  const events = useMemo<CalendarEvent[]>(() => {
+    const calendarEvents: CalendarEvent[] = [];
+    
     leads.forEach((lead) => {
-      const dateInfo = getLeadDate(lead);
-      if (dateInfo && isSameMonth(dateInfo.date, currentMonth)) {
-        const key = format(dateInfo.date, "yyyy-MM-dd");
-        if (!map[key]) map[key] = [];
-        map[key].push({ lead, isRepairDate: dateInfo.isRepairDate });
+      // If repair date is set, show on that date in red
+      if (lead.repairDate) {
+        const date = typeof lead.repairDate === "string" ? parseISO(lead.repairDate) : lead.repairDate;
+        const start = new Date(date);
+        start.setHours(9, 0, 0, 0); // Default to 9 AM
+        const end = new Date(start);
+        end.setHours(11, 0, 0, 0); // 2-hour default duration
+        
+        calendarEvents.push({
+          id: `${lead.id}-repair`,
+          title: lead.name,
+          start,
+          end,
+          lead,
+          isRepairDate: true,
+        });
+      }
+      // Otherwise show on service entered date in yellow (in progress)
+      else if (lead.serviceEnteredAt) {
+        const date = typeof lead.serviceEnteredAt === "string" ? parseISO(lead.serviceEnteredAt) : lead.serviceEnteredAt;
+        const start = new Date(date);
+        start.setHours(8, 0, 0, 0); // Default to 8 AM
+        const end = new Date(start);
+        end.setHours(10, 0, 0, 0); // 2-hour default duration
+        
+        calendarEvents.push({
+          id: `${lead.id}-inprogress`,
+          title: lead.name,
+          start,
+          end,
+          lead,
+          isRepairDate: false,
+        });
       }
     });
-    return map;
-  }, [leads, currentMonth]);
+    
+    return calendarEvents;
+  }, [leads]);
 
-  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  // Custom event styling
+  const eventStyleGetter = useCallback((event: CalendarEvent) => {
+    return {
+      className: event.isRepairDate ? "event-repair" : "event-in-progress",
+    };
+  }, []);
+
+  // Handle event selection (clicking on an event)
+  const handleSelectEvent = useCallback((event: CalendarEvent) => {
+    onCardClick(event.lead);
+  }, [onCardClick]);
+
+  // Handle event drag and drop
+  const handleEventDrop = useCallback(({ event, start }: { event: CalendarEvent; start: Date }) => {
+    if (onEventDrop && event.isRepairDate) {
+      onEventDrop(event.lead.id, start);
+    }
+  }, [onEventDrop]);
+
+  // Custom toolbar messages
+  const messages = {
+    today: "Today",
+    previous: "Back",
+    next: "Next",
+    month: "Month",
+    week: "Week",
+    day: "Day",
+    agenda: "Agenda",
+    showMore: (count: number) => `+${count} more`,
+  };
+
+  // Available views
+  const views = useMemo(() => {
+    // Show fewer views on mobile
+    if (typeof window !== "undefined" && window.innerWidth < 640) {
+      return [Views.DAY, Views.MONTH, Views.AGENDA];
+    }
+    return [Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA];
+  }, []);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between max-w-4xl mx-auto">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-          className="min-h-[44px] min-w-[44px]"
-          data-testid="button-service-prev-month"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <h2 className="text-lg font-semibold" data-testid="text-service-current-month">
-          {format(currentMonth, "MMMM yyyy")}
-        </h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-          className="min-h-[44px] min-w-[44px]"
-          data-testid="button-service-next-month"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+    <div className="space-y-4" data-testid="service-big-calendar">
+      <div 
+        className="bg-card rounded-lg p-2 sm:p-4"
+        style={{ height: "calc(100vh - 260px)", minHeight: "500px" }}
+      >
+        <BigCalendar
+          localizer={localizer}
+          events={events}
+          startAccessor="start"
+          endAccessor="end"
+          view={currentView}
+          onView={setCurrentView}
+          date={currentDate}
+          onNavigate={setCurrentDate}
+          views={views}
+          eventPropGetter={eventStyleGetter}
+          onSelectEvent={handleSelectEvent}
+          selectable={false}
+          popup
+          messages={messages}
+          formats={{
+            dayHeaderFormat: (date: Date) => format(date, "EEEE, MMM d"),
+            dayRangeHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
+              `${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`,
+            agendaDateFormat: (date: Date) => format(date, "EEE, MMM d"),
+          }}
+          step={30}
+          timeslots={2}
+          min={new Date(2024, 0, 1, 6, 0, 0)} // 6 AM
+          max={new Date(2024, 0, 1, 20, 0, 0)} // 8 PM
+          tooltipAccessor={(event: CalendarEvent) => {
+            const tech = technicians.find((t) => t.id === event.lead.assignedEmployeeId);
+            return `${event.title}${tech ? ` - ${tech.name}` : ""}${event.lead.serviceStep ? ` (${event.lead.serviceStep})` : ""}`;
+          }}
+        />
       </div>
-
-      <div className="grid grid-cols-7 gap-1 max-w-4xl mx-auto">
-        {weekDays.map((day) => (
-          <div
-            key={day}
-            className="text-center text-xs font-medium text-muted-foreground py-2"
-          >
-            {day}
-          </div>
-        ))}
-
-        {Array.from({ length: startDayOfWeek }).map((_, idx) => (
-          <div key={`empty-${idx}`} className="h-[100px] sm:h-[120px] lg:h-[130px]" />
-        ))}
-
-        {daysInMonth.map((day) => {
-          const dateKey = format(day, "yyyy-MM-dd");
-          const dayLeads = leadsByDate[dateKey] || [];
-          const isToday = isSameDay(day, new Date());
-
-          return (
-            <div
-              key={dateKey}
-              className={cn(
-                "h-[100px] sm:h-[120px] lg:h-[130px] border rounded-md p-1 bg-card overflow-hidden",
-                isToday && "ring-2 ring-primary"
-              )}
-              data-testid={`service-calendar-day-${dateKey}`}
-            >
-              <div className="text-xs font-medium text-muted-foreground mb-1">
-                {format(day, "d")}
-              </div>
-              <div className="space-y-1 overflow-y-auto h-[calc(100%-20px)] scrollbar-thin">
-                {dayLeads.map(({ lead, isRepairDate }) => (
-                  <HoverCard key={lead.id} openDelay={200} closeDelay={100}>
-                    <HoverCardTrigger asChild>
-                      <button
-                        onClick={() => onCardClick(lead)}
-                        className={cn(
-                          "w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate min-h-[28px] flex items-center",
-                          isRepairDate
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-yellow-400 text-yellow-900"
-                        )}
-                        data-testid={`service-calendar-job-${lead.id}`}
-                      >
-                        <span className="truncate">{lead.name}</span>
-                      </button>
-                    </HoverCardTrigger>
-                    <HoverCardContent className="w-72 p-3" side="right" align="start">
-                      <div className="space-y-2">
-                        <h4 className="font-semibold text-sm">{lead.name}</h4>
-                        {lead.address && (
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <MapPin className="h-3 w-3 flex-shrink-0" />
-                            <span>{lead.address}</span>
-                          </div>
-                        )}
-                        {lead.phone && (
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Phone className="h-3 w-3 flex-shrink-0" />
-                            <span>{lead.phone}</span>
-                          </div>
-                        )}
-                        {lead.estimatedValue && (
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <DollarSign className="h-3 w-3 flex-shrink-0" />
-                            <span>${parseFloat(lead.estimatedValue).toLocaleString()}</span>
-                          </div>
-                        )}
-                        {lead.repairDate && (
-                          <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
-                            <CalendarDays className="h-3 w-3 flex-shrink-0" />
-                            <span>Repair: {format(typeof lead.repairDate === "string" ? parseISO(lead.repairDate) : lead.repairDate, "MMM d, yyyy")}</span>
-                          </div>
-                        )}
-                        {lead.serviceStep && (
-                          <Badge variant="outline" className="text-[10px] mt-1">
-                            {lead.serviceStep}
-                          </Badge>
-                        )}
-                        {lead.clientIssue && (
-                          <p className="text-xs text-muted-foreground border-t pt-2 mt-2 line-clamp-2">
-                            {lead.clientIssue}
-                          </p>
-                        )}
-                      </div>
-                    </HoverCardContent>
-                  </HoverCard>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground max-w-4xl mx-auto">
+      
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-yellow-400" />
           <span>In Progress</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-primary" />
-          <span>Repair Date</span>
+          <span>Scheduled Repair</span>
         </div>
       </div>
     </div>
@@ -917,7 +924,7 @@ export default function ServicePipeline() {
                 <Skeleton className="h-[400px] w-full" />
               </div>
             ) : (
-              <CalendarView leads={filteredLeads} onCardClick={openEditDialog} />
+              <CalendarView leads={filteredLeads} technicians={technicians} onCardClick={openEditDialog} />
             )}
           </TabsContent>
         </Tabs>
