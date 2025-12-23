@@ -730,11 +730,9 @@ export default function ProposalBuilder() {
     });
   }, [customTonnage, customEquipmentType, thermostatBrandFilter, isPackageUnitType, allowedSgaModels, allowedShpModels]);
 
-  // For GP: only need Package Unit + Thermostat (2 components)
-  // For all others (SGA, SHP, PHP): need Outdoor/Package Unit + Coil/Heater Kit + Thermostat (3 components)
-  const isCustomBuildComplete = customEquipmentType === "GP"
-    ? (selectedOutdoorUnit && selectedThermostat && customTonnage)
-    : (selectedOutdoorUnit && selectedCoil && selectedThermostat && customTonnage);
+  // Allow adding to proposal with at least one component selected
+  const selectedComponentCount = [selectedOutdoorUnit, selectedCoil, selectedIndoorUnit, selectedThermostat].filter(Boolean).length;
+  const isCustomBuildComplete = customTonnage && selectedComponentCount >= 1;
 
   const cartItemCount = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -2067,10 +2065,7 @@ export default function ProposalBuilder() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {customEquipmentType === "GP"
-                          ? `${[selectedOutdoorUnit, selectedThermostat].filter(Boolean).length} / 2 components`
-                          : `${[selectedOutdoorUnit, selectedCoil, selectedThermostat].filter(Boolean).length} / 3 components`
-                        }
+                        {selectedComponentCount} component{selectedComponentCount !== 1 ? 's' : ''} selected
                       </p>
                     </div>
                     <Button
@@ -2088,10 +2083,7 @@ export default function ProposalBuilder() {
                 {!isCustomBuildComplete && (
                   <div className="mb-4 p-3 bg-amber-100 dark:bg-amber-900 rounded-lg border border-amber-300 dark:border-amber-700">
                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                      {customEquipmentType === "GP"
-                        ? "Please select all 2 required components to add this custom build to your proposal."
-                        : "Please select all 3 required components to add this custom build to your proposal."
-                      }
+                      Please select at least one component to add to your proposal.
                     </p>
                   </div>
                 )}
@@ -2128,7 +2120,7 @@ export default function ProposalBuilder() {
                     </>
                   )}
 
-                  {/* SGA/SHP show coil/evaporator coil */}
+                  {/* SGA/SHP show coil/evaporator coil/air handler */}
                   {!isPackageUnitType && (
                     <>
                       <div className="my-6 flex items-center gap-3">
@@ -2145,6 +2137,27 @@ export default function ProposalBuilder() {
                         coilBrandFilter,
                         setCoilBrandFilter,
                         "coil"
+                      )}
+
+                      {/* SGA shows Indoor Unit (furnace/air handler) */}
+                      {customEquipmentType === "SGA" && (
+                        <>
+                          <div className="my-6 flex items-center gap-3">
+                            <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
+                            <span className="text-[#d3b07d] text-xs font-medium uppercase tracking-wider">Next Component</span>
+                            <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
+                          </div>
+
+                          {renderComponentSection(
+                            "Indoor Unit",
+                            indoorUnitOptions,
+                            selectedIndoorUnit,
+                            setSelectedIndoorUnit,
+                            indoorBrandFilter,
+                            setIndoorBrandFilter,
+                            "indoor"
+                          )}
+                        </>
                       )}
                     </>
                   )}
