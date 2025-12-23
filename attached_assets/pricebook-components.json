@@ -102,7 +102,8 @@
     "totalInvestment": "10003",
     "sourcePage": "33",
     "equipmentCost": 699.05,
-    "sellingPrice": 1398.1
+    "sellingPrice": 1398.1,
+    "imageUrl": "sga_premium_images/sga_premium_1.5ton_budget_2_ameristar_5txca001as3hc.png"
   },
   {
     "unitType": "SGA",
@@ -3609,7 +3610,8 @@
     "totalInvestment": "9880",
     "sourcePage": "35",
     "equipmentCost": 1956.73,
-    "sellingPrice": 3913.46
+    "sellingPrice": 3913.46,
+    "imageUrl": "sga_premium_images/sga_premium_1.5ton_budget_1_trane_5ttr4018a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3734,7 +3736,8 @@
     "totalInvestment": "10596",
     "sourcePage": "31",
     "equipmentCost": 2111.5,
-    "sellingPrice": 4223
+    "sellingPrice": 4223,
+    "imageUrl": "sga_premium_images/sga_premium_2.5ton_budget_1_trane_5ttr4030a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3858,7 +3861,8 @@
     "totalInvestment": "11043",
     "sourcePage": "27",
     "equipmentCost": 2289.85,
-    "sellingPrice": 4579.7
+    "sellingPrice": 4579.7,
+    "imageUrl": "sga_premium_images/sga_premium_3.5ton_budget_1_trane_5ttr4042a1000.png"
   },
   {
     "unitType": "SGA",
