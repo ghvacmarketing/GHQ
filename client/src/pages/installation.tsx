@@ -1465,14 +1465,14 @@ export default function Installation() {
               <div className="space-y-2">
                 <Label htmlFor="subcontractor">Subcontractor</Label>
                 <Select
-                  value={editForm.installSubcontractor}
-                  onValueChange={(value) => setEditForm({ ...editForm, installSubcontractor: value })}
+                  value={editForm.installSubcontractor || "none"}
+                  onValueChange={(value) => setEditForm({ ...editForm, installSubcontractor: value === "none" ? "" : value })}
                 >
                   <SelectTrigger id="subcontractor" className="min-h-[44px]" data-testid="select-subcontractor">
                     <SelectValue placeholder="Select subcontractor" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     <SelectItem value="Dustin">Dustin</SelectItem>
                     <SelectItem value="Baltezar">Baltezar</SelectItem>
                   </SelectContent>
