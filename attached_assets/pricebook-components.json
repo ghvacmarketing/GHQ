@@ -10124,34 +10124,37 @@
   {
     "equipmentType": "SGA",
     "tonnage": "1.5",
-    "componentType": "Outdoor Unit",
+    "componentType": "Air Conditioner",
     "model": "5TTX5018A1000",
     "brand": "Trane",
     "cost": 2744.95,
     "price": 5490,
     "priceLow": 5490,
-    "priceHigh": 5490
+    "priceHigh": 5490,
+    "unitType": "SGA"
   },
   {
     "equipmentType": "SGA",
     "tonnage": "2.5",
-    "componentType": "Outdoor Unit",
+    "componentType": "Air Conditioner",
     "model": "5TTX5030A1000",
     "brand": "Trane",
     "cost": 3051.43,
     "price": 6103,
     "priceLow": 6103,
-    "priceHigh": 6103
+    "priceHigh": 6103,
+    "unitType": "SGA"
   },
   {
     "equipmentType": "SGA",
     "tonnage": "3.5",
-    "componentType": "Outdoor Unit",
+    "componentType": "Air Conditioner",
     "model": "5TTX5042A1000",
     "brand": "Trane",
     "cost": 3278.98,
     "price": 6558,
     "priceLow": 6558,
-    "priceHigh": 6558
+    "priceHigh": 6558,
+    "unitType": "SGA"
   }
 ]
