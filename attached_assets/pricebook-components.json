@@ -70,7 +70,7 @@
     "priceLow": 349,
     "priceHigh": 349,
     "equipmentType": "SHP",
-    "imageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "imageUrl": "shp_essential_images/shp_essential_5ton_budget_3_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -1311,7 +1311,8 @@
     "description": "Air Handler; 10 year limited parts warranty with timely registration -Equipment must be registered within 90 days of original installation",
     "monthlyPayment": "166",
     "totalInvestment": "11076",
-    "sourcePage": "62"
+    "sourcePage": "62",
+    "imageUrl": "shp_essential_images/shp_essential_1_5ton_good_2_carrier_27sca518a003.png"
   },
   {
     "unitType": "SHP",
@@ -1325,7 +1326,8 @@
     "description": "Air Handler; 10 year limited parts warranty with timely registration -Equipment must be registered within 90 days of original installation",
     "monthlyPayment": "173",
     "totalInvestment": "11571",
-    "sourcePage": "61"
+    "sourcePage": "61",
+    "imageUrl": "shp_essential_images/shp_essential_2ton_good_2_carrier_27sca524a003.png"
   },
   {
     "unitType": "SHP",
@@ -1346,7 +1348,8 @@
     "price": 2526,
     "priceLow": 2526,
     "priceHigh": 2526,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_2ton_better_2_trane_5tem4b02ac21s.png"
   },
   {
     "unitType": "SHP",
@@ -1629,7 +1632,8 @@
     "description": "Heat Pump",
     "monthlyPayment": "166",
     "totalInvestment": "11076",
-    "sourcePage": "62"
+    "sourcePage": "62",
+    "imageUrl": "shp_essential_images/shp_essential_1_5ton_good_1_carrier_fj5anxa18l05.png"
   },
   {
     "unitType": "SHP",
@@ -1643,7 +1647,8 @@
     "description": "Heat Pump",
     "monthlyPayment": "173",
     "totalInvestment": "11571",
-    "sourcePage": "61"
+    "sourcePage": "61",
+    "imageUrl": "shp_essential_images/shp_essential_2ton_good_1_carrier_fj5anxb24l05.png"
   },
   {
     "unitType": "SHP",
@@ -1749,7 +1754,7 @@
     "priceLow": 5879,
     "priceHigh": 5879,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "shp_essential_images/shp_essential_1_5ton_best_1_trane_5twr5018a1000.png"
   },
   {
     "unitType": "SHP",
@@ -1771,7 +1776,7 @@
     "priceLow": 6322,
     "priceHigh": 6322,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "shp_essential_images/shp_essential_2ton_best_1_trane_5twr5024a1000.png"
   },
   {
     "unitType": "SHP",
@@ -1925,7 +1930,8 @@
     "description": "Air Handler",
     "monthlyPayment": "145",
     "totalInvestment": "9667",
-    "sourcePage": "61"
+    "sourcePage": "61",
+    "imageUrl": "shp_essential_images/shp_essential_3ton_budget_2_runtru_a5ahc003a1b30a.png"
   },
   {
     "unitType": "SHP",
@@ -1939,7 +1945,8 @@
     "description": "Air Handler",
     "monthlyPayment": "142",
     "totalInvestment": "9498",
-    "sourcePage": "62"
+    "sourcePage": "62",
+    "imageUrl": "shp_essential_images/shp_essential_1_5ton_budget_2_ameristar_a5ahv002a1b30a.png"
   },
   {
     "unitType": "SHP",
@@ -2185,7 +2192,8 @@
     "description": "Outdoor; 10 Year Compressor and Coil Financing Details:; 10 Year Limited Functional Parts with 12.99% APR Payment based; Rregistration on 120 Mos",
     "monthlyPayment": "142",
     "totalInvestment": "9498",
-    "sourcePage": "62"
+    "sourcePage": "62",
+    "imageUrl": "shp_essential_images/shp_essential_1_5ton_budget_1_ameristar_a5hp4018a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2199,7 +2207,8 @@
     "description": "Heat Pump; 10 year limited parts warranty Financing Details:; 10 year limited compressor and coil 12.99% APR Payment based warranty on 120 Mos; Must be registered within 60 days of nstallation",
     "monthlyPayment": "145",
     "totalInvestment": "9667",
-    "sourcePage": "61"
+    "sourcePage": "61",
+    "imageUrl": "shp_essential_images/shp_essential_2ton_budget_1_runtru_a5hp4024a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2220,7 +2229,8 @@
     "price": 4467,
     "priceLow": 4467,
     "priceHigh": 4467,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_1_5ton_better_1_trane_5twr4018a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2241,7 +2251,8 @@
     "price": 4621,
     "priceLow": 4621,
     "priceHigh": 4621,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_2ton_better_1_trane_5twr4024a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2358,7 +2369,8 @@
     "price": 2683,
     "priceLow": 2683,
     "priceHigh": 2683,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_3ton_good_2_trane_5tem4b03ac31s.png"
   },
   {
     "unitType": "SHP",
@@ -2400,7 +2412,8 @@
     "price": 4930,
     "priceLow": 4930,
     "priceHigh": 4930,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_3ton_good_1_trane_5twr4036a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2422,7 +2435,7 @@
     "priceLow": 6734,
     "priceHigh": 6734,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "shp_essential_images/shp_essential_3ton_best_1_trane_5twr5036a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2436,7 +2449,8 @@
     "description": "Air Handler; 10 year limited parts warranty with timely registration Equipment must be registered within 90 days of original installation",
     "monthlyPayment": "161",
     "totalInvestment": "10723",
-    "sourcePage": "59"
+    "sourcePage": "59",
+    "imageUrl": "shp_essential_images/shp_essential_3ton_better_2_carrier_27sca536a003.png"
   },
   {
     "unitType": "SHP",
@@ -2450,7 +2464,8 @@
     "description": "Heat Pump",
     "monthlyPayment": "161",
     "totalInvestment": "10723",
-    "sourcePage": "59"
+    "sourcePage": "59",
+    "imageUrl": "shp_essential_images/shp_essential_3ton_better_1_carrier_fj5anxb36l10.png"
   },
   {
     "unitType": "SHP",
@@ -2471,7 +2486,8 @@
     "priceHigh": 3958,
     "equipmentCost": 1979,
     "sellingPrice": 3958,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_3ton_budget_1_runtru_a5hp4036a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2485,7 +2501,8 @@
     "description": "Air Handler; 10 year limited parts warranty with timely registration -Equipment must be registered within 90 days of original installation",
     "monthlyPayment": "193",
     "totalInvestment": "12892",
-    "sourcePage": "58"
+    "sourcePage": "58",
+    "imageUrl": "shp_essential_images/shp_essential_3_5ton_good_2_carrier_27spa642a003.png"
   },
   {
     "unitType": "SHP",
@@ -2506,7 +2523,8 @@
     "price": 2991,
     "priceLow": 2991,
     "priceHigh": 2991,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_3_5ton_better_2_trane_5tem4d05ac41s.png"
   },
   {
     "unitType": "SHP",
@@ -2527,7 +2545,8 @@
     "price": 3153,
     "priceLow": 3153,
     "priceHigh": 3153,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_4ton_good_2_trane_5tem4d06ac41s.png"
   },
   {
     "unitType": "SHP",
@@ -2562,7 +2581,8 @@
     "description": "Heat Pump; 10 year parts limited warranty (including Financing Details compressor and coil) with timely 12.99% APR Payment base registration on 120 Mo; Equipment must be registered within 90 days of original installation",
     "monthlyPayment": "193",
     "totalInvestment": "12892",
-    "sourcePage": "58"
+    "sourcePage": "58",
+    "imageUrl": "shp_essential_images/shp_essential_3_5ton_good_1_carrier_fj5anxc42l10.png"
   },
   {
     "unitType": "SHP",
@@ -2583,7 +2603,8 @@
     "price": 5340,
     "priceLow": 5340,
     "priceHigh": 5340,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_4ton_good_1_trane_5twr4048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2605,7 +2626,7 @@
     "priceLow": 6997,
     "priceHigh": 6997,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "shp_essential_images/shp_essential_3_5ton_best_1_trane_5twr5042a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2627,7 +2648,7 @@
     "priceLow": 7245,
     "priceHigh": 7245,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "shp_essential_images/shp_essential_4ton_best_1_trane_5twr5048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2641,7 +2662,8 @@
     "description": "Air Handler",
     "monthlyPayment": "162",
     "totalInvestment": "10818",
-    "sourcePage": "58"
+    "sourcePage": "58",
+    "imageUrl": "shp_essential_images/shp_essential_3_5ton_budget_2_ameristar_a5ahc005a1d30a.png"
   },
   {
     "unitType": "SHP",
@@ -2655,7 +2677,8 @@
     "description": "Air Handler; 10 year limited parts warranty with timely registration Equipment must be registered within 90 days of original installation",
     "monthlyPayment": "193",
     "totalInvestment": "12871",
-    "sourcePage": "57"
+    "sourcePage": "57",
+    "imageUrl": "shp_essential_images/shp_essential_4ton_better_2_carrier_27sca548a003.png"
   },
   {
     "unitType": "SHP",
@@ -2669,7 +2692,8 @@
     "description": "Air Handler; 10 year limited parts warranty; Must be registered within days of nstallation",
     "monthlyPayment": "193",
     "totalInvestment": "12871",
-    "sourcePage": "57"
+    "sourcePage": "57",
+    "imageUrl": "shp_essential_images/shp_essential_4ton_budget_2_runtru_a5ahc006a1d30a.png"
   },
   {
     "unitType": "SHP",
@@ -2683,7 +2707,8 @@
     "description": "Outdoor; 10 Year Compressor and Coil Financing Details:; 10 Year Limited Functional Parts with 12.99% APR Payment based; Rregistration on 120 Mos",
     "monthlyPayment": "162",
     "totalInvestment": "10818",
-    "sourcePage": "58"
+    "sourcePage": "58",
+    "imageUrl": "shp_essential_images/shp_essential_3_5ton_budget_1_ameristar_a5hp4042a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2697,7 +2722,8 @@
     "description": "Heat Pump",
     "monthlyPayment": "193",
     "totalInvestment": "12871",
-    "sourcePage": "57"
+    "sourcePage": "57",
+    "imageUrl": "shp_essential_images/shp_essential_4ton_better_1_carrier_fj5anxc48l10.png"
   },
   {
     "unitType": "SHP",
@@ -2718,7 +2744,8 @@
     "priceHigh": 4386,
     "equipmentCost": 2193,
     "sellingPrice": 4386,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_4ton_budget_1_runtru_a5hp4048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2739,7 +2766,8 @@
     "price": 5141,
     "priceLow": 5141,
     "priceHigh": 5141,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_3_5ton_better_1_trane_5twr4042a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2760,7 +2788,8 @@
     "price": 3672,
     "priceLow": 3672,
     "priceHigh": 3672,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_5ton_good_2_trane_5tem4d07ac51s.png"
   },
   {
     "unitType": "SHP",
@@ -2782,7 +2811,7 @@
     "priceLow": 7745,
     "priceHigh": 7745,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "shp_essential_images/shp_essential_5ton_best_1_trane_5twr5060a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2796,7 +2825,8 @@
     "description": "Air Handler; 10 year limited parts warranty with timely registration Equipment must be registered within 90 days of original installation",
     "monthlyPayment": "213",
     "totalInvestment": "14219",
-    "sourcePage": "55"
+    "sourcePage": "55",
+    "imageUrl": "shp_essential_images/shp_essential_5ton_better_2_carrier_27sca560a003.png"
   },
   {
     "unitType": "SHP",
@@ -2810,7 +2840,8 @@
     "description": "Heat Pump",
     "monthlyPayment": "213",
     "totalInvestment": "14219",
-    "sourcePage": "55"
+    "sourcePage": "55",
+    "imageUrl": "shp_essential_images/shp_essential_5ton_better_1_carrier_fj5anxd60l00.png"
   },
   {
     "unitType": "SHP",
@@ -2824,7 +2855,8 @@
     "description": "Air Handler; 10 year limited parts warranty; Must be registered within days of nstallation",
     "monthlyPayment": "151",
     "totalInvestment": "10114",
-    "sourcePage": "56"
+    "sourcePage": "56",
+    "imageUrl": "shp_essential_images/shp_essential_5ton_budget_2_runtru_a5ahc007a1d30a.png"
   },
   {
     "unitType": "SHP",
@@ -2845,7 +2877,8 @@
     "priceHigh": 4812,
     "equipmentCost": 2406,
     "sellingPrice": 4812,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_5ton_budget_1_runtru_a5hp4060a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2866,7 +2899,8 @@
     "price": 5742,
     "priceLow": 5742,
     "priceHigh": 5742,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_5ton_good_1_trane_5twr4060a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2887,7 +2921,8 @@
     "price": 3180,
     "priceLow": 3180,
     "priceHigh": 3180,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_premium_images/shp_premium_2ton_budget_2_trane_5tem6b02av21s.png"
   },
   {
     "unitType": "SHP",
@@ -2908,7 +2943,8 @@
     "price": 3370,
     "priceLow": 3370,
     "priceHigh": 3370,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_premium_images/shp_premium_2ton_best_2_trane_5temcb02av21.png"
   },
   {
     "unitType": "SHP",
@@ -2930,7 +2966,7 @@
     "priceLow": 7620,
     "priceHigh": 7620,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
+    "imageUrl": "shp_premium_images/shp_premium_2ton_best_1_trane_5twv8x24a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2952,7 +2988,7 @@
     "priceLow": 6812,
     "priceHigh": 6812,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
+    "imageUrl": "shp_premium_images/shp_premium_2ton_better_1_trane_5twr7024a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2973,7 +3009,8 @@
     "price": 3680,
     "priceLow": 3680,
     "priceHigh": 3680,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_premium_images/shp_premium_3ton_good_2_trane_5tem6d04av31s.png"
   },
   {
     "unitType": "SHP",
@@ -2994,7 +3031,8 @@
     "price": 3567,
     "priceLow": 3567,
     "priceHigh": 3567,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_premium_images/shp_premium_3ton_best_2_trane_5temcb03av31.png"
   },
   {
     "unitType": "SHP",
@@ -3016,7 +3054,7 @@
     "priceLow": 8477,
     "priceHigh": 8477,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
+    "imageUrl": "shp_premium_images/shp_premium_3ton_best_1_trane_5twv8x36a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3037,7 +3075,8 @@
     "price": 3380,
     "priceLow": 3380,
     "priceHigh": 3380,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_premium_images/shp_premium_3ton_better_2_trane_5tem6b03av21s.png"
   },
   {
     "unitType": "SHP",
@@ -3059,7 +3098,7 @@
     "priceLow": 7665,
     "priceHigh": 7665,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
+    "imageUrl": "shp_premium_images/shp_premium_3ton_better_1_trane_5twr7036a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3080,7 +3119,8 @@
     "price": 4389,
     "priceLow": 4389,
     "priceHigh": 4389,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_premium_images/shp_premium_4ton_good_2_trane_5tem6d06av41s.png"
   },
   {
     "unitType": "SHP",
@@ -3101,7 +3141,8 @@
     "price": 4567,
     "priceLow": 4567,
     "priceHigh": 4567,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_premium_images/shp_premium_4ton_best_2_trane_5temcd06av41.png"
   },
   {
     "unitType": "SHP",
@@ -3123,7 +3164,7 @@
     "priceLow": 9323,
     "priceHigh": 9323,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
+    "imageUrl": "shp_premium_images/shp_premium_4ton_best_1_trane_5twv8x48a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3145,7 +3186,7 @@
     "priceLow": 8501,
     "priceHigh": 8501,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
+    "imageUrl": "shp_premium_images/shp_premium_4ton_better_1_trane_5twr7048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3166,7 +3207,8 @@
     "price": 4869,
     "priceLow": 4869,
     "priceHigh": 4869,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_premium_images/shp_premium_5ton_budget_2_trane_5tem6d07av51s.png"
   },
   {
     "unitType": "SHP",
@@ -3187,7 +3229,8 @@
     "price": 5078,
     "priceLow": 5078,
     "priceHigh": 5078,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_premium_images/shp_premium_5ton_best_2_trane_5temcd07av51.png"
   },
   {
     "unitType": "SHP",
@@ -3209,7 +3252,7 @@
     "priceLow": 10172,
     "priceHigh": 10172,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
+    "imageUrl": "shp_premium_images/shp_premium_5ton_best_1_trane_5twv8x60a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3231,7 +3274,7 @@
     "priceLow": 9340,
     "priceHigh": 9340,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
+    "imageUrl": "shp_premium_images/shp_premium_5ton_better_1_trane_5twr7060a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3252,7 +3295,8 @@
     "price": 4459,
     "priceLow": 4459,
     "priceHigh": 4459,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_ultimate_images/shp_ultimate_3ton_better_2_trane_5tamxc03av31d.png"
   },
   {
     "unitType": "SHP",
@@ -3295,7 +3339,7 @@
     "priceLow": 9096,
     "priceHigh": 9096,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_2ton_best_1_trane_5twv0x24a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3317,7 +3361,7 @@
     "priceLow": 7077,
     "priceHigh": 7077,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_2ton_budget_1_trane_5twx5024a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3339,7 +3383,7 @@
     "priceLow": 7066,
     "priceHigh": 7066,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_2ton_good_1_trane_5twx7024a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3360,7 +3404,8 @@
     "price": 4871,
     "priceLow": 4871,
     "priceHigh": 4871,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_ultimate_images/shp_ultimate_3ton_best_2_trane_5tamxd05av41d.png"
   },
   {
     "unitType": "SHP",
@@ -3403,7 +3448,7 @@
     "priceLow": 9959,
     "priceHigh": 9959,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_3ton_best_1_trane_5twv0x36a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3425,7 +3470,7 @@
     "priceLow": 7489,
     "priceHigh": 7489,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_3ton_budget_1_trane_5twx5036a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3447,7 +3492,7 @@
     "priceLow": 7921,
     "priceHigh": 7921,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_3ton_good_1_trane_5twx7036a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3468,7 +3513,8 @@
     "price": 5129,
     "priceLow": 5129,
     "priceHigh": 5129,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_ultimate_images/shp_ultimate_4ton_best_2_trane_5tamxd06av41d.png"
   },
   {
     "unitType": "SHP",
@@ -3511,7 +3557,7 @@
     "priceLow": 10804,
     "priceHigh": 10804,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_4ton_best_1_trane_5twv0x48a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3532,7 +3578,8 @@
     "price": 5650,
     "priceLow": 5650,
     "priceHigh": 5650,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_ultimate_images/shp_ultimate_5ton_better_2_trane_5tamxd07av51d.png"
   },
   {
     "unitType": "SHP",
@@ -3554,7 +3601,7 @@
     "priceLow": 7997,
     "priceHigh": 7997,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_4ton_budget_1_trane_5twx5048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3576,7 +3623,7 @@
     "priceLow": 8758,
     "priceHigh": 8758,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_4ton_good_1_trane_5twx7048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3598,7 +3645,7 @@
     "priceLow": 11650,
     "priceHigh": 11650,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_5ton_best_1_trane_5twv0x60a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3721,7 +3768,8 @@
     "price": 4774,
     "priceLow": 4774,
     "priceHigh": 4774,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_2_5ton_good_1_trane_5twr4030a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3743,7 +3791,7 @@
     "priceLow": 6525,
     "priceHigh": 6525,
     "equipmentType": "SHP",
-    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
+    "imageUrl": "shp_essential_images/shp_essential_2_5ton_best_1_trane_5twr5030a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3795,7 +3843,8 @@
     "priceHigh": 3792,
     "equipmentCost": 1896,
     "sellingPrice": 3792,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "shp_essential_images/shp_essential_2_5ton_budget_1_ameristar_a5hp4030a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3809,7 +3858,8 @@
     "description": "Heat Pump; 10 year parts limited warranty (including Financing Details: compressor and coil) with timely 12.99% APR Payment based registration on 120 Mos; Equipment must be registered within 90 days of original installation",
     "monthlyPayment": "154",
     "totalInvestment": "10313",
-    "sourcePage": "60"
+    "sourcePage": "60",
+    "imageUrl": "shp_essential_images/shp_essential_2_5ton_better_1_carrier_fj5anxb30l08.png"
   },
   {
     "unitType": "SGA",
@@ -4008,7 +4058,7 @@
     "tier": "Ultimate",
     "unitName": "XL16i Series Heat Pump",
     "description": "Heat Pump; Trane Heat Pump System Component",
-    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_1_5ton_budget_1_trane_5twx5018a1000.png"
   },
   {
     "equipmentType": "SHP",
@@ -4026,7 +4076,7 @@
     "tier": "Ultimate",
     "unitName": "XL16i Series Heat Pump",
     "description": "Heat Pump; Trane Heat Pump System Component",
-    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_2_5ton_budget_1_trane_5twx5030a1000.png"
   },
   {
     "equipmentType": "SHP",
@@ -4044,7 +4094,7 @@
     "tier": "Ultimate",
     "unitName": "XL16i Series Heat Pump",
     "description": "Heat Pump; Trane Heat Pump System Component",
-    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_3_5ton_budget_1_trane_5twx5042a1000.png"
   },
   {
     "equipmentType": "SHP",
@@ -4061,7 +4111,8 @@
     "sellingPrice": 3940,
     "tier": "Essential",
     "unitName": "Air Handler",
-    "description": "Air Handler; Trane Heat Pump System Component"
+    "description": "Air Handler; Trane Heat Pump System Component",
+    "imageUrl": "shp_ultimate_images/shp_ultimate_3_5ton_budget_2_trane_5tem6d05av41s.png"
   },
   {
     "equipmentType": "SHP",
@@ -4079,7 +4130,7 @@
     "tier": "Ultimate",
     "unitName": "XL16i Series Heat Pump",
     "description": "Heat Pump; Trane Heat Pump System Component",
-    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_5ton_budget_1_trane_5twx5060a1000.png"
   },
   {
     "equipmentType": "SHP",
@@ -4097,7 +4148,7 @@
     "tier": "Ultimate",
     "unitName": "XL16i Series Heat Pump",
     "description": "Heat Pump; Trane Heat Pump System Component",
-    "imageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
+    "imageUrl": "shp_ultimate_images/shp_ultimate_5ton_good_1_trane_5twx7060a1000.png"
   },
   {
     "equipmentType": "SHP",
