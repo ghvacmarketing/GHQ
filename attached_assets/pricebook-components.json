@@ -13,7 +13,7 @@
     "totalInvestment": "11201",
     "sourcePage": "33",
     "equipmentCost": 2560.45,
-    "sellingPrice": 5121
+    "sellingPrice": 5120.9
   },
   {
     "unitType": "SGA",
@@ -29,7 +29,7 @@
     "totalInvestment": "11201",
     "sourcePage": "33",
     "equipmentCost": 711.35,
-    "sellingPrice": 1423
+    "sellingPrice": 1422.7
   },
   {
     "unitType": "SGA",
@@ -61,7 +61,7 @@
     "totalInvestment": "11201",
     "sourcePage": "33",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -77,7 +77,7 @@
     "totalInvestment": "10003",
     "sourcePage": "33",
     "equipmentCost": 2036.68,
-    "sellingPrice": 4073
+    "sellingPrice": 4073.36
   },
   {
     "unitType": "SGA",
@@ -93,7 +93,7 @@
     "totalInvestment": "10003",
     "sourcePage": "33",
     "equipmentCost": 699.05,
-    "sellingPrice": 1398
+    "sellingPrice": 1398.1
   },
   {
     "unitType": "SGA",
@@ -125,7 +125,7 @@
     "totalInvestment": "10003",
     "sourcePage": "33",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -183,7 +183,7 @@
     "totalInvestment": "7874",
     "sourcePage": "34",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -255,7 +255,7 @@
     "totalInvestment": "11867",
     "sourcePage": "29",
     "equipmentCost": 2762.38,
-    "sellingPrice": 5525
+    "sellingPrice": 5524.76
   },
   {
     "unitType": "SGA",
@@ -271,7 +271,7 @@
     "totalInvestment": "11867",
     "sourcePage": "29",
     "equipmentCost": 724.68,
-    "sellingPrice": 1449
+    "sellingPrice": 1449.36
   },
   {
     "unitType": "SGA",
@@ -287,7 +287,7 @@
     "totalInvestment": "11867",
     "sourcePage": "29",
     "equipmentCost": 1190.03,
-    "sellingPrice": 2380
+    "sellingPrice": 2380.06
   },
   {
     "unitType": "SGA",
@@ -303,7 +303,7 @@
     "totalInvestment": "11867",
     "sourcePage": "29",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -417,7 +417,7 @@
     "totalInvestment": "8402",
     "sourcePage": "30",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -433,7 +433,7 @@
     "totalInvestment": "10578",
     "sourcePage": "30",
     "equipmentCost": 2186.33,
-    "sellingPrice": 4373
+    "sellingPrice": 4372.66
   },
   {
     "unitType": "SGA",
@@ -463,7 +463,7 @@
     "totalInvestment": "10578",
     "sourcePage": "30",
     "equipmentCost": 1190.03,
-    "sellingPrice": 2380
+    "sellingPrice": 2380.06
   },
   {
     "unitType": "SGA",
@@ -479,7 +479,7 @@
     "totalInvestment": "10578",
     "sourcePage": "30",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -551,7 +551,7 @@
     "totalInvestment": "12902",
     "sourcePage": "25",
     "equipmentCost": 3014.53,
-    "sellingPrice": 6029
+    "sellingPrice": 6029.06
   },
   {
     "unitType": "SGA",
@@ -581,7 +581,7 @@
     "totalInvestment": "12902",
     "sourcePage": "25",
     "equipmentCost": 1247.43,
-    "sellingPrice": 2495
+    "sellingPrice": 2494.86
   },
   {
     "unitType": "SGA",
@@ -597,7 +597,7 @@
     "totalInvestment": "12902",
     "sourcePage": "25",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -655,7 +655,7 @@
     "totalInvestment": "9127",
     "sourcePage": "26",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -671,7 +671,7 @@
     "totalInvestment": "11329",
     "sourcePage": "26",
     "equipmentCost": 2391.33,
-    "sellingPrice": 4783
+    "sellingPrice": 4782.66
   },
   {
     "unitType": "SGA",
@@ -701,7 +701,7 @@
     "totalInvestment": "11329",
     "sourcePage": "26",
     "equipmentCost": 1247.43,
-    "sellingPrice": 2495
+    "sellingPrice": 2494.86
   },
   {
     "unitType": "SGA",
@@ -717,7 +717,7 @@
     "totalInvestment": "11329",
     "sourcePage": "26",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -789,7 +789,7 @@
     "totalInvestment": "13546",
     "sourcePage": "23",
     "equipmentCost": 3271.8,
-    "sellingPrice": 6544
+    "sellingPrice": 6543.6
   },
   {
     "unitType": "SGA",
@@ -819,7 +819,7 @@
     "totalInvestment": "13546",
     "sourcePage": "23",
     "equipmentCost": 1279.2,
-    "sellingPrice": 2558
+    "sellingPrice": 2558.4
   },
   {
     "unitType": "SGA",
@@ -835,7 +835,7 @@
     "totalInvestment": "13546",
     "sourcePage": "23",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -893,7 +893,7 @@
     "totalInvestment": "9768",
     "sourcePage": "24",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -909,7 +909,7 @@
     "totalInvestment": "12035",
     "sourcePage": "24",
     "equipmentCost": 2597.35,
-    "sellingPrice": 5195
+    "sellingPrice": 5194.7
   },
   {
     "unitType": "SGA",
@@ -939,7 +939,7 @@
     "totalInvestment": "12035",
     "sourcePage": "24",
     "equipmentCost": 1279.2,
-    "sellingPrice": 2558
+    "sellingPrice": 2558.4
   },
   {
     "unitType": "SGA",
@@ -955,7 +955,7 @@
     "totalInvestment": "12035",
     "sourcePage": "24",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -971,7 +971,7 @@
     "totalInvestment": "15198",
     "sourcePage": "20",
     "equipmentCost": 3614.15,
-    "sellingPrice": 7228
+    "sellingPrice": 7228.3
   },
   {
     "unitType": "SGA",
@@ -987,7 +987,7 @@
     "totalInvestment": "15198",
     "sourcePage": "20",
     "equipmentCost": 711.35,
-    "sellingPrice": 1423
+    "sellingPrice": 1422.7
   },
   {
     "unitType": "SGA",
@@ -1003,7 +1003,7 @@
     "totalInvestment": "15198",
     "sourcePage": "20",
     "equipmentCost": 1718.93,
-    "sellingPrice": 3438
+    "sellingPrice": 3437.86
   },
   {
     "unitType": "SGA",
@@ -1019,7 +1019,7 @@
     "totalInvestment": "15198",
     "sourcePage": "20",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -1035,7 +1035,7 @@
     "totalInvestment": "12173",
     "sourcePage": "20",
     "equipmentCost": 3102.68,
-    "sellingPrice": 6205
+    "sellingPrice": 6205.36
   },
   {
     "unitType": "SGA",
@@ -1051,7 +1051,7 @@
     "totalInvestment": "12173",
     "sourcePage": "20",
     "equipmentCost": 711.35,
-    "sellingPrice": 1423
+    "sellingPrice": 1422.7
   },
   {
     "unitType": "SGA",
@@ -1083,7 +1083,7 @@
     "totalInvestment": "12173",
     "sourcePage": "20",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -1099,7 +1099,7 @@
     "totalInvestment": "10699",
     "sourcePage": "21",
     "equipmentCost": 2036.68,
-    "sellingPrice": 4073
+    "sellingPrice": 4073.36
   },
   {
     "unitType": "SGA",
@@ -1115,7 +1115,7 @@
     "totalInvestment": "10699",
     "sourcePage": "21",
     "equipmentCost": 699.05,
-    "sellingPrice": 1398
+    "sellingPrice": 1398.1
   },
   {
     "unitType": "SGA",
@@ -1131,7 +1131,7 @@
     "totalInvestment": "10699",
     "sourcePage": "21",
     "equipmentCost": 1132.63,
-    "sellingPrice": 2265
+    "sellingPrice": 2265.26
   },
   {
     "unitType": "SGA",
@@ -1147,7 +1147,7 @@
     "totalInvestment": "10699",
     "sourcePage": "21",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -1163,7 +1163,7 @@
     "totalInvestment": "11201",
     "sourcePage": "21",
     "equipmentCost": 2560.45,
-    "sellingPrice": 5121
+    "sellingPrice": 5120.9
   },
   {
     "unitType": "SGA",
@@ -1179,7 +1179,7 @@
     "totalInvestment": "11201",
     "sourcePage": "21",
     "equipmentCost": 711.35,
-    "sellingPrice": 1423
+    "sellingPrice": 1422.7
   },
   {
     "unitType": "SGA",
@@ -1211,7 +1211,7 @@
     "totalInvestment": "11201",
     "sourcePage": "21",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -1227,7 +1227,7 @@
     "totalInvestment": "16309",
     "sourcePage": "17",
     "equipmentCost": 3941.13,
-    "sellingPrice": 7882
+    "sellingPrice": 7882.26
   },
   {
     "unitType": "SGA",
@@ -1243,7 +1243,7 @@
     "totalInvestment": "16309",
     "sourcePage": "17",
     "equipmentCost": 798.48,
-    "sellingPrice": 1597
+    "sellingPrice": 1596.96
   },
   {
     "unitType": "SGA",
@@ -1259,7 +1259,7 @@
     "totalInvestment": "16309",
     "sourcePage": "17",
     "equipmentCost": 1822.45,
-    "sellingPrice": 3645
+    "sellingPrice": 3644.9
   },
   {
     "unitType": "SGA",
@@ -1275,7 +1275,7 @@
     "totalInvestment": "16309",
     "sourcePage": "17",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -1291,7 +1291,7 @@
     "totalInvestment": "13190",
     "sourcePage": "17",
     "equipmentCost": 3425.55,
-    "sellingPrice": 6851
+    "sellingPrice": 6851.1
   },
   {
     "unitType": "SGA",
@@ -1307,7 +1307,7 @@
     "totalInvestment": "13190",
     "sourcePage": "17",
     "equipmentCost": 711.35,
-    "sellingPrice": 1423
+    "sellingPrice": 1422.7
   },
   {
     "unitType": "SGA",
@@ -1323,7 +1323,7 @@
     "totalInvestment": "13190",
     "sourcePage": "17",
     "equipmentCost": 1247.43,
-    "sellingPrice": 2495
+    "sellingPrice": 2494.86
   },
   {
     "unitType": "SGA",
@@ -1339,7 +1339,7 @@
     "totalInvestment": "13190",
     "sourcePage": "17",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -1355,7 +1355,7 @@
     "totalInvestment": "11254",
     "sourcePage": "18",
     "equipmentCost": 2186.33,
-    "sellingPrice": 4373
+    "sellingPrice": 4372.66
   },
   {
     "unitType": "SGA",
@@ -1371,7 +1371,7 @@
     "totalInvestment": "11254",
     "sourcePage": "18",
     "equipmentCost": 724.68,
-    "sellingPrice": 1449
+    "sellingPrice": 1449.36
   },
   {
     "unitType": "SGA",
@@ -1387,7 +1387,7 @@
     "totalInvestment": "11254",
     "sourcePage": "18",
     "equipmentCost": 1190.03,
-    "sellingPrice": 2380
+    "sellingPrice": 2380.06
   },
   {
     "unitType": "SGA",
@@ -1403,7 +1403,7 @@
     "totalInvestment": "11254",
     "sourcePage": "18",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -1419,7 +1419,7 @@
     "totalInvestment": "11867",
     "sourcePage": "18",
     "equipmentCost": 2762.38,
-    "sellingPrice": 5525
+    "sellingPrice": 5524.76
   },
   {
     "unitType": "SGA",
@@ -1435,7 +1435,7 @@
     "totalInvestment": "11867",
     "sourcePage": "18",
     "equipmentCost": 724.68,
-    "sellingPrice": 1449
+    "sellingPrice": 1449.36
   },
   {
     "unitType": "SGA",
@@ -1451,7 +1451,7 @@
     "totalInvestment": "11867",
     "sourcePage": "18",
     "equipmentCost": 1190.03,
-    "sellingPrice": 2380
+    "sellingPrice": 2380.06
   },
   {
     "unitType": "SGA",
@@ -1467,7 +1467,7 @@
     "totalInvestment": "11867",
     "sourcePage": "18",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -1483,7 +1483,7 @@
     "totalInvestment": "17249",
     "sourcePage": "14",
     "equipmentCost": 4266.05,
-    "sellingPrice": 8532
+    "sellingPrice": 8532.1
   },
   {
     "unitType": "SGA",
@@ -1499,7 +1499,7 @@
     "totalInvestment": "17249",
     "sourcePage": "14",
     "equipmentCost": 807.7,
-    "sellingPrice": 1615
+    "sellingPrice": 1615.4
   },
   {
     "unitType": "SGA",
@@ -1515,7 +1515,7 @@
     "totalInvestment": "17249",
     "sourcePage": "14",
     "equipmentCost": 1928.03,
-    "sellingPrice": 3856
+    "sellingPrice": 3856.06
   },
   {
     "unitType": "SGA",
@@ -1531,7 +1531,7 @@
     "totalInvestment": "17249",
     "sourcePage": "14",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -1547,7 +1547,7 @@
     "totalInvestment": "14023",
     "sourcePage": "14",
     "equipmentCost": 3748.43,
-    "sellingPrice": 7497
+    "sellingPrice": 7496.86
   },
   {
     "unitType": "SGA",
@@ -1563,7 +1563,7 @@
     "totalInvestment": "14023",
     "sourcePage": "14",
     "equipmentCost": 798.48,
-    "sellingPrice": 1597
+    "sellingPrice": 1596.96
   },
   {
     "unitType": "SGA",
@@ -1579,7 +1579,7 @@
     "totalInvestment": "14023",
     "sourcePage": "14",
     "equipmentCost": 1220.78,
-    "sellingPrice": 2442
+    "sellingPrice": 2441.56
   },
   {
     "unitType": "SGA",
@@ -1595,7 +1595,7 @@
     "totalInvestment": "14023",
     "sourcePage": "14",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -1611,7 +1611,7 @@
     "totalInvestment": "11987",
     "sourcePage": "15",
     "equipmentCost": 2391.33,
-    "sellingPrice": 4783
+    "sellingPrice": 4782.66
   },
   {
     "unitType": "SGA",
@@ -1627,7 +1627,7 @@
     "totalInvestment": "11987",
     "sourcePage": "15",
     "equipmentCost": 798.48,
-    "sellingPrice": 1597
+    "sellingPrice": 1596.96
   },
   {
     "unitType": "SGA",
@@ -1643,7 +1643,7 @@
     "totalInvestment": "11987",
     "sourcePage": "15",
     "equipmentCost": 1220.78,
-    "sellingPrice": 2442
+    "sellingPrice": 2441.56
   },
   {
     "unitType": "SGA",
@@ -1659,7 +1659,7 @@
     "totalInvestment": "11987",
     "sourcePage": "15",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -1675,7 +1675,7 @@
     "totalInvestment": "12902",
     "sourcePage": "15",
     "equipmentCost": 3014.53,
-    "sellingPrice": 6029
+    "sellingPrice": 6029.06
   },
   {
     "unitType": "SGA",
@@ -1691,7 +1691,7 @@
     "totalInvestment": "12902",
     "sourcePage": "15",
     "equipmentCost": 877.4,
-    "sellingPrice": 1755
+    "sellingPrice": 1754.8
   },
   {
     "unitType": "SGA",
@@ -1707,7 +1707,7 @@
     "totalInvestment": "12902",
     "sourcePage": "15",
     "equipmentCost": 1247.43,
-    "sellingPrice": 2495
+    "sellingPrice": 2494.86
   },
   {
     "unitType": "SGA",
@@ -1723,7 +1723,7 @@
     "totalInvestment": "12902",
     "sourcePage": "15",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -1739,7 +1739,7 @@
     "totalInvestment": "18224",
     "sourcePage": "12",
     "equipmentCost": 4590.98,
-    "sellingPrice": 9182
+    "sellingPrice": 9181.96
   },
   {
     "unitType": "SGA",
@@ -1755,7 +1755,7 @@
     "totalInvestment": "18224",
     "sourcePage": "12",
     "equipmentCost": 877.4,
-    "sellingPrice": 1755
+    "sellingPrice": 1754.8
   },
   {
     "unitType": "SGA",
@@ -1771,7 +1771,7 @@
     "totalInvestment": "18224",
     "sourcePage": "12",
     "equipmentCost": 1985.43,
-    "sellingPrice": 3971
+    "sellingPrice": 3970.86
   },
   {
     "unitType": "SGA",
@@ -1787,7 +1787,7 @@
     "totalInvestment": "18224",
     "sourcePage": "12",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -1803,7 +1803,7 @@
     "totalInvestment": "15031",
     "sourcePage": "12",
     "equipmentCost": 4069.25,
-    "sellingPrice": 8139
+    "sellingPrice": 8138.5
   },
   {
     "unitType": "SGA",
@@ -1819,7 +1819,7 @@
     "totalInvestment": "15031",
     "sourcePage": "12",
     "equipmentCost": 877.4,
-    "sellingPrice": 1755
+    "sellingPrice": 1754.8
   },
   {
     "unitType": "SGA",
@@ -1835,7 +1835,7 @@
     "totalInvestment": "15031",
     "sourcePage": "12",
     "equipmentCost": 1279.2,
-    "sellingPrice": 2558
+    "sellingPrice": 2558.4
   },
   {
     "unitType": "SGA",
@@ -1851,7 +1851,7 @@
     "totalInvestment": "15031",
     "sourcePage": "12",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -1867,7 +1867,7 @@
     "totalInvestment": "12803",
     "sourcePage": "13",
     "equipmentCost": 2597.35,
-    "sellingPrice": 5195
+    "sellingPrice": 5194.7
   },
   {
     "unitType": "SGA",
@@ -1883,7 +1883,7 @@
     "totalInvestment": "12803",
     "sourcePage": "13",
     "equipmentCost": 877.4,
-    "sellingPrice": 1755
+    "sellingPrice": 1754.8
   },
   {
     "unitType": "SGA",
@@ -1899,7 +1899,7 @@
     "totalInvestment": "12803",
     "sourcePage": "13",
     "equipmentCost": 1279.2,
-    "sellingPrice": 2558
+    "sellingPrice": 2558.4
   },
   {
     "unitType": "SGA",
@@ -1915,7 +1915,7 @@
     "totalInvestment": "12803",
     "sourcePage": "13",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -1931,7 +1931,7 @@
     "totalInvestment": "13546",
     "sourcePage": "13",
     "equipmentCost": 3271.8,
-    "sellingPrice": 6544
+    "sellingPrice": 6543.6
   },
   {
     "unitType": "SGA",
@@ -1947,7 +1947,7 @@
     "totalInvestment": "13546",
     "sourcePage": "13",
     "equipmentCost": 877.4,
-    "sellingPrice": 1755
+    "sellingPrice": 1754.8
   },
   {
     "unitType": "SGA",
@@ -1963,7 +1963,7 @@
     "totalInvestment": "13546",
     "sourcePage": "13",
     "equipmentCost": 1279.2,
-    "sellingPrice": 2558
+    "sellingPrice": 2558.4
   },
   {
     "unitType": "SGA",
@@ -1979,7 +1979,7 @@
     "totalInvestment": "13546",
     "sourcePage": "13",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -1995,7 +1995,7 @@
     "totalInvestment": "16776",
     "sourcePage": "9",
     "equipmentCost": 4353.18,
-    "sellingPrice": 8706
+    "sellingPrice": 8706.36
   },
   {
     "unitType": "SGA",
@@ -2011,7 +2011,7 @@
     "totalInvestment": "16776",
     "sourcePage": "9",
     "equipmentCost": 705.2,
-    "sellingPrice": 1410
+    "sellingPrice": 1410.4
   },
   {
     "unitType": "SGA",
@@ -2027,7 +2027,7 @@
     "totalInvestment": "16776",
     "sourcePage": "9",
     "equipmentCost": 1718.93,
-    "sellingPrice": 3438
+    "sellingPrice": 3437.86
   },
   {
     "unitType": "SGA",
@@ -2043,7 +2043,7 @@
     "totalInvestment": "16776",
     "sourcePage": "9",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -2059,7 +2059,7 @@
     "totalInvestment": "15184",
     "sourcePage": "9",
     "equipmentCost": 3614.15,
-    "sellingPrice": 7228
+    "sellingPrice": 7228.3
   },
   {
     "unitType": "SGA",
@@ -2089,7 +2089,7 @@
     "totalInvestment": "15184",
     "sourcePage": "9",
     "equipmentCost": 1718.93,
-    "sellingPrice": 3438
+    "sellingPrice": 3437.86
   },
   {
     "unitType": "SGA",
@@ -2105,7 +2105,7 @@
     "totalInvestment": "15184",
     "sourcePage": "9",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -2121,7 +2121,7 @@
     "totalInvestment": "12111",
     "sourcePage": "10",
     "equipmentCost": 2953.03,
-    "sellingPrice": 5906
+    "sellingPrice": 5906.06
   },
   {
     "unitType": "SGA",
@@ -2137,7 +2137,7 @@
     "totalInvestment": "12111",
     "sourcePage": "10",
     "equipmentCost": 724.68,
-    "sellingPrice": 1449
+    "sellingPrice": 1449.36
   },
   {
     "unitType": "SGA",
@@ -2169,7 +2169,7 @@
     "totalInvestment": "12111",
     "sourcePage": "10",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -2185,7 +2185,7 @@
     "totalInvestment": "14055",
     "sourcePage": "10",
     "equipmentCost": 3229.78,
-    "sellingPrice": 6460
+    "sellingPrice": 6459.56
   },
   {
     "unitType": "SGA",
@@ -2231,7 +2231,7 @@
     "totalInvestment": "14055",
     "sourcePage": "10",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -2247,7 +2247,7 @@
     "totalInvestment": "17548",
     "sourcePage": "6",
     "equipmentCost": 4680.15,
-    "sellingPrice": 9360
+    "sellingPrice": 9360.3
   },
   {
     "unitType": "SGA",
@@ -2263,7 +2263,7 @@
     "totalInvestment": "17548",
     "sourcePage": "6",
     "equipmentCost": 711.35,
-    "sellingPrice": 1423
+    "sellingPrice": 1422.7
   },
   {
     "unitType": "SGA",
@@ -2279,7 +2279,7 @@
     "totalInvestment": "17548",
     "sourcePage": "6",
     "equipmentCost": 1822.45,
-    "sellingPrice": 3645
+    "sellingPrice": 3644.9
   },
   {
     "unitType": "SGA",
@@ -2295,7 +2295,7 @@
     "totalInvestment": "17548",
     "sourcePage": "6",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -2311,7 +2311,7 @@
     "totalInvestment": "16309",
     "sourcePage": "6",
     "equipmentCost": 3941.13,
-    "sellingPrice": 7882
+    "sellingPrice": 7882.26
   },
   {
     "unitType": "SGA",
@@ -2327,7 +2327,7 @@
     "totalInvestment": "16309",
     "sourcePage": "6",
     "equipmentCost": 798.48,
-    "sellingPrice": 1597
+    "sellingPrice": 1596.96
   },
   {
     "unitType": "SGA",
@@ -2343,7 +2343,7 @@
     "totalInvestment": "16309",
     "sourcePage": "6",
     "equipmentCost": 1822.45,
-    "sellingPrice": 3645
+    "sellingPrice": 3644.9
   },
   {
     "unitType": "SGA",
@@ -2359,7 +2359,7 @@
     "totalInvestment": "16309",
     "sourcePage": "6",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -2375,7 +2375,7 @@
     "totalInvestment": "12741",
     "sourcePage": "7",
     "equipmentCost": 3152.9,
-    "sellingPrice": 6306
+    "sellingPrice": 6305.8
   },
   {
     "unitType": "SGA",
@@ -2391,7 +2391,7 @@
     "totalInvestment": "12741",
     "sourcePage": "7",
     "equipmentCost": 724.68,
-    "sellingPrice": 1449
+    "sellingPrice": 1449.36
   },
   {
     "unitType": "SGA",
@@ -2407,7 +2407,7 @@
     "totalInvestment": "12741",
     "sourcePage": "7",
     "equipmentCost": 1190.03,
-    "sellingPrice": 2380
+    "sellingPrice": 2380.06
   },
   {
     "unitType": "SGA",
@@ -2423,7 +2423,7 @@
     "totalInvestment": "12741",
     "sourcePage": "7",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -2439,7 +2439,7 @@
     "totalInvestment": "14732",
     "sourcePage": "7",
     "equipmentCost": 3553.68,
-    "sellingPrice": 7107
+    "sellingPrice": 7107.36
   },
   {
     "unitType": "SGA",
@@ -2455,7 +2455,7 @@
     "totalInvestment": "14732",
     "sourcePage": "7",
     "equipmentCost": 711.35,
-    "sellingPrice": 1423
+    "sellingPrice": 1422.7
   },
   {
     "unitType": "SGA",
@@ -2471,7 +2471,7 @@
     "totalInvestment": "14732",
     "sourcePage": "7",
     "equipmentCost": 1822.45,
-    "sellingPrice": 3645
+    "sellingPrice": 3644.9
   },
   {
     "unitType": "SGA",
@@ -2487,7 +2487,7 @@
     "totalInvestment": "14732",
     "sourcePage": "7",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -2503,7 +2503,7 @@
     "totalInvestment": "18721",
     "sourcePage": "3",
     "equipmentCost": 5004.05,
-    "sellingPrice": 10008
+    "sellingPrice": 10008.1
   },
   {
     "unitType": "SGA",
@@ -2519,7 +2519,7 @@
     "totalInvestment": "18721",
     "sourcePage": "3",
     "equipmentCost": 798.48,
-    "sellingPrice": 1597
+    "sellingPrice": 1596.96
   },
   {
     "unitType": "SGA",
@@ -2535,7 +2535,7 @@
     "totalInvestment": "18721",
     "sourcePage": "3",
     "equipmentCost": 1880.88,
-    "sellingPrice": 3762
+    "sellingPrice": 3761.76
   },
   {
     "unitType": "SGA",
@@ -2551,7 +2551,7 @@
     "totalInvestment": "18721",
     "sourcePage": "3",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -2567,7 +2567,7 @@
     "totalInvestment": "17250",
     "sourcePage": "3",
     "equipmentCost": 4266.05,
-    "sellingPrice": 8532
+    "sellingPrice": 8532.1
   },
   {
     "unitType": "SGA",
@@ -2583,7 +2583,7 @@
     "totalInvestment": "17250",
     "sourcePage": "3",
     "equipmentCost": 807.7,
-    "sellingPrice": 1615
+    "sellingPrice": 1615.4
   },
   {
     "unitType": "SGA",
@@ -2599,7 +2599,7 @@
     "totalInvestment": "17250",
     "sourcePage": "3",
     "equipmentCost": 1928.03,
-    "sellingPrice": 3856
+    "sellingPrice": 3856.06
   },
   {
     "unitType": "SGA",
@@ -2615,7 +2615,7 @@
     "totalInvestment": "17250",
     "sourcePage": "3",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -2631,7 +2631,7 @@
     "totalInvestment": "13766",
     "sourcePage": "4",
     "equipmentCost": 3401.98,
-    "sellingPrice": 6804
+    "sellingPrice": 6803.96
   },
   {
     "unitType": "SGA",
@@ -2647,7 +2647,7 @@
     "totalInvestment": "13766",
     "sourcePage": "4",
     "equipmentCost": 877.4,
-    "sellingPrice": 1755
+    "sellingPrice": 1754.8
   },
   {
     "unitType": "SGA",
@@ -2663,7 +2663,7 @@
     "totalInvestment": "13766",
     "sourcePage": "4",
     "equipmentCost": 1247.43,
-    "sellingPrice": 2495
+    "sellingPrice": 2494.86
   },
   {
     "unitType": "SGA",
@@ -2679,7 +2679,7 @@
     "totalInvestment": "13766",
     "sourcePage": "4",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -2695,7 +2695,7 @@
     "totalInvestment": "15751",
     "sourcePage": "4",
     "equipmentCost": 3875.53,
-    "sellingPrice": 7751
+    "sellingPrice": 7751.06
   },
   {
     "unitType": "SGA",
@@ -2711,7 +2711,7 @@
     "totalInvestment": "15751",
     "sourcePage": "4",
     "equipmentCost": 798.48,
-    "sellingPrice": 1597
+    "sellingPrice": 1596.96
   },
   {
     "unitType": "SGA",
@@ -2727,7 +2727,7 @@
     "totalInvestment": "15751",
     "sourcePage": "4",
     "equipmentCost": 1880.88,
-    "sellingPrice": 3762
+    "sellingPrice": 3761.76
   },
   {
     "unitType": "SGA",
@@ -2743,7 +2743,7 @@
     "totalInvestment": "15751",
     "sourcePage": "4",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -2759,7 +2759,7 @@
     "totalInvestment": "20202",
     "sourcePage": "1",
     "equipmentCost": 5331.03,
-    "sellingPrice": 10662
+    "sellingPrice": 10662.06
   },
   {
     "unitType": "SGA",
@@ -2775,7 +2775,7 @@
     "totalInvestment": "20202",
     "sourcePage": "1",
     "equipmentCost": 877.4,
-    "sellingPrice": 1755
+    "sellingPrice": 1754.8
   },
   {
     "unitType": "SGA",
@@ -2791,7 +2791,7 @@
     "totalInvestment": "20202",
     "sourcePage": "1",
     "equipmentCost": 1985.43,
-    "sellingPrice": 3971
+    "sellingPrice": 3970.86
   },
   {
     "unitType": "SGA",
@@ -2807,7 +2807,7 @@
     "totalInvestment": "20202",
     "sourcePage": "1",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -2823,7 +2823,7 @@
     "totalInvestment": "18401",
     "sourcePage": "1",
     "equipmentCost": 4590.98,
-    "sellingPrice": 9182
+    "sellingPrice": 9181.96
   },
   {
     "unitType": "SGA",
@@ -2839,7 +2839,7 @@
     "totalInvestment": "18401",
     "sourcePage": "1",
     "equipmentCost": 877.4,
-    "sellingPrice": 1755
+    "sellingPrice": 1754.8
   },
   {
     "unitType": "SGA",
@@ -2855,7 +2855,7 @@
     "totalInvestment": "18401",
     "sourcePage": "1",
     "equipmentCost": 1985.43,
-    "sellingPrice": 3971
+    "sellingPrice": 3970.86
   },
   {
     "unitType": "SGA",
@@ -2871,7 +2871,7 @@
     "totalInvestment": "18401",
     "sourcePage": "1",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -2887,7 +2887,7 @@
     "totalInvestment": "14411",
     "sourcePage": "2",
     "equipmentCost": 3659.25,
-    "sellingPrice": 7319
+    "sellingPrice": 7318.5
   },
   {
     "unitType": "SGA",
@@ -2903,7 +2903,7 @@
     "totalInvestment": "14411",
     "sourcePage": "2",
     "equipmentCost": 877.4,
-    "sellingPrice": 1755
+    "sellingPrice": 1754.8
   },
   {
     "unitType": "SGA",
@@ -2919,7 +2919,7 @@
     "totalInvestment": "14411",
     "sourcePage": "2",
     "equipmentCost": 1279.2,
-    "sellingPrice": 2558
+    "sellingPrice": 2558.4
   },
   {
     "unitType": "SGA",
@@ -2935,7 +2935,7 @@
     "totalInvestment": "14411",
     "sourcePage": "2",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -2951,7 +2951,7 @@
     "totalInvestment": "17193",
     "sourcePage": "2",
     "equipmentCost": 4196.35,
-    "sellingPrice": 8393
+    "sellingPrice": 8392.7
   },
   {
     "unitType": "SGA",
@@ -2967,7 +2967,7 @@
     "totalInvestment": "17193",
     "sourcePage": "2",
     "equipmentCost": 877.4,
-    "sellingPrice": 1755
+    "sellingPrice": 1754.8
   },
   {
     "unitType": "SGA",
@@ -2983,7 +2983,7 @@
     "totalInvestment": "17193",
     "sourcePage": "2",
     "equipmentCost": 1985.43,
-    "sellingPrice": 3971
+    "sellingPrice": 3970.86
   },
   {
     "unitType": "SGA",
@@ -2999,7 +2999,7 @@
     "totalInvestment": "17193",
     "sourcePage": "2",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -3099,7 +3099,7 @@
     "totalInvestment": "11571",
     "sourcePage": "61",
     "equipmentCost": 1262.8,
-    "sellingPrice": 2526
+    "sellingPrice": 2525.6
   },
   {
     "unitType": "SHP",
@@ -3185,7 +3185,7 @@
     "totalInvestment": "13852",
     "sourcePage": "70",
     "equipmentCost": 4926.15,
-    "sellingPrice": 9852
+    "sellingPrice": 9852.3
   },
   {
     "unitType": "SHP",
@@ -3201,7 +3201,7 @@
     "totalInvestment": "14633",
     "sourcePage": "69",
     "equipmentCost": 5294.13,
-    "sellingPrice": 10588
+    "sellingPrice": 10588.26
   },
   {
     "unitType": "SHP",
@@ -3217,7 +3217,7 @@
     "totalInvestment": "12400",
     "sourcePage": "74",
     "equipmentCost": 4807.25,
-    "sellingPrice": 9615
+    "sellingPrice": 9614.5
   },
   {
     "unitType": "SHP",
@@ -3233,7 +3233,7 @@
     "totalInvestment": "12679",
     "sourcePage": "73",
     "equipmentCost": 4932.3,
-    "sellingPrice": 9865
+    "sellingPrice": 9864.6
   },
   {
     "unitType": "SHP",
@@ -3249,7 +3249,7 @@
     "totalInvestment": "12956",
     "sourcePage": "72",
     "equipmentCost": 5055.3,
-    "sellingPrice": 10111
+    "sellingPrice": 10110.6
   },
   {
     "unitType": "SHP",
@@ -3265,7 +3265,7 @@
     "totalInvestment": "13515",
     "sourcePage": "71",
     "equipmentCost": 5305.4,
-    "sellingPrice": 10611
+    "sellingPrice": 10610.8
   },
   {
     "unitType": "SHP",
@@ -3281,7 +3281,7 @@
     "totalInvestment": "13852",
     "sourcePage": "70",
     "equipmentCost": 5455.05,
-    "sellingPrice": 10910
+    "sellingPrice": 10910.1
   },
   {
     "unitType": "SHP",
@@ -3297,7 +3297,7 @@
     "totalInvestment": "14633",
     "sourcePage": "69",
     "equipmentCost": 5805.6,
-    "sellingPrice": 11611
+    "sellingPrice": 11611.2
   },
   {
     "unitType": "SHP",
@@ -3489,7 +3489,7 @@
     "totalInvestment": "11076",
     "sourcePage": "62",
     "equipmentCost": 2939.7,
-    "sellingPrice": 5879
+    "sellingPrice": 5879.4
   },
   {
     "unitType": "SHP",
@@ -3505,7 +3505,7 @@
     "totalInvestment": "11571",
     "sourcePage": "61",
     "equipmentCost": 3161.1,
-    "sellingPrice": 6322
+    "sellingPrice": 6322.2
   },
   {
     "unitType": "SHP",
@@ -3521,7 +3521,7 @@
     "totalInvestment": "12689",
     "sourcePage": "68",
     "equipmentCost": 4723.2,
-    "sellingPrice": 9446
+    "sellingPrice": 9446.4
   },
   {
     "unitType": "SHP",
@@ -3537,7 +3537,7 @@
     "totalInvestment": "13174",
     "sourcePage": "67",
     "equipmentCost": 4917.95,
-    "sellingPrice": 9836
+    "sellingPrice": 9835.9
   },
   {
     "unitType": "SHP",
@@ -3553,7 +3553,7 @@
     "totalInvestment": "13709",
     "sourcePage": "66",
     "equipmentCost": 5113.73,
-    "sellingPrice": 10227
+    "sellingPrice": 10227.46
   },
   {
     "unitType": "SHP",
@@ -3569,7 +3569,7 @@
     "totalInvestment": "14159",
     "sourcePage": "65",
     "equipmentCost": 5314.63,
-    "sellingPrice": 10629
+    "sellingPrice": 10629.26
   },
   {
     "unitType": "SHP",
@@ -3601,7 +3601,7 @@
     "totalInvestment": "15647",
     "sourcePage": "63",
     "equipmentCost": 5914.25,
-    "sellingPrice": 11829
+    "sellingPrice": 11828.5
   },
   {
     "unitType": "SHP",
@@ -3631,7 +3631,7 @@
     "totalInvestment": "11571",
     "sourcePage": "61",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -3719,7 +3719,7 @@
     "totalInvestment": "9667",
     "sourcePage": "61",
     "equipmentCost": 1262.8,
-    "sellingPrice": 2526
+    "sellingPrice": 2525.6
   },
   {
     "unitType": "SHP",
@@ -3973,7 +3973,7 @@
     "totalInvestment": "11156",
     "sourcePage": "74",
     "equipmentCost": 4343.95,
-    "sellingPrice": 8688
+    "sellingPrice": 8687.9
   },
   {
     "unitType": "SHP",
@@ -3989,7 +3989,7 @@
     "totalInvestment": "11512",
     "sourcePage": "73",
     "equipmentCost": 4501.8,
-    "sellingPrice": 9004
+    "sellingPrice": 9003.6
   },
   {
     "unitType": "SHP",
@@ -4005,7 +4005,7 @@
     "totalInvestment": "11744",
     "sourcePage": "72",
     "equipmentCost": 4605.33,
-    "sellingPrice": 9211
+    "sellingPrice": 9210.66
   },
   {
     "unitType": "SHP",
@@ -4021,7 +4021,7 @@
     "totalInvestment": "11976",
     "sourcePage": "71",
     "equipmentCost": 4708.85,
-    "sellingPrice": 9418
+    "sellingPrice": 9417.7
   },
   {
     "unitType": "SHP",
@@ -4065,7 +4065,7 @@
     "totalInvestment": "9498",
     "sourcePage": "62",
     "equipmentCost": 2233.48,
-    "sellingPrice": 4467
+    "sellingPrice": 4466.96
   },
   {
     "unitType": "SHP",
@@ -4081,7 +4081,7 @@
     "totalInvestment": "9667",
     "sourcePage": "61",
     "equipmentCost": 2310.35,
-    "sellingPrice": 4621
+    "sellingPrice": 4620.7
   },
   {
     "unitType": "SHP",
@@ -4113,7 +4113,7 @@
     "totalInvestment": "12170",
     "sourcePage": "67",
     "equipmentCost": 4561.25,
-    "sellingPrice": 9123
+    "sellingPrice": 9122.5
   },
   {
     "unitType": "SHP",
@@ -4129,7 +4129,7 @@
     "totalInvestment": "12499",
     "sourcePage": "66",
     "equipmentCost": 4665.8,
-    "sellingPrice": 9332
+    "sellingPrice": 9331.6
   },
   {
     "unitType": "SHP",
@@ -4145,7 +4145,7 @@
     "totalInvestment": "12845",
     "sourcePage": "65",
     "equipmentCost": 4820.58,
-    "sellingPrice": 9641
+    "sellingPrice": 9641.16
   },
   {
     "unitType": "SHP",
@@ -4161,7 +4161,7 @@
     "totalInvestment": "12283",
     "sourcePage": "64",
     "equipmentCost": 4974.33,
-    "sellingPrice": 9949
+    "sellingPrice": 9948.66
   },
   {
     "unitType": "SHP",
@@ -4177,7 +4177,7 @@
     "totalInvestment": "14051",
     "sourcePage": "63",
     "equipmentCost": 5293.1,
-    "sellingPrice": 10586
+    "sellingPrice": 10586.2
   },
   {
     "unitType": "SHP",
@@ -4207,7 +4207,7 @@
     "totalInvestment": "9667",
     "sourcePage": "61",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -4223,7 +4223,7 @@
     "totalInvestment": "12258",
     "sourcePage": "59",
     "equipmentCost": 1341.73,
-    "sellingPrice": 2683
+    "sellingPrice": 2683.46
   },
   {
     "unitType": "SHP",
@@ -4239,7 +4239,7 @@
     "totalInvestment": "12258",
     "sourcePage": "59",
     "equipmentCost": 128.13,
-    "sellingPrice": 256
+    "sellingPrice": 256.26
   },
   {
     "unitType": "SHP",
@@ -4255,7 +4255,7 @@
     "totalInvestment": "12258",
     "sourcePage": "59",
     "equipmentCost": 2465.13,
-    "sellingPrice": 4930
+    "sellingPrice": 4930.26
   },
   {
     "unitType": "SHP",
@@ -4271,7 +4271,7 @@
     "totalInvestment": "12258",
     "sourcePage": "59",
     "equipmentCost": 3367.13,
-    "sellingPrice": 6734
+    "sellingPrice": 6734.26
   },
   {
     "unitType": "SHP",
@@ -4287,7 +4287,7 @@
     "totalInvestment": "12258",
     "sourcePage": "59",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -4387,7 +4387,7 @@
     "totalInvestment": "10723",
     "sourcePage": "59",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -4417,7 +4417,7 @@
     "totalInvestment": "12892",
     "sourcePage": "58",
     "equipmentCost": 1495.48,
-    "sellingPrice": 2991
+    "sellingPrice": 2990.96
   },
   {
     "unitType": "SHP",
@@ -4433,7 +4433,7 @@
     "totalInvestment": "13463",
     "sourcePage": "57",
     "equipmentCost": 1576.45,
-    "sellingPrice": 3153
+    "sellingPrice": 3152.9
   },
   {
     "unitType": "SHP",
@@ -4463,7 +4463,7 @@
     "totalInvestment": "13463",
     "sourcePage": "57",
     "equipmentCost": 179.38,
-    "sellingPrice": 359
+    "sellingPrice": 358.76
   },
   {
     "unitType": "SHP",
@@ -4493,7 +4493,7 @@
     "totalInvestment": "13463",
     "sourcePage": "57",
     "equipmentCost": 2670.13,
-    "sellingPrice": 5340
+    "sellingPrice": 5340.26
   },
   {
     "unitType": "SHP",
@@ -4509,7 +4509,7 @@
     "totalInvestment": "12892",
     "sourcePage": "58",
     "equipmentCost": 3498.33,
-    "sellingPrice": 6997
+    "sellingPrice": 6996.66
   },
   {
     "unitType": "SHP",
@@ -4525,7 +4525,7 @@
     "totalInvestment": "13463",
     "sourcePage": "57",
     "equipmentCost": 3622.35,
-    "sellingPrice": 7245
+    "sellingPrice": 7244.7
   },
   {
     "unitType": "SHP",
@@ -4555,7 +4555,7 @@
     "totalInvestment": "13463",
     "sourcePage": "57",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -4613,7 +4613,7 @@
     "totalInvestment": "10818",
     "sourcePage": "58",
     "equipmentCost": 1495.48,
-    "sellingPrice": 2991
+    "sellingPrice": 2990.96
   },
   {
     "unitType": "SHP",
@@ -4699,7 +4699,7 @@
     "totalInvestment": "10818",
     "sourcePage": "58",
     "equipmentCost": 2570.7,
-    "sellingPrice": 5141
+    "sellingPrice": 5141.4
   },
   {
     "unitType": "SHP",
@@ -4729,7 +4729,7 @@
     "totalInvestment": "12871",
     "sourcePage": "57",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -4745,7 +4745,7 @@
     "totalInvestment": "14602",
     "sourcePage": "55",
     "equipmentCost": 1835.78,
-    "sellingPrice": 3672
+    "sellingPrice": 3671.56
   },
   {
     "unitType": "SHP",
@@ -4761,7 +4761,7 @@
     "totalInvestment": "14602",
     "sourcePage": "55",
     "equipmentCost": 179.38,
-    "sellingPrice": 359
+    "sellingPrice": 358.76
   },
   {
     "unitType": "SHP",
@@ -4777,7 +4777,7 @@
     "totalInvestment": "14602",
     "sourcePage": "55",
     "equipmentCost": 3872.45,
-    "sellingPrice": 7745
+    "sellingPrice": 7744.9
   },
   {
     "unitType": "SHP",
@@ -4793,7 +4793,7 @@
     "totalInvestment": "14602",
     "sourcePage": "55",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -4823,7 +4823,7 @@
     "totalInvestment": "14219",
     "sourcePage": "55",
     "equipmentCost": 179.38,
-    "sellingPrice": 359
+    "sellingPrice": 358.76
   },
   {
     "unitType": "SHP",
@@ -4909,7 +4909,7 @@
     "totalInvestment": "10114",
     "sourcePage": "56",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -4925,7 +4925,7 @@
     "totalInvestment": "12364",
     "sourcePage": "56",
     "equipmentCost": 1835.78,
-    "sellingPrice": 3672
+    "sellingPrice": 3671.56
   },
   {
     "unitType": "SHP",
@@ -4955,7 +4955,7 @@
     "totalInvestment": "12364",
     "sourcePage": "56",
     "equipmentCost": 2871.03,
-    "sellingPrice": 5742
+    "sellingPrice": 5742.06
   },
   {
     "unitType": "SHP",
@@ -4971,7 +4971,7 @@
     "totalInvestment": "12364",
     "sourcePage": "56",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -4987,7 +4987,7 @@
     "totalInvestment": "14275",
     "sourcePage": "53",
     "equipmentCost": 1589.78,
-    "sellingPrice": 3180
+    "sellingPrice": 3179.56
   },
   {
     "unitType": "SHP",
@@ -5003,7 +5003,7 @@
     "totalInvestment": "14275",
     "sourcePage": "53",
     "equipmentCost": 1685.1,
-    "sellingPrice": 3370
+    "sellingPrice": 3370.2
   },
   {
     "unitType": "SHP",
@@ -5033,7 +5033,7 @@
     "totalInvestment": "14275",
     "sourcePage": "53",
     "equipmentCost": 3161.1,
-    "sellingPrice": 6322
+    "sellingPrice": 6322.2
   },
   {
     "unitType": "SHP",
@@ -5049,7 +5049,7 @@
     "totalInvestment": "14275",
     "sourcePage": "53",
     "equipmentCost": 3809.93,
-    "sellingPrice": 7620
+    "sellingPrice": 7619.86
   },
   {
     "unitType": "SHP",
@@ -5065,7 +5065,7 @@
     "totalInvestment": "14275",
     "sourcePage": "53",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -5081,7 +5081,7 @@
     "totalInvestment": "14275",
     "sourcePage": "53",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SHP",
@@ -5097,7 +5097,7 @@
     "totalInvestment": "13119",
     "sourcePage": "53",
     "equipmentCost": 1589.78,
-    "sellingPrice": 3180
+    "sellingPrice": 3179.56
   },
   {
     "unitType": "SHP",
@@ -5127,7 +5127,7 @@
     "totalInvestment": "13119",
     "sourcePage": "53",
     "equipmentCost": 2310.35,
-    "sellingPrice": 4621
+    "sellingPrice": 4620.7
   },
   {
     "unitType": "SHP",
@@ -5143,7 +5143,7 @@
     "totalInvestment": "13119",
     "sourcePage": "53",
     "equipmentCost": 3406.08,
-    "sellingPrice": 6812
+    "sellingPrice": 6812.16
   },
   {
     "unitType": "SHP",
@@ -5159,7 +5159,7 @@
     "totalInvestment": "13119",
     "sourcePage": "53",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -5175,7 +5175,7 @@
     "totalInvestment": "15163",
     "sourcePage": "51",
     "equipmentCost": 1839.88,
-    "sellingPrice": 3680
+    "sellingPrice": 3679.76
   },
   {
     "unitType": "SHP",
@@ -5221,7 +5221,7 @@
     "totalInvestment": "15163",
     "sourcePage": "51",
     "equipmentCost": 3367.13,
-    "sellingPrice": 6734
+    "sellingPrice": 6734.26
   },
   {
     "unitType": "SHP",
@@ -5237,7 +5237,7 @@
     "totalInvestment": "15163",
     "sourcePage": "51",
     "equipmentCost": 4238.38,
-    "sellingPrice": 8477
+    "sellingPrice": 8476.76
   },
   {
     "unitType": "SHP",
@@ -5253,7 +5253,7 @@
     "totalInvestment": "15163",
     "sourcePage": "51",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -5269,7 +5269,7 @@
     "totalInvestment": "15163",
     "sourcePage": "51",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SHP",
@@ -5285,7 +5285,7 @@
     "totalInvestment": "13801",
     "sourcePage": "51",
     "equipmentCost": 1341.73,
-    "sellingPrice": 2683
+    "sellingPrice": 2683.46
   },
   {
     "unitType": "SHP",
@@ -5301,7 +5301,7 @@
     "totalInvestment": "13801",
     "sourcePage": "51",
     "equipmentCost": 1690.23,
-    "sellingPrice": 3380
+    "sellingPrice": 3380.46
   },
   {
     "unitType": "SHP",
@@ -5331,7 +5331,7 @@
     "totalInvestment": "13801",
     "sourcePage": "51",
     "equipmentCost": 2465.13,
-    "sellingPrice": 4930
+    "sellingPrice": 4930.26
   },
   {
     "unitType": "SHP",
@@ -5347,7 +5347,7 @@
     "totalInvestment": "13801",
     "sourcePage": "51",
     "equipmentCost": 3832.48,
-    "sellingPrice": 7665
+    "sellingPrice": 7664.96
   },
   {
     "unitType": "SHP",
@@ -5363,7 +5363,7 @@
     "totalInvestment": "13801",
     "sourcePage": "51",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -5379,7 +5379,7 @@
     "totalInvestment": "16954",
     "sourcePage": "49",
     "equipmentCost": 2194.53,
-    "sellingPrice": 4389
+    "sellingPrice": 4389.06
   },
   {
     "unitType": "SHP",
@@ -5395,7 +5395,7 @@
     "totalInvestment": "16954",
     "sourcePage": "49",
     "equipmentCost": 2283.7,
-    "sellingPrice": 4567
+    "sellingPrice": 4567.4
   },
   {
     "unitType": "SHP",
@@ -5425,7 +5425,7 @@
     "totalInvestment": "16954",
     "sourcePage": "49",
     "equipmentCost": 3622.35,
-    "sellingPrice": 7245
+    "sellingPrice": 7244.7
   },
   {
     "unitType": "SHP",
@@ -5441,7 +5441,7 @@
     "totalInvestment": "16954",
     "sourcePage": "49",
     "equipmentCost": 4661.7,
-    "sellingPrice": 9323
+    "sellingPrice": 9323.4
   },
   {
     "unitType": "SHP",
@@ -5457,7 +5457,7 @@
     "totalInvestment": "16954",
     "sourcePage": "49",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -5473,7 +5473,7 @@
     "totalInvestment": "16954",
     "sourcePage": "49",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SHP",
@@ -5489,7 +5489,7 @@
     "totalInvestment": "15523",
     "sourcePage": "49",
     "equipmentCost": 1576.45,
-    "sellingPrice": 3153
+    "sellingPrice": 3152.9
   },
   {
     "unitType": "SHP",
@@ -5505,7 +5505,7 @@
     "totalInvestment": "15523",
     "sourcePage": "49",
     "equipmentCost": 2194.53,
-    "sellingPrice": 4389
+    "sellingPrice": 4389.06
   },
   {
     "unitType": "SHP",
@@ -5535,7 +5535,7 @@
     "totalInvestment": "15523",
     "sourcePage": "49",
     "equipmentCost": 2670.13,
-    "sellingPrice": 5340
+    "sellingPrice": 5340.26
   },
   {
     "unitType": "SHP",
@@ -5551,7 +5551,7 @@
     "totalInvestment": "15523",
     "sourcePage": "49",
     "equipmentCost": 4250.68,
-    "sellingPrice": 8501
+    "sellingPrice": 8501.36
   },
   {
     "unitType": "SHP",
@@ -5567,7 +5567,7 @@
     "totalInvestment": "15523",
     "sourcePage": "49",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -5583,7 +5583,7 @@
     "totalInvestment": "18306",
     "sourcePage": "48",
     "equipmentCost": 2434.38,
-    "sellingPrice": 4869
+    "sellingPrice": 4868.76
   },
   {
     "unitType": "SHP",
@@ -5599,7 +5599,7 @@
     "totalInvestment": "18306",
     "sourcePage": "48",
     "equipmentCost": 2538.93,
-    "sellingPrice": 5078
+    "sellingPrice": 5077.86
   },
   {
     "unitType": "SHP",
@@ -5629,7 +5629,7 @@
     "totalInvestment": "18306",
     "sourcePage": "48",
     "equipmentCost": 3872.45,
-    "sellingPrice": 7745
+    "sellingPrice": 7744.9
   },
   {
     "unitType": "SHP",
@@ -5645,7 +5645,7 @@
     "totalInvestment": "18306",
     "sourcePage": "48",
     "equipmentCost": 5086.05,
-    "sellingPrice": 10172
+    "sellingPrice": 10172.1
   },
   {
     "unitType": "SHP",
@@ -5661,7 +5661,7 @@
     "totalInvestment": "18306",
     "sourcePage": "48",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -5677,7 +5677,7 @@
     "totalInvestment": "18306",
     "sourcePage": "48",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SHP",
@@ -5693,7 +5693,7 @@
     "totalInvestment": "17379",
     "sourcePage": "48",
     "equipmentCost": 2434.38,
-    "sellingPrice": 4869
+    "sellingPrice": 4868.76
   },
   {
     "unitType": "SHP",
@@ -5723,7 +5723,7 @@
     "totalInvestment": "17379",
     "sourcePage": "48",
     "equipmentCost": 2871.03,
-    "sellingPrice": 5742
+    "sellingPrice": 5742.06
   },
   {
     "unitType": "SHP",
@@ -5739,7 +5739,7 @@
     "totalInvestment": "17379",
     "sourcePage": "48",
     "equipmentCost": 4669.9,
-    "sellingPrice": 9340
+    "sellingPrice": 9339.8
   },
   {
     "unitType": "SHP",
@@ -5755,7 +5755,7 @@
     "totalInvestment": "17379",
     "sourcePage": "48",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -5771,7 +5771,7 @@
     "totalInvestment": "16745",
     "sourcePage": "45",
     "equipmentCost": 2229.38,
-    "sellingPrice": 4459
+    "sellingPrice": 4458.76
   },
   {
     "unitType": "SHP",
@@ -5787,7 +5787,7 @@
     "totalInvestment": "16745",
     "sourcePage": "45",
     "equipmentCost": 124.03,
-    "sellingPrice": 248
+    "sellingPrice": 248.06
   },
   {
     "unitType": "SHP",
@@ -5803,7 +5803,7 @@
     "totalInvestment": "16745",
     "sourcePage": "45",
     "equipmentCost": 4547.93,
-    "sellingPrice": 9096
+    "sellingPrice": 9095.86
   },
   {
     "unitType": "SHP",
@@ -5819,7 +5819,7 @@
     "totalInvestment": "16745",
     "sourcePage": "45",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SHP",
@@ -5835,7 +5835,7 @@
     "totalInvestment": "15186",
     "sourcePage": "45",
     "equipmentCost": 2229.38,
-    "sellingPrice": 4459
+    "sellingPrice": 4458.76
   },
   {
     "unitType": "SHP",
@@ -5851,7 +5851,7 @@
     "totalInvestment": "15186",
     "sourcePage": "45",
     "equipmentCost": 124.03,
-    "sellingPrice": 248
+    "sellingPrice": 248.06
   },
   {
     "unitType": "SHP",
@@ -5867,7 +5867,7 @@
     "totalInvestment": "15186",
     "sourcePage": "45",
     "equipmentCost": 3809.93,
-    "sellingPrice": 7620
+    "sellingPrice": 7619.86
   },
   {
     "unitType": "SHP",
@@ -5883,7 +5883,7 @@
     "totalInvestment": "15186",
     "sourcePage": "45",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SHP",
@@ -5899,7 +5899,7 @@
     "totalInvestment": "13366",
     "sourcePage": "46",
     "equipmentCost": 1685.1,
-    "sellingPrice": 3370
+    "sellingPrice": 3370.2
   },
   {
     "unitType": "SHP",
@@ -5915,7 +5915,7 @@
     "totalInvestment": "13366",
     "sourcePage": "46",
     "equipmentCost": 108.65,
-    "sellingPrice": 217
+    "sellingPrice": 217.3
   },
   {
     "unitType": "SHP",
@@ -5931,7 +5931,7 @@
     "totalInvestment": "13366",
     "sourcePage": "46",
     "equipmentCost": 3538.3,
-    "sellingPrice": 7077
+    "sellingPrice": 7076.6
   },
   {
     "unitType": "SHP",
@@ -5947,7 +5947,7 @@
     "totalInvestment": "13366",
     "sourcePage": "46",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -5963,7 +5963,7 @@
     "totalInvestment": "13624",
     "sourcePage": "46",
     "equipmentCost": 1685.1,
-    "sellingPrice": 3370
+    "sellingPrice": 3370.2
   },
   {
     "unitType": "SHP",
@@ -5979,7 +5979,7 @@
     "totalInvestment": "13624",
     "sourcePage": "46",
     "equipmentCost": 108.65,
-    "sellingPrice": 217
+    "sellingPrice": 217.3
   },
   {
     "unitType": "SHP",
@@ -5995,7 +5995,7 @@
     "totalInvestment": "13624",
     "sourcePage": "46",
     "equipmentCost": 3533.18,
-    "sellingPrice": 7066
+    "sellingPrice": 7066.36
   },
   {
     "unitType": "SHP",
@@ -6011,7 +6011,7 @@
     "totalInvestment": "13624",
     "sourcePage": "46",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -6027,7 +6027,7 @@
     "totalInvestment": "17199",
     "sourcePage": "42",
     "equipmentCost": 2435.4,
-    "sellingPrice": 4871
+    "sellingPrice": 4870.8
   },
   {
     "unitType": "SHP",
@@ -6043,7 +6043,7 @@
     "totalInvestment": "17199",
     "sourcePage": "42",
     "equipmentCost": 162.98,
-    "sellingPrice": 326
+    "sellingPrice": 325.96
   },
   {
     "unitType": "SHP",
@@ -6059,7 +6059,7 @@
     "totalInvestment": "17199",
     "sourcePage": "42",
     "equipmentCost": 4979.45,
-    "sellingPrice": 9959
+    "sellingPrice": 9958.9
   },
   {
     "unitType": "SHP",
@@ -6075,7 +6075,7 @@
     "totalInvestment": "17199",
     "sourcePage": "42",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SHP",
@@ -6091,7 +6091,7 @@
     "totalInvestment": "16176",
     "sourcePage": "42",
     "equipmentCost": 2229.38,
-    "sellingPrice": 4459
+    "sellingPrice": 4458.76
   },
   {
     "unitType": "SHP",
@@ -6107,7 +6107,7 @@
     "totalInvestment": "16176",
     "sourcePage": "42",
     "equipmentCost": 162.98,
-    "sellingPrice": 326
+    "sellingPrice": 325.96
   },
   {
     "unitType": "SHP",
@@ -6123,7 +6123,7 @@
     "totalInvestment": "16176",
     "sourcePage": "42",
     "equipmentCost": 4238.38,
-    "sellingPrice": 8477
+    "sellingPrice": 8476.76
   },
   {
     "unitType": "SHP",
@@ -6139,7 +6139,7 @@
     "totalInvestment": "16176",
     "sourcePage": "42",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SHP",
@@ -6155,7 +6155,7 @@
     "totalInvestment": "13882",
     "sourcePage": "43",
     "equipmentCost": 1690.23,
-    "sellingPrice": 3380
+    "sellingPrice": 3380.46
   },
   {
     "unitType": "SHP",
@@ -6185,7 +6185,7 @@
     "totalInvestment": "13882",
     "sourcePage": "43",
     "equipmentCost": 3744.33,
-    "sellingPrice": 7489
+    "sellingPrice": 7488.66
   },
   {
     "unitType": "SHP",
@@ -6201,7 +6201,7 @@
     "totalInvestment": "13882",
     "sourcePage": "43",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -6247,7 +6247,7 @@
     "totalInvestment": "14569",
     "sourcePage": "43",
     "equipmentCost": 3960.6,
-    "sellingPrice": 7921
+    "sellingPrice": 7921.2
   },
   {
     "unitType": "SHP",
@@ -6263,7 +6263,7 @@
     "totalInvestment": "14569",
     "sourcePage": "43",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -6279,7 +6279,7 @@
     "totalInvestment": "19187",
     "sourcePage": "39",
     "equipmentCost": 2564.55,
-    "sellingPrice": 5129
+    "sellingPrice": 5129.1
   },
   {
     "unitType": "SHP",
@@ -6295,7 +6295,7 @@
     "totalInvestment": "19187",
     "sourcePage": "39",
     "equipmentCost": 177.33,
-    "sellingPrice": 355
+    "sellingPrice": 354.66
   },
   {
     "unitType": "SHP",
@@ -6311,7 +6311,7 @@
     "totalInvestment": "19187",
     "sourcePage": "39",
     "equipmentCost": 5401.75,
-    "sellingPrice": 10804
+    "sellingPrice": 10803.5
   },
   {
     "unitType": "SHP",
@@ -6327,7 +6327,7 @@
     "totalInvestment": "19187",
     "sourcePage": "39",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SHP",
@@ -6343,7 +6343,7 @@
     "totalInvestment": "18016",
     "sourcePage": "39",
     "equipmentCost": 2824.9,
-    "sellingPrice": 5650
+    "sellingPrice": 5649.8
   },
   {
     "unitType": "SHP",
@@ -6359,7 +6359,7 @@
     "totalInvestment": "18016",
     "sourcePage": "39",
     "equipmentCost": 177.33,
-    "sellingPrice": 355
+    "sellingPrice": 354.66
   },
   {
     "unitType": "SHP",
@@ -6375,7 +6375,7 @@
     "totalInvestment": "18016",
     "sourcePage": "39",
     "equipmentCost": 4661.7,
-    "sellingPrice": 9323
+    "sellingPrice": 9323.4
   },
   {
     "unitType": "SHP",
@@ -6391,7 +6391,7 @@
     "totalInvestment": "18016",
     "sourcePage": "39",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SHP",
@@ -6407,7 +6407,7 @@
     "totalInvestment": "15578",
     "sourcePage": "40",
     "equipmentCost": 2194.53,
-    "sellingPrice": 4389
+    "sellingPrice": 4389.06
   },
   {
     "unitType": "SHP",
@@ -6437,7 +6437,7 @@
     "totalInvestment": "15578",
     "sourcePage": "40",
     "equipmentCost": 3998.53,
-    "sellingPrice": 7997
+    "sellingPrice": 7997.06
   },
   {
     "unitType": "SHP",
@@ -6453,7 +6453,7 @@
     "totalInvestment": "15578",
     "sourcePage": "40",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -6469,7 +6469,7 @@
     "totalInvestment": "16428",
     "sourcePage": "40",
     "equipmentCost": 2194.53,
-    "sellingPrice": 4389
+    "sellingPrice": 4389.06
   },
   {
     "unitType": "SHP",
@@ -6499,7 +6499,7 @@
     "totalInvestment": "16428",
     "sourcePage": "40",
     "equipmentCost": 4378.8,
-    "sellingPrice": 8758
+    "sellingPrice": 8757.6
   },
   {
     "unitType": "SHP",
@@ -6515,7 +6515,7 @@
     "totalInvestment": "16428",
     "sourcePage": "40",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SHP",
@@ -6531,7 +6531,7 @@
     "totalInvestment": "21210",
     "sourcePage": "37",
     "equipmentCost": 2824.9,
-    "sellingPrice": 5650
+    "sellingPrice": 5649.8
   },
   {
     "unitType": "SHP",
@@ -6547,7 +6547,7 @@
     "totalInvestment": "21210",
     "sourcePage": "37",
     "equipmentCost": 177.33,
-    "sellingPrice": 355
+    "sellingPrice": 354.66
   },
   {
     "unitType": "SHP",
@@ -6563,7 +6563,7 @@
     "totalInvestment": "21210",
     "sourcePage": "37",
     "equipmentCost": 5825.08,
-    "sellingPrice": 11650
+    "sellingPrice": 11650.16
   },
   {
     "unitType": "SHP",
@@ -6579,7 +6579,7 @@
     "totalInvestment": "21210",
     "sourcePage": "37",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SHP",
@@ -6595,7 +6595,7 @@
     "totalInvestment": "19620",
     "sourcePage": "37",
     "equipmentCost": 2824.9,
-    "sellingPrice": 5650
+    "sellingPrice": 5649.8
   },
   {
     "unitType": "SHP",
@@ -6611,7 +6611,7 @@
     "totalInvestment": "19620",
     "sourcePage": "37",
     "equipmentCost": 177.33,
-    "sellingPrice": 355
+    "sellingPrice": 354.66
   },
   {
     "unitType": "SHP",
@@ -6627,7 +6627,7 @@
     "totalInvestment": "19620",
     "sourcePage": "37",
     "equipmentCost": 5086.05,
-    "sellingPrice": 10172
+    "sellingPrice": 10172.1
   },
   {
     "unitType": "SHP",
@@ -6643,7 +6643,7 @@
     "totalInvestment": "19620",
     "sourcePage": "37",
     "equipmentCost": 580.15,
-    "sellingPrice": 1160
+    "sellingPrice": 1160.3
   },
   {
     "unitType": "SGA",
@@ -6659,7 +6659,7 @@
     "totalInvestment": "10685",
     "sourcePage": "35",
     "equipmentCost": 2328.8,
-    "sellingPrice": 4658
+    "sellingPrice": 4657.6
   },
   {
     "unitType": "SGA",
@@ -6705,7 +6705,7 @@
     "totalInvestment": "10685",
     "sourcePage": "35",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -6721,7 +6721,7 @@
     "totalInvestment": "9880",
     "sourcePage": "35",
     "equipmentCost": 1956.73,
-    "sellingPrice": 3913
+    "sellingPrice": 3913.46
   },
   {
     "unitType": "SGA",
@@ -6751,7 +6751,7 @@
     "totalInvestment": "9880",
     "sourcePage": "35",
     "equipmentCost": 1132.63,
-    "sellingPrice": 2265
+    "sellingPrice": 2265.26
   },
   {
     "unitType": "SGA",
@@ -6767,7 +6767,7 @@
     "totalInvestment": "9880",
     "sourcePage": "35",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -6825,7 +6825,7 @@
     "totalInvestment": "7554",
     "sourcePage": "36",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -6897,7 +6897,7 @@
     "totalInvestment": "11637",
     "sourcePage": "31",
     "equipmentCost": 2659.88,
-    "sellingPrice": 5320
+    "sellingPrice": 5319.76
   },
   {
     "unitType": "SGA",
@@ -6913,7 +6913,7 @@
     "totalInvestment": "12007",
     "sourcePage": "60",
     "equipmentCost": 1341.73,
-    "sellingPrice": 2683
+    "sellingPrice": 2683.46
   },
   {
     "unitType": "SGA",
@@ -6957,7 +6957,7 @@
     "totalInvestment": "11637",
     "sourcePage": "31",
     "equipmentCost": 1190.03,
-    "sellingPrice": 2380
+    "sellingPrice": 2380.06
   },
   {
     "unitType": "SHP",
@@ -6973,7 +6973,7 @@
     "totalInvestment": "12007",
     "sourcePage": "60",
     "equipmentCost": 2387.23,
-    "sellingPrice": 4774
+    "sellingPrice": 4774.46
   },
   {
     "unitType": "SHP",
@@ -6989,7 +6989,7 @@
     "totalInvestment": "12007",
     "sourcePage": "60",
     "equipmentCost": 3262.58,
-    "sellingPrice": 6525
+    "sellingPrice": 6525.16
   },
   {
     "unitType": "SGA",
@@ -7005,7 +7005,7 @@
     "totalInvestment": "11637",
     "sourcePage": "31",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -7093,7 +7093,7 @@
     "totalInvestment": "10596",
     "sourcePage": "31",
     "equipmentCost": 1190.03,
-    "sellingPrice": 2380
+    "sellingPrice": 2380.06
   },
   {
     "unitType": "SHP",
@@ -7151,7 +7151,7 @@
     "totalInvestment": "10596",
     "sourcePage": "31",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -7209,7 +7209,7 @@
     "totalInvestment": "8089",
     "sourcePage": "32",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -7281,7 +7281,7 @@
     "totalInvestment": "12468",
     "sourcePage": "27",
     "equipmentCost": 2892.55,
-    "sellingPrice": 5785
+    "sellingPrice": 5785.1
   },
   {
     "unitType": "SGA",
@@ -7311,7 +7311,7 @@
     "totalInvestment": "12468",
     "sourcePage": "27",
     "equipmentCost": 1247.43,
-    "sellingPrice": 2495
+    "sellingPrice": 2494.86
   },
   {
     "unitType": "SGA",
@@ -7327,7 +7327,7 @@
     "totalInvestment": "12468",
     "sourcePage": "27",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -7343,7 +7343,7 @@
     "totalInvestment": "11043",
     "sourcePage": "27",
     "equipmentCost": 2289.85,
-    "sellingPrice": 4580
+    "sellingPrice": 4579.7
   },
   {
     "unitType": "SGA",
@@ -7373,7 +7373,7 @@
     "totalInvestment": "11043",
     "sourcePage": "27",
     "equipmentCost": 1220.78,
-    "sellingPrice": 2442
+    "sellingPrice": 2441.56
   },
   {
     "unitType": "SGA",
@@ -7389,7 +7389,7 @@
     "totalInvestment": "11043",
     "sourcePage": "27",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -7447,7 +7447,7 @@
     "totalInvestment": "8807",
     "sourcePage": "28",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -7519,7 +7519,7 @@
     "totalInvestment": "9880",
     "sourcePage": "22",
     "equipmentCost": 1956.73,
-    "sellingPrice": 3913
+    "sellingPrice": 3913.46
   },
   {
     "unitType": "SGA",
@@ -7535,7 +7535,7 @@
     "totalInvestment": "10233",
     "sourcePage": "54",
     "equipmentCost": 1589.78,
-    "sellingPrice": 3180
+    "sellingPrice": 3179.56
   },
   {
     "unitType": "SGA",
@@ -7579,7 +7579,7 @@
     "totalInvestment": "9880",
     "sourcePage": "22",
     "equipmentCost": 1132.63,
-    "sellingPrice": 2265
+    "sellingPrice": 2265.26
   },
   {
     "unitType": "SHP",
@@ -7595,7 +7595,7 @@
     "totalInvestment": "10233",
     "sourcePage": "54",
     "equipmentCost": 2233.48,
-    "sellingPrice": 4467
+    "sellingPrice": 4466.96
   },
   {
     "unitType": "SGA",
@@ -7611,7 +7611,7 @@
     "totalInvestment": "9880",
     "sourcePage": "22",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -7627,7 +7627,7 @@
     "totalInvestment": "10685",
     "sourcePage": "22",
     "equipmentCost": 2328.8,
-    "sellingPrice": 4658
+    "sellingPrice": 4657.6
   },
   {
     "unitType": "SGA",
@@ -7643,7 +7643,7 @@
     "totalInvestment": "11810",
     "sourcePage": "54",
     "equipmentCost": 1589.78,
-    "sellingPrice": 3180
+    "sellingPrice": 3179.56
   },
   {
     "unitType": "SGA",
@@ -7703,7 +7703,7 @@
     "totalInvestment": "11810",
     "sourcePage": "54",
     "equipmentCost": 2939.7,
-    "sellingPrice": 5879
+    "sellingPrice": 5879.4
   },
   {
     "unitType": "SGA",
@@ -7719,7 +7719,7 @@
     "totalInvestment": "10685",
     "sourcePage": "22",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -7751,7 +7751,7 @@
     "totalInvestment": "10829",
     "sourcePage": "52",
     "equipmentCost": 1690.23,
-    "sellingPrice": 3380
+    "sellingPrice": 3380.46
   },
   {
     "unitType": "SGA",
@@ -7795,7 +7795,7 @@
     "totalInvestment": "10384",
     "sourcePage": "19",
     "equipmentCost": 1190.03,
-    "sellingPrice": 2380
+    "sellingPrice": 2380.06
   },
   {
     "unitType": "SHP",
@@ -7811,7 +7811,7 @@
     "totalInvestment": "10829",
     "sourcePage": "52",
     "equipmentCost": 2387.23,
-    "sellingPrice": 4774
+    "sellingPrice": 4774.46
   },
   {
     "unitType": "SGA",
@@ -7827,7 +7827,7 @@
     "totalInvestment": "10384",
     "sourcePage": "19",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -7843,7 +7843,7 @@
     "totalInvestment": "11869",
     "sourcePage": "19",
     "equipmentCost": 2659.88,
-    "sellingPrice": 5320
+    "sellingPrice": 5319.76
   },
   {
     "unitType": "SGA",
@@ -7859,7 +7859,7 @@
     "totalInvestment": "12788",
     "sourcePage": "52",
     "equipmentCost": 1690.23,
-    "sellingPrice": 3380
+    "sellingPrice": 3380.46
   },
   {
     "unitType": "SGA",
@@ -7903,7 +7903,7 @@
     "totalInvestment": "11869",
     "sourcePage": "19",
     "equipmentCost": 1220.78,
-    "sellingPrice": 2442
+    "sellingPrice": 2441.56
   },
   {
     "unitType": "SHP",
@@ -7919,7 +7919,7 @@
     "totalInvestment": "12788",
     "sourcePage": "52",
     "equipmentCost": 3262.58,
-    "sellingPrice": 6525
+    "sellingPrice": 6525.16
   },
   {
     "unitType": "SGA",
@@ -7935,7 +7935,7 @@
     "totalInvestment": "11869",
     "sourcePage": "19",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -7951,7 +7951,7 @@
     "totalInvestment": "11043",
     "sourcePage": "16",
     "equipmentCost": 2289.85,
-    "sellingPrice": 4580
+    "sellingPrice": 4579.7
   },
   {
     "unitType": "SGA",
@@ -7967,7 +7967,7 @@
     "totalInvestment": "12494",
     "sourcePage": "50",
     "equipmentCost": 2194.53,
-    "sellingPrice": 4389
+    "sellingPrice": 4389.06
   },
   {
     "unitType": "SGA",
@@ -8011,7 +8011,7 @@
     "totalInvestment": "11043",
     "sourcePage": "16",
     "equipmentCost": 1220.78,
-    "sellingPrice": 2442
+    "sellingPrice": 2441.56
   },
   {
     "unitType": "SHP",
@@ -8027,7 +8027,7 @@
     "totalInvestment": "12494",
     "sourcePage": "50",
     "equipmentCost": 2570.7,
-    "sellingPrice": 5141
+    "sellingPrice": 5141.4
   },
   {
     "unitType": "SGA",
@@ -8043,7 +8043,7 @@
     "totalInvestment": "11043",
     "sourcePage": "16",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "SGA",
@@ -8059,7 +8059,7 @@
     "totalInvestment": "12468",
     "sourcePage": "16",
     "equipmentCost": 2892.55,
-    "sellingPrice": 5785
+    "sellingPrice": 5785.1
   },
   {
     "unitType": "SGA",
@@ -8075,7 +8075,7 @@
     "totalInvestment": "14458",
     "sourcePage": "50",
     "equipmentCost": 2194.53,
-    "sellingPrice": 4389
+    "sellingPrice": 4389.06
   },
   {
     "unitType": "SGA",
@@ -8119,7 +8119,7 @@
     "totalInvestment": "12468",
     "sourcePage": "16",
     "equipmentCost": 1247.43,
-    "sellingPrice": 2495
+    "sellingPrice": 2494.86
   },
   {
     "unitType": "SHP",
@@ -8135,7 +8135,7 @@
     "totalInvestment": "14458",
     "sourcePage": "50",
     "equipmentCost": 3498.33,
-    "sellingPrice": 6997
+    "sellingPrice": 6996.66
   },
   {
     "unitType": "SGA",
@@ -8151,7 +8151,7 @@
     "totalInvestment": "12468",
     "sourcePage": "16",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "PHP",
@@ -8167,7 +8167,7 @@
     "totalInvestment": "15647",
     "sourcePage": "63",
     "equipmentCost": 5914.25,
-    "sellingPrice": 11829
+    "sellingPrice": 11828.5
   },
   {
     "unitType": "PHP",
@@ -8215,7 +8215,7 @@
     "totalInvestment": "14051",
     "sourcePage": "63",
     "equipmentCost": 5293.1,
-    "sellingPrice": 10586
+    "sellingPrice": 10586.2
   },
   {
     "unitType": "PHP",
@@ -8245,7 +8245,7 @@
     "totalInvestment": "14051",
     "sourcePage": "63",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "PHP",
@@ -8331,7 +8331,7 @@
     "totalInvestment": "11270",
     "sourcePage": "63",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "PHP",
@@ -8395,7 +8395,7 @@
     "totalInvestment": "12283",
     "sourcePage": "64",
     "equipmentCost": 4974.33,
-    "sellingPrice": 9949
+    "sellingPrice": 9948.66
   },
   {
     "unitType": "PHP",
@@ -8425,7 +8425,7 @@
     "totalInvestment": "12283",
     "sourcePage": "64",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "PHP",
@@ -8513,7 +8513,7 @@
     "totalInvestment": "9737",
     "sourcePage": "64",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "PHP",
@@ -8529,7 +8529,7 @@
     "totalInvestment": "14159",
     "sourcePage": "65",
     "equipmentCost": 5314.63,
-    "sellingPrice": 10629
+    "sellingPrice": 10629.26
   },
   {
     "unitType": "PHP",
@@ -8577,7 +8577,7 @@
     "totalInvestment": "12845",
     "sourcePage": "65",
     "equipmentCost": 4820.58,
-    "sellingPrice": 9641
+    "sellingPrice": 9641.16
   },
   {
     "unitType": "PHP",
@@ -8607,7 +8607,7 @@
     "totalInvestment": "12845",
     "sourcePage": "65",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "PHP",
@@ -8693,7 +8693,7 @@
     "totalInvestment": "10128",
     "sourcePage": "65",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "PHP",
@@ -8709,7 +8709,7 @@
     "totalInvestment": "13709",
     "sourcePage": "66",
     "equipmentCost": 5113.73,
-    "sellingPrice": 10227
+    "sellingPrice": 10227.46
   },
   {
     "unitType": "PHP",
@@ -8757,7 +8757,7 @@
     "totalInvestment": "12499",
     "sourcePage": "66",
     "equipmentCost": 4665.8,
-    "sellingPrice": 9332
+    "sellingPrice": 9331.6
   },
   {
     "unitType": "PHP",
@@ -8787,7 +8787,7 @@
     "totalInvestment": "12499",
     "sourcePage": "66",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "PHP",
@@ -8873,7 +8873,7 @@
     "totalInvestment": "9643",
     "sourcePage": "66",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "PHP",
@@ -8889,7 +8889,7 @@
     "totalInvestment": "13174",
     "sourcePage": "67",
     "equipmentCost": 4917.95,
-    "sellingPrice": 9836
+    "sellingPrice": 9835.9
   },
   {
     "unitType": "PHP",
@@ -8937,7 +8937,7 @@
     "totalInvestment": "12170",
     "sourcePage": "67",
     "equipmentCost": 4561.25,
-    "sellingPrice": 9123
+    "sellingPrice": 9122.5
   },
   {
     "unitType": "PHP",
@@ -8967,7 +8967,7 @@
     "totalInvestment": "12170",
     "sourcePage": "67",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "PHP",
@@ -9055,7 +9055,7 @@
     "totalInvestment": "9025",
     "sourcePage": "67",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "PHP",
@@ -9071,7 +9071,7 @@
     "totalInvestment": "12689",
     "sourcePage": "68",
     "equipmentCost": 4723.2,
-    "sellingPrice": 9446
+    "sellingPrice": 9446.4
   },
   {
     "unitType": "PHP",
@@ -9149,7 +9149,7 @@
     "totalInvestment": "11869",
     "sourcePage": "68",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "PHP",
@@ -9235,7 +9235,7 @@
     "totalInvestment": "8622",
     "sourcePage": "68",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "GP",
@@ -9251,7 +9251,7 @@
     "totalInvestment": "14633",
     "sourcePage": "69",
     "equipmentCost": 5805.6,
-    "sellingPrice": 11611
+    "sellingPrice": 11611.2
   },
   {
     "unitType": "GP",
@@ -9311,7 +9311,7 @@
     "totalInvestment": "13281",
     "sourcePage": "69",
     "equipmentCost": 5294.13,
-    "sellingPrice": 10588
+    "sellingPrice": 10588.26
   },
   {
     "unitType": "GP",
@@ -9327,7 +9327,7 @@
     "totalInvestment": "13281",
     "sourcePage": "69",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "GP",
@@ -9357,7 +9357,7 @@
     "totalInvestment": "10526",
     "sourcePage": "69",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "GP",
@@ -9373,7 +9373,7 @@
     "totalInvestment": "13852",
     "sourcePage": "70",
     "equipmentCost": 5455.05,
-    "sellingPrice": 10910
+    "sellingPrice": 10910.1
   },
   {
     "unitType": "GP",
@@ -9433,7 +9433,7 @@
     "totalInvestment": "12459",
     "sourcePage": "70",
     "equipmentCost": 4926.15,
-    "sellingPrice": 9852
+    "sellingPrice": 9852.3
   },
   {
     "unitType": "GP",
@@ -9449,7 +9449,7 @@
     "totalInvestment": "12459",
     "sourcePage": "70",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "GP",
@@ -9479,7 +9479,7 @@
     "totalInvestment": "10024",
     "sourcePage": "70",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "GP",
@@ -9495,7 +9495,7 @@
     "totalInvestment": "13515",
     "sourcePage": "71",
     "equipmentCost": 5305.4,
-    "sellingPrice": 10611
+    "sellingPrice": 10610.8
   },
   {
     "unitType": "GP",
@@ -9541,7 +9541,7 @@
     "totalInvestment": "11976",
     "sourcePage": "71",
     "equipmentCost": 4708.85,
-    "sellingPrice": 9418
+    "sellingPrice": 9417.7
   },
   {
     "unitType": "GP",
@@ -9557,7 +9557,7 @@
     "totalInvestment": "11976",
     "sourcePage": "71",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "GP",
@@ -9629,7 +9629,7 @@
     "totalInvestment": "9645",
     "sourcePage": "71",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "GP",
@@ -9645,7 +9645,7 @@
     "totalInvestment": "12956",
     "sourcePage": "72",
     "equipmentCost": 5055.3,
-    "sellingPrice": 10111
+    "sellingPrice": 10110.6
   },
   {
     "unitType": "GP",
@@ -9691,7 +9691,7 @@
     "totalInvestment": "11744",
     "sourcePage": "72",
     "equipmentCost": 4605.33,
-    "sellingPrice": 9211
+    "sellingPrice": 9210.66
   },
   {
     "unitType": "GP",
@@ -9707,7 +9707,7 @@
     "totalInvestment": "11744",
     "sourcePage": "72",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "GP",
@@ -9779,7 +9779,7 @@
     "totalInvestment": "8703",
     "sourcePage": "72",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "GP",
@@ -9795,7 +9795,7 @@
     "totalInvestment": "12679",
     "sourcePage": "73",
     "equipmentCost": 4932.3,
-    "sellingPrice": 9865
+    "sellingPrice": 9864.6
   },
   {
     "unitType": "GP",
@@ -9841,7 +9841,7 @@
     "totalInvestment": "11512",
     "sourcePage": "73",
     "equipmentCost": 4501.8,
-    "sellingPrice": 9004
+    "sellingPrice": 9003.6
   },
   {
     "unitType": "GP",
@@ -9857,7 +9857,7 @@
     "totalInvestment": "11512",
     "sourcePage": "73",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "GP",
@@ -9929,7 +9929,7 @@
     "totalInvestment": "8444",
     "sourcePage": "73",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "GP",
@@ -9945,7 +9945,7 @@
     "totalInvestment": "12400",
     "sourcePage": "74",
     "equipmentCost": 4807.25,
-    "sellingPrice": 9615
+    "sellingPrice": 9614.5
   },
   {
     "unitType": "GP",
@@ -9991,7 +9991,7 @@
     "totalInvestment": "11156",
     "sourcePage": "74",
     "equipmentCost": 4343.95,
-    "sellingPrice": 8688
+    "sellingPrice": 8687.9
   },
   {
     "unitType": "GP",
@@ -10007,7 +10007,7 @@
     "totalInvestment": "11156",
     "sourcePage": "74",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   },
   {
     "unitType": "GP",
@@ -10079,6 +10079,6 @@
     "totalInvestment": "8075",
     "sourcePage": "74",
     "equipmentCost": 174.25,
-    "sellingPrice": 349
+    "sellingPrice": 348.5
   }
 ]

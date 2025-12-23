@@ -618,15 +618,11 @@ export class DatabaseStorage implements IStorage {
       setData[key] = value;
     }
     
-    console.log('updateServiceLead setData:', JSON.stringify(setData, null, 2));
-    
     const [lead] = await db
       .update(leads)
       .set(setData)
       .where(eq(leads.id, id))
       .returning();
-    
-    console.log('updateServiceLead result repairDate:', lead?.repairDate);
     
     return lead ? this.normalizeLead(lead) : undefined;
   }

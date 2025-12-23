@@ -1,0 +1,839 @@
+[
+  {
+    "equipmentType": "SGA",
+    "tonnage": "1.5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR4018A1000",
+    "brand": "Trane",
+    "cost": 1956.73,
+    "price": 3913.46
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "1.5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR5018A1000",
+    "brand": "Trane",
+    "cost": 2328.8,
+    "price": 4657.6
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "1.5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX5018A1000",
+    "brand": "Trane",
+    "cost": 2744.95,
+    "price": 5489.9
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "1.5",
+    "componentType": "Furnace",
+    "model": "S8X1A040M3PSC",
+    "brand": "Trane",
+    "cost": 1132.63,
+    "price": 2265.26
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "1.5",
+    "componentType": "Furnace",
+    "model": "S8X1B040M2PSC",
+    "brand": "Trane",
+    "cost": 1107,
+    "price": 2214
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "1.5",
+    "componentType": "Indoor Coil",
+    "model": "5TXCA001AS3HC",
+    "brand": "Trane",
+    "cost": 699.05,
+    "price": 1398.1
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "1.5",
+    "componentType": "Indoor Coil",
+    "model": "5TXCB003AS3HC",
+    "brand": "Trane",
+    "cost": 711.35,
+    "price": 1422.7
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "1.5",
+    "componentType": "Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "brand": "Trane",
+    "cost": 174.25,
+    "price": 348.5
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR4024A1000",
+    "brand": "Trane",
+    "cost": 2036.68,
+    "price": 4073.36
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR5024A1000",
+    "brand": "Trane",
+    "cost": 2560.45,
+    "price": 5120.9
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR7024A1000",
+    "brand": "Trane",
+    "cost": 3102.68,
+    "price": 6205.36
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Outdoor Unit",
+    "model": "5TTV0X24A1000",
+    "brand": "Trane",
+    "cost": 4353.18,
+    "price": 8706.36
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Outdoor Unit",
+    "model": "5TTV8X24A1000",
+    "brand": "Trane",
+    "cost": 3614.15,
+    "price": 7228.3
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX5024A1000",
+    "brand": "Trane",
+    "cost": 2953.03,
+    "price": 5906.06
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX7024A1000",
+    "brand": "Trane",
+    "cost": 3229.78,
+    "price": 6459.56
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Furnace",
+    "model": "S8V2A040M3PCA",
+    "brand": "Trane",
+    "cost": null,
+    "price": null
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Furnace",
+    "model": "S8V2A040M3PCB",
+    "brand": "Trane",
+    "cost": 1718.93,
+    "price": 3437.86
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Furnace",
+    "model": "S8X1A040M3PSC",
+    "brand": "Trane",
+    "cost": 1132.63,
+    "price": 2265.26
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Furnace",
+    "model": "S8X1B040M2PSC",
+    "brand": "Trane",
+    "cost": 1107,
+    "price": 2214
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Indoor Coil",
+    "model": "5TXCA001AS3HC",
+    "brand": "Trane",
+    "cost": 699.05,
+    "price": 1398.1
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Indoor Coil",
+    "model": "5TXCA002AS3HC",
+    "brand": "Trane",
+    "cost": 705.2,
+    "price": 1410.4
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Indoor Coil",
+    "model": "5TXCA002AS3HCAA",
+    "brand": "Trane",
+    "cost": 705.2,
+    "price": 1410.4
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Indoor Coil",
+    "model": "5TXCB003AS3HC",
+    "brand": "Trane",
+    "cost": 711.35,
+    "price": 1422.7
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Indoor Coil",
+    "model": "5TXCB004AS3HC",
+    "brand": "Trane",
+    "cost": 724.68,
+    "price": 1449.36
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "brand": "Trane",
+    "cost": 174.25,
+    "price": 348.5
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Thermostat/Controls",
+    "model": "TLINK360A2VVUA",
+    "brand": "Trane",
+    "cost": 580.15,
+    "price": 1160.3
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2",
+    "componentType": "Thermostat/Controls",
+    "model": "UX360B",
+    "brand": "Trane",
+    "cost": null,
+    "price": null
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2.5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR4030A1000",
+    "brand": "Trane",
+    "cost": 2111.5,
+    "price": 4223
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2.5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR5030A1000",
+    "brand": "Trane",
+    "cost": 2659.88,
+    "price": 5319.76
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2.5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX5030A1000",
+    "brand": "Trane",
+    "cost": 3051.43,
+    "price": 6102.86
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2.5",
+    "componentType": "Furnace",
+    "model": "S8X1B060M4PSC",
+    "brand": "Trane",
+    "cost": 1190.03,
+    "price": 2380.06
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2.5",
+    "componentType": "Furnace",
+    "model": "S8X1B080M4PSC",
+    "brand": "Trane",
+    "cost": 1220.78,
+    "price": 2441.56
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2.5",
+    "componentType": "Indoor Coil",
+    "model": "5TXCB003AS3HC",
+    "brand": "Trane",
+    "cost": 711.35,
+    "price": 1422.7
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2.5",
+    "componentType": "Indoor Coil",
+    "model": "5TXCB004AS3HC",
+    "brand": "Trane",
+    "cost": 724.68,
+    "price": 1449.36
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2.5",
+    "componentType": "Indoor Coil",
+    "model": "5TXCB006AS3HCAA",
+    "brand": "Trane",
+    "cost": 798.48,
+    "price": 1596.96
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "2.5",
+    "componentType": "Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "brand": "Trane",
+    "cost": 174.25,
+    "price": 348.5
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR4036A1000",
+    "brand": "Trane",
+    "cost": 2186.33,
+    "price": 4372.66
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR5036A1000",
+    "brand": "Trane",
+    "cost": 2762.38,
+    "price": 5524.76
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR7036A1000",
+    "brand": "Trane",
+    "cost": 3425.55,
+    "price": 6851.1
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Outdoor Unit",
+    "model": "5TTV0X36A1000",
+    "brand": "Trane",
+    "cost": 4680.15,
+    "price": 9360.3
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Outdoor Unit",
+    "model": "5TTV8X36A1000",
+    "brand": "Trane",
+    "cost": 3941.13,
+    "price": 7882.26
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX5036A1000",
+    "brand": "Trane",
+    "cost": 3152.9,
+    "price": 6305.8
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX7036A1000",
+    "brand": "Trane",
+    "cost": 3553.68,
+    "price": 7107.36
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Furnace",
+    "model": "S8V2B060M4PCB",
+    "brand": "Trane",
+    "cost": 1822.45,
+    "price": 3644.9
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Furnace",
+    "model": "S8X1B060M4PSC",
+    "brand": "Trane",
+    "cost": 1190.03,
+    "price": 2380.06
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Furnace",
+    "model": "S8X1C080M5PSC",
+    "brand": "Trane",
+    "cost": 1247.43,
+    "price": 2494.86
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Indoor Coil",
+    "model": "5TXCB003AS3HC",
+    "brand": "Trane",
+    "cost": 711.35,
+    "price": 1422.7
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Indoor Coil",
+    "model": "5TXCB004AS3HC",
+    "brand": "Trane",
+    "cost": 724.68,
+    "price": 1449.36
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Indoor Coil",
+    "model": "5TXCB006AS3HC",
+    "brand": "Trane",
+    "cost": 798.48,
+    "price": 1596.96
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "brand": "Trane",
+    "cost": 174.25,
+    "price": 348.5
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Thermostat/Controls",
+    "model": "TLINK360A2VVUA",
+    "brand": "Trane",
+    "cost": 580.15,
+    "price": 1160.3
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3",
+    "componentType": "Thermostat/Controls",
+    "model": "UX360B",
+    "brand": "Trane",
+    "cost": null,
+    "price": null
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3.5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR4042A1000",
+    "brand": "Trane",
+    "cost": 2289.85,
+    "price": 4579.7
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3.5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR5042A1000",
+    "brand": "Trane",
+    "cost": 2892.55,
+    "price": 5785.1
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3.5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX5042A1000",
+    "brand": "Trane",
+    "cost": 3278.98,
+    "price": 6557.96
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3.5",
+    "componentType": "Furnace",
+    "model": "S8X1B080M4PSC",
+    "brand": "Trane",
+    "cost": 1220.78,
+    "price": 2441.56
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3.5",
+    "componentType": "Furnace",
+    "model": "S8X1C080M5PSC",
+    "brand": "Trane",
+    "cost": 1247.43,
+    "price": 2494.86
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3.5",
+    "componentType": "Indoor Coil",
+    "model": "5TXCB006AS3HC",
+    "brand": "Trane",
+    "cost": 798.48,
+    "price": 1596.96
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3.5",
+    "componentType": "Indoor Coil",
+    "model": "5TXCC007AS3HC",
+    "brand": "Trane",
+    "cost": 807.7,
+    "price": 1615.4
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "3.5",
+    "componentType": "Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "brand": "Trane",
+    "cost": 174.25,
+    "price": 348.5
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR4048A1000",
+    "brand": "Trane",
+    "cost": 2391.33,
+    "price": 4782.66
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR5048A1000",
+    "brand": "Trane",
+    "cost": 3014.53,
+    "price": 6029.06
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR7048A1000",
+    "brand": "Trane",
+    "cost": 3748.43,
+    "price": 7496.86
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Outdoor Unit",
+    "model": "5TTV0X48A1000",
+    "brand": "Trane",
+    "cost": 5004.05,
+    "price": 10008.1
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Outdoor Unit",
+    "model": "5TTV8X48A1000",
+    "brand": "Trane",
+    "cost": 4266.05,
+    "price": 8532.1
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX5048A1000",
+    "brand": "Trane",
+    "cost": 3401.98,
+    "price": 6803.96
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX7048A1000",
+    "brand": "Trane",
+    "cost": 3875.53,
+    "price": 7751.06
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Furnace",
+    "model": "S8V2B080M4PCB",
+    "brand": "Trane",
+    "cost": 1880.88,
+    "price": 3761.76
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Furnace",
+    "model": "S8V2C080M5PCB",
+    "brand": "Trane",
+    "cost": 1928.03,
+    "price": 3856.06
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Furnace",
+    "model": "S8X1B080M4PSC",
+    "brand": "Trane",
+    "cost": 1220.78,
+    "price": 2441.56
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Furnace",
+    "model": "S8X1C080M5PSC",
+    "brand": "Trane",
+    "cost": 1247.43,
+    "price": 2494.86
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Indoor Coil",
+    "model": "5TXCB006AS3HC",
+    "brand": "Trane",
+    "cost": 798.48,
+    "price": 1596.96
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Indoor Coil",
+    "model": "5TXCB006AS3HCAA",
+    "brand": "Trane",
+    "cost": 798.48,
+    "price": 1596.96
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Indoor Coil",
+    "model": "5TXCC007AS3HC",
+    "brand": "Trane",
+    "cost": 807.7,
+    "price": 1615.4
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Indoor Coil",
+    "model": "5TXCC007AS3HCAA",
+    "brand": "Trane",
+    "cost": 807.7,
+    "price": 1615.4
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Indoor Coil",
+    "model": "5TXCC009AS3HC",
+    "brand": "Trane",
+    "cost": 877.4,
+    "price": 1754.8
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "brand": "Trane",
+    "cost": 174.25,
+    "price": 348.5
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Thermostat/Controls",
+    "model": "TLINK360A2VVUA",
+    "brand": "Trane",
+    "cost": 580.15,
+    "price": 1160.3
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "4",
+    "componentType": "Thermostat/Controls",
+    "model": "UX360B",
+    "brand": "Trane",
+    "cost": null,
+    "price": null
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR4060A1000",
+    "brand": "Trane",
+    "cost": 2597.35,
+    "price": 5194.7
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR5060A1000",
+    "brand": "Trane",
+    "cost": 3271.8,
+    "price": 6543.6
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTR7060A1000",
+    "brand": "Trane",
+    "cost": 4069.25,
+    "price": 8138.5
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTV0X60A1000",
+    "brand": "Trane",
+    "cost": 5331.03,
+    "price": 10662.06
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTV8X60A1000",
+    "brand": "Trane",
+    "cost": 4590.98,
+    "price": 9181.96
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX5060A1000",
+    "brand": "Trane",
+    "cost": 3659.25,
+    "price": 7318.5
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Outdoor Unit",
+    "model": "5TTX7060A1000",
+    "brand": "Trane",
+    "cost": 4196.35,
+    "price": 8392.7
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Furnace",
+    "model": "S8V2C100M5PCB",
+    "brand": "Trane",
+    "cost": 1985.43,
+    "price": 3970.86
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Furnace",
+    "model": "S8X1C100M5PSC",
+    "brand": "Trane",
+    "cost": 1279.2,
+    "price": 2558.4
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Indoor Coil",
+    "model": "5TXCC007AS3HC",
+    "brand": "Trane",
+    "cost": 807.7,
+    "price": 1615.4
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Indoor Coil",
+    "model": "5TXCC009AS3HC",
+    "brand": "Trane",
+    "cost": 877.4,
+    "price": 1754.8
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Thermostat/Controls",
+    "model": "TCONT724AS42DA",
+    "brand": "Trane",
+    "cost": 174.25,
+    "price": 348.5
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Thermostat/Controls",
+    "model": "TLINK360A2VVUA",
+    "brand": "Trane",
+    "cost": 580.15,
+    "price": 1160.3
+  },
+  {
+    "equipmentType": "SGA",
+    "tonnage": "5",
+    "componentType": "Thermostat/Controls",
+    "model": "UX360B",
+    "brand": "Trane",
+    "cost": null,
+    "price": null
+  }
+]

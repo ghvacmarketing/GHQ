@@ -248,6 +248,7 @@ export default function ProposalBuilder() {
   const [generatedQuote, setGeneratedQuote] = useState<string | null>(null);
 
   // Build Your Own state
+  const [customEquipmentType, setCustomEquipmentType] = useState<string | null>(null);
   const [customTonnage, setCustomTonnage] = useState<string | null>(null);
   const [selectedOutdoorUnit, setSelectedOutdoorUnit] = useState<PricebookComponent | null>(null);
   const [selectedCoil, setSelectedCoil] = useState<PricebookComponent | null>(null);
@@ -495,11 +496,12 @@ export default function ProposalBuilder() {
     });
   }, [selectedUnitType, selectedTier, selectedTonnage]);
 
-  // Filter outdoor units by tonnage (AC, Heat Pump have tonnage in model numbers) - dedupe by model
+  // Filter outdoor units by equipment type and tonnage - dedupe by model
   const outdoorUnitOptions = useMemo(() => {
-    if (!customTonnage) return [];
+    if (!customTonnage || !customEquipmentType) return [];
     const seen = new Set<string>();
     return components.filter(comp => {
+      if (comp.unitType !== customEquipmentType) return false;
       const compTonnage = extractTonnageFromModel(comp.model);
       const matchesTonnage = compTonnage === customTonnage;
       const matchesType = OUTDOOR_UNIT_TYPES.includes(comp.componentType);
@@ -509,13 +511,14 @@ export default function ProposalBuilder() {
       seen.add(comp.model);
       return true;
     });
-  }, [customTonnage, outdoorBrandFilter]);
+  }, [customTonnage, customEquipmentType, outdoorBrandFilter]);
 
-  // Get unique coils (they're often universal, filter by brand only and dedupe by model)
+  // Get unique coils by equipment type - dedupe by model
   const coilOptions = useMemo(() => {
-    if (!customTonnage) return [];
+    if (!customTonnage || !customEquipmentType) return [];
     const seen = new Set<string>();
     return components.filter(comp => {
+      if (comp.unitType !== customEquipmentType) return false;
       if (comp.componentType !== "Evaporator Coil") return false;
       const matchesBrand = coilBrandFilter === "All Brands" || comp.brand === coilBrandFilter;
       if (!matchesBrand) return false;
@@ -523,13 +526,14 @@ export default function ProposalBuilder() {
       seen.add(comp.model);
       return true;
     });
-  }, [customTonnage, coilBrandFilter]);
+  }, [customTonnage, customEquipmentType, coilBrandFilter]);
 
-  // Get unique indoor units (furnaces/air handlers, dedupe by model)
+  // Get unique indoor units by equipment type - dedupe by model
   const indoorUnitOptions = useMemo(() => {
-    if (!customTonnage) return [];
+    if (!customTonnage || !customEquipmentType) return [];
     const seen = new Set<string>();
     return components.filter(comp => {
+      if (comp.unitType !== customEquipmentType) return false;
       if (!INDOOR_UNIT_TYPES.includes(comp.componentType)) return false;
       const matchesBrand = indoorBrandFilter === "All Brands" || comp.brand === indoorBrandFilter;
       if (!matchesBrand) return false;
@@ -537,13 +541,14 @@ export default function ProposalBuilder() {
       seen.add(comp.model);
       return true;
     });
-  }, [customTonnage, indoorBrandFilter]);
+  }, [customTonnage, customEquipmentType, indoorBrandFilter]);
 
-  // Get unique thermostats (universal, dedupe by model)
+  // Get unique thermostats by equipment type - dedupe by model
   const thermostatOptions = useMemo(() => {
-    if (!customTonnage) return [];
+    if (!customTonnage || !customEquipmentType) return [];
     const seen = new Set<string>();
     return components.filter(comp => {
+      if (comp.unitType !== customEquipmentType) return false;
       if (comp.componentType !== "Thermostat/Control") return false;
       const matchesBrand = thermostatBrandFilter === "All Brands" || comp.brand === thermostatBrandFilter;
       if (!matchesBrand) return false;
@@ -551,7 +556,7 @@ export default function ProposalBuilder() {
       seen.add(comp.model);
       return true;
     });
-  }, [customTonnage, thermostatBrandFilter]);
+  }, [customTonnage, customEquipmentType, thermostatBrandFilter]);
 
   const isCustomBuildComplete = selectedOutdoorUnit && selectedCoil && selectedIndoorUnit && selectedThermostat && customTonnage;
 
@@ -604,9 +609,10 @@ export default function ProposalBuilder() {
   const totalSteps = hasSingleTier ? 3 : 4;
 
   const customBuildStep = useMemo(() => {
-    if (!customTonnage) return 1;
-    return 2;
-  }, [customTonnage]);
+    if (!customEquipmentType) return 1;
+    if (!customTonnage) return 2;
+    return 3;
+  }, [customEquipmentType, customTonnage]);
 
   const addToCart = (pkg: PricebookPackage) => {
     const extractedTonnage = selectedTonnage || getPackageTonnageDisplay(pkg);
@@ -704,8 +710,22 @@ export default function ProposalBuilder() {
       setSelectedCoil(null);
       setSelectedIndoorUnit(null);
       setSelectedThermostat(null);
+    } else if (customEquipmentType) {
+      setCustomEquipmentType(null);
     }
   };
+
+  // Get tonnages available for selected equipment type
+  const customTonnageOptions = useMemo(() => {
+    if (!customEquipmentType) return TONNAGE_OPTIONS;
+    const filteredComponents = components.filter(c => c.unitType === customEquipmentType);
+    const tonnages = new Set<string>();
+    filteredComponents.forEach(c => {
+      const tonnage = extractTonnageFromModel(c.model);
+      if (tonnage) tonnages.add(tonnage);
+    });
+    return TONNAGE_OPTIONS.filter(t => tonnages.has(t));
+  }, [customEquipmentType]);
 
   const clearCart = () => {
     setCart([]);
@@ -1389,7 +1409,13 @@ export default function ProposalBuilder() {
                 </Link>
               )}
               <div className="text-sm text-muted-foreground flex items-center">
-                <span className="font-medium">Step {customBuildStep} of 2</span>
+                <span className="font-medium">Step {customBuildStep} of 3</span>
+                {customEquipmentType && (
+                  <>
+                    <ChevronRight className="h-3 w-3 mx-1" />
+                    <span>{customEquipmentType}</span>
+                  </>
+                )}
                 {customTonnage && (
                   <>
                     <ChevronRight className="h-3 w-3 mx-1" />
@@ -1401,10 +1427,46 @@ export default function ProposalBuilder() {
 
             {customBuildStep === 1 && (
               <div>
+                <h2 className="text-xl font-semibold mb-2">Select Equipment Type</h2>
+                <p className="text-muted-foreground mb-4">Choose the type of system you want to build</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {["SGA", "SHP", "PHP", "GP"].map(type => {
+                    const typeInfo = UNIT_TYPE_INFO[type];
+                    const TypeIcon = typeInfo?.icon || Package;
+                    return (
+                      <Card
+                        key={type}
+                        className="cursor-pointer hover:border-primary transition-colors"
+                        onClick={() => setCustomEquipmentType(type)}
+                        data-testid={`custom-equipment-type-${type.toLowerCase()}`}
+                      >
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-lg flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <TypeIcon className="h-5 w-5 text-primary" />
+                              {typeInfo?.name || type}
+                            </div>
+                            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground">
+                            {typeInfo?.description || `${type} system`}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {customBuildStep === 2 && (
+              <div>
                 <h2 className="text-xl font-semibold mb-2">Select System Size</h2>
-                <p className="text-muted-foreground mb-4">Choose the tonnage for your custom build</p>
+                <p className="text-muted-foreground mb-4">Choose the tonnage for your {customEquipmentType} system</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {TONNAGE_OPTIONS.map(tonnage => (
+                  {customTonnageOptions.map(tonnage => (
                     <Card
                       key={tonnage}
                       className="cursor-pointer hover:border-primary transition-colors"
@@ -1425,14 +1487,20 @@ export default function ProposalBuilder() {
                     </Card>
                   ))}
                 </div>
+                {customTonnageOptions.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No tonnage options available for {customEquipmentType}</p>
+                  </div>
+                )}
               </div>
             )}
 
-            {customBuildStep === 2 && (
+            {customBuildStep === 3 && (
               <div>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
                   <div>
-                    <h2 className="text-xl font-semibold">Build Your {customTonnage} System</h2>
+                    <h2 className="text-xl font-semibold">Build Your {customEquipmentType} {customTonnage} System</h2>
                     <p className="text-muted-foreground">Select one component from each category</p>
                   </div>
                   <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
@@ -1560,7 +1628,7 @@ export default function ProposalBuilder() {
           </div>
         )}
 
-        {cart.length > 0 && !cartOpen && activeTab === "custom" && customBuildStep === 1 && (
+        {cart.length > 0 && !cartOpen && activeTab === "custom" && customBuildStep < 3 && (
           <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80">
             <Button
               className="w-full min-h-[52px] shadow-lg"
