@@ -1972,85 +1972,115 @@ export default function ProposalBuilder() {
 
 
             <div className="mb-6">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3">EQUIPMENT SUMMARY</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                EQUIPMENT INCLUDED
+              </h3>
               <div className="space-y-4">
                 {cart.map((item, index) => {
                   if (item.isCustomBuild) {
                     const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
                     const priceLow = estimate.low * item.quantity;
                     const priceHigh = estimate.high * item.quantity;
+                    const components = [
+                      { label: 'Outdoor Unit', brand: item.outdoorUnit.brand, name: item.outdoorUnit.unitName, image: item.outdoorUnit.imageUrl },
+                      { label: 'Evaporator Coil', brand: item.coil.brand, name: item.coil.unitName, image: item.coil.imageUrl },
+                      { label: 'Indoor Unit', brand: item.indoorUnit.brand, name: item.indoorUnit.unitName, image: item.indoorUnit.imageUrl },
+                      { label: 'Thermostat', brand: item.thermostat.brand, name: item.thermostat.unitName, image: item.thermostat.imageUrl },
+                    ];
                     return (
-                      <div key={item.id} className="border rounded-lg p-4 bg-card">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Badge className="bg-green-500 text-white text-xs">
-                            <Wrench className="h-3 w-3 mr-1" />
-                            Custom Build
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">{item.tonnage}</span>
-                          {item.quantity > 1 && <Badge variant="outline">x{item.quantity}</Badge>}
-                        </div>
-                        <div className="flex gap-4">
-                          <EquipmentImageGrid
-                            images={{
-                              outdoor: item.outdoorUnit.imageUrl,
-                              coil: item.coil.imageUrl,
-                              furnace: item.indoorUnit.imageUrl,
-                              thermostat: item.thermostat.imageUrl
-                            }}
-                            size="md"
-                            showLabels
-                          />
-                          <div className="flex-1">
-                            <div className="text-sm space-y-1 text-muted-foreground">
-                              <p>• {item.outdoorUnit.brand} {item.outdoorUnit.unitName}</p>
-                              <p>• {item.coil.brand} {item.coil.unitName}</p>
-                              <p>• {item.indoorUnit.brand} {item.indoorUnit.unitName}</p>
-                              <p>• {item.thermostat.brand} {item.thermostat.unitName}</p>
-                            </div>
+                      <div key={item.id} className="rounded-xl border-2 border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-white dark:from-green-950 dark:to-gray-900 overflow-hidden shadow-sm">
+                        <div className="bg-green-500 text-white px-4 py-2 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Wrench className="h-4 w-4" />
+                            <span className="font-semibold">Custom Build</span>
+                            <span className="text-green-100">•</span>
+                            <span className="text-green-100">{item.tonnage}</span>
                           </div>
+                          {item.quantity > 1 && <Badge className="bg-white/20 text-white">x{item.quantity}</Badge>}
                         </div>
-                        <div className="mt-3 pt-3 border-t flex justify-between items-center">
-                          <Badge variant="outline" className="text-xs">Estimated</Badge>
-                          <p className="text-xl font-bold text-primary">{formatPriceRange(priceLow, priceHigh)}</p>
+                        <div className="p-4">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                            {components.map((comp, i) => (
+                              <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center border border-gray-100 dark:border-gray-700">
+                                {comp.image ? (
+                                  <img src={`/assets/${comp.image}`} alt={comp.label} className="w-12 h-12 mx-auto object-contain mb-1" loading="lazy" />
+                                ) : (
+                                  <div className="w-12 h-12 mx-auto bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mb-1">
+                                    <Package className="h-6 w-6 text-gray-400" />
+                                  </div>
+                                )}
+                                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{comp.label}</p>
+                                <p className="text-xs font-medium truncate">{comp.brand}</p>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="bg-green-100 dark:bg-green-900/50 rounded-lg p-3 flex items-center justify-between">
+                            <div>
+                              <Badge variant="outline" className="text-xs border-green-300 text-green-700 dark:border-green-600 dark:text-green-300">Estimated Price</Badge>
+                            </div>
+                            <p className="text-2xl font-bold text-green-700 dark:text-green-300">{formatPriceRange(priceLow, priceHigh)}</p>
+                          </div>
                         </div>
                       </div>
                     );
                   } else {
                     const itemPrice = (parseFloat(item.totalInvestment) || 0) * item.quantity;
                     const monthlyPrice = (parseFloat(item.monthlyPayment) || 0) * item.quantity;
+                    const levelColors: Record<string, string> = {
+                      Best: 'from-amber-50 to-white dark:from-amber-950 dark:to-gray-900 border-amber-200 dark:border-amber-800',
+                      Better: 'from-purple-50 to-white dark:from-purple-950 dark:to-gray-900 border-purple-200 dark:border-purple-800',
+                      Good: 'from-blue-50 to-white dark:from-blue-950 dark:to-gray-900 border-blue-200 dark:border-blue-800',
+                      Budget: 'from-gray-50 to-white dark:from-gray-900 dark:to-gray-900 border-gray-200 dark:border-gray-700',
+                    };
+                    const headerColors: Record<string, string> = {
+                      Best: 'bg-amber-500',
+                      Better: 'bg-purple-500',
+                      Good: 'bg-blue-500',
+                      Budget: 'bg-gray-500',
+                    };
+                    const components = [
+                      { label: 'Outdoor Unit', name: `${item.outdoorBrand} ${item.outdoorModel}`, image: item.outdoorImageUrl },
+                      { label: 'Evaporator Coil', name: item.coilName || item.coilModel, image: item.coilImageUrl },
+                      { label: 'Indoor Unit', name: item.indoorHeatName || item.indoorHeatModel, image: item.furnaceImageUrl },
+                      { label: 'Thermostat', name: item.thermostatName || item.thermostatModel, image: item.thermostatImageUrl },
+                    ].filter(c => c.name);
                     return (
-                      <div key={item.id} className="border rounded-lg p-4 bg-card">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Badge className={`${getPackageLevelColor(item.packageLevel)} text-white text-xs`}>
-                            {item.packageLevel}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">{item.extractedTonnage}</span>
-                          {item.quantity > 1 && <Badge variant="outline">x{item.quantity}</Badge>}
-                        </div>
-                        <div className="flex gap-4">
-                          <EquipmentImageGrid
-                            images={{
-                              outdoor: item.outdoorImageUrl,
-                              coil: item.coilImageUrl,
-                              furnace: item.furnaceImageUrl,
-                              thermostat: item.thermostatImageUrl
-                            }}
-                            size="md"
-                            showLabels
-                          />
-                          <div className="flex-1">
-                            <p className="font-medium">{UNIT_TYPE_INFO[item.unitType]?.name || item.unitType}</p>
-                            <p className="text-sm text-muted-foreground mb-2">{item.tier} Tier</p>
-                            <div className="text-sm space-y-1 text-muted-foreground">
-                              <p>• {item.outdoorBrand} {item.outdoorName}</p>
-                              {item.indoorHeatName && <p>• {item.indoorHeatName}</p>}
-                              {item.thermostatName && <p>• {item.thermostatName}</p>}
-                            </div>
+                      <div key={item.id} className={`rounded-xl border-2 bg-gradient-to-br overflow-hidden shadow-sm ${levelColors[item.packageLevel] || levelColors.Budget}`}>
+                        <div className={`${headerColors[item.packageLevel] || headerColors.Budget} text-white px-4 py-2 flex items-center justify-between`}>
+                          <div className="flex items-center gap-2">
+                            <Award className="h-4 w-4" />
+                            <span className="font-semibold">{item.packageLevel} Package</span>
+                            <span className="opacity-70">•</span>
+                            <span className="opacity-90">{item.extractedTonnage}</span>
                           </div>
+                          {item.quantity > 1 && <Badge className="bg-white/20 text-white">x{item.quantity}</Badge>}
                         </div>
-                        <div className="mt-3 pt-3 border-t flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">{formatPrice(monthlyPrice)}/mo</span>
-                          <p className="text-xl font-bold text-primary">{formatPrice(itemPrice)}</p>
+                        <div className="p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="font-semibold text-lg">{UNIT_TYPE_INFO[item.unitType]?.name || item.unitType}</span>
+                            <Badge variant="secondary" className="text-xs">{item.tier}</Badge>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                            {components.map((comp, i) => (
+                              <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center border border-gray-100 dark:border-gray-700">
+                                {comp.image ? (
+                                  <img src={`/assets/${comp.image}`} alt={comp.label} className="w-12 h-12 mx-auto object-contain mb-1" loading="lazy" />
+                                ) : (
+                                  <div className="w-12 h-12 mx-auto bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mb-1">
+                                    <Package className="h-6 w-6 text-gray-400" />
+                                  </div>
+                                )}
+                                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{comp.label}</p>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="bg-primary/10 rounded-lg p-3 flex items-center justify-between">
+                            <div className="text-sm text-muted-foreground">
+                              {formatPrice(monthlyPrice)}/mo financing
+                            </div>
+                            <p className="text-2xl font-bold text-primary">{formatPrice(itemPrice)}</p>
+                          </div>
                         </div>
                       </div>
                     );
