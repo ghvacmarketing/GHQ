@@ -121,6 +121,55 @@ const formatPriceRange = (low: number, high: number) => {
   return '$' + low.toLocaleString() + ' - $' + high.toLocaleString();
 };
 
+// Equipment image grid component for cart and quote views
+function EquipmentImageGrid({ 
+  images, 
+  size = 'sm',
+  showLabels = false 
+}: { 
+  images: { outdoor?: string; coil?: string; furnace?: string; thermostat?: string };
+  size?: 'sm' | 'md' | 'lg';
+  showLabels?: boolean;
+}) {
+  const sizeClasses = {
+    sm: 'w-10 h-10',
+    md: 'w-14 h-14',
+    lg: 'w-20 h-20'
+  };
+  
+  const imgSize = sizeClasses[size];
+  const hasAnyImage = images.outdoor || images.coil || images.furnace || images.thermostat;
+  
+  if (!hasAnyImage) return null;
+  
+  const imageItems = [
+    { key: 'outdoor', url: images.outdoor, label: 'Outdoor' },
+    { key: 'coil', url: images.coil, label: 'Coil' },
+    { key: 'furnace', url: images.furnace, label: 'Indoor' },
+    { key: 'thermostat', url: images.thermostat, label: 'T-stat' },
+  ].filter(item => item.url);
+  
+  return (
+    <div className={`grid ${imageItems.length <= 2 ? 'grid-cols-2' : 'grid-cols-4'} gap-1`}>
+      {imageItems.map(item => (
+        <div key={item.key} className="flex flex-col items-center">
+          <img 
+            src={`/assets/${item.url}`}
+            alt={item.label}
+            className={`${imgSize} object-contain rounded bg-gray-50 dark:bg-gray-800`}
+            loading="lazy"
+          />
+          {showLabels && (
+            <span className="text-[9px] text-muted-foreground mt-0.5 truncate w-full text-center">
+              {item.label}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function calculateCustomBuildEstimate(
   outdoorUnit: PricebookComponent | null,
   coil: PricebookComponent | null,
@@ -1051,7 +1100,7 @@ export default function ProposalBuilder() {
                             <div className="flex-1 min-w-0">
                               {item.isCustomBuild ? (
                                 <>
-                                  <div className="flex items-center gap-2 mb-1">
+                                  <div className="flex items-center gap-2 mb-2">
                                     <Badge className="bg-green-500 text-white text-xs">
                                       <Wrench className="h-3 w-3 mr-1" />
                                       Custom Build
@@ -1060,13 +1109,27 @@ export default function ProposalBuilder() {
                                       x{item.quantity}
                                     </Badge>
                                   </div>
-                                  <p className="font-medium text-sm">{item.tonnage} System</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {item.outdoorUnit.brand} {item.outdoorUnit.componentType}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {item.indoorUnit.brand} {item.indoorUnit.componentType}
-                                  </p>
+                                  <div className="flex gap-3">
+                                    <EquipmentImageGrid
+                                      images={{
+                                        outdoor: item.outdoorUnit.imageUrl,
+                                        coil: item.coil.imageUrl,
+                                        furnace: item.indoorUnit.imageUrl,
+                                        thermostat: item.thermostat.imageUrl
+                                      }}
+                                      size="sm"
+                                      showLabels
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-sm">{item.tonnage} System</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {item.outdoorUnit.brand} {item.outdoorUnit.componentType}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {item.indoorUnit.brand} {item.indoorUnit.componentType}
+                                      </p>
+                                    </div>
+                                  </div>
                                   <div className="mt-2 pt-2 border-t">
                                     <div className="flex items-center gap-1">
                                       <Badge variant="outline" className="text-xs">Est.</Badge>
@@ -1081,7 +1144,7 @@ export default function ProposalBuilder() {
                                 </>
                               ) : (
                                 <>
-                                  <div className="flex items-center gap-2 mb-1">
+                                  <div className="flex items-center gap-2 mb-2">
                                     <Badge className={`${getPackageLevelColor(item.packageLevel)} text-white text-xs`}>
                                       {item.packageLevel}
                                     </Badge>
@@ -1089,15 +1152,29 @@ export default function ProposalBuilder() {
                                       x{item.quantity}
                                     </Badge>
                                   </div>
-                                  <p className="font-medium text-sm">
-                                    {UNIT_TYPE_INFO[item.unitType]?.name || item.unitType}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {item.tier} • {item.extractedTonnage}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {item.outdoorBrand} {item.outdoorModel}
-                                  </p>
+                                  <div className="flex gap-3">
+                                    <EquipmentImageGrid
+                                      images={{
+                                        outdoor: item.outdoorImageUrl,
+                                        coil: item.coilImageUrl,
+                                        furnace: item.furnaceImageUrl,
+                                        thermostat: item.thermostatImageUrl
+                                      }}
+                                      size="sm"
+                                      showLabels
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-sm">
+                                        {UNIT_TYPE_INFO[item.unitType]?.name || item.unitType}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {item.tier} • {item.extractedTonnage}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        {item.outdoorBrand} {item.outdoorModel}
+                                      </p>
+                                    </div>
+                                  </div>
                                   <div className="mt-2 pt-2 border-t">
                                     <p className="font-bold text-sm text-primary">
                                       {formatPrice((parseFloat(item.totalInvestment) || 0) * item.quantity)}
@@ -1112,7 +1189,7 @@ export default function ProposalBuilder() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive"
+                              className="h-8 w-8 text-destructive flex-shrink-0"
                               onClick={() => removeFromCart(item.id)}
                               data-testid={`button-remove-${item.id}`}
                             >
@@ -1896,7 +1973,7 @@ export default function ProposalBuilder() {
 
             <div className="mb-6">
               <h3 className="text-sm font-semibold text-muted-foreground mb-3">EQUIPMENT SUMMARY</h3>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {cart.map((item, index) => {
                   if (item.isCustomBuild) {
                     const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
@@ -1904,16 +1981,26 @@ export default function ProposalBuilder() {
                     const priceHigh = estimate.high * item.quantity;
                     return (
                       <div key={item.id} className="border rounded-lg p-4 bg-card">
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Badge className="bg-green-500 text-white text-xs">
+                            <Wrench className="h-3 w-3 mr-1" />
+                            Custom Build
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">{item.tonnage}</span>
+                          {item.quantity > 1 && <Badge variant="outline">x{item.quantity}</Badge>}
+                        </div>
+                        <div className="flex gap-4">
+                          <EquipmentImageGrid
+                            images={{
+                              outdoor: item.outdoorUnit.imageUrl,
+                              coil: item.coil.imageUrl,
+                              furnace: item.indoorUnit.imageUrl,
+                              thermostat: item.thermostat.imageUrl
+                            }}
+                            size="md"
+                            showLabels
+                          />
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Badge className="bg-green-500 text-white text-xs">
-                                <Wrench className="h-3 w-3 mr-1" />
-                                Custom Build
-                              </Badge>
-                              <span className="text-sm text-muted-foreground">{item.tonnage}</span>
-                              {item.quantity > 1 && <Badge variant="outline">x{item.quantity}</Badge>}
-                            </div>
                             <div className="text-sm space-y-1 text-muted-foreground">
                               <p>• {item.outdoorUnit.brand} {item.outdoorUnit.unitName}</p>
                               <p>• {item.coil.brand} {item.coil.unitName}</p>
@@ -1921,10 +2008,10 @@ export default function ProposalBuilder() {
                               <p>• {item.thermostat.brand} {item.thermostat.unitName}</p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <Badge variant="outline" className="mb-1 text-xs">Estimated</Badge>
-                            <p className="text-xl font-bold text-primary">{formatPriceRange(priceLow, priceHigh)}</p>
-                          </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t flex justify-between items-center">
+                          <Badge variant="outline" className="text-xs">Estimated</Badge>
+                          <p className="text-xl font-bold text-primary">{formatPriceRange(priceLow, priceHigh)}</p>
                         </div>
                       </div>
                     );
@@ -1933,27 +2020,37 @@ export default function ProposalBuilder() {
                     const monthlyPrice = (parseFloat(item.monthlyPayment) || 0) * item.quantity;
                     return (
                       <div key={item.id} className="border rounded-lg p-4 bg-card">
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Badge className={`${getPackageLevelColor(item.packageLevel)} text-white text-xs`}>
+                            {item.packageLevel}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">{item.extractedTonnage}</span>
+                          {item.quantity > 1 && <Badge variant="outline">x{item.quantity}</Badge>}
+                        </div>
+                        <div className="flex gap-4">
+                          <EquipmentImageGrid
+                            images={{
+                              outdoor: item.outdoorImageUrl,
+                              coil: item.coilImageUrl,
+                              furnace: item.furnaceImageUrl,
+                              thermostat: item.thermostatImageUrl
+                            }}
+                            size="md"
+                            showLabels
+                          />
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Badge className={`${getPackageLevelColor(item.packageLevel)} text-white text-xs`}>
-                                {item.packageLevel}
-                              </Badge>
-                              <span className="text-sm text-muted-foreground">{item.extractedTonnage}</span>
-                              {item.quantity > 1 && <Badge variant="outline">x{item.quantity}</Badge>}
-                            </div>
                             <p className="font-medium">{UNIT_TYPE_INFO[item.unitType]?.name || item.unitType}</p>
-                            <p className="text-sm text-muted-foreground">{item.tier} Tier</p>
-                            <div className="text-sm space-y-1 text-muted-foreground mt-2">
+                            <p className="text-sm text-muted-foreground mb-2">{item.tier} Tier</p>
+                            <div className="text-sm space-y-1 text-muted-foreground">
                               <p>• {item.outdoorBrand} {item.outdoorName}</p>
                               {item.indoorHeatName && <p>• {item.indoorHeatName}</p>}
                               {item.thermostatName && <p>• {item.thermostatName}</p>}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-xl font-bold text-primary">{formatPrice(itemPrice)}</p>
-                            <p className="text-sm text-muted-foreground">{formatPrice(monthlyPrice)}/mo</p>
-                          </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">{formatPrice(monthlyPrice)}/mo</span>
+                          <p className="text-xl font-bold text-primary">{formatPrice(itemPrice)}</p>
                         </div>
                       </div>
                     );
