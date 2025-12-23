@@ -2126,7 +2126,8 @@
     "price": 5906,
     "priceLow": 5906,
     "priceHigh": 5906,
-    "equipmentType": "SGA"
+    "equipmentType": "SGA",
+    "series": "XL16c Series"
   },
   {
     "unitType": "SGA",
@@ -2195,7 +2196,8 @@
     "price": 6460,
     "priceLow": 6460,
     "priceHigh": 6460,
-    "equipmentType": "SGA"
+    "equipmentType": "SGA",
+    "series": "XL16c Series"
   },
   {
     "unitType": "SGA",
@@ -2390,7 +2392,8 @@
     "price": 6306,
     "priceLow": 6306,
     "priceHigh": 6306,
-    "equipmentType": "SGA"
+    "equipmentType": "SGA",
+    "series": "XL16c Series"
   },
   {
     "unitType": "SGA",
@@ -2459,7 +2462,8 @@
     "price": 7107,
     "priceLow": 7107,
     "priceHigh": 7107,
-    "equipmentType": "SGA"
+    "equipmentType": "SGA",
+    "series": "XL16c Series"
   },
   {
     "unitType": "SGA",
@@ -2656,7 +2660,8 @@
     "price": 6804,
     "priceLow": 6804,
     "priceHigh": 6804,
-    "equipmentType": "SGA"
+    "equipmentType": "SGA",
+    "series": "XL16c Series"
   },
   {
     "unitType": "SGA",
@@ -2725,7 +2730,8 @@
     "price": 7751,
     "priceLow": 7751,
     "priceHigh": 7751,
-    "equipmentType": "SGA"
+    "equipmentType": "SGA",
+    "series": "XL16c Series"
   },
   {
     "unitType": "SGA",
@@ -2922,7 +2928,8 @@
     "price": 7319,
     "priceLow": 7319,
     "priceHigh": 7319,
-    "equipmentType": "SGA"
+    "equipmentType": "SGA",
+    "series": "XL16c Series"
   },
   {
     "unitType": "SGA",
@@ -2991,7 +2998,8 @@
     "price": 8393,
     "priceLow": 8393,
     "priceHigh": 8393,
-    "equipmentType": "SGA"
+    "equipmentType": "SGA",
+    "series": "XL16c Series"
   },
   {
     "unitType": "SGA",
@@ -10131,7 +10139,10 @@
     "price": 5490,
     "priceLow": 5490,
     "priceHigh": 5490,
-    "unitType": "SGA"
+    "unitType": "SGA",
+    "tier": "Ultimate",
+    "description": "XL16c Series Air Conditioner; 12-year registered limited warranty on compressor; 10-year on outdoor coil & all other functional parts",
+    "series": "XL16c Series"
   },
   {
     "equipmentType": "SGA",
@@ -10143,7 +10154,10 @@
     "price": 6103,
     "priceLow": 6103,
     "priceHigh": 6103,
-    "unitType": "SGA"
+    "unitType": "SGA",
+    "tier": "Ultimate",
+    "description": "XL16c Series Air Conditioner; 12-year registered limited warranty on compressor; 10-year on outdoor coil & all other functional parts",
+    "series": "XL16c Series"
   },
   {
     "equipmentType": "SGA",
@@ -10155,6 +10169,9 @@
     "price": 6558,
     "priceLow": 6558,
     "priceHigh": 6558,
-    "unitType": "SGA"
+    "unitType": "SGA",
+    "tier": "Ultimate",
+    "description": "XL16c Series Air Conditioner; 12-year registered limited warranty on compressor; 10-year on outdoor coil & all other functional parts",
+    "series": "XL16c Series"
   }
 ]
