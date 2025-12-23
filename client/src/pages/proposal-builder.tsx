@@ -529,14 +529,14 @@ export default function ProposalBuilder() {
   }, [customTonnage, customEquipmentType, outdoorBrandFilter, isPackageUnitType]);
 
   // Get unique coils/heater kits by equipment type - dedupe by model
-  // SGA uses Evaporator Coil, SHP uses Heater Kit
-  const coilOrHeaterLabel = customEquipmentType === "SHP" ? "Heater Kit" : "Evaporator Coil";
-  const coilOrHeaterType = customEquipmentType === "SHP" ? "Heater Kit" : "Evaporator Coil";
+  // SGA uses Evaporator Coil, SHP/PHP uses Heater Kit
+  const coilOrHeaterLabel = (customEquipmentType === "SHP" || customEquipmentType === "PHP") ? "Heater Kit" : "Evaporator Coil";
+  const coilOrHeaterType = (customEquipmentType === "SHP" || customEquipmentType === "PHP") ? "Heater Kit" : "Evaporator Coil";
   
   const coilOptions = useMemo(() => {
     if (!customTonnage || !customEquipmentType) return [];
     const seen = new Set<string>();
-    const targetType = customEquipmentType === "SHP" ? "Heater Kit" : "Evaporator Coil";
+    const targetType = (customEquipmentType === "SHP" || customEquipmentType === "PHP") ? "Heater Kit" : "Evaporator Coil";
     // Extract numeric tonnage from "1.5 Ton" format
     const numericTonnage = customTonnage.replace(" Ton", "");
     return components.filter(comp => {
@@ -585,10 +585,13 @@ export default function ProposalBuilder() {
     });
   }, [customTonnage, customEquipmentType, thermostatBrandFilter, isPackageUnitType]);
 
-  // For PHP/GP: only need Package Unit + Thermostat (2 components)
+  // For GP: only need Package Unit + Thermostat (2 components)
+  // For PHP: need Package Unit + Heater Kit + Thermostat (3 components)
   // For SGA/SHP: need all 4 components
-  const isCustomBuildComplete = isPackageUnitType 
+  const isCustomBuildComplete = customEquipmentType === "GP"
     ? (selectedOutdoorUnit && selectedThermostat && customTonnage)
+    : customEquipmentType === "PHP"
+    ? (selectedOutdoorUnit && selectedCoil && selectedThermostat && customTonnage)
     : (selectedOutdoorUnit && selectedCoil && selectedIndoorUnit && selectedThermostat && customTonnage);
 
   const cartItemCount = useMemo(() => {
@@ -1546,8 +1549,10 @@ export default function ProposalBuilder() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {isPackageUnitType 
+                        {customEquipmentType === "GP"
                           ? `${[selectedOutdoorUnit, selectedThermostat].filter(Boolean).length} / 2 components`
+                          : customEquipmentType === "PHP"
+                          ? `${[selectedOutdoorUnit, selectedCoil, selectedThermostat].filter(Boolean).length} / 3 components`
                           : `${[selectedOutdoorUnit, selectedCoil, selectedIndoorUnit, selectedThermostat].filter(Boolean).length} / 4 components`
                         }
                       </p>
@@ -1567,8 +1572,10 @@ export default function ProposalBuilder() {
                 {!isCustomBuildComplete && (
                   <div className="mb-4 p-3 bg-amber-100 dark:bg-amber-900 rounded-lg border border-amber-300 dark:border-amber-700">
                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                      {isPackageUnitType 
+                      {customEquipmentType === "GP"
                         ? "Please select all 2 required components to add this custom build to your proposal."
+                        : customEquipmentType === "PHP"
+                        ? "Please select all 3 required components to add this custom build to your proposal."
                         : "Please select all 4 required components to add this custom build to your proposal."
                       }
                     </p>
@@ -1586,6 +1593,28 @@ export default function ProposalBuilder() {
                     "outdoor"
                   )}
 
+                  {/* PHP shows heater kit only (no indoor unit) */}
+                  {customEquipmentType === "PHP" && (
+                    <>
+                      <div className="my-6 flex items-center gap-3">
+                        <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
+                        <span className="text-[#d3b07d] text-xs font-medium uppercase tracking-wider">Next Component</span>
+                        <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
+                      </div>
+
+                      {renderComponentSection(
+                        "Heater Kit",
+                        coilOptions,
+                        selectedCoil,
+                        setSelectedCoil,
+                        coilBrandFilter,
+                        setCoilBrandFilter,
+                        "coil"
+                      )}
+                    </>
+                  )}
+
+                  {/* SGA/SHP show coil/heater kit AND indoor unit */}
                   {!isPackageUnitType && (
                     <>
                       <div className="my-6 flex items-center gap-3">
