@@ -1854,22 +1854,30 @@ export default function ProposalBuilder() {
 
       <Dialog open={quoteDialogOpen} onOpenChange={setQuoteDialogOpen}>
         <DialogContent className="sm:max-w-3xl h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col">
-          <div className="bg-gradient-to-r from-red-700 to-red-800 text-white p-4 sm:p-6 shrink-0 flex-none">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+          <div className="relative bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 text-white p-6 sm:p-8 shrink-0 flex-none overflow-hidden">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAyNHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+            <div className="relative flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
+              <div className="bg-white rounded-2xl p-3 shadow-xl shadow-black/20">
                 <img
                   src={redlogo}
                   alt="GHVAC"
-                  className="h-10 sm:h-12 w-auto bg-white rounded-md p-1"
+                  className="h-14 sm:h-16 w-auto"
                 />
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold">GHVAC Tools</h1>
-                  <p className="text-sm text-red-100">Equipment Proposal</p>
+              </div>
+              <div className="text-center sm:text-left flex-1">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Your Equipment Proposal</h1>
+                <p className="text-red-200 mt-1 text-sm sm:text-base">Professional HVAC solutions tailored for your home</p>
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-3">
+                  <Badge className="bg-white/10 text-white border-white/20 backdrop-blur-sm">
+                    <FileText className="h-3 w-3 mr-1" />
+                    {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </Badge>
+                  <Badge className="bg-green-500/20 text-green-200 border-green-400/30 backdrop-blur-sm">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Valid 30 Days
+                  </Badge>
                 </div>
               </div>
-              <Badge className="bg-white/20 text-white border-white/30">
-                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </Badge>
             </div>
           </div>
           
