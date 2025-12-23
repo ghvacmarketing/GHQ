@@ -730,11 +730,11 @@ export default function ProposalBuilder() {
   }, [customTonnage, customEquipmentType, thermostatBrandFilter, isPackageUnitType, allowedSgaModels, allowedShpModels]);
 
   // For GP: only need Package Unit + Thermostat (2 components)
-  // For PHP: need Package Unit + Heater Kit + Thermostat (3 components)
-  // For SGA/SHP: need all 4 components
+  // For PHP/SHP: need Package Unit/Outdoor + Coil/Heater Kit + Thermostat (3 components)
+  // For SGA: need all 4 components
   const isCustomBuildComplete = customEquipmentType === "GP"
     ? (selectedOutdoorUnit && selectedThermostat && customTonnage)
-    : customEquipmentType === "PHP"
+    : (customEquipmentType === "PHP" || customEquipmentType === "SHP")
     ? (selectedOutdoorUnit && selectedCoil && selectedThermostat && customTonnage)
     : (selectedOutdoorUnit && selectedCoil && selectedIndoorUnit && selectedThermostat && customTonnage);
 
@@ -2071,7 +2071,7 @@ export default function ProposalBuilder() {
                       <p className="text-xs text-muted-foreground">
                         {customEquipmentType === "GP"
                           ? `${[selectedOutdoorUnit, selectedThermostat].filter(Boolean).length} / 2 components`
-                          : customEquipmentType === "PHP"
+                          : (customEquipmentType === "PHP" || customEquipmentType === "SHP")
                           ? `${[selectedOutdoorUnit, selectedCoil, selectedThermostat].filter(Boolean).length} / 3 components`
                           : `${[selectedOutdoorUnit, selectedCoil, selectedIndoorUnit, selectedThermostat].filter(Boolean).length} / 4 components`
                         }
@@ -2094,7 +2094,7 @@ export default function ProposalBuilder() {
                     <p className="text-sm text-amber-800 dark:text-amber-200">
                       {customEquipmentType === "GP"
                         ? "Please select all 2 required components to add this custom build to your proposal."
-                        : customEquipmentType === "PHP"
+                        : (customEquipmentType === "PHP" || customEquipmentType === "SHP")
                         ? "Please select all 3 required components to add this custom build to your proposal."
                         : "Please select all 4 required components to add this custom build to your proposal."
                       }
@@ -2134,7 +2134,7 @@ export default function ProposalBuilder() {
                     </>
                   )}
 
-                  {/* SGA/SHP show coil/heater kit AND indoor unit */}
+                  {/* SGA/SHP show coil/evaporator coil */}
                   {!isPackageUnitType && (
                     <>
                       <div className="my-6 flex items-center gap-3">
@@ -2153,20 +2153,25 @@ export default function ProposalBuilder() {
                         "coil"
                       )}
 
-                      <div className="my-6 flex items-center gap-3">
-                        <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
-                        <span className="text-[#d3b07d] text-xs font-medium uppercase tracking-wider">Next Component</span>
-                        <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
-                      </div>
+                      {/* Only SGA shows indoor unit */}
+                      {customEquipmentType === "SGA" && (
+                        <>
+                          <div className="my-6 flex items-center gap-3">
+                            <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
+                            <span className="text-[#d3b07d] text-xs font-medium uppercase tracking-wider">Next Component</span>
+                            <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#d3b07d] to-transparent rounded-full" />
+                          </div>
 
-                      {renderComponentSection(
-                        "Indoor Unit",
-                        indoorUnitOptions,
-                        selectedIndoorUnit,
-                        setSelectedIndoorUnit,
-                        indoorBrandFilter,
-                        setIndoorBrandFilter,
-                        "indoor"
+                          {renderComponentSection(
+                            "Indoor Unit",
+                            indoorUnitOptions,
+                            selectedIndoorUnit,
+                            setSelectedIndoorUnit,
+                            indoorBrandFilter,
+                            setIndoorBrandFilter,
+                            "indoor"
+                          )}
+                        </>
                       )}
                     </>
                   )}
