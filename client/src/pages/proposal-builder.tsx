@@ -324,6 +324,11 @@ function isCustomBuild(item: CartItem): item is CustomBuildCart {
   return 'isCustomBuild' in item && item.isCustomBuild === true;
 }
 
+type HvacPackageCartItem = PricebookPackage & { id: string; extractedTonnage: string; quantity: number; isCustomBuild?: false; eliteData?: ElitePackageData };
+function isHvacPackage(item: CartItem): item is HvacPackageCartItem {
+  return !isCrawlspaceItem(item) && !isCustomBuild(item);
+}
+
 const formatPrice = (price: number) => '$' + price.toLocaleString();
 const formatPriceRange = (low: number, high: number) => {
   if (low === high) return '$' + low.toLocaleString();
@@ -536,10 +541,11 @@ export default function ProposalBuilder() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchAllFields, setSearchAllFields] = useState(false);
 
-  // Elite Package state
-  const [eliteEnabled, setEliteEnabled] = useState(false);
-  const [selectedAirflowOption, setSelectedAirflowOption] = useState<string | null>(null);
+  // Elite Package state - per-package (key = package index)
+  const [eliteEnabledByIndex, setEliteEnabledByIndex] = useState<Record<number, boolean>>({});
+  const [selectedAirflowByIndex, setSelectedAirflowByIndex] = useState<Record<number, string>>({});
   const [selectedCrawlspaceTier, setSelectedCrawlspaceTier] = useState<CrawlspaceTier | null>(null);
+  const [crawlspaceEliteEnabled, setCrawlspaceEliteEnabled] = useState(false);
 
   // Debounce customer search
   useEffect(() => {
@@ -1143,7 +1149,7 @@ export default function ProposalBuilder() {
     
     let eliteData: ElitePackageData | undefined;
     if (withElite) {
-      eliteData = calculateCrawlspaceElitePricing(tier);
+      eliteData = calculateCrawlspaceElitePricing(tier.price);
     }
 
     const crawlspaceItem: CrawlspaceCartItem = {
@@ -1174,18 +1180,19 @@ export default function ProposalBuilder() {
     });
 
     setSelectedCrawlspaceTier(null);
-    setEliteEnabled(false);
+    setCrawlspaceEliteEnabled(false);
   };
 
-  const addToCartWithElite = (pkg: PricebookPackage, withElite: boolean = false) => {
+  const addToCartWithElite = (pkg: PricebookPackage, index: number) => {
     const extractedTonnage = selectedTonnage || getPackageTonnageDisplay(pkg);
-    const id = withElite 
+    const airflowSelection = selectedAirflowByIndex[index];
+    const id = airflowSelection 
       ? `elite-${pkg.unitType}-${pkg.tier}-${extractedTonnage}-${pkg.packageLevel}-${pkg.outdoorModel}`
       : generatePackageId(pkg, extractedTonnage);
     
     let eliteData: ElitePackageData | undefined;
-    if (withElite && selectedAirflowOption) {
-      const airflowOption = HVAC_ELITE_AIRFLOW_OPTIONS.find(opt => opt.name === selectedAirflowOption)!;
+    if (airflowSelection) {
+      const airflowOption = HVAC_ELITE_AIRFLOW_OPTIONS.find(opt => opt.name === airflowSelection)!;
       const result = calculateHvacElitePricing(parseFloat(pkg.totalInvestment) || 0, pkg.tonnage, airflowOption.id);
       eliteData = result || undefined;
     }
@@ -1203,14 +1210,14 @@ export default function ProposalBuilder() {
     });
 
     toast({
-      title: withElite ? "Elite Package Added!" : "Added to Proposal",
-      description: withElite 
+      title: eliteData ? "Elite Package Added!" : "Added to Proposal",
+      description: eliteData 
         ? `${pkg.outdoorBrand} ${pkg.packageLevel} with Elite upgrades added.`
         : `${pkg.outdoorBrand} ${pkg.packageLevel} package added.`,
     });
 
-    setEliteEnabled(false);
-    setSelectedAirflowOption(null);
+    setEliteEnabledByIndex(prev => ({ ...prev, [index]: false }));
+    setSelectedAirflowByIndex(prev => ({ ...prev, [index]: '' }));
   };
 
   const removeFromCart = (packageId: string) => {
@@ -2009,7 +2016,7 @@ export default function ProposalBuilder() {
                     )}
                     {packageOptions.map((pkg, index) => {
                       const isInCart = cart.some(item => 
-                        !item.isCustomBuild &&
+                        isHvacPackage(item) &&
                         item.unitType === pkg.unitType && 
                         item.tier === pkg.tier && 
                         item.packageLevel === pkg.packageLevel
@@ -2110,7 +2117,7 @@ export default function ProposalBuilder() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {packageOptions.map((pkg, index) => {
                       const isInCart = cart.some(item => 
-                        !item.isCustomBuild &&
+                        isHvacPackage(item) &&
                         item.unitType === pkg.unitType && 
                         item.tier === pkg.tier && 
                         item.packageLevel === pkg.packageLevel &&
@@ -2239,18 +2246,18 @@ export default function ProposalBuilder() {
                                 </Label>
                                 <Switch
                                   id={`elite-${pkg.packageLevel}-${index}`}
-                                  checked={eliteEnabled}
+                                  checked={eliteEnabledByIndex[index] || false}
                                   onCheckedChange={(checked) => {
-                                    setEliteEnabled(checked);
-                                    if (checked && !selectedAirflowOption) {
-                                      setSelectedAirflowOption(HVAC_ELITE_AIRFLOW_OPTIONS[0].name);
+                                    setEliteEnabledByIndex(prev => ({ ...prev, [index]: checked }));
+                                    if (checked && !selectedAirflowByIndex[index]) {
+                                      setSelectedAirflowByIndex(prev => ({ ...prev, [index]: HVAC_ELITE_AIRFLOW_OPTIONS[0].name }));
                                     }
                                   }}
                                   data-testid={`switch-elite-${pkg.packageLevel.toLowerCase()}`}
                                 />
                               </div>
                               
-                              {eliteEnabled && (
+                              {eliteEnabledByIndex[index] && (
                                 <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-700">
                                   <p className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-2">Core Bundles Included:</p>
                                   <div className="space-y-1 mb-3">
@@ -2264,8 +2271,8 @@ export default function ProposalBuilder() {
                                   
                                   <p className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-2">Select Airflow Option:</p>
                                   <RadioGroup 
-                                    value={selectedAirflowOption || ''} 
-                                    onValueChange={setSelectedAirflowOption}
+                                    value={selectedAirflowByIndex[index] || ''} 
+                                    onValueChange={(value) => setSelectedAirflowByIndex(prev => ({ ...prev, [index]: value }))}
                                     className="space-y-2"
                                   >
                                     {HVAC_ELITE_AIRFLOW_OPTIONS.map(option => (
@@ -2281,8 +2288,8 @@ export default function ProposalBuilder() {
                                     ))}
                                   </RadioGroup>
                                   
-                                  {selectedAirflowOption && (() => {
-                                    const airflowOption = HVAC_ELITE_AIRFLOW_OPTIONS.find(opt => opt.name === selectedAirflowOption)!;
+                                  {selectedAirflowByIndex[index] && (() => {
+                                    const airflowOption = HVAC_ELITE_AIRFLOW_OPTIONS.find(opt => opt.name === selectedAirflowByIndex[index])!;
                                     const pricing = calculateHvacElitePricing(parseFloat(pkg.totalInvestment) || 0, pkg.tonnage, airflowOption.id);
                                     if (!pricing) return null;
                                     const bundlesTotal = Object.values(pricing.coreBundlePrices).reduce((a, b) => a + b, 0) + pricing.airflowPrice;
@@ -2321,12 +2328,12 @@ export default function ProposalBuilder() {
                             </div>
                             
                             <Button
-                              className={`w-full min-h-[44px] ${eliteEnabled ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
-                              onClick={() => eliteEnabled ? addToCartWithElite(pkg, true) : addToCart(pkg)}
+                              className={`w-full min-h-[44px] ${eliteEnabledByIndex[index] ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
+                              onClick={() => eliteEnabledByIndex[index] ? addToCartWithElite(pkg, index) : addToCart(pkg)}
                               data-testid={`button-add-${pkg.packageLevel.toLowerCase()}`}
                             >
                               <ShoppingCart className="h-4 w-4 mr-2" />
-                              {eliteEnabled ? "Add Elite Package" : "Add to Proposal"}
+                              {eliteEnabledByIndex[index] ? "Add Elite Package" : "Add to Proposal"}
                             </Button>
                           </CardContent>
                         </Card>
@@ -2481,7 +2488,7 @@ export default function ProposalBuilder() {
                       )}
                       {customBuildPackageOptions.map((pkg, index) => {
                         const isInCart = cart.some(item => 
-                          !item.isCustomBuild &&
+                          isHvacPackage(item) &&
                           item.unitType === pkg.unitType && 
                           item.tier === pkg.tier && 
                           item.packageLevel === pkg.packageLevel
@@ -2783,7 +2790,7 @@ export default function ProposalBuilder() {
                         <div className="flex items-center justify-between">
                           <div>
                             <Badge className="bg-teal-500 text-white mb-2">{tier.name}</Badge>
-                            <CardTitle className="text-lg">{tier.mil} Mil Vapor Barrier</CardTitle>
+                            <CardTitle className="text-lg">{tier.milThickness} Mil Vapor Barrier</CardTitle>
                           </div>
                         </div>
                       </CardHeader>
@@ -2814,15 +2821,15 @@ export default function ProposalBuilder() {
                       <Droplets className="h-5 w-5 text-teal-500" />
                       {selectedCrawlspaceTier.name} Package Selected
                     </h3>
-                    <p className="text-sm text-muted-foreground">{selectedCrawlspaceTier.mil} Mil - {formatPrice(selectedCrawlspaceTier.price)}</p>
+                    <p className="text-sm text-muted-foreground">{selectedCrawlspaceTier.milThickness} Mil - {formatPrice(selectedCrawlspaceTier.price)}</p>
                   </div>
                   
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                     <div className="flex items-center gap-3 p-3 rounded-lg border bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
                       <Switch
                         id="elite-crawlspace"
-                        checked={eliteEnabled}
-                        onCheckedChange={setEliteEnabled}
+                        checked={crawlspaceEliteEnabled}
+                        onCheckedChange={setCrawlspaceEliteEnabled}
                         data-testid="switch-elite-crawlspace"
                       />
                       <Label htmlFor="elite-crawlspace" className="flex items-center gap-2 cursor-pointer">
@@ -2833,16 +2840,16 @@ export default function ProposalBuilder() {
                     
                     <Button
                       className="min-h-[44px] bg-teal-600 hover:bg-teal-700"
-                      onClick={() => addCrawlspaceToCart(selectedCrawlspaceTier, eliteEnabled)}
+                      onClick={() => addCrawlspaceToCart(selectedCrawlspaceTier, crawlspaceEliteEnabled)}
                       data-testid="button-add-crawlspace"
                     >
                       <ShoppingCart className="h-4 w-4 mr-2" />
-                      {eliteEnabled ? "Add Elite Package" : "Add to Proposal"}
+                      {crawlspaceEliteEnabled ? "Add Elite Package" : "Add to Proposal"}
                     </Button>
                   </div>
                 </div>
 
-                {eliteEnabled && (
+                {crawlspaceEliteEnabled && (
                   <div className="mt-4 p-4 rounded-lg bg-gradient-to-r from-amber-100 to-amber-50 dark:from-amber-900/50 dark:to-amber-950/50 border border-amber-200 dark:border-amber-700">
                     <div className="flex items-center gap-2 mb-3">
                       <Crown className="h-5 w-5 text-amber-600" />
@@ -2852,7 +2859,7 @@ export default function ProposalBuilder() {
                       {CRAWLSPACE_ELITE_BUNDLES.map(bundle => (
                         <div key={bundle.name} className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700">
                           <p className="font-medium text-sm">{bundle.name}</p>
-                          <p className="text-amber-600 dark:text-amber-400 font-semibold">{formatPrice(bundle.price)}</p>
+                          <p className="text-amber-600 dark:text-amber-400 font-semibold">{formatPrice(bundle.fixedPrice || 0)}</p>
                           <ul className="mt-2 text-xs text-muted-foreground space-y-1">
                             {bundle.benefits.slice(0, 2).map((benefit, i) => (
                               <li key={i} className="flex items-start gap-1">
@@ -2866,7 +2873,8 @@ export default function ProposalBuilder() {
                     </div>
                     
                     {(() => {
-                      const elitePricing = calculateCrawlspaceElitePricing(selectedCrawlspaceTier);
+                      const elitePricing = calculateCrawlspaceElitePricing(selectedCrawlspaceTier.price);
+                      const bundlesTotal = Object.values(elitePricing.coreBundlePrices).reduce((a, b) => a + b, 0);
                       return (
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-amber-200 dark:border-amber-700">
                           <div className="space-y-2 text-sm">
@@ -2876,15 +2884,15 @@ export default function ProposalBuilder() {
                             </div>
                             <div className="flex justify-between">
                               <span>Elite Bundles:</span>
-                              <span>{formatPrice(elitePricing.bundlesTotal)}</span>
+                              <span>{formatPrice(bundlesTotal)}</span>
                             </div>
                             <div className="flex justify-between border-t pt-2">
                               <span>Subtotal:</span>
-                              <span>{formatPrice(elitePricing.subtotal)}</span>
+                              <span>{formatPrice(elitePricing.originalTotal)}</span>
                             </div>
                             <div className="flex justify-between text-green-600 dark:text-green-400">
                               <span>20% Elite Discount:</span>
-                              <span>-{formatPrice(elitePricing.discount)}</span>
+                              <span>-{formatPrice(elitePricing.discountAmount)}</span>
                             </div>
                             <div className="flex justify-between border-t pt-2 text-lg font-bold">
                               <span>Total:</span>
@@ -2892,7 +2900,7 @@ export default function ProposalBuilder() {
                             </div>
                           </div>
                           <Badge className="mt-3 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-300">
-                            You Save {formatPrice(elitePricing.discount)} (20%)
+                            You Save {formatPrice(elitePricing.discountAmount)} (20%)
                           </Badge>
                         </div>
                       );
