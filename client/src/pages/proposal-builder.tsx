@@ -1483,6 +1483,9 @@ export default function ProposalBuilder() {
                 {/* Mini-Split compact layout */}
                 {selectedUnitType === "Mini-Split" ? (
                   <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800 mb-4">
+                      Each package includes both the outdoor condenser and indoor wall-mounted unit for a complete ductless system.
+                    </p>
                     {packageOptions.map((pkg, index) => {
                       const isInCart = cart.some(item => 
                         !item.isCustomBuild &&
@@ -1497,70 +1500,76 @@ export default function ProposalBuilder() {
                           className={`relative overflow-hidden ${isInCart ? 'border-primary ring-1 ring-primary bg-primary/5' : ''}`}
                           data-testid={`package-${pkg.packageLevel.toLowerCase()}`}
                         >
-                          <div className="flex items-center p-4 gap-4">
-                            {/* Images side by side */}
-                            <div className="flex gap-2 flex-shrink-0">
-                              {pkg.outdoorImageUrl && (
-                                <div className="text-center">
-                                  <img 
-                                    src={`/assets/${pkg.outdoorImageUrl}`}
-                                    alt="Outdoor"
-                                    className="w-14 h-14 object-contain rounded bg-white border"
-                                    loading="lazy"
-                                  />
-                                  <p className="text-[10px] text-muted-foreground mt-1">Outdoor</p>
-                                </div>
-                              )}
-                              {pkg.furnaceImageUrl && (
-                                <div className="text-center">
-                                  <img 
-                                    src={`/assets/${pkg.furnaceImageUrl}`}
-                                    alt="Indoor"
-                                    className="w-14 h-14 object-contain rounded bg-white border"
-                                    loading="lazy"
-                                  />
-                                  <p className="text-[10px] text-muted-foreground mt-1">Indoor</p>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Main info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Badge className="bg-blue-600 text-white font-bold">
-                                  {pkg.packageLevel}
-                                </Badge>
-                                <span className="text-sm text-muted-foreground">
-                                  {btuValue.toLocaleString()} BTU
-                                </span>
-                                {isInCart && (
-                                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary">
-                                    <Check className="h-3 w-3 mr-1" />
-                                    Added
-                                  </Badge>
+                          <div className="p-4">
+                            <div className="flex items-start gap-4">
+                              {/* Images side by side */}
+                              <div className="flex gap-3 flex-shrink-0">
+                                {pkg.outdoorImageUrl && (
+                                  <div className="text-center">
+                                    <img 
+                                      src={`/assets/${pkg.outdoorImageUrl}`}
+                                      alt="Outdoor Condenser"
+                                      className="w-16 h-16 object-contain rounded-lg bg-white border shadow-sm"
+                                      loading="lazy"
+                                    />
+                                    <p className="text-[10px] text-muted-foreground mt-1 font-medium">Outdoor</p>
+                                  </div>
+                                )}
+                                {pkg.furnaceImageUrl && (
+                                  <div className="text-center">
+                                    <img 
+                                      src={`/assets/${pkg.furnaceImageUrl}`}
+                                      alt="Indoor Wall Unit"
+                                      className="w-16 h-16 object-contain rounded-lg bg-white border shadow-sm"
+                                      loading="lazy"
+                                    />
+                                    <p className="text-[10px] text-muted-foreground mt-1 font-medium">Indoor</p>
+                                  </div>
                                 )}
                               </div>
-                              <p className="text-sm text-muted-foreground truncate">
-                                {pkg.outdoorBrand} Ductless System
-                              </p>
-                            </div>
-                            
-                            {/* Price and action */}
-                            <div className="text-right flex-shrink-0">
-                              <p className="text-lg font-bold text-primary">
-                                {formatPrice(parseFloat(pkg.totalInvestment) || 0)}
-                              </p>
-                              <p className="text-xs text-muted-foreground mb-2">
-                                {formatPrice(parseFloat(pkg.monthlyPayment) || 0)}/mo
-                              </p>
-                              <Button
-                                size="sm"
-                                className="min-h-[36px]"
-                                onClick={() => addToCart(pkg)}
-                                data-testid={`button-add-${pkg.packageLevel.toLowerCase()}`}
-                              >
-                                <ShoppingCart className="h-4 w-4" />
-                              </Button>
+                              
+                              {/* Main info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <Badge className="bg-blue-600 text-white font-bold text-sm px-3">
+                                    {pkg.packageLevel}
+                                  </Badge>
+                                  <span className="text-sm font-medium">
+                                    {btuValue.toLocaleString()} BTU
+                                  </span>
+                                  {isInCart && (
+                                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary">
+                                      <Check className="h-3 w-3 mr-1" />
+                                      Added
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  {pkg.outdoorBrand} Complete System
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Includes outdoor condenser + indoor wall unit
+                                </p>
+                              </div>
+                              
+                              {/* Price and action */}
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-xl font-bold text-primary">
+                                  {formatPrice(parseFloat(pkg.totalInvestment) || 0)}
+                                </p>
+                                <p className="text-xs text-muted-foreground mb-2">
+                                  {formatPrice(parseFloat(pkg.monthlyPayment) || 0)}/mo
+                                </p>
+                                <Button
+                                  size="sm"
+                                  className="min-h-[40px] px-4"
+                                  onClick={() => addToCart(pkg)}
+                                  data-testid={`button-add-${pkg.packageLevel.toLowerCase()}`}
+                                >
+                                  <ShoppingCart className="h-4 w-4 mr-2" />
+                                  Add
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         </Card>
