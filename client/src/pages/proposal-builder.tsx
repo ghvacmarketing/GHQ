@@ -253,6 +253,8 @@ function extractTonnageFromModel(model: string): string | null {
 
 function getPackageTonnageDisplay(pkg: PricebookPackage): string {
   if (pkg.tonnage) {
+    // Handle special "All" value for packages that skip tonnage selection
+    if (pkg.tonnage === "All") return "All";
     const tonNum = parseFloat(pkg.tonnage);
     if (!isNaN(tonNum)) {
       return `${tonNum} Ton`;
