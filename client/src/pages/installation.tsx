@@ -269,7 +269,7 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
             {lead.installSubcontractor && (
               <div className="flex items-center gap-1 text-xs text-purple-600 font-medium mt-1">
                 <User className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">Sub: {lead.installSubcontractor}</span>
+                <span className="truncate">Tech: {lead.installSubcontractor}</span>
               </div>
             )}
             <div className="flex flex-wrap gap-1 mt-2">
@@ -1444,13 +1444,13 @@ export default function Installation() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="assignedEmployee">Assigned Employee</Label>
+                <Label htmlFor="assignedEmployee">Project Manager</Label>
                 <Select
                   value={editForm.assignedEmployeeId}
                   onValueChange={(value) => setEditForm({ ...editForm, assignedEmployeeId: value })}
                 >
                   <SelectTrigger id="assignedEmployee" className="min-h-[44px]" data-testid="select-assigned-employee">
-                    <SelectValue placeholder="Select employee" />
+                    <SelectValue placeholder="Select project manager" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unassigned">Unassigned</SelectItem>
@@ -1463,13 +1463,13 @@ export default function Installation() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="subcontractor">Subcontractor</Label>
+                <Label htmlFor="subcontractor">Technician</Label>
                 <Select
                   value={editForm.installSubcontractor || "none"}
                   onValueChange={(value) => setEditForm({ ...editForm, installSubcontractor: value === "none" ? "" : value })}
                 >
                   <SelectTrigger id="subcontractor" className="min-h-[44px]" data-testid="select-subcontractor">
-                    <SelectValue placeholder="Select subcontractor" />
+                    <SelectValue placeholder="Select technician" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
