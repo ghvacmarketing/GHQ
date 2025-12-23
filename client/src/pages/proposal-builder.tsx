@@ -1186,7 +1186,8 @@ export default function ProposalBuilder() {
     let eliteData: ElitePackageData | undefined;
     if (withElite && selectedAirflowOption) {
       const airflowOption = HVAC_ELITE_AIRFLOW_OPTIONS.find(opt => opt.name === selectedAirflowOption)!;
-      eliteData = calculateHvacElitePricing(parseFloat(pkg.totalInvestment) || 0, airflowOption);
+      const result = calculateHvacElitePricing(parseFloat(pkg.totalInvestment) || 0, pkg.tonnage, airflowOption.id);
+      eliteData = result || undefined;
     }
 
     setCart(prev => {
@@ -2256,7 +2257,7 @@ export default function ProposalBuilder() {
                                     {HVAC_ELITE_CORE_BUNDLES.map(bundle => (
                                       <div key={bundle.name} className="flex justify-between text-xs">
                                         <span className="text-muted-foreground">{bundle.name}</span>
-                                        <span className="font-medium">{formatPrice(bundle.price)}</span>
+                                        <span className="font-medium">{formatPrice(getEliteBundlePrice(bundle, pkg.tonnage))}</span>
                                       </div>
                                     ))}
                                   </div>
@@ -2275,14 +2276,16 @@ export default function ProposalBuilder() {
                                             {option.name}
                                           </Label>
                                         </div>
-                                        <span className="text-xs font-medium">{formatPrice(option.price)}</span>
+                                        <span className="text-xs font-medium">{formatPrice(getEliteAirflowPrice(option, pkg.tonnage))}</span>
                                       </div>
                                     ))}
                                   </RadioGroup>
                                   
                                   {selectedAirflowOption && (() => {
                                     const airflowOption = HVAC_ELITE_AIRFLOW_OPTIONS.find(opt => opt.name === selectedAirflowOption)!;
-                                    const pricing = calculateHvacElitePricing(parseFloat(pkg.totalInvestment) || 0, airflowOption);
+                                    const pricing = calculateHvacElitePricing(parseFloat(pkg.totalInvestment) || 0, pkg.tonnage, airflowOption.id);
+                                    if (!pricing) return null;
+                                    const bundlesTotal = Object.values(pricing.coreBundlePrices).reduce((a, b) => a + b, 0) + pricing.airflowPrice;
                                     return (
                                       <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-700">
                                         <div className="space-y-1 text-xs">
@@ -2292,15 +2295,15 @@ export default function ProposalBuilder() {
                                           </div>
                                           <div className="flex justify-between">
                                             <span>Elite Bundles:</span>
-                                            <span>{formatPrice(pricing.bundlesTotal)}</span>
+                                            <span>{formatPrice(bundlesTotal)}</span>
                                           </div>
                                           <div className="flex justify-between border-t pt-1">
                                             <span>Subtotal:</span>
-                                            <span>{formatPrice(pricing.subtotal)}</span>
+                                            <span>{formatPrice(pricing.originalTotal)}</span>
                                           </div>
                                           <div className="flex justify-between text-green-600 dark:text-green-400">
                                             <span>20% Elite Discount:</span>
-                                            <span>-{formatPrice(pricing.discount)}</span>
+                                            <span>-{formatPrice(pricing.discountAmount)}</span>
                                           </div>
                                           <div className="flex justify-between border-t pt-1 font-bold text-sm">
                                             <span>Total:</span>
@@ -2308,7 +2311,7 @@ export default function ProposalBuilder() {
                                           </div>
                                         </div>
                                         <Badge className="mt-2 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
-                                          Save {formatPrice(pricing.discount)} (20%)
+                                          Save {formatPrice(pricing.discountAmount)} (20%)
                                         </Badge>
                                       </div>
                                     );
