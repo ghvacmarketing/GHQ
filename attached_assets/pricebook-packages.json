@@ -3900,7 +3900,7 @@
     "seer": null,
     "afue": null,
     "hspf": null,
-    "outdoorModel": null,
+    "outdoorModel": "1.5 Ton Capacity",
     "coilModel": null,
     "furnaceModel": null,
     "thermostat": null,
@@ -3924,7 +3924,13 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "monthlyPayment": "112",
+    "totalInvestment": "7527",
+    "outdoorBrand": "GHVAC",
+    "outdoorName": "Duct System Replacement",
+    "indoorHeatName": "Remove & dispose of existing supply and return duct system; daily job-site clean-up; disconnect & reconnect HVAC equipment as needed; test & balance system upon completion; up to 2 follow-up visits included to balance comfort issues; 10-year workmanship guarantee on supply & return ducting system.",
+    "indoorHeatModel": "Complete System"
   },
   {
     "id": null,
@@ -3936,7 +3942,7 @@
     "seer": null,
     "afue": null,
     "hspf": null,
-    "outdoorModel": null,
+    "outdoorModel": "2 Ton Capacity",
     "coilModel": null,
     "furnaceModel": null,
     "thermostat": null,
@@ -3960,7 +3966,13 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "monthlyPayment": "140",
+    "totalInvestment": "9353",
+    "outdoorBrand": "GHVAC",
+    "outdoorName": "Duct System Replacement",
+    "indoorHeatName": "Remove & dispose of existing supply and return duct system; daily job-site clean-up; disconnect & reconnect HVAC equipment as needed; test & balance system upon completion; up to 2 follow-up visits included to balance comfort issues; 10-year workmanship guarantee on supply & return ducting system.",
+    "indoorHeatModel": "Complete System"
   },
   {
     "id": null,
@@ -3972,7 +3984,7 @@
     "seer": null,
     "afue": null,
     "hspf": null,
-    "outdoorModel": null,
+    "outdoorModel": "2.5 Ton Capacity",
     "coilModel": null,
     "furnaceModel": null,
     "thermostat": null,
@@ -3996,7 +4008,13 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "monthlyPayment": "167",
+    "totalInvestment": "11179",
+    "outdoorBrand": "GHVAC",
+    "outdoorName": "Duct System Replacement",
+    "indoorHeatName": "Remove & dispose of existing supply and return duct system; daily job-site clean-up; disconnect & reconnect HVAC equipment as needed; test & balance system upon completion; up to 2 follow-up visits included to balance comfort issues; 10-year workmanship guarantee on supply & return ducting system.",
+    "indoorHeatModel": "Complete System"
   },
   {
     "id": null,
@@ -4008,7 +4026,7 @@
     "seer": null,
     "afue": null,
     "hspf": null,
-    "outdoorModel": null,
+    "outdoorModel": "3 Ton Capacity",
     "coilModel": null,
     "furnaceModel": null,
     "thermostat": null,
@@ -4032,7 +4050,13 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "monthlyPayment": "194",
+    "totalInvestment": "13005",
+    "outdoorBrand": "GHVAC",
+    "outdoorName": "Duct System Replacement",
+    "indoorHeatName": "Remove & dispose of existing supply and return duct system; daily job-site clean-up; disconnect & reconnect HVAC equipment as needed; test & balance system upon completion; up to 2 follow-up visits included to balance comfort issues; 10-year workmanship guarantee on supply & return ducting system.",
+    "indoorHeatModel": "Complete System"
   },
   {
     "id": null,
@@ -4044,7 +4068,7 @@
     "seer": null,
     "afue": null,
     "hspf": null,
-    "outdoorModel": null,
+    "outdoorModel": "3.5 Ton Capacity",
     "coilModel": null,
     "furnaceModel": null,
     "thermostat": null,
@@ -4068,7 +4092,13 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "monthlyPayment": "221",
+    "totalInvestment": "14831",
+    "outdoorBrand": "GHVAC",
+    "outdoorName": "Duct System Replacement",
+    "indoorHeatName": "Remove & dispose of existing supply and return duct system; daily job-site clean-up; disconnect & reconnect HVAC equipment as needed; test & balance system upon completion; up to 2 follow-up visits included to balance comfort issues; 10-year workmanship guarantee on supply & return ducting system.",
+    "indoorHeatModel": "Complete System"
   },
   {
     "id": null,
@@ -4080,7 +4110,7 @@
     "seer": null,
     "afue": null,
     "hspf": null,
-    "outdoorModel": null,
+    "outdoorModel": "4 Ton Capacity",
     "coilModel": null,
     "furnaceModel": null,
     "thermostat": null,
@@ -4104,7 +4134,13 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "monthlyPayment": "249",
+    "totalInvestment": "16657",
+    "outdoorBrand": "GHVAC",
+    "outdoorName": "Duct System Replacement",
+    "indoorHeatName": "Remove & dispose of existing supply and return duct system; daily job-site clean-up; disconnect & reconnect HVAC equipment as needed; test & balance system upon completion; up to 2 follow-up visits included to balance comfort issues; 10-year workmanship guarantee on supply & return ducting system.",
+    "indoorHeatModel": "Complete System"
   },
   {
     "id": null,
@@ -4116,7 +4152,7 @@
     "seer": null,
     "afue": null,
     "hspf": null,
-    "outdoorModel": null,
+    "outdoorModel": "5 Ton Capacity",
     "coilModel": null,
     "furnaceModel": null,
     "thermostat": null,
@@ -4140,7 +4176,13 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "monthlyPayment": "303",
+    "totalInvestment": "20309",
+    "outdoorBrand": "GHVAC",
+    "outdoorName": "Duct System Replacement",
+    "indoorHeatName": "Remove & dispose of existing supply and return duct system; daily job-site clean-up; disconnect & reconnect HVAC equipment as needed; test & balance system upon completion; up to 2 follow-up visits included to balance comfort issues; 10-year workmanship guarantee on supply & return ducting system.",
+    "indoorHeatModel": "Complete System"
   },
   {
     "id": null,
@@ -4163,7 +4205,7 @@
     "laborCost": 0,
     "totalCost": 2469.5,
     "sellingPrice": 4939,
-    "monthlyPayment": 74,
+    "monthlyPayment": "74",
     "warranty": "10 year parts limited warranty",
     "features": [
       "Infinity Series",
@@ -4175,7 +4217,11 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "totalInvestment": "4939",
+    "outdoorBrand": "Carrier",
+    "outdoorName": "6K BTU Heat Pump",
+    "indoorHeatName": "6K BTU High Wall Mount"
   },
   {
     "id": null,
@@ -4198,7 +4244,7 @@
     "laborCost": 0,
     "totalCost": 2365,
     "sellingPrice": 4730,
-    "monthlyPayment": 71,
+    "monthlyPayment": "71",
     "warranty": "10 year parts limited warranty",
     "features": [
       "Performance Series",
@@ -4210,7 +4256,11 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "totalInvestment": "4730",
+    "outdoorBrand": "Carrier",
+    "outdoorName": "9K BTU Heat Pump",
+    "indoorHeatName": "9K BTU High Wall Mount"
   },
   {
     "id": null,
@@ -4233,7 +4283,7 @@
     "laborCost": 0,
     "totalCost": 2487,
     "sellingPrice": 4974,
-    "monthlyPayment": 75,
+    "monthlyPayment": "75",
     "warranty": "10 year parts limited warranty",
     "features": [
       "Performance Series",
@@ -4245,7 +4295,11 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "totalInvestment": "4974",
+    "outdoorBrand": "Carrier",
+    "outdoorName": "12K BTU Heat Pump",
+    "indoorHeatName": "12K BTU High Wall Mount"
   },
   {
     "id": null,
@@ -4268,7 +4322,7 @@
     "laborCost": 0,
     "totalCost": 2616.5,
     "sellingPrice": 5233,
-    "monthlyPayment": 79,
+    "monthlyPayment": "79",
     "warranty": "10 year parts limited warranty",
     "features": [
       "Performance Series",
@@ -4280,7 +4334,11 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "totalInvestment": "5233",
+    "outdoorBrand": "Carrier",
+    "outdoorName": "18K BTU Heat Pump",
+    "indoorHeatName": "18K BTU High Wall Mount"
   },
   {
     "id": null,
@@ -4303,7 +4361,7 @@
     "laborCost": 0,
     "totalCost": 3777,
     "sellingPrice": 7554,
-    "monthlyPayment": 113,
+    "monthlyPayment": "113",
     "warranty": "10 year parts limited warranty",
     "features": [
       "Performance Series",
@@ -4315,7 +4373,11 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "totalInvestment": "7554",
+    "outdoorBrand": "Carrier",
+    "outdoorName": "24K BTU Heat Pump",
+    "indoorHeatName": "24K BTU High Wall Mount"
   },
   {
     "id": null,
@@ -4338,7 +4400,7 @@
     "laborCost": 0,
     "totalCost": 5097,
     "sellingPrice": 10194,
-    "monthlyPayment": 153,
+    "monthlyPayment": "153",
     "warranty": "10 year parts limited warranty",
     "features": [
       "Performance Series",
@@ -4350,7 +4412,11 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "totalInvestment": "10194",
+    "outdoorBrand": "Carrier",
+    "outdoorName": "30K BTU Heat Pump",
+    "indoorHeatName": "30K BTU High Wall Mount"
   },
   {
     "id": null,
@@ -4373,7 +4439,7 @@
     "laborCost": 0,
     "totalCost": 5373,
     "sellingPrice": 10746,
-    "monthlyPayment": 161,
+    "monthlyPayment": "161",
     "warranty": "10 year parts limited warranty",
     "features": [
       "Performance Series",
@@ -4385,6 +4451,10 @@
     "outdoorImageUrl": null,
     "coilImageUrl": null,
     "furnaceImageUrl": null,
-    "thermostatImageUrl": null
+    "thermostatImageUrl": null,
+    "totalInvestment": "10746",
+    "outdoorBrand": "Carrier",
+    "outdoorName": "36K BTU Heat Pump",
+    "indoorHeatName": "36K BTU High Wall Mount"
   }
 ]
