@@ -45,7 +45,9 @@ type PricebookPackage = {
   thermostatName: string;
   accessoryModels: string;
   outdoorImageUrl?: string;
+  coilImageUrl?: string;
   furnaceImageUrl?: string;
+  thermostatImageUrl?: string;
 };
 
 type PricebookComponent = {
@@ -1398,9 +1400,21 @@ export default function ProposalBuilder() {
                             
                             {pkg.coilModel && (
                               <div className="p-2 bg-muted rounded-md">
-                                <p className="font-medium text-xs text-muted-foreground mb-1">Evaporator Coil</p>
-                                <p className="font-medium">{pkg.coilModel}</p>
-                                <p className="text-muted-foreground text-xs">{pkg.coilName}</p>
+                                <div className="flex gap-3">
+                                  {pkg.coilImageUrl && (
+                                    <img 
+                                      src={`/assets/${pkg.coilImageUrl}`}
+                                      alt={pkg.coilModel}
+                                      className="w-16 h-16 object-contain rounded bg-white flex-shrink-0"
+                                      loading="lazy"
+                                    />
+                                  )}
+                                  <div className="flex-1">
+                                    <p className="font-medium text-xs text-muted-foreground mb-1">Evaporator Coil</p>
+                                    <p className="font-medium">{pkg.coilModel}</p>
+                                    <p className="text-muted-foreground text-xs">{pkg.coilName}</p>
+                                  </div>
+                                </div>
                               </div>
                             )}
                             
@@ -1426,9 +1440,21 @@ export default function ProposalBuilder() {
                             
                             {pkg.thermostatModel && (
                               <div className="p-2 bg-muted rounded-md">
-                                <p className="font-medium text-xs text-muted-foreground mb-1">Thermostat</p>
-                                <p className="font-medium">{pkg.thermostatModel}</p>
-                                <p className="text-muted-foreground text-xs">{pkg.thermostatName}</p>
+                                <div className="flex gap-3">
+                                  {pkg.thermostatImageUrl && (
+                                    <img 
+                                      src={`/assets/${pkg.thermostatImageUrl}`}
+                                      alt={pkg.thermostatModel}
+                                      className="w-16 h-16 object-contain rounded bg-white flex-shrink-0"
+                                      loading="lazy"
+                                    />
+                                  )}
+                                  <div className="flex-1">
+                                    <p className="font-medium text-xs text-muted-foreground mb-1">Thermostat</p>
+                                    <p className="font-medium">{pkg.thermostatModel}</p>
+                                    <p className="text-muted-foreground text-xs">{pkg.thermostatName}</p>
+                                  </div>
+                                </div>
                               </div>
                             )}
                           </div>
