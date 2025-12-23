@@ -815,8 +815,20 @@ export default function ProposalBuilder() {
   };
 
   const handleBack = () => {
+    // When going back from packages view
     if (selectedTonnage) {
-      setSelectedTonnage(null);
+      // If tonnage step was skipped (e.g., Mini-Split with "All"), go back to tier or unit type
+      if (hasSingleTonnage) {
+        setSelectedTonnage(null);
+        if (hasSingleTier) {
+          setSelectedTier(null);
+          setSelectedUnitType(null);
+        } else {
+          setSelectedTier(null);
+        }
+      } else {
+        setSelectedTonnage(null);
+      }
     } else if (selectedTier) {
       // If single tier, go back to unit type selection
       if (hasSingleTier) {
@@ -1459,147 +1471,242 @@ export default function ProposalBuilder() {
 
             {selectedTier && selectedTonnage && (
               <div>
-                <h2 className="text-xl font-semibold mb-2">Select Package</h2>
+                <h2 className="text-xl font-semibold mb-2">
+                  {selectedUnitType === "Mini-Split" ? "Select Mini-Split System" : "Select Package"}
+                </h2>
                 <p className="text-muted-foreground mb-4">
-                  Choose from available {selectedTier} packages for {selectedTonnage}
+                  {selectedUnitType === "Mini-Split" 
+                    ? "Choose the BTU capacity for your space"
+                    : `Choose from available ${selectedTier} packages for ${selectedTonnage}`}
                 </p>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {packageOptions.map((pkg, index) => {
-                    const isInCart = cart.some(item => 
-                      !item.isCustomBuild &&
-                      item.unitType === pkg.unitType && 
-                      item.tier === pkg.tier && 
-                      item.packageLevel === pkg.packageLevel &&
-                      item.extractedTonnage === selectedTonnage
-                    );
-                    return (
-                      <Card
-                        key={`${pkg.packageLevel}-${pkg.outdoorModel}-${index}`}
-                        className={`relative ${isInCart ? 'border-primary ring-1 ring-primary' : ''}`}
-                        data-testid={`package-${pkg.packageLevel.toLowerCase()}`}
-                      >
-                        {isInCart && (
-                          <div className="absolute top-2 right-2">
-                            <Badge className="bg-primary">
-                              <Check className="h-3 w-3 mr-1" />
-                              In Cart
-                            </Badge>
-                          </div>
-                        )}
-                        <CardHeader className="pb-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Badge className={`${getPackageLevelColor(pkg.packageLevel)} text-white`}>
-                                {pkg.packageLevel}
-                              </Badge>
-                              <span className="text-sm text-muted-foreground">{pkg.outdoorBrand}</span>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xl font-bold text-primary">
-                                {formatPrice(parseFloat(pkg.totalInvestment) || 0)}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatPrice(parseFloat(pkg.monthlyPayment) || 0)}/mo financing
-                              </p>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <div className="space-y-2 text-sm">
-                            <div className="p-2 bg-muted rounded-md">
-                              <div className="flex gap-3">
-                                {pkg.outdoorImageUrl && (
+                
+                {/* Mini-Split compact layout */}
+                {selectedUnitType === "Mini-Split" ? (
+                  <div className="space-y-3">
+                    {packageOptions.map((pkg, index) => {
+                      const isInCart = cart.some(item => 
+                        !item.isCustomBuild &&
+                        item.unitType === pkg.unitType && 
+                        item.tier === pkg.tier && 
+                        item.packageLevel === pkg.packageLevel
+                      );
+                      const btuValue = parseInt(pkg.packageLevel.replace('K', '')) * 1000;
+                      return (
+                        <Card
+                          key={`${pkg.packageLevel}-${pkg.outdoorModel}-${index}`}
+                          className={`relative overflow-hidden ${isInCart ? 'border-primary ring-1 ring-primary bg-primary/5' : ''}`}
+                          data-testid={`package-${pkg.packageLevel.toLowerCase()}`}
+                        >
+                          <div className="flex items-center p-4 gap-4">
+                            {/* Images side by side */}
+                            <div className="flex gap-2 flex-shrink-0">
+                              {pkg.outdoorImageUrl && (
+                                <div className="text-center">
                                   <img 
                                     src={`/assets/${pkg.outdoorImageUrl}`}
-                                    alt={pkg.outdoorModel}
-                                    className="w-16 h-16 object-contain rounded bg-white flex-shrink-0"
+                                    alt="Outdoor"
+                                    className="w-14 h-14 object-contain rounded bg-white border"
                                     loading="lazy"
                                   />
-                                )}
-                                <div className="flex-1">
-                                  <p className="font-medium text-xs text-muted-foreground mb-1">Outdoor Unit</p>
-                                  <p className="font-medium">{pkg.outdoorBrand} {pkg.outdoorModel}</p>
-                                  <p className="text-muted-foreground text-xs">{pkg.outdoorName}</p>
+                                  <p className="text-[10px] text-muted-foreground mt-1">Outdoor</p>
                                 </div>
-                              </div>
+                              )}
+                              {pkg.furnaceImageUrl && (
+                                <div className="text-center">
+                                  <img 
+                                    src={`/assets/${pkg.furnaceImageUrl}`}
+                                    alt="Indoor"
+                                    className="w-14 h-14 object-contain rounded bg-white border"
+                                    loading="lazy"
+                                  />
+                                  <p className="text-[10px] text-muted-foreground mt-1">Indoor</p>
+                                </div>
+                              )}
                             </div>
                             
-                            {pkg.coilModel && (
-                              <div className="p-2 bg-muted rounded-md">
-                                <div className="flex gap-3">
-                                  {pkg.coilImageUrl && (
-                                    <img 
-                                      src={`/assets/${pkg.coilImageUrl}`}
-                                      alt={pkg.coilModel}
-                                      className="w-16 h-16 object-contain rounded bg-white flex-shrink-0"
-                                      loading="lazy"
-                                    />
-                                  )}
-                                  <div className="flex-1">
-                                    <p className="font-medium text-xs text-muted-foreground mb-1">Evaporator Coil</p>
-                                    <p className="font-medium">{pkg.coilModel}</p>
-                                    <p className="text-muted-foreground text-xs">{pkg.coilName}</p>
-                                  </div>
-                                </div>
+                            {/* Main info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge className="bg-blue-600 text-white font-bold">
+                                  {pkg.packageLevel}
+                                </Badge>
+                                <span className="text-sm text-muted-foreground">
+                                  {btuValue.toLocaleString()} BTU
+                                </span>
+                                {isInCart && (
+                                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary">
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Added
+                                  </Badge>
+                                )}
                               </div>
-                            )}
+                              <p className="text-sm text-muted-foreground truncate">
+                                {pkg.outdoorBrand} Ductless System
+                              </p>
+                            </div>
                             
-                            {pkg.indoorHeatModel && (
-                              <div className="p-2 bg-muted rounded-md">
-                                <div className="flex gap-3">
-                                  {pkg.furnaceImageUrl && (
-                                    <img 
-                                      src={`/assets/${pkg.furnaceImageUrl}`}
-                                      alt={pkg.indoorHeatModel}
-                                      className="w-16 h-16 object-contain rounded bg-white flex-shrink-0"
-                                      loading="lazy"
-                                    />
-                                  )}
-                                  <div className="flex-1">
-                                    <p className="font-medium text-xs text-muted-foreground mb-1">
-                                      {(pkg.unitType === 'PHP' || pkg.unitType === 'SHP') ? 'Heat Kit' : 'Indoor Unit / Furnace'}
-                                    </p>
-                                    <p className="font-medium">{pkg.indoorHeatModel}</p>
-                                    <p className="text-muted-foreground text-xs">{pkg.indoorHeatName}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {pkg.thermostatModel && (
-                              <div className="p-2 bg-muted rounded-md">
-                                <div className="flex gap-3">
-                                  {pkg.thermostatImageUrl && (
-                                    <img 
-                                      src={`/assets/${pkg.thermostatImageUrl}`}
-                                      alt={pkg.thermostatModel}
-                                      className="w-16 h-16 object-contain rounded bg-white flex-shrink-0"
-                                      loading="lazy"
-                                    />
-                                  )}
-                                  <div className="flex-1">
-                                    <p className="font-medium text-xs text-muted-foreground mb-1">Thermostat</p>
-                                    <p className="font-medium">{pkg.thermostatModel}</p>
-                                    <p className="text-muted-foreground text-xs">{pkg.thermostatName}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
+                            {/* Price and action */}
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-lg font-bold text-primary">
+                                {formatPrice(parseFloat(pkg.totalInvestment) || 0)}
+                              </p>
+                              <p className="text-xs text-muted-foreground mb-2">
+                                {formatPrice(parseFloat(pkg.monthlyPayment) || 0)}/mo
+                              </p>
+                              <Button
+                                size="sm"
+                                className="min-h-[36px]"
+                                onClick={() => addToCart(pkg)}
+                                data-testid={`button-add-${pkg.packageLevel.toLowerCase()}`}
+                              >
+                                <ShoppingCart className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
-                          
-                          <Button
-                            className="w-full min-h-[44px]"
-                            onClick={() => addToCart(pkg)}
-                            data-testid={`button-add-${pkg.packageLevel.toLowerCase()}`}
-                          >
-                            <ShoppingCart className="h-4 w-4 mr-2" />
-                            Add to Proposal
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* Standard package grid for other equipment types */
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {packageOptions.map((pkg, index) => {
+                      const isInCart = cart.some(item => 
+                        !item.isCustomBuild &&
+                        item.unitType === pkg.unitType && 
+                        item.tier === pkg.tier && 
+                        item.packageLevel === pkg.packageLevel &&
+                        item.extractedTonnage === selectedTonnage
+                      );
+                      return (
+                        <Card
+                          key={`${pkg.packageLevel}-${pkg.outdoorModel}-${index}`}
+                          className={`relative ${isInCart ? 'border-primary ring-1 ring-primary' : ''}`}
+                          data-testid={`package-${pkg.packageLevel.toLowerCase()}`}
+                        >
+                          {isInCart && (
+                            <div className="absolute top-2 right-2">
+                              <Badge className="bg-primary">
+                                <Check className="h-3 w-3 mr-1" />
+                                In Cart
+                              </Badge>
+                            </div>
+                          )}
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Badge className={`${getPackageLevelColor(pkg.packageLevel)} text-white`}>
+                                  {pkg.packageLevel}
+                                </Badge>
+                                <span className="text-sm text-muted-foreground">{pkg.outdoorBrand}</span>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xl font-bold text-primary">
+                                  {formatPrice(parseFloat(pkg.totalInvestment) || 0)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatPrice(parseFloat(pkg.monthlyPayment) || 0)}/mo financing
+                                </p>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div className="space-y-2 text-sm">
+                              <div className="p-2 bg-muted rounded-md">
+                                <div className="flex gap-3">
+                                  {pkg.outdoorImageUrl && (
+                                    <img 
+                                      src={`/assets/${pkg.outdoorImageUrl}`}
+                                      alt={pkg.outdoorModel}
+                                      className="w-16 h-16 object-contain rounded bg-white flex-shrink-0"
+                                      loading="lazy"
+                                    />
+                                  )}
+                                  <div className="flex-1">
+                                    <p className="font-medium text-xs text-muted-foreground mb-1">Outdoor Unit</p>
+                                    <p className="font-medium">{pkg.outdoorBrand} {pkg.outdoorModel}</p>
+                                    <p className="text-muted-foreground text-xs">{pkg.outdoorName}</p>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {pkg.coilModel && (
+                                <div className="p-2 bg-muted rounded-md">
+                                  <div className="flex gap-3">
+                                    {pkg.coilImageUrl && (
+                                      <img 
+                                        src={`/assets/${pkg.coilImageUrl}`}
+                                        alt={pkg.coilModel}
+                                        className="w-16 h-16 object-contain rounded bg-white flex-shrink-0"
+                                        loading="lazy"
+                                      />
+                                    )}
+                                    <div className="flex-1">
+                                      <p className="font-medium text-xs text-muted-foreground mb-1">Evaporator Coil</p>
+                                      <p className="font-medium">{pkg.coilModel}</p>
+                                      <p className="text-muted-foreground text-xs">{pkg.coilName}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {pkg.indoorHeatModel && (
+                                <div className="p-2 bg-muted rounded-md">
+                                  <div className="flex gap-3">
+                                    {pkg.furnaceImageUrl && (
+                                      <img 
+                                        src={`/assets/${pkg.furnaceImageUrl}`}
+                                        alt={pkg.indoorHeatModel}
+                                        className="w-16 h-16 object-contain rounded bg-white flex-shrink-0"
+                                        loading="lazy"
+                                      />
+                                    )}
+                                    <div className="flex-1">
+                                      <p className="font-medium text-xs text-muted-foreground mb-1">
+                                        {(pkg.unitType === 'PHP' || pkg.unitType === 'SHP') ? 'Heat Kit' : 'Indoor Unit / Furnace'}
+                                      </p>
+                                      <p className="font-medium">{pkg.indoorHeatModel}</p>
+                                      <p className="text-muted-foreground text-xs">{pkg.indoorHeatName}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {pkg.thermostatModel && (
+                                <div className="p-2 bg-muted rounded-md">
+                                  <div className="flex gap-3">
+                                    {pkg.thermostatImageUrl && (
+                                      <img 
+                                        src={`/assets/${pkg.thermostatImageUrl}`}
+                                        alt={pkg.thermostatModel}
+                                        className="w-16 h-16 object-contain rounded bg-white flex-shrink-0"
+                                        loading="lazy"
+                                      />
+                                    )}
+                                    <div className="flex-1">
+                                      <p className="font-medium text-xs text-muted-foreground mb-1">Thermostat</p>
+                                      <p className="font-medium">{pkg.thermostatModel}</p>
+                                      <p className="text-muted-foreground text-xs">{pkg.thermostatName}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <Button
+                              className="w-full min-h-[44px]"
+                              onClick={() => addToCart(pkg)}
+                              data-testid={`button-add-${pkg.packageLevel.toLowerCase()}`}
+                            >
+                              <ShoppingCart className="h-4 w-4 mr-2" />
+                              Add to Proposal
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
                 
                 {packageOptions.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
