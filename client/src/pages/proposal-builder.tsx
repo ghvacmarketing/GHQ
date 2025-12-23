@@ -565,7 +565,15 @@ export default function ProposalBuilder() {
     });
     
     return filtered.sort((a, b) => {
-      return PACKAGE_LEVEL_ORDER.indexOf(a.packageLevel) - PACKAGE_LEVEL_ORDER.indexOf(b.packageLevel);
+      // For standard package levels (Best/Better/Good/Budget)
+      const aIdx = PACKAGE_LEVEL_ORDER.indexOf(a.packageLevel);
+      const bIdx = PACKAGE_LEVEL_ORDER.indexOf(b.packageLevel);
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      // For BTU-based levels (Mini-Split: 6K, 9K, etc.), sort by numeric value
+      const aNum = parseInt(a.packageLevel.replace('K', ''));
+      const bNum = parseInt(b.packageLevel.replace('K', ''));
+      if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+      return 0;
     });
   }, [selectedUnitType, selectedTier, selectedTonnage]);
 
