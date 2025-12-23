@@ -3271,8 +3271,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1505BRK",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "shp_essential_images/shp_essential_1_5ton_best_1_trane_5twr5018a1000.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_1_5ton_best_3_trane_tcont724as42da.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_1_5ton_best_2_trane_5tem4b02ac21s.png"
   },
   {
     "unitType": "SHP",
@@ -3291,7 +3292,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1505BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_1_5ton_better_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_1_5ton_better_1_trane_5twr4018a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_1_5ton_better_2_trane_5tem4b02ac21s.png"
   },
   {
     "unitType": "SHP",
@@ -3309,7 +3312,10 @@
     "indoorHeatName": "Carrier Fan Coil",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_1_5ton_good_1_carrier_fj5anxa18l05.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_1_5ton_good_2_carrier_27sca518a003.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_1_5ton_good_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SHP",
@@ -3328,7 +3334,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1505BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_1_5ton_budget_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_1_5ton_budget_1_ameristar_a5hp4018a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_1_5ton_budget_2_ameristar_a5ahv002a1b30a.png"
   },
   {
     "unitType": "SHP",
@@ -3347,8 +3355,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1505BRK",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "shp_essential_images/shp_essential_2ton_best_1_trane_5twr5024a1000.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_2ton_best_3_trane_tcont724as42da.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_2ton_best_2_trane_5tem4b02ac21s.png"
   },
   {
     "unitType": "SHP",
@@ -3367,7 +3376,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1505BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_2ton_better_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_2ton_better_1_trane_5twr4024a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_2ton_better_2_trane_5tem4b02ac21s.png"
   },
   {
     "unitType": "SHP",
@@ -3385,7 +3396,10 @@
     "indoorHeatName": "Carrier Fan Coil",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_2ton_good_1_carrier_fj5anxb24l05.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_2ton_good_2_carrier_27sca524a003.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_2ton_good_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SHP",
@@ -3404,7 +3418,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1505BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_2ton_budget_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_2ton_budget_1_runtru_a5hp4024a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_2ton_budget_2_ameristar_a5ahc003a1b30a.png"
   },
   {
     "unitType": "SHP",
@@ -3423,8 +3439,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1508BRK",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "shp_essential_images/shp_essential_2_5ton_best_1_trane_5twr5030a1000.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_2_5ton_best_3_trane_tcont724as42da.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_2_5ton_best_2_trane_5tem4b03ac31s.png"
   },
   {
     "unitType": "SHP",
@@ -3442,7 +3459,10 @@
     "indoorHeatName": "Carrier Fan Coil",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_2_5ton_better_1_carrier_fj5anxb30l08.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_2_5ton_better_2_carrier_27spa630a003.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_2_5ton_better_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SHP",
@@ -3461,7 +3481,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1508BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_2_5ton_good_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_2_5ton_good_1_trane_5twr4030a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_2_5ton_good_2_trane_5tem4b03ac31s.png"
   },
   {
     "unitType": "SHP",
@@ -3480,7 +3502,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1508BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_2_5ton_budget_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_2_5ton_budget_1_ameristar_a5hp4030a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_2_5ton_budget_2_ameristar_a5ahc003a1b30a.png"
   },
   {
     "unitType": "SHP",
@@ -3499,8 +3523,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1510BRK",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "shp_essential_images/shp_essential_3ton_best_1_trane_5twr5036a1000.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_3ton_best_3_trane_tcont724as42da.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_3ton_best_2_trane_5tem4b03ac31s.png"
   },
   {
     "unitType": "SHP",
@@ -3518,7 +3543,10 @@
     "indoorHeatName": "Carrier Fan Coil",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_3ton_better_1_carrier_fj5anxb36l10.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_3ton_better_2_carrier_27sca536a003.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_3ton_better_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SHP",
@@ -3537,7 +3565,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1510BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_3ton_good_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_3ton_good_1_trane_5twr4036a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_3ton_good_2_trane_5tem4b03ac31s.png"
   },
   {
     "unitType": "SHP",
@@ -3556,7 +3586,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1510BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_3ton_budget_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_3ton_budget_1_runtru_a5hp4036a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_3ton_budget_2_runtru_a5ahc003a1b30a.png"
   },
   {
     "unitType": "SHP",
@@ -3575,8 +3607,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1510BRK",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "shp_essential_images/shp_essential_3_5ton_best_1_trane_5twr5042a1000.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_3_5ton_best_3_trane_tcont724as42da.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_3_5ton_best_2_trane_5tem4d05ac41s.png"
   },
   {
     "unitType": "SHP",
@@ -3595,7 +3628,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1510BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_3_5ton_better_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_3_5ton_better_1_trane_5twr4042a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_3_5ton_better_2_trane_5tem4d05ac41s.png"
   },
   {
     "unitType": "SHP",
@@ -3613,7 +3648,10 @@
     "indoorHeatName": "Carrier Fan Coil",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_3_5ton_good_1_carrier_fj5anxc42l10.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_3_5ton_good_2_carrier_27spa642a003.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_3_5ton_good_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SHP",
@@ -3632,7 +3670,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1510BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_3_5ton_budget_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_3_5ton_budget_1_ameristar_a5hp4042a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_3_5ton_budget_2_ameristar_a5ahc005a1d30a.png"
   },
   {
     "unitType": "SHP",
@@ -3651,8 +3691,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1517BRK",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "shp_essential_images/shp_essential_4ton_best_1_trane_5twr5048a1000.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_4ton_best_3_trane_tcont724as42da.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_4ton_best_2_trane_5tem4d06ac41s.png"
   },
   {
     "unitType": "SHP",
@@ -3670,7 +3711,10 @@
     "indoorHeatName": "Carrier Fan Coil",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_4ton_better_1_carrier_fj5anxc48l10.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_4ton_better_2_carrier_27sca548a003.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_4ton_better_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SHP",
@@ -3689,7 +3733,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1517BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_4ton_good_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_4ton_good_1_trane_5twr4048a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_4ton_good_2_trane_5tem4d06ac41s.png"
   },
   {
     "unitType": "SHP",
@@ -3708,7 +3754,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1517BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_4ton_budget_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_4ton_budget_1_runtru_a5hp4048a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_4ton_budget_2_runtru_a5ahc006a1d30a.png"
   },
   {
     "unitType": "SHP",
@@ -3727,8 +3775,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1517BRK",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "shp_essential_images/shp_essential_5ton_best_1_trane_5twr5060a1000.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_5ton_best_3_trane_tcont724as42da.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_5ton_best_2_trane_5tem4d07ac51s.png"
   },
   {
     "unitType": "SHP",
@@ -3746,7 +3795,10 @@
     "indoorHeatName": "Carrier Fan Coil",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": "BAYHTR1517BRK"
+    "accessoryModels": "BAYHTR1517BRK",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_5ton_better_1_carrier_fj5anxd60l00.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_5ton_better_2_carrier_27sca560a003.png",
+    "thermostatImageUrl": "shp_essential_images/shp_essential_5ton_better_3_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SHP",
@@ -3765,7 +3817,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1517BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_5ton_good_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_5ton_good_1_trane_5twr4060a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_5ton_good_2_trane_5tem4d07ac51s.png"
   },
   {
     "unitType": "SHP",
@@ -3784,7 +3838,9 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "BAYHTR1517BRK",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "thermostatImageUrl": "shp_essential_images/shp_essential_5ton_budget_3_trane_tcont724as42da.png",
+    "outdoorImageUrl": "shp_essential_images/shp_essential_5ton_budget_1_runtru_a5hp4060a1000.png",
+    "furnaceImageUrl": "shp_essential_images/shp_essential_5ton_budget_2_runtru_a5ahc007a1d30a.png"
   },
   {
     "id": null,
