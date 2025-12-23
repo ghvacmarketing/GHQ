@@ -287,6 +287,7 @@ export const leads = pgTable("leads", {
   installDate: timestamp("install_date"), // Scheduled installation start date (required at Assign to Sub-Contractor)
   installEndDate: timestamp("install_end_date"), // Optional end date for multi-day installations
   installEnteredAt: timestamp("install_entered_at"), // When lead entered installation board (marked Won)
+  installSubcontractor: text("install_subcontractor"), // Subcontractor assigned to this installation (Dustin, Baltezar, etc.)
   // Service pipeline fields
   serviceStep: text("service_step"), // Kanban column for service tracking
   serviceOrder: integer("service_order").default(0), // Order within column

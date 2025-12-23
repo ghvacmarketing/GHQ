@@ -266,6 +266,12 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
                 <span className="truncate">{assignedTechnician.name}</span>
               </div>
             )}
+            {lead.installSubcontractor && (
+              <div className="flex items-center gap-1 text-xs text-purple-600 font-medium mt-1">
+                <User className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">Sub: {lead.installSubcontractor}</span>
+              </div>
+            )}
             <div className="flex flex-wrap gap-1 mt-2">
               {lead.installStep && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 flex items-center gap-1 border-primary text-primary">
@@ -749,7 +755,7 @@ export default function Installation() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("all");
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
-  const [editForm, setEditForm] = useState({ installStep: "", clientIssue: "", assignedEmployeeId: "", installDate: undefined as Date | undefined, installEndDate: undefined as Date | undefined });
+  const [editForm, setEditForm] = useState({ installStep: "", clientIssue: "", assignedEmployeeId: "", installDate: undefined as Date | undefined, installEndDate: undefined as Date | undefined, installSubcontractor: "" });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { installStep?: string; installOrder?: number }>>({});
   const [activeView, setActiveView] = useState<"kanban" | "calendar">("kanban");
@@ -973,6 +979,7 @@ export default function Installation() {
       assignedEmployeeId: lead.assignedEmployeeId || "unassigned",
       installDate: installDateValue,
       installEndDate: installEndDateValue,
+      installSubcontractor: lead.installSubcontractor || "",
     });
   };
 
@@ -999,6 +1006,7 @@ export default function Installation() {
         assignedEmployeeId: editForm.assignedEmployeeId === "unassigned" ? null : editForm.assignedEmployeeId,
         installDate: editForm.installDate ? editForm.installDate.toISOString() : null,
         installEndDate: editForm.installEndDate ? editForm.installEndDate.toISOString() : null,
+        installSubcontractor: editForm.installSubcontractor || null,
       },
     });
     setEditingLead(null);
@@ -1451,6 +1459,22 @@ export default function Installation() {
                         {tech.name}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subcontractor">Subcontractor</Label>
+                <Select
+                  value={editForm.installSubcontractor}
+                  onValueChange={(value) => setEditForm({ ...editForm, installSubcontractor: value })}
+                >
+                  <SelectTrigger id="subcontractor" className="min-h-[44px]" data-testid="select-subcontractor">
+                    <SelectValue placeholder="Select subcontractor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="Dustin">Dustin</SelectItem>
+                    <SelectItem value="Baltezar">Baltezar</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
