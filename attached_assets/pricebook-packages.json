@@ -1790,10 +1790,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b040m2psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb003as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_essential_images/sga_essential_1_5ton_best_1_trane_5ttr5018a1000.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_1_5ton_best_3_trane_s8x1b040m2psc.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_1_5ton_best_2_ameristar_5txcb003as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_1_5ton_best_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -1812,10 +1812,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png",
-    "outdoorImageUrl": "sga_premium_images/sga_premium_1.5ton_budget_1_trane_5ttr4018a1000.png",
-    "coilImageUrl": "sga_premium_images/sga_premium_1.5ton_budget_2_ameristar_5txca001as3hc.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_1_5ton_better_3_trane_s8x1a040m3psc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_1_5ton_better_4_trane_tcont724as42da.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_1_5ton_better_1_trane_5ttr4018a1000.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_1_5ton_better_2_ameristar_5txca001as3hc.png"
   },
   {
     "unitType": "SGA",
@@ -1833,7 +1833,11 @@
     "indoorHeatName": "Carrier Comfort Furnace",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_1_5ton_good_1_carrier_26sca518w003.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_1_5ton_good_2_carrier_cvava2414xma.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_1_5ton_good_3_carrier_58sb0b045m14--12.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_1_5ton_good_4_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SGA",
@@ -1852,9 +1856,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png",
-    "coilImageUrl": "sga_premium_images/sga_premium_1.5ton_budget_2_ameristar_5txca001as3hc.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_1_5ton_budget_3_runtru_5txca001as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_1_5ton_budget_4_trane_tcont724as42da.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_1_5ton_budget_2_ameristar_a801x040am3sd.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_1_5ton_budget_1_ameristar_a5ac4018a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1873,10 +1878,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b040m2psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb003as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_essential_images/sga_essential_2ton_best_1_trane_5ttr5024a1000.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_2ton_best_3_trane_s8x1b040m2psc.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_2ton_best_2_trane_5txcb003as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_2ton_best_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -1895,9 +1900,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b040m2psc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png",
-    "coilImageUrl": "sga_premium_images/sga_premium_1.5ton_budget_2_ameristar_5txca001as3hc.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_2ton_better_3_trane_s8x1b040m2psc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_2ton_better_4_trane_tcont724as42da.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_2ton_better_2_trane_5txca001as3hc.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_2ton_better_1_trane_5ttr4024a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1915,7 +1921,11 @@
     "indoorHeatName": "Carrier Comfort Furnace",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_2ton_good_1_carrier_26sca524w003.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_2ton_good_2_carrier_cvava2414xma.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_2ton_good_3_carrier_58sb0b045m14--12.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_2ton_good_4_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SGA",
@@ -1934,9 +1944,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb003as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_2ton_budget_3_runtru_a801x040am3sd.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_2ton_budget_2_runtru_5txcb003as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_2ton_budget_4_trane_tcont724as42da.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_2ton_budget_1_runtru_a5ac4024a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1955,10 +1966,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b060m4psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_2_trane_5txcb004as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_essential_images/sga_essential_2_5ton_best_1_trane_5ttr5030a1000.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_2_5ton_best_3_trane_s8x1b060m4psc.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_2_5ton_best_2_ameristar_5txcb004as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_2_5ton_best_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -1977,10 +1988,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b060m4psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb003as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png",
-    "outdoorImageUrl": "sga_premium_images/sga_premium_2.5ton_budget_1_trane_5ttr4030a1000.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_2_5ton_better_3_trane_s8x1b060m4psc.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_2_5ton_better_2_ameristar_5txcb003as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_2_5ton_better_4_trane_tcont724as42da.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_2_5ton_better_1_trane_5ttr4030a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1998,7 +2009,11 @@
     "indoorHeatName": "Carrier Comfort Furnace",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_2_5ton_good_1_carrier_26sca530w003.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_2_5ton_good_2_carrier_cvava3014xma.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_2_5ton_good_3_carrier_58sb0b045m14--12.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_2_5ton_good_4_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SGA",
@@ -2017,9 +2032,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_2_trane_5txcb004as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_2_5ton_budget_3_runtru_a801x060bm4sd.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_2_5ton_budget_2_runtru_5txcb004as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_2_5ton_budget_4_trane_tcont724as42da.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_2_5ton_budget_1_ameristar_a5ac4030a1000.png"
   },
   {
     "unitType": "SGA",
@@ -2038,10 +2054,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_essential_3t_outdoor_5ttr5036a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b060m4psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_2_trane_5txcb004as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_essential_images/sga_essential_3ton_best_1_trane_5ttr5036a1000.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_3ton_best_3_trane_s8x1b060m4psc.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_3ton_best_2_trane_5txcb004as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_3ton_best_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -2059,7 +2075,11 @@
     "indoorHeatName": "Carrier Comfort Furnace",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_3ton_better_1_carrier_26sca536w003.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_3ton_better_2_carrier_cvava3617xma.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_3ton_better_3_carrier_58sb0b070m17--16.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_3ton_better_4_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SGA",
@@ -2078,9 +2098,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1b060m4psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_2_trane_5txcb004as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_3ton_good_3_trane_s8x1b060m4psc.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_3ton_good_2_ameristar_5txcb004as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_3ton_good_4_trane_tcont724as42da.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_3ton_good_1_trane_5ttr4036a1000.png"
   },
   {
     "unitType": "SGA",
@@ -2099,9 +2120,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_2_trane_5txcb004as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_3ton_budget_3_runtru_a801x060bm4sd.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_3ton_budget_2_runtru_5txcb004as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_3ton_budget_4_trane_tcont724as42da.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_3ton_budget_1_runtru_a5ac4036a1000.png"
   },
   {
     "unitType": "SGA",
@@ -2120,10 +2142,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1c080m5psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate_3.5ton_budget_2_ameristar_5txcc007as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_essential_images/sga_essential_3_5ton_best_1_trane_5ttr5042a1000.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_3_5ton_best_3_trane_s8x1c080m5psc.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_3_5ton_best_2_ameristar_5txcc007as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_3_5ton_best_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -2142,10 +2164,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb006as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png",
-    "outdoorImageUrl": "sga_premium_images/sga_premium_3.5ton_budget_1_trane_5ttr4042a1000.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_3_5ton_better_3_trane_s8x1b080m4psc.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_3_5ton_better_2_ameristar_5txcb006as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_3_5ton_better_4_trane_tcont724as42da.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_3_5ton_better_1_trane_5ttr4042a1000.png"
   },
   {
     "unitType": "SGA",
@@ -2163,7 +2185,11 @@
     "indoorHeatName": "Carrier Comfort Furnace",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_3_5ton_good_1_carrier_26sca542w003.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_3_5ton_good_2_carrier_cvava4821xma.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_3_5ton_good_3_carrier_58sb0b090m21--16.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_3_5ton_good_4_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SGA",
@@ -2182,9 +2208,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate_3.5ton_budget_2_ameristar_5txcc007as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_3_5ton_budget_3_ameristar_a801x080cm5sd.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_3_5ton_budget_2_ameristar_5txcc007as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_3_5ton_budget_4_trane_tcont724as42da.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_3_5ton_budget_1_ameristar_a5ac4042a1000.png"
   },
   {
     "unitType": "SGA",
@@ -2202,7 +2229,11 @@
     "indoorHeatName": "Carrier Comfort Furnace",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_4ton_best_1_carrier_26sca548w003.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_4ton_best_2_carrier_cvava4821xma.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_4ton_best_3_carrier_58sb0b090m21--16.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_4ton_best_4_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SGA",
@@ -2221,10 +2252,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1c080m5psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcc009as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_essential_images/sga_essential_4ton_better_1_trane_5ttr5048a1000.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_4ton_better_3_trane_s8x1c080m5psc.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_4ton_better_2_ameristar_5txcc009as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_4ton_better_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -2243,9 +2274,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1c080m5psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb006as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_4ton_good_3_trane_s8x1c080m5psc.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_4ton_good_2_ameristar_5txcb006as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_4ton_good_4_trane_tcont724as42da.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_4ton_good_1_trane_5ttr4048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -2264,9 +2296,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcb006as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_4ton_budget_3_runtru_a801x080bm4sd.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_4ton_budget_2_runtru_5txcb006as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_4ton_budget_4_trane_tcont724as42da.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_4ton_budget_1_runtru_a5ac4048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -2284,7 +2317,11 @@
     "indoorHeatName": "Carrier Comfort Furnace",
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
-    "accessoryModels": ""
+    "accessoryModels": "",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_5ton_best_1_carrier_26sca560w003.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_5ton_best_2_carrier_cvava6021xma.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_5ton_best_3_carrier_58sb0b110m21--20.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_5ton_best_4_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "SGA",
@@ -2303,10 +2340,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "outdoorImageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1c100m5psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcc009as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "outdoorImageUrl": "sga_essential_images/sga_essential_5ton_better_1_trane_5ttr5060a1000.png",
+    "furnaceImageUrl": "sga_essential_images/sga_essential_5ton_better_3_trane_s8x1c100m5psc.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_5ton_better_2_ameristar_5txcc009as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_5ton_better_4_trane_tcont724as42da.png"
   },
   {
     "unitType": "SGA",
@@ -2325,9 +2362,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_ultimate_images/sga_ultimate__oneton_budget_3_trane_s8x1c100m5psc.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_2_trane_5txcc009as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_5ton_good_3_trane_s8x1c100m5psc.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_5ton_good_2_ameristar_5txcc009as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_5ton_good_4_trane_tcont724as42da.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_5ton_good_1_trane_5ttr4060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -2346,9 +2384,10 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "furnaceImageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png",
-    "coilImageUrl": "sga_ultimate_images/sga_ultimate_3.5ton_budget_2_ameristar_5txcc007as3hc.png",
-    "thermostatImageUrl": "sga_ultimate_images/sga_ultimate__oneton_good_4_trane_tcont724as42da.png"
+    "furnaceImageUrl": "sga_essential_images/sga_essential_5ton_budget_3_runtru_a801x100cm5sd.png",
+    "coilImageUrl": "sga_essential_images/sga_essential_5ton_budget_2_runtru_5txcc007as3hc.png",
+    "thermostatImageUrl": "sga_essential_images/sga_essential_5ton_budget_4_trane_tcont724as42da.png",
+    "outdoorImageUrl": "sga_essential_images/sga_essential_5ton_budget_1_runtru_a5ac4060a1000.png"
   },
   {
     "unitType": "SHP",
