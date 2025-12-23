@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import NavDropdown from "@/components/nav-dropdown";
@@ -533,6 +536,11 @@ export default function ProposalBuilder() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchAllFields, setSearchAllFields] = useState(false);
 
+  // Elite Package state
+  const [eliteEnabled, setEliteEnabled] = useState(false);
+  const [selectedAirflowOption, setSelectedAirflowOption] = useState<string | null>(null);
+  const [selectedCrawlspaceTier, setSelectedCrawlspaceTier] = useState<CrawlspaceTier | null>(null);
+
   // Debounce customer search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -620,12 +628,18 @@ export default function ProposalBuilder() {
 
     const equipmentDetails = cart.map(item => {
       if (isCrawlspaceItem(item)) {
+        const basePrice = item.tier.price;
+        const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
         return {
           type: "crawlspace",
           tierName: item.tier.name,
-          tierPrice: item.tier.price,
+          tierPrice: basePrice,
           quantity: item.quantity,
-          totalPrice: item.tier.price * item.quantity,
+          totalPrice: finalPrice * item.quantity,
+          isElite: !!item.eliteData,
+          eliteDiscount: item.eliteData?.discountAmount || 0,
+          eliteSavings: item.eliteData ? item.eliteData.discountAmount * item.quantity : 0,
+          eliteBundles: item.eliteData?.coreBundlePrices || null,
         };
       } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
@@ -657,8 +671,13 @@ export default function ProposalBuilder() {
           } : null,
         };
       } else {
-        const itemPrice = (parseFloat(item.totalInvestment) || 0) * item.quantity;
-        const monthlyPrice = (parseFloat(item.monthlyPayment) || 0) * item.quantity;
+        const basePrice = parseFloat(item.totalInvestment) || 0;
+        const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
+        const itemPrice = finalPrice * item.quantity;
+        const baseMonthly = parseFloat(item.monthlyPayment) || 0;
+        const monthlyPrice = item.eliteData 
+          ? Math.round(item.eliteData.finalTotal / 67) * item.quantity
+          : baseMonthly * item.quantity;
         return {
           type: "package",
           unitType: item.unitType,
@@ -682,6 +701,12 @@ export default function ProposalBuilder() {
             name: item.thermostatName,
             model: item.thermostatModel,
           } : null,
+          isElite: !!item.eliteData,
+          eliteDiscount: item.eliteData?.discountAmount || 0,
+          eliteSavings: item.eliteData ? item.eliteData.discountAmount * item.quantity : 0,
+          eliteBundles: item.eliteData?.coreBundlePrices || null,
+          eliteAirflowOption: item.eliteData?.selectedAirflowOptionId || null,
+          eliteAirflowPrice: item.eliteData?.airflowPrice || 0,
         };
       }
     });
@@ -955,13 +980,15 @@ export default function ProposalBuilder() {
   const cartTotalRange = useMemo(() => {
     return cart.reduce((acc, item) => {
       if (isCrawlspaceItem(item)) {
-        const price = item.tier.price * item.quantity;
+        // Use Elite final price if available, otherwise base price
+        const price = (item.eliteData ? item.eliteData.finalTotal : item.tier.price) * item.quantity;
         return { low: acc.low + price, high: acc.high + price };
       } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
         return { low: acc.low + estimate.low * item.quantity, high: acc.high + estimate.high * item.quantity };
       } else {
-        const price = (parseFloat(item.totalInvestment) || 0) * item.quantity;
+        // Use Elite final price if available, otherwise base price
+        const price = (item.eliteData ? item.eliteData.finalTotal : (parseFloat(item.totalInvestment) || 0)) * item.quantity;
         return { low: acc.low + price, high: acc.high + price };
       }
     }, { low: 0, high: 0 });
@@ -969,10 +996,22 @@ export default function ProposalBuilder() {
 
   const cartTotal = cartTotalRange.high; // Use high for backward compatibility
 
+  // Calculate total savings from Elite packages
+  const cartEliteSavings = useMemo(() => {
+    return cart.reduce((total, item) => {
+      if (item.eliteData) {
+        return total + item.eliteData.discountAmount * item.quantity;
+      }
+      return total;
+    }, 0);
+  }, [cart]);
+
   const cartMonthlyTotalRange = useMemo(() => {
     return cart.reduce((acc, item) => {
       if (isCrawlspaceItem(item)) {
-        const monthly = Math.round(item.tier.price / 67) * item.quantity;
+        // Crawlspace: derive monthly from price / 67
+        const basePrice = item.eliteData ? item.eliteData.finalTotal : item.tier.price;
+        const monthly = Math.round(basePrice / 67) * item.quantity;
         return { low: acc.low + monthly, high: acc.high + monthly };
       } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
@@ -981,8 +1020,16 @@ export default function ProposalBuilder() {
           high: acc.high + Math.round(estimate.high / 67) * item.quantity 
         };
       } else {
-        const monthly = (parseFloat(item.monthlyPayment) || 0) * item.quantity;
-        return { low: acc.low + monthly, high: acc.high + monthly };
+        // HVAC packages: use proper monthly payment logic
+        // For Elite: derive from finalTotal / 67
+        // For non-Elite: use the precise monthlyPayment from pricebook
+        if (item.eliteData) {
+          const monthly = Math.round(item.eliteData.finalTotal / 67) * item.quantity;
+          return { low: acc.low + monthly, high: acc.high + monthly };
+        } else {
+          const monthly = (parseFloat(item.monthlyPayment) || 0) * item.quantity;
+          return { low: acc.low + monthly, high: acc.high + monthly };
+        }
       }
     }, { low: 0, high: 0 });
   }, [cart]);
@@ -1089,6 +1136,82 @@ export default function ProposalBuilder() {
     setSelectedThermostat(null);
   };
 
+  const addCrawlspaceToCart = (tier: CrawlspaceTier, withElite: boolean = false) => {
+    const id = withElite 
+      ? `crawlspace-elite-${tier.name.toLowerCase()}`
+      : `crawlspace-${tier.name.toLowerCase()}`;
+    
+    let eliteData: ElitePackageData | undefined;
+    if (withElite) {
+      eliteData = calculateCrawlspaceElitePricing(tier);
+    }
+
+    const crawlspaceItem: CrawlspaceCartItem = {
+      id,
+      isCrawlspace: true,
+      tier,
+      quantity: 1,
+      eliteData,
+    };
+
+    setCart(prev => {
+      const existing = prev.find(item => item.id === id);
+      if (existing) {
+        return prev.map(item =>
+          item.id === id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...prev, crawlspaceItem];
+    });
+
+    toast({
+      title: withElite ? "Elite Crawlspace Added!" : "Crawlspace Added",
+      description: withElite 
+        ? `${tier.name} package with Elite bundle added to proposal.`
+        : `${tier.name} crawlspace package added to proposal.`,
+    });
+
+    setSelectedCrawlspaceTier(null);
+    setEliteEnabled(false);
+  };
+
+  const addToCartWithElite = (pkg: PricebookPackage, withElite: boolean = false) => {
+    const extractedTonnage = selectedTonnage || getPackageTonnageDisplay(pkg);
+    const id = withElite 
+      ? `elite-${pkg.unitType}-${pkg.tier}-${extractedTonnage}-${pkg.packageLevel}-${pkg.outdoorModel}`
+      : generatePackageId(pkg, extractedTonnage);
+    
+    let eliteData: ElitePackageData | undefined;
+    if (withElite && selectedAirflowOption) {
+      const airflowOption = HVAC_ELITE_AIRFLOW_OPTIONS.find(opt => opt.name === selectedAirflowOption)!;
+      eliteData = calculateHvacElitePricing(parseFloat(pkg.totalInvestment) || 0, airflowOption);
+    }
+
+    setCart(prev => {
+      const existing = prev.find(item => item.id === id);
+      if (existing) {
+        return prev.map(item =>
+          item.id === id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...prev, { ...pkg, id, extractedTonnage, quantity: 1, isCustomBuild: false as const, eliteData }];
+    });
+
+    toast({
+      title: withElite ? "Elite Package Added!" : "Added to Proposal",
+      description: withElite 
+        ? `${pkg.outdoorBrand} ${pkg.packageLevel} with Elite upgrades added.`
+        : `${pkg.outdoorBrand} ${pkg.packageLevel} package added.`,
+    });
+
+    setEliteEnabled(false);
+    setSelectedAirflowOption(null);
+  };
+
   const removeFromCart = (packageId: string) => {
     setCart(prev => prev.filter(item => item.id !== packageId));
   };
@@ -1175,10 +1298,15 @@ export default function ProposalBuilder() {
 
     cart.forEach((item, index) => {
       if (isCrawlspaceItem(item)) {
-        const itemPrice = item.tier.price * item.quantity;
-        quoteText += `${index + 1}. Crawlspace Encapsulation - ${item.tier.name}\n`;
+        const basePrice = item.tier.price;
+        const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
+        const itemPrice = finalPrice * item.quantity;
+        quoteText += `${index + 1}. Crawlspace Encapsulation - ${item.tier.name}${item.eliteData ? ' (Elite Package)' : ''}\n`;
         quoteText += `   ${item.tier.description}\n`;
         quoteText += `   Price: ${formatPrice(itemPrice)}\n`;
+        if (item.eliteData) {
+          quoteText += `   Elite Savings: ${formatPrice(item.eliteData.discountAmount * item.quantity)} (20% off)\n`;
+        }
         if (item.quantity > 1) quoteText += `   Qty: ${item.quantity}\n`;
         quoteText += `\n`;
       } else if (isCustomBuild(item)) {
@@ -1195,13 +1323,18 @@ export default function ProposalBuilder() {
         quoteText += `\n`;
       } else {
         const unitTypeName = UNIT_TYPE_INFO[item.unitType]?.name || item.unitType;
-        const itemPrice = (parseFloat(item.totalInvestment) || 0) * item.quantity;
-        quoteText += `${index + 1}. ${item.packageLevel} Package - ${item.extractedTonnage}\n`;
+        const basePrice = parseFloat(item.totalInvestment) || 0;
+        const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
+        const itemPrice = finalPrice * item.quantity;
+        quoteText += `${index + 1}. ${item.packageLevel} Package - ${item.extractedTonnage}${item.eliteData ? ' (Elite Package)' : ''}\n`;
         quoteText += `   ${unitTypeName} (${item.tier})\n`;
         quoteText += `   - ${item.outdoorBrand} ${item.outdoorName}\n`;
         if (item.indoorHeatName) quoteText += `   - ${item.indoorHeatName}\n`;
         if (item.thermostatName) quoteText += `   - ${item.thermostatName}\n`;
         quoteText += `   Price: ${formatPrice(itemPrice)}\n`;
+        if (item.eliteData) {
+          quoteText += `   Elite Savings: ${formatPrice(item.eliteData.discountAmount * item.quantity)} (20% off)\n`;
+        }
         if (item.quantity > 1) quoteText += `   Qty: ${item.quantity}\n`;
         quoteText += `\n`;
       }
@@ -1437,10 +1570,16 @@ export default function ProposalBuilder() {
                             <div className="flex-1 min-w-0">
                               {isCrawlspaceItem(item) ? (
                                 <>
-                                  <div className="flex items-center gap-2 mb-2">
+                                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                                     <Badge className="bg-teal-500 text-white text-xs">
                                       Crawlspace
                                     </Badge>
+                                    {item.eliteData && (
+                                      <Badge className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-xs">
+                                        <Crown className="h-3 w-3 mr-1" />
+                                        Elite
+                                      </Badge>
+                                    )}
                                     <Badge variant="outline" className="text-xs">
                                       x{item.quantity}
                                     </Badge>
@@ -1450,9 +1589,26 @@ export default function ProposalBuilder() {
                                     <p className="text-xs text-muted-foreground">{item.tier.description}</p>
                                   </div>
                                   <div className="mt-2 pt-2 border-t">
-                                    <p className="font-bold text-sm text-primary">
-                                      {formatPrice(item.tier.price * item.quantity)}
-                                    </p>
+                                    {item.eliteData ? (
+                                      <div className="space-y-1">
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                          <span>Base: {formatPrice(item.tier.price)}</span>
+                                          <span className="line-through">{formatPrice(item.eliteData.originalTotal)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                          <Badge className="bg-green-500 text-white text-xs">
+                                            Save {formatPrice(item.eliteData.discountAmount)} (20%)
+                                          </Badge>
+                                          <span className="font-bold text-sm text-primary">
+                                            {formatPrice(item.eliteData.finalTotal * item.quantity)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <p className="font-bold text-sm text-primary">
+                                        {formatPrice(item.tier.price * item.quantity)}
+                                      </p>
+                                    )}
                                   </div>
                                 </>
                               ) : isCustomBuild(item) ? (
@@ -1506,10 +1662,16 @@ export default function ProposalBuilder() {
                                 </>
                               ) : (
                                 <>
-                                  <div className="flex items-center gap-2 mb-2">
+                                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                                     <Badge className={`${getPackageLevelColor(item.packageLevel)} text-white text-xs`}>
                                       {item.packageLevel}
                                     </Badge>
+                                    {item.eliteData && (
+                                      <Badge className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-xs">
+                                        <Crown className="h-3 w-3 mr-1" />
+                                        Elite
+                                      </Badge>
+                                    )}
                                     <Badge variant="outline" className="text-xs">
                                       x{item.quantity}
                                     </Badge>
@@ -1539,12 +1701,31 @@ export default function ProposalBuilder() {
                                     </div>
                                   </div>
                                   <div className="mt-2 pt-2 border-t">
-                                    <p className="font-bold text-sm text-primary">
-                                      {formatPrice((parseFloat(item.totalInvestment) || 0) * item.quantity)}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {formatPrice((parseFloat(item.monthlyPayment) || 0) * item.quantity)}/mo
-                                    </p>
+                                    {item.eliteData ? (
+                                      <div className="space-y-1">
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                          <span>Base: {formatPrice(parseFloat(item.totalInvestment) || 0)}</span>
+                                          <span className="line-through">{formatPrice(item.eliteData.originalTotal)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                          <Badge className="bg-green-500 text-white text-xs">
+                                            Save {formatPrice(item.eliteData.discountAmount)} (20%)
+                                          </Badge>
+                                          <span className="font-bold text-sm text-primary">
+                                            {formatPrice(item.eliteData.finalTotal * item.quantity)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <p className="font-bold text-sm text-primary">
+                                          {formatPrice((parseFloat(item.totalInvestment) || 0) * item.quantity)}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {formatPrice((parseFloat(item.monthlyPayment) || 0) * item.quantity)}/mo
+                                        </p>
+                                      </>
+                                    )}
                                   </div>
                                 </>
                               )}
@@ -1567,6 +1748,17 @@ export default function ProposalBuilder() {
                 {cart.length > 0 && (
                   <div className="absolute bottom-0 left-0 right-0 p-4 bg-card border-t space-y-3">
                     <div className="bg-muted p-3 rounded-lg">
+                      {cartEliteSavings > 0 && (
+                        <div className="flex justify-between items-center mb-2 pb-2 border-b border-green-200 dark:border-green-800">
+                          <span className="text-sm font-medium text-green-700 dark:text-green-400 flex items-center gap-1">
+                            <Crown className="h-4 w-4" />
+                            Elite Savings
+                          </span>
+                          <Badge className="bg-green-500 text-white">
+                            You Save {formatPrice(cartEliteSavings)}
+                          </Badge>
+                        </div>
+                      )}
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-sm font-medium">
                           Total Investment {hasEstimatedItems && <Badge variant="outline" className="ml-1 text-xs">Includes Est.</Badge>}
@@ -1608,14 +1800,14 @@ export default function ProposalBuilder() {
 
       <main className="p-3 sm:p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 h-14 p-1 mx-auto mb-6 bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl shadow-md" data-testid="tabs-view-switcher">
+          <TabsList className="grid w-full max-w-xl grid-cols-3 h-14 p-1 mx-auto mb-6 bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl shadow-md" data-testid="tabs-view-switcher">
             <TabsTrigger 
               value="preset" 
               className="min-h-[48px] rounded-lg font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-lg dark:data-[state=active]:bg-slate-900" 
               data-testid="tab-preset-packages"
             >
               <Package className="h-5 w-5 mr-2" />
-              Preset Packages
+              <span className="hidden sm:inline">Preset </span>Packages
             </TabsTrigger>
             <TabsTrigger 
               value="custom" 
@@ -1623,7 +1815,15 @@ export default function ProposalBuilder() {
               data-testid="tab-build-your-own"
             >
               <Wrench className="h-5 w-5 mr-2" />
-              Build Your Own
+              <span className="hidden sm:inline">Build Your </span>Own
+            </TabsTrigger>
+            <TabsTrigger 
+              value="crawlspace" 
+              className="min-h-[48px] rounded-lg font-semibold transition-all data-[state=active]:bg-teal-500 data-[state=active]:text-white data-[state=active]:shadow-lg" 
+              data-testid="tab-crawlspace"
+            >
+              <Droplets className="h-5 w-5 mr-2" />
+              Crawlspace
             </TabsTrigger>
           </TabsList>
 
@@ -2030,13 +2230,100 @@ export default function ProposalBuilder() {
                               )}
                             </div>
                             
+                            <div className="p-3 rounded-lg border bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor={`elite-${pkg.packageLevel}-${index}`} className="flex items-center gap-2 cursor-pointer">
+                                  <Crown className="h-4 w-4 text-amber-500" />
+                                  <span className="font-medium text-sm">Upgrade to Elite Package</span>
+                                </Label>
+                                <Switch
+                                  id={`elite-${pkg.packageLevel}-${index}`}
+                                  checked={eliteEnabled}
+                                  onCheckedChange={(checked) => {
+                                    setEliteEnabled(checked);
+                                    if (checked && !selectedAirflowOption) {
+                                      setSelectedAirflowOption(HVAC_ELITE_AIRFLOW_OPTIONS[0].name);
+                                    }
+                                  }}
+                                  data-testid={`switch-elite-${pkg.packageLevel.toLowerCase()}`}
+                                />
+                              </div>
+                              
+                              {eliteEnabled && (
+                                <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-700">
+                                  <p className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-2">Core Bundles Included:</p>
+                                  <div className="space-y-1 mb-3">
+                                    {HVAC_ELITE_CORE_BUNDLES.map(bundle => (
+                                      <div key={bundle.name} className="flex justify-between text-xs">
+                                        <span className="text-muted-foreground">{bundle.name}</span>
+                                        <span className="font-medium">{formatPrice(bundle.price)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  
+                                  <p className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-2">Select Airflow Option:</p>
+                                  <RadioGroup 
+                                    value={selectedAirflowOption || ''} 
+                                    onValueChange={setSelectedAirflowOption}
+                                    className="space-y-2"
+                                  >
+                                    {HVAC_ELITE_AIRFLOW_OPTIONS.map(option => (
+                                      <div key={option.name} className="flex items-center justify-between p-2 rounded border bg-white dark:bg-gray-800 border-amber-200 dark:border-amber-700">
+                                        <div className="flex items-center gap-2">
+                                          <RadioGroupItem value={option.name} id={`airflow-${option.name}-${index}`} />
+                                          <Label htmlFor={`airflow-${option.name}-${index}`} className="text-xs cursor-pointer">
+                                            {option.name}
+                                          </Label>
+                                        </div>
+                                        <span className="text-xs font-medium">{formatPrice(option.price)}</span>
+                                      </div>
+                                    ))}
+                                  </RadioGroup>
+                                  
+                                  {selectedAirflowOption && (() => {
+                                    const airflowOption = HVAC_ELITE_AIRFLOW_OPTIONS.find(opt => opt.name === selectedAirflowOption)!;
+                                    const pricing = calculateHvacElitePricing(parseFloat(pkg.totalInvestment) || 0, airflowOption);
+                                    return (
+                                      <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-700">
+                                        <div className="space-y-1 text-xs">
+                                          <div className="flex justify-between">
+                                            <span>Base Package:</span>
+                                            <span>{formatPrice(parseFloat(pkg.totalInvestment) || 0)}</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span>Elite Bundles:</span>
+                                            <span>{formatPrice(pricing.bundlesTotal)}</span>
+                                          </div>
+                                          <div className="flex justify-between border-t pt-1">
+                                            <span>Subtotal:</span>
+                                            <span>{formatPrice(pricing.subtotal)}</span>
+                                          </div>
+                                          <div className="flex justify-between text-green-600 dark:text-green-400">
+                                            <span>20% Elite Discount:</span>
+                                            <span>-{formatPrice(pricing.discount)}</span>
+                                          </div>
+                                          <div className="flex justify-between border-t pt-1 font-bold text-sm">
+                                            <span>Total:</span>
+                                            <span className="text-primary">{formatPrice(pricing.finalTotal)}</span>
+                                          </div>
+                                        </div>
+                                        <Badge className="mt-2 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                                          Save {formatPrice(pricing.discount)} (20%)
+                                        </Badge>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                            </div>
+                            
                             <Button
-                              className="w-full min-h-[44px]"
-                              onClick={() => addToCart(pkg)}
+                              className={`w-full min-h-[44px] ${eliteEnabled ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
+                              onClick={() => eliteEnabled ? addToCartWithElite(pkg, true) : addToCart(pkg)}
                               data-testid={`button-add-${pkg.packageLevel.toLowerCase()}`}
                             >
                               <ShoppingCart className="h-4 w-4 mr-2" />
-                              Add to Proposal
+                              {eliteEnabled ? "Add Elite Package" : "Add to Proposal"}
                             </Button>
                           </CardContent>
                         </Card>
@@ -2447,7 +2734,185 @@ export default function ProposalBuilder() {
               </div>
             )}
           </TabsContent>
+
+          <TabsContent value="crawlspace">
+            <div className="flex items-center gap-2 mb-4">
+              <Link href="/">
+                <Button variant="ghost" size="sm" className="min-h-[44px]" data-testid="button-home-crawlspace">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Home
+                </Button>
+              </Link>
+              <div className="text-sm text-muted-foreground flex items-center">
+                <span className="font-medium">Crawlspace Encapsulation</span>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold mb-2">Select Crawlspace Package</h2>
+              <p className="text-muted-foreground mb-4">Choose the encapsulation level for your crawlspace</p>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {CRAWLSPACE_TIERS.map((tier, index) => {
+                  const isSelected = selectedCrawlspaceTier?.name === tier.name;
+                  const isInCart = cart.some(item => 
+                    isCrawlspaceItem(item) && item.tier.name === tier.name
+                  );
+                  
+                  return (
+                    <Card
+                      key={tier.name}
+                      className={`relative cursor-pointer transition-all hover:shadow-lg ${
+                        isSelected ? 'ring-2 ring-teal-500 border-teal-500' : ''
+                      } ${isInCart ? 'border-teal-500 bg-teal-50/50 dark:bg-teal-950/50' : ''}`}
+                      onClick={() => setSelectedCrawlspaceTier(tier)}
+                      data-testid={`crawlspace-tier-${tier.name.toLowerCase()}`}
+                    >
+                      {isInCart && (
+                        <div className="absolute top-2 right-2">
+                          <Badge className="bg-teal-500">
+                            <Check className="h-3 w-3 mr-1" />
+                            In Cart
+                          </Badge>
+                        </div>
+                      )}
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Badge className="bg-teal-500 text-white mb-2">{tier.name}</Badge>
+                            <CardTitle className="text-lg">{tier.mil} Mil Vapor Barrier</CardTitle>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <p className="text-sm text-muted-foreground">{tier.description}</p>
+                        <div className="pt-2 border-t">
+                          <div className="flex items-center justify-between">
+                            <span className="text-2xl font-bold text-teal-600 dark:text-teal-400">
+                              {formatPrice(tier.price)}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {formatPrice(Math.round(tier.price / 67))}/mo
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+
+            {selectedCrawlspaceTier && (
+              <div className="mt-6 p-4 border-2 border-teal-200 dark:border-teal-800 rounded-xl bg-gradient-to-r from-teal-50 to-white dark:from-teal-950 dark:to-gray-900">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Droplets className="h-5 w-5 text-teal-500" />
+                      {selectedCrawlspaceTier.name} Package Selected
+                    </h3>
+                    <p className="text-sm text-muted-foreground">{selectedCrawlspaceTier.mil} Mil - {formatPrice(selectedCrawlspaceTier.price)}</p>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="flex items-center gap-3 p-3 rounded-lg border bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+                      <Switch
+                        id="elite-crawlspace"
+                        checked={eliteEnabled}
+                        onCheckedChange={setEliteEnabled}
+                        data-testid="switch-elite-crawlspace"
+                      />
+                      <Label htmlFor="elite-crawlspace" className="flex items-center gap-2 cursor-pointer">
+                        <Crown className="h-4 w-4 text-amber-500" />
+                        <span className="font-medium">Elite Package</span>
+                      </Label>
+                    </div>
+                    
+                    <Button
+                      className="min-h-[44px] bg-teal-600 hover:bg-teal-700"
+                      onClick={() => addCrawlspaceToCart(selectedCrawlspaceTier, eliteEnabled)}
+                      data-testid="button-add-crawlspace"
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      {eliteEnabled ? "Add Elite Package" : "Add to Proposal"}
+                    </Button>
+                  </div>
+                </div>
+
+                {eliteEnabled && (
+                  <div className="mt-4 p-4 rounded-lg bg-gradient-to-r from-amber-100 to-amber-50 dark:from-amber-900/50 dark:to-amber-950/50 border border-amber-200 dark:border-amber-700">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Crown className="h-5 w-5 text-amber-600" />
+                      <h4 className="font-semibold text-amber-800 dark:text-amber-200">Elite Package Includes:</h4>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                      {CRAWLSPACE_ELITE_BUNDLES.map(bundle => (
+                        <div key={bundle.name} className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700">
+                          <p className="font-medium text-sm">{bundle.name}</p>
+                          <p className="text-amber-600 dark:text-amber-400 font-semibold">{formatPrice(bundle.price)}</p>
+                          <ul className="mt-2 text-xs text-muted-foreground space-y-1">
+                            {bundle.benefits.slice(0, 2).map((benefit, i) => (
+                              <li key={i} className="flex items-start gap-1">
+                                <Check className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
+                                <span>{benefit}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {(() => {
+                      const elitePricing = calculateCrawlspaceElitePricing(selectedCrawlspaceTier);
+                      return (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-amber-200 dark:border-amber-700">
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span>Base Package:</span>
+                              <span>{formatPrice(selectedCrawlspaceTier.price)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Elite Bundles:</span>
+                              <span>{formatPrice(elitePricing.bundlesTotal)}</span>
+                            </div>
+                            <div className="flex justify-between border-t pt-2">
+                              <span>Subtotal:</span>
+                              <span>{formatPrice(elitePricing.subtotal)}</span>
+                            </div>
+                            <div className="flex justify-between text-green-600 dark:text-green-400">
+                              <span>20% Elite Discount:</span>
+                              <span>-{formatPrice(elitePricing.discount)}</span>
+                            </div>
+                            <div className="flex justify-between border-t pt-2 text-lg font-bold">
+                              <span>Total:</span>
+                              <span className="text-teal-600 dark:text-teal-400">{formatPrice(elitePricing.finalTotal)}</span>
+                            </div>
+                          </div>
+                          <Badge className="mt-3 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-300">
+                            You Save {formatPrice(elitePricing.discount)} (20%)
+                          </Badge>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
+
+        {cart.length > 0 && !cartOpen && activeTab === "crawlspace" && !selectedCrawlspaceTier && (
+          <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80">
+            <Button
+              className="w-full min-h-[52px] shadow-lg bg-teal-600 hover:bg-teal-700"
+              onClick={() => setCartOpen(true)}
+              data-testid="button-view-cart-crawlspace"
+            >
+              <ShoppingCart className="h-5 w-5 mr-2" />
+              View Proposal ({cartItemCount} packages)
+            </Button>
+          </div>
+        )}
 
         {cart.length > 0 && !cartOpen && activeTab === "preset" && currentStep < totalSteps && (
           <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80">
