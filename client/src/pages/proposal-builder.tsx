@@ -1854,20 +1854,20 @@ export default function ProposalBuilder() {
 
       <Dialog open={quoteDialogOpen} onOpenChange={setQuoteDialogOpen}>
         <DialogContent className="sm:max-w-3xl h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col">
-          <div className="bg-white dark:bg-gray-900 border-b px-4 py-3 sm:px-6 sm:py-4">
+          <div className="bg-gray-50 dark:bg-gray-900 border-b mx-4 mt-4 rounded-xl px-5 py-4 sm:px-6 sm:py-5">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 <img
                   src={redlogo}
                   alt="GHVAC"
-                  className="h-10 w-auto"
+                  className="h-12 sm:h-14 w-auto"
                 />
                 <div>
-                  <h1 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Equipment Proposal</h1>
-                  <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                  <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">Equipment Proposal</h1>
+                  <p className="text-sm text-muted-foreground">{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                 </div>
               </div>
-              <Badge variant="outline" className="text-xs hidden sm:flex">
+              <Badge variant="outline" className="text-sm hidden sm:flex">
                 Valid 30 Days
               </Badge>
             </div>
