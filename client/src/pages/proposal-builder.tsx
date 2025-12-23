@@ -513,13 +513,20 @@ export default function ProposalBuilder() {
     });
   }, [customTonnage, customEquipmentType, outdoorBrandFilter]);
 
-  // Get unique coils by equipment type - dedupe by model
+  // Get unique coils/heater kits by equipment type - dedupe by model
+  // SGA uses Evaporator Coil, SHP uses Heater Kit
+  const coilOrHeaterLabel = customEquipmentType === "SHP" ? "Heater Kit" : "Evaporator Coil";
+  const coilOrHeaterType = customEquipmentType === "SHP" ? "Heater Kit" : "Evaporator Coil";
+  
   const coilOptions = useMemo(() => {
     if (!customTonnage || !customEquipmentType) return [];
     const seen = new Set<string>();
+    const targetType = customEquipmentType === "SHP" ? "Heater Kit" : "Evaporator Coil";
     return components.filter(comp => {
       if (comp.unitType !== customEquipmentType) return false;
-      if (comp.componentType !== "Evaporator Coil") return false;
+      if (comp.componentType !== targetType) return false;
+      // For heater kits, also match by tonnage
+      if (targetType === "Heater Kit" && comp.tonnage !== customTonnage) return false;
       const matchesBrand = coilBrandFilter === "All Brands" || comp.brand === coilBrandFilter;
       if (!matchesBrand) return false;
       if (seen.has(comp.model)) return false;
@@ -1556,7 +1563,7 @@ export default function ProposalBuilder() {
                   </div>
 
                   {renderComponentSection(
-                    "Evaporator Coil",
+                    coilOrHeaterLabel,
                     coilOptions,
                     selectedCoil,
                     setSelectedCoil,
