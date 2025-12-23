@@ -98,6 +98,7 @@ const UNIT_TYPE_INFO: Record<string, { name: string; description: string; icon: 
   PHP: { name: "PHP", description: "All-in-one packaged heat pump unit", icon: Package },
   GP: { name: "GP", description: "All-in-one gas/electric package unit", icon: Package },
   "Mini-Split": { name: "Mini-Split", description: "Ductless single-zone heating & cooling", icon: Zap },
+  "Ducting": { name: "Ducting", description: "Complete duct system replacement", icon: Package },
 };
 
 const TIER_INFO: Record<string, { description: string }> = {
