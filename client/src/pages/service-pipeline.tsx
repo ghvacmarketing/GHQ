@@ -282,7 +282,14 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
             )}
             {lead.serviceStep && (
               <div className="mt-2 pt-2 border-t">
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 border-blue-200">
+                <Badge 
+                  variant="outline" 
+                  className={`text-[10px] px-1.5 py-0.5 ${
+                    ["Quote Needed", "Approved", "Parts Arrived"].includes(lead.serviceStep)
+                      ? "bg-red-100 text-red-700 border-red-300 font-semibold"
+                      : "bg-blue-50 text-blue-700 border-blue-200"
+                  }`}
+                >
                   <Wrench className="h-2.5 w-2.5 mr-1" />
                   {lead.serviceStep}
                 </Badge>
@@ -500,7 +507,14 @@ function CalendarView({ leads, onCardClick }: CalendarViewProps) {
                           </div>
                         )}
                         {lead.serviceStep && (
-                          <Badge variant="outline" className="text-[10px] mt-1">
+                          <Badge 
+                            variant="outline" 
+                            className={`text-[10px] mt-1 ${
+                              ["Quote Needed", "Approved", "Parts Arrived"].includes(lead.serviceStep)
+                                ? "bg-red-100 text-red-700 border-red-300 font-semibold"
+                                : ""
+                            }`}
+                          >
                             {lead.serviceStep}
                           </Badge>
                         )}
