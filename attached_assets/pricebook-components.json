@@ -13,7 +13,8 @@
     "totalInvestment": "11201",
     "sourcePage": "33",
     "equipmentCost": 2560.45,
-    "sellingPrice": 5120.9
+    "sellingPrice": 5120.9,
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -45,7 +46,8 @@
     "totalInvestment": "11201",
     "sourcePage": "33",
     "equipmentCost": 1107,
-    "sellingPrice": 2214
+    "sellingPrice": 2214,
+    "imageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png"
   },
   {
     "unitType": "SHP",
@@ -127,7 +129,7 @@
     "monthlyPayment": "118",
     "totalInvestment": "7874",
     "sourcePage": "34",
-    "imageUrl": "sga_images/sga_square_furnace_a801x040am3sd.png"
+    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -200,7 +202,7 @@
     "sourcePage": "29",
     "equipmentCost": 2762.38,
     "sellingPrice": 5524.76,
-    "imageUrl": "sga_images/sga_square_essential_3t_outdoor_5ttr5036a1000.png"
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -232,7 +234,8 @@
     "totalInvestment": "11867",
     "sourcePage": "29",
     "equipmentCost": 1190.03,
-    "sellingPrice": 2380.06
+    "sellingPrice": 2380.06,
+    "imageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png"
   },
   {
     "unitType": "SGA",
@@ -377,7 +380,8 @@
     "totalInvestment": "12902",
     "sourcePage": "25",
     "equipmentCost": 3014.53,
-    "sellingPrice": 6029.06
+    "sellingPrice": 6029.06,
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -407,7 +411,8 @@
     "totalInvestment": "12902",
     "sourcePage": "25",
     "equipmentCost": 1247.43,
-    "sellingPrice": 2494.86
+    "sellingPrice": 2494.86,
+    "imageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png"
   },
   {
     "unitType": "SGA",
@@ -449,7 +454,8 @@
     "description": "Gas Furnace; 10 Year Limited Functional Parts with Rregistration 20 Year Limited Heat Exchanger Warranty",
     "monthlyPayment": "137",
     "totalInvestment": "9127",
-    "sourcePage": "26"
+    "sourcePage": "26",
+    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -540,7 +546,8 @@
     "totalInvestment": "13546",
     "sourcePage": "23",
     "equipmentCost": 1279.2,
-    "sellingPrice": 2558.4
+    "sellingPrice": 2558.4,
+    "imageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png"
   },
   {
     "unitType": "SGA",
@@ -582,7 +589,8 @@
     "description": "Gas Furnace; 10 Year Limited Functional Parts with Rregistration 20 Year Limited Heat Exchanger Warranty",
     "monthlyPayment": "146",
     "totalInvestment": "9768",
-    "sourcePage": "24"
+    "sourcePage": "24",
+    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -614,7 +622,8 @@
     "totalInvestment": "15198",
     "sourcePage": "20",
     "equipmentCost": 3614.15,
-    "sellingPrice": 7228.3
+    "sellingPrice": 7228.3,
+    "imageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -630,7 +639,8 @@
     "totalInvestment": "15198",
     "sourcePage": "20",
     "equipmentCost": 1718.93,
-    "sellingPrice": 3437.86
+    "sellingPrice": 3437.86,
+    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -662,7 +672,8 @@
     "totalInvestment": "12173",
     "sourcePage": "20",
     "equipmentCost": 3102.68,
-    "sellingPrice": 6205.36
+    "sellingPrice": 6205.36,
+    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -678,7 +689,8 @@
     "totalInvestment": "10699",
     "sourcePage": "21",
     "equipmentCost": 1132.63,
-    "sellingPrice": 2265.26
+    "sellingPrice": 2265.26,
+    "imageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png"
   },
   {
     "unitType": "SGA",
@@ -694,7 +706,8 @@
     "totalInvestment": "16309",
     "sourcePage": "17",
     "equipmentCost": 3941.13,
-    "sellingPrice": 7882.26
+    "sellingPrice": 7882.26,
+    "imageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -710,7 +723,8 @@
     "totalInvestment": "16309",
     "sourcePage": "17",
     "equipmentCost": 1822.45,
-    "sellingPrice": 3644.9
+    "sellingPrice": 3644.9,
+    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -726,7 +740,8 @@
     "totalInvestment": "13190",
     "sourcePage": "17",
     "equipmentCost": 3425.55,
-    "sellingPrice": 6851.1
+    "sellingPrice": 6851.1,
+    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -759,7 +774,8 @@
     "totalInvestment": "17249",
     "sourcePage": "14",
     "equipmentCost": 1928.03,
-    "sellingPrice": 3856.06
+    "sellingPrice": 3856.06,
+    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -792,7 +808,8 @@
     "totalInvestment": "14023",
     "sourcePage": "14",
     "equipmentCost": 1220.78,
-    "sellingPrice": 2441.56
+    "sellingPrice": 2441.56,
+    "imageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png"
   },
   {
     "unitType": "SGA",
@@ -808,7 +825,8 @@
     "totalInvestment": "18224",
     "sourcePage": "12",
     "equipmentCost": 4590.98,
-    "sellingPrice": 9181.96
+    "sellingPrice": 9181.96,
+    "imageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -824,7 +842,8 @@
     "totalInvestment": "18224",
     "sourcePage": "12",
     "equipmentCost": 1985.43,
-    "sellingPrice": 3970.86
+    "sellingPrice": 3970.86,
+    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -840,7 +859,8 @@
     "totalInvestment": "15031",
     "sourcePage": "12",
     "equipmentCost": 4069.25,
-    "sellingPrice": 8138.5
+    "sellingPrice": 8138.5,
+    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -856,7 +876,8 @@
     "totalInvestment": "16776",
     "sourcePage": "9",
     "equipmentCost": 4353.18,
-    "sellingPrice": 8706.36
+    "sellingPrice": 8706.36,
+    "imageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -908,7 +929,8 @@
     "priceLow": 5906,
     "priceHigh": 5906,
     "equipmentType": "SGA",
-    "series": "XL16c Series"
+    "series": "XL16c Series",
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -930,7 +952,8 @@
     "priceLow": 6460,
     "priceHigh": 6460,
     "equipmentType": "SGA",
-    "series": "XL16c Series"
+    "series": "XL16c Series",
+    "imageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -946,7 +969,8 @@
     "totalInvestment": "14055",
     "sourcePage": "10",
     "equipmentCost": 1718.93,
-    "sellingPrice": 3438
+    "sellingPrice": 3438,
+    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -962,7 +986,8 @@
     "totalInvestment": "17548",
     "sourcePage": "6",
     "equipmentCost": 4680.15,
-    "sellingPrice": 9360.3
+    "sellingPrice": 9360.3,
+    "imageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -984,7 +1009,8 @@
     "priceLow": 6306,
     "priceHigh": 6306,
     "equipmentType": "SGA",
-    "series": "XL16c Series"
+    "series": "XL16c Series",
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1006,7 +1032,8 @@
     "priceLow": 7107,
     "priceHigh": 7107,
     "equipmentType": "SGA",
-    "series": "XL16c Series"
+    "series": "XL16c Series",
+    "imageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1055,7 +1082,8 @@
     "totalInvestment": "18721",
     "sourcePage": "3",
     "equipmentCost": 1880.88,
-    "sellingPrice": 3761.76
+    "sellingPrice": 3761.76,
+    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -1133,7 +1161,8 @@
     "totalInvestment": "20202",
     "sourcePage": "1",
     "equipmentCost": 5331.03,
-    "sellingPrice": 10662.06
+    "sellingPrice": 10662.06,
+    "imageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1155,7 +1184,8 @@
     "priceLow": 7319,
     "priceHigh": 7319,
     "equipmentType": "SGA",
-    "series": "XL16c Series"
+    "series": "XL16c Series",
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "unitType": "SGA",
@@ -1177,7 +1207,8 @@
     "priceLow": 8393,
     "priceHigh": 8393,
     "equipmentType": "SGA",
-    "series": "XL16c Series"
+    "series": "XL16c Series",
+    "imageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -1684,7 +1715,8 @@
     "price": 5879,
     "priceLow": 5879,
     "priceHigh": 5879,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SHP",
@@ -1705,7 +1737,8 @@
     "price": 6322,
     "priceLow": 6322,
     "priceHigh": 6322,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2355,7 +2388,8 @@
     "price": 6734,
     "priceLow": 6734,
     "priceHigh": 6734,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2537,7 +2571,8 @@
     "price": 6997,
     "priceLow": 6997,
     "priceHigh": 6997,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2558,7 +2593,8 @@
     "price": 7245,
     "priceLow": 7245,
     "priceHigh": 7245,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2712,7 +2748,8 @@
     "price": 7745,
     "priceLow": 7745,
     "priceHigh": 7745,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2859,7 +2896,8 @@
     "price": 7620,
     "priceLow": 7620,
     "priceHigh": 7620,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2880,7 +2918,8 @@
     "price": 6812,
     "priceLow": 6812,
     "priceHigh": 6812,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2943,7 +2982,8 @@
     "price": 8477,
     "priceLow": 8477,
     "priceHigh": 8477,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
   },
   {
     "unitType": "SHP",
@@ -2985,7 +3025,8 @@
     "price": 7665,
     "priceLow": 7665,
     "priceHigh": 7665,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3048,7 +3089,8 @@
     "price": 9323,
     "priceLow": 9323,
     "priceHigh": 9323,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3069,7 +3111,8 @@
     "price": 8501,
     "priceLow": 8501,
     "priceHigh": 8501,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3132,7 +3175,8 @@
     "price": 10172,
     "priceLow": 10172,
     "priceHigh": 10172,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_landscape_premium_4t_outdoor_5ttv8x48a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3153,7 +3197,8 @@
     "price": 9340,
     "priceLow": 9340,
     "priceHigh": 9340,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_square_premium_4t_outdoor_5ttr7048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3216,7 +3261,8 @@
     "price": 9096,
     "priceLow": 9096,
     "priceHigh": 9096,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3237,7 +3283,8 @@
     "price": 7077,
     "priceLow": 7077,
     "priceHigh": 7077,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3258,7 +3305,8 @@
     "price": 7066,
     "priceLow": 7066,
     "priceHigh": 7066,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3321,7 +3369,8 @@
     "price": 9959,
     "priceLow": 9959,
     "priceHigh": 9959,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3342,7 +3391,8 @@
     "price": 7489,
     "priceLow": 7489,
     "priceHigh": 7489,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3363,7 +3413,8 @@
     "price": 7921,
     "priceLow": 7921,
     "priceHigh": 7921,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3426,7 +3477,8 @@
     "price": 10804,
     "priceLow": 10804,
     "priceHigh": 10804,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3468,7 +3520,8 @@
     "price": 7997,
     "priceLow": 7997,
     "priceHigh": 7997,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3489,7 +3542,8 @@
     "price": 8758,
     "priceLow": 8758,
     "priceHigh": 8758,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3510,7 +3564,8 @@
     "price": 11650,
     "priceLow": 11650,
     "priceHigh": 11650,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_landscape_ultimate_4t_outdoor_5ttv0x48a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3526,7 +3581,8 @@
     "totalInvestment": "10685",
     "sourcePage": "35",
     "equipmentCost": 2328.8,
-    "sellingPrice": 4657.6
+    "sellingPrice": 4657.6,
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3586,7 +3642,8 @@
     "totalInvestment": "11637",
     "sourcePage": "31",
     "equipmentCost": 2659.88,
-    "sellingPrice": 5319.76
+    "sellingPrice": 5319.76,
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SHP",
@@ -3649,7 +3706,8 @@
     "price": 6525,
     "priceLow": 6525,
     "priceHigh": 6525,
-    "equipmentType": "SHP"
+    "equipmentType": "SHP",
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3772,7 +3830,8 @@
     "totalInvestment": "12468",
     "sourcePage": "27",
     "equipmentCost": 2892.55,
-    "sellingPrice": 5785.1
+    "sellingPrice": 5785.1,
+    "imageUrl": "sga_images/sga_square_essential_5t_outdoor_5ttr5060a1000.png"
   },
   {
     "unitType": "SGA",
@@ -3817,7 +3876,7 @@
     "monthlyPayment": "132",
     "totalInvestment": "8807",
     "sourcePage": "28",
-    "imageUrl": "sga_images/sga_square_furnace_a801x080cm5sd.png"
+    "imageUrl": "sga_images/sga_square_furnace_a801x060bm4sd.png"
   },
   {
     "unitType": "SGA",
@@ -3849,7 +3908,8 @@
     "series": "XL16c Series",
     "unitName": "XL16c Series",
     "sellingPrice": 5490,
-    "equipmentCost": 2744.95
+    "equipmentCost": 2744.95,
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "equipmentType": "SGA",
@@ -3867,7 +3927,8 @@
     "series": "XL16c Series",
     "unitName": "XL16c Series",
     "sellingPrice": 6103,
-    "equipmentCost": 3051.43
+    "equipmentCost": 3051.43,
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "equipmentType": "SGA",
@@ -3885,7 +3946,8 @@
     "series": "XL16c Series",
     "unitName": "XL16c Series",
     "sellingPrice": 6558,
-    "equipmentCost": 3278.98
+    "equipmentCost": 3278.98,
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "equipmentType": "SHP",
@@ -3902,7 +3964,8 @@
     "sellingPrice": 6663,
     "tier": "Ultimate",
     "unitName": "XL16i Series Heat Pump",
-    "description": "Heat Pump; Trane Heat Pump System Component"
+    "description": "Heat Pump; Trane Heat Pump System Component",
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "equipmentType": "SHP",
@@ -3919,7 +3982,8 @@
     "sellingPrice": 7278,
     "tier": "Ultimate",
     "unitName": "XL16i Series Heat Pump",
-    "description": "Heat Pump; Trane Heat Pump System Component"
+    "description": "Heat Pump; Trane Heat Pump System Component",
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "equipmentType": "SHP",
@@ -3936,7 +4000,8 @@
     "sellingPrice": 7751,
     "tier": "Ultimate",
     "unitName": "XL16i Series Heat Pump",
-    "description": "Heat Pump; Trane Heat Pump System Component"
+    "description": "Heat Pump; Trane Heat Pump System Component",
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "equipmentType": "SHP",
@@ -3970,7 +4035,8 @@
     "sellingPrice": 8493,
     "tier": "Ultimate",
     "unitName": "XL16i Series Heat Pump",
-    "description": "Heat Pump; Trane Heat Pump System Component"
+    "description": "Heat Pump; Trane Heat Pump System Component",
+    "imageUrl": "sga_images/sga_banner_outdoor_5ttx5048a1000.png"
   },
   {
     "equipmentType": "SHP",
@@ -3987,7 +4053,8 @@
     "sellingPrice": 9594,
     "tier": "Ultimate",
     "unitName": "XL16i Series Heat Pump",
-    "description": "Heat Pump; Trane Heat Pump System Component"
+    "description": "Heat Pump; Trane Heat Pump System Component",
+    "imageUrl": "sga_images/sga_landscape_outdoor_5ttx7048a1000.png"
   },
   {
     "equipmentType": "SHP",
