@@ -1488,11 +1488,11 @@ export default function ProposalBuilder() {
                 {(selectedUnitType === "Mini-Split" || selectedUnitType === "Ducting") ? (
                   <div className="space-y-3">
                     {selectedUnitType === "Mini-Split" ? (
-                      <p className="text-sm text-muted-foreground bg-amber-50 p-3 rounded-lg border border-amber-200 mb-4">
+                      <p className="text-sm text-muted-foreground p-3 rounded-lg border mb-4" style={{ backgroundColor: '#d3b07d20', borderColor: '#d3b07d' }}>
                         Each package includes both the outdoor condenser and indoor wall-mounted unit for a complete ductless system.
                       </p>
                     ) : (
-                      <p className="text-sm text-muted-foreground bg-amber-50 p-3 rounded-lg border border-amber-200 mb-4">
+                      <p className="text-sm text-muted-foreground p-3 rounded-lg border mb-4" style={{ backgroundColor: '#d3b07d20', borderColor: '#d3b07d' }}>
                         Complete duct system replacement includes removal of existing ducts, new ductwork installation, and system balancing with a 10-year workmanship guarantee.
                       </p>
                     )}
@@ -1545,8 +1545,8 @@ export default function ProposalBuilder() {
                               {/* Main info */}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <Badge className="bg-amber-500 text-white font-bold text-sm px-3">
-                                    {isMiniSplit ? pkg.packageLevel : tonnageDisplay}
+                                  <Badge className="text-white font-bold text-sm px-3" style={{ backgroundColor: '#d3b07d' }}>
+                                    {isMiniSplit ? pkg.packageLevel : pkg.packageLevel}
                                   </Badge>
                                   {isMiniSplit && (
                                     <span className="text-sm font-medium">
