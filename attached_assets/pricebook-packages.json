@@ -496,8 +496,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "thermostatImageUrl": "gp_images/gp_2ton_best_2_trane_tcont824as52da.png",
-    "outdoorImageUrl": "gp_images/gp_2ton_best_1_trane_5ycz5024a1060.png"
+    "thermostatImageUrl": "gp_images_v2/gp_2ton_best_2_thermostat_trane_tcont824as52da.png",
+    "outdoorImageUrl": "gp_images_v2/gp_2ton_best_1_package_unit_trane_5ycz5024a1060.png"
   },
   {
     "unitType": "GP",
@@ -516,8 +516,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "thermostatImageUrl": "gp_images/gp_2ton_better_2_trane_tcont724as42da.png",
-    "outdoorImageUrl": "gp_images/gp_2ton_better_1_trane_5ycc4024a1060.png"
+    "thermostatImageUrl": "gp_images_v2/gp_2ton_better_2_thermostat_trane_tcont724as42da.png",
+    "outdoorImageUrl": "gp_images_v2/gp_2ton_better_1_package_unit_trane_5ycc4024a1060.png"
   },
   {
     "unitType": "GP",
@@ -536,8 +536,8 @@
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
     "accessoryModels": "",
-    "outdoorImageUrl": "gp_images/gp_2ton_good_1_carrier_48nl-b240603.png",
-    "thermostatImageUrl": "gp_images/gp_2ton_good_2_carrier_eb-state3lticr-01.png"
+    "outdoorImageUrl": "gp_images_v2/gp_2ton_good_1_package_unit_carrier_48nl-b240603.png",
+    "thermostatImageUrl": "gp_images_v2/gp_2ton_good_2_thermostat_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "GP",
@@ -556,8 +556,8 @@
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
     "accessoryModels": "",
-    "outdoorImageUrl": "gp_images/gp_2ton_budget_1_runtru_a5pg3024a1060.png",
-    "thermostatImageUrl": "gp_images/gp_2ton_budget_2_trane_tcont724as42da.png"
+    "outdoorImageUrl": "gp_images_v2/gp_2ton_budget_1_package_unit_runtru_a5pg3024a1060.png",
+    "thermostatImageUrl": "gp_images_v2/gp_2ton_budget_2_thermostat_trane_tcont724as42da.png"
   },
   {
     "unitType": "GP",
@@ -576,8 +576,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "thermostatImageUrl": "gp_images/gp_2_5ton_best_2_trane_tcont824as52da.png",
-    "outdoorImageUrl": "gp_images/gp_2_5ton_best_1_trane_5ycz5030a1070.png"
+    "thermostatImageUrl": "gp_images_v2/gp_2_5ton_best_2_thermostat_trane_tcont824as52da.png",
+    "outdoorImageUrl": "gp_images_v2/gp_2_5ton_best_1_package_unit_trane_5ycz5030a1070.png"
   },
   {
     "unitType": "GP",
@@ -596,8 +596,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "thermostatImageUrl": "gp_images/gp_2_5ton_better_2_trane_tcont724as42da.png",
-    "outdoorImageUrl": "gp_images/gp_2_5ton_better_1_trane_5ycc4030a1070.png"
+    "thermostatImageUrl": "gp_images_v2/gp_2_5ton_better_2_thermostat_trane_tcont724as42da.png",
+    "outdoorImageUrl": "gp_images_v2/gp_2_5ton_better_1_package_unit_trane_5ycc4030a1070.png"
   },
   {
     "unitType": "GP",
@@ -616,8 +616,8 @@
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
     "accessoryModels": "",
-    "outdoorImageUrl": "gp_images/gp_2_5ton_good_1_carrier_48nl-b300603.png",
-    "thermostatImageUrl": "gp_images/gp_2_5ton_good_2_carrier_eb-state3lticr-01.png"
+    "outdoorImageUrl": "gp_images_v2/gp_2_5ton_good_1_package_unit_carrier_48nl-b300603.png",
+    "thermostatImageUrl": "gp_images_v2/gp_2_5ton_good_2_thermostat_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "GP",
@@ -636,8 +636,8 @@
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
     "accessoryModels": "",
-    "outdoorImageUrl": "gp_images/gp_2_5ton_budget_1_runtru_a5pg3030a1070.png",
-    "thermostatImageUrl": "gp_images/gp_2_5ton_budget_2_trane_tcont724as42da.png"
+    "outdoorImageUrl": "gp_images_v2/gp_2_5ton_budget_1_package_unit_runtru_a5pg3030a1070.png",
+    "thermostatImageUrl": "gp_images_v2/gp_2_5ton_budget_2_thermostat_trane_tcont724as42da.png"
   },
   {
     "unitType": "GP",
@@ -656,8 +656,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "thermostatImageUrl": "gp_images/gp_3ton_best_2_trane_tcont824as52da.png",
-    "outdoorImageUrl": "gp_images/gp_3ton_best_1_trane_5ycz5036a1070.png"
+    "thermostatImageUrl": "gp_images_v2/gp_3ton_best_2_thermostat_trane_tcont824as52da.png",
+    "outdoorImageUrl": "gp_images_v2/gp_3ton_best_1_package_unit_trane_5ycz5036a1070.png"
   },
   {
     "unitType": "GP",
@@ -676,8 +676,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "thermostatImageUrl": "gp_images/gp_3ton_better_2_trane_tcont724as42da.png",
-    "outdoorImageUrl": "gp_images/gp_3ton_better_1_trane_5ycc4036a1070.png"
+    "thermostatImageUrl": "gp_images_v2/gp_3ton_better_2_thermostat_trane_tcont724as42da.png",
+    "outdoorImageUrl": "gp_images_v2/gp_3ton_better_1_package_unit_trane_5ycc4036a1070.png"
   },
   {
     "unitType": "GP",
@@ -696,8 +696,8 @@
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
     "accessoryModels": "",
-    "outdoorImageUrl": "gp_images/gp_3ton_good_1_carrier_48nl-b360903.png",
-    "thermostatImageUrl": "gp_images/gp_3ton_good_2_carrier_eb-state3lticr-01.png"
+    "outdoorImageUrl": "gp_images_v2/gp_3ton_good_1_package_unit_carrier_48nl-b360903.png",
+    "thermostatImageUrl": "gp_images_v2/gp_3ton_good_2_thermostat_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "GP",
@@ -716,8 +716,8 @@
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
     "accessoryModels": "",
-    "outdoorImageUrl": "gp_images/gp_3ton_budget_1_runtru_a5pg3036a1070.png",
-    "thermostatImageUrl": "gp_images/gp_3ton_budget_2_trane_tcont724as42da.png"
+    "outdoorImageUrl": "gp_images_v2/gp_3ton_budget_1_package_unit_runtru_a5pg3036a1070.png",
+    "thermostatImageUrl": "gp_images_v2/gp_3ton_budget_2_thermostat_trane_tcont724as42da.png"
   },
   {
     "unitType": "GP",
@@ -736,8 +736,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "thermostatImageUrl": "gp_images/gp_3_5ton_best_2_trane_tcont824as52da.png",
-    "outdoorImageUrl": "gp_images/gp_3_5ton_best_1_trane_5ycz5042a1090.png"
+    "thermostatImageUrl": "gp_images_v2/gp_3_5ton_best_2_thermostat_trane_tcont824as52da.png",
+    "outdoorImageUrl": "gp_images_v2/gp_3_5ton_best_1_package_unit_trane_5ycz5042a1090.png"
   },
   {
     "unitType": "GP",
@@ -756,8 +756,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "thermostatImageUrl": "gp_images/gp_3_5ton_better_2_trane_tcont724as42da.png",
-    "outdoorImageUrl": "gp_images/gp_3_5ton_better_1_trane_5ycc4042a1060.png"
+    "thermostatImageUrl": "gp_images_v2/gp_3_5ton_better_2_thermostat_trane_tcont724as42da.png",
+    "outdoorImageUrl": "gp_images_v2/gp_3_5ton_better_1_package_unit_trane_5ycc4042a1060.png"
   },
   {
     "unitType": "GP",
@@ -776,8 +776,8 @@
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
     "accessoryModels": "",
-    "outdoorImageUrl": "gp_images/gp_3_5ton_good_1_carrier_48nl-b420903.png",
-    "thermostatImageUrl": "gp_images/gp_3_5ton_good_2_carrier_eb-state3lticr-01.png"
+    "outdoorImageUrl": "gp_images_v2/gp_3_5ton_good_1_package_unit_carrier_48nl-b420903.png",
+    "thermostatImageUrl": "gp_images_v2/gp_3_5ton_good_2_thermostat_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "GP",
@@ -796,8 +796,8 @@
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
     "accessoryModels": "",
-    "outdoorImageUrl": "gp_images/gp_3_5ton_budget_1_runtru_a5pg3042a1090.png",
-    "thermostatImageUrl": "gp_images/gp_3_5ton_budget_2_trane_tcont724as42da.png"
+    "outdoorImageUrl": "gp_images_v2/gp_3_5ton_budget_1_package_unit_runtru_a5pg3042a1090.png",
+    "thermostatImageUrl": "gp_images_v2/gp_3_5ton_budget_2_thermostat_trane_tcont724as42da.png"
   },
   {
     "unitType": "GP",
@@ -816,8 +816,8 @@
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
     "accessoryModels": "",
-    "outdoorImageUrl": "gp_images/gp_4ton_best_1_trane_5ycz5048a1090.png",
-    "thermostatImageUrl": "gp_images/gp_4ton_best_2_trane_tcont824as52da.png"
+    "outdoorImageUrl": "gp_images_v2/gp_4ton_best_1_package_unit_trane_5ycz5048a1090.png",
+    "thermostatImageUrl": "gp_images_v2/gp_4ton_best_2_thermostat_trane_tcont824as52da.png"
   },
   {
     "unitType": "GP",
@@ -836,8 +836,8 @@
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
     "accessoryModels": "",
-    "outdoorImageUrl": "gp_images/gp_4ton_better_1_carrier_48nl-b481153.png",
-    "thermostatImageUrl": "gp_images/gp_4ton_better_2_carrier_eb-state3lticr-01.png"
+    "outdoorImageUrl": "gp_images_v2/gp_4ton_better_1_package_unit_carrier_48nl-b481153.png",
+    "thermostatImageUrl": "gp_images_v2/gp_4ton_better_2_thermostat_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "GP",
@@ -856,8 +856,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "thermostatImageUrl": "gp_images/gp_4ton_good_2_trane_tcont724as42da.png",
-    "outdoorImageUrl": "gp_images/gp_4ton_good_1_trane_5ycc4048a1070.png"
+    "thermostatImageUrl": "gp_images_v2/gp_4ton_good_2_thermostat_trane_tcont724as42da.png",
+    "outdoorImageUrl": "gp_images_v2/gp_4ton_good_1_package_unit_trane_5ycc4048a1070.png"
   },
   {
     "unitType": "GP",
@@ -876,8 +876,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "thermostatImageUrl": "gp_images/gp_4ton_budget_2_trane_tcont724as42da.png",
-    "outdoorImageUrl": "gp_images/gp_4ton_budget_1_runtru_a5pg3048a1090.png"
+    "thermostatImageUrl": "gp_images_v2/gp_4ton_budget_2_thermostat_trane_tcont724as42da.png",
+    "outdoorImageUrl": "gp_images_v2/gp_4ton_budget_1_package_unit_runtru_a5pg3048a1090.png"
   },
   {
     "unitType": "GP",
@@ -896,8 +896,8 @@
     "thermostatModel": "TCONT824AS52DA",
     "thermostatName": "XL824 Connected Control",
     "accessoryModels": "",
-    "outdoorImageUrl": "gp_images/gp_5ton_best_1_trane_5ycz5060a1115.png",
-    "thermostatImageUrl": "gp_images/gp_5ton_best_2_trane_tcont824as52da.png"
+    "outdoorImageUrl": "gp_images_v2/gp_5ton_best_1_package_unit_trane_5ycz5060a1115.png",
+    "thermostatImageUrl": "gp_images_v2/gp_5ton_best_2_thermostat_trane_tcont824as52da.png"
   },
   {
     "unitType": "GP",
@@ -916,8 +916,8 @@
     "thermostatModel": "EB-STATE3LTICR-01",
     "thermostatName": "Ecobee3 Lite Pro",
     "accessoryModels": "",
-    "outdoorImageUrl": "gp_images/gp_5ton_better_1_carrier_48nl-b601153.png",
-    "thermostatImageUrl": "gp_images/gp_5ton_better_2_carrier_eb-state3lticr-01.png"
+    "outdoorImageUrl": "gp_images_v2/gp_5ton_better_1_package_unit_carrier_48nl-b601153.png",
+    "thermostatImageUrl": "gp_images_v2/gp_5ton_better_2_thermostat_carrier_eb-state3lticr-01.png"
   },
   {
     "unitType": "GP",
@@ -936,8 +936,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "thermostatImageUrl": "gp_images/gp_5ton_good_2_trane_tcont724as42da.png",
-    "outdoorImageUrl": "gp_images/gp_5ton_good_1_trane_5ycc4060a1090.png"
+    "thermostatImageUrl": "gp_images_v2/gp_5ton_good_2_thermostat_trane_tcont724as42da.png",
+    "outdoorImageUrl": "gp_images_v2/gp_5ton_good_1_package_unit_trane_5ycc4060a1090.png"
   },
   {
     "unitType": "GP",
@@ -956,8 +956,8 @@
     "thermostatModel": "TCONT724AS42DA",
     "thermostatName": "Wi-Fi Connected Control 5/2",
     "accessoryModels": "",
-    "thermostatImageUrl": "gp_images/gp_5ton_budget_2_trane_tcont724as42da.png",
-    "outdoorImageUrl": "gp_images/gp_5ton_budget_1_runtru_a5pg3060a1115.png"
+    "thermostatImageUrl": "gp_images_v2/gp_5ton_budget_2_thermostat_trane_tcont724as42da.png",
+    "outdoorImageUrl": "gp_images_v2/gp_5ton_budget_1_package_unit_runtru_a5pg3060a1115.png"
   },
   {
     "unitType": "SGA",
