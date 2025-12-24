@@ -208,22 +208,11 @@ const HVAC_ELITE_AIRFLOW_OPTIONS: EliteAirflowOption[] = [
     priceByTonnage: { "1.5": 7527, "2": 9353, "2.5": 11179, "3": 13005, "3.5": 14831, "4": 16657, "5": 20309 }
   },
   {
-    id: "duct-cleaning",
-    name: "Duct Cleaning",
-    description: "Professional duct cleaning service",
-    priceByTonnage: { "1.5": 1000, "2": 1000, "2.5": 1000, "3": 1000, "3.5": 1000, "4": 1000, "5": 1000 }
-  },
-  {
-    id: "new-return",
-    name: "New Return",
-    description: "New return duct setup for optimal airflow",
-    priceByTonnage: { "1.5": 350, "2": 350, "2.5": 700, "3": 700, "3.5": 1000, "4": 1000, "5": 1500 }
-  },
-  {
-    id: "reinsulation",
-    name: "Re-Insulation",
-    description: "Attic re-insulation for improved efficiency",
-    priceByTonnage: { "1.5": 895, "2": 995, "2.5": 1150, "3": 1295, "3.5": 1450, "4": 1650, "5": 1950 }
+    id: "cleaning-return-insulation",
+    name: "Duct Cleaning + New Return + Re-Insulation",
+    description: "Duct cleaning, new return setup, and attic re-insulation bundle",
+    // Combined: Duct Cleaning ($1000) + New Return (tonnage) + Re-Insulation (tonnage)
+    priceByTonnage: { "1.5": 2245, "2": 2345, "2.5": 2850, "3": 2995, "3.5": 3450, "4": 3650, "5": 4450 }
   }
 ];
 
