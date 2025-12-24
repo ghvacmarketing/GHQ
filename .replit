@@ -46,6 +46,8 @@ integrations = ["javascript_mem_db:1.0.0", "javascript_openai:1.0.0", "javascrip
 
 [userenv.shared]
 FIELDEDGE_CUSTOMER_SHEET_ID = "1POeQRuDUTia0BUYsVmEsBOqW6BDBvfL5qyKv-GQICU0"
+TRELLO_LIST_UNRESOLVED = "67769950d438e075bef2e14b"
+TRELLO_LIST_RESOLVED = "685c6b3a6a0a06c495b7602c"
 
 [userenv.development]
 SKIP_GLOBAL_AUTH = "true"
