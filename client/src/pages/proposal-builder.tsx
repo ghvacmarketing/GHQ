@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download } from "lucide-react";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType } from "docx";
 import { saveAs } from "file-saver";
+import { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,12 +36,25 @@ const CUSTOMER_STORAGE_KEY = 'ghvac-proposal-customer';
 // Company branding constants for proposals and documents
 const COMPANY_INFO = {
   name: "GIESBRECHT HVAC",
-  tagline: "Professional Heating & Cooling Solutions",
+  tagline: "Comfort you can trust.",
   address: "PO Box 917, Wrens, GA 30833",
   phone: "(706) 826-0644",
   email: "earnest@ghvacinc.com",
+  website: "ghvac.work",
   documentTitle: "COMPREHENSIVE HOME COMFORT PROPOSAL",
   footer: "Thank you for considering GHVAC!",
+  termsFooter: "This proposal is valid for 30 days. Prices subject to change. Financing terms subject to credit approval.",
+};
+
+// Brand colors for PDF
+const BRAND_COLORS = {
+  primary: [113, 20, 25] as [number, number, number], // #711419 - deep red
+  primaryHex: "#711419",
+  text: [26, 26, 26] as [number, number, number], // #1a1a1a
+  muted: [100, 100, 100] as [number, number, number],
+  white: [255, 255, 255] as [number, number, number],
+  lightGray: [245, 245, 245] as [number, number, number],
+  eliteGreen: [34, 139, 34] as [number, number, number], // Forest green for savings
 };
 
 type PricebookPackage = {
@@ -1910,6 +1924,356 @@ export default function ProposalBuilder() {
       toast({
         title: "Download Failed",
         description: "Could not generate the document. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const downloadQuoteAsPDF = async () => {
+    if (!aiGeneratedQuote) return;
+
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const contentWidth = pageWidth - (margin * 2);
+      let y = 20;
+
+      const addHeader = () => {
+        doc.setFillColor(...BRAND_COLORS.primary);
+        doc.rect(0, 0, pageWidth, 35, 'F');
+        doc.setFontSize(20);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...BRAND_COLORS.white);
+        doc.text(COMPANY_INFO.name, pageWidth / 2, 15, { align: 'center' });
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "italic");
+        doc.text(COMPANY_INFO.tagline, pageWidth / 2, 23, { align: 'center' });
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(230, 230, 230);
+        doc.text(`${COMPANY_INFO.phone} | ${COMPANY_INFO.email} | ${COMPANY_INFO.website}`, pageWidth / 2, 30, { align: 'center' });
+      };
+
+      const addFooter = (pageNum: number, totalPages: number) => {
+        doc.setDrawColor(...BRAND_COLORS.primary);
+        doc.setLineWidth(0.5);
+        doc.line(margin, pageHeight - 25, pageWidth - margin, pageHeight - 25);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(...BRAND_COLORS.text);
+        doc.text(COMPANY_INFO.footer, pageWidth / 2, pageHeight - 18, { align: 'center' });
+        doc.setFontSize(7);
+        doc.setTextColor(...BRAND_COLORS.muted);
+        doc.text(COMPANY_INFO.termsFooter, pageWidth / 2, pageHeight - 12, { align: 'center' });
+        doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth / 2, pageHeight - 7, { align: 'center' });
+      };
+
+      const checkPageBreak = (neededSpace: number) => {
+        if (y + neededSpace > pageHeight - 35) {
+          doc.addPage();
+          addHeader();
+          y = 45;
+        }
+      };
+
+      addHeader();
+      y = 45;
+
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...BRAND_COLORS.primary);
+      doc.text(COMPANY_INFO.documentTitle, pageWidth / 2, y, { align: 'center' });
+      y += 12;
+
+      doc.setDrawColor(...BRAND_COLORS.primary);
+      doc.setLineWidth(1);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 10;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...BRAND_COLORS.text);
+      doc.text("Prepared for:", margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(customerName || "Valued Customer", margin + 28, y);
+      y += 6;
+
+      if (customerAddress) {
+        doc.text(customerAddress, margin, y);
+        y += 6;
+      }
+
+      const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      doc.text(`Date: ${date}`, margin, y);
+      y += 12;
+
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...BRAND_COLORS.primary);
+      doc.text(aiGeneratedQuote.quote_title, pageWidth / 2, y, { align: 'center' });
+      y += 10;
+
+      if (aiGeneratedQuote.package_description) {
+        checkPageBreak(20);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...BRAND_COLORS.text);
+        const descLines = doc.splitTextToSize(aiGeneratedQuote.package_description, contentWidth);
+        doc.text(descLines, margin, y);
+        y += descLines.length * 5 + 8;
+      }
+
+      if (aiGeneratedQuote.whats_included && aiGeneratedQuote.whats_included.length > 0) {
+        checkPageBreak(20);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...BRAND_COLORS.primary);
+        doc.text("What's Included", margin, y);
+        y += 8;
+
+        aiGeneratedQuote.whats_included.forEach((category: { category: string; items: string[] }) => {
+          checkPageBreak(15);
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...BRAND_COLORS.text);
+          doc.text(category.category, margin + 5, y);
+          y += 5;
+
+          doc.setFont("helvetica", "normal");
+          category.items.forEach((item: string) => {
+            checkPageBreak(6);
+            const itemLines = doc.splitTextToSize(`• ${item}`, contentWidth - 15);
+            doc.text(itemLines, margin + 10, y);
+            y += itemLines.length * 4 + 2;
+          });
+          y += 3;
+        });
+      }
+
+      checkPageBreak(50);
+      y += 5;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...BRAND_COLORS.primary);
+      doc.text("Pricing Details", margin, y);
+      y += 8;
+
+      const tableStartX = margin;
+      const col1Width = contentWidth * 0.55;
+      const col2Width = contentWidth * 0.15;
+      const col3Width = contentWidth * 0.30;
+
+      doc.setFillColor(...BRAND_COLORS.primary);
+      doc.rect(tableStartX, y, contentWidth, 8, 'F');
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...BRAND_COLORS.white);
+      doc.text("Item", tableStartX + 3, y + 5.5);
+      doc.text("Qty", tableStartX + col1Width + 3, y + 5.5);
+      doc.text("Price", tableStartX + col1Width + col2Width + col3Width - 3, y + 5.5, { align: 'right' });
+      y += 8;
+
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...BRAND_COLORS.text);
+      let rowIndex = 0;
+
+      if (aiGeneratedQuote.line_items && aiGeneratedQuote.line_items.length > 0) {
+        aiGeneratedQuote.line_items.forEach((item: { name: string; qty: number; price: number; description: string }) => {
+          doc.setFontSize(9);
+          const nameLines = doc.splitTextToSize(item.name, col1Width - 6);
+          const descLines = item.description ? doc.splitTextToSize(item.description, col1Width - 6) : [];
+          const nameHeight = nameLines.length * 4;
+          const descHeight = descLines.length * 3.5;
+          const rowHeight = Math.max(12, nameHeight + descHeight + 6);
+          
+          checkPageBreak(rowHeight + 2);
+          if (rowIndex % 2 === 0) {
+            doc.setFillColor(...BRAND_COLORS.lightGray);
+            doc.rect(tableStartX, y, contentWidth, rowHeight, 'F');
+          }
+          
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...BRAND_COLORS.text);
+          let textY = y + 5;
+          nameLines.forEach((line: string) => {
+            doc.text(line, tableStartX + 3, textY);
+            textY += 4;
+          });
+          
+          doc.setFont("helvetica", "normal");
+          doc.text(item.qty.toString(), tableStartX + col1Width + 3, y + 5);
+          doc.text(`$${item.price.toLocaleString()}`, tableStartX + col1Width + col2Width + col3Width - 3, y + 5, { align: 'right' });
+          
+          if (descLines.length > 0) {
+            doc.setFontSize(7);
+            doc.setTextColor(...BRAND_COLORS.muted);
+            descLines.forEach((line: string) => {
+              doc.text(line, tableStartX + 3, textY);
+              textY += 3.5;
+            });
+            doc.setTextColor(...BRAND_COLORS.text);
+          }
+          
+          y += rowHeight;
+          rowIndex++;
+        });
+      }
+
+      doc.setDrawColor(...BRAND_COLORS.primary);
+      doc.setLineWidth(0.5);
+      doc.line(tableStartX, y, tableStartX + contentWidth, y);
+      y += 6;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text("Subtotal:", tableStartX + col1Width, y);
+      doc.text(`$${aiGeneratedQuote.subtotal.toLocaleString()}`, tableStartX + contentWidth - 3, y, { align: 'right' });
+      y += 6;
+
+      if (aiGeneratedQuote.elite_discount_active && aiGeneratedQuote.elite_discount_amount > 0) {
+        checkPageBreak(14);
+        doc.setFillColor(220, 255, 220);
+        doc.rect(tableStartX, y - 4, contentWidth, 12, 'F');
+        doc.setDrawColor(...BRAND_COLORS.eliteGreen);
+        doc.setLineWidth(1);
+        doc.rect(tableStartX, y - 4, contentWidth, 12, 'S');
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...BRAND_COLORS.eliteGreen);
+        doc.text(`Elite Package Discount (${aiGeneratedQuote.elite_discount_percent}%):`, tableStartX + col1Width, y + 2);
+        doc.text(`-$${aiGeneratedQuote.elite_discount_amount.toLocaleString()}`, tableStartX + contentWidth - 3, y + 2, { align: 'right' });
+        y += 14;
+        doc.setTextColor(...BRAND_COLORS.text);
+      }
+
+      if (aiGeneratedQuote.elite_warning) {
+        checkPageBreak(8);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(178, 34, 34);
+        const warnLines = doc.splitTextToSize(`Note: ${aiGeneratedQuote.elite_warning}`, contentWidth);
+        doc.text(warnLines, margin, y);
+        y += warnLines.length * 4 + 4;
+        doc.setTextColor(...BRAND_COLORS.text);
+      }
+
+      if (aiGeneratedQuote.discount_amount > 0 && !aiGeneratedQuote.elite_discount_active) {
+        doc.setFont("helvetica", "normal");
+        doc.text(`Discount (${aiGeneratedQuote.discount_percent}%):`, tableStartX + col1Width, y);
+        doc.text(`-$${aiGeneratedQuote.discount_amount.toLocaleString()}`, tableStartX + contentWidth - 3, y, { align: 'right' });
+        y += 6;
+      }
+
+      checkPageBreak(12);
+      doc.setFillColor(...BRAND_COLORS.primary);
+      doc.rect(tableStartX, y, contentWidth, 10, 'F');
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...BRAND_COLORS.white);
+      doc.text("TOTAL:", tableStartX + col1Width, y + 7);
+      doc.text(`$${aiGeneratedQuote.total.toLocaleString()}`, tableStartX + contentWidth - 3, y + 7, { align: 'right' });
+      y += 16;
+      doc.setTextColor(...BRAND_COLORS.text);
+
+      if (aiGeneratedQuote.savings_note) {
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(...BRAND_COLORS.eliteGreen);
+        doc.text(aiGeneratedQuote.savings_note, margin, y);
+        y += 6;
+        doc.setTextColor(...BRAND_COLORS.text);
+      }
+
+      if (aiGeneratedQuote.financing_text) {
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.text(aiGeneratedQuote.financing_text, margin, y);
+        y += 10;
+      }
+
+      if (aiGeneratedQuote.warranties_and_terms && aiGeneratedQuote.warranties_and_terms.length > 0) {
+        checkPageBreak(25);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...BRAND_COLORS.primary);
+        doc.text("Warranties & Terms", margin, y);
+        y += 7;
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...BRAND_COLORS.text);
+        aiGeneratedQuote.warranties_and_terms.forEach((term: string) => {
+          checkPageBreak(6);
+          const termLines = doc.splitTextToSize(`• ${term}`, contentWidth - 10);
+          doc.text(termLines, margin + 5, y);
+          y += termLines.length * 4 + 2;
+        });
+        y += 5;
+      }
+
+      if (aiGeneratedQuote.next_steps && aiGeneratedQuote.next_steps.length > 0) {
+        checkPageBreak(25);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...BRAND_COLORS.primary);
+        doc.text("Next Steps", margin, y);
+        y += 7;
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...BRAND_COLORS.text);
+        aiGeneratedQuote.next_steps.forEach((step: string) => {
+          checkPageBreak(6);
+          const stepLines = doc.splitTextToSize(`• ${step}`, contentWidth - 10);
+          doc.text(stepLines, margin + 5, y);
+          y += stepLines.length * 4 + 2;
+        });
+        y += 5;
+      }
+
+      if (aiGeneratedQuote.additional_enhancements && aiGeneratedQuote.additional_enhancements.length > 0) {
+        checkPageBreak(30);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...BRAND_COLORS.primary);
+        doc.text("Additional Enhancements Available", margin, y);
+        y += 8;
+        aiGeneratedQuote.additional_enhancements.forEach((enh: { name: string; price: number; description: string; whats_included: string[]; recommended_for: string }) => {
+          checkPageBreak(20);
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...BRAND_COLORS.text);
+          doc.text(`${enh.name} - $${enh.price.toLocaleString()}`, margin + 5, y);
+          y += 5;
+          if (enh.description) {
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "normal");
+            const enhDescLines = doc.splitTextToSize(enh.description, contentWidth - 15);
+            doc.text(enhDescLines, margin + 10, y);
+            y += enhDescLines.length * 4 + 3;
+          }
+        });
+      }
+
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        addFooter(i, totalPages);
+      }
+
+      const customerNameForFile = selectedCustomer?.displayName?.replace(/[^a-zA-Z0-9]/g, '_') || customerName?.replace(/[^a-zA-Z0-9]/g, '_') || 'Customer';
+      const dateForFile = new Date().toISOString().split('T')[0];
+      doc.save(`GHVAC_Quote_${customerNameForFile}_${dateForFile}.pdf`);
+
+      toast({
+        title: "Downloaded!",
+        description: "Quote saved as branded PDF.",
+      });
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      toast({
+        title: "Download Failed",
+        description: "Could not generate the PDF. Please try again.",
         variant: "destructive",
       });
     }
@@ -4115,12 +4479,12 @@ export default function ProposalBuilder() {
                 Close
               </Button>
               <Button
-                onClick={downloadQuoteAsDoc}
+                onClick={downloadQuoteAsPDF}
                 className="flex-1 min-h-[44px]"
                 data-testid="button-download-quote"
               >
                 <Download className="h-4 w-4 mr-2" />
-                Download as DOC
+                Download PDF
               </Button>
               <Button
                 onClick={handleAcceptQuote}
