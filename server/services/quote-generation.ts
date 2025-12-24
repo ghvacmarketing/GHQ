@@ -260,13 +260,15 @@ export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<
           },
           required: [
             "quote_title",
-            "customer_summary", 
+            "customer_summary",
+            "selected_base_package",
             "add_ons",
             "subtotal",
             "discount_percent",
             "discount_amount",
             "total",
             "savings_text",
+            "financing_text",
             "warranties_and_terms",
             "next_steps"
           ],
