@@ -519,7 +519,6 @@ export default function Voicemails() {
                 currentPageTitle="Voicemails"
                 items={[
                   { label: "Home", path: "/" },
-                  { label: "Voicemails", path: "/voicemails" },
                   { label: "Sales Prospects", path: "/sales-prospects" },
                   { label: "Installation Department", path: "/installation" },
                   { label: "Service Department", path: "/service-pipeline" },

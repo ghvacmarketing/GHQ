@@ -151,7 +151,6 @@ export default function Home() {
                   { label: "Sales Prospects", path: "/sales-prospects" },
                   { label: "Installation Department", path: "/installation" },
                   { label: "Service Department", path: "/service-pipeline" },
-                  { label: "Voicemails", path: "/voicemails" },
                 ]}
               />
             </div>
