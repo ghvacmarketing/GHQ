@@ -1,32 +1,52 @@
 import OpenAI from "openai";
-import { z } from "zod";
+import { AIQuoteResponseSchema, type AIQuoteResponse, type QuoteMessage } from "@shared/schema";
+import { storage } from "../storage";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-export const GeneratedQuoteSchema = z.object({
-  quote_title: z.string(),
-  customer_facing_summary: z.string(),
-  line_items: z.array(z.object({
-    name: z.string(),
-    qty: z.number(),
-    price: z.number(),
-    description: z.string(),
-  })),
-  subtotal: z.number(),
-  discount_amount: z.number(),
-  discount_percent: z.number(),
-  total: z.number(),
-  savings_text: z.string(),
-  financing_text: z.string().optional(),
-  warranties_and_terms: z.array(z.string()),
-});
+// System instruction block - always sent with every request
+const SYSTEM_INSTRUCTIONS = `You are GHVAC's professional HVAC quoting assistant. Your role is to generate accurate, sales-ready quotes for heating and cooling equipment installations.
 
-export type GeneratedQuote = z.infer<typeof GeneratedQuoteSchema>;
+BUSINESS RULES (MUST FOLLOW):
+1. Pricing Tiers:
+   - Budget: Entry-level equipment with basic features
+   - Good: Reliable mid-range equipment with standard warranties
+   - Better: Higher efficiency equipment with extended warranties
+   - Best: Premium equipment with maximum efficiency and best warranties
+
+2. Elite Package Rules:
+   - Elite Package adds: 10-Year Maintenance Plan, 10-Year Labor Warranty, Install Upgrade Bundle, New Ducting System
+   - Elite Package receives 20% discount on the total bundle price
+   - Only available when customer selects the upgrade
+
+3. Discount Policy:
+   - Standard quotes have no discount unless explicitly requested
+   - Maximum discount without manager approval: 10%
+   - Any discount must be justified (e.g., competitor pricing, bundle deal, loyalty)
+
+4. Quote Accuracy:
+   - ALWAYS use the EXACT prices provided in the input data
+   - NEVER calculate, estimate, or modify pricing on your own
+   - The subtotal, discount, and total MUST match the input data exactly
+
+BEHAVIORAL RULES:
+1. Ask at most ONE clarifying question if critical information is missing; otherwise assume reasonable defaults
+2. Be concise, professional, and sales-ready in all communications
+3. Highlight value propositions, not just features
+4. Emphasize warranties, efficiency ratings, and long-term savings
+5. If Elite Package is included, always highlight the 20% savings and added value
+
+OUTPUT REQUIREMENTS:
+- You MUST respond with valid JSON matching the exact schema provided
+- All prices must be numbers (not strings)
+- Keep customer_summary to 2-3 sentences maximum
+- Warranties and next_steps should be actionable bullet points`;
 
 export interface QuoteGenerationInput {
+  conversationId?: string;
   customerName?: string;
   customerAddress?: string;
   customerNotes?: string;
@@ -41,6 +61,10 @@ export interface QuoteGenerationInput {
     isElite: boolean;
     eliteIncludes?: string[];
     eliteSavings?: number;
+    tier?: string;
+    tonnage?: string;
+    brand?: string;
+    model?: string;
   }>;
   totals: {
     subtotal: number;
@@ -50,70 +74,207 @@ export interface QuoteGenerationInput {
   };
 }
 
-export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<GeneratedQuote> {
-  const systemPrompt = `You are an HVAC service quote generator for GHVAC. Generate professional, customer-friendly quotes.
+interface ConversationContext {
+  rollingSummary: string;
+  recentMessages: Array<{ role: 'user' | 'assistant'; content: string }>;
+}
 
-IMPORTANT RULES:
-- Use the exact prices provided in the input - do not calculate or modify them
-- Format all prices as numbers (not strings)
-- Be professional but warm and approachable
-- Highlight value and benefits, not just features
-- If Elite Package is included, emphasize the savings and added value
-- Keep the summary concise but informative (2-3 sentences max)
+async function getConversationContext(conversationId: string): Promise<ConversationContext> {
+  const conversation = await storage.getQuoteConversation(conversationId);
+  const messages = await storage.getRecentQuoteMessages(conversationId, 10);
+  
+  return {
+    rollingSummary: conversation?.rollingSummary || '',
+    recentMessages: messages
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .map(m => ({ 
+        role: m.role as 'user' | 'assistant', 
+        content: m.content 
+      })),
+  };
+}
 
-You MUST respond with valid JSON matching this exact structure:
-{
-  "quote_title": "string - Professional title for the quote",
-  "customer_facing_summary": "string - Friendly 2-3 sentence summary of what they're getting",
-  "line_items": [{"name": "string", "qty": number, "price": number, "description": "string"}],
-  "subtotal": number,
-  "discount_amount": number,
-  "discount_percent": number,
-  "total": number,
-  "savings_text": "string - If savings exist, describe them; otherwise empty string",
-  "financing_text": "string - Monthly payment info if applicable",
-  "warranties_and_terms": ["string array of warranty/term bullet points"]
-}`;
+async function updateRollingSummary(conversationId: string, input: QuoteGenerationInput): Promise<void> {
+  const summary = `Customer: ${input.customerName || 'Not specified'}
+Equipment: ${input.cartItems.map(item => `${item.name} (${item.type}, ${item.isElite ? 'Elite' : 'Standard'})`).join(', ')}
+Total Value: $${input.totals.grandTotal.toLocaleString()}
+Elite Savings: $${input.totals.eliteSavings.toLocaleString()}
+${input.customerNotes ? `Notes: ${input.customerNotes}` : ''}`;
 
-  const userPrompt = `Generate a professional HVAC quote for the following:
+  await storage.updateQuoteConversation(conversationId, { rollingSummary: summary });
+}
 
-CUSTOMER INFO:
-${input.customerName ? `Name: ${input.customerName}` : 'Name: Valued Customer'}
-${input.customerAddress ? `Address: ${input.customerAddress}` : ''}
-${input.customerNotes ? `Notes: ${input.customerNotes}` : ''}
+function buildUserPrompt(input: QuoteGenerationInput, context?: ConversationContext): string {
+  let prompt = `Generate a professional HVAC quote with the following details:
 
-EQUIPMENT/SERVICES:
-${input.cartItems.map((item, i) => `
+CUSTOMER INFORMATION:
+- Name: ${input.customerName || 'Valued Customer'}
+${input.customerAddress ? `- Address: ${input.customerAddress}` : ''}
+${input.customerNotes ? `- Notes: ${input.customerNotes}` : ''}
+
+EQUIPMENT/SERVICES IN QUOTE:
+${input.cartItems.map((item, i) => {
+  let itemDetails = `
 ${i + 1}. ${item.name}
-   Type: ${item.type.toUpperCase()}
-   ${item.description}
-   Quantity: ${item.quantity}
-   ${item.isElite ? `Elite Package: YES (Includes: ${item.eliteIncludes?.join(', ') || 'Premium upgrades'})` : 'Standard Package'}
-   Base Price: $${item.basePrice.toLocaleString()}
-   Final Price: $${item.finalPrice.toLocaleString()}
-   ${item.eliteSavings ? `Elite Savings: $${item.eliteSavings.toLocaleString()}` : ''}
-`).join('\n')}
+   - Type: ${item.type.toUpperCase()}
+   - Description: ${item.description}
+   - Quantity: ${item.quantity}
+   - Package: ${item.isElite ? 'ELITE PACKAGE' : 'Standard'}`;
+  
+  if (item.tier) itemDetails += `\n   - Tier: ${item.tier}`;
+  if (item.tonnage) itemDetails += `\n   - Tonnage: ${item.tonnage}`;
+  if (item.brand) itemDetails += `\n   - Brand: ${item.brand}`;
+  if (item.model) itemDetails += `\n   - Model: ${item.model}`;
+  
+  itemDetails += `\n   - Base Price: $${item.basePrice.toLocaleString()}`;
+  itemDetails += `\n   - Final Price: $${item.finalPrice.toLocaleString()}`;
+  
+  if (item.isElite && item.eliteIncludes) {
+    itemDetails += `\n   - Elite Includes: ${item.eliteIncludes.join(', ')}`;
+  }
+  if (item.eliteSavings) {
+    itemDetails += `\n   - Elite Savings: $${item.eliteSavings.toLocaleString()}`;
+  }
+  
+  return itemDetails;
+}).join('\n')}
 
-TOTALS:
+FINAL TOTALS (USE THESE EXACT VALUES):
 - Subtotal: $${input.totals.subtotal.toLocaleString()}
 - Elite Savings: $${input.totals.eliteSavings.toLocaleString()}
 - Grand Total: $${input.totals.grandTotal.toLocaleString()}
-- Monthly Payment (with approved financing): $${input.totals.monthlyPayment.toLocaleString()}/month
-${input.customInstructions ? `
-CUSTOM INSTRUCTIONS FROM TECHNICIAN:
+- Monthly Payment (67-month financing): $${input.totals.monthlyPayment.toLocaleString()}/month`;
+
+  if (context?.rollingSummary) {
+    prompt += `\n\nCONVERSATION CONTEXT:
+${context.rollingSummary}`;
+  }
+
+  if (input.customInstructions) {
+    prompt += `\n\nSPECIAL INSTRUCTIONS FROM TECHNICIAN:
 ${input.customInstructions}
 
-Follow these instructions when generating the quote. Adjust tone, emphasis, discounts, or special terms as requested.` : ''}
+Apply these instructions when generating the quote. Adjust tone, emphasis, discounts, or terms as requested while following business rules.`;
+  }
 
-Generate the quote JSON now. Use EXACT prices from above.`;
+  prompt += `\n\nGenerate the quote JSON now. Use the EXACT prices provided above.`;
+  
+  return prompt;
+}
 
+export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<AIQuoteResponse> {
+  let context: ConversationContext | undefined;
+  
+  // Load conversation context if conversation ID provided
+  if (input.conversationId) {
+    try {
+      context = await getConversationContext(input.conversationId);
+      await updateRollingSummary(input.conversationId, input);
+    } catch (error) {
+      console.error('Error loading conversation context:', error);
+    }
+  }
+
+  // Build messages array
+  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+    { role: 'system', content: SYSTEM_INSTRUCTIONS }
+  ];
+
+  // Add recent conversation history if available
+  if (context?.recentMessages && context.recentMessages.length > 0) {
+    for (const msg of context.recentMessages) {
+      messages.push({ role: msg.role, content: msg.content });
+    }
+  }
+
+  // Add current user prompt
+  const userPrompt = buildUserPrompt(input, context);
+  messages.push({ role: 'user', content: userPrompt });
+
+  // Store user message if conversation exists
+  if (input.conversationId) {
+    try {
+      await storage.createQuoteMessage({
+        conversationId: input.conversationId,
+        role: 'user',
+        content: input.customInstructions || 'Generate quote',
+      });
+    } catch (error) {
+      console.error('Error storing user message:', error);
+    }
+  }
+
+  // Call OpenAI with structured output and low temperature
   const response = await openai.chat.completions.create({
-    model: "gpt-5.1",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
-    ],
-    response_format: { type: "json_object" },
+    model: "gpt-4.1",
+    messages: messages,
+    response_format: { 
+      type: "json_schema",
+      json_schema: {
+        name: "quote_response",
+        strict: true,
+        schema: {
+          type: "object",
+          properties: {
+            quote_title: { type: "string" },
+            customer_summary: { type: "string" },
+            selected_base_package: {
+              type: "object",
+              properties: {
+                tier: { type: "string" },
+                tonnage: { type: "string" },
+                brand: { type: "string" },
+                model: { type: "string" }
+              },
+              required: ["tier", "tonnage", "brand", "model"],
+              additionalProperties: false
+            },
+            add_ons: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  qty: { type: "number" },
+                  price: { type: "number" },
+                  description: { type: "string" }
+                },
+                required: ["name", "qty", "price", "description"],
+                additionalProperties: false
+              }
+            },
+            subtotal: { type: "number" },
+            discount_percent: { type: "number" },
+            discount_amount: { type: "number" },
+            total: { type: "number" },
+            savings_text: { type: "string" },
+            financing_text: { type: "string" },
+            warranties_and_terms: {
+              type: "array",
+              items: { type: "string" }
+            },
+            next_steps: {
+              type: "array",
+              items: { type: "string" }
+            }
+          },
+          required: [
+            "quote_title",
+            "customer_summary", 
+            "add_ons",
+            "subtotal",
+            "discount_percent",
+            "discount_amount",
+            "total",
+            "savings_text",
+            "warranties_and_terms",
+            "next_steps"
+          ],
+          additionalProperties: false
+        }
+      }
+    },
+    temperature: 0.2, // Low temperature for consistent, predictable outputs
     max_completion_tokens: 2048,
   });
 
@@ -123,5 +284,39 @@ Generate the quote JSON now. Use EXACT prices from above.`;
   }
 
   const parsed = JSON.parse(content);
-  return GeneratedQuoteSchema.parse(parsed);
+  const validated = AIQuoteResponseSchema.parse(parsed);
+
+  // Store assistant response if conversation exists
+  if (input.conversationId) {
+    try {
+      await storage.createQuoteMessage({
+        conversationId: input.conversationId,
+        role: 'assistant',
+        content: JSON.stringify(validated),
+      });
+    } catch (error) {
+      console.error('Error storing assistant message:', error);
+    }
+  }
+
+  return validated;
 }
+
+// Create a new conversation for a quote session
+export async function createQuoteConversation(customerName: string, customerId?: string, cartSnapshot?: Record<string, unknown>): Promise<string> {
+  const conversation = await storage.createQuoteConversation({
+    customerName,
+    customerId,
+    cartSnapshot: cartSnapshot as Record<string, unknown> | undefined,
+  });
+  return conversation.id;
+}
+
+// Get conversation history for display
+export async function getConversationHistory(conversationId: string): Promise<QuoteMessage[]> {
+  return storage.getQuoteMessages(conversationId);
+}
+
+// Legacy export for backward compatibility
+export { AIQuoteResponseSchema as GeneratedQuoteSchema };
+export type GeneratedQuote = AIQuoteResponse;

@@ -16,7 +16,7 @@ import { pool, db } from "./db";
 import { eq } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAutoSync } from "./services/customer-sync";
-import { generateQuoteWithAI, type QuoteGenerationInput } from "./services/quote-generation";
+import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, type QuoteGenerationInput } from "./services/quote-generation";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -188,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate quote with AI (OpenAI)
+  // Generate quote with AI (OpenAI) - with conversation memory support
   app.post("/api/quotes/generate", async (req, res) => {
     try {
       const input: QuoteGenerationInput = req.body;
@@ -203,6 +203,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Error generating quote with AI:', error);
       res.status(500).json({ 
         message: "Failed to generate quote", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // Create a new quote conversation (AI memory)
+  app.post("/api/quotes/conversations", async (req, res) => {
+    try {
+      const { customerName, customerId, cartSnapshot } = req.body;
+      
+      if (!customerName) {
+        return res.status(400).json({ message: "Customer name is required" });
+      }
+      
+      const conversationId = await createQuoteConversation(
+        customerName, 
+        customerId, 
+        cartSnapshot
+      );
+      
+      res.json({ conversationId });
+    } catch (error) {
+      console.error('Error creating quote conversation:', error);
+      res.status(500).json({ 
+        message: "Failed to create conversation", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // Get conversation history
+  app.get("/api/quotes/conversations/:id", async (req, res) => {
+    try {
+      const conversation = await storage.getQuoteConversation(req.params.id);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      
+      const messages = await getConversationHistory(req.params.id);
+      
+      res.json({ 
+        conversation,
+        messages 
+      });
+    } catch (error) {
+      console.error('Error fetching conversation:', error);
+      res.status(500).json({ 
+        message: "Failed to fetch conversation", 
         error: error instanceof Error ? error.message : "Unknown error" 
       });
     }
