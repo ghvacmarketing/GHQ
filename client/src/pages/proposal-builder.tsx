@@ -2014,9 +2014,9 @@ export default function ProposalBuilder() {
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(...BRAND_COLORS.primary);
-      const titleLines = doc.splitTextToSize(aiGeneratedQuote.quote_title, contentWidth - 10);
+      const titleLines = doc.splitTextToSize(aiGeneratedQuote.quote_title, contentWidth);
       titleLines.forEach((line: string) => {
-        doc.text(line, pageWidth / 2, y, { align: 'center' });
+        doc.text(line, margin, y);
         y += 5;
       });
       y += 5;
