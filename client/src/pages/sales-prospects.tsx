@@ -2122,7 +2122,36 @@ function LeadCard({
                           <div className="space-y-3">
                             {details.equipment.map((item: any, idx: number) => (
                               <div key={idx} className="bg-white dark:bg-gray-900 rounded p-2 border">
-                                {item.type === "custom" ? (
+                                {item.type === "crawlspace" ? (
+                                  <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <Badge variant="outline" className="text-xs bg-teal-50 text-teal-700 border-teal-300">Crawlspace</Badge>
+                                      <span className="text-xs text-muted-foreground">{item.tierName}</span>
+                                      {item.isElite && (
+                                        <Badge className="bg-amber-500 text-white text-xs">
+                                          <Crown className="h-3 w-3 mr-1" />
+                                          Elite
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="font-medium text-sm mt-1">Crawlspace Encapsulation - {item.tierName}</p>
+                                    <p className="text-xs text-muted-foreground">Base price: ${item.tierPrice?.toLocaleString()}</p>
+                                    {item.isElite && item.eliteBundles && (
+                                      <div className="text-xs text-amber-700 dark:text-amber-300 mt-1 bg-amber-50 dark:bg-amber-950/30 p-1.5 rounded space-y-0.5">
+                                        <p className="font-medium">Elite Package Includes:</p>
+                                        {Object.entries(item.eliteBundles).map(([key, price]) => (
+                                          <p key={key}>• {key.replace(/^crawl-/, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}: ${(price as number).toLocaleString()}</p>
+                                        ))}
+                                        {item.eliteSavings > 0 && (
+                                          <p className="font-medium text-green-600">Savings: ${item.eliteSavings.toLocaleString()}</p>
+                                        )}
+                                      </div>
+                                    )}
+                                    <p className="text-sm font-medium text-primary mt-1">
+                                      ${item.totalPrice?.toLocaleString()}
+                                    </p>
+                                  </div>
+                                ) : item.type === "custom" ? (
                                   <div>
                                     <p className="font-medium text-sm">Custom Build - {item.tonnage}</p>
                                     <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
