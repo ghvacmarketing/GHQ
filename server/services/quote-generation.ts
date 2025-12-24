@@ -318,6 +318,7 @@ export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<
             "discount_amount",
             "total",
             "savings_note",
+            "financing_text",
             "warranties_and_terms",
             "next_steps",
             "additional_enhancements"
