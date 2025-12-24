@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Settings, BookOpen, ExternalLink } from "lucide-react";
+import { Settings, BookOpen, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 
@@ -10,25 +11,38 @@ const SALESBOOK_OPTIONS = [
 ];
 
 export default function PriceBook() {
-  const [selectedBook, setSelectedBook] = useState('brian');
+  const [selectedBook, setSelectedBook] = useState<string | null>(null);
   
-  const currentBook = SALESBOOK_OPTIONS.find(b => b.id === selectedBook) || SALESBOOK_OPTIONS[0];
+  const currentBook = SALESBOOK_OPTIONS.find(b => b.id === selectedBook);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
+      <header className="flex-shrink-0 bg-card border-b border-border shadow-sm">
         <div className="flex items-center justify-between p-3 sm:p-4">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
-            <img 
-              src={redlogo} 
-              alt="Giesbrecht HVAC" 
-              className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
-              data-testid="img-company-logo"
-            />
+            {selectedBook ? (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setSelectedBook(null)}
+                className="mr-2"
+                data-testid="button-back"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+            ) : (
+              <img 
+                src={redlogo} 
+                alt="Giesbrecht HVAC" 
+                className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
+                data-testid="img-company-logo"
+              />
+            )}
             <div className="min-w-0">
               <NavDropdown 
-                currentPageTitle="Price Book"
+                currentPageTitle={currentBook ? currentBook.label : "Salesbook"}
                 items={[
                   { label: "Home", path: "/" },
                   { label: "Sales Prospects", path: "/sales-prospects" },
@@ -51,44 +65,37 @@ export default function PriceBook() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col">
-        {/* Book Selector */}
-        <div className="p-3 sm:p-4 bg-muted/50 border-b">
-          <div className="flex flex-wrap items-center justify-center gap-2 max-w-2xl mx-auto">
-            {SALESBOOK_OPTIONS.map((book) => (
-              <Button
-                key={book.id}
-                variant={selectedBook === book.id ? 'default' : 'outline'}
-                size="sm"
-                className={`min-h-[40px] ${selectedBook === book.id ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
-                onClick={() => setSelectedBook(book.id)}
-                data-testid={`button-book-${book.id}`}
-              >
-                <BookOpen className="h-4 w-4 mr-2" />
-                {book.label}
-              </Button>
-            ))}
-            <a 
-              href={currentBook.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-2"
-            >
-              <Button variant="ghost" size="sm" className="min-h-[40px]" data-testid="link-fullscreen">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Fullscreen
-              </Button>
-            </a>
+      {/* Selection Screen */}
+      {!selectedBook && (
+        <main className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-md">
+            <h1 className="text-2xl font-bold text-center mb-6">Choose Your Salesbook</h1>
+            <div className="grid gap-4">
+              {SALESBOOK_OPTIONS.map((book) => (
+                <Card 
+                  key={book.id}
+                  className="cursor-pointer hover:border-orange-500 hover:shadow-lg transition-all"
+                  onClick={() => setSelectedBook(book.id)}
+                  data-testid={`card-book-${book.id}`}
+                >
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="bg-orange-500 text-white p-4 rounded-lg">
+                      <BookOpen className="h-8 w-8" />
+                    </div>
+                    <span className="text-xl font-semibold">{book.label}</span>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
+        </main>
+      )}
 
-        <div 
-          className="w-full"
-          style={{ height: 'calc(100vh - 140px)' }}
-          data-testid="flipbook-container"
-        >
+      {/* Salesbook View */}
+      {selectedBook && currentBook && (
+        <main className="flex-1 overflow-hidden">
           <iframe 
-            style={{ border: 'none', width: '100%', height: '100%' }}
+            className="w-full h-full border-0"
             src={currentBook.url}
             seamless
             scrolling="no"
@@ -98,8 +105,8 @@ export default function PriceBook() {
             title={currentBook.label}
             data-testid="flipbook-iframe"
           />
-        </div>
-      </main>
+        </main>
+      )}
     </div>
   );
 }
