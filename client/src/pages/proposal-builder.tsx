@@ -562,7 +562,7 @@ export default function ProposalBuilder() {
   const [crawlspaceEliteEnabled, setCrawlspaceEliteEnabled] = useState(false);
   
   // Salesbook state
-  const [selectedSalesperson, setSelectedSalesperson] = useState<'brian' | 'zack'>('zack');
+  const [selectedSalesperson, setSelectedSalesperson] = useState<'brian' | 'chandler'>('chandler');
 
   // Debounce customer search
   useEffect(() => {
@@ -1913,7 +1913,7 @@ export default function ProposalBuilder() {
                 <a 
                   href={selectedSalesperson === 'brian' 
                     ? "https://online.fliphtml5.com/iwkrq/Brian-Salesbook/" 
-                    : "https://online.fliphtml5.com/iwkrq/Zack-Salesbook/"
+                    : "https://online.fliphtml5.com/iwkrq/CHandler-Salesbook/"
                   }
                   target="_blank"
                   rel="noopener noreferrer"
@@ -1938,12 +1938,12 @@ export default function ProposalBuilder() {
                       Brian's Salesbook
                     </Button>
                     <Button
-                      variant={selectedSalesperson === 'zack' ? 'default' : 'outline'}
-                      className={`min-h-[60px] text-lg font-semibold ${selectedSalesperson === 'zack' ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
-                      onClick={() => setSelectedSalesperson('zack')}
-                      data-testid="button-salesbook-zack"
+                      variant={selectedSalesperson === 'chandler' ? 'default' : 'outline'}
+                      className={`min-h-[60px] text-lg font-semibold ${selectedSalesperson === 'chandler' ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
+                      onClick={() => setSelectedSalesperson('chandler')}
+                      data-testid="button-salesbook-chandler"
                     >
-                      Zack's Salesbook
+                      Chandler's Salesbook
                     </Button>
                   </div>
                 </CardContent>
@@ -1954,7 +1954,7 @@ export default function ProposalBuilder() {
                   className="absolute top-0 left-0 w-full h-full border-0"
                   src={selectedSalesperson === 'brian' 
                     ? "https://online.fliphtml5.com/iwkrq/Brian-Salesbook/" 
-                    : "https://online.fliphtml5.com/iwkrq/Zack-Salesbook/"
+                    : "https://online.fliphtml5.com/iwkrq/CHandler-Salesbook/"
                   }
                   scrolling="no"
                   allowFullScreen
