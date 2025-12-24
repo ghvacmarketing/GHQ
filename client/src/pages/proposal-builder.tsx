@@ -3760,22 +3760,27 @@ export default function ProposalBuilder() {
                       <Crown className="h-5 w-5 text-amber-600" />
                       <h4 className="font-semibold text-amber-800 dark:text-amber-200">Elite Package Includes:</h4>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                      {CRAWLSPACE_ELITE_BUNDLES.map(bundle => (
-                        <div key={bundle.name} className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700">
-                          <p className="font-medium text-sm">{bundle.name}</p>
-                          <p className="text-amber-600 dark:text-amber-400 font-semibold">{formatPrice(bundle.fixedPrice || 0)}</p>
-                          <ul className="mt-2 text-xs text-muted-foreground space-y-1">
-                            {bundle.benefits.slice(0, 2).map((benefit, i) => (
-                              <li key={i} className="flex items-start gap-1">
-                                <Check className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
-                                <span>{benefit}</span>
-                              </li>
-                            ))}
-                          </ul>
+                    {(() => {
+                      const elitePricing = calculateCrawlspaceElitePricing(selectedCrawlspaceTier.price);
+                      return (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                          {CRAWLSPACE_ELITE_BUNDLES.map(bundle => (
+                            <div key={bundle.name} className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700">
+                              <p className="font-medium text-sm">{bundle.name}</p>
+                              <p className="text-amber-600 dark:text-amber-400 font-semibold">{formatPrice(elitePricing.coreBundlePrices[bundle.id] || 0)}</p>
+                              <ul className="mt-2 text-xs text-muted-foreground space-y-1">
+                                {bundle.benefits.slice(0, 2).map((benefit, i) => (
+                                  <li key={i} className="flex items-start gap-1">
+                                    <Check className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
+                                    <span>{benefit}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })()}
                     
                     {(() => {
                       const elitePricing = calculateCrawlspaceElitePricing(selectedCrawlspaceTier.price);
@@ -4007,14 +4012,29 @@ export default function ProposalBuilder() {
                                 ELITE PACKAGE INCLUDES:
                               </p>
                               <div className="space-y-1">
-                                {CRAWLSPACE_ELITE_BUNDLES.map(bundle => (
-                                  <div key={bundle.name} className="flex justify-between text-xs">
-                                    <span className="text-muted-foreground">{bundle.name}</span>
-                                    <span className="font-medium">{(bundle.fixedPrice || 0) > 0 ? formatPrice(bundle.fixedPrice || 0) : 'Included'}</span>
-                                  </div>
-                                ))}
+                                {CRAWLSPACE_ELITE_BUNDLES.map(bundle => {
+                                  const bundlePrice = item.eliteData?.coreBundlePrices[bundle.id] || 0;
+                                  return (
+                                    <div key={bundle.name} className="flex justify-between text-xs">
+                                      <span className="text-muted-foreground">{bundle.name}</span>
+                                      <span className="font-medium">{bundlePrice > 0 ? formatPrice(bundlePrice) : 'Included'}</span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                               <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-700">
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">Base Package</span>
+                                  <span className="font-medium">{formatPrice(item.tier.price)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">Elite Bundles</span>
+                                  <span className="font-medium">{formatPrice(Object.values(item.eliteData.coreBundlePrices).reduce((a, b) => a + b, 0))}</span>
+                                </div>
+                                <div className="flex justify-between text-xs border-t border-amber-200 dark:border-amber-700 pt-1 mt-1">
+                                  <span className="text-muted-foreground">Subtotal</span>
+                                  <span className="font-medium">{formatPrice(item.eliteData.originalTotal)}</span>
+                                </div>
                                 <div className="flex justify-between text-xs text-green-600 dark:text-green-400 font-medium">
                                   <span>20% Elite Discount</span>
                                   <span>-{formatPrice(item.eliteData.discountAmount)}</span>
