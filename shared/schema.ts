@@ -458,23 +458,16 @@ export type QuoteConversation = typeof quoteConversations.$inferSelect;
 export type InsertQuoteMessage = z.infer<typeof insertQuoteMessageSchema>;
 export type QuoteMessage = typeof quoteMessages.$inferSelect;
 
-// Structured AI Quote Response Schema
+// Structured AI Quote Response Schema - Professional Proposal Format
 export const AIQuoteResponseSchema = z.object({
   quote_title: z.string(),
-  customer_summary: z.string(),
-  selected_base_package: z.object({
-    tier: z.string(),
-    tonnage: z.string(),
-    brand: z.string(),
-    model: z.string(),
-  }).optional(),
-  line_items: z.array(z.object({
-    name: z.string(),
-    qty: z.number(),
-    price: z.number(),
-    description: z.string(),
+  package_description: z.string(),
+  whats_included: z.array(z.object({
+    category: z.string(),
+    items: z.array(z.string()),
   })),
-  add_ons: z.array(z.object({
+  best_for: z.string(),
+  line_items: z.array(z.object({
     name: z.string(),
     qty: z.number(),
     price: z.number(),
@@ -489,9 +482,16 @@ export const AIQuoteResponseSchema = z.object({
   discount_amount: z.number(),
   total: z.number(),
   savings_note: z.string(),
-  financing_text: z.string().optional(),
+  financing_text: z.string().optional().default(""),
   warranties_and_terms: z.array(z.string()),
   next_steps: z.array(z.string()),
+  additional_enhancements: z.array(z.object({
+    name: z.string(),
+    price: z.number(),
+    description: z.string(),
+    whats_included: z.array(z.string()),
+    recommended_for: z.string(),
+  })),
 });
 export type AIQuoteResponse = z.infer<typeof AIQuoteResponseSchema>;
 

@@ -32,6 +32,17 @@ import type { Customer } from "@shared/schema";
 const CART_STORAGE_KEY = 'ghvac-proposal-cart';
 const CUSTOMER_STORAGE_KEY = 'ghvac-proposal-customer';
 
+// Company branding constants for proposals and documents
+const COMPANY_INFO = {
+  name: "GIESBRECHT HVAC",
+  tagline: "Professional Heating & Cooling Solutions",
+  address: "PO Box 917, Wrens, GA 30833",
+  phone: "(706) 826-0644",
+  email: "earnest@ghvacinc.com",
+  documentTitle: "COMPREHENSIVE HOME COMFORT PROPOSAL",
+  footer: "Thank you for considering GHVAC!",
+};
+
 type PricebookPackage = {
   unitType: string;
   tier: string;
@@ -525,22 +536,23 @@ export default function ProposalBuilder() {
   const [generatedQuote, setGeneratedQuote] = useState<string | null>(null);
   const [aiGeneratedQuote, setAiGeneratedQuote] = useState<{
     quote_title: string;
-    customer_summary: string;
-    selected_base_package?: { tier: string; tonnage: string; brand: string; model: string };
+    package_description: string;
+    whats_included: { category: string; items: string[] }[];
+    best_for: string;
     line_items: { name: string; qty: number; price: number; description: string }[];
-    add_ons: { name: string; qty: number; price: number; description: string }[];
     subtotal: number;
     elite_discount_active: boolean;
     elite_discount_percent: number;
     elite_discount_amount: number;
     elite_warning: string;
-    discount_amount: number;
     discount_percent: number;
+    discount_amount: number;
     total: number;
     savings_note: string;
-    financing_text?: string;
+    financing_text: string;
     warranties_and_terms: string[];
     next_steps: string[];
+    additional_enhancements: { name: string; price: number; description: string; whats_included: string[]; recommended_for: string }[];
   } | null>(null);
   const [isGeneratingQuote, setIsGeneratingQuote] = useState(false);
   const [quoteInstructions, setQuoteInstructions] = useState("");
@@ -1436,7 +1448,20 @@ export default function ProposalBuilder() {
       setAiGeneratedQuote(aiQuote);
       
       let quoteText = `${aiQuote.quote_title}\n${'='.repeat(40)}\n\n`;
-      quoteText += `${aiQuote.customer_summary}\n\n`;
+      quoteText += `${aiQuote.package_description}\n\n`;
+      if (aiQuote.whats_included && aiQuote.whats_included.length > 0) {
+        quoteText += `WHAT'S INCLUDED:\n`;
+        aiQuote.whats_included.forEach((category: { category: string; items: string[] }) => {
+          quoteText += `\n${category.category}:\n`;
+          category.items.forEach((item: string) => {
+            quoteText += `  • ${item}\n`;
+          });
+        });
+        quoteText += `\n`;
+      }
+      if (aiQuote.best_for) {
+        quoteText += `Best For: ${aiQuote.best_for}\n\n`;
+      }
       if (aiQuote.line_items && aiQuote.line_items.length > 0) {
         quoteText += `LINE ITEMS:\n`;
         aiQuote.line_items.forEach((item: { name: string; qty: number; price: number; description: string }) => {
@@ -1464,6 +1489,19 @@ export default function ProposalBuilder() {
         quoteText += `\nNext Steps:\n`;
         aiQuote.next_steps.forEach((step: string) => {
           quoteText += `• ${step}\n`;
+        });
+      }
+      if (aiQuote.additional_enhancements && aiQuote.additional_enhancements.length > 0) {
+        quoteText += `\nADDITIONAL ENHANCEMENTS:\n`;
+        aiQuote.additional_enhancements.forEach((enh: { name: string; price: number; description: string; whats_included: string[]; recommended_for: string }) => {
+          quoteText += `\n${enh.name} - $${enh.price.toLocaleString()}\n`;
+          quoteText += `  ${enh.description}\n`;
+          if (enh.whats_included && enh.whats_included.length > 0) {
+            quoteText += `  Includes: ${enh.whats_included.join(', ')}\n`;
+          }
+          if (enh.recommended_for) {
+            quoteText += `  Recommended for: ${enh.recommended_for}\n`;
+          }
         });
       }
       setGeneratedQuote(quoteText);
@@ -1498,70 +1536,348 @@ export default function ProposalBuilder() {
   };
 
   const downloadQuoteAsDoc = async () => {
-    if (!generatedQuote) return;
+    if (!aiGeneratedQuote) return;
     
     try {
-      const lines = generatedQuote.split('\n');
       const paragraphs: Paragraph[] = [];
       
-      lines.forEach((line, index) => {
-        if (index === 0) {
+      // === HEADER SECTION ===
+      // Company Name
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun({ text: COMPANY_INFO.name, bold: true, size: 36 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 40 },
+        })
+      );
+      // Tagline
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun({ text: COMPANY_INFO.tagline, italics: true, size: 24 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 80 },
+        })
+      );
+      // Contact info
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun({ text: `${COMPANY_INFO.address} | Phone: ${COMPANY_INFO.phone} | ${COMPANY_INFO.email}`, size: 20 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+        })
+      );
+      // Proposal title
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun({ text: COMPANY_INFO.documentTitle, bold: true, size: 28 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+        })
+      );
+      // Customer info
+      paragraphs.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: "Prepared for: ", bold: true }),
+            new TextRun({ text: customerName || "Valued Customer" }),
+          ],
+          spacing: { after: 40 },
+        })
+      );
+      if (customerAddress) {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: customerAddress })],
+            spacing: { after: 80 },
+          })
+        );
+      }
+      // Separator line
+      paragraphs.push(
+        new Paragraph({
+          border: {
+            bottom: { color: "000000", space: 1, style: BorderStyle.SINGLE, size: 12 },
+          },
+          spacing: { after: 300 },
+        })
+      );
+
+      // === QUOTE TITLE (Bold, Centered) ===
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun({ text: aiGeneratedQuote.quote_title, bold: true, size: 32 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+        })
+      );
+
+      // === PACKAGE DESCRIPTION ===
+      if (aiGeneratedQuote.package_description) {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: aiGeneratedQuote.package_description })],
+            spacing: { after: 200 },
+          })
+        );
+      }
+
+      // === WHAT'S INCLUDED SECTION ===
+      if (aiGeneratedQuote.whats_included && aiGeneratedQuote.whats_included.length > 0) {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: "What's Included", bold: true, size: 26 })],
+            spacing: { before: 200, after: 120 },
+          })
+        );
+        
+        aiGeneratedQuote.whats_included.forEach((category) => {
+          // Category name in bold
           paragraphs.push(
             new Paragraph({
-              children: [new TextRun({ text: line, bold: true, size: 32 })],
-              heading: HeadingLevel.HEADING_1,
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 200 },
+              children: [new TextRun({ text: category.category, bold: true })],
+              spacing: { before: 120, after: 60 },
             })
           );
-        } else if (line.startsWith('===') || line.startsWith('---')) {
-          paragraphs.push(
-            new Paragraph({
-              border: {
-                bottom: { color: "999999", space: 1, style: BorderStyle.SINGLE, size: 6 },
-              },
-              spacing: { after: 200 },
-            })
-          );
-        } else if (line.includes(':') && !line.startsWith('•') && !line.startsWith('-')) {
-          const colonIndex = line.indexOf(':');
-          const label = line.substring(0, colonIndex + 1);
-          const value = line.substring(colonIndex + 1);
+          // Category items as bullets
+          category.items.forEach((item) => {
+            paragraphs.push(
+              new Paragraph({
+                children: [new TextRun({ text: `• ${item}` })],
+                indent: { left: 360 },
+                spacing: { after: 40 },
+              })
+            );
+          });
+        });
+      }
+
+      // === BEST FOR SECTION ===
+      if (aiGeneratedQuote.best_for) {
+        paragraphs.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Best For: ", bold: true }),
+              new TextRun({ text: aiGeneratedQuote.best_for }),
+            ],
+            spacing: { before: 200, after: 200 },
+          })
+        );
+      }
+
+      // === PRICING SECTION ===
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun({ text: "Pricing", bold: true, size: 26 })],
+          spacing: { before: 200, after: 120 },
+        })
+      );
+
+      // Line Items
+      if (aiGeneratedQuote.line_items && aiGeneratedQuote.line_items.length > 0) {
+        aiGeneratedQuote.line_items.forEach((item) => {
           paragraphs.push(
             new Paragraph({
               children: [
-                new TextRun({ text: label, bold: true }),
-                new TextRun({ text: value }),
+                new TextRun({ text: `• ${item.name}` }),
+                new TextRun({ text: ` (x${item.qty}): $${item.price.toLocaleString()}` }),
               ],
-              spacing: { after: 100 },
-            })
-          );
-        } else if (line.startsWith('•') || line.startsWith('-')) {
-          paragraphs.push(
-            new Paragraph({
-              children: [new TextRun({ text: line })],
               indent: { left: 360 },
-              spacing: { after: 80 },
+              spacing: { after: 40 },
             })
           );
-        } else if (line.trim() === '') {
-          paragraphs.push(new Paragraph({ spacing: { after: 100 } }));
-        } else if (line.includes('$') && (line.includes('Total') || line.includes('Subtotal') || line.includes('Discount'))) {
+          if (item.description) {
+            paragraphs.push(
+              new Paragraph({
+                children: [new TextRun({ text: item.description, size: 20, color: "666666" })],
+                indent: { left: 720 },
+                spacing: { after: 60 },
+              })
+            );
+          }
+        });
+      }
+
+      // Subtotal
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun({ text: `Subtotal: $${aiGeneratedQuote.subtotal.toLocaleString()}`, bold: true })],
+          spacing: { before: 120, after: 60 },
+        })
+      );
+
+      // Elite Discount (if active)
+      if (aiGeneratedQuote.elite_discount_active && aiGeneratedQuote.elite_discount_amount > 0) {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: `Elite Package Discount (${aiGeneratedQuote.elite_discount_percent}%): -$${aiGeneratedQuote.elite_discount_amount.toLocaleString()}`, bold: true, color: "228B22" })],
+            spacing: { after: 60 },
+          })
+        );
+      }
+
+      // Elite Warning (if any)
+      if (aiGeneratedQuote.elite_warning) {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: `Note: ${aiGeneratedQuote.elite_warning}`, italics: true, color: "B22222" })],
+            spacing: { after: 60 },
+          })
+        );
+      }
+
+      // Non-elite discount
+      if (aiGeneratedQuote.discount_amount > 0 && !aiGeneratedQuote.elite_discount_active) {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: `Discount (${aiGeneratedQuote.discount_percent}%): -$${aiGeneratedQuote.discount_amount.toLocaleString()}`, bold: true })],
+            spacing: { after: 60 },
+          })
+        );
+      }
+
+      // Total
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun({ text: `Total: $${aiGeneratedQuote.total.toLocaleString()}`, bold: true, size: 28 })],
+          spacing: { before: 80, after: 120 },
+        })
+      );
+
+      // Savings note
+      if (aiGeneratedQuote.savings_note) {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: aiGeneratedQuote.savings_note, italics: true, color: "228B22" })],
+            spacing: { after: 80 },
+          })
+        );
+      }
+
+      // Financing text
+      if (aiGeneratedQuote.financing_text) {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: aiGeneratedQuote.financing_text })],
+            spacing: { after: 200 },
+          })
+        );
+      }
+
+      // === WARRANTIES & TERMS SECTION ===
+      if (aiGeneratedQuote.warranties_and_terms && aiGeneratedQuote.warranties_and_terms.length > 0) {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Warranties & Terms", bold: true, size: 26 })],
+            spacing: { before: 200, after: 120 },
+          })
+        );
+        
+        aiGeneratedQuote.warranties_and_terms.forEach((term) => {
           paragraphs.push(
             new Paragraph({
-              children: [new TextRun({ text: line, bold: true, size: 24 })],
-              spacing: { after: 100 },
+              children: [new TextRun({ text: `• ${term}` })],
+              indent: { left: 360 },
+              spacing: { after: 40 },
             })
           );
-        } else {
+        });
+      }
+
+      // === NEXT STEPS SECTION ===
+      if (aiGeneratedQuote.next_steps && aiGeneratedQuote.next_steps.length > 0) {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Next Steps", bold: true, size: 26 })],
+            spacing: { before: 200, after: 120 },
+          })
+        );
+        
+        aiGeneratedQuote.next_steps.forEach((step) => {
           paragraphs.push(
             new Paragraph({
-              children: [new TextRun({ text: line })],
-              spacing: { after: 80 },
+              children: [new TextRun({ text: `• ${step}` })],
+              indent: { left: 360 },
+              spacing: { after: 40 },
             })
           );
-        }
-      });
+        });
+      }
+
+      // === ADDITIONAL ENHANCEMENTS SECTION ===
+      if (aiGeneratedQuote.additional_enhancements && aiGeneratedQuote.additional_enhancements.length > 0) {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Additional Enhancements", bold: true, size: 26 })],
+            spacing: { before: 300, after: 120 },
+          })
+        );
+        
+        aiGeneratedQuote.additional_enhancements.forEach((enh) => {
+          // Enhancement name and price
+          paragraphs.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: enh.name, bold: true }),
+                new TextRun({ text: ` - $${enh.price.toLocaleString()}`, bold: true }),
+              ],
+              spacing: { before: 120, after: 60 },
+            })
+          );
+          // Description
+          if (enh.description) {
+            paragraphs.push(
+              new Paragraph({
+                children: [new TextRun({ text: enh.description })],
+                indent: { left: 360 },
+                spacing: { after: 40 },
+              })
+            );
+          }
+          // What's included
+          if (enh.whats_included && enh.whats_included.length > 0) {
+            paragraphs.push(
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "Includes: ", bold: true }),
+                  new TextRun({ text: enh.whats_included.join(", ") }),
+                ],
+                indent: { left: 360 },
+                spacing: { after: 40 },
+              })
+            );
+          }
+          // Recommended for
+          if (enh.recommended_for) {
+            paragraphs.push(
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "Recommended For: ", bold: true }),
+                  new TextRun({ text: enh.recommended_for }),
+                ],
+                indent: { left: 360 },
+                spacing: { after: 80 },
+              })
+            );
+          }
+        });
+      }
+
+      // === FOOTER ===
+      paragraphs.push(
+        new Paragraph({
+          border: {
+            top: { color: "000000", space: 1, style: BorderStyle.SINGLE, size: 6 },
+          },
+          spacing: { before: 400 },
+        })
+      );
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun({ text: COMPANY_INFO.footer, bold: true, italics: true, size: 24 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 200, after: 100 },
+        })
+      );
 
       const doc = new Document({
         sections: [{
@@ -3540,77 +3856,132 @@ export default function ProposalBuilder() {
               </div>
               {aiGeneratedQuote && (
                 <div className="mt-4 p-4 bg-white dark:bg-gray-900 rounded-lg border">
-                  <h4 className="font-semibold text-primary mb-2">{aiGeneratedQuote.quote_title}</h4>
-                  <p className="text-sm text-muted-foreground mb-3">{aiGeneratedQuote.customer_summary}</p>
+                  <h4 className="font-bold text-lg text-foreground mb-2">{aiGeneratedQuote.quote_title}</h4>
+                  <p className="text-sm text-muted-foreground mb-4">{aiGeneratedQuote.package_description}</p>
                   
-                  {/* Line Items - Always show all items with prices */}
-                  {aiGeneratedQuote.line_items && aiGeneratedQuote.line_items.length > 0 && (
-                    <div className="space-y-2 mb-3">
-                      <p className="text-xs font-semibold text-muted-foreground">LINE ITEMS</p>
-                      {aiGeneratedQuote.line_items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-sm border-b pb-2">
-                          <div>
-                            <span className="font-medium">{item.name}</span>
-                            {item.qty > 1 && <span className="text-muted-foreground"> x{item.qty}</span>}
-                            <p className="text-xs text-muted-foreground">{item.description}</p>
+                  {/* What's Included - Categorized bullets */}
+                  {aiGeneratedQuote.whats_included && aiGeneratedQuote.whats_included.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">WHAT'S INCLUDED</p>
+                      <div className="space-y-3">
+                        {aiGeneratedQuote.whats_included.map((category, idx) => (
+                          <div key={idx}>
+                            <p className="text-sm font-medium text-foreground">{category.category}</p>
+                            <ul className="text-xs text-muted-foreground mt-1 space-y-0.5 ml-3">
+                              {category.items.map((item, itemIdx) => (
+                                <li key={itemIdx}>• {item}</li>
+                              ))}
+                            </ul>
                           </div>
-                          <span className="font-medium">{formatPrice(item.price)}</span>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                   
-                  {/* Pricing Breakdown - Consistent layout */}
-                  <div className="border-t pt-3 space-y-2">
-                    {/* Subtotal */}
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span>{formatPrice(aiGeneratedQuote.subtotal)}</span>
-                    </div>
-                    
-                    {/* Elite Bundle Discount - Only when active */}
-                    {aiGeneratedQuote.elite_discount_active && aiGeneratedQuote.elite_discount_amount > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-green-600 dark:text-green-400">
-                          Elite Bundle Discount ({aiGeneratedQuote.elite_discount_percent}%)
-                        </span>
-                        <span className="text-green-600 dark:text-green-400">
-                          –{formatPrice(aiGeneratedQuote.elite_discount_amount)}
-                        </span>
+                  {/* Best For */}
+                  {aiGeneratedQuote.best_for && (
+                    <p className="text-sm text-muted-foreground mb-4 italic">
+                      <span className="font-medium not-italic">Best For:</span> {aiGeneratedQuote.best_for}
+                    </p>
+                  )}
+                  
+                  {/* Line Items Table */}
+                  {aiGeneratedQuote.line_items && aiGeneratedQuote.line_items.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">LINE ITEMS</p>
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="text-left py-2 px-3 font-medium">Item</th>
+                              <th className="text-center py-2 px-2 font-medium w-12">Qty</th>
+                              <th className="text-right py-2 px-3 font-medium">Price</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {aiGeneratedQuote.line_items.map((item, idx) => (
+                              <tr key={idx} className="border-t">
+                                <td className="py-2 px-3">
+                                  <span className="font-medium">{item.name}</span>
+                                  <p className="text-xs text-muted-foreground">{item.description}</p>
+                                </td>
+                                <td className="py-2 px-2 text-center">{item.qty}</td>
+                                <td className="py-2 px-3 text-right font-medium">{formatPrice(item.price)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    )}
-                    
-                    {/* Elite Warning - When toggle is on but requirements not met */}
-                    {aiGeneratedQuote.elite_warning && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 italic">
-                        {aiGeneratedQuote.elite_warning}
-                      </p>
-                    )}
-                    
-                    {/* Other discounts (non-Elite) */}
-                    {aiGeneratedQuote.discount_amount > 0 && !aiGeneratedQuote.elite_discount_active && (
-                      <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
-                        <span>Discount ({aiGeneratedQuote.discount_percent}%)</span>
-                        <span>–{formatPrice(aiGeneratedQuote.discount_amount)}</span>
-                      </div>
-                    )}
-                    
-                    {/* Total - Always shown, bold and prominent */}
-                    <div className="flex justify-between font-bold text-lg pt-1 border-t">
-                      <span>Total</span>
-                      <span className="text-primary">{formatPrice(aiGeneratedQuote.total)}</span>
                     </div>
-                    
-                    {/* Savings note - Small muted text, not a banner */}
-                    {aiGeneratedQuote.savings_note && (
-                      <p className="text-xs text-muted-foreground italic mt-1">
-                        {aiGeneratedQuote.savings_note}
-                      </p>
-                    )}
+                  )}
+                  
+                  {/* Pricing Breakdown Table */}
+                  <div className="border rounded-lg overflow-hidden mb-4">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {/* Subtotal */}
+                        <tr className="border-b">
+                          <td className="py-2 px-3 text-muted-foreground">Subtotal</td>
+                          <td className="py-2 px-3 text-right">{formatPrice(aiGeneratedQuote.subtotal)}</td>
+                        </tr>
+                        
+                        {/* Elite Bundle Discount - Subtle green row */}
+                        {aiGeneratedQuote.elite_discount_active && aiGeneratedQuote.elite_discount_amount > 0 && (
+                          <tr className="border-b bg-green-50 dark:bg-green-950/30">
+                            <td className="py-2 px-3 text-green-700 dark:text-green-400">
+                              Elite Bundle Discount ({aiGeneratedQuote.elite_discount_percent}%)
+                            </td>
+                            <td className="py-2 px-3 text-right text-green-700 dark:text-green-400">
+                              –{formatPrice(aiGeneratedQuote.elite_discount_amount)}
+                            </td>
+                          </tr>
+                        )}
+                        
+                        {/* Other discounts (non-Elite) */}
+                        {aiGeneratedQuote.discount_amount > 0 && !aiGeneratedQuote.elite_discount_active && (
+                          <tr className="border-b bg-green-50 dark:bg-green-950/30">
+                            <td className="py-2 px-3 text-green-700 dark:text-green-400">
+                              Discount ({aiGeneratedQuote.discount_percent}%)
+                            </td>
+                            <td className="py-2 px-3 text-right text-green-700 dark:text-green-400">
+                              –{formatPrice(aiGeneratedQuote.discount_amount)}
+                            </td>
+                          </tr>
+                        )}
+                        
+                        {/* Total */}
+                        <tr className="bg-muted/50 font-bold">
+                          <td className="py-3 px-3">Total</td>
+                          <td className="py-3 px-3 text-right text-primary text-lg">{formatPrice(aiGeneratedQuote.total)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                   
-                  {aiGeneratedQuote.warranties_and_terms.length > 0 && (
-                    <div className="mt-4 pt-3 border-t">
+                  {/* Elite Warning */}
+                  {aiGeneratedQuote.elite_warning && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 italic mb-3">
+                      {aiGeneratedQuote.elite_warning}
+                    </p>
+                  )}
+                  
+                  {/* Savings note */}
+                  {aiGeneratedQuote.savings_note && (
+                    <p className="text-xs text-muted-foreground italic mb-3">
+                      {aiGeneratedQuote.savings_note}
+                    </p>
+                  )}
+                  
+                  {/* Financing text */}
+                  {aiGeneratedQuote.financing_text && (
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {aiGeneratedQuote.financing_text}
+                    </p>
+                  )}
+                  
+                  {/* Warranties & Terms */}
+                  {aiGeneratedQuote.warranties_and_terms && aiGeneratedQuote.warranties_and_terms.length > 0 && (
+                    <div className="pt-3 border-t">
                       <p className="text-xs font-semibold text-muted-foreground mb-2">WARRANTIES & TERMS</p>
                       <ul className="text-xs text-muted-foreground space-y-1">
                         {aiGeneratedQuote.warranties_and_terms.map((term, idx) => (
@@ -3620,6 +3991,7 @@ export default function ProposalBuilder() {
                     </div>
                   )}
                   
+                  {/* Next Steps */}
                   {aiGeneratedQuote.next_steps && aiGeneratedQuote.next_steps.length > 0 && (
                     <div className="mt-4 pt-3 border-t">
                       <p className="text-xs font-semibold text-muted-foreground mb-2">NEXT STEPS</p>
@@ -3628,6 +4000,34 @@ export default function ProposalBuilder() {
                           <li key={idx}>• {step}</li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+                  
+                  {/* Additional Enhancements */}
+                  {aiGeneratedQuote.additional_enhancements && aiGeneratedQuote.additional_enhancements.length > 0 && (
+                    <div className="mt-4 pt-3 border-t">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">ADDITIONAL ENHANCEMENTS</p>
+                      <div className="space-y-3">
+                        {aiGeneratedQuote.additional_enhancements.map((enh, idx) => (
+                          <div key={idx} className="p-3 bg-muted/30 rounded-lg">
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="font-medium text-sm">{enh.name}</span>
+                              <span className="font-medium text-sm text-primary">{formatPrice(enh.price)}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-2">{enh.description}</p>
+                            {enh.whats_included && enh.whats_included.length > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                <span className="font-medium">Includes:</span> {enh.whats_included.join(', ')}
+                              </div>
+                            )}
+                            {enh.recommended_for && (
+                              <p className="text-xs text-muted-foreground italic mt-1">
+                                Recommended for: {enh.recommended_for}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -3690,7 +4090,7 @@ export default function ProposalBuilder() {
                 Financing terms are subject to credit approval.
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Thank you for considering GHVAC!
+                {COMPANY_INFO.footer}
               </p>
             </div>
           </ScrollArea>

@@ -9,52 +9,36 @@ const openai = new OpenAI({
 });
 
 // System instruction block - always sent with every request
-const SYSTEM_INSTRUCTIONS = `You are GHVAC's professional HVAC quoting assistant. Your role is to generate accurate, sales-ready quotes for heating and cooling equipment installations.
+const SYSTEM_INSTRUCTIONS = `You are GHVAC's professional HVAC quoting assistant. Generate professional "Comprehensive Home Comfort Proposal" documents.
 
-BUSINESS RULES (MUST FOLLOW):
-1. Pricing Tiers:
-   - Budget: Entry-level equipment with basic features
-   - Good: Reliable mid-range equipment with standard warranties
-   - Better: Higher efficiency equipment with extended warranties
-   - Best: Premium equipment with maximum efficiency and best warranties
+DOCUMENT FORMAT (FOLLOW EXACTLY):
+1. quote_title: Format as "OPTION: $TOTAL" (e.g., "OPTION: $25,599.00") followed by a short descriptive subtitle
+2. package_description: 2-3 sentence sales paragraph highlighting the package value proposition
+3. whats_included: Categorized bullet points grouped by component (e.g., "3.0 Ton Premium Ducting System", "Aprilaire E070 WiFi Dehumidifier")
+4. best_for: One sentence describing ideal customer for this package
+5. Pricing section: line_items → subtotal → elite_discount (if active) → total
 
-2. Elite Package Rules:
-   - Elite Package adds: 10-Year Maintenance Plan, 10-Year Labor Warranty, Install Upgrade Bundle, New Ducting System
-   - Elite Package receives 20% discount on the total bundle price
-   - Only available when customer selects the upgrade AND has all required Elite items
+BUSINESS RULES:
+1. Elite Package: 10-Year Maintenance, Labor Warranty, Install Bundle, Ducting - receives 20% discount
+2. Quote Accuracy: Use EXACT prices from input data. Total = Subtotal - Elite Discount
+3. Discount Policy: Max 10% without manager approval
 
-3. Discount Policy:
-   - Standard quotes have no discount unless explicitly requested
-   - Maximum discount without manager approval: 10%
-   - Any discount must be justified (e.g., competitor pricing, bundle deal, loyalty)
+PRICING LAYOUT (CRITICAL):
+- line_items: ALL items with individual prices
+- subtotal: Sum of all line items BEFORE discount
+- elite_discount_active: true only when Elite is applied
+- elite_discount_amount: 20% of subtotal (when Elite active)
+- total: Subtotal minus Elite Discount
+- savings_note: Small note about savings (optional)
 
-4. Quote Accuracy:
-   - ALWAYS use the EXACT prices provided in the input data
-   - NEVER calculate, estimate, or modify pricing on your own
-   - The subtotal, discount, and total MUST match the input data exactly
+OUTPUT STRUCTURE:
+- whats_included: Array of {category: string, items: string[]} - group benefits by component
+- additional_enhancements: Optional upgrades that can be added (empty array if none)
+- warranties_and_terms: 4-6 key warranty/term bullet points
+- next_steps: 2-3 actionable next steps
+- financing_text: Monthly payment info
 
-PRICING BREAKDOWN LAYOUT RULES (CRITICAL):
-1. line_items: List ALL items (base package + add-ons + upgrades) with their individual prices
-2. subtotal: Sum of all line item prices (base + add-ons + upgrades)
-3. Elite Discount Row:
-   - If Elite is ACTIVE (elite_discount_active=true): Show "Elite Bundle Discount (20%)" with negative amount
-   - If Elite is NOT ACTIVE: Set elite_discount_active=false, elite_discount_amount=0
-   - If Elite toggle is ON but requirements not met: Set elite_warning message
-4. Total = Subtotal - Elite Discount Amount (when Elite active)
-5. savings_note: Optional small muted note about savings, NOT a banner
-
-BEHAVIORAL RULES:
-1. Ask at most ONE clarifying question if critical information is missing; otherwise assume reasonable defaults
-2. Be concise, professional, and sales-ready in all communications
-3. Highlight value propositions, not just features
-4. Emphasize warranties, efficiency ratings, and long-term savings
-
-OUTPUT REQUIREMENTS:
-- You MUST respond with valid JSON matching the exact schema provided
-- All prices must be numbers (not strings)
-- Keep customer_summary to 2-3 sentences maximum
-- Warranties and next_steps should be actionable bullet points
-- Format prices as numbers, the frontend will format as currency`;
+All prices must be numbers (not strings). Format prices as numbers, frontend handles currency formatting.`;
 
 export interface QuoteGenerationInput {
   conversationId?: string;
@@ -257,33 +241,21 @@ export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<
           type: "object",
           properties: {
             quote_title: { type: "string" },
-            customer_summary: { type: "string" },
-            selected_base_package: {
-              type: "object",
-              properties: {
-                tier: { type: "string" },
-                tonnage: { type: "string" },
-                brand: { type: "string" },
-                model: { type: "string" }
-              },
-              required: ["tier", "tonnage", "brand", "model"],
-              additionalProperties: false
-            },
-            line_items: {
+            package_description: { type: "string" },
+            whats_included: {
               type: "array",
               items: {
                 type: "object",
                 properties: {
-                  name: { type: "string" },
-                  qty: { type: "number" },
-                  price: { type: "number" },
-                  description: { type: "string" }
+                  category: { type: "string" },
+                  items: { type: "array", items: { type: "string" } }
                 },
-                required: ["name", "qty", "price", "description"],
+                required: ["category", "items"],
                 additionalProperties: false
               }
             },
-            add_ons: {
+            best_for: { type: "string" },
+            line_items: {
               type: "array",
               items: {
                 type: "object",
@@ -314,14 +286,29 @@ export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<
             next_steps: {
               type: "array",
               items: { type: "string" }
+            },
+            additional_enhancements: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  price: { type: "number" },
+                  description: { type: "string" },
+                  whats_included: { type: "array", items: { type: "string" } },
+                  recommended_for: { type: "string" }
+                },
+                required: ["name", "price", "description", "whats_included", "recommended_for"],
+                additionalProperties: false
+              }
             }
           },
           required: [
             "quote_title",
-            "customer_summary",
-            "selected_base_package",
+            "package_description",
+            "whats_included",
+            "best_for",
             "line_items",
-            "add_ons",
             "subtotal",
             "elite_discount_active",
             "elite_discount_percent",
@@ -331,9 +318,9 @@ export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<
             "discount_amount",
             "total",
             "savings_note",
-            "financing_text",
             "warranties_and_terms",
-            "next_steps"
+            "next_steps",
+            "additional_enhancements"
           ],
           additionalProperties: false
         }
