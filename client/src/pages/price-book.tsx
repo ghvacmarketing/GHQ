@@ -83,12 +83,12 @@ export default function PriceBook() {
         </div>
 
         <div 
-          className="flex-1 w-full" 
-          style={{ position: 'relative', paddingTop: '56%', width: '100%', height: 0 }}
+          className="w-full"
+          style={{ height: 'calc(100vh - 140px)' }}
           data-testid="flipbook-container"
         >
           <iframe 
-            style={{ position: 'absolute', border: 'none', width: '100%', height: '100%', left: 0, top: 0 }}
+            style={{ border: 'none', width: '100%', height: '100%' }}
             src={currentBook.url}
             seamless
             scrolling="no"
