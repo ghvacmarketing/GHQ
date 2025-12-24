@@ -15,6 +15,8 @@ import { twilioService } from "./sms";
 import { pool, db } from "./db";
 import { eq } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
+import * as fs from "fs";
+import * as path from "path";
 import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAutoSync } from "./services/customer-sync";
 import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, type QuoteGenerationInput } from "./services/quote-generation";
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook } from "./services/vector-store";
@@ -70,6 +72,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Serve static assets from attached_assets directory (for SGA images, etc.)
   app.use('/assets', express.static('attached_assets'));
+  
+  // Serve uploads folder for voicemail MP3 files
+  app.use('/uploads', express.static('uploads'));
 
   // Configure multer for file uploads
   const upload = multer({
@@ -78,6 +83,226 @@ export async function registerRoutes(app: Express): Promise<Server> {
       fileSize: 25 * 1024 * 1024, // 25MB limit
     },
   });
+
+  // Ensure uploads directory exists
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  // ============================================
+  // TRELLO WEBHOOK ROUTES (must be before express.json middleware for POST)
+  // ============================================
+
+  // GET/HEAD for Trello webhook verification
+  app.get("/webhooks/trello", (req, res) => {
+    res.status(200).send("OK");
+  });
+
+  app.head("/webhooks/trello", (req, res) => {
+    res.status(200).send();
+  });
+
+  // POST for receiving Trello webhooks - uses raw body for HMAC verification
+  app.post("/webhooks/trello", express.raw({ type: 'application/json' }), async (req, res) => {
+    try {
+      const trelloSecret = process.env.TRELLO_SECRET;
+      const trelloListId = process.env.TRELLO_LIST_ID;
+
+      if (!trelloSecret) {
+        console.error("TRELLO_SECRET not configured");
+        return res.status(500).send("Server configuration error");
+      }
+
+      // Verify HMAC-SHA1 signature
+      const signature = req.headers['x-trello-webhook'] as string;
+      if (signature) {
+        const callbackURL = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+        const rawBody = req.body.toString('utf8');
+        const expectedSignature = createHmac('sha1', trelloSecret)
+          .update(rawBody + callbackURL)
+          .digest('base64');
+
+        if (signature !== expectedSignature) {
+          console.warn("Trello webhook signature mismatch");
+          return res.status(401).send("Invalid signature");
+        }
+      }
+
+      // Parse the webhook payload
+      const payload = JSON.parse(req.body.toString('utf8'));
+      const action = payload?.action;
+
+      if (!action) {
+        return res.status(200).send("No action");
+      }
+
+      const actionType = action.type;
+      const cardId = action.data?.card?.id;
+      const listId = action.data?.list?.id || action.data?.card?.idList;
+
+      console.log(`Trello webhook received: ${actionType}, cardId: ${cardId}, listId: ${listId}`);
+
+      // Only process actions for cards in the configured voicemail list
+      if (trelloListId && listId !== trelloListId) {
+        return res.status(200).send("Not voicemail list");
+      }
+
+      // Process relevant action types
+      if (['createCard', 'addAttachmentToCard', 'updateCard'].includes(actionType) && cardId) {
+        try {
+          // Fetch full card details from Trello
+          const card = await trelloService.getCard(cardId);
+          
+          // Parse caller info and received date from card name/description
+          let caller = null;
+          let receivedAt = null;
+          
+          // Try to extract caller from card name (format: "Voicemail from +1234567890")
+          const callerMatch = card.name?.match(/from\s*([\+\d\-\s\(\)]+)/i);
+          if (callerMatch) {
+            caller = callerMatch[1].trim();
+          }
+
+          // Try to extract date from card description or use card creation date
+          if (card.dateLastActivity) {
+            receivedAt = new Date(card.dateLastActivity);
+          }
+
+          // Upsert voicemail record
+          await storage.upsertVoicemail({
+            trelloCardId: cardId,
+            trelloListId: listId || trelloListId || null,
+            title: card.name || 'Untitled Voicemail',
+            description: card.desc || null,
+            status: 'NEW',
+            caller,
+            receivedAt,
+            mp3Filename: null,
+          });
+
+          // If there's an attachment action, download MP3 files
+          if (actionType === 'addAttachmentToCard') {
+            const attachments = await trelloService.getCardAttachments(cardId);
+            
+            for (const attachment of attachments) {
+              if (attachment.mimeType?.includes('audio') || attachment.name?.endsWith('.mp3')) {
+                try {
+                  const buffer = await trelloService.downloadAttachment(attachment.url);
+                  const filename = `${cardId}_${Date.now()}.mp3`;
+                  const filepath = path.join(uploadsDir, filename);
+                  fs.writeFileSync(filepath, buffer);
+                  
+                  // Update voicemail with MP3 filename
+                  await storage.updateVoicemailMp3(cardId, filename);
+                  console.log(`Downloaded MP3 for card ${cardId}: ${filename}`);
+                } catch (downloadError) {
+                  console.error(`Failed to download attachment for card ${cardId}:`, downloadError);
+                }
+              }
+            }
+          }
+
+          console.log(`Processed voicemail card: ${cardId}`);
+        } catch (cardError) {
+          console.error(`Failed to process card ${cardId}:`, cardError);
+        }
+      }
+
+      res.status(200).send("OK");
+    } catch (error) {
+      console.error("Error processing Trello webhook:", error);
+      res.status(200).send("Error processed");
+    }
+  });
+
+  // ============================================
+  // VOICEMAIL API ENDPOINTS
+  // ============================================
+
+  // GET /api/voicemails - list all voicemails (optionally filter by status)
+  app.get("/api/voicemails", async (req, res) => {
+    try {
+      const status = req.query.status as string;
+      let voicemails;
+      
+      if (status) {
+        voicemails = await storage.getVoicemailsByStatus(status);
+      } else {
+        voicemails = await storage.getAllVoicemails();
+      }
+      
+      res.json(voicemails);
+    } catch (error) {
+      console.error("Error fetching voicemails:", error);
+      res.status(500).json({ message: "Error fetching voicemails" });
+    }
+  });
+
+  // GET /api/voicemails/:id - get single voicemail
+  app.get("/api/voicemails/:id", async (req, res) => {
+    try {
+      const voicemail = await storage.getVoicemail(req.params.id);
+      if (!voicemail) {
+        return res.status(404).json({ message: "Voicemail not found" });
+      }
+      res.json(voicemail);
+    } catch (error) {
+      console.error("Error fetching voicemail:", error);
+      res.status(500).json({ message: "Error fetching voicemail" });
+    }
+  });
+
+  // PATCH /api/voicemails/:id - update voicemail status/notes
+  app.patch("/api/voicemails/:id", async (req, res) => {
+    try {
+      const { status, description, caller } = req.body;
+      const updates: any = {};
+      
+      if (status && ['NEW', 'UNRESOLVED', 'RESOLVED'].includes(status)) {
+        updates.status = status;
+      }
+      if (description !== undefined) {
+        updates.description = description;
+      }
+      if (caller !== undefined) {
+        updates.caller = caller;
+      }
+      
+      const voicemail = await storage.updateVoicemail(req.params.id, updates);
+      if (!voicemail) {
+        return res.status(404).json({ message: "Voicemail not found" });
+      }
+      res.json(voicemail);
+    } catch (error) {
+      console.error("Error updating voicemail:", error);
+      res.status(500).json({ message: "Error updating voicemail" });
+    }
+  });
+
+  // GET /setup/trello-lists - helper endpoint to list board lists with IDs
+  app.get("/setup/trello-lists", async (req, res) => {
+    try {
+      const boardId = req.query.boardId as string || process.env.TRELLO_BOARD_ID;
+      if (!boardId) {
+        return res.status(400).json({ message: "TRELLO_BOARD_ID not configured" });
+      }
+      
+      const lists = await trelloService.getBoardLists(boardId);
+      res.json(lists.map((list: any) => ({
+        id: list.id,
+        name: list.name,
+        closed: list.closed,
+      })));
+    } catch (error) {
+      console.error("Error fetching Trello lists:", error);
+      res.status(500).json({ message: "Error fetching Trello lists" });
+    }
+  });
+
+  // ============================================
+  // MAIN API ROUTES
+  // ============================================
 
   // Get quotes with pagination support
   app.get("/api/quotes", async (req, res) => {

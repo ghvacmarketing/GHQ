@@ -1,0 +1,288 @@
+What you’re building
+
+Trello stays as intake. Your Replit app will:
+
+Receive a Trello webhook whenever a new voicemail card is created (or when the mp3 attachment gets added).
+
+Use your Trello Key + Token to fetch the card details + attachment info.
+
+Download the mp3 and store it.
+
+Create/update a “voicemail record” in your app.
+
+Show it in your own Kanban (NEW / UNRESOLVED / RESOLVED) just like Trello.
+
+No phone system changes. No inbox access required.
+
+Step 1 — Confirm board access (must-have)
+
+Even if you have a token, your Trello account must be able to view that voicemail board.
+
+If you can open the board in Trello while logged in, you’re good.
+
+If not, you need the board owner to add you as a board member (workspace admin is NOT required).
+
+Step 2 — Create the Replit backend “webhook receiver”
+
+In Replit, you need a backend that exposes a public HTTPS endpoint:
+
+GET /webhooks/trello → returns 200 OK
+
+HEAD /webhooks/trello → returns 200 OK
+
+POST /webhooks/trello → receives Trello webhook events (JSON)
+
+Why GET/HEAD?
+
+Trello “verifies” the webhook URL by pinging it. If it doesn’t return 200, webhook creation fails.
+
+Important implementation requirement:
+
+The POST /webhooks/trello handler must read the RAW request body (not pre-parsed JSON) so you can validate Trello’s signature.
+
+Step 3 — Store secrets in Replit (Environment Variables)
+
+In Replit Secrets, add:
+
+TRELLO_KEY = your API key
+
+TRELLO_TOKEN = your token
+
+TRELLO_API_SECRET = your Trello API secret (used for webhook signature verification)
+
+PUBLIC_WEBHOOK_URL = your exact webhook URL
+
+example: https://<your-replit-domain>/webhooks/trello
+
+This PUBLIC_WEBHOOK_URL must match EXACTLY what you register in Trello (same path, same https, no trailing slash differences), because it’s used in signature calculation.
+
+Step 4 — Verify Trello webhooks securely (signature check)
+
+When Trello calls your webhook, it includes a header:
+
+x-trello-webhook
+
+Your server must validate it:
+
+Take the raw request body as a string
+
+Concatenate it with PUBLIC_WEBHOOK_URL (rawBody + callbackURL)
+
+Create HMAC-SHA1 using TRELLO_API_SECRET
+
+Base64 encode the result
+
+Compare to the header value
+
+If mismatch → reject (401)
+
+Tell Replit to implement exactly that, or else anyone could spoof voicemail events into your app.
+
+Step 5 — Decide what Trello events you will process
+
+Trello will send different action.type values. For voicemails, the important ones are:
+
+createCard
+The voicemail “card” gets created in your intake list.
+
+addAttachmentToCard
+Often the mp3 (and the .eml) is attached shortly after the card is created. This is typically the best trigger to download the mp3.
+
+updateCard (optional but recommended)
+This fires when a card moves lists. You can use it to keep your app’s status synced when someone drags a card from NEW → RESOLVED, etc.
+
+Practical best practice:
+
+Create/update your internal record on createCard
+
+Download mp3 on addAttachmentToCard
+
+Update status on updateCard when list changes
+
+Step 6 — Get the Trello List IDs (to map NEW/UNRESOLVED/RESOLVED)
+
+Your app must know which Trello list corresponds to which status.
+
+Use this Trello API call in a browser (replace KEY/TOKEN, and use your board shortlink l8jsw7ZC):
+
+GET https://api.trello.com/1/boards/l8jsw7ZC/lists?fields=name,id&key=KEY&token=TOKEN
+
+Copy the list IDs for:
+
+“Answering service …” (NEW)
+
+“Called back didn’t answer | Unresolved”
+
+“Resolved Voicemails”
+
+Save them in Replit Secrets, for example:
+
+TRELLO_LIST_INTAKE
+
+TRELLO_LIST_UNRESOLVED
+
+TRELLO_LIST_RESOLVED
+
+Then in your code, set:
+
+if card.idList == intake list → status = NEW
+
+if card.idList == unresolved list → status = UNRESOLVED
+
+if card.idList == resolved list → status = RESOLVED
+
+Step 7 — Create the Trello webhook that points to your Replit endpoint
+
+You create a webhook in Trello that tells Trello where to send events.
+
+You have two good options for idModel:
+
+Option A (recommended): Attach webhook to the INTAKE LIST
+
+Less noise, more focused.
+
+idModel = TRELLO_LIST_INTAKE
+
+Option B: Attach webhook to the BOARD
+
+More noise, but covers moves/attachments everywhere.
+
+To create the webhook, your Replit shell (or Postman) needs to do a POST to:
+
+POST https://api.trello.com/1/webhooks/?key=KEY&token=TOKEN
+
+With fields:
+
+description: anything
+
+callbackURL: your exact PUBLIC_WEBHOOK_URL
+
+idModel: list id (or board id)
+
+If creation fails, it’s almost always because:
+
+Your webhook URL isn’t returning 200 to verification (GET/HEAD)
+
+Your URL is wrong (http instead of https, wrong path, trailing slash mismatch)
+
+Step 8 — When webhook fires, fetch the full card details
+
+Webhook payloads are “event-ish” and not always enough. Your Replit app should:
+
+Extract the card.id from the webhook payload
+
+Fetch the card from Trello API:
+
+GET https://api.trello.com/1/cards/{cardId}?fields=name,desc,idList,dateLastActivity&attachments=true&attachment_fields=id,name,url,mimeType&key=KEY&token=TOKEN
+
+From that response:
+
+name becomes your internal “card title”
+
+desc becomes notes/transcript (if any)
+
+idList maps to your status (NEW/UNRESOLVED/RESOLVED)
+
+attachments will include the mp3 and .eml
+
+Step 9 — Download and store the mp3
+
+In attachments you’ll usually see:
+
+original-email.eml
+
+something.mp3
+
+Filter attachments where:
+
+filename ends with .mp3 OR
+
+mimeType contains audio
+
+Then download it. The most reliable method is to use Trello’s attachment download endpoint:
+
+GET https://api.trello.com/1/cards/{cardId}/attachments/{attachmentId}/download/{attachmentName}?key=KEY&token=TOKEN
+
+Store it somewhere your app can serve:
+
+Fastest MVP: save to disk in Replit (works short-term)
+
+Better production: upload to Cloudflare R2 / S3 and store a URL in your DB
+
+Step 10 — Save voicemail records in your app (DB schema)
+
+Your Replit app needs a table/collection like:
+
+trelloCardId (unique)
+
+title
+
+description
+
+status (NEW/UNRESOLVED/RESOLVED)
+
+caller (optional: parse from title “Voicemail message from …”)
+
+receivedAt (use dateLastActivity or parse from title/body)
+
+mp3Url or mp3Filename
+
+createdAt, updatedAt
+
+Logic:
+
+On createCard: create record if not exists
+
+On addAttachmentToCard: attach mp3 if not already saved
+
+On updateCard (list change): update status
+
+Also add idempotency:
+
+Don’t re-download the mp3 if you already stored it for that Trello card.
+
+Step 11 — Build your UI (Kanban replacement)
+
+Your frontend needs:
+
+A Kanban board with columns:
+
+NEW
+
+UNRESOLVED
+
+RESOLVED
+
+And endpoints like:
+
+GET /api/voicemails (optionally filter by status)
+
+PATCH /api/voicemails/:id to update:
+
+status
+
+assigned user
+
+notes
+
+a way to play audio (mp3 link)
+
+Optional “sync back to Trello”:
+
+When your app marks Resolved, also move the Trello card to Resolved list (that requires write scope).
+
+Step 12 — Production reliability notes (so it doesn’t randomly break)
+
+Replit sleeping: If your repl sleeps, Trello webhooks will fail. For real use, use Replit Deployments / always-on hosting.
+
+Store mp3 off-Replit for long-term durability (R2/S3).
+
+Log failures and retry download if Trello temporarily errors.
+
+Don’t skip signature verification.
+
+What to tell Replit (copy/paste prompt)
+
+If you want Replit AI to implement this, paste this prompt:
+
+Build a Node/Express backend in Replit that receives Trello webhooks at /webhooks/trello (GET/HEAD return 200). POST must verify Trello webhook signature using x-trello-webhook header computed as base64(HMAC-SHA1(rawBody + PUBLIC_WEBHOOK_URL, key=TRELLO_API_SECRET)). Then parse action types createCard/addAttachmentToCard/updateCard. For each event, fetch full card details from Trello using TRELLO_KEY/TRELLO_TOKEN with attachments. If an mp3 attachment exists, download it via Trello attachment download endpoint (with key/token) and store it (MVP local uploads folder; later R2/S3). Save/update a voicemail record in SQLite with fields trelloCardId, title, description, status mapped from Trello list IDs, mp3 filename/url, timestamps. Provide API endpoints /api/voicemails and serve mp3 files. Keep processing idempotent (don’t re-download mp3 if already stored).

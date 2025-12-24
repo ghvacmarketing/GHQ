@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray } from "drizzle-orm";
@@ -132,6 +132,15 @@ export interface IStorage {
   createQuoteMessage(message: InsertQuoteMessage): Promise<QuoteMessage>;
   getQuoteMessages(conversationId: string, limit?: number): Promise<QuoteMessage[]>;
   getRecentQuoteMessages(conversationId: string, limit?: number): Promise<QuoteMessage[]>;
+  
+  // Voicemail operations (Trello webhook integration)
+  getVoicemail(id: string): Promise<Voicemail | undefined>;
+  getAllVoicemails(): Promise<Voicemail[]>;
+  getVoicemailsByStatus(status: string): Promise<Voicemail[]>;
+  getVoicemailByTrelloCardId(trelloCardId: string): Promise<Voicemail | undefined>;
+  upsertVoicemail(data: InsertVoicemail): Promise<Voicemail>;
+  updateVoicemail(id: string, updates: Partial<Voicemail>): Promise<Voicemail | undefined>;
+  updateVoicemailMp3(trelloCardId: string, mp3Filename: string): Promise<Voicemail | undefined>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -1003,6 +1012,67 @@ export class DatabaseStorage implements IStorage {
       .orderBy(quoteMessages.createdAt);
     
     return messages.slice(-limit);
+  }
+
+  // Voicemail operations (Trello webhook integration)
+  async getVoicemail(id: string): Promise<Voicemail | undefined> {
+    const [voicemail] = await db.select().from(voicemails).where(eq(voicemails.id, id));
+    return voicemail || undefined;
+  }
+
+  async getAllVoicemails(): Promise<Voicemail[]> {
+    const allVoicemails = await db.select().from(voicemails).orderBy(voicemails.createdAt);
+    return allVoicemails.reverse();
+  }
+
+  async getVoicemailsByStatus(status: string): Promise<Voicemail[]> {
+    return await db.select().from(voicemails).where(eq(voicemails.status, status)).orderBy(voicemails.createdAt);
+  }
+
+  async getVoicemailByTrelloCardId(trelloCardId: string): Promise<Voicemail | undefined> {
+    const [voicemail] = await db.select().from(voicemails).where(eq(voicemails.trelloCardId, trelloCardId));
+    return voicemail || undefined;
+  }
+
+  async upsertVoicemail(data: InsertVoicemail): Promise<Voicemail> {
+    const existing = await this.getVoicemailByTrelloCardId(data.trelloCardId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(voicemails)
+        .set({ 
+          ...data, 
+          mp3Filename: data.mp3Filename || existing.mp3Filename,
+          updatedAt: new Date() 
+        })
+        .where(eq(voicemails.trelloCardId, data.trelloCardId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(voicemails)
+        .values(data)
+        .returning();
+      return created;
+    }
+  }
+
+  async updateVoicemail(id: string, updates: Partial<Voicemail>): Promise<Voicemail | undefined> {
+    const [updated] = await db
+      .update(voicemails)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(voicemails.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async updateVoicemailMp3(trelloCardId: string, mp3Filename: string): Promise<Voicemail | undefined> {
+    const [updated] = await db
+      .update(voicemails)
+      .set({ mp3Filename, updatedAt: new Date() })
+      .where(eq(voicemails.trelloCardId, trelloCardId))
+      .returning();
+    return updated || undefined;
   }
 
   // Initialize default data if needed

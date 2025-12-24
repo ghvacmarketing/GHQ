@@ -166,6 +166,47 @@ TOTAL: $${quoteData.total}${notesSection}
 
 STATUS: Quote Pending - Follow-up Required`;
   }
+
+  async getCard(cardId: string): Promise<any> {
+    const url = `${this.baseUrl}/cards/${cardId}?key=${this.config.apiKey}&token=${this.config.token}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Trello API error: ${response.statusText}`);
+    }
+    return await response.json();
+  }
+
+  async getCardAttachments(cardId: string): Promise<any[]> {
+    const url = `${this.baseUrl}/cards/${cardId}/attachments?key=${this.config.apiKey}&token=${this.config.token}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Trello API error: ${response.statusText}`);
+    }
+    return await response.json();
+  }
+
+  async downloadAttachment(url: string): Promise<Buffer> {
+    const authedUrl = url.includes('?') 
+      ? `${url}&key=${this.config.apiKey}&token=${this.config.token}`
+      : `${url}?key=${this.config.apiKey}&token=${this.config.token}`;
+    
+    const response = await fetch(authedUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download attachment: ${response.statusText}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  }
+
+  async getBoardLists(boardId?: string): Promise<any[]> {
+    const bid = boardId || this.config.boardId;
+    const url = `${this.baseUrl}/boards/${bid}/lists?key=${this.config.apiKey}&token=${this.config.token}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Trello API error: ${response.statusText}`);
+    }
+    return await response.json();
+  }
 }
 
 export const trelloService = new TrelloService();

@@ -458,6 +458,30 @@ export type QuoteConversation = typeof quoteConversations.$inferSelect;
 export type InsertQuoteMessage = z.infer<typeof insertQuoteMessageSchema>;
 export type QuoteMessage = typeof quoteMessages.$inferSelect;
 
+// Voicemails table (Trello webhook integration)
+export const voicemails = pgTable("voicemails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  trelloCardId: text("trello_card_id").unique().notNull(),
+  trelloListId: text("trello_list_id"),
+  title: text("title"),
+  description: text("description"),
+  status: text("status").notNull().default("NEW"), // NEW, UNRESOLVED, RESOLVED
+  caller: text("caller"),
+  receivedAt: timestamp("received_at"),
+  mp3Filename: text("mp3_filename"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertVoicemailSchema = createInsertSchema(voicemails).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertVoicemail = z.infer<typeof insertVoicemailSchema>;
+export type Voicemail = typeof voicemails.$inferSelect;
+
 // Structured AI Quote Response Schema - Professional Proposal Format
 export const AIQuoteResponseSchema = z.object({
   quote_title: z.string(),
