@@ -107,7 +107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/webhooks/trello", express.raw({ type: 'application/json' }), async (req, res) => {
     try {
       const trelloSecret = process.env.TRELLO_SECRET;
-      const trelloListId = process.env.TRELLO_LIST_ID;
+      const trelloListNew = process.env.TRELLO_LIST_NEW || process.env.TRELLO_LIST_ID;
       const trelloListUnresolved = process.env.TRELLO_LIST_UNRESOLVED;
       const trelloListResolved = process.env.TRELLO_LIST_RESOLVED;
 
@@ -175,7 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status = 'UNRESOLVED';
           } else if (targetListId === trelloListResolved) {
             status = 'RESOLVED';
-          } else if (targetListId === trelloListId) {
+          } else if (targetListId === trelloListNew) {
             status = 'NEW';
           }
 
@@ -184,7 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Upsert voicemail record
           await storage.upsertVoicemail({
             trelloCardId: cardId,
-            trelloListId: targetListId || trelloListId || null,
+            trelloListId: targetListId || trelloListNew || null,
             title: card.name || 'Untitled Voicemail',
             description: card.desc || null,
             status,
@@ -288,13 +288,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Two-way sync: If status changed and voicemail has a Trello card, move it to the corresponding list
       if (updates.status && voicemail.trelloCardId) {
-        const trelloListId = process.env.TRELLO_LIST_ID;
+        const trelloListNew = process.env.TRELLO_LIST_NEW || process.env.TRELLO_LIST_ID;
         const trelloListUnresolved = process.env.TRELLO_LIST_UNRESOLVED;
         const trelloListResolved = process.env.TRELLO_LIST_RESOLVED;
 
         let targetListId: string | null = null;
-        if (updates.status === 'NEW' && trelloListId) {
-          targetListId = trelloListId;
+        if (updates.status === 'NEW' && trelloListNew) {
+          targetListId = trelloListNew;
         } else if (updates.status === 'UNRESOLVED' && trelloListUnresolved) {
           targetListId = trelloListUnresolved;
         } else if (updates.status === 'RESOLVED' && trelloListResolved) {
