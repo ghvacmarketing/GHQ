@@ -34,7 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { ArrowLeft, ArrowRight, Search, MapPin, DollarSign, Calendar, CalendarDays, User, StickyNote, GripVertical, Phone, Mail, FileText, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Package, Wrench } from "lucide-react";
+import { ArrowLeft, ArrowRight, Search, MapPin, DollarSign, Calendar, CalendarDays, User, StickyNote, GripVertical, Phone, Mail, FileText, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Package, Wrench, Crown } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
@@ -1253,9 +1253,15 @@ export default function Installation() {
                               </div>
                             ) : (
                               <div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <Badge variant="outline" className="text-xs">{item.packageLevel}</Badge>
                                   <span className="text-xs text-muted-foreground">{item.tonnage}</span>
+                                  {item.isElite && (
+                                    <Badge className="bg-amber-500 text-white text-xs">
+                                      <Crown className="h-3 w-3 mr-1" />
+                                      Elite
+                                    </Badge>
+                                  )}
                                 </div>
                                 <p className="font-medium text-sm mt-1">{item.unitTypeName} ({item.tier})</p>
                                 <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
@@ -1263,6 +1269,17 @@ export default function Installation() {
                                   {item.indoor?.name && <p>• {item.indoor.name} {item.indoor?.model && <span className="font-mono">({item.indoor.model})</span>}</p>}
                                   {item.thermostat?.name && <p>• {item.thermostat.name} {item.thermostat?.model && <span className="font-mono">({item.thermostat.model})</span>}</p>}
                                 </div>
+                                {item.isElite && item.eliteBundles && (
+                                  <div className="text-xs text-amber-700 dark:text-amber-300 mt-1 bg-amber-50 dark:bg-amber-950/30 p-1.5 rounded space-y-0.5">
+                                    <p className="font-medium">Elite Package Includes:</p>
+                                    {Object.entries(item.eliteBundles).map(([key, price]) => (
+                                      <p key={key}>• {key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}: ${(price as number).toLocaleString()}</p>
+                                    ))}
+                                    {item.eliteSavings > 0 && (
+                                      <p className="font-medium text-green-600">Savings: ${item.eliteSavings.toLocaleString()}</p>
+                                    )}
+                                  </div>
+                                )}
                                 <p className="text-sm font-medium text-primary mt-1">
                                   ${item.totalPrice?.toLocaleString()}
                                   {item.monthlyPayment > 0 && (

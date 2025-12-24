@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter, Navigation, MessageSquare, StickyNote, ArrowRightCircle, UserPlus, Activity, FileText, ExternalLink, Search, Users, Package } from "lucide-react";
+import { Plus, Edit, Trash2, Check, X, Phone, Mail, MapPin, Calendar, DollarSign, Settings, Download, Upload, CheckCircle2, TrendingUp, Filter, Navigation, MessageSquare, StickyNote, ArrowRightCircle, UserPlus, Activity, FileText, ExternalLink, Search, Users, Package, Crown } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -2137,9 +2137,15 @@ function LeadCard({
                                   </div>
                                 ) : (
                                   <div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                       <Badge variant="outline" className="text-xs">{item.packageLevel}</Badge>
                                       <span className="text-xs text-muted-foreground">{item.tonnage}</span>
+                                      {item.isElite && (
+                                        <Badge className="bg-amber-500 text-white text-xs">
+                                          <Crown className="h-3 w-3 mr-1" />
+                                          Elite
+                                        </Badge>
+                                      )}
                                     </div>
                                     <p className="font-medium text-sm mt-1">{item.unitTypeName} ({item.tier})</p>
                                     <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
@@ -2147,6 +2153,17 @@ function LeadCard({
                                       {item.indoor?.name && <p>• {item.indoor.name} {item.indoor?.model && <span className="font-mono">({item.indoor.model})</span>}</p>}
                                       {item.thermostat?.name && <p>• {item.thermostat.name} {item.thermostat?.model && <span className="font-mono">({item.thermostat.model})</span>}</p>}
                                     </div>
+                                    {item.isElite && item.eliteBundles && (
+                                      <div className="text-xs text-amber-700 dark:text-amber-300 mt-1 bg-amber-50 dark:bg-amber-950/30 p-1.5 rounded space-y-0.5">
+                                        <p className="font-medium">Elite Package Includes:</p>
+                                        {Object.entries(item.eliteBundles).map(([key, price]) => (
+                                          <p key={key}>• {key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}: ${(price as number).toLocaleString()}</p>
+                                        ))}
+                                        {item.eliteSavings > 0 && (
+                                          <p className="font-medium text-green-600">Savings: ${item.eliteSavings.toLocaleString()}</p>
+                                        )}
+                                      </div>
+                                    )}
                                     <p className="text-sm font-medium text-primary mt-1">
                                       ${item.totalPrice?.toLocaleString()}
                                       {item.monthlyPayment > 0 && (
