@@ -206,7 +206,7 @@ export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<
 
   // Call OpenAI with structured output and low temperature
   const response = await openai.chat.completions.create({
-    model: "gpt-4.1",
+    model: "gpt-5.2",
     messages: messages,
     response_format: { 
       type: "json_schema",
