@@ -2798,10 +2798,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Build a readable summary for clientIssue
       const equipmentSummary = equipmentDetails && equipmentDetails.length > 0
         ? equipmentDetails.map((item: any) => {
-            if (item.type === "custom") {
-              return `Custom ${item.tonnage} System: ${item.outdoor.brand} ${item.outdoor.name}`;
-            } else {
+            if (item.type === "crawlspace") {
+              const eliteLabel = item.isElite ? " (Elite)" : "";
+              return `Crawlspace Encapsulation - ${item.tierName}${eliteLabel}`;
+            } else if (item.type === "custom") {
+              return `Custom ${item.tonnage} System: ${item.outdoor?.brand || 'N/A'} ${item.outdoor?.name || ''}`;
+            } else if (item.outdoor) {
               return `${item.outdoor.brand} ${item.packageLevel} ${item.unitTypeName} - ${item.tonnage}`;
+            } else {
+              return item.name || 'Equipment item';
             }
           }).join('; ')
         : 'Equipment proposal accepted';
