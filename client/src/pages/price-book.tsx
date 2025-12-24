@@ -5,13 +5,12 @@ import NavDropdown from "@/components/nav-dropdown";
 import redlogo from "@assets/redlogo.webp";
 
 const SALESBOOK_OPTIONS = [
-  { id: 'pricebook', label: 'Price Book', url: 'https://online.fliphtml5.com/iwkrq/dcmc/' },
-  { id: 'brian', label: "Brian's Salesbook", url: 'https://online.fliphtml5.com/iwkrq/Brian-Salesbook/' },
-  { id: 'chandler', label: "Chandler's Salesbook", url: 'https://online.fliphtml5.com/iwkrq/CHandler-Salesbook/' },
+  { id: 'brian', label: "Brian's Salesbook", url: 'https://online.fliphtml5.com/iwkrq/Zack-Salesbook/' },
+  { id: 'chandler', label: "Chandler's Salesbook", url: 'https://online.fliphtml5.com/iwkrq/dcmc/' },
 ];
 
 export default function PriceBook() {
-  const [selectedBook, setSelectedBook] = useState('pricebook');
+  const [selectedBook, setSelectedBook] = useState('brian');
   
   const currentBook = SALESBOOK_OPTIONS.find(b => b.id === selectedBook) || SALESBOOK_OPTIONS[0];
 
@@ -85,7 +84,7 @@ export default function PriceBook() {
 
         <div 
           className="flex-1 w-full" 
-          style={{ position: 'relative', paddingTop: 'max(60%,324px)', width: '100%', height: 0 }}
+          style={{ position: 'relative', paddingTop: '56%', width: '100%', height: 0 }}
           data-testid="flipbook-container"
         >
           <iframe 
