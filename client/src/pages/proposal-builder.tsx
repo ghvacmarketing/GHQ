@@ -1164,6 +1164,7 @@ export default function ProposalBuilder() {
     toast({
       title: "Added to Proposal",
       description: `${pkg.outdoorBrand} ${pkg.packageLevel} package added.`,
+      duration: 2000,
     });
   };
 
@@ -1286,6 +1287,7 @@ export default function ProposalBuilder() {
       description: eliteData 
         ? `${pkg.outdoorBrand} ${pkg.packageLevel} with Elite upgrades added.`
         : `${pkg.outdoorBrand} ${pkg.packageLevel} package added.`,
+      duration: 2000,
     });
 
     setEliteEnabledByIndex(prev => ({ ...prev, [index]: false }));
