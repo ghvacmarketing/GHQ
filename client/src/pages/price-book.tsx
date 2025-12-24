@@ -42,7 +42,7 @@ export default function PriceBook() {
             )}
             <div className="min-w-0">
               <NavDropdown 
-                currentPageTitle={currentBook ? currentBook.label : "Salesbook"}
+                currentPageTitle={currentBook ? currentBook.label : "Pricebook"}
                 items={[
                   { label: "Home", path: "/" },
                   { label: "Sales Prospects", path: "/sales-prospects" },
@@ -74,12 +74,15 @@ export default function PriceBook() {
               {SALESBOOK_OPTIONS.map((book) => (
                 <Card 
                   key={book.id}
-                  className="cursor-pointer hover:border-orange-500 hover:shadow-lg transition-all"
+                  className="cursor-pointer hover:shadow-lg transition-all"
+                  style={{ borderColor: 'transparent' }}
                   onClick={() => setSelectedBook(book.id)}
                   data-testid={`card-book-${book.id}`}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = '#d3b07d'}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'transparent'}
                 >
                   <CardContent className="p-6 flex items-center gap-4">
-                    <div className="bg-orange-500 text-white p-4 rounded-lg">
+                    <div className="text-white p-4 rounded-lg" style={{ backgroundColor: '#d3b07d' }}>
                       <BookOpen className="h-8 w-8" />
                     </div>
                     <span className="text-xl font-semibold">{book.label}</span>
