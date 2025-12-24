@@ -527,12 +527,17 @@ export default function ProposalBuilder() {
     quote_title: string;
     customer_summary: string;
     selected_base_package?: { tier: string; tonnage: string; brand: string; model: string };
+    line_items: { name: string; qty: number; price: number; description: string }[];
     add_ons: { name: string; qty: number; price: number; description: string }[];
     subtotal: number;
+    elite_discount_active: boolean;
+    elite_discount_percent: number;
+    elite_discount_amount: number;
+    elite_warning: string;
     discount_amount: number;
     discount_percent: number;
     total: number;
-    savings_text?: string;
+    savings_note: string;
     financing_text?: string;
     warranties_and_terms: string[];
     next_steps: string[];
@@ -1420,18 +1425,24 @@ export default function ProposalBuilder() {
       
       let quoteText = `${aiQuote.quote_title}\n${'='.repeat(40)}\n\n`;
       quoteText += `${aiQuote.customer_summary}\n\n`;
-      if (aiQuote.add_ons && aiQuote.add_ons.length > 0) {
-        quoteText += `INCLUDED ITEMS:\n`;
-        aiQuote.add_ons.forEach((item: { name: string; qty: number; price: number; description: string }) => {
+      if (aiQuote.line_items && aiQuote.line_items.length > 0) {
+        quoteText += `LINE ITEMS:\n`;
+        aiQuote.line_items.forEach((item: { name: string; qty: number; price: number; description: string }) => {
           quoteText += `- ${item.name} (x${item.qty}): $${item.price.toLocaleString()}\n  ${item.description}\n`;
         });
       }
       quoteText += `\nSubtotal: $${aiQuote.subtotal.toLocaleString()}\n`;
-      if (aiQuote.discount_amount > 0) {
+      if (aiQuote.elite_discount_active && aiQuote.elite_discount_amount > 0) {
+        quoteText += `Elite Bundle Discount (${aiQuote.elite_discount_percent}%): -$${aiQuote.elite_discount_amount.toLocaleString()}\n`;
+      }
+      if (aiQuote.elite_warning) {
+        quoteText += `Note: ${aiQuote.elite_warning}\n`;
+      }
+      if (aiQuote.discount_amount > 0 && !aiQuote.elite_discount_active) {
         quoteText += `Discount (${aiQuote.discount_percent}%): -$${aiQuote.discount_amount.toLocaleString()}\n`;
       }
       quoteText += `Total: $${aiQuote.total.toLocaleString()}\n`;
-      if (aiQuote.savings_text) quoteText += `\n${aiQuote.savings_text}\n`;
+      if (aiQuote.savings_note) quoteText += `\n${aiQuote.savings_note}\n`;
       if (aiQuote.financing_text) quoteText += `${aiQuote.financing_text}\n`;
       quoteText += `\nWarranties & Terms:\n`;
       aiQuote.warranties_and_terms.forEach((term: string) => {
@@ -3520,9 +3531,11 @@ export default function ProposalBuilder() {
                   <h4 className="font-semibold text-primary mb-2">{aiGeneratedQuote.quote_title}</h4>
                   <p className="text-sm text-muted-foreground mb-3">{aiGeneratedQuote.customer_summary}</p>
                   
-                  {aiGeneratedQuote.add_ons && aiGeneratedQuote.add_ons.length > 0 && (
+                  {/* Line Items - Always show all items with prices */}
+                  {aiGeneratedQuote.line_items && aiGeneratedQuote.line_items.length > 0 && (
                     <div className="space-y-2 mb-3">
-                      {aiGeneratedQuote.add_ons.map((item, idx) => (
+                      <p className="text-xs font-semibold text-muted-foreground">LINE ITEMS</p>
+                      {aiGeneratedQuote.line_items.map((item, idx) => (
                         <div key={idx} className="flex justify-between text-sm border-b pb-2">
                           <div>
                             <span className="font-medium">{item.name}</span>
@@ -3535,26 +3548,54 @@ export default function ProposalBuilder() {
                     </div>
                   )}
                   
-                  <div className="border-t pt-3 space-y-1">
+                  {/* Pricing Breakdown - Consistent layout */}
+                  <div className="border-t pt-3 space-y-2">
+                    {/* Subtotal */}
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal</span>
                       <span>{formatPrice(aiGeneratedQuote.subtotal)}</span>
                     </div>
-                    {aiGeneratedQuote.discount_amount > 0 && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span>Discount ({aiGeneratedQuote.discount_percent}%)</span>
-                        <span>-{formatPrice(aiGeneratedQuote.discount_amount)}</span>
+                    
+                    {/* Elite Bundle Discount - Only when active */}
+                    {aiGeneratedQuote.elite_discount_active && aiGeneratedQuote.elite_discount_amount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-green-600 dark:text-green-400">
+                          Elite Bundle Discount ({aiGeneratedQuote.elite_discount_percent}%)
+                        </span>
+                        <span className="text-green-600 dark:text-green-400">
+                          –{formatPrice(aiGeneratedQuote.elite_discount_amount)}
+                        </span>
                       </div>
                     )}
-                    <div className="flex justify-between font-bold">
+                    
+                    {/* Elite Warning - When toggle is on but requirements not met */}
+                    {aiGeneratedQuote.elite_warning && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 italic">
+                        {aiGeneratedQuote.elite_warning}
+                      </p>
+                    )}
+                    
+                    {/* Other discounts (non-Elite) */}
+                    {aiGeneratedQuote.discount_amount > 0 && !aiGeneratedQuote.elite_discount_active && (
+                      <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                        <span>Discount ({aiGeneratedQuote.discount_percent}%)</span>
+                        <span>–{formatPrice(aiGeneratedQuote.discount_amount)}</span>
+                      </div>
+                    )}
+                    
+                    {/* Total - Always shown, bold and prominent */}
+                    <div className="flex justify-between font-bold text-lg pt-1 border-t">
                       <span>Total</span>
                       <span className="text-primary">{formatPrice(aiGeneratedQuote.total)}</span>
                     </div>
+                    
+                    {/* Savings note - Small muted text, not a banner */}
+                    {aiGeneratedQuote.savings_note && (
+                      <p className="text-xs text-muted-foreground italic mt-1">
+                        {aiGeneratedQuote.savings_note}
+                      </p>
+                    )}
                   </div>
-                  
-                  {aiGeneratedQuote.savings_text && (
-                    <Badge className="mt-3 bg-green-500 text-white">{aiGeneratedQuote.savings_text}</Badge>
-                  )}
                   
                   {aiGeneratedQuote.warranties_and_terms.length > 0 && (
                     <div className="mt-4 pt-3 border-t">

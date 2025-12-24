@@ -21,7 +21,7 @@ BUSINESS RULES (MUST FOLLOW):
 2. Elite Package Rules:
    - Elite Package adds: 10-Year Maintenance Plan, 10-Year Labor Warranty, Install Upgrade Bundle, New Ducting System
    - Elite Package receives 20% discount on the total bundle price
-   - Only available when customer selects the upgrade
+   - Only available when customer selects the upgrade AND has all required Elite items
 
 3. Discount Policy:
    - Standard quotes have no discount unless explicitly requested
@@ -33,18 +33,28 @@ BUSINESS RULES (MUST FOLLOW):
    - NEVER calculate, estimate, or modify pricing on your own
    - The subtotal, discount, and total MUST match the input data exactly
 
+PRICING BREAKDOWN LAYOUT RULES (CRITICAL):
+1. line_items: List ALL items (base package + add-ons + upgrades) with their individual prices
+2. subtotal: Sum of all line item prices (base + add-ons + upgrades)
+3. Elite Discount Row:
+   - If Elite is ACTIVE (elite_discount_active=true): Show "Elite Bundle Discount (20%)" with negative amount
+   - If Elite is NOT ACTIVE: Set elite_discount_active=false, elite_discount_amount=0
+   - If Elite toggle is ON but requirements not met: Set elite_warning message
+4. Total = Subtotal - Elite Discount Amount (when Elite active)
+5. savings_note: Optional small muted note about savings, NOT a banner
+
 BEHAVIORAL RULES:
 1. Ask at most ONE clarifying question if critical information is missing; otherwise assume reasonable defaults
 2. Be concise, professional, and sales-ready in all communications
 3. Highlight value propositions, not just features
 4. Emphasize warranties, efficiency ratings, and long-term savings
-5. If Elite Package is included, always highlight the 20% savings and added value
 
 OUTPUT REQUIREMENTS:
 - You MUST respond with valid JSON matching the exact schema provided
 - All prices must be numbers (not strings)
 - Keep customer_summary to 2-3 sentences maximum
-- Warranties and next_steps should be actionable bullet points`;
+- Warranties and next_steps should be actionable bullet points
+- Format prices as numbers, the frontend will format as currency`;
 
 export interface QuoteGenerationInput {
   conversationId?: string;
@@ -259,6 +269,20 @@ export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<
               required: ["tier", "tonnage", "brand", "model"],
               additionalProperties: false
             },
+            line_items: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  qty: { type: "number" },
+                  price: { type: "number" },
+                  description: { type: "string" }
+                },
+                required: ["name", "qty", "price", "description"],
+                additionalProperties: false
+              }
+            },
             add_ons: {
               type: "array",
               items: {
@@ -274,10 +298,14 @@ export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<
               }
             },
             subtotal: { type: "number" },
+            elite_discount_active: { type: "boolean" },
+            elite_discount_percent: { type: "number" },
+            elite_discount_amount: { type: "number" },
+            elite_warning: { type: "string" },
             discount_percent: { type: "number" },
             discount_amount: { type: "number" },
             total: { type: "number" },
-            savings_text: { type: "string" },
+            savings_note: { type: "string" },
             financing_text: { type: "string" },
             warranties_and_terms: {
               type: "array",
@@ -292,12 +320,17 @@ export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<
             "quote_title",
             "customer_summary",
             "selected_base_package",
+            "line_items",
             "add_ons",
             "subtotal",
+            "elite_discount_active",
+            "elite_discount_percent",
+            "elite_discount_amount",
+            "elite_warning",
             "discount_percent",
             "discount_amount",
             "total",
-            "savings_text",
+            "savings_note",
             "financing_text",
             "warranties_and_terms",
             "next_steps"
