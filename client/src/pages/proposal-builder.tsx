@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, BookOpen, ExternalLink } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, BookOpen, ExternalLink, Download } from "lucide-react";
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType } from "docx";
+import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1437,6 +1439,98 @@ export default function ProposalBuilder() {
       toast({
         title: "Copy Failed",
         description: "Please select and copy the text manually.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const downloadQuoteAsDoc = async () => {
+    if (!generatedQuote) return;
+    
+    try {
+      const lines = generatedQuote.split('\n');
+      const paragraphs: Paragraph[] = [];
+      
+      lines.forEach((line, index) => {
+        if (index === 0) {
+          paragraphs.push(
+            new Paragraph({
+              children: [new TextRun({ text: line, bold: true, size: 32 })],
+              heading: HeadingLevel.HEADING_1,
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            })
+          );
+        } else if (line.startsWith('===') || line.startsWith('---')) {
+          paragraphs.push(
+            new Paragraph({
+              border: {
+                bottom: { color: "999999", space: 1, style: BorderStyle.SINGLE, size: 6 },
+              },
+              spacing: { after: 200 },
+            })
+          );
+        } else if (line.includes(':') && !line.startsWith('•') && !line.startsWith('-')) {
+          const colonIndex = line.indexOf(':');
+          const label = line.substring(0, colonIndex + 1);
+          const value = line.substring(colonIndex + 1);
+          paragraphs.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: label, bold: true }),
+                new TextRun({ text: value }),
+              ],
+              spacing: { after: 100 },
+            })
+          );
+        } else if (line.startsWith('•') || line.startsWith('-')) {
+          paragraphs.push(
+            new Paragraph({
+              children: [new TextRun({ text: line })],
+              indent: { left: 360 },
+              spacing: { after: 80 },
+            })
+          );
+        } else if (line.trim() === '') {
+          paragraphs.push(new Paragraph({ spacing: { after: 100 } }));
+        } else if (line.includes('$') && (line.includes('Total') || line.includes('Subtotal') || line.includes('Discount'))) {
+          paragraphs.push(
+            new Paragraph({
+              children: [new TextRun({ text: line, bold: true, size: 24 })],
+              spacing: { after: 100 },
+            })
+          );
+        } else {
+          paragraphs.push(
+            new Paragraph({
+              children: [new TextRun({ text: line })],
+              spacing: { after: 80 },
+            })
+          );
+        }
+      });
+
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: paragraphs,
+        }],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const customerName = selectedCustomer?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Customer';
+      const date = new Date().toISOString().split('T')[0];
+      saveAs(blob, `GHVAC_Quote_${customerName}_${date}.docx`);
+      
+      toast({
+        title: "Downloaded!",
+        description: "Quote saved as Word document.",
+      });
+    } catch (err) {
+      console.error('Error generating document:', err);
+      toast({
+        title: "Download Failed",
+        description: "Could not generate the document. Please try again.",
         variant: "destructive",
       });
     }
@@ -3581,12 +3675,12 @@ export default function ProposalBuilder() {
                 Close
               </Button>
               <Button
-                onClick={copyQuoteToClipboard}
+                onClick={downloadQuoteAsDoc}
                 className="flex-1 min-h-[44px]"
-                data-testid="button-copy-quote"
+                data-testid="button-download-quote"
               >
-                <Copy className="h-4 w-4 mr-2" />
-                Copy to Clipboard
+                <Download className="h-4 w-4 mr-2" />
+                Download as DOC
               </Button>
               <Button
                 onClick={handleAcceptQuote}
