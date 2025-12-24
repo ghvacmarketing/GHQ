@@ -355,6 +355,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /setup/trello-sync - manually sync existing cards from Trello list
+  app.post("/setup/trello-sync", async (req, res) => {
+    try {
+      const apiKey = process.env.TRELLO_API_KEY;
+      const token = process.env.TRELLO_TOKEN;
+      const listId = req.body.listId || process.env.TRELLO_LIST_ID;
+      
+      if (!apiKey || !token || !listId) {
+        return res.status(400).json({ message: "TRELLO_API_KEY, TRELLO_TOKEN, and listId required" });
+      }
+      
+      // Fetch all cards from the list
+      const url = `https://api.trello.com/1/lists/${listId}/cards?fields=name,desc,idList,dateLastActivity&attachments=true&attachment_fields=id,name,mimeType,url&key=${encodeURIComponent(apiKey)}&token=${encodeURIComponent(token)}`;
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        const errorText = await response.text();
+        return res.status(response.status).json({ message: "Failed to fetch cards from Trello", error: errorText });
+      }
+      
+      const cards = await response.json();
+      const results: { cardId: string; title: string; status: string; mp3Downloaded: boolean }[] = [];
+      
+      for (const card of cards) {
+        // Parse caller from title
+        const callerMatch = card.name.match(/from\s+"?([^"]+)"?/i);
+        const caller = callerMatch ? callerMatch[1].trim() : null;
+        
+        // Upsert voicemail record
+        await storage.upsertVoicemail({
+          trelloCardId: card.id,
+          trelloListId: card.idList,
+          title: card.name,
+          description: card.desc || "",
+          status: "NEW",
+          caller,
+          receivedAt: card.dateLastActivity ? new Date(card.dateLastActivity) : null,
+          mp3Filename: null,
+        });
+        
+        // Check for MP3 attachment
+        const mp3Attachment = (card.attachments || []).find((a: any) => {
+          const name = (a.name || "").toLowerCase();
+          const mime = (a.mimeType || "").toLowerCase();
+          return name.endsWith(".mp3") || mime.includes("audio");
+        });
+        
+        let mp3Downloaded = false;
+        if (mp3Attachment) {
+          // Check if we already have it
+          const existing = await storage.getVoicemailByTrelloCardId(card.id);
+          if (!existing?.mp3Filename) {
+            try {
+              // Download using Trello's authenticated endpoint with OAuth header
+              const downloadUrl = `https://api.trello.com/1/cards/${card.id}/attachments/${mp3Attachment.id}/download/${encodeURIComponent(mp3Attachment.name)}`;
+              const downloadResponse = await fetch(downloadUrl, {
+                headers: {
+                  'Authorization': `OAuth oauth_consumer_key="${apiKey}", oauth_token="${token}"`
+                }
+              });
+              if (downloadResponse.ok) {
+                const buffer = Buffer.from(await downloadResponse.arrayBuffer());
+                const fs = await import("fs");
+                const path = await import("path");
+                const uploadsDir = path.join(process.cwd(), "uploads");
+                if (!fs.existsSync(uploadsDir)) {
+                  fs.mkdirSync(uploadsDir, { recursive: true });
+                }
+                const safeName = `${Date.now()}-${mp3Attachment.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+                const filePath = path.join(uploadsDir, safeName);
+                fs.writeFileSync(filePath, buffer);
+                await storage.updateVoicemailMp3(card.id, safeName);
+                mp3Downloaded = true;
+                console.log(`[SYNC] Downloaded MP3 for card ${card.id}: ${safeName}`);
+              }
+            } catch (err) {
+              console.error(`[SYNC] Failed to download MP3 for card ${card.id}:`, err);
+            }
+          }
+        }
+        
+        results.push({
+          cardId: card.id,
+          title: card.name,
+          status: "NEW",
+          mp3Downloaded,
+        });
+      }
+      
+      res.json({ message: `Synced ${results.length} cards`, results });
+    } catch (error) {
+      console.error("Error syncing Trello cards:", error);
+      res.status(500).json({ message: "Error syncing Trello cards" });
+    }
+  });
+
   // ============================================
   // MAIN API ROUTES
   // ============================================

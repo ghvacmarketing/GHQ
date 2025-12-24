@@ -186,11 +186,12 @@ STATUS: Quote Pending - Follow-up Required`;
   }
 
   async downloadAttachment(url: string): Promise<Buffer> {
-    const authedUrl = url.includes('?') 
-      ? `${url}&key=${this.config.apiKey}&token=${this.config.token}`
-      : `${url}?key=${this.config.apiKey}&token=${this.config.token}`;
-    
-    const response = await fetch(authedUrl);
+    // Use OAuth header for authenticated attachment download (required by Trello)
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `OAuth oauth_consumer_key="${this.config.apiKey}", oauth_token="${this.config.token}"`
+      }
+    });
     if (!response.ok) {
       throw new Error(`Failed to download attachment: ${response.statusText}`);
     }
