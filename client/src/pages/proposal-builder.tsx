@@ -1007,27 +1007,26 @@ export default function ProposalBuilder() {
     return cart.reduce((sum, item) => sum + item.quantity, 0);
   }, [cart]);
 
-  const cartTotalRange = useMemo(() => {
+  // Canonical pricing: Calculate subtotal BEFORE any discounts (sum of all items at original prices)
+  const cartSubtotalPreDiscount = useMemo(() => {
     return cart.reduce((acc, item) => {
       if (isCrawlspaceItem(item)) {
-        // Use Elite final price if available, otherwise base price
-        const price = (item.eliteData ? item.eliteData.finalTotal : item.tier.price) * item.quantity;
+        // For Elite: use originalTotal (pre-discount), otherwise base tier price
+        const price = (item.eliteData ? item.eliteData.originalTotal : item.tier.price) * item.quantity;
         return { low: acc.low + price, high: acc.high + price };
       } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
         return { low: acc.low + estimate.low * item.quantity, high: acc.high + estimate.high * item.quantity };
       } else {
-        // Use Elite final price if available, otherwise base price
-        const price = (item.eliteData ? item.eliteData.finalTotal : (parseFloat(item.totalInvestment) || 0)) * item.quantity;
+        // For Elite: use originalTotal (pre-discount), otherwise base totalInvestment
+        const price = (item.eliteData ? item.eliteData.originalTotal : (parseFloat(item.totalInvestment) || 0)) * item.quantity;
         return { low: acc.low + price, high: acc.high + price };
       }
     }, { low: 0, high: 0 });
   }, [cart]);
 
-  const cartTotal = cartTotalRange.high; // Use high for backward compatibility
-
-  // Calculate total savings from Elite packages
-  const cartEliteSavings = useMemo(() => {
+  // Calculate total Elite discount amount (20% savings)
+  const cartEliteDiscountAmount = useMemo(() => {
     return cart.reduce((total, item) => {
       if (item.eliteData) {
         return total + item.eliteData.discountAmount * item.quantity;
@@ -1035,6 +1034,19 @@ export default function ProposalBuilder() {
       return total;
     }, 0);
   }, [cart]);
+
+  // Canonical pricing: Total after discount = Subtotal - Elite Discount
+  const cartTotalAfterDiscount = useMemo(() => {
+    return {
+      low: cartSubtotalPreDiscount.low - cartEliteDiscountAmount,
+      high: cartSubtotalPreDiscount.high - cartEliteDiscountAmount
+    };
+  }, [cartSubtotalPreDiscount, cartEliteDiscountAmount]);
+
+  // Legacy aliases for backward compatibility
+  const cartTotalRange = cartTotalAfterDiscount;
+  const cartTotal = cartTotalRange.high;
+  const cartEliteSavings = cartEliteDiscountAmount;
 
   const cartMonthlyTotalRange = useMemo(() => {
     return cart.reduce((acc, item) => {
@@ -1408,9 +1420,9 @@ export default function ProposalBuilder() {
           customInstructions: quoteInstructions || undefined,
           cartItems,
           totals: {
-            subtotal: cartTotalRange.high,
-            eliteSavings: cartEliteSavings,
-            grandTotal: cartTotalRange.high,
+            subtotal: cartSubtotalPreDiscount.high,
+            eliteSavings: cartEliteDiscountAmount,
+            grandTotal: cartTotalAfterDiscount.high,
             monthlyPayment: cartMonthlyTotalRange.high,
           },
         }),
@@ -3625,34 +3637,43 @@ export default function ProposalBuilder() {
             <Separator className="my-6" />
 
             <div className="bg-muted rounded-lg p-4">
+              {/* Subtotal - Always shows pre-discount total */}
               <div className="flex justify-between items-center mb-2">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">{formatPriceRange(cartTotalRange.low, cartTotalRange.high)}</span>
+                <span className="font-medium">{formatPriceRange(cartSubtotalPreDiscount.low, cartSubtotalPreDiscount.high)}</span>
               </div>
               {hasEstimatedItems && (
                 <p className="text-xs text-muted-foreground mb-2">* Includes estimated pricing for custom builds</p>
               )}
+              
+              {/* Elite Discount Row - Only shown when there's Elite savings */}
+              {cartEliteDiscountAmount > 0 && (
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <Crown className="h-4 w-4" />
+                    Elite Bundle Discount (20%)
+                  </span>
+                  <span className="font-medium text-green-600 dark:text-green-400">–{formatPrice(cartEliteDiscountAmount)}</span>
+                </div>
+              )}
+              
               <Separator className="my-3" />
+              
+              {/* Total Investment - Shows post-discount total */}
               <div className="flex justify-between items-center">
                 <span className="text-lg font-bold">Total Investment</span>
-                <span className="text-2xl font-bold text-primary">{formatPriceRange(cartTotalRange.low, cartTotalRange.high)}</span>
+                <span className="text-2xl font-bold text-primary">{formatPriceRange(cartTotalAfterDiscount.low, cartTotalAfterDiscount.high)}</span>
               </div>
               <div className="flex justify-between items-center mt-1">
                 <span className="text-sm text-muted-foreground">Monthly Payment (with approved financing)</span>
                 <span className="text-sm font-medium">{formatPriceRange(cartMonthlyTotalRange.low, cartMonthlyTotalRange.high)}/mo</span>
               </div>
-              {cartEliteSavings > 0 && (
-                <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-semibold text-green-700 dark:text-green-300 flex items-center gap-1">
-                      <Crown className="h-4 w-4" />
-                      Total Elite Savings
-                    </span>
-                    <Badge className="bg-green-500 text-white text-sm px-3 py-1">
-                      You Save {formatPrice(cartEliteSavings)}!
-                    </Badge>
-                  </div>
-                </div>
+              
+              {/* Savings note - Small muted text instead of banner */}
+              {cartEliteDiscountAmount > 0 && (
+                <p className="text-xs text-muted-foreground italic mt-2">
+                  You save {formatPrice(cartEliteDiscountAmount)} with Elite Package!
+                </p>
               )}
             </div>
 
