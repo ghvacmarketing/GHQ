@@ -233,8 +233,19 @@ function JobCard({ lead, technicians, onClick, isDragging }: JobCardProps) {
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-sm truncate" data-testid={`text-job-name-${lead.id}`}>
+            <h4 className="font-semibold text-sm truncate flex items-center gap-1.5" data-testid={`text-job-name-${lead.id}`}>
               {lead.name}
+              {(() => {
+                try {
+                  if (lead.quoteDetails) {
+                    const details = JSON.parse(lead.quoteDetails);
+                    if (details.equipment?.some((item: any) => item.isElite)) {
+                      return <Crown className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />;
+                    }
+                  }
+                } catch { /* ignore */ }
+                return null;
+              })()}
             </h4>
             {lead.estimatedValue && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">

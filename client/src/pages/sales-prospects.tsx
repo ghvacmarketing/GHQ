@@ -1903,8 +1903,19 @@ function LeadCard({
       <CardHeader className="pb-3">
         {/* Row 1: Name + Status */}
         <div className="flex items-start justify-between gap-3">
-          <CardTitle className="break-words text-base leading-tight flex-1 min-w-0" data-testid={`text-lead-name-${lead.id}`}>
+          <CardTitle className="break-words text-base leading-tight flex-1 min-w-0 flex items-center gap-1.5" data-testid={`text-lead-name-${lead.id}`}>
             {lead.name}
+            {(() => {
+              try {
+                if (lead.quoteDetails) {
+                  const details = JSON.parse(lead.quoteDetails);
+                  if (details.equipment?.some((item: any) => item.isElite)) {
+                    return <Crown className="h-4 w-4 text-amber-500 flex-shrink-0" />;
+                  }
+                }
+              } catch { /* ignore */ }
+              return null;
+            })()}
           </CardTitle>
           <div className="flex-shrink-0">
             {isActive ? (
