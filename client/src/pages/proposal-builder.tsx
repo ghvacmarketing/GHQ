@@ -3272,7 +3272,7 @@ export default function ProposalBuilder() {
                             </div>
                             <div className="text-right">
                               {item.eliteData && (
-                                <p className="text-xs text-muted-foreground line-through">{formatPrice(basePrice * item.quantity)}</p>
+                                <p className="text-xs text-muted-foreground line-through">{formatPrice(item.eliteData.originalTotal * item.quantity)}</p>
                               )}
                               <p className="text-2xl font-bold text-teal-700 dark:text-teal-300">{formatPrice(itemPrice)}</p>
                             </div>
@@ -3428,7 +3428,7 @@ export default function ProposalBuilder() {
                             </div>
                             <div className="text-right">
                               {item.eliteData && (
-                                <p className="text-xs text-muted-foreground line-through">{formatPrice(basePrice * item.quantity)}</p>
+                                <p className="text-xs text-muted-foreground line-through">{formatPrice(item.eliteData.originalTotal * item.quantity)}</p>
                               )}
                               <p className="text-2xl font-bold text-primary">{formatPrice(itemPrice)}</p>
                             </div>
