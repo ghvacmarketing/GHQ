@@ -265,7 +265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH /api/voicemails/:id - update voicemail status/notes
+  // PATCH /api/voicemails/:id - update voicemail status/notes (with two-way Trello sync)
   app.patch("/api/voicemails/:id", async (req, res) => {
     try {
       const { status, description, caller } = req.body;
@@ -285,6 +285,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!voicemail) {
         return res.status(404).json({ message: "Voicemail not found" });
       }
+
+      // Two-way sync: If status changed and voicemail has a Trello card, move it to the corresponding list
+      if (updates.status && voicemail.trelloCardId) {
+        const trelloListId = process.env.TRELLO_LIST_ID;
+        const trelloListUnresolved = process.env.TRELLO_LIST_UNRESOLVED;
+        const trelloListResolved = process.env.TRELLO_LIST_RESOLVED;
+
+        let targetListId: string | null = null;
+        if (updates.status === 'NEW' && trelloListId) {
+          targetListId = trelloListId;
+        } else if (updates.status === 'UNRESOLVED' && trelloListUnresolved) {
+          targetListId = trelloListUnresolved;
+        } else if (updates.status === 'RESOLVED' && trelloListResolved) {
+          targetListId = trelloListResolved;
+        }
+
+        if (targetListId) {
+          try {
+            await trelloService.moveCardToList(voicemail.trelloCardId, targetListId);
+            console.log(`Moved Trello card ${voicemail.trelloCardId} to list ${targetListId} (${updates.status})`);
+          } catch (trelloError) {
+            console.error(`Failed to move Trello card ${voicemail.trelloCardId}:`, trelloError);
+            // Don't fail the request, just log the error - DB is already updated
+          }
+        }
+      }
+
       res.json(voicemail);
     } catch (error) {
       console.error("Error updating voicemail:", error);

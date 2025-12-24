@@ -208,6 +208,22 @@ STATUS: Quote Pending - Follow-up Required`;
     }
     return await response.json();
   }
+
+  async moveCardToList(cardId: string, listId: string): Promise<any> {
+    const url = `${this.baseUrl}/cards/${cardId}?key=${this.config.apiKey}&token=${this.config.token}`;
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ idList: listId }),
+    });
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Trello API error moving card: ${response.statusText} - ${errorBody}`);
+    }
+    return await response.json();
+  }
 }
 
 export const trelloService = new TrelloService();
