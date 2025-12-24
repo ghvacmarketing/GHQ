@@ -525,18 +525,21 @@ export default function ProposalBuilder() {
   const [generatedQuote, setGeneratedQuote] = useState<string | null>(null);
   const [aiGeneratedQuote, setAiGeneratedQuote] = useState<{
     quote_title: string;
-    customer_facing_summary: string;
-    line_items: { name: string; qty: number; price: number; description: string }[];
+    customer_summary: string;
+    selected_base_package?: { tier: string; tonnage: string; brand: string; model: string };
+    add_ons: { name: string; qty: number; price: number; description: string }[];
     subtotal: number;
     discount_amount: number;
     discount_percent: number;
     total: number;
-    savings_text: string;
+    savings_text?: string;
     financing_text?: string;
     warranties_and_terms: string[];
+    next_steps: string[];
   } | null>(null);
   const [isGeneratingQuote, setIsGeneratingQuote] = useState(false);
   const [quoteInstructions, setQuoteInstructions] = useState("");
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   // Build Your Own state
   const [customEquipmentType, setCustomEquipmentType] = useState<string | null>(null);
@@ -1303,11 +1306,32 @@ export default function ProposalBuilder() {
     });
   };
 
-  const openQuoteDialog = () => {
+  const openQuoteDialog = async () => {
     if (cart.length === 0) return;
     setAiGeneratedQuote(null);
     setQuoteInstructions("");
+    setConversationId(null);
     setQuoteDialogOpen(true);
+    
+    // Create a new conversation for memory tracking
+    if (customerName) {
+      try {
+        const response = await fetch('/api/quotes/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customerName,
+            cartSnapshot: { itemCount: cart.length },
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setConversationId(data.conversationId);
+        }
+      } catch (error) {
+        console.error('Failed to create conversation:', error);
+      }
+    }
   };
 
   const generateQuote = async () => {
@@ -1372,6 +1396,7 @@ export default function ProposalBuilder() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          conversationId: conversationId || undefined,
           customerName,
           customerAddress,
           customerNotes,
@@ -1394,11 +1419,13 @@ export default function ProposalBuilder() {
       setAiGeneratedQuote(aiQuote);
       
       let quoteText = `${aiQuote.quote_title}\n${'='.repeat(40)}\n\n`;
-      quoteText += `${aiQuote.customer_facing_summary}\n\n`;
-      quoteText += `LINE ITEMS:\n`;
-      aiQuote.line_items.forEach((item: { name: string; qty: number; price: number; description: string }) => {
-        quoteText += `- ${item.name} (x${item.qty}): $${item.price.toLocaleString()}\n  ${item.description}\n`;
-      });
+      quoteText += `${aiQuote.customer_summary}\n\n`;
+      if (aiQuote.add_ons && aiQuote.add_ons.length > 0) {
+        quoteText += `INCLUDED ITEMS:\n`;
+        aiQuote.add_ons.forEach((item: { name: string; qty: number; price: number; description: string }) => {
+          quoteText += `- ${item.name} (x${item.qty}): $${item.price.toLocaleString()}\n  ${item.description}\n`;
+        });
+      }
       quoteText += `\nSubtotal: $${aiQuote.subtotal.toLocaleString()}\n`;
       if (aiQuote.discount_amount > 0) {
         quoteText += `Discount (${aiQuote.discount_percent}%): -$${aiQuote.discount_amount.toLocaleString()}\n`;
@@ -1410,6 +1437,12 @@ export default function ProposalBuilder() {
       aiQuote.warranties_and_terms.forEach((term: string) => {
         quoteText += `• ${term}\n`;
       });
+      if (aiQuote.next_steps && aiQuote.next_steps.length > 0) {
+        quoteText += `\nNext Steps:\n`;
+        aiQuote.next_steps.forEach((step: string) => {
+          quoteText += `• ${step}\n`;
+        });
+      }
       setGeneratedQuote(quoteText);
       
     } catch (error) {
@@ -1515,9 +1548,9 @@ export default function ProposalBuilder() {
       });
 
       const blob = await Packer.toBlob(doc);
-      const customerName = selectedCustomer?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Customer';
+      const customerNameForFile = selectedCustomer?.displayName?.replace(/[^a-zA-Z0-9]/g, '_') || customerName?.replace(/[^a-zA-Z0-9]/g, '_') || 'Customer';
       const date = new Date().toISOString().split('T')[0];
-      saveAs(blob, `GHVAC_Quote_${customerName}_${date}.docx`);
+      saveAs(blob, `GHVAC_Quote_${customerNameForFile}_${date}.docx`);
       
       toast({
         title: "Downloaded!",
@@ -3485,20 +3518,22 @@ export default function ProposalBuilder() {
               {aiGeneratedQuote && (
                 <div className="mt-4 p-4 bg-white dark:bg-gray-900 rounded-lg border">
                   <h4 className="font-semibold text-primary mb-2">{aiGeneratedQuote.quote_title}</h4>
-                  <p className="text-sm text-muted-foreground mb-3">{aiGeneratedQuote.customer_facing_summary}</p>
+                  <p className="text-sm text-muted-foreground mb-3">{aiGeneratedQuote.customer_summary}</p>
                   
-                  <div className="space-y-2 mb-3">
-                    {aiGeneratedQuote.line_items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between text-sm border-b pb-2">
-                        <div>
-                          <span className="font-medium">{item.name}</span>
-                          {item.qty > 1 && <span className="text-muted-foreground"> x{item.qty}</span>}
-                          <p className="text-xs text-muted-foreground">{item.description}</p>
+                  {aiGeneratedQuote.add_ons && aiGeneratedQuote.add_ons.length > 0 && (
+                    <div className="space-y-2 mb-3">
+                      {aiGeneratedQuote.add_ons.map((item, idx) => (
+                        <div key={idx} className="flex justify-between text-sm border-b pb-2">
+                          <div>
+                            <span className="font-medium">{item.name}</span>
+                            {item.qty > 1 && <span className="text-muted-foreground"> x{item.qty}</span>}
+                            <p className="text-xs text-muted-foreground">{item.description}</p>
+                          </div>
+                          <span className="font-medium">{formatPrice(item.price)}</span>
                         </div>
-                        <span className="font-medium">{formatPrice(item.price)}</span>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                   
                   <div className="border-t pt-3 space-y-1">
                     <div className="flex justify-between text-sm">
@@ -3527,6 +3562,17 @@ export default function ProposalBuilder() {
                       <ul className="text-xs text-muted-foreground space-y-1">
                         {aiGeneratedQuote.warranties_and_terms.map((term, idx) => (
                           <li key={idx}>• {term}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {aiGeneratedQuote.next_steps && aiGeneratedQuote.next_steps.length > 0 && (
+                    <div className="mt-4 pt-3 border-t">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">NEXT STEPS</p>
+                      <ul className="text-xs text-muted-foreground space-y-1">
+                        {aiGeneratedQuote.next_steps.map((step, idx) => (
+                          <li key={idx}>• {step}</li>
                         ))}
                       </ul>
                     </div>
