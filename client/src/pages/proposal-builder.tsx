@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, BookOpen, ExternalLink, Download } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download } from "lucide-react";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType } from "docx";
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
@@ -563,9 +563,6 @@ export default function ProposalBuilder() {
   const [selectedCrawlspaceTier, setSelectedCrawlspaceTier] = useState<CrawlspaceTier | null>(null);
   const [crawlspaceEliteEnabled, setCrawlspaceEliteEnabled] = useState(false);
   
-  // Salesbook state
-  const [selectedSalesperson, setSelectedSalesperson] = useState<'brian' | 'chandler'>('chandler');
-
   // Debounce customer search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1960,15 +1957,7 @@ export default function ProposalBuilder() {
 
       <main className="p-3 sm:p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4 h-14 p-1 mx-auto mb-6 bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl shadow-md" data-testid="tabs-view-switcher">
-            <TabsTrigger 
-              value="salesbook" 
-              className="min-h-[48px] rounded-lg font-semibold transition-all data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg" 
-              data-testid="tab-salesbook"
-            >
-              <BookOpen className="h-5 w-5 sm:mr-2" />
-              <span className="hidden sm:inline">Salesbook</span>
-            </TabsTrigger>
+          <TabsList className="grid w-full max-w-2xl grid-cols-3 h-14 p-1 mx-auto mb-6 bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl shadow-md" data-testid="tabs-view-switcher">
             <TabsTrigger 
               value="preset" 
               className="min-h-[48px] rounded-lg font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-lg dark:data-[state=active]:bg-slate-900" 
@@ -1994,73 +1983,6 @@ export default function ProposalBuilder() {
               <span className="hidden sm:inline">Crawlspace</span>
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="salesbook">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-center justify-between mb-4">
-                <Link href="/">
-                  <Button variant="ghost" size="sm" className="min-h-[44px]" data-testid="button-salesbook-home">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Home
-                  </Button>
-                </Link>
-                <a 
-                  href={selectedSalesperson === 'brian' 
-                    ? "https://online.fliphtml5.com/iwkrq/Brian-Salesbook/" 
-                    : "https://online.fliphtml5.com/iwkrq/CHandler-Salesbook/"
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
-                  data-testid="link-salesbook-fullscreen"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Open Fullscreen
-                </a>
-              </div>
-              
-              <Card className="mb-4">
-                <CardContent className="p-4">
-                  <h3 className="text-lg font-semibold mb-3 text-center">Choose Your Salesbook</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      variant={selectedSalesperson === 'brian' ? 'default' : 'outline'}
-                      className={`min-h-[60px] text-lg font-semibold ${selectedSalesperson === 'brian' ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
-                      onClick={() => setSelectedSalesperson('brian')}
-                      data-testid="button-salesbook-brian"
-                    >
-                      Brian's Salesbook
-                    </Button>
-                    <Button
-                      variant={selectedSalesperson === 'chandler' ? 'default' : 'outline'}
-                      className={`min-h-[60px] text-lg font-semibold ${selectedSalesperson === 'chandler' ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
-                      onClick={() => setSelectedSalesperson('chandler')}
-                      data-testid="button-salesbook-chandler"
-                    >
-                      Chandler's Salesbook
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="relative w-full rounded-lg overflow-hidden shadow-lg border" style={{ paddingTop: 'max(60%, 324px)' }}>
-                <iframe 
-                  className="absolute top-0 left-0 w-full h-full border-0"
-                  src={selectedSalesperson === 'brian' 
-                    ? "https://online.fliphtml5.com/iwkrq/Brian-Salesbook/" 
-                    : "https://online.fliphtml5.com/iwkrq/CHandler-Salesbook/"
-                  }
-                  scrolling="no"
-                  allowFullScreen
-                  data-testid="iframe-salesbook"
-                />
-              </div>
-              
-              <p className="text-center text-sm text-muted-foreground mt-4">
-                Use the flipbook controls to navigate through the sales presentation
-              </p>
-            </div>
-          </TabsContent>
 
           <TabsContent value="preset">
             <div className="flex items-center gap-2 mb-4">
