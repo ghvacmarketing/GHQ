@@ -217,8 +217,7 @@ function VoicemailCard({ voicemail, isDragging, onCardClick }: VoicemailCardProp
     : null;
 
   const handleCardClick = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('[data-drag-handle]') || 
-        (e.target as HTMLElement).closest('button')) {
+    if ((e.target as HTMLElement).closest('button')) {
       return;
     }
     onCardClick?.(voicemail);
@@ -228,19 +227,16 @@ function VoicemailCard({ voicemail, isDragging, onCardClick }: VoicemailCardProp
     <Card
       ref={setNodeRef}
       style={style}
-      className="mb-2 hover:shadow-md transition-shadow bg-white touch-manipulation cursor-pointer"
+      {...attributes}
+      {...listeners}
+      className="mb-2 hover:shadow-md transition-shadow bg-white touch-manipulation cursor-grab active:cursor-grabbing"
       data-testid={`card-voicemail-${voicemail.id}`}
-      data-no-drag
       onClick={handleCardClick}
     >
       <CardContent className="p-3">
         <div className="flex items-start gap-2">
           <div
-            {...attributes}
-            {...listeners}
-            className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
-            onClick={(e) => e.stopPropagation()}
-            data-drag-handle
+            className="flex-shrink-0 p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
             data-testid={`voicemail-drag-handle-${voicemail.id}`}
           >
             <GripVertical className="h-4 w-4 text-muted-foreground" />
