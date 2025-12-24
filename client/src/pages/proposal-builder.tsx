@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -534,6 +534,7 @@ export default function ProposalBuilder() {
     warranties_and_terms: string[];
   } | null>(null);
   const [isGeneratingQuote, setIsGeneratingQuote] = useState(false);
+  const [quoteInstructions, setQuoteInstructions] = useState("");
 
   // Build Your Own state
   const [customEquipmentType, setCustomEquipmentType] = useState<string | null>(null);
@@ -1300,12 +1301,17 @@ export default function ProposalBuilder() {
     });
   };
 
+  const openQuoteDialog = () => {
+    if (cart.length === 0) return;
+    setAiGeneratedQuote(null);
+    setQuoteInstructions("");
+    setQuoteDialogOpen(true);
+  };
+
   const generateQuote = async () => {
     if (cart.length === 0) return;
     
     setIsGeneratingQuote(true);
-    setAiGeneratedQuote(null);
-    setQuoteDialogOpen(true);
     
     try {
       const cartItems = cart.map(item => {
@@ -1367,6 +1373,7 @@ export default function ProposalBuilder() {
           customerName,
           customerAddress,
           customerNotes,
+          customInstructions: quoteInstructions || undefined,
           cartItems,
           totals: {
             subtotal: cartTotalRange.high,
@@ -1410,7 +1417,6 @@ export default function ProposalBuilder() {
         description: "Could not generate AI quote. Please try again.",
         variant: "destructive",
       });
-      setQuoteDialogOpen(false);
     } finally {
       setIsGeneratingQuote(false);
     }
@@ -1839,16 +1845,11 @@ export default function ProposalBuilder() {
                       </Button>
                       <Button
                         className="flex-1 min-h-[44px]"
-                        onClick={generateQuote}
-                        disabled={isGeneratingQuote}
+                        onClick={openQuoteDialog}
                         data-testid="button-generate-quote"
                       >
-                        {isGeneratingQuote ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <FileText className="h-4 w-4 mr-2" />
-                        )}
-                        {isGeneratingQuote ? 'Generating...' : 'Generate Quote'}
+                        <FileText className="h-4 w-4 mr-2" />
+                        View Quote
                       </Button>
                     </div>
                   </div>
@@ -3028,29 +3029,6 @@ export default function ProposalBuilder() {
           </div>
           
           <ScrollArea className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6">
-            {/* Loading State */}
-            {isGeneratingQuote && (
-              <div className="flex flex-col items-center justify-center py-16">
-                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                <p className="text-lg font-medium text-muted-foreground">Generating AI Quote...</p>
-                <p className="text-sm text-muted-foreground">This may take a few seconds</p>
-              </div>
-            )}
-
-            {/* AI Generated Summary */}
-            {!isGeneratingQuote && aiGeneratedQuote && (
-              <div className="mb-6 p-4 bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-lg">
-                <h3 className="text-lg font-semibold text-primary mb-2">{aiGeneratedQuote.quote_title}</h3>
-                <p className="text-muted-foreground">{aiGeneratedQuote.customer_facing_summary}</p>
-                {aiGeneratedQuote.savings_text && (
-                  <Badge className="mt-3 bg-green-500 text-white">{aiGeneratedQuote.savings_text}</Badge>
-                )}
-              </div>
-            )}
-
-            {/* Customer Search Section */}
-            {!isGeneratingQuote && (
-            <>
             <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
               <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-3 flex items-center gap-2">
                 <Search className="h-4 w-4" />
@@ -3374,6 +3352,95 @@ export default function ProposalBuilder() {
               </div>
             </div>
 
+            {/* AI Quote Chat Section */}
+            <div className="my-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950 dark:to-blue-950 border border-purple-200 dark:border-purple-800 rounded-lg">
+              <h3 className="text-sm font-semibold text-purple-800 dark:text-purple-200 mb-3 flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                AI QUOTE GENERATOR
+              </h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                Type instructions to customize your quote (e.g., "give 10% discount", "emphasize warranty", "make it more formal")
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={quoteInstructions}
+                  onChange={(e) => setQuoteInstructions(e.target.value)}
+                  placeholder="Enter custom instructions for the AI..."
+                  className="flex-1"
+                  data-testid="input-quote-instructions"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isGeneratingQuote) {
+                      generateQuote();
+                    }
+                  }}
+                />
+                <Button
+                  onClick={generateQuote}
+                  disabled={isGeneratingQuote}
+                  className="bg-purple-600 hover:bg-purple-700"
+                  data-testid="button-generate-ai-quote"
+                >
+                  {isGeneratingQuote ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  <span className="ml-2 hidden sm:inline">Generate</span>
+                </Button>
+              </div>
+              {aiGeneratedQuote && (
+                <div className="mt-4 p-4 bg-white dark:bg-gray-900 rounded-lg border">
+                  <h4 className="font-semibold text-primary mb-2">{aiGeneratedQuote.quote_title}</h4>
+                  <p className="text-sm text-muted-foreground mb-3">{aiGeneratedQuote.customer_facing_summary}</p>
+                  
+                  <div className="space-y-2 mb-3">
+                    {aiGeneratedQuote.line_items.map((item, idx) => (
+                      <div key={idx} className="flex justify-between text-sm border-b pb-2">
+                        <div>
+                          <span className="font-medium">{item.name}</span>
+                          {item.qty > 1 && <span className="text-muted-foreground"> x{item.qty}</span>}
+                          <p className="text-xs text-muted-foreground">{item.description}</p>
+                        </div>
+                        <span className="font-medium">{formatPrice(item.price)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="border-t pt-3 space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span>{formatPrice(aiGeneratedQuote.subtotal)}</span>
+                    </div>
+                    {aiGeneratedQuote.discount_amount > 0 && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Discount ({aiGeneratedQuote.discount_percent}%)</span>
+                        <span>-{formatPrice(aiGeneratedQuote.discount_amount)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold">
+                      <span>Total</span>
+                      <span className="text-primary">{formatPrice(aiGeneratedQuote.total)}</span>
+                    </div>
+                  </div>
+                  
+                  {aiGeneratedQuote.savings_text && (
+                    <Badge className="mt-3 bg-green-500 text-white">{aiGeneratedQuote.savings_text}</Badge>
+                  )}
+                  
+                  {aiGeneratedQuote.warranties_and_terms.length > 0 && (
+                    <div className="mt-4 pt-3 border-t">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">WARRANTIES & TERMS</p>
+                      <ul className="text-xs text-muted-foreground space-y-1">
+                        {aiGeneratedQuote.warranties_and_terms.map((term, idx) => (
+                          <li key={idx}>• {term}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <Separator className="my-6" />
 
             <div className="bg-muted rounded-lg p-4">
@@ -3424,8 +3491,6 @@ export default function ProposalBuilder() {
                 Thank you for considering GHVAC!
               </p>
             </div>
-            </>
-            )}
           </ScrollArea>
           
           <div className="border-t p-4 bg-card shrink-0 flex-none">

@@ -30,6 +30,7 @@ export interface QuoteGenerationInput {
   customerName?: string;
   customerAddress?: string;
   customerNotes?: string;
+  customInstructions?: string;
   cartItems: Array<{
     type: 'hvac' | 'crawlspace' | 'custom';
     name: string;
@@ -98,6 +99,11 @@ TOTALS:
 - Elite Savings: $${input.totals.eliteSavings.toLocaleString()}
 - Grand Total: $${input.totals.grandTotal.toLocaleString()}
 - Monthly Payment (with approved financing): $${input.totals.monthlyPayment.toLocaleString()}/month
+${input.customInstructions ? `
+CUSTOM INSTRUCTIONS FROM TECHNICIAN:
+${input.customInstructions}
+
+Follow these instructions when generating the quote. Adjust tone, emphasis, discounts, or special terms as requested.` : ''}
 
 Generate the quote JSON now. Use EXACT prices from above.`;
 
