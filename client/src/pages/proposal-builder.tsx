@@ -212,19 +212,20 @@ const HVAC_ELITE_AIRFLOW_OPTIONS: EliteAirflowOption[] = [
     name: "Duct Cleaning",
     description: "Professional duct cleaning service",
     priceByTonnage: { "1.5": 1000, "2": 1000, "2.5": 1000, "3": 1000, "3.5": 1000, "4": 1000, "5": 1000 }
+  },
+  {
+    id: "new-return",
+    name: "New Return",
+    description: "New return duct setup for optimal airflow",
+    priceByTonnage: { "1.5": 350, "2": 350, "2.5": 700, "3": 700, "3.5": 1000, "4": 1000, "5": 1500 }
+  },
+  {
+    id: "reinsulation",
+    name: "Re-Insulation",
+    description: "Attic re-insulation for improved efficiency",
+    priceByTonnage: { "1.5": 895, "2": 995, "2.5": 1150, "3": 1295, "3.5": 1450, "4": 1650, "5": 1950 }
   }
 ];
-
-// HVAC Elite Re-Insulation Add-On (optional, flat pricing by tonnage)
-const HVAC_ELITE_REINSULATION_PRICES: Record<string, number> = {
-  "1.5": 895,
-  "2": 995,
-  "2.5": 1150,
-  "3": 1295,
-  "3.5": 1450,
-  "4": 1650,
-  "5": 1950
-};
 
 // Crawlspace Tiers
 type CrawlspaceTier = {
