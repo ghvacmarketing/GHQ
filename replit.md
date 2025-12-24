@@ -33,6 +33,8 @@ Preferred communication style: Simple, everyday language.
 - **Sales Prospects**: CRM pipeline with lead management, notes, tasks, CSV import/export, phone/email validation, Geoapify address autocomplete, and HTML5 geolocation.
 - **Installation Pipeline**: Kanban board for tracking installation jobs, integrating with sales leads. Features drag-and-drop, optimistic updates, and mobile-first design.
 - **Customer Database**: FieldEdge CSV import system with checksum-based upsert for syncing customer data. Auto-syncs from Google Sheets every 10 minutes with two-way sync (add, update, delete). Integrates customer lookup into lead forms and quote generation.
+- **AI Quote Generation**: Uses OpenAI GPT-5.2 with structured outputs (strict json_schema) for consistent, sales-ready quotes. Features conversation memory with rolling summaries (last 10 messages stored in database), and optional knowledge base integration via vector store file_search to enhance product descriptions from uploaded sales PDFs.
+- **Vector Store Knowledge Base**: Optional feature that uploads sales books and product documentation to OpenAI vector stores for enhanced quote generation. Gracefully degrades when API is not available. Admin endpoints for file management.
 - **Security**: Requires `SESSION_SECRET` and `ADMIN_API_KEY` environment variables. Implements a `GLOBAL_PASSWORD` gate for application-wide access control, configurable via environment variables.
 
 ## External Dependencies
@@ -40,7 +42,7 @@ Preferred communication style: Simple, everyday language.
 - **SendGrid**: Email notifications.
 - **Trello API**: Workflow management.
 - **Neon Database**: PostgreSQL hosting.
-- **OpenAI API (Whisper & GPT)**: Voice transcription and intelligent text formatting/extraction.
+- **OpenAI API (Whisper & GPT)**: Voice transcription, intelligent text formatting/extraction, and AI-powered quote generation using GPT-5.2 with structured outputs, conversation memory, and optional vector store knowledge base integration.
 - **Twilio**: SMS Magic Link authentication.
 - **Geoapify API**: Address autocomplete and reverse geocoding.
 - **react-pdf**: PDF viewing.
