@@ -300,6 +300,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /setup/trello-webhook - register webhook with Trello
+  app.post("/setup/trello-webhook", async (req, res) => {
+    try {
+      const apiKey = process.env.TRELLO_API_KEY;
+      const token = process.env.TRELLO_TOKEN;
+      const listId = process.env.TRELLO_LIST_ID;
+      
+      if (!apiKey || !token) {
+        return res.status(400).json({ message: "TRELLO_API_KEY and TRELLO_TOKEN must be configured" });
+      }
+      
+      // Get the callback URL from request or use the host header
+      const host = req.get('host');
+      const protocol = req.get('x-forwarded-proto') || 'https';
+      const callbackURL = req.body.callbackURL || `${protocol}://${host}/webhooks/trello`;
+      const idModel = req.body.idModel || listId || process.env.TRELLO_BOARD_ID;
+      
+      if (!idModel) {
+        return res.status(400).json({ message: "idModel (TRELLO_LIST_ID or TRELLO_BOARD_ID) must be configured" });
+      }
+      
+      const url = `https://api.trello.com/1/webhooks/?key=${encodeURIComponent(apiKey)}&token=${encodeURIComponent(token)}`;
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: 'GHVAC Voicemail Webhook',
+          callbackURL,
+          idModel,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Trello webhook registration failed:", errorText);
+        return res.status(response.status).json({ 
+          message: "Failed to register webhook with Trello",
+          error: errorText 
+        });
+      }
+      
+      const webhook = await response.json();
+      console.log("Trello webhook registered:", webhook);
+      res.json({ 
+        message: "Webhook registered successfully",
+        webhook,
+        callbackURL 
+      });
+    } catch (error) {
+      console.error("Error registering Trello webhook:", error);
+      res.status(500).json({ message: "Error registering Trello webhook" });
+    }
+  });
+
   // ============================================
   // MAIN API ROUTES
   // ============================================
