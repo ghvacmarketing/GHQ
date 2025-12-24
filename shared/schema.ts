@@ -423,6 +423,68 @@ export type Customer = typeof customers.$inferSelect;
 export type InsertCustomerImportBatch = z.infer<typeof insertCustomerImportBatchSchema>;
 export type CustomerImportBatch = typeof customerImportBatches.$inferSelect;
 
+// Quote Conversations for AI memory
+export const quoteConversations = pgTable("quote_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id"),
+  customerName: text("customer_name").notNull(),
+  rollingSummary: text("rolling_summary"),
+  cartSnapshot: json("cart_snapshot"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const quoteMessages = pgTable("quote_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull(),
+  role: text("role").notNull(), // 'user' | 'assistant' | 'system'
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertQuoteConversationSchema = createInsertSchema(quoteConversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertQuoteMessageSchema = createInsertSchema(quoteMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertQuoteConversation = z.infer<typeof insertQuoteConversationSchema>;
+export type QuoteConversation = typeof quoteConversations.$inferSelect;
+export type InsertQuoteMessage = z.infer<typeof insertQuoteMessageSchema>;
+export type QuoteMessage = typeof quoteMessages.$inferSelect;
+
+// Structured AI Quote Response Schema
+export const AIQuoteResponseSchema = z.object({
+  quote_title: z.string(),
+  customer_summary: z.string(),
+  selected_base_package: z.object({
+    tier: z.string(),
+    tonnage: z.string(),
+    brand: z.string(),
+    model: z.string(),
+  }).optional(),
+  add_ons: z.array(z.object({
+    name: z.string(),
+    qty: z.number(),
+    price: z.number(),
+    description: z.string(),
+  })),
+  subtotal: z.number(),
+  discount_percent: z.number(),
+  discount_amount: z.number(),
+  total: z.number(),
+  savings_text: z.string(),
+  financing_text: z.string().optional(),
+  warranties_and_terms: z.array(z.string()),
+  next_steps: z.array(z.string()),
+});
+export type AIQuoteResponse = z.infer<typeof AIQuoteResponseSchema>;
+
 // Equipment types for Proposal Builder (sourced from Google Sheets)
 export type Equipment = {
   id: string;
