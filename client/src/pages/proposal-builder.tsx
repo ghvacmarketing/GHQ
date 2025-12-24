@@ -177,18 +177,18 @@ type EliteAirflowOption = {
 // HVAC Elite Core Bundles (always required when Elite is ON)
 const HVAC_ELITE_CORE_BUNDLES: EliteBundle[] = [
   {
+    id: "10yr-labor",
+    name: "10-Year Labor Warranty",
+    description: "Full labor coverage for repairs and service",
+    fixedPrice: 1000,
+    benefits: ["All labor costs covered", "No service call fees", "Factory-trained technicians", "Peace of mind protection"]
+  },
+  {
     id: "10yr-maintenance",
     name: "10-Year Maintenance Plan",
     description: "Comprehensive annual maintenance for 10 years",
     fixedPrice: 2290,
     benefits: ["Annual system tune-ups", "Priority scheduling", "Filter replacements", "Performance optimization"]
-  },
-  {
-    id: "10yr-labor",
-    name: "10-Year Labor Warranty",
-    description: "Full labor coverage for repairs and service",
-    fixedPrice: 2000,
-    benefits: ["All labor costs covered", "No service call fees", "Factory-trained technicians", "Peace of mind protection"]
   },
   {
     id: "install-upgrade",
@@ -208,12 +208,23 @@ const HVAC_ELITE_AIRFLOW_OPTIONS: EliteAirflowOption[] = [
     priceByTonnage: { "1.5": 7527, "2": 9353, "2.5": 11179, "3": 13005, "3.5": 14831, "4": 16657, "5": 20309 }
   },
   {
-    id: "duct-cleaning-upgrade",
-    name: "Duct Cleaning + New Return + Re-Insulation",
-    description: "Comprehensive duct service and upgrade package",
-    priceByTonnage: { "1.5": 1000, "2": 1500, "2.5": 2000, "3": 2500, "3.5": 3000, "4": 4000, "5": 5000 }
+    id: "duct-cleaning",
+    name: "Duct Cleaning",
+    description: "Professional duct cleaning service",
+    priceByTonnage: { "1.5": 1000, "2": 1000, "2.5": 1000, "3": 1000, "3.5": 1000, "4": 1000, "5": 1000 }
   }
 ];
+
+// HVAC Elite Re-Insulation Add-On (optional, flat pricing by tonnage)
+const HVAC_ELITE_REINSULATION_PRICES: Record<string, number> = {
+  "1.5": 895,
+  "2": 995,
+  "2.5": 1150,
+  "3": 1295,
+  "3.5": 1450,
+  "4": 1650,
+  "5": 1950
+};
 
 // Crawlspace Tiers
 type CrawlspaceTier = {
@@ -231,27 +242,28 @@ const CRAWLSPACE_TIERS: CrawlspaceTier[] = [
 ];
 
 // Crawlspace Elite Bundles (all required when Elite is ON)
+// Formula: Crawlspace Elite Add-On Total = P + $4,290 (where P = tier price)
 const CRAWLSPACE_ELITE_BUNDLES: EliteBundle[] = [
   {
     id: "crawl-10yr-maintenance",
-    name: "10-Year Crawlspace Maintenance",
+    name: "10-Year Maintenance",
     description: "Annual crawlspace inspection and maintenance for 10 years",
     fixedPrice: 2290,
     benefits: ["1 visit per year", "Moisture monitoring", "Barrier inspection", "Preventive maintenance"]
   },
   {
-    id: "crawl-replacement-warranty",
-    name: "Total Replacement Warranty",
-    description: "Complete parts and labor coverage",
+    id: "crawl-10yr-inspection",
+    name: "10-Year Inspection",
+    description: "Comprehensive inspection program for 10 years",
     fixedPrice: 1000,
-    benefits: ["Full parts coverage", "Labor included", "No deductibles", "Transferable warranty"]
+    benefits: ["Annual inspections", "Moisture testing", "Structural assessment", "Detailed reports"]
   },
   {
-    id: "crawl-inspection",
-    name: "Crawlspace Inspection",
-    description: "Comprehensive initial inspection and assessment",
-    fixedPrice: 0,
-    benefits: ["Moisture testing", "Structural assessment", "Mold/mildew check", "Detailed report"]
+    id: "crawl-replacement-warranty",
+    name: "Total Replacement Warranty (Parts + Labor)",
+    description: "Complete parts and labor coverage equal to project value + $1,000",
+    fixedPrice: 1000,
+    benefits: ["Full parts coverage", "Labor included", "No deductibles", "Transferable warranty"]
   }
 ];
 
@@ -304,14 +316,22 @@ function calculateHvacElitePricing(
 }
 
 // Calculate full Elite package pricing for Crawlspace
+// Formula: Crawlspace Elite = P + $4,290 where:
+// - 10-Year Maintenance: $2,290
+// - 10-Year Inspection: $1,000  
+// - Total Replacement Warranty: P + $1,000 (covers full project value + $1,000)
 function calculateCrawlspaceElitePricing(basePrice: number): ElitePackageData {
   const coreBundlePrices: Record<string, number> = {};
-  let bundleTotal = 0;
-  for (const bundle of CRAWLSPACE_ELITE_BUNDLES) {
-    const price = bundle.fixedPrice || 0;
-    coreBundlePrices[bundle.id] = price;
-    bundleTotal += price;
-  }
+  
+  // Fixed bundles
+  coreBundlePrices["crawl-10yr-maintenance"] = 2290;
+  coreBundlePrices["crawl-10yr-inspection"] = 1000;
+  // Total Replacement Warranty = basePrice + $1,000
+  coreBundlePrices["crawl-replacement-warranty"] = basePrice + 1000;
+  
+  const bundleTotal = coreBundlePrices["crawl-10yr-maintenance"] + 
+                      coreBundlePrices["crawl-10yr-inspection"] + 
+                      coreBundlePrices["crawl-replacement-warranty"];
 
   const originalTotal = basePrice + bundleTotal;
   const discountAmount = Math.round(originalTotal * (ELITE_DISCOUNT_PERCENT / 100));
