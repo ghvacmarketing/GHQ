@@ -2011,11 +2011,15 @@ export default function ProposalBuilder() {
       doc.text(`Date: ${date}`, margin, y);
       y += 12;
 
-      doc.setFontSize(14);
+      doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(...BRAND_COLORS.primary);
-      doc.text(aiGeneratedQuote.quote_title, pageWidth / 2, y, { align: 'center' });
-      y += 10;
+      const titleLines = doc.splitTextToSize(aiGeneratedQuote.quote_title, contentWidth - 10);
+      titleLines.forEach((line: string) => {
+        doc.text(line, pageWidth / 2, y, { align: 'center' });
+        y += 5;
+      });
+      y += 5;
 
       if (aiGeneratedQuote.package_description) {
         checkPageBreak(20);
@@ -2040,8 +2044,12 @@ export default function ProposalBuilder() {
           doc.setFontSize(10);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(...BRAND_COLORS.text);
-          doc.text(category.category, margin + 5, y);
-          y += 5;
+          const catLines = doc.splitTextToSize(category.category, contentWidth - 10);
+          catLines.forEach((line: string) => {
+            doc.text(line, margin + 5, y);
+            y += 4;
+          });
+          y += 1;
 
           doc.setFont("helvetica", "normal");
           category.items.forEach((item: string) => {
