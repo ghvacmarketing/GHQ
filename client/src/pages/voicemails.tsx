@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArrowLeft, GripVertical, Phone, Calendar, Play, Pause } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
@@ -156,9 +157,10 @@ function HorizontalScrollContainer({ children, className, isDraggingCard }: Hori
 interface VoicemailCardProps {
   voicemail: Voicemail;
   isDragging?: boolean;
+  onCardClick?: (voicemail: Voicemail) => void;
 }
 
-function VoicemailCard({ voicemail, isDragging }: VoicemailCardProps) {
+function VoicemailCard({ voicemail, isDragging, onCardClick }: VoicemailCardProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -214,13 +216,22 @@ function VoicemailCard({ voicemail, isDragging }: VoicemailCardProps) {
     ? format(typeof voicemail.receivedAt === "string" ? parseISO(voicemail.receivedAt) : voicemail.receivedAt, "MMM d, yyyy h:mm a")
     : null;
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('[data-drag-handle]') || 
+        (e.target as HTMLElement).closest('button')) {
+      return;
+    }
+    onCardClick?.(voicemail);
+  };
+
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      className="mb-2 hover:shadow-md transition-shadow bg-white touch-manipulation"
+      className="mb-2 hover:shadow-md transition-shadow bg-white touch-manipulation cursor-pointer"
       data-testid={`card-voicemail-${voicemail.id}`}
       data-no-drag
+      onClick={handleCardClick}
     >
       <CardContent className="p-3">
         <div className="flex items-start gap-2">
@@ -229,6 +240,7 @@ function VoicemailCard({ voicemail, isDragging }: VoicemailCardProps) {
             {...listeners}
             className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
+            data-drag-handle
             data-testid={`voicemail-drag-handle-${voicemail.id}`}
           >
             <GripVertical className="h-4 w-4 text-muted-foreground" />
@@ -282,9 +294,10 @@ function VoicemailCard({ voicemail, isDragging }: VoicemailCardProps) {
 interface KanbanColumnProps {
   status: VoicemailStatus;
   voicemails: Voicemail[];
+  onCardClick?: (voicemail: Voicemail) => void;
 }
 
-function KanbanColumn({ status, voicemails }: KanbanColumnProps) {
+function KanbanColumn({ status, voicemails, onCardClick }: KanbanColumnProps) {
   const columnId = getColumnId(status);
   
   const { setNodeRef, isOver } = useDroppable({
@@ -328,6 +341,7 @@ function KanbanColumn({ status, voicemails }: KanbanColumnProps) {
                   <VoicemailCard
                     key={voicemail.id}
                     voicemail={voicemail}
+                    onCardClick={onCardClick}
                   />
                 ))}
               </SortableContext>
@@ -348,6 +362,43 @@ export default function Voicemails() {
   const { toast } = useToast();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { status?: string }>>({});
+  const [selectedVoicemail, setSelectedVoicemail] = useState<Voicemail | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const dialogAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [dialogIsPlaying, setDialogIsPlaying] = useState(false);
+
+  const handleCardClick = useCallback((voicemail: Voicemail) => {
+    setSelectedVoicemail(voicemail);
+    setDialogOpen(true);
+  }, []);
+
+  const handleDialogClose = useCallback((open: boolean) => {
+    if (!open) {
+      if (dialogAudioRef.current) {
+        dialogAudioRef.current.pause();
+        dialogAudioRef.current = null;
+      }
+      setDialogIsPlaying(false);
+    }
+    setDialogOpen(open);
+  }, []);
+
+  const handleDialogPlayPause = useCallback(() => {
+    if (!selectedVoicemail?.mp3Filename) return;
+
+    if (!dialogAudioRef.current) {
+      dialogAudioRef.current = new Audio(`/uploads/${selectedVoicemail.mp3Filename}`);
+      dialogAudioRef.current.onended = () => setDialogIsPlaying(false);
+    }
+
+    if (dialogIsPlaying) {
+      dialogAudioRef.current.pause();
+      setDialogIsPlaying(false);
+    } else {
+      dialogAudioRef.current.play();
+      setDialogIsPlaying(true);
+    }
+  }, [selectedVoicemail, dialogIsPlaying]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -504,6 +555,7 @@ export default function Voicemails() {
                   key={status}
                   status={status}
                   voicemails={voicemailsByStatus[status]}
+                  onCardClick={handleCardClick}
                 />
               ))}
             </HorizontalScrollContainer>
@@ -515,6 +567,87 @@ export default function Voicemails() {
           </DndContext>
         )}
       </main>
+
+      <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col" data-testid="dialog-voicemail-details">
+          <DialogHeader>
+            <DialogTitle data-testid="dialog-voicemail-title">
+              {selectedVoicemail?.title || "Untitled Voicemail"}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedVoicemail && (
+            <div className="flex-1 overflow-hidden flex flex-col gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge 
+                  variant={
+                    selectedVoicemail.status === "RESOLVED" ? "default" :
+                    selectedVoicemail.status === "UNRESOLVED" ? "secondary" : "outline"
+                  }
+                  data-testid="dialog-voicemail-status"
+                >
+                  {selectedVoicemail.status || "NEW"}
+                </Badge>
+              </div>
+
+              {selectedVoicemail.caller && (
+                <div className="flex items-center gap-2 text-sm" data-testid="dialog-voicemail-caller">
+                  <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <span>{selectedVoicemail.caller}</span>
+                </div>
+              )}
+
+              {selectedVoicemail.receivedAt && (
+                <div className="flex items-center gap-2 text-sm" data-testid="dialog-voicemail-date">
+                  <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <span>
+                    {format(
+                      typeof selectedVoicemail.receivedAt === "string" 
+                        ? parseISO(selectedVoicemail.receivedAt) 
+                        : selectedVoicemail.receivedAt, 
+                      "MMMM d, yyyy 'at' h:mm a"
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {selectedVoicemail.mp3Filename && (
+                <div className="py-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleDialogPlayPause}
+                    className="min-h-[44px]"
+                    data-testid="dialog-button-play-voicemail"
+                  >
+                    {dialogIsPlaying ? (
+                      <>
+                        <Pause className="h-4 w-4 mr-2" />
+                        Pause Audio
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-2" />
+                        Play Audio
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {selectedVoicemail.description && (
+                <div className="flex-1 overflow-hidden">
+                  <h4 className="text-sm font-medium mb-2">Transcription</h4>
+                  <ScrollArea className="h-[200px] border rounded-md p-3 bg-muted/30">
+                    <p className="text-sm whitespace-pre-wrap" data-testid="dialog-voicemail-description">
+                      {selectedVoicemail.description}
+                    </p>
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

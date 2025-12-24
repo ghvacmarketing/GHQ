@@ -108,6 +108,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const trelloSecret = process.env.TRELLO_SECRET;
       const trelloListId = process.env.TRELLO_LIST_ID;
+      const trelloListUnresolved = process.env.TRELLO_LIST_UNRESOLVED;
+      const trelloListResolved = process.env.TRELLO_LIST_RESOLVED;
 
       if (!trelloSecret) {
         console.error("TRELLO_SECRET not configured");
@@ -140,13 +142,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const actionType = action.type;
       const cardId = action.data?.card?.id;
       const listId = action.data?.list?.id || action.data?.card?.idList;
+      const listAfter = action.data?.listAfter;
 
-      console.log(`Trello webhook received: ${actionType}, cardId: ${cardId}, listId: ${listId}`);
-
-      // Only process actions for cards in the configured voicemail list
-      if (trelloListId && listId !== trelloListId) {
-        return res.status(200).send("Not voicemail list");
-      }
+      console.log(`Trello webhook received: ${actionType}, cardId: ${cardId}, listId: ${listId}, listAfter: ${listAfter?.id || 'none'}`);
 
       // Process relevant action types
       if (['createCard', 'addAttachmentToCard', 'updateCard'].includes(actionType) && cardId) {
@@ -169,13 +167,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
             receivedAt = new Date(card.dateLastActivity);
           }
 
+          // Determine status based on list movement or current list
+          let status = 'NEW';
+          const targetListId = listAfter?.id || listId;
+          
+          if (targetListId === trelloListUnresolved) {
+            status = 'UNRESOLVED';
+          } else if (targetListId === trelloListResolved) {
+            status = 'RESOLVED';
+          } else if (targetListId === trelloListId) {
+            status = 'NEW';
+          }
+
+          console.log(`Card ${cardId} target list: ${targetListId}, determined status: ${status}`);
+
           // Upsert voicemail record
           await storage.upsertVoicemail({
             trelloCardId: cardId,
-            trelloListId: listId || trelloListId || null,
+            trelloListId: targetListId || trelloListId || null,
             title: card.name || 'Untitled Voicemail',
             description: card.desc || null,
-            status: 'NEW',
+            status,
             caller,
             receivedAt,
             mp3Filename: null,
