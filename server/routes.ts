@@ -17,6 +17,7 @@ import { eq } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAutoSync } from "./services/customer-sync";
 import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, type QuoteGenerationInput } from "./services/quote-generation";
+import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore } from "./services/vector-store";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -527,6 +528,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(metadata);
     } catch (error) {
       res.status(500).json({ message: "Error getting cache metadata" });
+    }
+  });
+
+  // Vector Store / Knowledge Base endpoints
+  app.get("/api/admin/vector-store/files", requireAdminAuth, async (req, res) => {
+    try {
+      const files = await listVectorStoreFiles();
+      res.json({ files });
+    } catch (error) {
+      console.error("Error listing vector store files:", error);
+      res.status(500).json({ message: "Error listing files" });
+    }
+  });
+
+  app.post("/api/admin/vector-store/upload", requireAdminAuth, upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const { fileId, vectorStoreId } = await uploadBufferToVectorStore(
+        req.file.buffer,
+        req.file.originalname
+      );
+
+      res.json({ 
+        message: "File uploaded successfully",
+        fileId,
+        vectorStoreId,
+        filename: req.file.originalname
+      });
+    } catch (error) {
+      console.error("Error uploading to vector store:", error);
+      res.status(500).json({ message: "Error uploading file" });
+    }
+  });
+
+  app.delete("/api/admin/vector-store/files/:fileId", requireAdminAuth, async (req, res) => {
+    try {
+      const success = await deleteFileFromVectorStore(req.params.fileId);
+      if (success) {
+        res.json({ message: "File deleted successfully" });
+      } else {
+        res.status(500).json({ message: "Error deleting file" });
+      }
+    } catch (error) {
+      console.error("Error deleting vector store file:", error);
+      res.status(500).json({ message: "Error deleting file" });
+    }
+  });
+
+  app.get("/api/admin/vector-store/status", requireAdminAuth, async (req, res) => {
+    try {
+      const vectorStoreId = await getOrCreateVectorStore();
+      const files = await listVectorStoreFiles();
+      res.json({ 
+        vectorStoreId,
+        fileCount: files.length,
+        files
+      });
+    } catch (error) {
+      console.error("Error getting vector store status:", error);
+      res.status(500).json({ message: "Error getting vector store status" });
     }
   });
 

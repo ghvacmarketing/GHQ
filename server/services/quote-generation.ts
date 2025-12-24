@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { AIQuoteResponseSchema, type AIQuoteResponse, type QuoteMessage } from "@shared/schema";
 import { storage } from "../storage";
+import { searchVectorStore, getOrCreateVectorStore, listVectorStoreFiles } from "./vector-store";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -164,6 +165,7 @@ Apply these instructions when generating the quote. Adjust tone, emphasis, disco
 
 export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<AIQuoteResponse> {
   let context: ConversationContext | undefined;
+  let knowledgeBaseContext = "";
   
   // Load conversation context if conversation ID provided
   if (input.conversationId) {
@@ -175,9 +177,30 @@ export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<
     }
   }
 
-  // Build messages array
+  // Search knowledge base for relevant product information
+  try {
+    const files = await listVectorStoreFiles();
+    if (files.length > 0) {
+      const searchQuery = input.cartItems.map(item => 
+        `${item.brand || ''} ${item.name} ${item.description}`.trim()
+      ).join(', ');
+      
+      const kbResult = await searchVectorStore(
+        `Find product details, specifications, rebate programs, and selling points for: ${searchQuery}`
+      );
+      
+      if (kbResult) {
+        knowledgeBaseContext = `\n\nPRODUCT KNOWLEDGE BASE (use to enhance descriptions):\n${kbResult}`;
+      }
+    }
+  } catch (error) {
+    console.error('Error searching knowledge base:', error);
+  }
+
+  // Build messages array with knowledge base context
+  const systemContent = SYSTEM_INSTRUCTIONS + knowledgeBaseContext;
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-    { role: 'system', content: SYSTEM_INSTRUCTIONS }
+    { role: 'system', content: systemContent }
   ];
 
   // Add recent conversation history if available
