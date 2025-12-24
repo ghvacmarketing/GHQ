@@ -521,6 +521,19 @@ export default function ProposalBuilder() {
   const [customerAddress, setCustomerAddress] = useState(() => loadCustomerFromStorage().address);
   const [customerNotes, setCustomerNotes] = useState(() => loadCustomerFromStorage().notes);
   const [generatedQuote, setGeneratedQuote] = useState<string | null>(null);
+  const [aiGeneratedQuote, setAiGeneratedQuote] = useState<{
+    quote_title: string;
+    customer_facing_summary: string;
+    line_items: { name: string; qty: number; price: number; description: string }[];
+    subtotal: number;
+    discount_amount: number;
+    discount_percent: number;
+    total: number;
+    savings_text: string;
+    financing_text?: string;
+    warranties_and_terms: string[];
+  } | null>(null);
+  const [isGeneratingQuote, setIsGeneratingQuote] = useState(false);
 
   // Build Your Own state
   const [customEquipmentType, setCustomEquipmentType] = useState<string | null>(null);
@@ -1287,110 +1300,120 @@ export default function ProposalBuilder() {
     });
   };
 
-  const generateQuote = () => {
+  const generateQuote = async () => {
     if (cart.length === 0) return;
     
-    const date = new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-
-    let quoteText = `GHVAC EQUIPMENT PROPOSAL\n`;
-    quoteText += `${'='.repeat(40)}\n\n`;
-    quoteText += `Date: ${date}\n`;
-    if (customerName) quoteText += `Prepared for: ${customerName}\n`;
-    if (customerAddress) quoteText += `Address: ${customerAddress}\n`;
-    quoteText += `\nEQUIPMENT SUMMARY\n`;
-    quoteText += `${'-'.repeat(40)}\n\n`;
-
-    cart.forEach((item, index) => {
-      if (isCrawlspaceItem(item)) {
-        const basePrice = item.tier.price;
-        const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
-        const itemPrice = finalPrice * item.quantity;
-        quoteText += `${index + 1}. Crawlspace Encapsulation - ${item.tier.name}${item.eliteData ? ' (Elite Package)' : ''}\n`;
-        quoteText += `   ${item.tier.milThickness} Mil Vapor Barrier\n`;
-        quoteText += `   ${item.tier.description}\n`;
-        if (item.eliteData) {
-          quoteText += `   \n   ELITE PACKAGE INCLUDES:\n`;
-          CRAWLSPACE_ELITE_BUNDLES.forEach(bundle => {
-            const bundlePrice = bundle.fixedPrice || 0;
-            quoteText += `   - ${bundle.name}${bundlePrice > 0 ? ` (${formatPrice(bundlePrice)} value)` : ' (Included)'}\n`;
-          });
-          quoteText += `   \n   Base: ${formatPrice(basePrice)} + Bundles: ${formatPrice(Object.values(item.eliteData.coreBundlePrices).reduce((a, b) => a + b, 0))}\n`;
-          quoteText += `   20% Elite Discount: -${formatPrice(item.eliteData.discountAmount)}\n`;
-        }
-        quoteText += `   Total: ${formatPrice(itemPrice)}\n`;
-        if (item.eliteData) {
-          quoteText += `   YOU SAVE: ${formatPrice(item.eliteData.discountAmount * item.quantity)}\n`;
-        }
-        if (item.quantity > 1) quoteText += `   Qty: ${item.quantity}\n`;
-        quoteText += `\n`;
-      } else if (isCustomBuild(item)) {
-        const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
-        const priceLow = estimate.low * item.quantity;
-        const priceHigh = estimate.high * item.quantity;
-        quoteText += `${index + 1}. Custom Build - ${item.tonnage} System\n`;
-        if (item.outdoorUnit) quoteText += `   - ${item.outdoorUnit.brand} ${item.outdoorUnit.unitName}\n`;
-        if (item.coil) quoteText += `   - ${item.coil.brand} ${item.coil.unitName}\n`;
-        if (item.indoorUnit) quoteText += `   - ${item.indoorUnit.brand} ${item.indoorUnit.unitName}\n`;
-        if (item.thermostat) quoteText += `   - ${item.thermostat.brand} ${item.thermostat.unitName}\n`;
-        quoteText += `   Price: ${formatPriceRange(priceLow, priceHigh)} (Estimated)\n`;
-        if (item.quantity > 1) quoteText += `   Qty: ${item.quantity}\n`;
-        quoteText += `\n`;
-      } else {
-        const unitTypeName = UNIT_TYPE_INFO[item.unitType]?.name || item.unitType;
-        const basePrice = parseFloat(item.totalInvestment) || 0;
-        const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
-        const itemPrice = finalPrice * item.quantity;
-        quoteText += `${index + 1}. ${item.packageLevel} Package - ${item.extractedTonnage}${item.eliteData ? ' (Elite Package)' : ''}\n`;
-        quoteText += `   ${unitTypeName} (${item.tier})\n`;
-        quoteText += `   - ${item.outdoorBrand} ${item.outdoorName}\n`;
-        if (item.indoorHeatName) quoteText += `   - ${item.indoorHeatName}\n`;
-        if (item.thermostatName) quoteText += `   - ${item.thermostatName}\n`;
-        if (item.eliteData) {
-          quoteText += `   \n   ELITE PACKAGE INCLUDES:\n`;
-          HVAC_ELITE_CORE_BUNDLES.forEach(bundle => {
-            const bundlePrice = item.eliteData!.coreBundlePrices[bundle.id] || 0;
-            quoteText += `   - ${bundle.name} (${formatPrice(bundlePrice)} value)\n`;
-          });
-          const airflowOption = HVAC_ELITE_AIRFLOW_OPTIONS.find(o => o.id === item.eliteData!.selectedAirflowOptionId);
-          if (airflowOption) {
-            quoteText += `   - ${airflowOption.name} (${formatPrice(item.eliteData.airflowPrice)} value)\n`;
-          }
-          quoteText += `   \n   Base: ${formatPrice(basePrice)} + Bundles: ${formatPrice(Object.values(item.eliteData.coreBundlePrices).reduce((a, b) => a + b, 0) + item.eliteData.airflowPrice)}\n`;
-          quoteText += `   20% Elite Discount: -${formatPrice(item.eliteData.discountAmount)}\n`;
-        }
-        quoteText += `   Total: ${formatPrice(itemPrice)}\n`;
-        if (item.eliteData) {
-          quoteText += `   YOU SAVE: ${formatPrice(item.eliteData.discountAmount * item.quantity)}\n`;
-        }
-        if (item.quantity > 1) quoteText += `   Qty: ${item.quantity}\n`;
-        quoteText += `\n`;
-      }
-    });
-
-    quoteText += `${'-'.repeat(40)}\n`;
-    quoteText += `TOTAL INVESTMENT: ${formatPriceRange(cartTotalRange.low, cartTotalRange.high)}${hasEstimatedItems ? ' *' : ''}\n`;
-    quoteText += `Monthly Payment: ${formatPriceRange(cartMonthlyTotalRange.low, cartMonthlyTotalRange.high)}/mo (with approved financing)\n`;
-    if (cartEliteSavings > 0) {
-      quoteText += `\n*** TOTAL ELITE SAVINGS: ${formatPrice(cartEliteSavings)} ***\n`;
-    }
-    if (hasEstimatedItems) {
-      quoteText += `* Includes estimated pricing for custom builds\n`;
-    }
-
-    if (customerNotes) {
-      quoteText += `\nNotes:\n${customerNotes}\n`;
-    }
-
-    quoteText += `\n${'-'.repeat(40)}\n`;
-    quoteText += `Thank you for considering GHVAC!\n`;
-    quoteText += `This proposal is valid for 30 days.\n`;
-
-    setGeneratedQuote(quoteText);
+    setIsGeneratingQuote(true);
+    setAiGeneratedQuote(null);
     setQuoteDialogOpen(true);
+    
+    try {
+      const cartItems = cart.map(item => {
+        if (isCrawlspaceItem(item)) {
+          const basePrice = item.tier.price;
+          const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
+          return {
+            type: 'crawlspace' as const,
+            name: `Crawlspace Encapsulation - ${item.tier.name}`,
+            description: `${item.tier.milThickness} Mil Vapor Barrier - ${item.tier.description}`,
+            basePrice: basePrice,
+            finalPrice: finalPrice,
+            quantity: item.quantity,
+            isElite: !!item.eliteData,
+            eliteIncludes: item.eliteData ? CRAWLSPACE_ELITE_BUNDLES.map(b => b.name) : undefined,
+            eliteSavings: item.eliteData?.discountAmount,
+          };
+        } else if (isCustomBuild(item)) {
+          const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
+          return {
+            type: 'custom' as const,
+            name: `Custom Build - ${item.tonnage} System`,
+            description: [
+              item.outdoorUnit ? `${item.outdoorUnit.brand} ${item.outdoorUnit.unitName}` : null,
+              item.indoorUnit ? `${item.indoorUnit.brand} ${item.indoorUnit.unitName}` : null,
+              item.thermostat ? `${item.thermostat.brand} ${item.thermostat.unitName}` : null,
+            ].filter(Boolean).join(', '),
+            basePrice: estimate.high,
+            finalPrice: estimate.high,
+            quantity: item.quantity,
+            isElite: false,
+          };
+        } else {
+          const unitTypeName = UNIT_TYPE_INFO[item.unitType]?.name || item.unitType;
+          const basePrice = parseFloat(item.totalInvestment) || 0;
+          const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
+          const eliteIncludes = item.eliteData ? [
+            ...HVAC_ELITE_CORE_BUNDLES.map(b => b.name),
+            HVAC_ELITE_AIRFLOW_OPTIONS.find(o => o.id === item.eliteData!.selectedAirflowOptionId)?.name
+          ].filter(Boolean) as string[] : undefined;
+          return {
+            type: 'hvac' as const,
+            name: `${item.packageLevel} Package - ${item.extractedTonnage}`,
+            description: `${unitTypeName} (${item.tier}) - ${item.outdoorBrand} ${item.outdoorName}`,
+            basePrice: basePrice,
+            finalPrice: finalPrice,
+            quantity: item.quantity,
+            isElite: !!item.eliteData,
+            eliteIncludes,
+            eliteSavings: item.eliteData?.discountAmount,
+          };
+        }
+      });
+      
+      const response = await fetch('/api/quotes/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName,
+          customerAddress,
+          customerNotes,
+          cartItems,
+          totals: {
+            subtotal: cartTotalRange.high,
+            eliteSavings: cartEliteSavings,
+            grandTotal: cartTotalRange.high,
+            monthlyPayment: cartMonthlyTotalRange.high,
+          },
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate quote');
+      }
+      
+      const aiQuote = await response.json();
+      setAiGeneratedQuote(aiQuote);
+      
+      let quoteText = `${aiQuote.quote_title}\n${'='.repeat(40)}\n\n`;
+      quoteText += `${aiQuote.customer_facing_summary}\n\n`;
+      quoteText += `LINE ITEMS:\n`;
+      aiQuote.line_items.forEach((item: { name: string; qty: number; price: number; description: string }) => {
+        quoteText += `- ${item.name} (x${item.qty}): $${item.price.toLocaleString()}\n  ${item.description}\n`;
+      });
+      quoteText += `\nSubtotal: $${aiQuote.subtotal.toLocaleString()}\n`;
+      if (aiQuote.discount_amount > 0) {
+        quoteText += `Discount (${aiQuote.discount_percent}%): -$${aiQuote.discount_amount.toLocaleString()}\n`;
+      }
+      quoteText += `Total: $${aiQuote.total.toLocaleString()}\n`;
+      if (aiQuote.savings_text) quoteText += `\n${aiQuote.savings_text}\n`;
+      if (aiQuote.financing_text) quoteText += `${aiQuote.financing_text}\n`;
+      quoteText += `\nWarranties & Terms:\n`;
+      aiQuote.warranties_and_terms.forEach((term: string) => {
+        quoteText += `• ${term}\n`;
+      });
+      setGeneratedQuote(quoteText);
+      
+    } catch (error) {
+      console.error('Error generating quote:', error);
+      toast({
+        title: "Quote Generation Failed",
+        description: "Could not generate AI quote. Please try again.",
+        variant: "destructive",
+      });
+      setQuoteDialogOpen(false);
+    } finally {
+      setIsGeneratingQuote(false);
+    }
   };
 
   const copyQuoteToClipboard = async () => {
@@ -1817,10 +1840,15 @@ export default function ProposalBuilder() {
                       <Button
                         className="flex-1 min-h-[44px]"
                         onClick={generateQuote}
+                        disabled={isGeneratingQuote}
                         data-testid="button-generate-quote"
                       >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Generate Quote
+                        {isGeneratingQuote ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <FileText className="h-4 w-4 mr-2" />
+                        )}
+                        {isGeneratingQuote ? 'Generating...' : 'Generate Quote'}
                       </Button>
                     </div>
                   </div>
@@ -3000,7 +3028,29 @@ export default function ProposalBuilder() {
           </div>
           
           <ScrollArea className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6">
+            {/* Loading State */}
+            {isGeneratingQuote && (
+              <div className="flex flex-col items-center justify-center py-16">
+                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                <p className="text-lg font-medium text-muted-foreground">Generating AI Quote...</p>
+                <p className="text-sm text-muted-foreground">This may take a few seconds</p>
+              </div>
+            )}
+
+            {/* AI Generated Summary */}
+            {!isGeneratingQuote && aiGeneratedQuote && (
+              <div className="mb-6 p-4 bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-lg">
+                <h3 className="text-lg font-semibold text-primary mb-2">{aiGeneratedQuote.quote_title}</h3>
+                <p className="text-muted-foreground">{aiGeneratedQuote.customer_facing_summary}</p>
+                {aiGeneratedQuote.savings_text && (
+                  <Badge className="mt-3 bg-green-500 text-white">{aiGeneratedQuote.savings_text}</Badge>
+                )}
+              </div>
+            )}
+
             {/* Customer Search Section */}
+            {!isGeneratingQuote && (
+            <>
             <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
               <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-3 flex items-center gap-2">
                 <Search className="h-4 w-4" />
@@ -3374,6 +3424,8 @@ export default function ProposalBuilder() {
                 Thank you for considering GHVAC!
               </p>
             </div>
+            </>
+            )}
           </ScrollArea>
           
           <div className="border-t p-4 bg-card shrink-0 flex-none">

@@ -16,6 +16,7 @@ import { pool, db } from "./db";
 import { eq } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAutoSync } from "./services/customer-sync";
+import { generateQuoteWithAI, type QuoteGenerationInput } from "./services/quote-generation";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -184,6 +185,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating quote:', error);
       res.status(400).json({ message: "Invalid quote data" });
+    }
+  });
+
+  // Generate quote with AI (OpenAI)
+  app.post("/api/quotes/generate", async (req, res) => {
+    try {
+      const input: QuoteGenerationInput = req.body;
+      
+      if (!input.cartItems || input.cartItems.length === 0) {
+        return res.status(400).json({ message: "Cart items are required" });
+      }
+      
+      const generatedQuote = await generateQuoteWithAI(input);
+      res.json(generatedQuote);
+    } catch (error) {
+      console.error('Error generating quote with AI:', error);
+      res.status(500).json({ 
+        message: "Failed to generate quote", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
     }
   });
 
