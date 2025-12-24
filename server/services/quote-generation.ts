@@ -180,21 +180,28 @@ export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<
   // Search knowledge base for relevant product information
   try {
     const files = await listVectorStoreFiles();
+    console.log(`Knowledge base has ${files.length} files`);
+    
     if (files.length > 0) {
       const searchQuery = input.cartItems.map(item => 
         `${item.brand || ''} ${item.name} ${item.description}`.trim()
       ).join(', ');
       
+      console.log(`Searching knowledge base for: ${searchQuery.substring(0, 100)}...`);
+      
       const kbResult = await searchVectorStore(
         `Find product details, specifications, rebate programs, and selling points for: ${searchQuery}`
       );
       
-      if (kbResult) {
+      if (kbResult && kbResult.length > 0) {
         knowledgeBaseContext = `\n\nPRODUCT KNOWLEDGE BASE (use to enhance descriptions):\n${kbResult}`;
+        console.log(`Added ${kbResult.length} chars of knowledge base context`);
       }
+    } else {
+      console.log('Knowledge base is empty - run seed to upload sales book');
     }
   } catch (error) {
-    console.error('Error searching knowledge base:', error);
+    console.error('Error searching knowledge base (continuing without KB context):', error);
   }
 
   // Build messages array with knowledge base context

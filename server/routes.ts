@@ -17,7 +17,7 @@ import { eq } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAutoSync } from "./services/customer-sync";
 import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, type QuoteGenerationInput } from "./services/quote-generation";
-import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore } from "./services/vector-store";
+import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook } from "./services/vector-store";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -581,9 +581,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/vector-store/status", requireAdminAuth, async (req, res) => {
     try {
+      const { isVectorStoreUnavailable } = await import("./services/vector-store");
+      
+      if (isVectorStoreUnavailable()) {
+        return res.json({ 
+          available: false,
+          message: "Vector store API not available in this environment",
+          vectorStoreId: null,
+          fileCount: 0,
+          files: []
+        });
+      }
+      
       const vectorStoreId = await getOrCreateVectorStore();
       const files = await listVectorStoreFiles();
       res.json({ 
+        available: true,
         vectorStoreId,
         fileCount: files.length,
         files
@@ -591,6 +604,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting vector store status:", error);
       res.status(500).json({ message: "Error getting vector store status" });
+    }
+  });
+
+  app.post("/api/admin/vector-store/seed", requireAdminAuth, async (req, res) => {
+    try {
+      // Import the check function to provide better error messages
+      const { isVectorStoreUnavailable } = await import("./services/vector-store");
+      
+      if (isVectorStoreUnavailable()) {
+        return res.status(503).json({ 
+          message: "Vector store API not available in this environment. Knowledge base features are disabled.",
+          available: false
+        });
+      }
+      
+      const success = await seedVectorStoreWithSalesBook();
+      if (success) {
+        const files = await listVectorStoreFiles();
+        res.json({ message: "Vector store seeded successfully", files, available: true });
+      } else {
+        res.status(400).json({ message: "Sales book PDF not found or vector store already seeded" });
+      }
+    } catch (error) {
+      console.error("Error seeding vector store:", error);
+      res.status(500).json({ message: "Error seeding vector store" });
     }
   });
 
@@ -3315,6 +3353,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Start customer auto-sync (every 10 minutes)
   startAutoSync(10);
   console.log('Customer auto-sync started (every 10 minutes)');
+
+  // Seed vector store with sales book if empty (async, don't block startup)
+  seedVectorStoreWithSalesBook().then(success => {
+    if (success) {
+      console.log('Vector store knowledge base initialized');
+    }
+  }).catch(err => {
+    console.error('Error seeding vector store on startup:', err);
+  });
 
   return httpServer;
 }

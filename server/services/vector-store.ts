@@ -11,9 +11,15 @@ const VECTOR_STORE_NAME = "ghvac-product-knowledge";
 
 let cachedVectorStoreId: string | null = null;
 
+let vectorStoreUnavailable = false;
+
 export async function getOrCreateVectorStore(): Promise<string> {
   if (cachedVectorStoreId) {
     return cachedVectorStoreId;
+  }
+
+  if (vectorStoreUnavailable) {
+    throw new Error("Vector store API not available in this environment");
   }
 
   try {
@@ -33,8 +39,13 @@ export async function getOrCreateVectorStore(): Promise<string> {
     cachedVectorStoreId = vectorStore.id;
     console.log(`Created new vector store: ${vectorStore.id}`);
     return vectorStore.id;
-  } catch (error) {
-    console.error("Error getting/creating vector store:", error);
+  } catch (error: any) {
+    if (error?.status === 405) {
+      vectorStoreUnavailable = true;
+      console.log("Vector store API not supported in this environment - knowledge base features disabled");
+    } else {
+      console.error("Error getting/creating vector store:", error);
+    }
     throw error;
   }
 }
@@ -100,6 +111,10 @@ export async function listVectorStoreFiles(): Promise<Array<{
   status: string;
   createdAt: number;
 }>> {
+  if (vectorStoreUnavailable) {
+    return [];
+  }
+  
   try {
     const vectorStoreId = await getOrCreateVectorStore();
     const files = await openai.vectorStores.files.list(vectorStoreId);
@@ -136,8 +151,8 @@ export async function deleteFileFromVectorStore(fileId: string): Promise<boolean
   try {
     const vectorStoreId = await getOrCreateVectorStore();
     
-    await openai.vectorStores.files.del(vectorStoreId, fileId);
-    await openai.files.del(fileId);
+    await openai.vectorStores.files.delete(vectorStoreId, fileId);
+    await openai.files.delete(fileId);
     
     console.log(`Deleted file ${fileId} from vector store`);
     return true;
@@ -148,44 +163,80 @@ export async function deleteFileFromVectorStore(fileId: string): Promise<boolean
 }
 
 export async function searchVectorStore(query: string): Promise<string> {
+  if (vectorStoreUnavailable) {
+    return "";
+  }
+  
   try {
     const vectorStoreId = await getOrCreateVectorStore();
     
     const files = await openai.vectorStores.files.list(vectorStoreId);
     if (files.data.length === 0) {
+      console.log("Vector store is empty, skipping search");
       return "";
     }
 
-    const response = await openai.chat.completions.create({
+    console.log(`Searching vector store ${vectorStoreId} for: ${query.substring(0, 100)}...`);
+
+    const response = await openai.responses.create({
       model: "gpt-5-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant that extracts relevant product information from the knowledge base. Return only the most relevant product details, specifications, and pricing information that matches the query."
-        },
-        {
-          role: "user",
-          content: query
-        }
-      ],
+      input: `Extract the most relevant product details, specifications, rebates, and selling points for: ${query}`,
       tools: [
         {
           type: "file_search",
-          file_search: {
-            vector_store_ids: [vectorStoreId],
-          }
+          vector_store_ids: [vectorStoreId],
+          max_num_results: 5,
         } as any
       ],
-      tool_choice: "auto",
-      max_completion_tokens: 1024,
     });
 
-    const content = response.choices[0]?.message?.content || "";
-    return content;
+    const outputText = (response as any).output_text || "";
+    console.log(`Vector store search returned ${outputText.length} chars`);
+    return outputText;
   } catch (error) {
     console.error("Error searching vector store:", error);
-    return "";
+    throw error;
   }
+}
+
+export async function seedVectorStoreWithSalesBook(): Promise<boolean> {
+  // First, check if vector store is available by trying to get/create it
+  try {
+    await getOrCreateVectorStore();
+  } catch (error) {
+    // If we get here, vectorStoreUnavailable should now be set
+    if (vectorStoreUnavailable) {
+      return false;
+    }
+    throw error;
+  }
+  
+  try {
+    const files = await listVectorStoreFiles();
+    if (files.length > 0) {
+      console.log("Vector store already has files, skipping seed.");
+      return true;
+    }
+
+    const salesBookPath = path.join(process.cwd(), "attached_assets", "Chandler_Sales_Book_1766587153181.pdf");
+    
+    if (!fs.existsSync(salesBookPath)) {
+      console.log("Sales book PDF not found, skipping seed.");
+      return false;
+    }
+
+    console.log("Seeding vector store with sales book...");
+    await uploadFileToVectorStore(salesBookPath, "Chandler_Sales_Book.pdf");
+    console.log("Sales book uploaded successfully to vector store.");
+    return true;
+  } catch (error) {
+    console.error("Error seeding vector store:", error);
+    return false;
+  }
+}
+
+export function isVectorStoreUnavailable(): boolean {
+  return vectorStoreUnavailable;
 }
 
 export { cachedVectorStoreId };
