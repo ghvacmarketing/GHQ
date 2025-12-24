@@ -241,8 +241,8 @@ type CrawlspaceTier = {
 
 const CRAWLSPACE_TIERS: CrawlspaceTier[] = [
   { id: "crawl-10mil", name: "Essential", milThickness: 10, price: 10505, description: "Partial Ducting Upgrade + Standard Encapsulation (10 mil) + High-Capacity Dehumidifier" },
-  { id: "crawl-12mil", name: "Premium", milThickness: 12, price: 16087, description: "Complete Premium Ducting + Deluxe Encapsulation (12 mil) + Dehumidifier + 10-Year Maintenance" },
-  { id: "crawl-20mil", name: "Ultimate", milThickness: 20, price: 25599, description: "Complete Premium Ducting + Premium Encapsulation (20 mil) + Dehumidifier + 10-Year Maintenance" }
+  { id: "crawl-12mil", name: "Premium", milThickness: 12, price: 16087, description: "Complete Premium Ducting + Deluxe Encapsulation (12 mil) + Dehumidifier" },
+  { id: "crawl-20mil", name: "Ultimate", milThickness: 20, price: 25599, description: "Complete Premium Ducting + Premium Encapsulation (20 mil) + Dehumidifier" }
 ];
 
 // Crawlspace Elite Bundles (all required when Elite is ON)
@@ -699,6 +699,7 @@ export default function ProposalBuilder() {
         return {
           type: "crawlspace",
           tierName: item.tier.name,
+          tierDescription: item.tier.description,
           tierPrice: basePrice,
           quantity: item.quantity,
           totalPrice: finalPrice * item.quantity,

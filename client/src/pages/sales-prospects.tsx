@@ -2146,7 +2146,10 @@ function LeadCard({
                                       )}
                                     </div>
                                     <p className="font-medium text-sm mt-1">Crawlspace Encapsulation - {item.tierName}</p>
-                                    <p className="text-xs text-muted-foreground">Base price: ${item.tierPrice?.toLocaleString()}</p>
+                                    {item.tierDescription && (
+                                      <p className="text-xs text-muted-foreground">{item.tierDescription}</p>
+                                    )}
+                                    <p className="text-xs text-muted-foreground mt-1">Base price: ${item.tierPrice?.toLocaleString()}</p>
                                     {item.isElite && item.eliteBundles && (
                                       <div className="text-xs text-amber-700 dark:text-amber-300 mt-1 bg-amber-50 dark:bg-amber-950/30 p-1.5 rounded space-y-0.5">
                                         <p className="font-medium">Elite Package Includes:</p>
