@@ -236,9 +236,9 @@ type CrawlspaceTier = {
 };
 
 const CRAWLSPACE_TIERS: CrawlspaceTier[] = [
-  { id: "crawl-10mil", name: "Essential", milThickness: 10, price: 2000, description: "10 mil vapor barrier - Standard protection" },
-  { id: "crawl-12mil", name: "Premium", milThickness: 12, price: 4000, description: "12 mil vapor barrier - Enhanced durability" },
-  { id: "crawl-20mil", name: "Ultimate", milThickness: 20, price: 8000, description: "20 mil vapor barrier - Maximum protection" }
+  { id: "crawl-10mil", name: "Essential", milThickness: 10, price: 10505, description: "Partial Ducting Upgrade + Standard Encapsulation (10 mil) + High-Capacity Dehumidifier" },
+  { id: "crawl-12mil", name: "Premium", milThickness: 12, price: 16087, description: "Complete Premium Ducting + Deluxe Encapsulation (12 mil) + Dehumidifier + 10-Year Maintenance" },
+  { id: "crawl-20mil", name: "Ultimate", milThickness: 20, price: 25599, description: "Complete Premium Ducting + Premium Encapsulation (20 mil) + Dehumidifier + 10-Year Maintenance" }
 ];
 
 // Crawlspace Elite Bundles (all required when Elite is ON)
