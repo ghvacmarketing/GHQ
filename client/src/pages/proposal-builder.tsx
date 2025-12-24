@@ -3105,26 +3105,61 @@ export default function ProposalBuilder() {
               <div className="space-y-4">
                 {cart.map((item, index) => {
                   if (isCrawlspaceItem(item)) {
-                    const itemPrice = item.tier.price * item.quantity;
+                    const basePrice = item.tier.price;
+                    const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
+                    const itemPrice = finalPrice * item.quantity;
                     return (
-                      <div key={item.id} className="rounded-xl border-2 border-teal-200 dark:border-teal-800 bg-gradient-to-br from-teal-50 to-white dark:from-teal-950 dark:to-gray-900 overflow-hidden shadow-sm">
-                        <div className="bg-teal-500 text-white px-4 py-2 flex items-center justify-between">
+                      <div key={item.id} className={`rounded-xl border-2 ${item.eliteData ? 'border-amber-300 dark:border-amber-700' : 'border-teal-200 dark:border-teal-800'} bg-gradient-to-br from-teal-50 to-white dark:from-teal-950 dark:to-gray-900 overflow-hidden shadow-sm`}>
+                        <div className={`${item.eliteData ? 'bg-gradient-to-r from-amber-500 to-amber-600' : 'bg-teal-500'} text-white px-4 py-2 flex items-center justify-between`}>
                           <div className="flex items-center gap-2">
-                            <Package className="h-4 w-4" />
+                            {item.eliteData ? <Crown className="h-4 w-4" /> : <Package className="h-4 w-4" />}
                             <span className="font-semibold">Crawlspace Encapsulation</span>
-                            <span className="text-teal-100">•</span>
-                            <span className="text-teal-100">{item.tier.name}</span>
+                            <span className="opacity-70">•</span>
+                            <span className="opacity-90">{item.tier.name}</span>
+                            {item.eliteData && <Badge className="bg-white/20 text-white text-xs ml-1">Elite Package</Badge>}
                           </div>
                           {item.quantity > 1 && <Badge className="bg-white/20 text-white">x{item.quantity}</Badge>}
                         </div>
                         <div className="p-4">
-                          <p className="text-sm text-muted-foreground mb-4">{item.tier.description}</p>
+                          <p className="text-sm text-muted-foreground mb-4">{item.tier.milThickness} Mil Vapor Barrier - {item.tier.description}</p>
+                          {item.eliteData && (
+                            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+                              <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-1">
+                                <Crown className="h-3 w-3" />
+                                ELITE PACKAGE INCLUDES:
+                              </p>
+                              <div className="space-y-1">
+                                {CRAWLSPACE_ELITE_BUNDLES.map(bundle => (
+                                  <div key={bundle.name} className="flex justify-between text-xs">
+                                    <span className="text-muted-foreground">{bundle.name}</span>
+                                    <span className="font-medium">{(bundle.fixedPrice || 0) > 0 ? formatPrice(bundle.fixedPrice || 0) : 'Included'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-700">
+                                <div className="flex justify-between text-xs text-green-600 dark:text-green-400 font-medium">
+                                  <span>20% Elite Discount</span>
+                                  <span>-{formatPrice(item.eliteData.discountAmount)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           <div className="bg-teal-100 dark:bg-teal-900/50 rounded-lg p-3 flex items-center justify-between">
                             <div className="text-sm text-muted-foreground">
                               {formatPrice(Math.round(itemPrice / 67))}/mo financing
                             </div>
-                            <p className="text-2xl font-bold text-teal-700 dark:text-teal-300">{formatPrice(itemPrice)}</p>
+                            <div className="text-right">
+                              {item.eliteData && (
+                                <p className="text-xs text-muted-foreground line-through">{formatPrice(basePrice * item.quantity)}</p>
+                              )}
+                              <p className="text-2xl font-bold text-teal-700 dark:text-teal-300">{formatPrice(itemPrice)}</p>
+                            </div>
                           </div>
+                          {item.eliteData && (
+                            <Badge className="mt-2 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                              You Save {formatPrice(item.eliteData.discountAmount * item.quantity)}!
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     );
@@ -3175,8 +3210,12 @@ export default function ProposalBuilder() {
                       </div>
                     );
                   } else {
-                    const itemPrice = (parseFloat(item.totalInvestment) || 0) * item.quantity;
-                    const monthlyPrice = (parseFloat(item.monthlyPayment) || 0) * item.quantity;
+                    const basePrice = parseFloat(item.totalInvestment) || 0;
+                    const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
+                    const itemPrice = finalPrice * item.quantity;
+                    const monthlyPrice = item.eliteData 
+                      ? Math.round(item.eliteData.finalTotal / 67) * item.quantity
+                      : (parseFloat(item.monthlyPayment) || 0) * item.quantity;
                     const levelColors: Record<string, string> = {
                       Best: 'from-amber-50 to-white dark:from-amber-950 dark:to-gray-900 border-amber-200 dark:border-amber-800',
                       Better: 'from-purple-50 to-white dark:from-purple-950 dark:to-gray-900 border-purple-200 dark:border-purple-800',
@@ -3197,20 +3236,21 @@ export default function ProposalBuilder() {
                       { label: 'Thermostat', name: item.thermostatName || item.thermostatModel, image: item.thermostatImageUrl },
                     ].filter(c => c.name);
                     return (
-                      <div key={item.id} className={`rounded-xl border-2 bg-gradient-to-br overflow-hidden shadow-sm ${levelColors[item.packageLevel] || levelColors.Budget}`}>
-                        <div className={`${headerColors[item.packageLevel] || headerColors.Budget} text-white px-4 py-2 flex items-center justify-between`}>
+                      <div key={item.id} className={`rounded-xl border-2 bg-gradient-to-br overflow-hidden shadow-sm ${item.eliteData ? 'border-amber-300 dark:border-amber-700' : ''} ${levelColors[item.packageLevel] || levelColors.Budget}`}>
+                        <div className={`${item.eliteData ? 'bg-gradient-to-r from-amber-500 to-amber-600' : (headerColors[item.packageLevel] || headerColors.Budget)} text-white px-4 py-2 flex items-center justify-between`}>
                           <div className="flex items-center gap-2">
-                            <Award className="h-4 w-4" />
-                            <span className="font-semibold">{item.packageLevel} Package</span>
+                            {item.eliteData ? <Crown className="h-4 w-4" /> : <Award className="h-4 w-4" />}
+                            <span className="font-semibold">{item.unitType}</span>
                             <span className="opacity-70">•</span>
-                            <span className="opacity-90">{item.extractedTonnage}</span>
+                            <span className="opacity-90">{item.tier}</span>
+                            {item.eliteData && <Badge className="bg-white/20 text-white text-xs ml-1">Elite Package</Badge>}
                           </div>
                           {item.quantity > 1 && <Badge className="bg-white/20 text-white">x{item.quantity}</Badge>}
                         </div>
                         <div className="p-4">
                           <div className="flex items-center gap-2 mb-3">
                             <span className="font-semibold text-lg">{UNIT_TYPE_INFO[item.unitType]?.name || item.unitType}</span>
-                            <Badge variant="secondary" className="text-xs">{item.tier}</Badge>
+                            <Badge variant="secondary" className="text-xs">{item.extractedTonnage}</Badge>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                             {components.map((comp, i) => (
@@ -3226,12 +3266,56 @@ export default function ProposalBuilder() {
                               </div>
                             ))}
                           </div>
+                          {item.eliteData && (
+                            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+                              <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-1">
+                                <Crown className="h-3 w-3" />
+                                ELITE PACKAGE INCLUDES:
+                              </p>
+                              <div className="space-y-1">
+                                {HVAC_ELITE_CORE_BUNDLES.map(bundle => (
+                                  <div key={bundle.name} className="flex justify-between text-xs">
+                                    <span className="text-muted-foreground">{bundle.name}</span>
+                                    <span className="font-medium">{formatPrice(item.eliteData!.coreBundlePrices[bundle.id] || 0)}</span>
+                                  </div>
+                                ))}
+                                {(() => {
+                                  const airflowOption = HVAC_ELITE_AIRFLOW_OPTIONS.find(o => o.id === item.eliteData!.selectedAirflowOptionId);
+                                  if (airflowOption) {
+                                    return (
+                                      <div className="flex justify-between text-xs">
+                                        <span className="text-muted-foreground">{airflowOption.name}</span>
+                                        <span className="font-medium">{formatPrice(item.eliteData!.airflowPrice)}</span>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
+                              <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-700">
+                                <div className="flex justify-between text-xs text-green-600 dark:text-green-400 font-medium">
+                                  <span>20% Elite Discount</span>
+                                  <span>-{formatPrice(item.eliteData.discountAmount)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           <div className="bg-primary/10 rounded-lg p-3 flex items-center justify-between">
                             <div className="text-sm text-muted-foreground">
                               {formatPrice(monthlyPrice)}/mo financing
                             </div>
-                            <p className="text-2xl font-bold text-primary">{formatPrice(itemPrice)}</p>
+                            <div className="text-right">
+                              {item.eliteData && (
+                                <p className="text-xs text-muted-foreground line-through">{formatPrice(basePrice * item.quantity)}</p>
+                              )}
+                              <p className="text-2xl font-bold text-primary">{formatPrice(itemPrice)}</p>
+                            </div>
                           </div>
+                          {item.eliteData && (
+                            <Badge className="mt-2 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                              You Save {formatPrice(item.eliteData.discountAmount * item.quantity)}!
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     );
@@ -3259,6 +3343,19 @@ export default function ProposalBuilder() {
                 <span className="text-sm text-muted-foreground">Monthly Payment (with approved financing)</span>
                 <span className="text-sm font-medium">{formatPriceRange(cartMonthlyTotalRange.low, cartMonthlyTotalRange.high)}/mo</span>
               </div>
+              {cartEliteSavings > 0 && (
+                <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-semibold text-green-700 dark:text-green-300 flex items-center gap-1">
+                      <Crown className="h-4 w-4" />
+                      Total Elite Savings
+                    </span>
+                    <Badge className="bg-green-500 text-white text-sm px-3 py-1">
+                      You Save {formatPrice(cartEliteSavings)}!
+                    </Badge>
+                  </div>
+                </div>
+              )}
             </div>
 
             {customerNotes && (
