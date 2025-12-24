@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray } from "drizzle-orm";
@@ -121,6 +121,17 @@ export interface IStorage {
   
   // Backup operations
   clearAllData(): Promise<void>;
+  
+  // Quote Conversation operations (AI memory)
+  createQuoteConversation(conversation: InsertQuoteConversation): Promise<QuoteConversation>;
+  getQuoteConversation(id: string): Promise<QuoteConversation | undefined>;
+  updateQuoteConversation(id: string, updates: Partial<QuoteConversation>): Promise<QuoteConversation | undefined>;
+  deleteQuoteConversation(id: string): Promise<boolean>;
+  
+  // Quote Message operations
+  createQuoteMessage(message: InsertQuoteMessage): Promise<QuoteMessage>;
+  getQuoteMessages(conversationId: string, limit?: number): Promise<QuoteMessage[]>;
+  getRecentQuoteMessages(conversationId: string, limit?: number): Promise<QuoteMessage[]>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -930,6 +941,68 @@ export class DatabaseStorage implements IStorage {
     await db.delete(technicians);
     await db.delete(parts);
     await db.delete(categories);
+  }
+
+  // Quote Conversation operations (AI memory)
+  async createQuoteConversation(conversation: InsertQuoteConversation): Promise<QuoteConversation> {
+    const [created] = await db
+      .insert(quoteConversations)
+      .values(conversation)
+      .returning();
+    return created;
+  }
+
+  async getQuoteConversation(id: string): Promise<QuoteConversation | undefined> {
+    const [conversation] = await db
+      .select()
+      .from(quoteConversations)
+      .where(eq(quoteConversations.id, id));
+    return conversation || undefined;
+  }
+
+  async updateQuoteConversation(id: string, updates: Partial<QuoteConversation>): Promise<QuoteConversation | undefined> {
+    const [updated] = await db
+      .update(quoteConversations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(quoteConversations.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteQuoteConversation(id: string): Promise<boolean> {
+    await db.delete(quoteMessages).where(eq(quoteMessages.conversationId, id));
+    const result = await db.delete(quoteConversations).where(eq(quoteConversations.id, id));
+    return true;
+  }
+
+  // Quote Message operations
+  async createQuoteMessage(message: InsertQuoteMessage): Promise<QuoteMessage> {
+    const [created] = await db
+      .insert(quoteMessages)
+      .values(message)
+      .returning();
+    return created;
+  }
+
+  async getQuoteMessages(conversationId: string, limit?: number): Promise<QuoteMessage[]> {
+    let query = db
+      .select()
+      .from(quoteMessages)
+      .where(eq(quoteMessages.conversationId, conversationId))
+      .orderBy(quoteMessages.createdAt);
+    
+    const messages = await query;
+    return limit ? messages.slice(-limit) : messages;
+  }
+
+  async getRecentQuoteMessages(conversationId: string, limit: number = 10): Promise<QuoteMessage[]> {
+    const messages = await db
+      .select()
+      .from(quoteMessages)
+      .where(eq(quoteMessages.conversationId, conversationId))
+      .orderBy(quoteMessages.createdAt);
+    
+    return messages.slice(-limit);
   }
 
   // Initialize default data if needed
