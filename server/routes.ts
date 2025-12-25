@@ -3770,18 +3770,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
 
-  // Start customer auto-sync (every 10 minutes)
-  startAutoSync(10);
-  console.log('Customer auto-sync started (every 10 minutes)');
+  // Defer expensive startup operations to run after server is ready (allows health checks to pass)
+  setTimeout(() => {
+    // Start customer auto-sync (every 10 minutes)
+    startAutoSync(10);
+    console.log('Customer auto-sync started (every 10 minutes)');
 
-  // Seed vector store with sales book if empty (async, don't block startup)
-  seedVectorStoreWithSalesBook().then(success => {
-    if (success) {
-      console.log('Vector store knowledge base initialized');
-    }
-  }).catch(err => {
-    console.error('Error seeding vector store on startup:', err);
-  });
+    // Seed vector store with sales book if empty (async, don't block startup)
+    seedVectorStoreWithSalesBook().then(success => {
+      if (success) {
+        console.log('Vector store knowledge base initialized');
+      }
+    }).catch(err => {
+      console.error('Error seeding vector store on startup:', err);
+    });
+  }, 5000); // 5 second delay to allow health checks to pass first
 
   return httpServer;
 }

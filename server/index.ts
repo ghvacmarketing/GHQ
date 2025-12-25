@@ -2,15 +2,12 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
-// Validate required environment variables
-if (!process.env.SESSION_SECRET) {
-  console.error("❌ FATAL ERROR: SESSION_SECRET environment variable is required but not set.");
-  console.error("   Please set SESSION_SECRET to a secure random string.");
-  console.error("   Example: SESSION_SECRET=your-secure-random-string-here");
-  process.exit(1);
-}
-
 const app = express();
+
+// Immediate health check endpoint - must be first to pass Cloud Run health checks
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
 // Conditional JSON parsing - skip for PDF upload route which needs 50MB limit
 app.use((req, res, next) => {
   if (req.path === '/api/price-book/upload') {
@@ -81,5 +78,12 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Validate required environment variables after server starts (allows health checks to pass)
+    if (!process.env.SESSION_SECRET) {
+      console.error("⚠️ WARNING: SESSION_SECRET environment variable is not set.");
+      console.error("   Session management will not work correctly without it.");
+      console.error("   Please set SESSION_SECRET to a secure random string.");
+    }
   });
 })();
