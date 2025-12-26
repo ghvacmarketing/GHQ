@@ -18,6 +18,9 @@ import ServicePipeline from "@/pages/service-pipeline";
 import ProposalBuilder from "@/pages/proposal-builder";
 import Voicemails from "@/pages/voicemails";
 import ProposalHistory from "@/pages/proposal-history";
+import EmployeePortal from "@/pages/employee-portal";
+import EmployeePortalLogin from "@/pages/employee-portal-login";
+import EmployeePortalAdmin from "@/pages/employee-portal-admin";
 import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import GlobalPasswordGate from "@/components/GlobalPasswordGate";
@@ -54,6 +57,9 @@ function Router() {
       <Route path="/voicemails" component={Voicemails} />
       <Route path="/proposal-history" component={ProposalHistory} />
       <Route path="/admin" component={AdminSettingsWrapper} />
+      <Route path="/employee-portal/login" component={EmployeePortalLogin} />
+      <Route path="/employee-portal/admin" component={EmployeePortalAdmin} />
+      <Route path="/employee-portal" component={EmployeePortal} />
       <Route component={NotFound} />
     </Switch>
   );
