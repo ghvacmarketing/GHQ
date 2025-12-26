@@ -1,0 +1,172 @@
+Crawlspace Package Pricing Logic (Spec for Replit)
+1) Goal
+
+We sell 3 crawlspace packages (Essential / Premium / Ultimate).
+Each package price is based on:
+
+A size band (standard square-foot buckets)
+
+Labor = (band sqft × $1.50)
+
+Liner rolls needed (floor + 3ft up walls + pillars)
+
+Dehumidifier (only 2 models) with 50% markup + $150 receptacle box
+
+2) Inputs
+
+crawlspace_sqft (floor square footage the customer has)
+
+package_tier ∈ {ESSENTIAL, PREMIUM, ULTIMATE}
+
+3) Size bands (round UP)
+
+We don’t price “exact sqft”. We round the crawlspace sqft up to the next band:
+
+BANDS = [1000, 1250, 1500, 1750, 2000]
+
+band_sqft = smallest value in BANDS where band_sqft >= crawlspace_sqft
+(if crawlspace_sqft > 2000, either add more bands or keep adding 250 sqft steps)
+
+4) Constants / Assumptions
+
+These match what we decided:
+
+LABOR_RATE_PER_SQFT = 1.50
+
+WALL_HEIGHT_FT = 3
+WASTE_FACTOR = 1.10   (10% waste/overlap)
+
+PILLAR_SIDE_IN = 16
+PILLAR_HEIGHT_FT = 3
+
+Pillars estimate by sqft (average)
+
+Use this simple average rule so each band has realistic pillar counts:
+
+pillars = round(band_sqft / 125)
+
+(so 1000→8, 1250→10, 1500→12, 1750→14, 2000→16)
+
+5) Liner square footage calculation (floor + 3ft walls + pillars)
+5.1 Wall liner needed (3ft up)
+
+Assume crawlspace is “roughly square” for estimating perimeter.
+
+side_ft = sqrt(band_sqft)
+perimeter_ft = 4 * side_ft
+wall_area_sqft = perimeter_ft * WALL_HEIGHT_FT
+             = 4 * sqrt(band_sqft) * 3
+             = 12 * sqrt(band_sqft)
+
+5.2 Pillar wrap liner needed
+
+Each pillar is 16" x 16". Wrap liner up 3ft.
+
+pillar_side_ft = 16/12
+pillar_perimeter_ft = 4 * pillar_side_ft
+pillar_wrap_area_each = pillar_perimeter_ft * 3
+                      = (4*(16/12))*3
+                      = 16 sqft per pillar
+pillar_area_sqft = pillars * 16
+
+5.3 Total liner area
+liner_area_sqft = (band_sqft + wall_area_sqft + pillar_area_sqft) * WASTE_FACTOR
+
+6) Roll sizing + roll counts
+
+Most liners we’re using are 12' x 100' rolls:
+
+ROLL_AREA_12x100 = 1200 sqft
+rolls_needed = ceil(liner_area_sqft / 1200)
+
+
+If you later switch any tier to a 10' x 100' roll, set roll area to 1000 sqft for that tier.
+
+7) Package material selection (liner grade + roll price)
+
+Use these roll prices (from the sheet image):
+
+Ultimate (20 mil)
+
+20 Mil Reinforced Crawl Space Liner – 12' x 100' roll
+
+roll_price = 559.99
+
+Premium (12 mil)
+
+12 Mil Economy Crawl Space Liner (WB) – 12' x 100' roll
+
+roll_price = 307.99
+
+Essential (10 mil)
+
+10 Mil Non-Reinforced Crawl Space Liner – 12' x 100' roll
+
+roll_price = 167.99
+
+liner_material_cost = rolls_needed * roll_price
+
+8) Labor calculation
+labor_cost = band_sqft * 1.50
+
+9) Dehumidifier logic (ONLY 2 models)
+
+We only quote these 2:
+
+For 12 mil and 20 mil packages → Aprilaire E070
+
+base cost = 1649.99
+
+For 10 mil package → Aprilaire E100
+
+base cost = 2149.99
+
+Pricing rule:
+
+We apply 50% markup + $150 for receptacle box:
+
+DEHUMIDIFIER_MARKUP = 1.50
+RECEPTACLE_ADD = 150
+
+dehumidifier_sell_price = (base_cost * 1.50) + 150
+
+
+Note: If you meant “true 50% gross margin” (not 50% markup), the multiplier would be 2.0 instead of 1.5.
+
+10) Total package price
+total_price =
+  liner_material_cost +
+  labor_cost +
+  dehumidifier_sell_price
+
+11) Precomputed band averages (for validation)
+
+Using the formulas above (3ft walls, pillars rule, 10% waste, 12x100 rolls):
+
+1000 sqft → ~8 pillars → liner area ~1658 sqft → 2 rolls
+
+1250 sqft → ~10 pillars → liner area ~2018 sqft → 2 rolls
+
+1500 sqft → ~12 pillars → liner area ~2372 sqft → 2 rolls
+
+1750 sqft → ~14 pillars → liner area ~2724 sqft → 3 rolls
+
+2000 sqft → ~16 pillars → liner area ~3072 sqft → 3 rolls
+
+12) Output (quote breakdown)
+
+For each quote, output a breakdown like:
+
+Size band: band_sqft
+
+Estimated pillars: pillars
+
+Rolls needed: rolls_needed
+
+Liner material cost
+
+Labor cost
+
+Dehumidifier model + sell price (includes $150 receptacle)
+
+Total

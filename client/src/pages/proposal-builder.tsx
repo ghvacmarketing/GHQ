@@ -133,6 +133,8 @@ type CrawlspaceCartItem = {
   id: string;
   isCrawlspace: true;
   tier: CrawlspaceTier;
+  sqft: number;
+  pricingBreakdown: CrawlspacePricingBreakdown;
   quantity: number;
   eliteData?: ElitePackageData;
 };
@@ -230,19 +232,117 @@ const HVAC_ELITE_AIRFLOW_OPTIONS: EliteAirflowOption[] = [
   }
 ];
 
+// Crawlspace Pricing Constants (from spec)
+const CRAWLSPACE_CONSTANTS = {
+  LABOR_RATE_PER_SQFT: 1.50,
+  WALL_HEIGHT_FT: 3,
+  WASTE_FACTOR: 1.10, // 10% waste/overlap
+  PILLAR_SIDE_IN: 16,
+  PILLAR_HEIGHT_FT: 3,
+  ROLL_AREA_12x100: 1200, // sqft per roll
+  DEHUMIDIFIER_MARKUP: 1.50, // 50% markup
+  RECEPTACLE_ADD: 150, // $150 for receptacle box
+  SIZE_BANDS: [1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000] // Extended bands
+};
+
+// Dehumidifier models
+const DEHUMIDIFIERS = {
+  E070: { model: "Aprilaire E070", baseCost: 1649.99, tiers: ["Premium", "Ultimate"] },
+  E100: { model: "Aprilaire E100", baseCost: 2149.99, tiers: ["Essential"] }
+};
+
+// Liner roll prices by tier
+const LINER_ROLL_PRICES = {
+  Essential: { milThickness: 10, rollPrice: 167.99, description: "10 Mil Non-Reinforced" },
+  Premium: { milThickness: 12, rollPrice: 307.99, description: "12 Mil Economy (WB)" },
+  Ultimate: { milThickness: 20, rollPrice: 559.99, description: "20 Mil Reinforced" }
+};
+
+// Crawlspace pricing breakdown type
+type CrawlspacePricingBreakdown = {
+  inputSqft: number;
+  bandSqft: number;
+  pillars: number;
+  wallAreaSqft: number;
+  pillarAreaSqft: number;
+  totalLinerAreaSqft: number;
+  rollsNeeded: number;
+  linerMaterialCost: number;
+  laborCost: number;
+  dehumidifierModel: string;
+  dehumidifierBaseCost: number;
+  dehumidifierSellPrice: number;
+  totalPrice: number;
+};
+
+// Calculate crawlspace pricing based on sqft and tier
+function calculateCrawlspacePricing(sqft: number, tierName: string): CrawlspacePricingBreakdown {
+  // Round up to next size band
+  let bandSqft = CRAWLSPACE_CONSTANTS.SIZE_BANDS.find(band => band >= sqft) || sqft;
+  // If beyond our bands, round up to next 250
+  if (sqft > CRAWLSPACE_CONSTANTS.SIZE_BANDS[CRAWLSPACE_CONSTANTS.SIZE_BANDS.length - 1]) {
+    bandSqft = Math.ceil(sqft / 250) * 250;
+  }
+  
+  // Pillars estimate: band_sqft / 125
+  const pillars = Math.round(bandSqft / 125);
+  
+  // Wall liner (3ft up): 12 * sqrt(band_sqft)
+  const wallAreaSqft = 12 * Math.sqrt(bandSqft);
+  
+  // Pillar wrap: 16 sqft per pillar
+  const pillarAreaSqft = pillars * 16;
+  
+  // Total liner area with waste factor
+  const totalLinerAreaSqft = Math.round((bandSqft + wallAreaSqft + pillarAreaSqft) * CRAWLSPACE_CONSTANTS.WASTE_FACTOR);
+  
+  // Rolls needed
+  const rollsNeeded = Math.ceil(totalLinerAreaSqft / CRAWLSPACE_CONSTANTS.ROLL_AREA_12x100);
+  
+  // Liner material cost
+  const linerInfo = LINER_ROLL_PRICES[tierName as keyof typeof LINER_ROLL_PRICES];
+  const linerMaterialCost = rollsNeeded * linerInfo.rollPrice;
+  
+  // Labor cost
+  const laborCost = bandSqft * CRAWLSPACE_CONSTANTS.LABOR_RATE_PER_SQFT;
+  
+  // Dehumidifier
+  const dehu = tierName === "Essential" ? DEHUMIDIFIERS.E100 : DEHUMIDIFIERS.E070;
+  const dehumidifierSellPrice = (dehu.baseCost * CRAWLSPACE_CONSTANTS.DEHUMIDIFIER_MARKUP) + CRAWLSPACE_CONSTANTS.RECEPTACLE_ADD;
+  
+  // Total
+  const totalPrice = Math.round(linerMaterialCost + laborCost + dehumidifierSellPrice);
+  
+  return {
+    inputSqft: sqft,
+    bandSqft,
+    pillars,
+    wallAreaSqft: Math.round(wallAreaSqft),
+    pillarAreaSqft,
+    totalLinerAreaSqft,
+    rollsNeeded,
+    linerMaterialCost: Math.round(linerMaterialCost * 100) / 100,
+    laborCost,
+    dehumidifierModel: dehu.model,
+    dehumidifierBaseCost: dehu.baseCost,
+    dehumidifierSellPrice: Math.round(dehumidifierSellPrice * 100) / 100,
+    totalPrice
+  };
+}
+
 // Crawlspace Tiers
 type CrawlspaceTier = {
   id: string;
   name: string;
   milThickness: number;
-  price: number;
   description: string;
+  rollPrice: number;
 };
 
 const CRAWLSPACE_TIERS: CrawlspaceTier[] = [
-  { id: "crawl-10mil", name: "Essential", milThickness: 10, price: 10505, description: "Standard Encapsulation (10 mil) + Dehumidifier" },
-  { id: "crawl-12mil", name: "Premium", milThickness: 12, price: 16087, description: "Deluxe Encapsulation (12 mil) + Smart High-Capacity Dehumidifier" },
-  { id: "crawl-20mil", name: "Ultimate", milThickness: 20, price: 25599, description: "Premium Encapsulation (20 mil) + Smart High-Capacity Dehumidifier" }
+  { id: "crawl-10mil", name: "Essential", milThickness: 10, rollPrice: 167.99, description: "10 Mil Non-Reinforced Liner + Aprilaire E100 Dehumidifier" },
+  { id: "crawl-12mil", name: "Premium", milThickness: 12, rollPrice: 307.99, description: "12 Mil Economy Liner + Aprilaire E070 Dehumidifier" },
+  { id: "crawl-20mil", name: "Ultimate", milThickness: 20, rollPrice: 559.99, description: "20 Mil Reinforced Liner + Aprilaire E070 Dehumidifier" }
 ];
 
 // Crawlspace Elite Bundles (all required when Elite is ON)
@@ -606,6 +706,7 @@ export default function ProposalBuilder() {
   const [selectedAirflowByIndex, setSelectedAirflowByIndex] = useState<Record<number, string>>({});
   const [selectedCrawlspaceTier, setSelectedCrawlspaceTier] = useState<CrawlspaceTier | null>(null);
   const [crawlspaceEliteEnabled, setCrawlspaceEliteEnabled] = useState(false);
+  const [crawlspaceSqft, setCrawlspaceSqft] = useState<string>("1000");
   
   // Debounce customer search
   useEffect(() => {
@@ -750,13 +851,15 @@ export default function ProposalBuilder() {
 
     const equipmentDetails = cart.map(item => {
       if (isCrawlspaceItem(item)) {
-        const basePrice = item.tier.price;
+        const basePrice = item.pricingBreakdown.totalPrice;
         const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
         return {
           type: "crawlspace",
           tierName: item.tier.name,
           tierDescription: item.tier.description,
           tierPrice: basePrice,
+          sqft: item.sqft,
+          bandSqft: item.pricingBreakdown.bandSqft,
           quantity: item.quantity,
           totalPrice: finalPrice * item.quantity,
           isElite: !!item.eliteData,
@@ -1105,7 +1208,7 @@ export default function ProposalBuilder() {
     return cart.reduce((acc, item) => {
       if (isCrawlspaceItem(item)) {
         // For Elite: use originalTotal (pre-discount), otherwise base tier price
-        const price = (item.eliteData ? item.eliteData.originalTotal : item.tier.price) * item.quantity;
+        const price = (item.eliteData ? item.eliteData.originalTotal : item.pricingBreakdown.totalPrice) * item.quantity;
         return { low: acc.low + price, high: acc.high + price };
       } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
@@ -1145,7 +1248,7 @@ export default function ProposalBuilder() {
     return cart.reduce((acc, item) => {
       if (isCrawlspaceItem(item)) {
         // Crawlspace: derive monthly from price / 67
-        const basePrice = item.eliteData ? item.eliteData.finalTotal : item.tier.price;
+        const basePrice = item.eliteData ? item.eliteData.finalTotal : item.pricingBreakdown.totalPrice;
         const monthly = Math.round(basePrice / 67) * item.quantity;
         return { low: acc.low + monthly, high: acc.high + monthly };
       } else if (isCustomBuild(item)) {
@@ -1272,20 +1375,26 @@ export default function ProposalBuilder() {
     setSelectedThermostat(null);
   };
 
-  const addCrawlspaceToCart = (tier: CrawlspaceTier, withElite: boolean = false) => {
+  const addCrawlspaceToCart = (tier: CrawlspaceTier, sqft: number, withElite: boolean = false) => {
+    // Calculate pricing based on sqft
+    const pricingBreakdown = calculateCrawlspacePricing(sqft, tier.name);
+    const basePrice = pricingBreakdown.totalPrice;
+    
     const id = withElite 
-      ? `crawlspace-elite-${tier.name.toLowerCase()}`
-      : `crawlspace-${tier.name.toLowerCase()}`;
+      ? `crawlspace-elite-${tier.name.toLowerCase()}-${sqft}`
+      : `crawlspace-${tier.name.toLowerCase()}-${sqft}`;
     
     let eliteData: ElitePackageData | undefined;
     if (withElite) {
-      eliteData = calculateCrawlspaceElitePricing(tier.price);
+      eliteData = calculateCrawlspaceElitePricing(basePrice);
     }
 
     const crawlspaceItem: CrawlspaceCartItem = {
       id,
       isCrawlspace: true,
       tier,
+      sqft,
+      pricingBreakdown,
       quantity: 1,
       eliteData,
     };
@@ -1305,12 +1414,13 @@ export default function ProposalBuilder() {
     toast({
       title: withElite ? "Elite Crawlspace Added!" : "Crawlspace Added",
       description: withElite 
-        ? `${tier.name} package with Elite bundle added to proposal.`
-        : `${tier.name} crawlspace package added to proposal.`,
+        ? `${tier.name} package (${sqft} sqft) with Elite bundle added.`
+        : `${tier.name} crawlspace package (${sqft} sqft) added.`,
     });
 
     setSelectedCrawlspaceTier(null);
     setCrawlspaceEliteEnabled(false);
+    setCrawlspaceSqft("1000");
   };
 
   const addToCartWithElite = (pkg: PricebookPackage, index: number) => {
@@ -1454,11 +1564,11 @@ export default function ProposalBuilder() {
     try {
       const cartItems = cart.map(item => {
         if (isCrawlspaceItem(item)) {
-          const basePrice = item.tier.price;
+          const basePrice = item.pricingBreakdown.totalPrice;
           const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
           return {
             type: 'crawlspace' as const,
-            name: `Crawlspace Encapsulation - ${item.tier.name}`,
+            name: `Crawlspace Encapsulation - ${item.tier.name} (${item.pricingBreakdown.bandSqft.toLocaleString()} sqft)`,
             description: `${item.tier.milThickness} Mil Vapor Barrier - ${item.tier.description}`,
             basePrice: basePrice,
             finalPrice: finalPrice,
@@ -1466,6 +1576,7 @@ export default function ProposalBuilder() {
             isElite: !!item.eliteData,
             eliteIncludes: item.eliteData ? CRAWLSPACE_ELITE_BUNDLES.map(b => b.name) : undefined,
             eliteSavings: item.eliteData?.discountAmount,
+            pricingBreakdown: item.pricingBreakdown,
           };
         } else if (isCustomBuild(item)) {
           const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
@@ -2559,10 +2670,13 @@ export default function ProposalBuilder() {
                                     <p className="text-xs text-muted-foreground">{item.tier.description}</p>
                                   </div>
                                   <div className="mt-2 pt-2 border-t">
+                                    <p className="text-xs text-muted-foreground mb-1">
+                                      {item.pricingBreakdown.bandSqft.toLocaleString()} sqft • {item.pricingBreakdown.rollsNeeded} rolls • {item.pricingBreakdown.dehumidifierModel}
+                                    </p>
                                     {item.eliteData ? (
                                       <div className="space-y-1">
                                         <div className="flex justify-between text-xs text-muted-foreground">
-                                          <span>Base: {formatPrice(item.tier.price)}</span>
+                                          <span>Base: {formatPrice(item.pricingBreakdown.totalPrice)}</span>
                                           <span className="line-through">{formatPrice(item.eliteData.originalTotal)}</span>
                                         </div>
                                         <div className="flex justify-between items-center">
@@ -2576,7 +2690,7 @@ export default function ProposalBuilder() {
                                       </div>
                                     ) : (
                                       <p className="font-bold text-sm text-primary">
-                                        {formatPrice(item.tier.price * item.quantity)}
+                                        {formatPrice(item.pricingBreakdown.totalPrice * item.quantity)}
                                       </p>
                                     )}
                                   </div>
@@ -3722,10 +3836,35 @@ export default function ProposalBuilder() {
 
             <div className="mb-6">
               <h2 className="text-xl font-semibold mb-2">Select Crawlspace Package</h2>
-              <p className="text-muted-foreground mb-4">Choose the encapsulation level for your crawlspace</p>
+              <p className="text-muted-foreground mb-4">Enter your crawlspace size and choose encapsulation level</p>
+              
+              {/* Sqft Input */}
+              <div className="mb-6 p-4 bg-teal-50 dark:bg-teal-950/50 rounded-lg border border-teal-200 dark:border-teal-800">
+                <Label htmlFor="crawlspace-sqft" className="text-sm font-medium mb-2 block">
+                  Crawlspace Square Footage
+                </Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    id="crawlspace-sqft"
+                    type="number"
+                    value={crawlspaceSqft}
+                    onChange={(e) => setCrawlspaceSqft(e.target.value)}
+                    min="100"
+                    max="5000"
+                    className="w-32 min-h-[44px]"
+                    data-testid="input-crawlspace-sqft"
+                  />
+                  <span className="text-sm text-muted-foreground">sqft</span>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    (Rounds up to nearest band: {CRAWLSPACE_CONSTANTS.SIZE_BANDS.join(", ")}...)
+                  </span>
+                </div>
+              </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {CRAWLSPACE_TIERS.map((tier, index) => {
+                {CRAWLSPACE_TIERS.map((tier) => {
+                  const sqftNum = parseInt(crawlspaceSqft) || 1000;
+                  const pricing = calculateCrawlspacePricing(sqftNum, tier.name);
                   const isSelected = selectedCrawlspaceTier?.name === tier.name;
                   const isInCart = cart.some(item => 
                     isCrawlspaceItem(item) && item.tier.name === tier.name
@@ -3758,13 +3897,34 @@ export default function ProposalBuilder() {
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <p className="text-sm text-muted-foreground">{tier.description}</p>
+                        
+                        {/* Pricing Breakdown */}
+                        <div className="text-xs space-y-1 border-t pt-2">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Size Band:</span>
+                            <span>{pricing.bandSqft.toLocaleString()} sqft</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Liner ({pricing.rollsNeeded} rolls):</span>
+                            <span>{formatPrice(pricing.linerMaterialCost)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Labor:</span>
+                            <span>{formatPrice(pricing.laborCost)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">{pricing.dehumidifierModel}:</span>
+                            <span>{formatPrice(pricing.dehumidifierSellPrice)}</span>
+                          </div>
+                        </div>
+                        
                         <div className="pt-2 border-t">
                           <div className="flex items-center justify-between">
                             <span className="text-2xl font-bold text-teal-600 dark:text-teal-400">
-                              {formatPrice(tier.price)}
+                              {formatPrice(pricing.totalPrice)}
                             </span>
                             <span className="text-sm text-muted-foreground">
-                              {formatPrice(Math.round(tier.price / 67))}/mo
+                              {formatPrice(Math.round(pricing.totalPrice / 67))}/mo
                             </span>
                           </div>
                         </div>
@@ -3775,7 +3935,12 @@ export default function ProposalBuilder() {
               </div>
             </div>
 
-            {selectedCrawlspaceTier && (
+            {selectedCrawlspaceTier && (() => {
+              const sqftNum = parseInt(crawlspaceSqft) || 1000;
+              const selectedPricing = calculateCrawlspacePricing(sqftNum, selectedCrawlspaceTier.name);
+              const basePrice = selectedPricing.totalPrice;
+              
+              return (
               <div className="mt-6 p-4 border-2 border-teal-200 dark:border-teal-800 rounded-xl bg-gradient-to-r from-teal-50 to-white dark:from-teal-950 dark:to-gray-900">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   <div>
@@ -3783,7 +3948,9 @@ export default function ProposalBuilder() {
                       <Droplets className="h-5 w-5 text-teal-500" />
                       {selectedCrawlspaceTier.name} Package Selected
                     </h3>
-                    <p className="text-sm text-muted-foreground">{selectedCrawlspaceTier.milThickness} Mil - {formatPrice(selectedCrawlspaceTier.price)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedCrawlspaceTier.milThickness} Mil - {selectedPricing.bandSqft.toLocaleString()} sqft - {formatPrice(basePrice)}
+                    </p>
                   </div>
                   
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -3802,7 +3969,7 @@ export default function ProposalBuilder() {
                     
                     <Button
                       className="min-h-[44px] bg-teal-600 hover:bg-teal-700"
-                      onClick={() => addCrawlspaceToCart(selectedCrawlspaceTier, crawlspaceEliteEnabled)}
+                      onClick={() => addCrawlspaceToCart(selectedCrawlspaceTier, sqftNum, crawlspaceEliteEnabled)}
                       data-testid="button-add-crawlspace"
                     >
                       <ShoppingCart className="h-4 w-4 mr-2" />
@@ -3818,7 +3985,7 @@ export default function ProposalBuilder() {
                       <h4 className="font-semibold text-amber-800 dark:text-amber-200">Elite Package Includes:</h4>
                     </div>
                     {(() => {
-                      const elitePricing = calculateCrawlspaceElitePricing(selectedCrawlspaceTier.price);
+                      const elitePricing = calculateCrawlspaceElitePricing(basePrice);
                       return (
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                           {CRAWLSPACE_ELITE_BUNDLES.map(bundle => (
@@ -3840,14 +4007,14 @@ export default function ProposalBuilder() {
                     })()}
                     
                     {(() => {
-                      const elitePricing = calculateCrawlspaceElitePricing(selectedCrawlspaceTier.price);
+                      const elitePricing = calculateCrawlspaceElitePricing(basePrice);
                       const bundlesTotal = Object.values(elitePricing.coreBundlePrices).reduce((a, b) => a + b, 0);
                       return (
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-amber-200 dark:border-amber-700">
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
-                              <span>Base Package:</span>
-                              <span>{formatPrice(selectedCrawlspaceTier.price)}</span>
+                              <span>Base Package ({selectedPricing.bandSqft.toLocaleString()} sqft):</span>
+                              <span>{formatPrice(basePrice)}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Elite Bundles:</span>
@@ -3875,7 +4042,8 @@ export default function ProposalBuilder() {
                   </div>
                 )}
               </div>
-            )}
+            );
+            })()}
           </TabsContent>
         </Tabs>
 
@@ -4045,7 +4213,7 @@ export default function ProposalBuilder() {
               <div className="space-y-4">
                 {cart.map((item, index) => {
                   if (isCrawlspaceItem(item)) {
-                    const basePrice = item.tier.price;
+                    const basePrice = item.pricingBreakdown.totalPrice;
                     const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
                     const itemPrice = finalPrice * item.quantity;
                     return (
@@ -4081,8 +4249,8 @@ export default function ProposalBuilder() {
                               </div>
                               <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-700">
                                 <div className="flex justify-between text-xs">
-                                  <span className="text-muted-foreground">Base Package</span>
-                                  <span className="font-medium">{formatPrice(item.tier.price)}</span>
+                                  <span className="text-muted-foreground">Base Package ({item.pricingBreakdown.bandSqft.toLocaleString()} sqft)</span>
+                                  <span className="font-medium">{formatPrice(item.pricingBreakdown.totalPrice)}</span>
                                 </div>
                                 <div className="flex justify-between text-xs">
                                   <span className="text-muted-foreground">Elite Bundles</span>
