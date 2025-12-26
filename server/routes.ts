@@ -265,18 +265,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/voicemails/sync - bulk sync voicemails from Trello lists
+  // POST /api/voicemails/sync - sync new voicemails from Trello (Voicenation list only)
   app.post("/api/voicemails/sync", async (req, res) => {
     try {
       const trelloListNew = process.env.TRELLO_LIST_NEW || process.env.TRELLO_LIST_ID;
-      const trelloListUnresolved = process.env.TRELLO_LIST_UNRESOLVED;
-      const trelloListResolved = process.env.TRELLO_LIST_RESOLVED;
+
+      if (!trelloListNew) {
+        return res.status(400).json({ message: "TRELLO_LIST_NEW not configured" });
+      }
 
       const listsToSync = [
         { listId: trelloListNew, status: 'NEW' },
-        { listId: trelloListUnresolved, status: 'UNRESOLVED' },
-        { listId: trelloListResolved, status: 'RESOLVED' },
-      ].filter(l => l.listId);
+      ];
 
       let synced = 0;
       let skipped = 0;
