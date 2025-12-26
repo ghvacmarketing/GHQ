@@ -55,6 +55,7 @@ export default function SalesProspects() {
   const [activeFilter, setActiveFilter] = useState<string>("All Active");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("all");
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   // Queries
   const { data: allLeads = [], isLoading: isLoadingLeads } = useQuery<Lead[]>({
@@ -156,9 +157,18 @@ export default function SalesProspects() {
     },
   });
 
-  // Filter leads based on active filter and selected employee
+  // Filter leads based on search, active filter, and selected employee
   const filteredLeads = allLeads.filter((lead) => {
-    // First apply employee filter
+    // First apply search filter (name or phone)
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase().trim();
+      const nameMatch = lead.name?.toLowerCase().includes(search);
+      const phoneMatch = lead.phone?.replace(/\D/g, '').includes(search.replace(/\D/g, ''));
+      if (!nameMatch && !phoneMatch) {
+        return false;
+      }
+    }
+    // Then apply employee filter
     if (selectedEmployeeId !== "all" && lead.assignedEmployeeId !== selectedEmployeeId) {
       return false;
     }
@@ -449,6 +459,30 @@ export default function SalesProspects() {
 
         {/* Filter & Actions */}
         <div className="space-y-3 mb-6">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search by name or phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-leads"
+            />
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+                onClick={() => setSearchTerm("")}
+                data-testid="button-clear-search"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
           {/* Mobile Filter Dropdowns */}
           <div className="md:hidden grid grid-cols-2 gap-2">
             <Select value={activeFilter} onValueChange={setActiveFilter}>
