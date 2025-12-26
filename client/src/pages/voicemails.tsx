@@ -1,6 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   DndContext,
   DragEndEvent,
@@ -24,15 +27,23 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, GripVertical, Phone, Calendar, Play, Pause, RefreshCw } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArrowLeft, GripVertical, Phone, Calendar, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, User } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
-import type { Voicemail } from "@shared/schema";
+import type { Voicemail, CallLog } from "@shared/schema";
 
 const VOICEMAIL_STATUSES = ["NEW", "UNRESOLVED", "RESOLVED"] as const;
 type VoicemailStatus = typeof VOICEMAIL_STATUSES[number];
@@ -354,7 +365,608 @@ function KanbanColumn({ status, voicemails, onCardClick }: KanbanColumnProps) {
   );
 }
 
-export default function Voicemails() {
+const callLogFormSchema = z.object({
+  clientName: z.string().min(1, "Client name is required"),
+  description: z.string().min(1, "Description is required"),
+  phone: z.string().optional(),
+  tag: z.string().optional(),
+});
+
+type CallLogFormData = z.infer<typeof callLogFormSchema>;
+
+interface CallLogEntryProps {
+  log: CallLog;
+  isHighlighted: boolean;
+  entryRef?: React.Ref<HTMLDivElement>;
+  onEdit: (log: CallLog) => void;
+  onDelete: (id: string) => void;
+}
+
+function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLogEntryProps) {
+  const initials = log.createdByName ? log.createdByName.charAt(0).toUpperCase() : "?";
+  const createdAt = log.createdAt ? (typeof log.createdAt === "string" ? parseISO(log.createdAt) : log.createdAt) : new Date();
+  const relativeTime = formatDistanceToNow(createdAt, { addSuffix: true });
+  const exactTime = format(createdAt, "MMM d, yyyy 'at' h:mm a");
+
+  const tagColors: Record<string, string> = {
+    Service: "bg-blue-100 text-blue-800",
+    Install: "bg-green-100 text-green-800",
+    Sales: "bg-purple-100 text-purple-800",
+  };
+
+  return (
+    <div
+      ref={entryRef}
+      className={cn(
+        "p-3 border rounded-lg bg-white transition-all duration-300",
+        isHighlighted && "ring-2 ring-primary animate-pulse"
+      )}
+      data-testid={`call-log-entry-${log.id}`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-sm">{log.clientName}</span>
+            {log.tag && (
+              <Badge variant="secondary" className={cn("text-xs", tagColors[log.tag] || "")}>
+                {log.tag}
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">{log.description}</p>
+          {log.phone && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+              <Phone className="h-3 w-3" />
+              <span>{log.phone}</span>
+            </div>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-xs text-muted-foreground mt-2 block cursor-default">{relativeTime}</span>
+            </TooltipTrigger>
+            <TooltipContent>{exactTime}</TooltipContent>
+          </Tooltip>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => onEdit(log)}
+            data-testid={`button-edit-log-${log.id}`}
+          >
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" data-testid={`button-delete-log-${log.id}`}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Call Log</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete this call log entry? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => onDelete(log.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface CallLogFormProps {
+  date: string;
+  editingLog?: CallLog | null;
+  onCancel?: () => void;
+  onSuccess?: () => void;
+}
+
+function CallLogForm({ date, editingLog, onCancel, onSuccess }: CallLogFormProps) {
+  const { toast } = useToast();
+  const form = useForm<CallLogFormData>({
+    resolver: zodResolver(callLogFormSchema),
+    defaultValues: {
+      clientName: editingLog?.clientName || "",
+      description: editingLog?.description || "",
+      phone: editingLog?.phone || "",
+      tag: editingLog?.tag || "",
+    },
+  });
+
+  useEffect(() => {
+    if (editingLog) {
+      form.reset({
+        clientName: editingLog.clientName || "",
+        description: editingLog.description || "",
+        phone: editingLog.phone || "",
+        tag: editingLog.tag || "",
+      });
+    } else {
+      form.reset({
+        clientName: "",
+        description: "",
+        phone: "",
+        tag: "",
+      });
+    }
+  }, [editingLog, form]);
+
+  const createMutation = useMutation({
+    mutationFn: async (data: CallLogFormData) => {
+      const res = await apiRequest("POST", "/api/call-logs", { ...data, date });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days", date] });
+      form.reset();
+      toast({ title: "Success", description: "Call log created" });
+      onSuccess?.();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create call log", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: CallLogFormData) => {
+      const res = await apiRequest("PUT", `/api/call-logs/${editingLog?.id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days", date] });
+      toast({ title: "Success", description: "Call log updated" });
+      onSuccess?.();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update call log", variant: "destructive" });
+    },
+  });
+
+  const onSubmit = (data: CallLogFormData) => {
+    if (editingLog) {
+      updateMutation.mutate(data);
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 p-3 border rounded-lg bg-muted/30">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FormField
+            control={form.control}
+            name="clientName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Client Name *</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter client name" {...field} data-testid="input-client-name" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone</FormLabel>
+                <FormControl>
+                  <Input placeholder="Phone number (optional)" {...field} data-testid="input-phone" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description *</FormLabel>
+              <FormControl>
+                <Textarea placeholder="What was the call about?" className="min-h-[60px]" {...field} data-testid="input-description" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="flex items-center gap-3">
+          <FormField
+            control={form.control}
+            name="tag"
+            render={({ field }) => (
+              <FormItem className="flex-1">
+                <FormLabel>Tag</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-tag">
+                      <SelectValue placeholder="Select a tag" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="Service">Service</SelectItem>
+                    <SelectItem value="Install">Install</SelectItem>
+                    <SelectItem value="Sales">Sales</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="flex items-center gap-2 pt-6">
+            {onCancel && (
+              <Button type="button" variant="outline" size="sm" onClick={onCancel} data-testid="button-cancel-form">
+                <X className="h-4 w-4 mr-1" />
+                Cancel
+              </Button>
+            )}
+            <Button type="submit" size="sm" disabled={isPending} data-testid="button-submit-form">
+              <Check className="h-4 w-4 mr-1" />
+              {isPending ? "Saving..." : editingLog ? "Update" : "Add"}
+            </Button>
+          </div>
+        </div>
+      </form>
+    </Form>
+  );
+}
+
+interface DateCardProps {
+  date: string;
+  count: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+  highlightedLogId: string | null;
+  entryRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
+  cardRef?: React.Ref<HTMLDivElement>;
+}
+
+function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRefs, cardRef }: DateCardProps) {
+  const { toast } = useToast();
+  const [editingLog, setEditingLog] = useState<CallLog | null>(null);
+  const [showForm, setShowForm] = useState(false);
+
+  const { data: dayData, isLoading } = useQuery<{ date: string; logs: CallLog[] }>({
+    queryKey: ["/api/call-logs/days", date],
+    enabled: isExpanded,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/call-logs/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days", date] });
+      toast({ title: "Success", description: "Call log deleted" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete call log", variant: "destructive" });
+    },
+  });
+
+  const formattedDate = format(parseISO(date), "EEE, MMM d, yyyy");
+  const logs = dayData?.logs || [];
+
+  const handleEdit = (log: CallLog) => {
+    setEditingLog(log);
+    setShowForm(true);
+  };
+
+  const handleFormSuccess = () => {
+    setEditingLog(null);
+    setShowForm(false);
+  };
+
+  const handleFormCancel = () => {
+    setEditingLog(null);
+    setShowForm(false);
+  };
+
+  return (
+    <div ref={cardRef} data-testid={`date-card-${date}`}>
+      <Collapsible open={isExpanded} onOpenChange={onToggle}>
+        <Card className="mb-3">
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-3 px-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <CardTitle className="text-sm font-medium">{formattedDate}</CardTitle>
+                </div>
+                <Badge variant="secondary">{count} {count === 1 ? "entry" : "entries"}</Badge>
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0 px-4 pb-4 space-y-3">
+              {!showForm && !editingLog && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setShowForm(true)}
+                  data-testid="button-add-entry"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Entry
+                </Button>
+              )}
+
+              {(showForm || editingLog) && (
+                <CallLogForm
+                  date={date}
+                  editingLog={editingLog}
+                  onCancel={handleFormCancel}
+                  onSuccess={handleFormSuccess}
+                />
+              )}
+
+              {isLoading ? (
+                <div className="text-center text-sm text-muted-foreground py-4">Loading...</div>
+              ) : logs.length === 0 ? (
+                <div className="text-center text-sm text-muted-foreground py-4">No entries for this day</div>
+              ) : (
+                <div className="space-y-2">
+                  {logs.map((log) => (
+                    <CallLogEntry
+                      key={log.id}
+                      log={log}
+                      isHighlighted={highlightedLogId === log.id}
+                      entryRef={(el) => { entryRefs.current[log.id] = el; }}
+                      onEdit={handleEdit}
+                      onDelete={(id) => deleteMutation.mutate(id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+    </div>
+  );
+}
+
+interface SearchResult extends CallLog {
+  date: string;
+}
+
+function DailyCallLog() {
+  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const [highlightedLogId, setHighlightedLogId] = useState<string | null>(null);
+  const entryRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: days = [], isLoading: isDaysLoading } = useQuery<{ id: string; date: string; count: number }[]>({
+    queryKey: ["/api/call-logs/days"],
+  });
+
+  const { data: searchResults = [], isLoading: isSearching } = useQuery<SearchResult[]>({
+    queryKey: ["/api/call-logs/search", searchQuery],
+    queryFn: async () => {
+      if (!searchQuery.trim()) return [];
+      const res = await fetch(`/api/call-logs/search?q=${encodeURIComponent(searchQuery)}`);
+      if (!res.ok) throw new Error("Search failed");
+      return res.json();
+    },
+    enabled: searchQuery.length >= 2,
+  });
+
+  useEffect(() => {
+    if (days.length > 0 && expandedDays.size === 0) {
+      setExpandedDays(new Set([days[0].date]));
+    }
+  }, [days]);
+
+  const toggleDay = useCallback((date: string) => {
+    setExpandedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) {
+        next.delete(date);
+      } else {
+        next.add(date);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSearchResultClick = useCallback((result: SearchResult) => {
+    setShowSearchResults(false);
+    setSearchQuery("");
+
+    setExpandedDays((prev) => {
+      const next = new Set(prev);
+      next.add(result.date);
+      return next;
+    });
+
+    setHighlightedLogId(result.id);
+
+    setTimeout(() => {
+      const cardEl = cardRefs.current[result.date];
+      if (cardEl) {
+        cardEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      setTimeout(() => {
+        const entryEl = entryRefs.current[result.id];
+        if (entryEl) {
+          entryEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 300);
+
+      setTimeout(() => {
+        setHighlightedLogId(null);
+      }, 3000);
+    }, 100);
+  }, []);
+
+  const todayDate = new Date().toISOString().split("T")[0];
+  const hasTodayCard = days.some((d) => d.date === todayDate);
+
+  const createTodayMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/call-logs", {
+        clientName: "Today's Log",
+        description: "Log created",
+        date: todayDate,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days"] });
+      setExpandedDays((prev) => new Set([...prev, todayDate]));
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            ref={searchInputRef}
+            placeholder="Search calls by name, phone, or keyword..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setShowSearchResults(true);
+            }}
+            onFocus={() => setShowSearchResults(true)}
+            className="pl-9"
+            data-testid="input-search-calls"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+              onClick={() => {
+                setSearchQuery("");
+                setShowSearchResults(false);
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
+        {showSearchResults && searchQuery.length >= 2 && (
+          <Card className="absolute z-20 w-full mt-1 max-h-64 overflow-auto">
+            <CardContent className="p-2">
+              {isSearching ? (
+                <div className="text-center text-sm text-muted-foreground py-4">Searching...</div>
+              ) : searchResults.length === 0 ? (
+                <div className="text-center text-sm text-muted-foreground py-4">No results found</div>
+              ) : (
+                <div className="space-y-1">
+                  {searchResults.map((result) => (
+                    <button
+                      key={result.id}
+                      className="w-full text-left p-2 rounded hover:bg-muted transition-colors"
+                      onClick={() => handleSearchResultClick(result)}
+                      data-testid={`search-result-${result.id}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                          {result.createdByName?.charAt(0) || "?"}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">{result.clientName}</div>
+                          <div className="text-xs text-muted-foreground truncate">{result.description}</div>
+                        </div>
+                        <Badge variant="outline" className="text-xs flex-shrink-0">
+                          {format(parseISO(result.date), "MMM d")}
+                        </Badge>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {!hasTodayCard && (
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            setExpandedDays((prev) => new Set([...prev, todayDate]));
+            if (!hasTodayCard) {
+              createTodayMutation.mutate();
+            }
+          }}
+          disabled={createTodayMutation.isPending}
+          data-testid="button-create-today"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          {createTodayMutation.isPending ? "Creating..." : "Start Today's Log"}
+        </Button>
+      )}
+
+      {isDaysLoading ? (
+        <div className="text-center text-muted-foreground py-8">Loading call logs...</div>
+      ) : days.length === 0 ? (
+        <div className="text-center text-muted-foreground py-8">
+          <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+          <p>No call logs yet</p>
+          <p className="text-sm">Start by creating today's log</p>
+        </div>
+      ) : (
+        <ScrollArea className="h-[calc(100vh-280px)]">
+          <div className="space-y-2 pr-4">
+            {days.map((day) => (
+              <DateCard
+                key={day.date}
+                date={day.date}
+                count={day.count}
+                isExpanded={expandedDays.has(day.date)}
+                onToggle={() => toggleDay(day.date)}
+                highlightedLogId={highlightedLogId}
+                entryRefs={entryRefs}
+                cardRef={(el) => { cardRefs.current[day.date] = el; }}
+              />
+            ))}
+          </div>
+        </ScrollArea>
+      )}
+    </div>
+  );
+}
+
+function VoicemailsKanban() {
   const { toast } = useToast();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { status?: string }>>({});
@@ -520,80 +1132,49 @@ export default function Voicemails() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
-        <div className="flex items-center justify-between p-3 sm:p-4">
-          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
-            <Link href="/">
-              <Button variant="ghost" size="icon" className="flex-shrink-0 min-h-[44px] min-w-[44px]" data-testid="button-back-home">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <img 
-              src={redlogo} 
-              alt="Giesbrecht HVAC" 
-              className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
-              data-testid="img-company-logo"
-            />
-            <div className="min-w-0">
-              <NavDropdown 
-                currentPageTitle="Voicemails"
-                items={[
-                  { label: "Home", path: "/" },
-                  { label: "Sales Prospects", path: "/sales-prospects" },
-                  { label: "Installation Department", path: "/installation" },
-                  { label: "Service Department", path: "/service-pipeline" },
-                ]}
-              />
-            </div>
-          </div>
-          <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => syncVoicemailsMutation.mutate()}
-              disabled={syncVoicemailsMutation.isPending}
-              className="min-h-[44px]"
-              data-testid="button-sync-voicemails"
-            >
-              <RefreshCw className={cn("h-4 w-4 mr-2", syncVoicemailsMutation.isPending && "animate-spin")} />
-              {syncVoicemailsMutation.isPending ? "Syncing..." : "Sync"}
-            </Button>
-            <UserMenu />
-          </div>
-        </div>
-      </header>
+    <>
+      <div className="flex justify-end mb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => syncVoicemailsMutation.mutate()}
+          disabled={syncVoicemailsMutation.isPending}
+          className="min-h-[44px]"
+          data-testid="button-sync-voicemails"
+        >
+          <RefreshCw className={cn("h-4 w-4 mr-2", syncVoicemailsMutation.isPending && "animate-spin")} />
+          {syncVoicemailsMutation.isPending ? "Syncing..." : "Sync from Trello"}
+        </Button>
+      </div>
 
-      <main className="p-3 sm:p-4">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-muted-foreground">Loading voicemails...</div>
-          </div>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <HorizontalScrollContainer isDraggingCard={!!activeId}>
-              {VOICEMAIL_STATUSES.map((status) => (
-                <KanbanColumn
-                  key={status}
-                  status={status}
-                  voicemails={voicemailsByStatus[status]}
-                  onCardClick={handleCardClick}
-                />
-              ))}
-            </HorizontalScrollContainer>
-            <DragOverlay>
-              {activeVoicemail && (
-                <VoicemailCard voicemail={activeVoicemail} isDragging />
-              )}
-            </DragOverlay>
-          </DndContext>
-        )}
-      </main>
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-muted-foreground">Loading voicemails...</div>
+        </div>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <HorizontalScrollContainer isDraggingCard={!!activeId}>
+            {VOICEMAIL_STATUSES.map((status) => (
+              <KanbanColumn
+                key={status}
+                status={status}
+                voicemails={voicemailsByStatus[status]}
+                onCardClick={handleCardClick}
+              />
+            ))}
+          </HorizontalScrollContainer>
+          <DragOverlay>
+            {activeVoicemail && (
+              <VoicemailCard voicemail={activeVoicemail} isDragging />
+            )}
+          </DragOverlay>
+        </DndContext>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
         <DialogContent className="max-w-lg max-h-[85vh] flex flex-col" data-testid="dialog-voicemail-details">
@@ -675,6 +1256,69 @@ export default function Voicemails() {
           )}
         </DialogContent>
       </Dialog>
+    </>
+  );
+}
+
+export default function Voicemails() {
+  const [activeTab, setActiveTab] = useState("voicemails");
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
+        <div className="flex items-center justify-between p-3 sm:p-4">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="flex-shrink-0 min-h-[44px] min-w-[44px]" data-testid="button-back-home">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <img 
+              src={redlogo} 
+              alt="Giesbrecht HVAC" 
+              className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
+              data-testid="img-company-logo"
+            />
+            <div className="min-w-0">
+              <NavDropdown 
+                currentPageTitle="Voicemails & Call Logs"
+                items={[
+                  { label: "Home", path: "/" },
+                  { label: "Sales Prospects", path: "/sales-prospects" },
+                  { label: "Installation Department", path: "/installation" },
+                  { label: "Service Department", path: "/service-pipeline" },
+                ]}
+              />
+            </div>
+          </div>
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+            <UserMenu />
+          </div>
+        </div>
+      </header>
+
+      <main className="p-3 sm:p-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
+            <TabsTrigger value="voicemails" data-testid="tab-voicemails">
+              <Phone className="h-4 w-4 mr-2" />
+              Voicemails
+            </TabsTrigger>
+            <TabsTrigger value="call-logs" data-testid="tab-call-logs">
+              <Calendar className="h-4 w-4 mr-2" />
+              Call Logs
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="voicemails" className="mt-0">
+            <VoicemailsKanban />
+          </TabsContent>
+
+          <TabsContent value="call-logs" className="mt-0">
+            <DailyCallLog />
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 }
