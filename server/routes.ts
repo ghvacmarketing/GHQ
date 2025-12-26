@@ -4,6 +4,7 @@ import multer from "multer";
 import compression from "compression";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import passport from "passport";
 import { storage } from "./storage";
 import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
@@ -76,6 +77,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Serve uploads folder for voicemail MP3 files
   app.use('/uploads', express.static('uploads'));
+
+  // Setup session middleware with PostgreSQL store
+  const PgSession = connectPgSimple(session);
+  app.use(session({
+    store: new PgSession({
+      pool,
+      tableName: 'session',
+      createTableIfMissing: true,
+    }),
+    secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge: 8 * 60 * 60 * 1000, // 8 hours
+      sameSite: 'lax',
+    },
+  }));
+
+  // Initialize passport for authentication
+  app.use(passport.initialize());
+  app.use(passport.session());
 
   // Setup employee portal authentication (passport strategies, login/logout routes)
   setupEmployeeAuth(app);
