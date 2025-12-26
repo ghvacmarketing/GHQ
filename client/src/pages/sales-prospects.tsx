@@ -157,27 +157,76 @@ export default function SalesProspects() {
     },
   });
 
-  // Filter leads based on search, active filter, and selected employee
-  const filteredLeads = allLeads.filter((lead) => {
-    // First apply search filter (name or phone)
-    if (searchTerm.trim()) {
-      const search = searchTerm.toLowerCase().trim();
-      const nameMatch = lead.name?.toLowerCase().includes(search);
-      const phoneMatch = lead.phone?.replace(/\D/g, '').includes(search.replace(/\D/g, ''));
-      if (!nameMatch && !phoneMatch) {
-        return false;
+  // Fuzzy match function - matches if characters appear in sequence (even with typos)
+  const fuzzyMatch = (text: string, search: string): number => {
+    if (!text || !search) return 0;
+    const textLower = text.toLowerCase();
+    const searchLower = search.toLowerCase();
+    
+    // Exact match gets highest score
+    if (textLower.includes(searchLower)) return 100;
+    
+    // Check if characters appear in sequence (fuzzy finder style)
+    let searchIdx = 0;
+    let matchCount = 0;
+    for (let i = 0; i < textLower.length && searchIdx < searchLower.length; i++) {
+      if (textLower[i] === searchLower[searchIdx]) {
+        matchCount++;
+        searchIdx++;
       }
     }
-    // Then apply employee filter
-    if (selectedEmployeeId !== "all" && lead.assignedEmployeeId !== selectedEmployeeId) {
-      return false;
+    
+    // Return score based on how many characters matched
+    if (matchCount >= searchLower.length * 0.6) {
+      return (matchCount / searchLower.length) * 80;
     }
-    // Then apply status filter
-    if (activeFilter === "All Active") return !lead.won && !lead.lost;
-    if (activeFilter === "Won") return lead.won;
-    if (activeFilter === "Lost") return lead.lost;
-    return lead.status === activeFilter && !lead.won && !lead.lost;
-  });
+    
+    // Check for partial word matches (for typos)
+    const words = textLower.split(/\s+/);
+    for (const word of words) {
+      let matches = 0;
+      for (const char of searchLower) {
+        if (word.includes(char)) matches++;
+      }
+      if (matches >= searchLower.length * 0.7) {
+        return 60;
+      }
+    }
+    
+    return 0;
+  };
+
+  // Filter and score leads based on search, active filter, and selected employee
+  const filteredLeads = allLeads
+    .map((lead) => {
+      let searchScore = 0;
+      if (searchTerm.trim()) {
+        const search = searchTerm.trim();
+        const nameScore = fuzzyMatch(lead.name || '', search);
+        const phoneDigits = lead.phone?.replace(/\D/g, '') || '';
+        const searchDigits = search.replace(/\D/g, '');
+        const phoneScore = searchDigits && phoneDigits.includes(searchDigits) ? 100 : 0;
+        searchScore = Math.max(nameScore, phoneScore);
+      }
+      return { lead, searchScore };
+    })
+    .filter(({ lead, searchScore }) => {
+      // If searching, only include matches
+      if (searchTerm.trim() && searchScore === 0) {
+        return false;
+      }
+      // Then apply employee filter
+      if (selectedEmployeeId !== "all" && lead.assignedEmployeeId !== selectedEmployeeId) {
+        return false;
+      }
+      // Then apply status filter
+      if (activeFilter === "All Active") return !lead.won && !lead.lost;
+      if (activeFilter === "Won") return lead.won;
+      if (activeFilter === "Lost") return lead.lost;
+      return lead.status === activeFilter && !lead.won && !lead.lost;
+    })
+    .sort((a, b) => b.searchScore - a.searchScore)
+    .map(({ lead }) => lead);
 
   // Get selected employee name
   const selectedEmployeeName = selectedEmployeeId === "all" 
