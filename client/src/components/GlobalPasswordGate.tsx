@@ -45,6 +45,21 @@ export default function GlobalPasswordGate({ children }: { children: React.React
       setAuthRequired(true);
     }
 
+    // Check if user is logged into Employee Portal (shares session)
+    try {
+      const portalResponse = await fetch('/api/employee-portal/me');
+      if (portalResponse.ok) {
+        const portalUser = await portalResponse.json();
+        if (portalUser && portalUser.id) {
+          // User is logged into Employee Portal, grant access
+          setIsAuthenticated(true);
+          return;
+        }
+      }
+    } catch {
+      // Not logged into portal, continue with other checks
+    }
+
     // Check localStorage for existing auth
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
