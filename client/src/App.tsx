@@ -18,6 +18,7 @@ import ServicePipeline from "@/pages/service-pipeline";
 import ProposalBuilder from "@/pages/proposal-builder";
 import Voicemails from "@/pages/voicemails";
 import MiscCalls from "@/pages/misc-calls";
+import ProposalHistory from "@/pages/proposal-history";
 import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import GlobalPasswordGate from "@/components/GlobalPasswordGate";
@@ -53,6 +54,7 @@ function Router() {
       <Route path="/proposal" component={ProposalBuilder} />
       <Route path="/voicemails" component={Voicemails} />
       <Route path="/misc-calls" component={MiscCalls} />
+      <Route path="/proposal-history" component={ProposalHistory} />
       <Route path="/admin" component={AdminSettingsWrapper} />
       <Route component={NotFound} />
     </Switch>

@@ -587,3 +587,28 @@ export const insertMiscCallSchema = createInsertSchema(miscCalls).omit({
 
 export type InsertMiscCall = z.infer<typeof insertMiscCallSchema>;
 export type MiscCall = typeof miscCalls.$inferSelect;
+
+// Saved Proposals table for proposal history
+export const savedProposals = pgTable("saved_proposals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerName: text("customer_name").notNull(),
+  customerAddress: text("customer_address"),
+  customerPhone: text("customer_phone"),
+  customerEmail: text("customer_email"),
+  quoteTitle: text("quote_title").notNull(),
+  packageDescription: text("package_description"),
+  total: text("total").notNull(),
+  quoteData: text("quote_data").notNull(), // JSON stringified AI quote response
+  status: text("status").notNull().default("saved"), // saved, accepted, expired
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSavedProposalSchema = createInsertSchema(savedProposals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSavedProposal = z.infer<typeof insertSavedProposalSchema>;
+export type SavedProposal = typeof savedProposals.$inferSelect;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, FileText, History, BookOpen, Book, UserCog, Wrench, ClipboardList, Voicemail, Phone, Home, Settings } from "lucide-react";
+import { Menu, FileText, History, BookOpen, Book, UserCog, Wrench, ClipboardList, Voicemail, Phone, Home, Settings, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -30,6 +30,7 @@ const navSections = [
       { label: "Price Book", href: "/price-book", icon: Book },
       { label: "Processes & Systems", href: "/processes", icon: BookOpen },
       { label: "Quote History", href: "/history", icon: History },
+      { label: "Proposal History", href: "/proposal-history", icon: FolderOpen },
     ],
   },
   {

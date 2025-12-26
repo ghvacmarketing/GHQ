@@ -425,6 +425,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== Saved Proposals Routes ==========
+  
+  // GET /api/saved-proposals - get all saved proposals
+  app.get("/api/saved-proposals", async (req, res) => {
+    try {
+      const proposals = await storage.getAllSavedProposals();
+      res.json(proposals);
+    } catch (error) {
+      console.error("Error fetching saved proposals:", error);
+      res.status(500).json({ message: "Error fetching saved proposals" });
+    }
+  });
+
+  // GET /api/saved-proposals/:id - get a single saved proposal
+  app.get("/api/saved-proposals/:id", async (req, res) => {
+    try {
+      const proposal = await storage.getSavedProposal(req.params.id);
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      res.json(proposal);
+    } catch (error) {
+      console.error("Error fetching saved proposal:", error);
+      res.status(500).json({ message: "Error fetching saved proposal" });
+    }
+  });
+
+  // POST /api/saved-proposals - create a new saved proposal
+  app.post("/api/saved-proposals", async (req, res) => {
+    try {
+      const { customerName, customerAddress, customerPhone, customerEmail, quoteTitle, packageDescription, total, quoteData, status } = req.body;
+      if (!customerName || !quoteTitle || !total || !quoteData) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      const proposal = await storage.createSavedProposal({
+        customerName,
+        customerAddress,
+        customerPhone,
+        customerEmail,
+        quoteTitle,
+        packageDescription,
+        total,
+        quoteData,
+        status: status || "saved",
+      });
+      res.json(proposal);
+    } catch (error) {
+      console.error("Error creating saved proposal:", error);
+      res.status(500).json({ message: "Error creating saved proposal" });
+    }
+  });
+
+  // DELETE /api/saved-proposals/:id - delete a saved proposal
+  app.delete("/api/saved-proposals/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteSavedProposal(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting saved proposal:", error);
+      res.status(500).json({ message: "Error deleting saved proposal" });
+    }
+  });
+
   // ========== Misc Calls Routes ==========
   
   // GET /api/misc-calls - get all misc calls

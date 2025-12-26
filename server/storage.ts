@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type MiscCall, type InsertMiscCall, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, miscCalls } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type MiscCall, type InsertMiscCall, type SavedProposal, type InsertSavedProposal, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, miscCalls, savedProposals } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray } from "drizzle-orm";
@@ -148,6 +148,13 @@ export interface IStorage {
   createMiscCall(call: InsertMiscCall): Promise<MiscCall>;
   updateMiscCall(id: string, updates: Partial<MiscCall>): Promise<MiscCall | undefined>;
   deleteMiscCall(id: string): Promise<boolean>;
+
+  // Saved Proposals operations
+  getAllSavedProposals(): Promise<SavedProposal[]>;
+  getSavedProposal(id: string): Promise<SavedProposal | undefined>;
+  createSavedProposal(proposal: InsertSavedProposal): Promise<SavedProposal>;
+  updateSavedProposal(id: string, updates: Partial<SavedProposal>): Promise<SavedProposal | undefined>;
+  deleteSavedProposal(id: string): Promise<boolean>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -1107,6 +1114,35 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMiscCall(id: string): Promise<boolean> {
     const result = await db.delete(miscCalls).where(eq(miscCalls.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Saved Proposals operations
+  async getAllSavedProposals(): Promise<SavedProposal[]> {
+    return await db.select().from(savedProposals).orderBy(savedProposals.createdAt);
+  }
+
+  async getSavedProposal(id: string): Promise<SavedProposal | undefined> {
+    const [proposal] = await db.select().from(savedProposals).where(eq(savedProposals.id, id));
+    return proposal || undefined;
+  }
+
+  async createSavedProposal(proposal: InsertSavedProposal): Promise<SavedProposal> {
+    const [created] = await db.insert(savedProposals).values(proposal).returning();
+    return created;
+  }
+
+  async updateSavedProposal(id: string, updates: Partial<SavedProposal>): Promise<SavedProposal | undefined> {
+    const [updated] = await db
+      .update(savedProposals)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(savedProposals.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteSavedProposal(id: string): Promise<boolean> {
+    const result = await db.delete(savedProposals).where(eq(savedProposals.id, id)).returning();
     return result.length > 0;
   }
 

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download, Save } from "lucide-react";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType } from "docx";
 import { saveAs } from "file-saver";
 import { jsPDF } from "jspdf";
@@ -671,6 +671,62 @@ export default function ProposalBuilder() {
       console.error("Accept quote error:", error);
     },
   });
+
+  // Save proposal mutation
+  const saveProposalMutation = useMutation({
+    mutationFn: async (data: {
+      customerName: string;
+      customerAddress?: string;
+      customerPhone?: string;
+      customerEmail?: string;
+      quoteTitle: string;
+      packageDescription?: string;
+      total: string;
+      quoteData: string;
+    }) => {
+      const res = await apiRequest("POST", "/api/saved-proposals", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Quote Saved!",
+        description: "Proposal saved to history.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-proposals"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to save proposal. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Save proposal error:", error);
+    },
+  });
+
+  const handleSaveProposal = () => {
+    if (!aiGeneratedQuote) {
+      toast({
+        title: "No Quote",
+        description: "Please generate a quote first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const customerNameToUse = selectedCustomer?.displayName || customerName || "Unknown Customer";
+    
+    saveProposalMutation.mutate({
+      customerName: customerNameToUse,
+      customerAddress: customerAddress || undefined,
+      customerPhone: selectedCustomer?.phone || undefined,
+      customerEmail: selectedCustomer?.email || undefined,
+      quoteTitle: aiGeneratedQuote.quote_title,
+      packageDescription: aiGeneratedQuote.package_description || undefined,
+      total: String(aiGeneratedQuote.total),
+      quoteData: JSON.stringify(aiGeneratedQuote),
+    });
+  };
 
   const handleSelectCustomer = (customer: Customer) => {
     const cleanName = customer.displayName.replace(/^["']|["']$/g, '');
@@ -4508,6 +4564,20 @@ export default function ProposalBuilder() {
                 className="flex-1 min-h-[44px]"
               >
                 Close
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleSaveProposal}
+                disabled={!aiGeneratedQuote || saveProposalMutation.isPending}
+                className="flex-1 min-h-[44px]"
+                data-testid="button-save-quote"
+              >
+                {saveProposalMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save Quote
               </Button>
               <Button
                 onClick={downloadQuoteAsPDF}
