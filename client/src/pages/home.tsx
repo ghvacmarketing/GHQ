@@ -3,7 +3,7 @@ import { FileText, History, Settings, BookOpen, Book, UserCog, Wrench, Clipboard
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import NavDropdown from "@/components/nav-dropdown";
+import MobileNav from "@/components/mobile-nav";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
 import { useQuery } from "@tanstack/react-query";
@@ -144,23 +144,14 @@ export default function Home() {
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="flex items-center justify-between p-3 sm:p-4">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <MobileNav />
             <img 
               src={redlogo} 
               alt="Giesbrecht HVAC" 
               className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
               data-testid="img-company-logo"
             />
-            <div className="min-w-0">
-              <NavDropdown 
-                currentPageTitle="Home"
-                items={[
-                  { label: "Home", path: "/" },
-                  { label: "Sales Prospects", path: "/sales-prospects" },
-                  { label: "Installation Department", path: "/installation" },
-                  { label: "Service Department", path: "/service-pipeline" },
-                ]}
-              />
-            </div>
+            <span className="text-sm sm:text-base font-semibold">Home</span>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             <Button 
