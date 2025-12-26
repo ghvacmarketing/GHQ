@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, boolean, json, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, timestamp, boolean, json, integer, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -629,3 +629,122 @@ export type InsertCallLogDay = z.infer<typeof insertCallLogDaySchema>;
 export type CallLogDay = typeof callLogDays.$inferSelect;
 export type InsertCallLog = z.infer<typeof insertCallLogSchema>;
 export type CallLog = typeof callLogs.$inferSelect;
+
+// Employee Portal Tables
+export const portalUsers = pgTable("portal_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  email: text("email").unique(),
+  password: text("password").notNull(),
+  role: text("role").notNull().default("employee"),
+  isActive: boolean("is_active").notNull().default(true),
+  lastLogin: timestamp("last_login"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const employeeProfiles = pgTable("employee_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => portalUsers.id, { onDelete: "cascade" }),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  phone: text("phone"),
+  address: text("address"),
+  hireDate: date("hire_date"),
+  department: text("department"),
+  position: text("position"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const compensations = pgTable("compensations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => portalUsers.id, { onDelete: "cascade" }),
+  payType: text("pay_type").notNull(),
+  rate: text("rate").notNull(),
+  commissionRate: text("commission_rate"),
+  paySchedule: text("pay_schedule").notNull().default("biweekly"),
+  effectiveDate: date("effective_date").notNull(),
+  endDate: date("end_date"),
+  createdBy: varchar("created_by").references(() => portalUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const paystubs = pgTable("paystubs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => portalUsers.id, { onDelete: "cascade" }),
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+  payDate: date("pay_date").notNull(),
+  grossPay: text("gross_pay").notNull(),
+  netPay: text("net_pay").notNull(),
+  hoursWorked: text("hours_worked"),
+  deductions: text("deductions"),
+  fileUrl: text("file_url"),
+  uploadedBy: varchar("uploaded_by").references(() => portalUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const compensationAuditLog = pgTable("compensation_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => portalUsers.id, { onDelete: "cascade" }),
+  compensationId: varchar("compensation_id").references(() => compensations.id),
+  action: text("action").notNull(),
+  previousValue: text("previous_value"),
+  newValue: text("new_value"),
+  changedBy: varchar("changed_by").notNull().references(() => portalUsers.id),
+  changedAt: timestamp("changed_at").defaultNow(),
+});
+
+export const employeeDocuments = pgTable("employee_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => portalUsers.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  fileUrl: text("file_url").notNull(),
+  category: text("category").notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => portalUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPortalUserSchema = createInsertSchema(portalUsers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEmployeeProfileSchema = createInsertSchema(employeeProfiles).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCompensationSchema = createInsertSchema(compensations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPaystubSchema = createInsertSchema(paystubs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCompensationAuditLogSchema = createInsertSchema(compensationAuditLog).omit({
+  id: true,
+});
+
+export const insertEmployeeDocumentSchema = createInsertSchema(employeeDocuments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPortalUser = z.infer<typeof insertPortalUserSchema>;
+export type PortalUser = typeof portalUsers.$inferSelect;
+export type InsertEmployeeProfile = z.infer<typeof insertEmployeeProfileSchema>;
+export type EmployeeProfile = typeof employeeProfiles.$inferSelect;
+export type InsertCompensation = z.infer<typeof insertCompensationSchema>;
+export type Compensation = typeof compensations.$inferSelect;
+export type InsertPaystub = z.infer<typeof insertPaystubSchema>;
+export type Paystub = typeof paystubs.$inferSelect;
+export type InsertCompensationAuditLog = z.infer<typeof insertCompensationAuditLogSchema>;
+export type CompensationAuditLog = typeof compensationAuditLog.$inferSelect;
+export type InsertEmployeeDocument = z.infer<typeof insertEmployeeDocumentSchema>;
+export type EmployeeDocument = typeof employeeDocuments.$inferSelect;
