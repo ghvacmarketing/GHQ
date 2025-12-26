@@ -265,6 +265,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/voicemails/sync - bulk sync voicemails from Trello lists
+  app.post("/api/voicemails/sync", async (req, res) => {
+    try {
+      const trelloListNew = process.env.TRELLO_LIST_NEW || process.env.TRELLO_LIST_ID;
+      const trelloListUnresolved = process.env.TRELLO_LIST_UNRESOLVED;
+      const trelloListResolved = process.env.TRELLO_LIST_RESOLVED;
+
+      const listsToSync = [
+        { listId: trelloListNew, status: 'NEW' },
+        { listId: trelloListUnresolved, status: 'UNRESOLVED' },
+        { listId: trelloListResolved, status: 'RESOLVED' },
+      ].filter(l => l.listId);
+
+      let synced = 0;
+      let skipped = 0;
+      let errors = 0;
+
+      for (const { listId, status } of listsToSync) {
+        try {
+          const cards = await trelloService.getCardsFromList(listId!);
+          console.log(`Syncing ${cards.length} cards from list ${listId} (${status})`);
+
+          for (const card of cards) {
+            try {
+              // Parse caller info from card name
+              let caller = null;
+              const callerMatch = card.name?.match(/from\s*([\+\d\-\s\(\)]+)/i);
+              if (callerMatch) {
+                caller = callerMatch[1].trim();
+              }
+
+              // Parse received date from card name or use card creation date
+              let receivedAt = null;
+              const dateMatch = card.name?.match(/(\d{1,2}\/\d{1,2}\/\d{2,4}|\w+\s+\d{1,2},?\s+\d{4})/);
+              if (dateMatch) {
+                const parsedDate = new Date(dateMatch[1]);
+                if (!isNaN(parsedDate.getTime())) {
+                  receivedAt = parsedDate;
+                }
+              }
+              if (!receivedAt && card.dateLastActivity) {
+                receivedAt = new Date(card.dateLastActivity);
+              }
+
+              // Find MP3 attachment
+              let mp3Filename = null;
+              const mp3Attachment = card.attachments?.find((a: any) => 
+                a.name?.toLowerCase().endsWith('.mp3') || a.url?.toLowerCase().includes('.mp3')
+              );
+
+              if (mp3Attachment) {
+                try {
+                  const buffer = await trelloService.downloadAttachment(mp3Attachment.url);
+                  const filename = `voicemail_${card.id}_${Date.now()}.mp3`;
+                  const filepath = path.join(uploadsDir, filename);
+                  await fs.promises.writeFile(filepath, buffer);
+                  mp3Filename = filename;
+                  console.log(`Downloaded MP3 for card ${card.id}: ${filename}`);
+                } catch (dlError) {
+                  console.error(`Failed to download MP3 for card ${card.id}:`, dlError);
+                }
+              }
+
+              await storage.upsertVoicemail({
+                trelloCardId: card.id,
+                caller: caller,
+                description: card.name || 'Voicemail',
+                status: status,
+                receivedAt: receivedAt,
+                mp3Filename: mp3Filename || undefined,
+              });
+              synced++;
+            } catch (cardError) {
+              console.error(`Error syncing card ${card.id}:`, cardError);
+              errors++;
+            }
+          }
+        } catch (listError) {
+          console.error(`Error fetching cards from list ${listId}:`, listError);
+          errors++;
+        }
+      }
+
+      res.json({
+        message: `Synced ${synced} voicemails from Trello`,
+        synced,
+        skipped,
+        errors,
+      });
+    } catch (error) {
+      console.error("Error syncing voicemails from Trello:", error);
+      res.status(500).json({ message: "Error syncing voicemails from Trello" });
+    }
+  });
+
   // PATCH /api/voicemails/:id - update voicemail status/notes (with two-way Trello sync)
   app.patch("/api/voicemails/:id", async (req, res) => {
     try {

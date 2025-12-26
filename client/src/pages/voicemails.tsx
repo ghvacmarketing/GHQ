@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, GripVertical, Phone, Calendar, Play, Pause } from "lucide-react";
+import { ArrowLeft, GripVertical, Phone, Calendar, Play, Pause, RefreshCw } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
@@ -433,6 +433,27 @@ export default function Voicemails() {
     },
   });
 
+  const syncVoicemailsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/voicemails/sync", {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/voicemails"] });
+      toast({
+        title: "Sync Complete",
+        description: `${data.synced} voicemails synced from Trello`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync voicemails from Trello",
+        variant: "destructive",
+      });
+    },
+  });
+
   const voicemailsByStatus = useMemo(() => {
     const map: Record<VoicemailStatus, Voicemail[]> = {
       NEW: [],
@@ -527,6 +548,17 @@ export default function Voicemails() {
             </div>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncVoicemailsMutation.mutate()}
+              disabled={syncVoicemailsMutation.isPending}
+              className="min-h-[44px]"
+              data-testid="button-sync-voicemails"
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2", syncVoicemailsMutation.isPending && "animate-spin")} />
+              {syncVoicemailsMutation.isPending ? "Syncing..." : "Sync"}
+            </Button>
             <UserMenu />
           </div>
         </div>

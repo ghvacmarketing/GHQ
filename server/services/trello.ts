@@ -224,6 +224,15 @@ STATUS: Quote Pending - Follow-up Required`;
     }
     return await response.json();
   }
+
+  async getCardsFromList(listId: string): Promise<any[]> {
+    const url = `${this.baseUrl}/lists/${listId}/cards?key=${this.config.apiKey}&token=${this.config.token}&attachments=true`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Trello API error: ${response.statusText}`);
+    }
+    return await response.json();
+  }
 }
 
 export const trelloService = new TrelloService();
