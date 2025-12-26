@@ -7,7 +7,8 @@ import MobileNav from "@/components/mobile-nav";
 import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
 import { useQuery } from "@tanstack/react-query";
-import type { Quote, Lead } from "@shared/schema";
+import { getQueryFn } from "@/lib/queryClient";
+import type { Quote, Lead, PortalUser } from "@shared/schema";
 import { useMemo } from "react";
 import { isThisWeek, subDays, isAfter } from "date-fns";
 
@@ -19,6 +20,13 @@ export default function Home() {
   const { data: leadsData, isLoading: isLoadingLeads } = useQuery<Lead[]>({
     queryKey: ['/api/leads'],
   });
+
+  const { data: portalUser } = useQuery<PortalUser | null>({
+    queryKey: ['/api/employee-portal/me'],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
+  const isLoggedIntoPortal = !!portalUser?.id;
 
   const quotes = quotesData?.quotes || [];
   const leads = leadsData || [];
@@ -154,15 +162,17 @@ export default function Home() {
             <span className="text-sm sm:text-base font-semibold">Home</span>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-            <Link href="/employee-portal/login">
-              <Button 
-                variant="ghost" 
-                size="icon"
-                data-testid="button-employee-portal"
-              >
-                <Users className="h-4 w-4" />
-              </Button>
-            </Link>
+            {isLoggedIntoPortal && (
+              <Link href="/employee-portal">
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  data-testid="button-employee-portal"
+                >
+                  <Users className="h-4 w-4" />
+                </Button>
+              </Link>
+            )}
             <Button 
               variant="ghost" 
               size="icon"
