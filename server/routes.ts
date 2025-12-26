@@ -289,12 +289,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           for (const card of cards) {
             try {
-              // Parse caller info from card name
-              let caller = null;
-              const callerMatch = card.name?.match(/from\s*([\+\d\-\s\(\)]+)/i);
-              if (callerMatch) {
-                caller = callerMatch[1].trim();
+              // Parse caller name from card name (format: "Voicemail message from 'Name,Office - B'")
+              let caller = 'Unknown Caller';
+              // Try to extract name in quotes first
+              const quotedMatch = card.name?.match(/from\s*["']([^"']+)["']/i);
+              if (quotedMatch) {
+                caller = quotedMatch[1].split(',')[0].trim(); // Get name before comma
+              } else {
+                // Fallback: try to get text after "from" 
+                const fromMatch = card.name?.match(/from\s+(.+?)(?:\s*[-\[]|$)/i);
+                if (fromMatch) {
+                  caller = fromMatch[1].trim();
+                }
               }
+
+              // Use card description as transcript
+              const transcript = card.desc || '';
 
               // Parse received date from card name or use card creation date
               let receivedAt = null;
@@ -330,8 +340,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               await storage.upsertVoicemail({
                 trelloCardId: card.id,
+                title: caller,
                 caller: caller,
-                description: card.name || 'Voicemail',
+                description: transcript,
                 status: status,
                 receivedAt: receivedAt,
                 mp3Filename: mp3Filename || undefined,
