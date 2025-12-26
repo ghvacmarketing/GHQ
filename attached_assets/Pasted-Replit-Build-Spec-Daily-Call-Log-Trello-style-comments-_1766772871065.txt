@@ -1,0 +1,231 @@
+Replit Build Spec: “Daily Call Log” (Trello-style comments inside date cards)
+1) Purpose
+
+Recreate the Trello “Comments and activity” experience, but specifically for phone call logs.
+
+Instead of general comments:
+
+Each day has a Date Card
+
+Inside the date card, users add Call Log Entries (like comments)
+
+Each entry includes:
+
+client name
+
+short description of call
+
+auto timestamp (like “1 hour ago”)
+
+who logged it
+
+This will live on the same page as the Voicemails page as a new section/tab/panel.
+
+2) UI Layout (same page as Voicemails)
+
+At the top of the page:
+
+A) Search Bar (global)
+
+Input placeholder: “Search calls by name, phone, or keyword…”
+
+Results appear as a dropdown list as the user types.
+
+Clicking a result:
+
+Automatically scrolls to the correct Date Card
+
+Expands it (if collapsed)
+
+Highlights the specific entry for 3–5 seconds
+
+Shows the exact timestamp + relative time (“2 hours ago”)
+
+B) Two-column layout (recommended)
+
+Left: Voicemails (existing)
+
+Right: Call Logs (new)
+OR
+
+Tabs: “Voicemails” | “Call Logs” (same page)
+
+3) Date Cards (Daily)
+Behavior
+
+Automatically create a card for today if none exists.
+
+Show cards in reverse chronological order (today on top).
+
+Each card header shows:
+
+Date (ex: “Mon, Dec 26, 2025”)
+
+Total entries count (ex: “7 calls”)
+
+Collapse/expand caret
+
+Inside the Date Card
+
+A “Write a call log…” input box (like Trello comment box)
+
+Fields:
+
+Client Name (required)
+
+Description (required)
+
+Optional: Phone #, Tag (service / install / sales), Assigned tech
+
+“Log Call” button
+
+When submitted:
+
+Entry is appended at the top (newest first)
+
+Timestamp is set automatically
+
+“time ago” label appears (ex: “1 minute ago”)
+
+4) Call Log Entry Component (Trello-like)
+
+Each entry should show:
+
+User initials avatar (like Trello)
+
+Logged by: employee name
+
+Time ago: “2 hours ago” (relative)
+
+Body text: “Client Name – description…”
+
+Actions:
+
+Edit (allowed within X minutes or anytime with permissions)
+
+Delete (admin only or creator only)
+
+Important: “Time ago” updates automatically every minute.
+
+5) Timestamp rules (auto time like Trello)
+
+When a new call is logged:
+
+Store an absolute timestamp: created_at in ISO format
+
+Display:
+
+relative time (“Just now”, “5 minutes ago”, “2 hours ago”)
+
+and on hover or small text: exact time (ex: “10:16 AM”)
+
+Relative time updates:
+
+every 60 seconds client-side
+
+based on local timezone
+
+6) Search behavior (must “jump into the card”)
+
+Search should query call logs across all dates.
+
+Search matches:
+
+client name (partial)
+
+phone
+
+description keywords
+
+Search results item shows:
+
+Client Name
+
+Date
+
+Small snippet of description
+
+Time
+
+On click:
+
+navigate/scroll to Date Card
+
+expand it
+
+scroll to the entry
+
+highlight the entry
+
+7) Data Model (database tables)
+call_log_days
+
+id
+
+date (YYYY-MM-DD) unique
+
+created_at
+
+call_logs
+
+id
+
+day_id (FK to call_log_days)
+
+client_name
+
+description
+
+phone (nullable)
+
+tag (nullable: service/install/sales/etc.)
+
+created_by_user_id
+
+created_at (timestamp)
+
+updated_at (timestamp nullable)
+
+Indexes:
+
+index on client_name
+
+index on created_at
+
+full-text / keyword index on description if possible
+
+8) API endpoints
+
+GET /call-logs/days → list date cards + counts
+
+GET /call-logs/days/:date → entries for a specific day
+
+POST /call-logs → create a call log entry (server sets created_at)
+
+PUT /call-logs/:id → edit entry
+
+DELETE /call-logs/:id → delete entry
+
+GET /call-logs/search?q= → returns list of matching entries with date + day_id + entry_id
+
+9) Permissions / tracking
+
+Must capture which logged the call:
+
+name/avatar initials
+
+Edit/Delete rules:
+
+Creator can edit
+
+Admin can edit/delete any
+
+10) Nice-to-have (optional but valuable)
+
+“Copy to clipboard” button for an entry
+
+Quick tag chips (Service / Install / Sales)
+
+Filter by tag
+
+Export day to CSV

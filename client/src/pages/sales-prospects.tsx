@@ -225,8 +225,7 @@ export default function SalesProspects() {
       if (activeFilter === "Lost") return lead.lost;
       return lead.status === activeFilter && !lead.won && !lead.lost;
     })
-    .sort((a, b) => b.searchScore - a.searchScore)
-    .map(({ lead }) => lead);
+    .sort((a, b) => b.searchScore - a.searchScore);
 
   // Get selected employee name
   const selectedEmployeeName = selectedEmployeeId === "all" 
@@ -302,7 +301,7 @@ export default function SalesProspects() {
   // Handle CSV export
   const handleExport = () => {
     const headers = ["Name", "Phone", "Email", "Address", "Estimated Value", "Status", "Client Issue", "Projected Close Date"];
-    const rows = filteredLeads.map((lead) => [
+    const rows = filteredLeads.map(({ lead }) => [
       lead.name,
       lead.phone || "",
       lead.email || "",
@@ -736,7 +735,7 @@ export default function SalesProspects() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {filteredLeads.map((lead) => (
+            {filteredLeads.map(({ lead, searchScore }) => (
               <LeadCard
                 key={lead.id}
                 lead={lead}
@@ -749,6 +748,7 @@ export default function SalesProspects() {
                 calculateDaysToClose={calculateDaysToClose}
                 formatCurrency={formatCurrency}
                 technicians={technicians}
+                isSearchMatch={searchTerm.trim() !== '' && searchScore > 0}
               />
             ))}
           </div>
@@ -1867,6 +1867,7 @@ function LeadCard({
   calculateDaysToClose,
   formatCurrency,
   technicians,
+  isSearchMatch = false,
 }: {
   lead: Lead;
   isExpanded: boolean;
@@ -1878,6 +1879,7 @@ function LeadCard({
   calculateDaysToClose: (date: Date | string | null) => string | null;
   formatCurrency: (value: string | number | null | undefined) => string;
   technicians: any[];
+  isSearchMatch?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState("details");
   const [noteContent, setNoteContent] = useState("");
@@ -1982,7 +1984,10 @@ function LeadCard({
 
   return (
     <>
-      <Card data-testid={`card-lead-${lead.id}`}>
+      <Card 
+        data-testid={`card-lead-${lead.id}`}
+        className={isSearchMatch ? "ring-2 ring-primary/30 bg-primary/5 transition-all duration-200" : ""}
+      >
       <CardHeader className="pb-3">
         {/* Row 1: Name + Status */}
         <div className="flex items-start justify-between gap-3">
