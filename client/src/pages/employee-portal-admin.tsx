@@ -90,8 +90,8 @@ export default function EmployeePortalAdmin() {
       await apiRequest("POST", "/api/employee-portal/logout");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/employee-portal"] });
-      navigate("/employee-portal/login");
+      queryClient.clear();
+      window.location.href = "/employee-portal/login";
     },
     onError: () => {
       toast({ title: "Logout failed", variant: "destructive" });
