@@ -810,6 +810,104 @@ export default function ProposalBuilder() {
 
     const customerNameToUse = selectedCustomer?.displayName || customerName || "Unknown Customer";
     
+    // Build cart items with image URLs for proposal history
+    const cartItemsForSave = cart.map(item => {
+      if (isCrawlspaceItem(item)) {
+        return {
+          type: "crawlspace" as const,
+          tierName: item.tier.name,
+          tierDescription: item.tier.description,
+          milThickness: item.tier.milThickness,
+          sqft: item.sqft,
+          bandSqft: item.pricingBreakdown.bandSqft,
+          totalPrice: item.pricingBreakdown.totalPrice,
+          quantity: item.quantity,
+          isElite: !!item.eliteData,
+          eliteFinalTotal: item.eliteData?.finalTotal,
+          eliteDiscountAmount: item.eliteData?.discountAmount,
+        };
+      } else if (isCustomBuild(item)) {
+        const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
+        return {
+          type: "custom" as const,
+          tonnage: item.tonnage,
+          quantity: item.quantity,
+          priceLow: estimate.low,
+          priceHigh: estimate.high,
+          outdoor: item.outdoorUnit ? {
+            brand: item.outdoorUnit.brand,
+            model: item.outdoorUnit.model,
+            name: item.outdoorUnit.unitName,
+            imageUrl: item.outdoorUnit.imageUrl,
+          } : null,
+          coil: item.coil ? {
+            brand: item.coil.brand,
+            model: item.coil.model,
+            name: item.coil.unitName,
+            imageUrl: item.coil.imageUrl,
+          } : null,
+          indoor: item.indoorUnit ? {
+            brand: item.indoorUnit.brand,
+            model: item.indoorUnit.model,
+            name: item.indoorUnit.unitName,
+            imageUrl: item.indoorUnit.imageUrl,
+          } : null,
+          thermostat: item.thermostat ? {
+            brand: item.thermostat.brand,
+            model: item.thermostat.model,
+            name: item.thermostat.unitName,
+            imageUrl: item.thermostat.imageUrl,
+          } : null,
+          isElite: !!item.eliteData,
+          eliteFinalTotal: item.eliteData?.finalTotal,
+          eliteDiscountAmount: item.eliteData?.discountAmount,
+        };
+      } else {
+        const basePrice = parseFloat(item.totalInvestment) || 0;
+        const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
+        return {
+          type: "package" as const,
+          unitType: item.unitType,
+          unitTypeName: UNIT_TYPE_INFO[item.unitType]?.name || item.unitType,
+          tier: item.tier,
+          tonnage: item.extractedTonnage,
+          packageLevel: item.packageLevel,
+          quantity: item.quantity,
+          totalPrice: finalPrice,
+          monthlyPayment: item.eliteData ? Math.round(item.eliteData.finalTotal / 67) : parseFloat(item.monthlyPayment) || 0,
+          outdoor: {
+            brand: item.outdoorBrand,
+            model: item.outdoorModel,
+            name: item.outdoorName,
+            imageUrl: item.outdoorImageUrl,
+          },
+          indoor: item.indoorHeatName ? {
+            name: item.indoorHeatName,
+            model: item.indoorHeatModel,
+          } : null,
+          thermostat: item.thermostatName ? {
+            name: item.thermostatName,
+            model: item.thermostatModel,
+            imageUrl: item.thermostatImageUrl,
+          } : null,
+          coil: item.coilName ? {
+            name: item.coilName,
+            model: item.coilModel,
+            imageUrl: item.coilImageUrl,
+          } : null,
+          isElite: !!item.eliteData,
+          eliteFinalTotal: item.eliteData?.finalTotal,
+          eliteDiscountAmount: item.eliteData?.discountAmount,
+        };
+      }
+    });
+
+    // Combine AI quote with cart items
+    const fullQuoteData = {
+      ...aiGeneratedQuote,
+      cartItems: cartItemsForSave,
+    };
+    
     saveProposalMutation.mutate({
       customerName: customerNameToUse,
       customerAddress: customerAddress || undefined,
@@ -818,7 +916,7 @@ export default function ProposalBuilder() {
       quoteTitle: aiGeneratedQuote.quote_title,
       packageDescription: aiGeneratedQuote.package_description || undefined,
       total: String(aiGeneratedQuote.total),
-      quoteData: JSON.stringify(aiGeneratedQuote),
+      quoteData: JSON.stringify(fullQuoteData),
     });
   };
 

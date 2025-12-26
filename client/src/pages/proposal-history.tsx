@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, FileText, Calendar, User, ChevronDown, ChevronUp, Trash2, DollarSign } from "lucide-react";
+import { ArrowLeft, FileText, Calendar, User, ChevronDown, ChevronUp, Trash2, DollarSign, Package, Crown, Wrench, Home as HomeIcon } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -170,6 +170,143 @@ export default function ProposalHistory() {
                       <div className="mt-4 pt-4 border-t space-y-4">
                         {proposal.packageDescription && (
                           <p className="text-sm text-muted-foreground">{proposal.packageDescription}</p>
+                        )}
+
+                        {/* Equipment/Cart Items with Images */}
+                        {quoteData.cartItems && quoteData.cartItems.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-1">
+                              <Package className="h-3.5 w-3.5" />
+                              EQUIPMENT SELECTED
+                            </p>
+                            <div className="space-y-3">
+                              {quoteData.cartItems.map((item: any, idx: number) => {
+                                if (item.type === "crawlspace") {
+                                  return (
+                                    <div key={idx} className="p-3 rounded-lg border bg-teal-50 dark:bg-teal-950/30 border-teal-200 dark:border-teal-800">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <HomeIcon className="h-4 w-4 text-teal-600" />
+                                        <span className="font-medium">{item.tierName} Crawlspace Encapsulation</span>
+                                        {item.isElite && (
+                                          <Badge className="bg-amber-500 text-white text-xs">
+                                            <Crown className="h-3 w-3 mr-1" />
+                                            Elite
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-muted-foreground">{item.milThickness} Mil Vapor Barrier • {item.bandSqft} sqft</p>
+                                      <div className="flex justify-between mt-2 text-sm">
+                                        <span>Qty: {item.quantity}</span>
+                                        <span className="font-bold text-teal-600">{formatPrice(item.isElite ? item.eliteFinalTotal * item.quantity : item.totalPrice * item.quantity)}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                } else if (item.type === "custom") {
+                                  return (
+                                    <div key={idx} className="p-3 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <Wrench className="h-4 w-4 text-green-600" />
+                                        <span className="font-medium">{item.tonnage} Custom Build</span>
+                                        {item.isElite && (
+                                          <Badge className="bg-amber-500 text-white text-xs">
+                                            <Crown className="h-3 w-3 mr-1" />
+                                            Elite
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="grid grid-cols-4 gap-2 my-3">
+                                        {item.outdoor?.imageUrl && (
+                                          <div className="text-center">
+                                            <img src={`/assets/${item.outdoor.imageUrl}`} alt="Outdoor" className="w-full h-16 object-contain rounded bg-white dark:bg-gray-800 p-1" />
+                                            <p className="text-[10px] text-muted-foreground mt-1">Outdoor</p>
+                                          </div>
+                                        )}
+                                        {item.coil?.imageUrl && (
+                                          <div className="text-center">
+                                            <img src={`/assets/${item.coil.imageUrl}`} alt="Coil" className="w-full h-16 object-contain rounded bg-white dark:bg-gray-800 p-1" />
+                                            <p className="text-[10px] text-muted-foreground mt-1">Coil</p>
+                                          </div>
+                                        )}
+                                        {item.indoor?.imageUrl && (
+                                          <div className="text-center">
+                                            <img src={`/assets/${item.indoor.imageUrl}`} alt="Indoor" className="w-full h-16 object-contain rounded bg-white dark:bg-gray-800 p-1" />
+                                            <p className="text-[10px] text-muted-foreground mt-1">Indoor</p>
+                                          </div>
+                                        )}
+                                        {item.thermostat?.imageUrl && (
+                                          <div className="text-center">
+                                            <img src={`/assets/${item.thermostat.imageUrl}`} alt="Thermostat" className="w-full h-16 object-contain rounded bg-white dark:bg-gray-800 p-1" />
+                                            <p className="text-[10px] text-muted-foreground mt-1">Thermostat</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground space-y-1">
+                                        {item.outdoor && <p>Outdoor: {item.outdoor.brand} {item.outdoor.name}</p>}
+                                        {item.coil && <p>Coil: {item.coil.brand} {item.coil.name}</p>}
+                                        {item.indoor && <p>Indoor: {item.indoor.brand} {item.indoor.name}</p>}
+                                        {item.thermostat && <p>Thermostat: {item.thermostat.brand} {item.thermostat.name}</p>}
+                                      </div>
+                                      <div className="flex justify-between mt-2 text-sm">
+                                        <span>Qty: {item.quantity}</span>
+                                        <span className="font-bold text-green-600">{formatPrice(item.priceLow * item.quantity)} - {formatPrice(item.priceHigh * item.quantity)}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                } else {
+                                  return (
+                                    <div key={idx} className={`p-3 rounded-lg border ${item.isElite ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800' : 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800'}`}>
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <Package className="h-4 w-4 text-blue-600" />
+                                        <span className="font-medium">{item.unitTypeName} - {item.tier} ({item.tonnage})</span>
+                                        {item.isElite && (
+                                          <Badge className="bg-amber-500 text-white text-xs">
+                                            <Crown className="h-3 w-3 mr-1" />
+                                            Elite
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="grid grid-cols-4 gap-2 my-3">
+                                        {item.outdoor?.imageUrl && (
+                                          <div className="text-center">
+                                            <img src={`/assets/${item.outdoor.imageUrl}`} alt="Outdoor" className="w-full h-16 object-contain rounded bg-white dark:bg-gray-800 p-1" />
+                                            <p className="text-[10px] text-muted-foreground mt-1">Outdoor</p>
+                                          </div>
+                                        )}
+                                        {item.coil?.imageUrl && (
+                                          <div className="text-center">
+                                            <img src={`/assets/${item.coil.imageUrl}`} alt="Coil" className="w-full h-16 object-contain rounded bg-white dark:bg-gray-800 p-1" />
+                                            <p className="text-[10px] text-muted-foreground mt-1">Coil</p>
+                                          </div>
+                                        )}
+                                        {item.indoor?.imageUrl && (
+                                          <div className="text-center">
+                                            <img src={`/assets/${item.indoor.imageUrl}`} alt="Indoor" className="w-full h-16 object-contain rounded bg-white dark:bg-gray-800 p-1" />
+                                            <p className="text-[10px] text-muted-foreground mt-1">Indoor</p>
+                                          </div>
+                                        )}
+                                        {item.thermostat?.imageUrl && (
+                                          <div className="text-center">
+                                            <img src={`/assets/${item.thermostat.imageUrl}`} alt="Thermostat" className="w-full h-16 object-contain rounded bg-white dark:bg-gray-800 p-1" />
+                                            <p className="text-[10px] text-muted-foreground mt-1">Thermostat</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground space-y-1">
+                                        {item.outdoor && <p>Outdoor: {item.outdoor.brand} {item.outdoor.name || item.outdoor.model}</p>}
+                                        {item.coil && <p>Coil: {item.coil.name || item.coil.model}</p>}
+                                        {item.indoor && <p>Indoor: {item.indoor.name || item.indoor.model}</p>}
+                                        {item.thermostat && <p>Thermostat: {item.thermostat.name || item.thermostat.model}</p>}
+                                      </div>
+                                      <div className="flex justify-between mt-2 text-sm">
+                                        <span>Qty: {item.quantity}</span>
+                                        <span className="font-bold text-blue-600">{formatPrice(item.totalPrice * item.quantity)}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              })}
+                            </div>
+                          </div>
                         )}
 
                         {quoteData.whats_included && quoteData.whats_included.length > 0 && (

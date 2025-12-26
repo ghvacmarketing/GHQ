@@ -76,6 +76,13 @@ export default function Home() {
       testId: "link-proposal-builder"
     },
     {
+      title: "Proposal History",
+      description: "View saved proposals and quotes",
+      icon: History,
+      href: "/proposal-history",
+      testId: "link-proposal-history"
+    },
+    {
       title: "Sales Prospects",
       description: "Track leads and follow-up activities",
       icon: UserCog,
