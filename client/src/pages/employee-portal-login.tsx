@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
 const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
+  username: z.string().email("Please enter a valid email address"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -39,7 +39,7 @@ export default function EmployeePortalLogin() {
       navigate("/employee-portal");
     },
     onError: () => {
-      toast({ title: "Login failed", description: "Invalid username or password", variant: "destructive" });
+      toast({ title: "Login failed", description: "Invalid email or password", variant: "destructive" });
     },
   });
 
@@ -59,13 +59,13 @@ export default function EmployeePortalLogin() {
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">Email</Label>
               <Input
                 id="username"
-                type="text"
-                placeholder="Enter your username"
+                type="email"
+                placeholder="Enter your email"
                 {...form.register("username")}
-                data-testid="input-username"
+                data-testid="input-email"
               />
               {form.formState.errors.username && (
                 <p className="text-sm text-destructive">

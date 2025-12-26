@@ -288,7 +288,7 @@ export default function EmployeePortalAdmin() {
     if (emp.profile) {
       return `${emp.profile.firstName} ${emp.profile.lastName}`;
     }
-    return emp.user.username;
+    return emp.user.email || emp.user.username;
   };
 
   return (
@@ -557,24 +557,14 @@ export default function EmployeePortalAdmin() {
             <DialogDescription>Create a new employee account and profile.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">Username *</Label>
-              <Input
-                id="username"
-                value={newEmployee.username}
-                onChange={(e) => setNewEmployee({ ...newEmployee, username: e.target.value })}
-                placeholder="Enter username"
-                data-testid="input-new-username"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="email">Email (Login) *</Label>
               <Input
                 id="email"
                 type="email"
-                value={newEmployee.email}
-                onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
-                placeholder="Enter email"
+                value={newEmployee.username}
+                onChange={(e) => setNewEmployee({ ...newEmployee, username: e.target.value, email: e.target.value })}
+                placeholder="Enter employee email"
                 data-testid="input-new-email"
               />
             </div>

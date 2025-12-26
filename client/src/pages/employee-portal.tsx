@@ -14,11 +14,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LogOut, User, DollarSign, FileText, Download, Edit, Phone, MapPin, Calendar, Briefcase, Mail } from "lucide-react";
 import type { PortalUser, EmployeeProfile, Compensation, Paystub, EmployeeDocument } from "@shared/schema";
 
-type ProfileData = {
-  user: PortalUser;
+type ProfileData = PortalUser & {
   profile: EmployeeProfile;
   compensation: Compensation | null;
-  paySchedule: string;
+  paySchedule: string | null;
 };
 
 export default function EmployeePortal() {
@@ -252,7 +251,7 @@ export default function EmployeePortal() {
                         <div>
                           <p className="text-sm text-muted-foreground">Email</p>
                           <p className="font-medium" data-testid="text-email">
-                            {profileData.user.email || "Not set"}
+                            {profileData?.email || profileData?.username || "Not set"}
                           </p>
                         </div>
                       </div>
