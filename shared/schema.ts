@@ -568,3 +568,22 @@ export type Proposal = {
   isLocked: boolean; // Whether this is a guaranteed quote or preliminary proposal
   createdAt: Date;
 };
+
+// Misc Calls table for sales team call tracking
+export const miscCalls = pgTable("misc_calls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  callerName: text("caller_name").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("NEW"), // NEW, IN_PROGRESS, RESOLVED
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMiscCallSchema = createInsertSchema(miscCalls).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMiscCall = z.infer<typeof insertMiscCallSchema>;
+export type MiscCall = typeof miscCalls.$inferSelect;

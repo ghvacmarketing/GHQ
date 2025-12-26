@@ -425,6 +425,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== Misc Calls Routes ==========
+  
+  // GET /api/misc-calls - get all misc calls
+  app.get("/api/misc-calls", async (req, res) => {
+    try {
+      const calls = await storage.getAllMiscCalls();
+      res.json(calls);
+    } catch (error) {
+      console.error("Error fetching misc calls:", error);
+      res.status(500).json({ message: "Error fetching misc calls" });
+    }
+  });
+
+  // POST /api/misc-calls - create a new misc call
+  app.post("/api/misc-calls", async (req, res) => {
+    try {
+      const { callerName, description, status } = req.body;
+      if (!callerName) {
+        return res.status(400).json({ message: "Caller name is required" });
+      }
+      const call = await storage.createMiscCall({
+        callerName,
+        description: description || "",
+        status: status || "NEW",
+      });
+      res.json(call);
+    } catch (error) {
+      console.error("Error creating misc call:", error);
+      res.status(500).json({ message: "Error creating misc call" });
+    }
+  });
+
+  // PATCH /api/misc-calls/:id - update a misc call
+  app.patch("/api/misc-calls/:id", async (req, res) => {
+    try {
+      const { callerName, description, status } = req.body;
+      const updates: any = {};
+      if (callerName !== undefined) updates.callerName = callerName;
+      if (description !== undefined) updates.description = description;
+      if (status !== undefined) updates.status = status;
+      
+      const call = await storage.updateMiscCall(req.params.id, updates);
+      if (!call) {
+        return res.status(404).json({ message: "Misc call not found" });
+      }
+      res.json(call);
+    } catch (error) {
+      console.error("Error updating misc call:", error);
+      res.status(500).json({ message: "Error updating misc call" });
+    }
+  });
+
+  // DELETE /api/misc-calls/:id - delete a misc call
+  app.delete("/api/misc-calls/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteMiscCall(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Misc call not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting misc call:", error);
+      res.status(500).json({ message: "Error deleting misc call" });
+    }
+  });
+
   // GET /setup/trello-lists - helper endpoint to list board lists with IDs
   app.get("/setup/trello-lists", async (req, res) => {
     try {
