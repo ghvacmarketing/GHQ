@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { ArrowLeft } from "lucide-react";
 
 const loginSchema = z.object({
   username: z.string().email("Please enter a valid email address"),
@@ -49,8 +50,14 @@ export default function EmployeePortalLogin() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+      <Card className="w-full max-w-md relative">
+        <CardHeader className="text-center pt-12">
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="absolute left-2 top-2" data-testid="button-back-home">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+          </Link>
           <CardTitle className="text-2xl">Employee Portal</CardTitle>
           <CardDescription>
             Sign in to access the employee portal
