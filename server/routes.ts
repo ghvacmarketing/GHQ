@@ -3128,6 +3128,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.closedAt = new Date(updateData.closedAt);
       }
       
+      // Sync won/lost boolean flags when status changes to Won or Lost
+      if (updateData.status === "Won" && !lead.won) {
+        updateData.won = true;
+        updateData.lost = false;
+        if (!updateData.closedAt && !lead.closedAt) {
+          updateData.closedAt = new Date();
+        }
+      } else if (updateData.status === "Lost" && !lead.lost) {
+        updateData.lost = true;
+        updateData.won = false;
+        if (!updateData.closedAt && !lead.closedAt) {
+          updateData.closedAt = new Date();
+        }
+      }
+      
       // Auto-set installStep to "Define Scope of Work" when a lead becomes eligible for Installation board
       const isBecomingWon = (updateData.status === "Won" || updateData.won === true) && lead.status !== "Won";
       const tagsToCheck = updateData.tags || lead.tags || [];

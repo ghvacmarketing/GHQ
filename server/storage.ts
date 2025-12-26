@@ -549,10 +549,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getWonLeads(): Promise<Lead[]> {
+    // Check both won boolean AND status field for data consistency
     const result = await db
       .select()
       .from(leads)
-      .where(eq(leads.won, true))
+      .where(or(eq(leads.won, true), eq(leads.status, "Won")))
       .orderBy(leads.closedAt);
     return result.map(lead => this.normalizeLead(lead));
   }
