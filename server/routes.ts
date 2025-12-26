@@ -20,6 +20,7 @@ import * as path from "path";
 import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAutoSync } from "./services/customer-sync";
 import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, type QuoteGenerationInput } from "./services/quote-generation";
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook } from "./services/vector-store";
+import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -75,6 +76,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Serve uploads folder for voicemail MP3 files
   app.use('/uploads', express.static('uploads'));
+
+  // Setup employee portal authentication (passport strategies, login/logout routes)
+  setupEmployeeAuth(app);
 
   // Configure multer for file uploads
   const upload = multer({
@@ -4081,6 +4085,331 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('[Customer Import] Error:', error);
       res.status(500).json({ message: "Error importing customers: " + error.message });
+    }
+  });
+
+  // ============================================
+  // EMPLOYEE PORTAL API ROUTES
+  // ============================================
+
+  // Admin: Create new employee user
+  app.post("/api/employee-portal/users", requireAdmin, async (req, res) => {
+    try {
+      const { username, email, password, role, firstName, lastName, phone, address, department, position, hireDate } = req.body;
+
+      if (!username || !password || !firstName || !lastName) {
+        return res.status(400).json({ message: "Username, password, firstName, and lastName are required" });
+      }
+
+      const existingUser = await storage.getPortalUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      if (email) {
+        const existingEmail = await storage.getPortalUserByEmail(email);
+        if (existingEmail) {
+          return res.status(400).json({ message: "Email already exists" });
+        }
+      }
+
+      const hashedPassword = await hashPassword(password);
+      const user = await storage.createPortalUser({
+        username,
+        email: email || null,
+        password: hashedPassword,
+        role: role || "employee",
+        isActive: true,
+      });
+
+      await storage.createEmployeeProfile({
+        userId: user.id,
+        firstName,
+        lastName,
+        phone: phone || null,
+        address: address || null,
+        department: department || null,
+        position: position || null,
+        hireDate: hireDate || null,
+      });
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error creating employee user:", error);
+      res.status(500).json({ message: "Failed to create employee user" });
+    }
+  });
+
+  // Admin: Get all users with profiles
+  app.get("/api/employee-portal/users", requireAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllPortalUsers();
+      const profiles = await storage.getAllEmployeeProfiles();
+
+      const usersWithProfiles = users.map(user => {
+        const { password, ...userWithoutPassword } = user;
+        const profile = profiles.find(p => p.userId === user.id);
+        return { ...userWithoutPassword, profile };
+      });
+
+      res.json(usersWithProfiles);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Admin: Update user (role, isActive)
+  app.patch("/api/employee-portal/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const { role, isActive } = req.body;
+      const updates: any = {};
+
+      if (role !== undefined) updates.role = role;
+      if (isActive !== undefined) updates.isActive = isActive;
+
+      const user = await storage.updatePortalUser(req.params.id, updates);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  // Admin: Set compensation for user
+  app.post("/api/employee-portal/users/:id/compensation", requireAdmin, async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const { payType, rate, commissionRate, paySchedule, effectiveDate } = req.body;
+
+      if (!payType || !rate || !paySchedule || !effectiveDate) {
+        return res.status(400).json({ message: "payType, rate, paySchedule, and effectiveDate are required" });
+      }
+
+      const user = await storage.getPortalUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const currentCompensation = await storage.getCurrentCompensation(userId);
+      if (currentCompensation) {
+        await storage.updateCompensation(currentCompensation.id, {
+          endDate: effectiveDate,
+        });
+      }
+
+      const newCompensation = await storage.createCompensation({
+        userId,
+        payType,
+        rate,
+        commissionRate: commissionRate || null,
+        paySchedule,
+        effectiveDate,
+        endDate: null,
+        createdBy: req.user!.id,
+      });
+
+      await storage.createCompensationAuditLog({
+        userId,
+        compensationId: newCompensation.id,
+        action: "created",
+        previousValue: currentCompensation ? JSON.stringify({
+          payType: currentCompensation.payType,
+          rate: currentCompensation.rate,
+          paySchedule: currentCompensation.paySchedule,
+        }) : null,
+        newValue: JSON.stringify({ payType, rate, paySchedule }),
+        changedBy: req.user!.id,
+      });
+
+      res.json(newCompensation);
+    } catch (error) {
+      console.error("Error setting compensation:", error);
+      res.status(500).json({ message: "Failed to set compensation" });
+    }
+  });
+
+  // Admin: Get compensation history for user
+  app.get("/api/employee-portal/users/:id/compensation", requireAdmin, async (req, res) => {
+    try {
+      const history = await storage.getCompensationHistory(req.params.id);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching compensation history:", error);
+      res.status(500).json({ message: "Failed to fetch compensation history" });
+    }
+  });
+
+  // Admin: Upload paystub for user
+  app.post("/api/employee-portal/users/:id/paystubs", requireAdmin, async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const { periodStart, periodEnd, payDate, grossPay, netPay, hoursWorked, deductions, fileUrl } = req.body;
+
+      if (!periodStart || !periodEnd || !payDate || !grossPay || !netPay) {
+        return res.status(400).json({ message: "periodStart, periodEnd, payDate, grossPay, and netPay are required" });
+      }
+
+      const user = await storage.getPortalUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const paystub = await storage.createPaystub({
+        userId,
+        periodStart,
+        periodEnd,
+        payDate,
+        grossPay,
+        netPay,
+        hoursWorked: hoursWorked || null,
+        deductions: deductions || null,
+        fileUrl: fileUrl || null,
+        uploadedBy: req.user!.id,
+      });
+
+      res.json(paystub);
+    } catch (error) {
+      console.error("Error uploading paystub:", error);
+      res.status(500).json({ message: "Failed to upload paystub" });
+    }
+  });
+
+  // Admin: Get all compensation audit logs
+  app.get("/api/employee-portal/audit-log", requireAdmin, async (req, res) => {
+    try {
+      const logs = await storage.getAllCompensationAuditLogs();
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching audit logs:", error);
+      res.status(500).json({ message: "Failed to fetch audit logs" });
+    }
+  });
+
+  // Admin: Upload company-wide or personal document
+  app.post("/api/employee-portal/documents", requireAdmin, async (req, res) => {
+    try {
+      const { userId, title, description, fileUrl, category } = req.body;
+
+      if (!title || !fileUrl || !category) {
+        return res.status(400).json({ message: "title, fileUrl, and category are required" });
+      }
+
+      const document = await storage.createEmployeeDocument({
+        userId: userId || null,
+        title,
+        description: description || null,
+        fileUrl,
+        category,
+        uploadedBy: req.user!.id,
+      });
+
+      res.json(document);
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
+  // Employee: Get own profile
+  app.get("/api/employee-portal/profile", requirePortalAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const user = await storage.getPortalUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const profile = await storage.getEmployeeProfile(userId);
+      const currentCompensation = await storage.getCurrentCompensation(userId);
+
+      const { password, ...userWithoutPassword } = user;
+      res.json({
+        ...userWithoutPassword,
+        profile,
+        compensation: currentCompensation,
+        paySchedule: currentCompensation?.paySchedule || null,
+      });
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  });
+
+  // Employee: Update own profile (limited fields)
+  app.patch("/api/employee-portal/profile", requirePortalAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { phone, address } = req.body;
+
+      const updates: any = {};
+      if (phone !== undefined) updates.phone = phone;
+      if (address !== undefined) updates.address = address;
+
+      const profile = await storage.updateEmployeeProfile(userId, updates);
+      if (!profile) {
+        return res.status(404).json({ message: "Profile not found" });
+      }
+
+      res.json(profile);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // Employee: Get own current compensation
+  app.get("/api/employee-portal/compensation", requirePortalAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const compensation = await storage.getCurrentCompensation(userId);
+      res.json(compensation || null);
+    } catch (error) {
+      console.error("Error fetching compensation:", error);
+      res.status(500).json({ message: "Failed to fetch compensation" });
+    }
+  });
+
+  // Employee: Get own compensation history
+  app.get("/api/employee-portal/compensation/history", requirePortalAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const history = await storage.getCompensationHistory(userId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching compensation history:", error);
+      res.status(500).json({ message: "Failed to fetch compensation history" });
+    }
+  });
+
+  // Employee: Get own paystubs
+  app.get("/api/employee-portal/paystubs", requirePortalAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const paystubs = await storage.getPaystubs(userId);
+      res.json(paystubs);
+    } catch (error) {
+      console.error("Error fetching paystubs:", error);
+      res.status(500).json({ message: "Failed to fetch paystubs" });
+    }
+  });
+
+  // Employee: Get own documents + company-wide docs
+  app.get("/api/employee-portal/documents", requirePortalAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const personalDocs = await storage.getEmployeeDocuments(userId);
+      const companyDocs = await storage.getEmployeeDocuments(null);
+      res.json([...companyDocs, ...personalDocs]);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      res.status(500).json({ message: "Failed to fetch documents" });
     }
   });
 
