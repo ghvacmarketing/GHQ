@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, FileText, History, BookOpen, Book, UserCog, Wrench, ClipboardList, Voicemail, Phone, Home, Settings, FolderOpen } from "lucide-react";
+import { Menu, FileText, History, BookOpen, Book, UserCog, Wrench, ClipboardList, Voicemail, Home, Settings, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,7 +21,6 @@ const navSections = [
       { label: "Installation Dept.", href: "/installation", icon: Wrench },
       { label: "Service Dept.", href: "/service-pipeline", icon: Wrench },
       { label: "Voicemails", href: "/voicemails", icon: Voicemail },
-      { label: "Misc. Calls", href: "/misc-calls", icon: Phone },
     ],
   },
   {

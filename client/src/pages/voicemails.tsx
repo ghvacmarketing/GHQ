@@ -383,7 +383,6 @@ interface CallLogEntryProps {
 }
 
 function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLogEntryProps) {
-  const initials = log.createdByName ? log.createdByName.charAt(0).toUpperCase() : "?";
   const createdAt = log.createdAt ? (typeof log.createdAt === "string" ? parseISO(log.createdAt) : log.createdAt) : new Date();
   const relativeTime = formatDistanceToNow(createdAt, { addSuffix: true });
   const exactTime = format(createdAt, "MMM d, yyyy 'at' h:mm a");
@@ -392,43 +391,43 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
     Service: "bg-blue-100 text-blue-800",
     Install: "bg-green-100 text-green-800",
     Sales: "bg-purple-100 text-purple-800",
+    Other: "bg-gray-100 text-gray-800",
   };
 
   return (
     <div
       ref={entryRef}
       className={cn(
-        "p-3 border rounded-lg bg-white transition-all duration-300",
+        "p-4 border rounded-lg bg-white shadow-sm transition-all duration-300",
         isHighlighted && "ring-2 ring-primary animate-pulse"
       )}
       data-testid={`call-log-entry-${log.id}`}
     >
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
-          {initials}
-        </div>
+      <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm">{log.clientName}</span>
+            <span className="font-semibold text-sm">{log.clientName}</span>
             {log.tag && (
               <Badge variant="secondary" className={cn("text-xs", tagColors[log.tag] || "")}>
                 {log.tag}
               </Badge>
             )}
           </div>
-          <p className="text-sm text-muted-foreground mt-1">{log.description}</p>
-          {log.phone && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-              <Phone className="h-3 w-3" />
-              <span>{log.phone}</span>
-            </div>
-          )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="text-xs text-muted-foreground mt-2 block cursor-default">{relativeTime}</span>
-            </TooltipTrigger>
-            <TooltipContent>{exactTime}</TooltipContent>
-          </Tooltip>
+          <p className="text-sm text-muted-foreground mt-2">{log.description}</p>
+          <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
+            {log.phone && (
+              <div className="flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                <span>{log.phone}</span>
+              </div>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-default">{relativeTime}</span>
+              </TooltipTrigger>
+              <TooltipContent>{exactTime}</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           <Button
@@ -608,6 +607,7 @@ function CallLogForm({ date, editingLog, onCancel, onSuccess }: CallLogFormProps
                     <SelectItem value="Service">Service</SelectItem>
                     <SelectItem value="Install">Install</SelectItem>
                     <SelectItem value="Sales">Sales</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

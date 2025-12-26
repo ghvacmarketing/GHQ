@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type MiscCall, type InsertMiscCall, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, miscCalls, savedProposals, callLogDays, callLogs } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray, desc } from "drizzle-orm";
@@ -141,13 +141,6 @@ export interface IStorage {
   upsertVoicemail(data: InsertVoicemail): Promise<Voicemail>;
   updateVoicemail(id: string, updates: Partial<Voicemail>): Promise<Voicemail | undefined>;
   updateVoicemailMp3(trelloCardId: string, mp3Filename: string): Promise<Voicemail | undefined>;
-
-  // Misc Calls operations
-  getAllMiscCalls(): Promise<MiscCall[]>;
-  getMiscCallsByStatus(status: string): Promise<MiscCall[]>;
-  createMiscCall(call: InsertMiscCall): Promise<MiscCall>;
-  updateMiscCall(id: string, updates: Partial<MiscCall>): Promise<MiscCall | undefined>;
-  deleteMiscCall(id: string): Promise<boolean>;
 
   // Saved Proposals operations
   getAllSavedProposals(): Promise<SavedProposal[]>;
@@ -1097,34 +1090,6 @@ export class DatabaseStorage implements IStorage {
       .where(eq(voicemails.trelloCardId, trelloCardId))
       .returning();
     return updated || undefined;
-  }
-
-  // Misc Calls operations
-  async getAllMiscCalls(): Promise<MiscCall[]> {
-    return await db.select().from(miscCalls).orderBy(miscCalls.createdAt);
-  }
-
-  async getMiscCallsByStatus(status: string): Promise<MiscCall[]> {
-    return await db.select().from(miscCalls).where(eq(miscCalls.status, status)).orderBy(miscCalls.createdAt);
-  }
-
-  async createMiscCall(call: InsertMiscCall): Promise<MiscCall> {
-    const [created] = await db.insert(miscCalls).values(call).returning();
-    return created;
-  }
-
-  async updateMiscCall(id: string, updates: Partial<MiscCall>): Promise<MiscCall | undefined> {
-    const [updated] = await db
-      .update(miscCalls)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(miscCalls.id, id))
-      .returning();
-    return updated || undefined;
-  }
-
-  async deleteMiscCall(id: string): Promise<boolean> {
-    const result = await db.delete(miscCalls).where(eq(miscCalls.id, id)).returning();
-    return result.length > 0;
   }
 
   // Saved Proposals operations
