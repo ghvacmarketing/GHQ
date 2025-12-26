@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, FileText, History, BookOpen, Book, UserCog, Wrench, ClipboardList, Voicemail, Home, Settings, FolderOpen } from "lucide-react";
+import { Menu, FileText, History, BookOpen, Book, UserCog, Wrench, ClipboardList, Voicemail, Home, Settings, FolderOpen, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -36,6 +36,7 @@ const navSections = [
     title: "Admin",
     items: [
       { label: "Settings", href: "/admin", icon: Settings },
+      { label: "Employee Portal", href: "/employee-portal/login", icon: Users },
     ],
   },
 ];
