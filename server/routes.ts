@@ -3271,7 +3271,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Lead not found" });
       }
 
-      const updatedLead = await storage.updateLead(req.params.id, { status });
+      // Normalize won/lost booleans based on status
+      const updateData: any = { status };
+      if (status === "Won") {
+        updateData.won = true;
+        updateData.lost = false;
+        if (!lead.closedAt) {
+          updateData.closedAt = new Date();
+        }
+      } else if (status === "Lost") {
+        updateData.lost = true;
+        updateData.won = false;
+        if (!lead.closedAt) {
+          updateData.closedAt = new Date();
+        }
+      } else {
+        // For any other status, clear won/lost flags
+        updateData.won = false;
+        updateData.lost = false;
+      }
+
+      const updatedLead = await storage.updateLead(req.params.id, updateData);
       res.json(updatedLead);
     } catch (error) {
       console.error('Error updating lead status:', error);
