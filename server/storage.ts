@@ -1,7 +1,7 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type MiscCall, type InsertMiscCall, type SavedProposal, type InsertSavedProposal, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, miscCalls, savedProposals } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type MiscCall, type InsertMiscCall, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, miscCalls, savedProposals, callLogDays, callLogs } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, or, and, ilike, sql, notInArray } from "drizzle-orm";
+import { eq, or, and, ilike, sql, notInArray, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Quote operations
@@ -155,6 +155,15 @@ export interface IStorage {
   createSavedProposal(proposal: InsertSavedProposal): Promise<SavedProposal>;
   updateSavedProposal(id: string, updates: Partial<SavedProposal>): Promise<SavedProposal | undefined>;
   deleteSavedProposal(id: string): Promise<boolean>;
+
+  // Call Log operations
+  getCallLogDays(): Promise<{ id: string; date: string; count: number }[]>;
+  getOrCreateCallLogDay(date: string): Promise<CallLogDay>;
+  getCallLogsByDay(date: string): Promise<CallLog[]>;
+  createCallLog(data: InsertCallLog): Promise<CallLog>;
+  updateCallLog(id: string, data: Partial<InsertCallLog>): Promise<CallLog | undefined>;
+  deleteCallLog(id: string): Promise<boolean>;
+  searchCallLogs(query: string): Promise<(CallLog & { date: string })[]>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -1145,6 +1154,80 @@ export class DatabaseStorage implements IStorage {
   async deleteSavedProposal(id: string): Promise<boolean> {
     const result = await db.delete(savedProposals).where(eq(savedProposals.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Call Log operations
+  async getCallLogDays(): Promise<{ id: string; date: string; count: number }[]> {
+    const days = await db.select().from(callLogDays).orderBy(desc(callLogDays.date));
+    const result = [];
+    for (const day of days) {
+      const logs = await db.select().from(callLogs).where(eq(callLogs.dayId, day.id));
+      result.push({ id: day.id, date: day.date, count: logs.length });
+    }
+    return result;
+  }
+
+  async getOrCreateCallLogDay(date: string): Promise<CallLogDay> {
+    const [existing] = await db.select().from(callLogDays).where(eq(callLogDays.date, date));
+    if (existing) return existing;
+    
+    const [created] = await db.insert(callLogDays).values({ date }).returning();
+    return created;
+  }
+
+  async getCallLogsByDay(date: string): Promise<CallLog[]> {
+    const [day] = await db.select().from(callLogDays).where(eq(callLogDays.date, date));
+    if (!day) return [];
+    
+    return await db.select().from(callLogs).where(eq(callLogs.dayId, day.id)).orderBy(desc(callLogs.createdAt));
+  }
+
+  async createCallLog(data: InsertCallLog): Promise<CallLog> {
+    const [created] = await db.insert(callLogs).values(data).returning();
+    return created;
+  }
+
+  async updateCallLog(id: string, data: Partial<InsertCallLog>): Promise<CallLog | undefined> {
+    const [updated] = await db
+      .update(callLogs)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(callLogs.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteCallLog(id: string): Promise<boolean> {
+    const result = await db.delete(callLogs).where(eq(callLogs.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async searchCallLogs(query: string): Promise<(CallLog & { date: string })[]> {
+    const searchTerm = `%${query}%`;
+    const logs = await db
+      .select({
+        id: callLogs.id,
+        dayId: callLogs.dayId,
+        clientName: callLogs.clientName,
+        description: callLogs.description,
+        phone: callLogs.phone,
+        tag: callLogs.tag,
+        createdByUserId: callLogs.createdByUserId,
+        createdByName: callLogs.createdByName,
+        createdAt: callLogs.createdAt,
+        updatedAt: callLogs.updatedAt,
+        date: callLogDays.date,
+      })
+      .from(callLogs)
+      .innerJoin(callLogDays, eq(callLogs.dayId, callLogDays.id))
+      .where(
+        or(
+          ilike(callLogs.clientName, searchTerm),
+          ilike(callLogs.description, searchTerm),
+          ilike(callLogs.phone, searchTerm)
+        )
+      )
+      .orderBy(desc(callLogs.createdAt));
+    return logs;
   }
 
   // Initialize default data if needed

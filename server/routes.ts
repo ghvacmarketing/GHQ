@@ -557,6 +557,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== Call Log Routes ==========
+
+  // GET /api/call-logs/days - Get all days with entry counts
+  app.get("/api/call-logs/days", async (req, res) => {
+    try {
+      const days = await storage.getCallLogDays();
+      res.json(days);
+    } catch (error) {
+      console.error("Error fetching call log days:", error);
+      res.status(500).json({ message: "Error fetching call log days" });
+    }
+  });
+
+  // GET /api/call-logs/search - Search call logs
+  app.get("/api/call-logs/search", async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query) {
+        return res.status(400).json({ message: "Query parameter 'q' is required" });
+      }
+      const results = await storage.searchCallLogs(query);
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching call logs:", error);
+      res.status(500).json({ message: "Error searching call logs" });
+    }
+  });
+
+  // GET /api/call-logs/days/:date - Get day info and call logs for a specific date
+  app.get("/api/call-logs/days/:date", async (req, res) => {
+    try {
+      const { date } = req.params;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
+      }
+      const logs = await storage.getCallLogsByDay(date);
+      res.json({ date, logs });
+    } catch (error) {
+      console.error("Error fetching call logs for day:", error);
+      res.status(500).json({ message: "Error fetching call logs for day" });
+    }
+  });
+
+  // POST /api/call-logs - Create a new call log entry
+  app.post("/api/call-logs", async (req, res) => {
+    try {
+      const { clientName, description, phone, tag, createdByName, date } = req.body;
+      
+      if (!clientName || !description) {
+        return res.status(400).json({ message: "clientName and description are required" });
+      }
+      
+      const logDate = date || new Date().toISOString().split('T')[0];
+      const day = await storage.getOrCreateCallLogDay(logDate);
+      
+      const callLog = await storage.createCallLog({
+        dayId: day.id,
+        clientName,
+        description,
+        phone: phone || null,
+        tag: tag || null,
+        createdByName: createdByName || null,
+        createdByUserId: null,
+      });
+      
+      res.json(callLog);
+    } catch (error) {
+      console.error("Error creating call log:", error);
+      res.status(500).json({ message: "Error creating call log" });
+    }
+  });
+
+  // PUT /api/call-logs/:id - Update a call log entry
+  app.put("/api/call-logs/:id", async (req, res) => {
+    try {
+      const { clientName, description, phone, tag, createdByName } = req.body;
+      const updates: any = {};
+      
+      if (clientName !== undefined) updates.clientName = clientName;
+      if (description !== undefined) updates.description = description;
+      if (phone !== undefined) updates.phone = phone;
+      if (tag !== undefined) updates.tag = tag;
+      if (createdByName !== undefined) updates.createdByName = createdByName;
+      
+      const callLog = await storage.updateCallLog(req.params.id, updates);
+      if (!callLog) {
+        return res.status(404).json({ message: "Call log not found" });
+      }
+      res.json(callLog);
+    } catch (error) {
+      console.error("Error updating call log:", error);
+      res.status(500).json({ message: "Error updating call log" });
+    }
+  });
+
+  // DELETE /api/call-logs/:id - Delete a call log entry
+  app.delete("/api/call-logs/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteCallLog(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Call log not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting call log:", error);
+      res.status(500).json({ message: "Error deleting call log" });
+    }
+  });
+
   // GET /setup/trello-lists - helper endpoint to list board lists with IDs
   app.get("/setup/trello-lists", async (req, res) => {
     try {
