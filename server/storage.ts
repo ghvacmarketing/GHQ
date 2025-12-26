@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray, desc } from "drizzle-orm";
@@ -157,6 +157,43 @@ export interface IStorage {
   updateCallLog(id: string, data: Partial<InsertCallLog>): Promise<CallLog | undefined>;
   deleteCallLog(id: string): Promise<boolean>;
   searchCallLogs(query: string): Promise<(CallLog & { date: string })[]>;
+
+  // Portal Users operations
+  getPortalUser(id: string): Promise<PortalUser | undefined>;
+  getPortalUserByUsername(username: string): Promise<PortalUser | undefined>;
+  getPortalUserByEmail(email: string): Promise<PortalUser | undefined>;
+  getAllPortalUsers(): Promise<PortalUser[]>;
+  createPortalUser(data: InsertPortalUser): Promise<PortalUser>;
+  updatePortalUser(id: string, data: Partial<InsertPortalUser>): Promise<PortalUser | undefined>;
+  updatePortalUserLastLogin(id: string): Promise<void>;
+
+  // Employee Profiles operations
+  getEmployeeProfile(userId: string): Promise<EmployeeProfile | undefined>;
+  getAllEmployeeProfiles(): Promise<EmployeeProfile[]>;
+  createEmployeeProfile(data: InsertEmployeeProfile): Promise<EmployeeProfile>;
+  updateEmployeeProfile(userId: string, data: Partial<InsertEmployeeProfile>): Promise<EmployeeProfile | undefined>;
+
+  // Compensations operations
+  getCurrentCompensation(userId: string): Promise<Compensation | undefined>;
+  getCompensationHistory(userId: string): Promise<Compensation[]>;
+  createCompensation(data: InsertCompensation): Promise<Compensation>;
+  updateCompensation(id: string, data: Partial<InsertCompensation>): Promise<Compensation | undefined>;
+
+  // Paystubs operations
+  getPaystubs(userId: string): Promise<Paystub[]>;
+  getAllPaystubs(): Promise<Paystub[]>;
+  createPaystub(data: InsertPaystub): Promise<Paystub>;
+  deletePaystub(id: string): Promise<boolean>;
+
+  // Compensation Audit Log operations
+  getCompensationAuditLog(userId: string): Promise<CompensationAuditLog[]>;
+  getAllCompensationAuditLogs(): Promise<CompensationAuditLog[]>;
+  createCompensationAuditLog(data: InsertCompensationAuditLog): Promise<CompensationAuditLog>;
+
+  // Employee Documents operations
+  getEmployeeDocuments(userId: string | null): Promise<EmployeeDocument[]>;
+  createEmployeeDocument(data: InsertEmployeeDocument): Promise<EmployeeDocument>;
+  deleteEmployeeDocument(id: string): Promise<boolean>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -1193,6 +1230,173 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(desc(callLogs.createdAt));
     return logs;
+  }
+
+  // Portal Users operations
+  async getPortalUser(id: string): Promise<PortalUser | undefined> {
+    const [user] = await db.select().from(portalUsers).where(eq(portalUsers.id, id));
+    return user || undefined;
+  }
+
+  async getPortalUserByUsername(username: string): Promise<PortalUser | undefined> {
+    const [user] = await db.select().from(portalUsers).where(eq(portalUsers.username, username));
+    return user || undefined;
+  }
+
+  async getPortalUserByEmail(email: string): Promise<PortalUser | undefined> {
+    const [user] = await db.select().from(portalUsers).where(eq(portalUsers.email, email));
+    return user || undefined;
+  }
+
+  async getAllPortalUsers(): Promise<PortalUser[]> {
+    return await db.select().from(portalUsers).orderBy(desc(portalUsers.createdAt));
+  }
+
+  async createPortalUser(data: InsertPortalUser): Promise<PortalUser> {
+    const [user] = await db.insert(portalUsers).values(data).returning();
+    return user;
+  }
+
+  async updatePortalUser(id: string, data: Partial<InsertPortalUser>): Promise<PortalUser | undefined> {
+    const [user] = await db
+      .update(portalUsers)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(portalUsers.id, id))
+      .returning();
+    return user || undefined;
+  }
+
+  async updatePortalUserLastLogin(id: string): Promise<void> {
+    await db
+      .update(portalUsers)
+      .set({ lastLogin: new Date(), updatedAt: new Date() })
+      .where(eq(portalUsers.id, id));
+  }
+
+  // Employee Profiles operations
+  async getEmployeeProfile(userId: string): Promise<EmployeeProfile | undefined> {
+    const [profile] = await db.select().from(employeeProfiles).where(eq(employeeProfiles.userId, userId));
+    return profile || undefined;
+  }
+
+  async getAllEmployeeProfiles(): Promise<EmployeeProfile[]> {
+    return await db.select().from(employeeProfiles).orderBy(desc(employeeProfiles.createdAt));
+  }
+
+  async createEmployeeProfile(data: InsertEmployeeProfile): Promise<EmployeeProfile> {
+    const [profile] = await db.insert(employeeProfiles).values(data).returning();
+    return profile;
+  }
+
+  async updateEmployeeProfile(userId: string, data: Partial<InsertEmployeeProfile>): Promise<EmployeeProfile | undefined> {
+    const [profile] = await db
+      .update(employeeProfiles)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(employeeProfiles.userId, userId))
+      .returning();
+    return profile || undefined;
+  }
+
+  // Compensations operations
+  async getCurrentCompensation(userId: string): Promise<Compensation | undefined> {
+    const today = new Date().toISOString().split('T')[0];
+    const allComps = await db
+      .select()
+      .from(compensations)
+      .where(eq(compensations.userId, userId))
+      .orderBy(desc(compensations.effectiveDate));
+    
+    const current = allComps.find(c => !c.endDate || c.endDate >= today);
+    return current || undefined;
+  }
+
+  async getCompensationHistory(userId: string): Promise<Compensation[]> {
+    return await db
+      .select()
+      .from(compensations)
+      .where(eq(compensations.userId, userId))
+      .orderBy(desc(compensations.effectiveDate));
+  }
+
+  async createCompensation(data: InsertCompensation): Promise<Compensation> {
+    const [comp] = await db.insert(compensations).values(data).returning();
+    return comp;
+  }
+
+  async updateCompensation(id: string, data: Partial<InsertCompensation>): Promise<Compensation | undefined> {
+    const [comp] = await db
+      .update(compensations)
+      .set(data)
+      .where(eq(compensations.id, id))
+      .returning();
+    return comp || undefined;
+  }
+
+  // Paystubs operations
+  async getPaystubs(userId: string): Promise<Paystub[]> {
+    return await db
+      .select()
+      .from(paystubs)
+      .where(eq(paystubs.userId, userId))
+      .orderBy(desc(paystubs.payDate));
+  }
+
+  async getAllPaystubs(): Promise<Paystub[]> {
+    return await db.select().from(paystubs).orderBy(desc(paystubs.payDate));
+  }
+
+  async createPaystub(data: InsertPaystub): Promise<Paystub> {
+    const [paystub] = await db.insert(paystubs).values(data).returning();
+    return paystub;
+  }
+
+  async deletePaystub(id: string): Promise<boolean> {
+    const result = await db.delete(paystubs).where(eq(paystubs.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Compensation Audit Log operations
+  async getCompensationAuditLog(userId: string): Promise<CompensationAuditLog[]> {
+    return await db
+      .select()
+      .from(compensationAuditLog)
+      .where(eq(compensationAuditLog.userId, userId))
+      .orderBy(desc(compensationAuditLog.changedAt));
+  }
+
+  async getAllCompensationAuditLogs(): Promise<CompensationAuditLog[]> {
+    return await db.select().from(compensationAuditLog).orderBy(desc(compensationAuditLog.changedAt));
+  }
+
+  async createCompensationAuditLog(data: InsertCompensationAuditLog): Promise<CompensationAuditLog> {
+    const [log] = await db.insert(compensationAuditLog).values(data).returning();
+    return log;
+  }
+
+  // Employee Documents operations
+  async getEmployeeDocuments(userId: string | null): Promise<EmployeeDocument[]> {
+    if (userId === null) {
+      return await db
+        .select()
+        .from(employeeDocuments)
+        .where(sql`${employeeDocuments.userId} IS NULL`)
+        .orderBy(desc(employeeDocuments.createdAt));
+    }
+    return await db
+      .select()
+      .from(employeeDocuments)
+      .where(eq(employeeDocuments.userId, userId))
+      .orderBy(desc(employeeDocuments.createdAt));
+  }
+
+  async createEmployeeDocument(data: InsertEmployeeDocument): Promise<EmployeeDocument> {
+    const [doc] = await db.insert(employeeDocuments).values(data).returning();
+    return doc;
+  }
+
+  async deleteEmployeeDocument(id: string): Promise<boolean> {
+    const result = await db.delete(employeeDocuments).where(eq(employeeDocuments.id, id)).returning();
+    return result.length > 0;
   }
 
   // Initialize default data if needed
