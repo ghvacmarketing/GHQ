@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download, Save } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download, Save, X } from "lucide-react";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType } from "docx";
 import { saveAs } from "file-saver";
 import { jsPDF } from "jspdf";
@@ -181,6 +181,7 @@ type EliteBundle = {
   priceByTonnage?: Record<string, number>; // For tonnage-based pricing
   fixedPrice?: number; // For flat pricing
   benefits: string[];
+  notCovered?: string[]; // Items not covered by warranty
 };
 
 type EliteAirflowOption = {
@@ -351,16 +352,32 @@ const CRAWLSPACE_ELITE_BUNDLES: EliteBundle[] = [
   {
     id: "crawl-10yr-maintenance-inspection",
     name: "10-Year Maintenance & Inspection",
-    description: "Annual crawlspace inspection and maintenance for 10 years",
+    description: "1 visit per year for 10 years",
     fixedPrice: 2290,
-    benefits: ["1 visit per year", "Moisture monitoring", "Barrier inspection", "Preventive maintenance", "Detailed reports"]
+    benefits: [
+      "Full crawlspace visual inspection (liner, seams, walls, pillars)",
+      "Check dehumidifier operation + clean/replace filter",
+      "Measure humidity/temperature and log readings",
+      "Inspect sump/drainage + discharge line (if present)",
+      "Check for standing water, leaks, or new moisture intrusion",
+      "Minor reseal/tape touch-ups (as needed)"
+    ]
   },
   {
     id: "crawl-dehumidifier-warranty",
-    name: "10-Year Dehumidifier Warranty (Parts + Labor)",
-    description: "Complete parts and labor coverage for dehumidifier",
+    name: "10-Year Dehumidifier Warranty",
+    description: "Parts + Labor coverage for dehumidifier",
     fixedPrice: 800,
-    benefits: ["Full parts coverage", "Labor included", "No deductibles", "Transferable warranty"]
+    benefits: [
+      "Parts coverage follows manufacturer terms",
+      "Labor coverage included for 10 years",
+      "Drain line clogs/maintenance issues covered on yearly plan"
+    ],
+    notCovered: [
+      "Flooding, plumbing leaks left unresolved",
+      "Pest damage, homeowner/third-party damage",
+      "Structural movement beyond normal settling"
+    ]
   }
 ];
 
@@ -413,22 +430,18 @@ function calculateHvacElitePricing(
 }
 
 // Calculate full Elite package pricing for Crawlspace
-// Formula: Crawlspace Elite = P + $4,290 where:
-// - 10-Year Maintenance: $2,290
-// - 10-Year Inspection: $1,000  
-// - Total Replacement Warranty: P + $1,000 (covers full project value + $1,000)
+// Formula: Crawlspace Elite = P + $3,090 where:
+// - 10-Year Maintenance & Inspection: $2,290
+// - 10-Year Dehumidifier Warranty: $800
 function calculateCrawlspaceElitePricing(basePrice: number): ElitePackageData {
   const coreBundlePrices: Record<string, number> = {};
   
-  // Fixed bundles
-  coreBundlePrices["crawl-10yr-maintenance"] = 2290;
-  coreBundlePrices["crawl-10yr-inspection"] = 1000;
-  // Total Replacement Warranty = basePrice + $1,000
-  coreBundlePrices["crawl-replacement-warranty"] = basePrice + 1000;
+  // Fixed bundles matching CRAWLSPACE_ELITE_BUNDLES
+  coreBundlePrices["crawl-10yr-maintenance-inspection"] = 2290;
+  coreBundlePrices["crawl-dehumidifier-warranty"] = 800;
   
-  const bundleTotal = coreBundlePrices["crawl-10yr-maintenance"] + 
-                      coreBundlePrices["crawl-10yr-inspection"] + 
-                      coreBundlePrices["crawl-replacement-warranty"];
+  const bundleTotal = coreBundlePrices["crawl-10yr-maintenance-inspection"] + 
+                      coreBundlePrices["crawl-dehumidifier-warranty"];
 
   const originalTotal = basePrice + bundleTotal;
   const discountAmount = Math.round(originalTotal * (ELITE_DISCOUNT_PERCENT / 100));
@@ -4079,19 +4092,39 @@ export default function ProposalBuilder() {
                     {(() => {
                       const elitePricing = calculateCrawlspaceElitePricing(basePrice);
                       return (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                           {CRAWLSPACE_ELITE_BUNDLES.map(bundle => (
-                            <div key={bundle.name} className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700">
-                              <p className="font-medium text-sm">{bundle.name}</p>
-                              <p className="text-amber-600 dark:text-amber-400 font-semibold">{formatPrice(elitePricing.coreBundlePrices[bundle.id] || 0)}</p>
-                              <ul className="mt-2 text-xs text-muted-foreground space-y-1">
-                                {bundle.benefits.slice(0, 2).map((benefit, i) => (
-                                  <li key={i} className="flex items-start gap-1">
-                                    <Check className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
+                            <div key={bundle.name} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700">
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <p className="font-semibold text-base">{bundle.name}</p>
+                                  <p className="text-xs text-muted-foreground">{bundle.description}</p>
+                                </div>
+                                <Badge className="bg-amber-500 text-white shrink-0">
+                                  {formatPrice(elitePricing.coreBundlePrices[bundle.id] || 0)}
+                                </Badge>
+                              </div>
+                              <ul className="mt-3 text-xs space-y-1.5">
+                                {bundle.benefits.map((benefit, i) => (
+                                  <li key={i} className="flex items-start gap-2">
+                                    <Check className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" />
                                     <span>{benefit}</span>
                                   </li>
                                 ))}
                               </ul>
+                              {bundle.notCovered && bundle.notCovered.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-700">
+                                  <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-1.5">Not Covered:</p>
+                                  <ul className="text-xs text-muted-foreground space-y-1">
+                                    {bundle.notCovered.map((item, i) => (
+                                      <li key={i} className="flex items-start gap-2">
+                                        <X className="h-3.5 w-3.5 text-red-400 mt-0.5 flex-shrink-0" />
+                                        <span>{item}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
