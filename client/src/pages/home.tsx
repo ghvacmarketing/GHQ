@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { FileText, History, Settings, BookOpen, Book, UserCog, Wrench, ClipboardList, Voicemail, Phone } from "lucide-react";
+import { FileText, History, Settings, BookOpen, Book, UserCog, Wrench, ClipboardList, Voicemail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -100,18 +100,11 @@ export default function Home() {
       testId: "link-service"
     },
     {
-      title: "Voicemails",
-      description: "Manage customer voicemails",
+      title: "Voicemails & Call Logs",
+      description: "Manage voicemails and daily call logs",
       icon: Voicemail,
       href: "/voicemails",
       testId: "link-voicemails"
-    },
-    {
-      title: "Misc. Calls",
-      description: "Track sales miscellaneous calls",
-      icon: Phone,
-      href: "/misc-calls",
-      testId: "link-misc-calls"
     },
   ];
 
