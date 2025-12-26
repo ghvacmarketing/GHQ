@@ -612,3 +612,39 @@ export const insertSavedProposalSchema = createInsertSchema(savedProposals).omit
 
 export type InsertSavedProposal = z.infer<typeof insertSavedProposalSchema>;
 export type SavedProposal = typeof savedProposals.$inferSelect;
+
+// Daily Call Log tables
+export const callLogDays = pgTable("call_log_days", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull().unique(), // YYYY-MM-DD format
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const callLogs = pgTable("call_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dayId: varchar("day_id").notNull().references(() => callLogDays.id, { onDelete: "cascade" }),
+  clientName: text("client_name").notNull(),
+  description: text("description").notNull(),
+  phone: text("phone"),
+  tag: text("tag"), // service, install, sales, etc.
+  createdByUserId: text("created_by_user_id"),
+  createdByName: text("created_by_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertCallLogDaySchema = createInsertSchema(callLogDays).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCallLogSchema = createInsertSchema(callLogs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCallLogDay = z.infer<typeof insertCallLogDaySchema>;
+export type CallLogDay = typeof callLogDays.$inferSelect;
+export type InsertCallLog = z.infer<typeof insertCallLogSchema>;
+export type CallLog = typeof callLogs.$inferSelect;
