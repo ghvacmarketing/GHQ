@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, getQueryFn } from "@/lib/queryClient";
+import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Building2, Lock, Mail, Loader2 } from "lucide-react";
 import type { PortalUser } from "@shared/schema";
 
@@ -50,7 +50,10 @@ export default function EmployeePortalLogin() {
       return res.json();
     },
     onSuccess: () => {
-      navigate("/employee-portal");
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-portal/me"] });
+      setTimeout(() => {
+        window.location.href = "/employee-portal";
+      }, 100);
     },
     onError: () => {
       toast({ title: "Login failed", description: "Invalid email or password", variant: "destructive" });
