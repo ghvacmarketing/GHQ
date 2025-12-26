@@ -4265,7 +4265,11 @@ export default function ProposalBuilder() {
                     )}
                   </div>
                 </PopoverTrigger>
-                <PopoverContent className="w-[calc(100vw-4rem)] sm:w-[500px] p-0" align="start">
+                <PopoverContent 
+                  className="w-[calc(100vw-4rem)] sm:w-[500px] p-0" 
+                  align="start"
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                >
                   <div className="p-2 border-b">
                     <div className="flex items-center gap-2">
                       <Checkbox
