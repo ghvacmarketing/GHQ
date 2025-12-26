@@ -379,7 +379,7 @@ export default function EmployeePortalAdmin() {
               </div>
             ) : employees && employees.length > 0 ? (
               <div className="space-y-4">
-                {employees.map((emp) => (
+                {employees.filter((emp) => emp?.user?.id).map((emp) => (
                   <Card 
                     key={emp.user.id} 
                     className="border-0 shadow-md rounded-xl overflow-hidden hover:shadow-lg transition-all"
