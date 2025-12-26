@@ -90,11 +90,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === 'production',
+      secure: true,
       httpOnly: true,
       maxAge: 8 * 60 * 60 * 1000, // 8 hours
-      sameSite: 'lax',
+      sameSite: 'none' as const,
     },
+    rolling: true,
   }));
 
   // Initialize passport for authentication
