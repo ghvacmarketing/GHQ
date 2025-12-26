@@ -162,17 +162,15 @@ export default function Home() {
             <span className="text-sm sm:text-base font-semibold">Home</span>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-            {isLoggedIntoPortal && (
-              <Link href="/employee-portal">
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  data-testid="button-employee-portal"
-                >
-                  <Users className="h-4 w-4" />
-                </Button>
-              </Link>
-            )}
+            <Link href={isLoggedIntoPortal ? "/employee-portal" : "/employee-portal/login"}>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                data-testid="button-employee-portal"
+              >
+                <Users className="h-4 w-4" />
+              </Button>
+            </Link>
             <Button 
               variant="ghost" 
               size="icon"
