@@ -13,8 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { LogOut, ArrowLeft, Users, FileText, Plus, Edit, DollarSign, Receipt, UserX, ChevronDown, ChevronUp } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { LogOut, ArrowLeft, Users, FileText, Plus, Edit, DollarSign, Receipt, UserX, ChevronDown, ChevronUp, Home, Shield, Clock, User } from "lucide-react";
 import type { PortalUser, EmployeeProfile, Compensation, CompensationAuditLog } from "@shared/schema";
 
 type EmployeeWithProfile = {
@@ -214,10 +214,10 @@ export default function EmployeePortalAdmin() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background p-4">
-        <div className="max-w-6xl mx-auto space-y-4">
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-64 w-full" />
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+        <div className="max-w-6xl mx-auto p-4 space-y-6">
+          <Skeleton className="h-20 w-full rounded-2xl" />
+          <Skeleton className="h-64 w-full rounded-2xl" />
         </div>
       </div>
     );
@@ -291,18 +291,35 @@ export default function EmployeePortalAdmin() {
     return emp.user.email || emp.user.username;
   };
 
+  const getInitials = (emp: EmployeeWithProfile) => {
+    if (emp.profile) {
+      return `${emp.profile.firstName?.[0] || ""}${emp.profile.lastName?.[0] || ""}`.toUpperCase();
+    }
+    return (emp.user.email?.[0] || "U").toUpperCase();
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      <header className="bg-white border-b shadow-sm sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="h-9 w-9" data-testid="button-home">
+                <Home className="h-4 w-4" />
+              </Button>
+            </Link>
             <Link href="/employee-portal">
               <Button variant="ghost" size="sm" data-testid="link-back-portal">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Portal
+                Portal
               </Button>
             </Link>
-            <h1 className="text-xl font-semibold" data-testid="text-admin-title">Employee Portal Admin</h1>
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+                <Shield className="h-4 w-4 text-white" />
+              </div>
+              <h1 className="text-lg font-semibold hidden sm:block" data-testid="text-admin-title">Admin Dashboard</h1>
+            </div>
           </div>
           <Button
             variant="outline"
@@ -312,28 +329,43 @@ export default function EmployeePortalAdmin() {
             data-testid="button-logout"
           >
             <LogOut className="h-4 w-4 mr-2" />
-            {logoutMutation.isPending ? "Logging out..." : "Logout"}
+            {logoutMutation.isPending ? "..." : "Logout"}
           </Button>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6">
         <Tabs defaultValue="employees" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md" data-testid="tabs-admin">
-            <TabsTrigger value="employees" data-testid="tab-employees">
+          <TabsList className="inline-flex h-11 items-center justify-center rounded-full bg-slate-100 p-1 text-slate-500 mb-6" data-testid="tabs-admin">
+            <TabsTrigger 
+              value="employees" 
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              data-testid="tab-employees"
+            >
               <Users className="h-4 w-4 mr-2" />
               Employees
             </TabsTrigger>
-            <TabsTrigger value="audit-log" data-testid="tab-audit-log">
-              <FileText className="h-4 w-4 mr-2" />
+            <TabsTrigger 
+              value="audit-log" 
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              data-testid="tab-audit-log"
+            >
+              <Clock className="h-4 w-4 mr-2" />
               Audit Log
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="employees" className="mt-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-medium">Employee Management</h2>
-              <Button onClick={() => setAddEmployeeOpen(true)} data-testid="button-add-employee">
+          <TabsContent value="employees" className="mt-0">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-xl font-semibold">Employee Management</h2>
+                <p className="text-sm text-muted-foreground mt-1">Manage team members and their compensation</p>
+              </div>
+              <Button 
+                onClick={() => setAddEmployeeOpen(true)} 
+                className="rounded-full shadow-lg hover:shadow-xl transition-all"
+                data-testid="button-add-employee"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Employee
               </Button>
@@ -341,56 +373,71 @@ export default function EmployeePortalAdmin() {
 
             {employeesLoading ? (
               <div className="space-y-4">
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-24 w-full rounded-xl" />
+                <Skeleton className="h-24 w-full rounded-xl" />
+                <Skeleton className="h-24 w-full rounded-xl" />
               </div>
             ) : employees && employees.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {employees.map((emp) => (
-                  <Card key={emp.user.id} data-testid={`card-employee-${emp.user.id}`}>
-                    <CardContent className="pt-4">
+                  <Card 
+                    key={emp.user.id} 
+                    className="border-0 shadow-md rounded-xl overflow-hidden hover:shadow-lg transition-all"
+                    data-testid={`card-employee-${emp.user.id}`}
+                  >
+                    <CardContent className="p-0">
                       <div
-                        className="flex items-center justify-between cursor-pointer"
+                        className="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50/50 transition-colors"
                         onClick={() => setExpandedEmployeeId(expandedEmployeeId === emp.user.id ? null : emp.user.id)}
                         data-testid={`row-employee-${emp.user.id}`}
                       >
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-4">
-                            <div>
-                              <p className="text-sm text-muted-foreground">Name</p>
-                              <p className="font-medium" data-testid={`text-name-${emp.user.id}`}>
-                                {getEmployeeName(emp)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">Role</p>
-                              <Badge variant="outline" data-testid={`badge-role-${emp.user.id}`}>
-                                {emp.user.role}
-                              </Badge>
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">Department</p>
-                              <p className="font-medium" data-testid={`text-department-${emp.user.id}`}>
-                                {emp.profile?.department || "N/A"}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">Position</p>
-                              <p className="font-medium" data-testid={`text-position-${emp.user.id}`}>
-                                {emp.profile?.position || "N/A"}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">Status</p>
-                              <Badge
-                                variant={emp.user.isActive ? "default" : "secondary"}
-                                data-testid={`badge-status-${emp.user.id}`}
-                              >
-                                {emp.user.isActive ? "Active" : "Inactive"}
-                              </Badge>
-                            </div>
+                        <Avatar className="h-12 w-12 border-2 border-white shadow">
+                          <AvatarFallback className={`text-white font-semibold ${emp.user.isActive ? 'bg-gradient-to-br from-primary to-primary/80' : 'bg-slate-400'}`}>
+                            {getInitials(emp)}
+                          </AvatarFallback>
+                        </Avatar>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold" data-testid={`text-name-${emp.user.id}`}>
+                              {getEmployeeName(emp)}
+                            </p>
+                            <Badge 
+                              variant={emp.user.role === "admin" ? "default" : "secondary"} 
+                              className="text-xs"
+                              data-testid={`badge-role-${emp.user.id}`}
+                            >
+                              {emp.user.role}
+                            </Badge>
+                            <Badge
+                              variant={emp.user.isActive ? "outline" : "secondary"}
+                              className={`text-xs ${emp.user.isActive ? 'border-emerald-500 text-emerald-600' : ''}`}
+                              data-testid={`badge-status-${emp.user.id}`}
+                            >
+                              {emp.user.isActive ? "Active" : "Inactive"}
+                            </Badge>
                           </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                            <span>{emp.profile?.position || "No position"}</span>
+                            {emp.profile?.department && (
+                              <>
+                                <span className="text-slate-300">•</span>
+                                <span>{emp.profile.department}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="hidden md:flex items-center gap-6 text-sm">
+                          {emp.compensation && (
+                            <div className="text-right">
+                              <p className="text-muted-foreground text-xs">Rate</p>
+                              <p className="font-semibold text-emerald-600">{formatCurrency(emp.compensation.rate)}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center">
                           {expandedEmployeeId === emp.user.id ? (
                             <ChevronUp className="h-5 w-5 text-muted-foreground" />
                           ) : (
@@ -400,56 +447,60 @@ export default function EmployeePortalAdmin() {
                       </div>
 
                       {expandedEmployeeId === emp.user.id && (
-                        <div className="mt-4 pt-4 border-t space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <p className="text-sm text-muted-foreground">Email</p>
-                              <p className="font-medium">{emp.user.email || "N/A"}</p>
+                        <div className="px-4 pb-4 pt-0 border-t bg-slate-50/30">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4">
+                            <div className="p-3 rounded-lg bg-white border">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Email</p>
+                              <p className="font-medium text-sm truncate">{emp.user.email || "N/A"}</p>
                             </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">Phone</p>
-                              <p className="font-medium">{emp.profile?.phone || "N/A"}</p>
+                            <div className="p-3 rounded-lg bg-white border">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Phone</p>
+                              <p className="font-medium text-sm">{emp.profile?.phone || "N/A"}</p>
                             </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">Hire Date</p>
-                              <p className="font-medium">{formatDate(emp.profile?.hireDate)}</p>
+                            <div className="p-3 rounded-lg bg-white border">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Hire Date</p>
+                              <p className="font-medium text-sm">{formatDate(emp.profile?.hireDate)}</p>
+                            </div>
+                            <div className="p-3 rounded-lg bg-white border">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Pay Schedule</p>
+                              <p className="font-medium text-sm capitalize">{emp.compensation?.paySchedule || "N/A"}</p>
                             </div>
                           </div>
 
                           {emp.compensation && (
-                            <Card className="bg-muted/50">
-                              <CardHeader className="py-3">
-                                <CardTitle className="text-sm">Current Compensation</CardTitle>
-                              </CardHeader>
-                              <CardContent className="pb-3">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Pay Type</p>
-                                    <p className="font-medium">{emp.compensation.payType}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Rate</p>
-                                    <p className="font-medium">{formatCurrency(emp.compensation.rate)}</p>
-                                  </div>
-                                  {emp.compensation.commissionRate && (
-                                    <div>
-                                      <p className="text-sm text-muted-foreground">Commission</p>
-                                      <p className="font-medium">{emp.compensation.commissionRate}%</p>
-                                    </div>
-                                  )}
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Pay Schedule</p>
-                                    <p className="font-medium capitalize">{emp.compensation.paySchedule}</p>
-                                  </div>
+                            <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-white border border-emerald-100 mb-4">
+                              <h4 className="text-sm font-semibold text-emerald-700 mb-3 flex items-center gap-2">
+                                <DollarSign className="h-4 w-4" />
+                                Current Compensation
+                              </h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Pay Type</p>
+                                  <Badge variant="secondary" className="mt-1">{emp.compensation.payType}</Badge>
                                 </div>
-                              </CardContent>
-                            </Card>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Rate</p>
+                                  <p className="font-bold text-lg text-emerald-600">{formatCurrency(emp.compensation.rate)}</p>
+                                </div>
+                                {emp.compensation.commissionRate && (
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Commission</p>
+                                    <p className="font-semibold">{emp.compensation.commissionRate}%</p>
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Schedule</p>
+                                  <p className="font-medium capitalize">{emp.compensation.paySchedule}</p>
+                                </div>
+                              </div>
+                            </div>
                           )}
 
                           <div className="flex flex-wrap gap-2">
                             <Button
                               variant="outline"
                               size="sm"
+                              className="rounded-full"
                               onClick={(e) => { e.stopPropagation(); handleOpenCompensation(emp); }}
                               data-testid={`button-set-compensation-${emp.user.id}`}
                             >
@@ -459,6 +510,7 @@ export default function EmployeePortalAdmin() {
                             <Button
                               variant="outline"
                               size="sm"
+                              className="rounded-full"
                               onClick={(e) => { e.stopPropagation(); handleOpenPaystub(emp); }}
                               data-testid={`button-add-paystub-${emp.user.id}`}
                             >
@@ -469,8 +521,8 @@ export default function EmployeePortalAdmin() {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                className="rounded-full text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5"
                                 onClick={(e) => { e.stopPropagation(); handleOpenDeactivate(emp); }}
-                                className="text-destructive hover:text-destructive"
                                 data-testid={`button-deactivate-${emp.user.id}`}
                               >
                                 <UserX className="h-4 w-4 mr-2" />
@@ -485,63 +537,85 @@ export default function EmployeePortalAdmin() {
                 ))}
               </div>
             ) : (
-              <Card data-testid="card-no-employees">
-                <CardContent className="py-12 text-center">
-                  <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No employees found. Add your first employee.</p>
+              <Card className="border-0 shadow-md rounded-xl" data-testid="card-no-employees">
+                <CardContent className="py-16 text-center">
+                  <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                    <Users className="h-8 w-8 text-slate-400" />
+                  </div>
+                  <p className="text-muted-foreground mb-4">No employees found</p>
+                  <Button onClick={() => setAddEmployeeOpen(true)} className="rounded-full">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Your First Employee
+                  </Button>
                 </CardContent>
               </Card>
             )}
           </TabsContent>
 
-          <TabsContent value="audit-log" className="mt-6">
-            <h2 className="text-lg font-medium mb-4">Compensation Audit Log</h2>
+          <TabsContent value="audit-log" className="mt-0">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold">Compensation Audit Log</h2>
+              <p className="text-sm text-muted-foreground mt-1">Track all compensation changes</p>
+            </div>
 
             {auditLoading ? (
-              <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-64 w-full rounded-xl" />
             ) : auditLog && auditLog.length > 0 ? (
-              <Card>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead>Previous Value</TableHead>
-                      <TableHead>New Value</TableHead>
-                      <TableHead>Changed By</TableHead>
-                      <TableHead>Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {auditLog.map((entry) => (
-                      <TableRow key={entry.id} data-testid={`row-audit-${entry.id}`}>
-                        <TableCell data-testid={`text-audit-employee-${entry.id}`}>
-                          {entry.employeeName || "Unknown"}
-                        </TableCell>
-                        <TableCell data-testid={`text-audit-action-${entry.id}`}>
-                          <Badge variant="outline">{entry.action}</Badge>
-                        </TableCell>
-                        <TableCell data-testid={`text-audit-previous-${entry.id}`}>
-                          {entry.previousValue || "-"}
-                        </TableCell>
-                        <TableCell data-testid={`text-audit-new-${entry.id}`}>
-                          {entry.newValue || "-"}
-                        </TableCell>
-                        <TableCell data-testid={`text-audit-changed-by-${entry.id}`}>
-                          {entry.changedByName || "System"}
-                        </TableCell>
-                        <TableCell data-testid={`text-audit-date-${entry.id}`}>
-                          {formatDate(entry.changedAt?.toString())}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
+              <div className="space-y-3">
+                {auditLog.map((entry) => (
+                  <Card key={entry.id} className="border-0 shadow-md rounded-xl overflow-hidden" data-testid={`row-audit-${entry.id}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-4">
+                        <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                          <DollarSign className="h-5 w-5 text-slate-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold" data-testid={`text-audit-employee-${entry.id}`}>
+                              {entry.employeeName || "Unknown"}
+                            </p>
+                            <Badge variant="outline" className="text-xs" data-testid={`text-audit-action-${entry.id}`}>
+                              {entry.action}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 mt-2 text-sm">
+                            {entry.previousValue && (
+                              <div>
+                                <span className="text-muted-foreground">From: </span>
+                                <span className="font-medium line-through text-slate-400" data-testid={`text-audit-previous-${entry.id}`}>
+                                  {entry.previousValue}
+                                </span>
+                              </div>
+                            )}
+                            {entry.newValue && (
+                              <div>
+                                <span className="text-muted-foreground">To: </span>
+                                <span className="font-semibold text-emerald-600" data-testid={`text-audit-new-${entry.id}`}>
+                                  {entry.newValue}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            <span data-testid={`text-audit-changed-by-${entry.id}`}>
+                              By: {entry.changedByName || "System"}
+                            </span>
+                            <span data-testid={`text-audit-date-${entry.id}`}>
+                              {formatDate(entry.changedAt?.toString())}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             ) : (
-              <Card data-testid="card-no-audit">
-                <CardContent className="py-12 text-center">
-                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <Card className="border-0 shadow-md rounded-xl" data-testid="card-no-audit">
+                <CardContent className="py-16 text-center">
+                  <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                    <Clock className="h-8 w-8 text-slate-400" />
+                  </div>
                   <p className="text-muted-foreground">No audit log entries found.</p>
                 </CardContent>
               </Card>
@@ -551,9 +625,9 @@ export default function EmployeePortalAdmin() {
       </main>
 
       <Dialog open={addEmployeeOpen} onOpenChange={setAddEmployeeOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Add New Employee</DialogTitle>
+            <DialogTitle className="text-xl">Add New Employee</DialogTitle>
             <DialogDescription>Create a new employee account and profile.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
@@ -564,7 +638,8 @@ export default function EmployeePortalAdmin() {
                 type="email"
                 value={newEmployee.username}
                 onChange={(e) => setNewEmployee({ ...newEmployee, username: e.target.value, email: e.target.value })}
-                placeholder="Enter employee email"
+                placeholder="employee@company.com"
+                className="h-11"
                 data-testid="input-new-email"
               />
             </div>
@@ -576,6 +651,7 @@ export default function EmployeePortalAdmin() {
                 value={newEmployee.password}
                 onChange={(e) => setNewEmployee({ ...newEmployee, password: e.target.value })}
                 placeholder="Enter password"
+                className="h-11"
                 data-testid="input-new-password"
               />
             </div>
@@ -585,7 +661,7 @@ export default function EmployeePortalAdmin() {
                 value={newEmployee.role}
                 onValueChange={(value) => setNewEmployee({ ...newEmployee, role: value })}
               >
-                <SelectTrigger data-testid="select-new-role">
+                <SelectTrigger className="h-11" data-testid="select-new-role">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -601,7 +677,8 @@ export default function EmployeePortalAdmin() {
                 id="firstName"
                 value={newEmployee.firstName}
                 onChange={(e) => setNewEmployee({ ...newEmployee, firstName: e.target.value })}
-                placeholder="Enter first name"
+                placeholder="John"
+                className="h-11"
                 data-testid="input-new-firstname"
               />
             </div>
@@ -611,7 +688,8 @@ export default function EmployeePortalAdmin() {
                 id="lastName"
                 value={newEmployee.lastName}
                 onChange={(e) => setNewEmployee({ ...newEmployee, lastName: e.target.value })}
-                placeholder="Enter last name"
+                placeholder="Doe"
+                className="h-11"
                 data-testid="input-new-lastname"
               />
             </div>
@@ -621,7 +699,8 @@ export default function EmployeePortalAdmin() {
                 id="phone"
                 value={newEmployee.phone}
                 onChange={(e) => setNewEmployee({ ...newEmployee, phone: e.target.value })}
-                placeholder="Enter phone number"
+                placeholder="(555) 123-4567"
+                className="h-11"
                 data-testid="input-new-phone"
               />
             </div>
@@ -631,7 +710,8 @@ export default function EmployeePortalAdmin() {
                 id="department"
                 value={newEmployee.department}
                 onChange={(e) => setNewEmployee({ ...newEmployee, department: e.target.value })}
-                placeholder="Enter department"
+                placeholder="e.g. Service, Sales"
+                className="h-11"
                 data-testid="input-new-department"
               />
             </div>
@@ -641,7 +721,8 @@ export default function EmployeePortalAdmin() {
                 id="position"
                 value={newEmployee.position}
                 onChange={(e) => setNewEmployee({ ...newEmployee, position: e.target.value })}
-                placeholder="Enter position"
+                placeholder="e.g. Technician, Manager"
+                className="h-11"
                 data-testid="input-new-position"
               />
             </div>
@@ -652,17 +733,19 @@ export default function EmployeePortalAdmin() {
                 type="date"
                 value={newEmployee.hireDate}
                 onChange={(e) => setNewEmployee({ ...newEmployee, hireDate: e.target.value })}
+                className="h-11"
                 data-testid="input-new-hiredate"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddEmployeeOpen(false)} data-testid="button-cancel-add">
+            <Button variant="outline" onClick={() => setAddEmployeeOpen(false)} className="rounded-full" data-testid="button-cancel-add">
               Cancel
             </Button>
             <Button
               onClick={handleSubmitEmployee}
               disabled={createEmployeeMutation.isPending || !newEmployee.username || !newEmployee.password || !newEmployee.firstName || !newEmployee.lastName}
+              className="rounded-full"
               data-testid="button-submit-add"
             >
               {createEmployeeMutation.isPending ? "Creating..." : "Create Employee"}
@@ -672,7 +755,7 @@ export default function EmployeePortalAdmin() {
       </Dialog>
 
       <Dialog open={compensationDialogOpen} onOpenChange={setCompensationDialogOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-2xl">
           <DialogHeader>
             <DialogTitle>Set Compensation</DialogTitle>
             <DialogDescription>
@@ -686,7 +769,7 @@ export default function EmployeePortalAdmin() {
                 value={compensationForm.payType}
                 onValueChange={(value) => setCompensationForm({ ...compensationForm, payType: value })}
               >
-                <SelectTrigger data-testid="select-pay-type">
+                <SelectTrigger className="h-11" data-testid="select-pay-type">
                   <SelectValue placeholder="Select pay type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -704,7 +787,8 @@ export default function EmployeePortalAdmin() {
                 step="0.01"
                 value={compensationForm.rate}
                 onChange={(e) => setCompensationForm({ ...compensationForm, rate: e.target.value })}
-                placeholder="Enter rate"
+                placeholder="e.g. 25.00"
+                className="h-11"
                 data-testid="input-comp-rate"
               />
             </div>
@@ -717,7 +801,8 @@ export default function EmployeePortalAdmin() {
                   step="0.1"
                   value={compensationForm.commissionRate}
                   onChange={(e) => setCompensationForm({ ...compensationForm, commissionRate: e.target.value })}
-                  placeholder="Enter commission rate"
+                  placeholder="e.g. 5"
+                  className="h-11"
                   data-testid="input-commission-rate"
                 />
               </div>
@@ -728,7 +813,7 @@ export default function EmployeePortalAdmin() {
                 value={compensationForm.paySchedule}
                 onValueChange={(value) => setCompensationForm({ ...compensationForm, paySchedule: value })}
               >
-                <SelectTrigger data-testid="select-pay-schedule">
+                <SelectTrigger className="h-11" data-testid="select-pay-schedule">
                   <SelectValue placeholder="Select pay schedule" />
                 </SelectTrigger>
                 <SelectContent>
@@ -745,17 +830,19 @@ export default function EmployeePortalAdmin() {
                 type="date"
                 value={compensationForm.effectiveDate}
                 onChange={(e) => setCompensationForm({ ...compensationForm, effectiveDate: e.target.value })}
+                className="h-11"
                 data-testid="input-effective-date"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCompensationDialogOpen(false)} data-testid="button-cancel-comp">
+            <Button variant="outline" onClick={() => setCompensationDialogOpen(false)} className="rounded-full" data-testid="button-cancel-comp">
               Cancel
             </Button>
             <Button
               onClick={handleSubmitCompensation}
               disabled={setCompensationMutation.isPending || !compensationForm.rate || !compensationForm.effectiveDate}
+              className="rounded-full"
               data-testid="button-submit-comp"
             >
               {setCompensationMutation.isPending ? "Saving..." : "Save Compensation"}
@@ -765,7 +852,7 @@ export default function EmployeePortalAdmin() {
       </Dialog>
 
       <Dialog open={paystubDialogOpen} onOpenChange={setPaystubDialogOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-2xl">
           <DialogHeader>
             <DialogTitle>Add Paystub</DialogTitle>
             <DialogDescription>
@@ -781,6 +868,7 @@ export default function EmployeePortalAdmin() {
                   type="date"
                   value={paystubForm.periodStart}
                   onChange={(e) => setPaystubForm({ ...paystubForm, periodStart: e.target.value })}
+                  className="h-11"
                   data-testid="input-period-start"
                 />
               </div>
@@ -791,6 +879,7 @@ export default function EmployeePortalAdmin() {
                   type="date"
                   value={paystubForm.periodEnd}
                   onChange={(e) => setPaystubForm({ ...paystubForm, periodEnd: e.target.value })}
+                  className="h-11"
                   data-testid="input-period-end"
                 />
               </div>
@@ -802,6 +891,7 @@ export default function EmployeePortalAdmin() {
                 type="date"
                 value={paystubForm.payDate}
                 onChange={(e) => setPaystubForm({ ...paystubForm, payDate: e.target.value })}
+                className="h-11"
                 data-testid="input-pay-date"
               />
             </div>
@@ -815,6 +905,7 @@ export default function EmployeePortalAdmin() {
                   value={paystubForm.grossPay}
                   onChange={(e) => setPaystubForm({ ...paystubForm, grossPay: e.target.value })}
                   placeholder="0.00"
+                  className="h-11"
                   data-testid="input-gross-pay"
                 />
               </div>
@@ -827,19 +918,21 @@ export default function EmployeePortalAdmin() {
                   value={paystubForm.netPay}
                   onChange={(e) => setPaystubForm({ ...paystubForm, netPay: e.target.value })}
                   placeholder="0.00"
+                  className="h-11"
                   data-testid="input-net-pay"
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="hoursWorked">Hours Worked (optional)</Label>
+              <Label htmlFor="hoursWorked">Hours Worked</Label>
               <Input
                 id="hoursWorked"
                 type="number"
                 step="0.5"
                 value={paystubForm.hoursWorked}
                 onChange={(e) => setPaystubForm({ ...paystubForm, hoursWorked: e.target.value })}
-                placeholder="40"
+                placeholder="e.g. 80"
+                className="h-11"
                 data-testid="input-hours-worked"
               />
             </div>
@@ -850,17 +943,19 @@ export default function EmployeePortalAdmin() {
                 value={paystubForm.fileUrl}
                 onChange={(e) => setPaystubForm({ ...paystubForm, fileUrl: e.target.value })}
                 placeholder="https://..."
+                className="h-11"
                 data-testid="input-file-url"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPaystubDialogOpen(false)} data-testid="button-cancel-paystub">
+            <Button variant="outline" onClick={() => setPaystubDialogOpen(false)} className="rounded-full" data-testid="button-cancel-paystub">
               Cancel
             </Button>
             <Button
               onClick={handleSubmitPaystub}
               disabled={addPaystubMutation.isPending || !paystubForm.periodStart || !paystubForm.periodEnd || !paystubForm.payDate || !paystubForm.grossPay || !paystubForm.netPay}
+              className="rounded-full"
               data-testid="button-submit-paystub"
             >
               {addPaystubMutation.isPending ? "Adding..." : "Add Paystub"}
@@ -870,18 +965,19 @@ export default function EmployeePortalAdmin() {
       </Dialog>
 
       <AlertDialog open={deactivateDialogOpen} onOpenChange={setDeactivateDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Deactivate Employee</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to deactivate {selectedEmployee ? getEmployeeName(selectedEmployee) : "this employee"}? They will no longer be able to log in to the portal.
+              Are you sure you want to deactivate {selectedEmployee ? getEmployeeName(selectedEmployee) : ""}? 
+              They will no longer be able to log in to the Employee Portal.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-deactivate">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeactivate}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-deactivate"
             >
               {deactivateMutation.isPending ? "Deactivating..." : "Deactivate"}
