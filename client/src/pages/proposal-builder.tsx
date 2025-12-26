@@ -346,27 +346,20 @@ const CRAWLSPACE_TIERS: CrawlspaceTier[] = [
 ];
 
 // Crawlspace Elite Bundles (all required when Elite is ON)
-// Formula: Crawlspace Elite Add-On Total = P + $4,290 (where P = tier price)
+// Formula: Crawlspace Elite Add-On Total = P + $3,090 (where P = tier price)
 const CRAWLSPACE_ELITE_BUNDLES: EliteBundle[] = [
   {
-    id: "crawl-10yr-maintenance",
-    name: "10-Year Maintenance",
+    id: "crawl-10yr-maintenance-inspection",
+    name: "10-Year Maintenance & Inspection",
     description: "Annual crawlspace inspection and maintenance for 10 years",
     fixedPrice: 2290,
-    benefits: ["1 visit per year", "Moisture monitoring", "Barrier inspection", "Preventive maintenance"]
+    benefits: ["1 visit per year", "Moisture monitoring", "Barrier inspection", "Preventive maintenance", "Detailed reports"]
   },
   {
-    id: "crawl-10yr-inspection",
-    name: "10-Year Inspection",
-    description: "Comprehensive inspection program for 10 years",
-    fixedPrice: 1000,
-    benefits: ["Annual inspections", "Moisture testing", "Structural assessment", "Detailed reports"]
-  },
-  {
-    id: "crawl-replacement-warranty",
-    name: "Total Replacement Warranty (Parts + Labor)",
-    description: "Complete parts and labor coverage equal to project value + $1,000",
-    fixedPrice: 1000,
+    id: "crawl-dehumidifier-warranty",
+    name: "10-Year Dehumidifier Warranty (Parts + Labor)",
+    description: "Complete parts and labor coverage for dehumidifier",
+    fixedPrice: 800,
     benefits: ["Full parts coverage", "Labor included", "No deductibles", "Transferable warranty"]
   }
 ];
@@ -3838,25 +3831,26 @@ export default function ProposalBuilder() {
               <h2 className="text-xl font-semibold mb-2">Select Crawlspace Package</h2>
               <p className="text-muted-foreground mb-4">Enter your crawlspace size and choose encapsulation level</p>
               
-              {/* Sqft Input */}
+              {/* Sqft Select */}
               <div className="mb-6 p-4 bg-teal-50 dark:bg-teal-950/50 rounded-lg border border-teal-200 dark:border-teal-800">
                 <Label htmlFor="crawlspace-sqft" className="text-sm font-medium mb-2 block">
                   Crawlspace Square Footage
                 </Label>
                 <div className="flex items-center gap-3">
-                  <Input
-                    id="crawlspace-sqft"
-                    type="number"
-                    value={crawlspaceSqft}
-                    onChange={(e) => setCrawlspaceSqft(e.target.value)}
-                    min="100"
-                    max="5000"
-                    className="w-32 min-h-[44px]"
-                    data-testid="input-crawlspace-sqft"
-                  />
-                  <span className="text-sm text-muted-foreground">sqft</span>
-                  <span className="text-xs text-muted-foreground ml-2">
-                    (Rounds up to nearest band: {CRAWLSPACE_CONSTANTS.SIZE_BANDS.join(", ")}...)
+                  <Select value={crawlspaceSqft} onValueChange={setCrawlspaceSqft}>
+                    <SelectTrigger className="w-40 min-h-[44px]" data-testid="select-crawlspace-sqft">
+                      <SelectValue placeholder="Select size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...CRAWLSPACE_CONSTANTS.SIZE_BANDS, 2250, 2500, 2750, 3000].map(sqft => (
+                        <SelectItem key={sqft} value={sqft.toString()}>
+                          {sqft.toLocaleString()} sqft
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">
+                    Select crawlspace size
                   </span>
                 </div>
               </div>
