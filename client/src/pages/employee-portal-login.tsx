@@ -1,15 +1,17 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { ArrowLeft, Building2, Lock, Mail, Loader2 } from "lucide-react";
+import type { PortalUser } from "@shared/schema";
 
 const loginSchema = z.object({
   username: z.string().email("Please enter a valid email address"),
@@ -21,6 +23,17 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function EmployeePortalLogin() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+
+  const { data: currentUser, isLoading: authLoading } = useQuery<PortalUser | null>({
+    queryKey: ["/api/employee-portal/me"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
+  useEffect(() => {
+    if (!authLoading && currentUser) {
+      navigate("/employee-portal");
+    }
+  }, [authLoading, currentUser, navigate]);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -47,6 +60,18 @@ export default function EmployeePortalLogin() {
   const onSubmit = (data: LoginFormData) => {
     loginMutation.mutate(data);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
+      </div>
+    );
+  }
+
+  if (currentUser) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
