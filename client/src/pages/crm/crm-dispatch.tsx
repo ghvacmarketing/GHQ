@@ -52,10 +52,10 @@ interface Technician {
 }
 
 const placeholderTechnicians: Technician[] = [
-  { id: "1", name: "Mike T.", initials: "MT", color: "from-blue-500 to-blue-600" },
-  { id: "2", name: "Sarah J.", initials: "SJ", color: "from-purple-500 to-purple-600" },
-  { id: "3", name: "Carlos R.", initials: "CR", color: "from-emerald-500 to-emerald-600" },
-  { id: "4", name: "Lisa M.", initials: "LM", color: "from-amber-500 to-amber-600" },
+  { id: "1", name: "Mike T.", initials: "MT", color: "bg-blue-600" },
+  { id: "2", name: "Sarah J.", initials: "SJ", color: "bg-purple-600" },
+  { id: "3", name: "Carlos R.", initials: "CR", color: "bg-emerald-600" },
+  { id: "4", name: "Lisa M.", initials: "LM", color: "bg-amber-600" },
 ];
 
 const initialJobs: Job[] = [
@@ -103,8 +103,8 @@ const initialJobs: Job[] = [
     id: "5",
     customerName: "Thompson Estate",
     jobType: "Heat Pump Service",
-    startTime: 7,
-    endTime: 9,
+    startTime: 8,
+    endTime: 10,
     status: "completed",
     address: "555 Cedar Ln",
     technicianId: "3",
@@ -141,13 +141,17 @@ const initialJobs: Job[] = [
   },
 ];
 
-const hours = Array.from({ length: 17 }, (_, i) => i + 6);
+// 8am to 8pm (13 hours: 8,9,10,11,12,13,14,15,16,17,18,19,20)
+const hours = Array.from({ length: 13 }, (_, i) => i + 8);
+const START_HOUR = 8;
+const END_HOUR = 20;
+const TOTAL_HOURS = END_HOUR - START_HOUR;
 
 const statusColors: Record<JobStatus, { bg: string; border: string; text: string }> = {
-  scheduled: { bg: "bg-blue-100", border: "border-blue-300", text: "text-blue-800" },
-  in_progress: { bg: "bg-yellow-100", border: "border-yellow-300", text: "text-yellow-800" },
-  completed: { bg: "bg-green-100", border: "border-green-300", text: "text-green-800" },
-  cancelled: { bg: "bg-red-100", border: "border-red-300", text: "text-red-800" },
+  scheduled: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
+  in_progress: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" },
+  completed: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
+  cancelled: { bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-500" },
 };
 
 const statusLabels: Record<JobStatus, string> = {
@@ -218,19 +222,17 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
       if (!parent) return;
       
       const parentWidth = parent.offsetWidth;
-      const hoursPerPixel = 16 / parentWidth;
+      const hoursPerPixel = TOTAL_HOURS / parentWidth;
       const deltaX = e.clientX - resizeStartX.current;
       const deltaHours = deltaX * hoursPerPixel;
       
       if (isResizingLeft) {
         let newStart = Math.round(originalStart.current + deltaHours);
-        newStart = Math.max(6, Math.min(newStart, originalEnd.current - 1));
-        // Update visual state only, keep position stable
+        newStart = Math.max(START_HOUR, Math.min(newStart, originalEnd.current - 1));
         setVisualStart(newStart);
       } else if (isResizingRight) {
         let newEnd = Math.round(originalEnd.current + deltaHours);
-        newEnd = Math.max(originalStart.current + 1, Math.min(newEnd, 22));
-        // Update visual state only, keep position stable
+        newEnd = Math.max(originalStart.current + 1, Math.min(newEnd, END_HOUR));
         setVisualEnd(newEnd);
       }
     };
@@ -255,19 +257,26 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
     };
   }, [isResizingLeft, isResizingRight, job.id, visualStart, visualEnd, onResize]);
 
+  const isResizing = isResizingLeft || isResizingRight;
+  
   // Use visual state for positioning during resize
-  const displayStart = isResizingLeft || isResizingRight ? visualStart : job.startTime;
-  const displayEnd = isResizingLeft || isResizingRight ? visualEnd : job.endTime;
-  const widthPercent = ((displayEnd - displayStart) / 16) * 100;
-  const leftPercent = ((displayStart - 6) / 16) * 100;
+  const displayStart = isResizing ? visualStart : job.startTime;
+  const displayEnd = isResizing ? visualEnd : job.endTime;
+  const widthPercent = ((displayEnd - displayStart) / TOTAL_HOURS) * 100;
+  const leftPercent = ((displayStart - START_HOUR) / TOTAL_HOURS) * 100;
 
   const style: React.CSSProperties = {
     left: `${leftPercent}%`,
     width: `${widthPercent}%`,
-    minWidth: "80px",
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    minWidth: "60px",
+    // Don't apply transform during resize - only during drag
+    transform: !isResizing && transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  // Only enable drag listeners when not resizing
+  const dragListeners = isResizing ? {} : listeners;
+  const dragAttributes = isResizing ? {} : attributes;
 
   return (
     <div
@@ -275,34 +284,30 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
         setNodeRef(node);
         (cardRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
-      className={`absolute top-1 bottom-1 rounded-md border ${colors.bg} ${colors.border} ${colors.text} overflow-hidden cursor-grab hover:shadow-md transition-shadow group ${isDragging ? 'shadow-lg z-50' : ''}`}
+      className={`absolute top-1 bottom-1 rounded border ${colors.bg} ${colors.border} ${colors.text} overflow-hidden cursor-grab group ${isDragging ? 'z-50' : ''}`}
       style={style}
       data-testid={`job-card-${job.id}`}
-      {...attributes}
-      {...listeners}
+      {...dragAttributes}
+      {...dragListeners}
     >
       <div
-        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 transition-colors z-10"
+        className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize z-10"
         onMouseDown={(e) => handleResizeStart(e, 'left')}
         data-testid={`resize-left-${job.id}`}
-      >
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-current opacity-0 group-hover:opacity-30 rounded" />
-      </div>
+      />
       
       <div
-        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 transition-colors z-10"
+        className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize z-10"
         onMouseDown={(e) => handleResizeStart(e, 'right')}
         data-testid={`resize-right-${job.id}`}
-      >
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-current opacity-0 group-hover:opacity-30 rounded" />
-      </div>
+      />
 
-      <div className="flex flex-col h-full justify-center px-3 py-1">
-        <p className="text-xs font-semibold truncate">{job.customerName}</p>
-        <p className="text-xs truncate opacity-80">{job.jobType}</p>
+      <div className="flex flex-col h-full justify-center px-2 py-1">
+        <p className="text-xs font-medium truncate">{job.customerName}</p>
+        <p className="text-xs truncate opacity-70">{job.jobType}</p>
         <div className="flex items-center gap-1 mt-0.5">
-          <Clock className="h-3 w-3" />
-          <span className="text-xs">
+          <Clock className="h-3 w-3 opacity-60" />
+          <span className="text-xs opacity-70">
             {formatHour(displayStart)} - {formatHour(displayEnd)}
           </span>
         </div>
@@ -316,19 +321,14 @@ function JobCardOverlay({ job }: { job: Job }) {
   
   return (
     <div
-      className={`rounded-md border ${colors.bg} ${colors.border} ${colors.text} px-3 py-2 shadow-xl cursor-grabbing`}
-      style={{ width: '200px' }}
+      className={`rounded border ${colors.bg} ${colors.border} ${colors.text} px-2 py-1.5 shadow-md cursor-grabbing`}
+      style={{ width: '160px' }}
     >
-      <div className="flex flex-col">
-        <p className="text-xs font-semibold truncate">{job.customerName}</p>
-        <p className="text-xs truncate opacity-80">{job.jobType}</p>
-        <div className="flex items-center gap-1 mt-0.5">
-          <Clock className="h-3 w-3" />
-          <span className="text-xs">
-            {formatHour(job.startTime)} - {formatHour(job.endTime)}
-          </span>
-        </div>
-      </div>
+      <p className="text-xs font-medium truncate">{job.customerName}</p>
+      <p className="text-xs truncate opacity-70">{job.jobType}</p>
+      <span className="text-xs opacity-70">
+        {formatHour(job.startTime)} - {formatHour(job.endTime)}
+      </span>
     </div>
   );
 }
@@ -349,29 +349,27 @@ function DroppableTechnicianRow({ tech, jobs, onResize, activeId }: DroppableTec
   return (
     <div
       key={tech.id}
-      className={`flex border-b border-slate-100 last:border-b-0 transition-colors ${isOver ? 'bg-indigo-50' : 'hover:bg-slate-50/50'}`}
+      className={`flex border-b border-slate-100 last:border-b-0 ${isOver ? 'bg-slate-50' : ''}`}
       data-testid={`technician-row-${tech.id}`}
     >
-      <div className="w-48 flex-shrink-0 p-3 bg-slate-50/50 border-r border-slate-200">
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${tech.color} flex items-center justify-center text-white text-xs font-semibold`}>
+      <div className="w-40 flex-shrink-0 p-2 border-r border-slate-100">
+        <div className="flex items-center gap-2">
+          <div className={`w-7 h-7 rounded-full ${tech.color} flex items-center justify-center text-white text-xs font-medium`}>
             {tech.initials}
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-900">{tech.name}</p>
-            <p className="text-xs text-slate-500">
-              {jobs.length} jobs
-            </p>
+            <p className="text-sm font-medium text-slate-800">{tech.name}</p>
+            <p className="text-xs text-slate-400">{jobs.length} jobs</p>
           </div>
         </div>
       </div>
-      <div ref={setNodeRef} className={`flex-1 relative h-16 ${isOver ? 'ring-2 ring-indigo-400 ring-inset' : ''}`}>
+      <div ref={setNodeRef} className={`flex-1 relative h-14 ${isOver ? 'bg-slate-50' : ''}`}>
         <div className="absolute inset-0 flex">
           {hours.map((hour) => (
             <div
               key={hour}
-              className="flex-1 border-r border-slate-100 last:border-r-0"
-              style={{ minWidth: "60px" }}
+              className="flex-1 border-r border-slate-50 last:border-r-0"
+              style={{ minWidth: "50px" }}
             />
           ))}
         </div>
@@ -485,12 +483,12 @@ export default function CrmDispatch() {
       const newTechId = overId.replace('technician-', '');
       const duration = job.endTime - job.startTime;
       
-      const timelineWidth = timelineRef.current?.offsetWidth || 1020;
-      const hoursPerPixel = 16 / timelineWidth;
+      const timelineWidth = timelineRef.current?.offsetWidth || 780;
+      const hoursPerPixel = TOTAL_HOURS / timelineWidth;
       const deltaHours = Math.round(delta.x * hoursPerPixel);
       
       let newStart = job.startTime + deltaHours;
-      newStart = Math.max(6, Math.min(newStart, 22 - duration));
+      newStart = Math.max(START_HOUR, Math.min(newStart, END_HOUR - duration));
       const newEnd = newStart + duration;
       
       setJobs(prev => prev.map(j => 
@@ -605,10 +603,9 @@ export default function CrmDispatch() {
           ))}
         </div>
 
-        <Card className="bg-white border shadow-sm hidden lg:block" data-testid="card-timeline">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Clock className="h-5 w-5 text-indigo-600" />
+        <Card className="bg-white border hidden lg:block" data-testid="card-timeline">
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-base font-medium text-slate-800">
               Daily Schedule
             </CardTitle>
           </CardHeader>
@@ -620,17 +617,17 @@ export default function CrmDispatch() {
               onDragEnd={handleDragEnd}
             >
               <ScrollArea className="w-full">
-                <div className="min-w-[1000px]">
-                  <div className="flex border-b border-slate-200">
-                    <div className="w-48 flex-shrink-0 p-3 bg-slate-50 border-r border-slate-200 font-medium text-sm text-slate-600">
+                <div className="min-w-[800px]">
+                  <div className="flex border-b border-slate-100">
+                    <div className="w-40 flex-shrink-0 p-2 border-r border-slate-100 text-xs font-medium text-slate-500">
                       Technician
                     </div>
                     <div ref={timelineRef} className="flex-1 flex">
                       {hours.map((hour) => (
                         <div
                           key={hour}
-                          className="flex-1 text-center py-3 text-xs font-medium text-slate-500 border-r border-slate-100 last:border-r-0"
-                          style={{ minWidth: "60px" }}
+                          className="flex-1 text-center py-2 text-xs text-slate-400 border-r border-slate-50 last:border-r-0"
+                          style={{ minWidth: "50px" }}
                         >
                           {formatHour(hour)}
                         </div>
@@ -659,10 +656,9 @@ export default function CrmDispatch() {
         </Card>
 
         <div className="lg:hidden space-y-4" data-testid="mobile-job-list">
-          <Card className="bg-white border shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                <Clock className="h-5 w-5 text-indigo-600" />
+          <Card className="bg-white border">
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-base font-medium text-slate-800">
                 Today's Jobs
               </CardTitle>
             </CardHeader>
@@ -681,7 +677,7 @@ export default function CrmDispatch() {
           </Card>
         </div>
 
-        <Card className="bg-white border shadow-sm" data-testid="card-legend">
+        <Card className="bg-white border" data-testid="card-legend">
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-4">
               <span className="text-sm font-medium text-slate-600">Status Legend:</span>
