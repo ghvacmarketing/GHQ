@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ import {
   DollarSign,
   Calendar,
   Loader2,
+  Home,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 
@@ -113,6 +114,11 @@ export default function CrmDashboard() {
       <header className="bg-white border-b shadow-sm sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button variant="ghost" size="icon" data-testid="button-home">
+                <Home className="h-5 w-5" />
+              </Button>
+            </Link>
             <h1 className="text-lg font-bold text-indigo-600" data-testid="text-crm-title">
               GHVAC CRM
             </h1>
