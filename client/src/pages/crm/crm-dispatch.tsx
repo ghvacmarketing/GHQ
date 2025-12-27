@@ -142,10 +142,10 @@ const initialJobs: Job[] = [
 ];
 
 // 8am to 8pm (13 hours: 8,9,10,11,12,13,14,15,16,17,18,19,20)
-const hours = Array.from({ length: 13 }, (_, i) => i + 8);
 const START_HOUR = 8;
 const END_HOUR = 20;
-const TOTAL_HOURS = END_HOUR - START_HOUR;
+const TOTAL_HOURS = END_HOUR - START_HOUR; // 12 hours
+const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i + START_HOUR); // 8am-7pm (12 slots)
 
 const statusColors: Record<JobStatus, { bg: string; border: string; text: string }> = {
   scheduled: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
