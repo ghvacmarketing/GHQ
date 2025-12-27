@@ -185,17 +185,21 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
   const originalStart = useRef(job.startTime);
   const originalEnd = useRef(job.endTime);
   
+  const isResizing = isResizingLeft || isResizingRight;
+  
   // Sync visual state when not resizing
   useEffect(() => {
-    if (!isResizingLeft && !isResizingRight) {
+    if (!isResizing) {
       setVisualStart(job.startTime);
       setVisualEnd(job.endTime);
     }
-  }, [job.startTime, job.endTime, isResizingLeft, isResizingRight]);
+  }, [job.startTime, job.endTime, isResizing]);
   
+  // Disable dragging while resizing
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: job.id,
     data: { job },
+    disabled: isResizing,
   });
 
   const handleResizeStart = useCallback((e: React.MouseEvent, side: 'left' | 'right') => {
@@ -215,7 +219,7 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
   }, [job.startTime, job.endTime]);
 
   useEffect(() => {
-    if (!isResizingLeft && !isResizingRight) return;
+    if (!isResizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
       const parent = cardRef.current?.parentElement;
@@ -255,10 +259,8 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizingLeft, isResizingRight, job.id, visualStart, visualEnd, onResize]);
+  }, [isResizing, isResizingLeft, isResizingRight, job.id, visualStart, visualEnd, onResize]);
 
-  const isResizing = isResizingLeft || isResizingRight;
-  
   // Use visual state for positioning during resize
   const displayStart = isResizing ? visualStart : job.startTime;
   const displayEnd = isResizing ? visualEnd : job.endTime;
@@ -269,14 +271,10 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
     left: `${leftPercent}%`,
     width: `${widthPercent}%`,
     minWidth: "60px",
-    // Don't apply transform during resize - only during drag
+    // Never apply transform during resize
     transform: !isResizing && transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.5 : 1,
   };
-
-  // Only enable drag listeners when not resizing
-  const dragListeners = isResizing ? {} : listeners;
-  const dragAttributes = isResizing ? {} : attributes;
 
   return (
     <div
@@ -284,33 +282,38 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
         setNodeRef(node);
         (cardRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
-      className={`absolute top-1 bottom-1 rounded border ${colors.bg} ${colors.border} ${colors.text} overflow-hidden cursor-grab group ${isDragging ? 'z-50' : ''}`}
+      className={`absolute top-1 bottom-1 rounded border ${colors.bg} ${colors.border} ${colors.text} overflow-hidden ${isDragging ? 'z-50' : ''}`}
       style={style}
       data-testid={`job-card-${job.id}`}
-      {...dragAttributes}
-      {...dragListeners}
     >
+      {/* Left resize handle - visible on hover */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize z-10"
+        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-20 flex items-center justify-center hover:bg-black/10"
         onMouseDown={(e) => handleResizeStart(e, 'left')}
+        onPointerDown={(e) => e.stopPropagation()}
         data-testid={`resize-left-${job.id}`}
-      />
+      >
+        <div className="w-0.5 h-4 bg-current opacity-30 rounded" />
+      </div>
       
+      {/* Right resize handle - visible on hover */}
       <div
-        className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize z-10"
+        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize z-20 flex items-center justify-center hover:bg-black/10"
         onMouseDown={(e) => handleResizeStart(e, 'right')}
+        onPointerDown={(e) => e.stopPropagation()}
         data-testid={`resize-right-${job.id}`}
-      />
+      >
+        <div className="w-0.5 h-4 bg-current opacity-30 rounded" />
+      </div>
 
-      <div className="flex flex-col h-full justify-center px-2 py-1">
+      {/* Draggable center content */}
+      <div 
+        className="flex flex-col h-full justify-center px-3 py-1 cursor-grab"
+        {...attributes}
+        {...listeners}
+      >
         <p className="text-xs font-medium truncate">{job.customerName}</p>
         <p className="text-xs truncate opacity-70">{job.jobType}</p>
-        <div className="flex items-center gap-1 mt-0.5">
-          <Clock className="h-3 w-3 opacity-60" />
-          <span className="text-xs opacity-70">
-            {formatHour(displayStart)} - {formatHour(displayEnd)}
-          </span>
-        </div>
       </div>
     </div>
   );
@@ -322,13 +325,10 @@ function JobCardOverlay({ job }: { job: Job }) {
   return (
     <div
       className={`rounded border ${colors.bg} ${colors.border} ${colors.text} px-2 py-1.5 shadow-md cursor-grabbing`}
-      style={{ width: '160px' }}
+      style={{ width: '140px' }}
     >
       <p className="text-xs font-medium truncate">{job.customerName}</p>
       <p className="text-xs truncate opacity-70">{job.jobType}</p>
-      <span className="text-xs opacity-70">
-        {formatHour(job.startTime)} - {formatHour(job.endTime)}
-      </span>
     </div>
   );
 }
