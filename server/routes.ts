@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, insertCrmCustomerSchema, insertCrmJobSchema } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -14,7 +14,7 @@ import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, inArray, desc } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -24,7 +24,7 @@ import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorSt
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
-import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureDefaultAdminExists, CRM_SESSION_COOKIE } from "./crm-auth";
+import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureDefaultAdminExists, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, logCrmAudit, hashPassword as hashCrmPassword } from "./crm-auth";
 import cookieParser from "cookie-parser";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
@@ -4545,6 +4545,365 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("CRM gate verification error:", error);
       return res.status(500).json({ message: "Verification failed" });
+    }
+  });
+
+  // ============================================
+  // CRM API ENDPOINTS
+  // ============================================
+
+  // GET /api/crm/customers - List customers
+  app.get("/api/crm/customers", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (isSalesOrAbove(user.role)) {
+        const customers = await db.select().from(crmCustomers).orderBy(desc(crmCustomers.createdAt));
+        return res.json(customers);
+      } else {
+        const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.techUserId, user.id));
+        if (assignments.length === 0) {
+          return res.json([]);
+        }
+        const jobIds = assignments.map(a => a.jobId);
+        const jobs = await db.select().from(crmJobs).where(inArray(crmJobs.id, jobIds));
+        const customerIds = Array.from(new Set(jobs.map(j => j.customerId)));
+        if (customerIds.length === 0) {
+          return res.json([]);
+        }
+        const customers = await db.select().from(crmCustomers).where(inArray(crmCustomers.id, customerIds));
+        return res.json(customers);
+      }
+    } catch (error) {
+      console.error("Error fetching CRM customers:", error);
+      return res.status(500).json({ message: "Failed to fetch customers" });
+    }
+  });
+
+  // POST /api/crm/customers - Create customer (ADMIN/SALES only)
+  app.post("/api/crm/customers", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const parsed = insertCrmCustomerSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid customer data", errors: parsed.error.errors });
+      }
+
+      const [customer] = await db.insert(crmCustomers).values(parsed.data).returning();
+      
+      await logCrmAudit(
+        user?.id || null,
+        "customer.created",
+        "customer",
+        customer.id,
+        { name: customer.name },
+        req.ip
+      );
+
+      return res.status(201).json(customer);
+    } catch (error) {
+      console.error("Error creating CRM customer:", error);
+      return res.status(500).json({ message: "Failed to create customer" });
+    }
+  });
+
+  // GET /api/crm/customers/:id - Get single customer
+  app.get("/api/crm/customers/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, req.params.id));
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      if (isSalesOrAbove(user.role)) {
+        return res.json(customer);
+      }
+
+      const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.techUserId, user.id));
+      const jobIds = assignments.map(a => a.jobId);
+      if (jobIds.length === 0) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const jobs = await db.select().from(crmJobs).where(inArray(crmJobs.id, jobIds));
+      const hasAccess = jobs.some(j => j.customerId === customer.id);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      return res.json(customer);
+    } catch (error) {
+      console.error("Error fetching CRM customer:", error);
+      return res.status(500).json({ message: "Failed to fetch customer" });
+    }
+  });
+
+  // GET /api/crm/jobs - List jobs
+  app.get("/api/crm/jobs", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (isSalesOrAbove(user.role)) {
+        const jobs = await db.select().from(crmJobs).orderBy(desc(crmJobs.createdAt));
+        return res.json(jobs);
+      } else {
+        const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.techUserId, user.id));
+        if (assignments.length === 0) {
+          return res.json([]);
+        }
+        const jobIds = assignments.map(a => a.jobId);
+        const jobs = await db.select().from(crmJobs).where(inArray(crmJobs.id, jobIds)).orderBy(desc(crmJobs.createdAt));
+        return res.json(jobs);
+      }
+    } catch (error) {
+      console.error("Error fetching CRM jobs:", error);
+      return res.status(500).json({ message: "Failed to fetch jobs" });
+    }
+  });
+
+  // POST /api/crm/jobs - Create job (ADMIN/SALES only)
+  app.post("/api/crm/jobs", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const parsed = insertCrmJobSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid job data", errors: parsed.error.errors });
+      }
+
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, parsed.data.customerId));
+      if (!customer) {
+        return res.status(400).json({ message: "Customer not found" });
+      }
+
+      const [job] = await db.insert(crmJobs).values(parsed.data as any).returning();
+      
+      await db.insert(crmJobStatusEvents).values({
+        jobId: job.id,
+        status: job.status || "new",
+        userId: user?.id || null,
+        notes: "Job created",
+      });
+
+      await logCrmAudit(
+        user?.id || null,
+        "job.created",
+        "job",
+        job.id,
+        { customerId: job.customerId, jobType: job.jobType },
+        req.ip
+      );
+
+      return res.status(201).json(job);
+    } catch (error) {
+      console.error("Error creating CRM job:", error);
+      return res.status(500).json({ message: "Failed to create job" });
+    }
+  });
+
+  // POST /api/crm/jobs/:id/assign - Assign tech to job (ADMIN/SALES only)
+  app.post("/api/crm/jobs/:id/assign", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { techUserId, startAt, endAt } = req.body;
+
+      if (!techUserId) {
+        return res.status(400).json({ message: "techUserId is required" });
+      }
+
+      const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, req.params.id));
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      const [tech] = await db.select().from(crmUsers).where(eq(crmUsers.id, techUserId));
+      if (!tech) {
+        return res.status(400).json({ message: "Tech user not found" });
+      }
+
+      const [assignment] = await db.insert(crmJobAssignments).values({
+        jobId: job.id,
+        techUserId,
+        startAt: startAt ? new Date(startAt) : null,
+        endAt: endAt ? new Date(endAt) : null,
+      }).returning();
+
+      await logCrmAudit(
+        user?.id || null,
+        "job.assigned",
+        "job",
+        job.id,
+        { techUserId, techName: tech.name },
+        req.ip
+      );
+
+      return res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error assigning tech to job:", error);
+      return res.status(500).json({ message: "Failed to assign tech" });
+    }
+  });
+
+  // POST /api/crm/jobs/:id/status - Update job status
+  app.post("/api/crm/jobs/:id/status", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { status, notes } = req.body;
+      if (!status) {
+        return res.status(400).json({ message: "status is required" });
+      }
+
+      const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, req.params.id));
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      if (!isSalesOrAbove(user.role)) {
+        const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.jobId, job.id));
+        const isAssigned = assignments.some(a => a.techUserId === user.id);
+        if (!isAssigned) {
+          return res.status(403).json({ message: "Access denied - not assigned to this job" });
+        }
+      }
+
+      const oldStatus = job.status;
+      const updateData: any = {
+        status,
+        updatedAt: new Date(),
+      };
+      if (status === "completed" && !job.completedAt) {
+        updateData.completedAt = new Date();
+      }
+
+      const [updatedJob] = await db.update(crmJobs).set(updateData).where(eq(crmJobs.id, job.id)).returning();
+
+      await db.insert(crmJobStatusEvents).values({
+        jobId: job.id,
+        status,
+        userId: user.id,
+        notes: notes || null,
+      });
+
+      await logCrmAudit(
+        user.id,
+        "job.status_changed",
+        "job",
+        job.id,
+        { oldStatus, newStatus: status, notes },
+        req.ip
+      );
+
+      return res.json(updatedJob);
+    } catch (error) {
+      console.error("Error updating job status:", error);
+      return res.status(500).json({ message: "Failed to update job status" });
+    }
+  });
+
+  // GET /api/crm/users - List users (ADMIN only)
+  app.get("/api/crm/users", requireCrmAdmin, async (req, res) => {
+    try {
+      const users = await db.select({
+        id: crmUsers.id,
+        name: crmUsers.name,
+        email: crmUsers.email,
+        phone: crmUsers.phone,
+        role: crmUsers.role,
+        isActive: crmUsers.isActive,
+        createdAt: crmUsers.createdAt,
+      }).from(crmUsers).orderBy(desc(crmUsers.createdAt));
+      return res.json(users);
+    } catch (error) {
+      console.error("Error fetching CRM users:", error);
+      return res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // POST /api/crm/users - Create user (ADMIN only)
+  app.post("/api/crm/users", requireCrmAdmin, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      const { name, email, password, role, phone } = req.body;
+
+      if (!name || !email || !password) {
+        return res.status(400).json({ message: "name, email, and password are required" });
+      }
+
+      const existing = await getCrmUserByEmail(email);
+      if (existing) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+
+      const passwordHash = await hashCrmPassword(password);
+      const [user] = await db.insert(crmUsers).values({
+        name,
+        email: email.toLowerCase(),
+        passwordHash,
+        role: role || "viewer",
+        phone: phone || null,
+      }).returning();
+
+      await logCrmAudit(
+        currentUser?.id || null,
+        "user.created",
+        "user",
+        user.id,
+        { name: user.name, email: user.email, role: user.role },
+        req.ip
+      );
+
+      const { passwordHash: _, ...userWithoutPassword } = user;
+      return res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error creating CRM user:", error);
+      return res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // PATCH /api/crm/users/:id/deactivate - Deactivate user (ADMIN only)
+  app.patch("/api/crm/users/:id/deactivate", requireCrmAdmin, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      const userId = req.params.id;
+
+      if (currentUser?.id === userId) {
+        return res.status(400).json({ message: "Cannot deactivate your own account" });
+      }
+
+      const [user] = await db.select().from(crmUsers).where(eq(crmUsers.id, userId));
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const [updatedUser] = await db.update(crmUsers).set({ isActive: false }).where(eq(crmUsers.id, userId)).returning();
+
+      await logCrmAudit(
+        currentUser?.id || null,
+        "user.deactivated",
+        "user",
+        userId,
+        { name: user.name, email: user.email },
+        req.ip
+      );
+
+      const { passwordHash: _, ...userWithoutPassword } = updatedUser;
+      return res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error deactivating CRM user:", error);
+      return res.status(500).json({ message: "Failed to deactivate user" });
     }
   });
 

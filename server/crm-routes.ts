@@ -145,7 +145,7 @@ router.get("/customers", requireCrmAuth, async (req: Request, res: Response) => 
         .from(crmJobs)
         .where(inArray(crmJobs.id, jobIds));
 
-      const customerIds = [...new Set(jobs.map((j) => j.customerId))];
+      const customerIds = Array.from(new Set(jobs.map((j) => j.customerId)));
       if (customerIds.length === 0) {
         return res.json([]);
       }
@@ -282,7 +282,7 @@ router.post("/jobs", requireCrmAuth, requireCrmSalesOrAbove, async (req: Request
       return res.status(400).json({ message: "Invalid job data", errors: parsed.error.errors });
     }
 
-    const [job] = await db.insert(crmJobs).values(parsed.data).returning();
+    const [job] = await db.insert(crmJobs).values(parsed.data as any).returning();
 
     await db.insert(crmJobStatusEvents).values({
       jobId: job.id,

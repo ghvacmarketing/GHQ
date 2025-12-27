@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { db } from "./db";
-import { crmUsers, crmSessions, type CrmUser, type CrmSession } from "@shared/schema";
+import { crmUsers, crmSessions, crmAuditLog, type CrmUser, type CrmSession } from "@shared/schema";
 import { eq, and, gt } from "drizzle-orm";
 
 const scryptAsync = promisify(scrypt);
@@ -195,6 +195,79 @@ export function requireCrmRole(...allowedRoles: string[]) {
         return res.status(500).json({ message: "Authentication error" });
       });
   };
+}
+
+const ADMIN_ROLES = ["owner", "manager"];
+const SALES_ROLES = ["owner", "manager", "dispatcher", "sales"];
+const TECH_ROLES = ["owner", "manager", "dispatcher", "sales", "tech"];
+
+export function isAdmin(role: string): boolean {
+  return ADMIN_ROLES.includes(role);
+}
+
+export function isSalesOrAbove(role: string): boolean {
+  return SALES_ROLES.includes(role);
+}
+
+export function isTechOrAbove(role: string): boolean {
+  return TECH_ROLES.includes(role);
+}
+
+export function requireCrmAdmin(req: Request, res: Response, next: NextFunction) {
+  getCurrentCrmUser(req)
+    .then((user) => {
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized - CRM authentication required" });
+      }
+      if (!isAdmin(user.role)) {
+        return res.status(403).json({ message: "Forbidden - Admin role required" });
+      }
+      next();
+    })
+    .catch((error) => {
+      console.error("CRM auth error:", error);
+      return res.status(500).json({ message: "Authentication error" });
+    });
+}
+
+export function requireCrmSalesOrAbove(req: Request, res: Response, next: NextFunction) {
+  getCurrentCrmUser(req)
+    .then((user) => {
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized - CRM authentication required" });
+      }
+      if (!isSalesOrAbove(user.role)) {
+        return res.status(403).json({ message: "Forbidden - Sales role or above required" });
+      }
+      next();
+    })
+    .catch((error) => {
+      console.error("CRM auth error:", error);
+      return res.status(500).json({ message: "Authentication error" });
+    });
+}
+
+export async function logCrmAudit(
+  userId: string | null,
+  action: string,
+  entityType: string,
+  entityId: string | null,
+  metadata?: Record<string, unknown>,
+  ipAddress?: string
+): Promise<void> {
+  try {
+    await db.insert(crmAuditLog).values({
+      actorUserId: userId,
+      actorType: userId ? "user" : "system",
+      action,
+      entityType,
+      entityId,
+      metadata,
+      ipAddress: ipAddress || null,
+    });
+  } catch (error) {
+    console.error("Failed to log audit entry:", error);
+  }
 }
 
 export { CRM_SESSION_COOKIE };
