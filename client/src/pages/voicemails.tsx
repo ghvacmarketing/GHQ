@@ -42,7 +42,7 @@ import MobileNav from "@/components/mobile-nav";
 import redlogo from "@assets/redlogo.webp";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO, formatDistanceToNow } from "date-fns";
+import { format, parseISO, formatDistanceToNow, subDays, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Voicemail, CallLog } from "@shared/schema";
 
@@ -388,62 +388,70 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
   const relativeTime = formatDistanceToNow(createdAt, { addSuffix: true });
   const exactTime = format(createdAt, "MMM d, yyyy 'at' h:mm a");
 
-  const tagColors: Record<string, string> = {
-    Service: "bg-blue-100 text-blue-800",
-    Install: "bg-green-100 text-green-800",
-    Sales: "bg-purple-100 text-purple-800",
-    Other: "bg-gray-100 text-gray-800",
+  const tagBorderColors: Record<string, string> = {
+    Service: "border-l-blue-500",
+    Install: "border-l-green-500",
+    Sales: "border-l-purple-500",
+    Other: "border-l-gray-400",
   };
+
+  const tagBadgeColors: Record<string, string> = {
+    Service: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    Install: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    Sales: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+    Other: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
+  };
+
+  const borderColor = log.tag ? tagBorderColors[log.tag] || "border-l-gray-300" : "border-l-gray-300";
 
   return (
     <div
       ref={entryRef}
       className={cn(
-        "p-4 border rounded-lg bg-white shadow-sm transition-all duration-300",
+        "group p-3 border rounded-lg bg-white dark:bg-card shadow-sm transition-all duration-200 border-l-4 hover:shadow-md hover:bg-gray-50/50 dark:hover:bg-muted/50",
+        borderColor,
         isHighlighted && "ring-2 ring-primary animate-pulse"
       )}
       data-testid={`call-log-entry-${log.id}`}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
+      <div className="flex items-start sm:items-center justify-between gap-2 sm:gap-4 flex-col sm:flex-row">
+        <div className="flex-1 min-w-0 w-full sm:w-auto">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm">{log.clientName}</span>
+            {log.phone && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                {log.phone}
+              </span>
+            )}
             {log.tag && (
-              <Badge variant="secondary" className={cn("text-xs", tagColors[log.tag] || "")}>
+              <Badge variant="secondary" className={cn("text-xs", tagBadgeColors[log.tag] || "")}>
                 {log.tag}
               </Badge>
             )}
           </div>
-          <p className="text-sm text-muted-foreground mt-2">{log.description}</p>
-          <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-            {log.phone && (
-              <div className="flex items-center gap-1">
-                <Phone className="h-3 w-3" />
-                <span>{log.phone}</span>
-              </div>
-            )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="cursor-default">{relativeTime}</span>
-              </TooltipTrigger>
-              <TooltipContent>{exactTime}</TooltipContent>
-            </Tooltip>
-          </div>
+          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{log.description}</p>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-[10px] text-muted-foreground/70 cursor-default mt-1 inline-block">{relativeTime}</span>
+            </TooltipTrigger>
+            <TooltipContent>{exactTime}</TooltipContent>
+          </Tooltip>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7"
             onClick={() => onEdit(log)}
             data-testid={`button-edit-log-${log.id}`}
           >
-            <Edit2 className="h-4 w-4" />
+            <Edit2 className="h-3.5 w-3.5" />
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" data-testid={`button-delete-log-${log.id}`}>
-                <Trash2 className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" data-testid={`button-delete-log-${log.id}`}>
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -758,6 +766,96 @@ interface SearchResult extends CallLog {
   date: string;
 }
 
+interface WeeklyStatsProps {
+  days: { id: string; date: string; count: number }[];
+}
+
+function WeeklyStats({ days }: WeeklyStatsProps) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  const weeklyData = useMemo(() => {
+    const today = startOfDay(new Date());
+    const last7Days: { date: string; dayName: string; count: number }[] = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const date = subDays(today, i);
+      const dateStr = format(date, "yyyy-MM-dd");
+      const dayName = format(date, "EEE");
+      const dayData = days.find((d) => d.date === dateStr);
+      last7Days.push({
+        date: dateStr,
+        dayName,
+        count: dayData?.count || 0,
+      });
+    }
+
+    const totalCalls = last7Days.reduce((sum, d) => sum + d.count, 0);
+    const maxCount = Math.max(...last7Days.map((d) => d.count), 1);
+
+    return { last7Days, totalCalls, maxCount };
+  }, [days]);
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="mb-4 bg-muted/30 dark:bg-muted/20">
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-3 px-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {isOpen ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+                <CardTitle className="text-sm font-medium">This Week</CardTitle>
+              </div>
+              <Badge variant="secondary" className="font-semibold">
+                {weeklyData.totalCalls} {weeklyData.totalCalls === 1 ? "call" : "calls"}
+              </Badge>
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-0 px-4 pb-4">
+            <div className="space-y-2">
+              {weeklyData.last7Days.map((day) => {
+                const widthPercent = weeklyData.maxCount > 0 ? (day.count / weeklyData.maxCount) * 100 : 0;
+                const isToday = day.date === format(new Date(), "yyyy-MM-dd");
+                return (
+                  <div key={day.date} className="flex items-center gap-3" data-testid={`weekly-stat-${day.date}`}>
+                    <span className={cn(
+                      "w-10 text-xs font-medium",
+                      isToday && "text-primary font-semibold"
+                    )}>
+                      {day.dayName}
+                    </span>
+                    <div className="flex-1 h-5 bg-muted dark:bg-muted/50 rounded-sm overflow-hidden relative">
+                      <div
+                        className={cn(
+                          "h-full rounded-sm transition-all duration-300",
+                          isToday ? "bg-primary" : "bg-primary/60"
+                        )}
+                        style={{ width: `${widthPercent}%` }}
+                      />
+                    </div>
+                    <span className={cn(
+                      "w-6 text-xs text-right",
+                      day.count === 0 ? "text-muted-foreground" : "font-medium",
+                      isToday && "text-primary font-semibold"
+                    )}>
+                      {day.count}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
+
 function DailyCallLog() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
@@ -852,6 +950,8 @@ function DailyCallLog() {
 
   return (
     <div className="space-y-4">
+      <WeeklyStats days={days} />
+
       <div className="relative">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
