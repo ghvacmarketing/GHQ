@@ -10,8 +10,6 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
-  ChevronLeft,
-  ChevronRight,
   CalendarDays,
   User,
   Clock,
@@ -173,15 +171,23 @@ interface DraggableJobCardProps {
 
 function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) {
   const colors = statusColors[job.status];
-  const widthPercent = ((job.endTime - job.startTime) / 16) * 100;
-  const leftPercent = ((job.startTime - 6) / 16) * 100;
   
   const cardRef = useRef<HTMLDivElement>(null);
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const [isResizingRight, setIsResizingRight] = useState(false);
+  const [visualStart, setVisualStart] = useState(job.startTime);
+  const [visualEnd, setVisualEnd] = useState(job.endTime);
   const resizeStartX = useRef(0);
   const originalStart = useRef(job.startTime);
   const originalEnd = useRef(job.endTime);
+  
+  // Sync visual state when not resizing
+  useEffect(() => {
+    if (!isResizingLeft && !isResizingRight) {
+      setVisualStart(job.startTime);
+      setVisualEnd(job.endTime);
+    }
+  }, [job.startTime, job.endTime, isResizingLeft, isResizingRight]);
   
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: job.id,
@@ -194,6 +200,8 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
     resizeStartX.current = e.clientX;
     originalStart.current = job.startTime;
     originalEnd.current = job.endTime;
+    setVisualStart(job.startTime);
+    setVisualEnd(job.endTime);
     
     if (side === 'left') {
       setIsResizingLeft(true);
@@ -217,19 +225,23 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
       if (isResizingLeft) {
         let newStart = Math.round(originalStart.current + deltaHours);
         newStart = Math.max(6, Math.min(newStart, originalEnd.current - 1));
-        if (newStart !== job.startTime) {
-          onResize(job.id, newStart, job.endTime);
-        }
+        // Update visual state only, keep position stable
+        setVisualStart(newStart);
       } else if (isResizingRight) {
         let newEnd = Math.round(originalEnd.current + deltaHours);
-        newEnd = Math.max(job.startTime + 1, Math.min(newEnd, 22));
-        if (newEnd !== job.endTime) {
-          onResize(job.id, job.startTime, newEnd);
-        }
+        newEnd = Math.max(originalStart.current + 1, Math.min(newEnd, 22));
+        // Update visual state only, keep position stable
+        setVisualEnd(newEnd);
       }
     };
 
     const handleMouseUp = () => {
+      // Commit the final values on mouseup
+      if (isResizingLeft) {
+        onResize(job.id, visualStart, originalEnd.current);
+      } else if (isResizingRight) {
+        onResize(job.id, originalStart.current, visualEnd);
+      }
       setIsResizingLeft(false);
       setIsResizingRight(false);
     };
@@ -241,7 +253,13 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizingLeft, isResizingRight, job.id, job.startTime, job.endTime, onResize]);
+  }, [isResizingLeft, isResizingRight, job.id, visualStart, visualEnd, onResize]);
+
+  // Use visual state for positioning during resize
+  const displayStart = isResizingLeft || isResizingRight ? visualStart : job.startTime;
+  const displayEnd = isResizingLeft || isResizingRight ? visualEnd : job.endTime;
+  const widthPercent = ((displayEnd - displayStart) / 16) * 100;
+  const leftPercent = ((displayStart - 6) / 16) * 100;
 
   const style: React.CSSProperties = {
     left: `${leftPercent}%`,
@@ -285,7 +303,7 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
         <div className="flex items-center gap-1 mt-0.5">
           <Clock className="h-3 w-3" />
           <span className="text-xs">
-            {formatHour(job.startTime)} - {formatHour(job.endTime)}
+            {formatHour(displayStart)} - {formatHour(displayEnd)}
           </span>
         </div>
       </div>
@@ -495,16 +513,6 @@ export default function CrmDispatch() {
     return filteredJobs.filter((job) => job.technicianId === techId);
   }, [filteredJobs]);
 
-  const changeDate = (days: number) => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() + days);
-    setSelectedDate(newDate);
-  };
-
-  const goToToday = () => {
-    setSelectedDate(new Date());
-  };
-
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
       setSelectedDate(date);
@@ -518,8 +526,6 @@ export default function CrmDispatch() {
     day: "numeric",
     year: "numeric",
   });
-
-  const isToday = selectedDate.toDateString() === new Date().toDateString();
 
   const activeJob = activeId ? jobs.find(job => job.id === activeId) : null;
 
@@ -558,36 +564,6 @@ export default function CrmDispatch() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1 bg-white rounded-lg border shadow-sm p-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => changeDate(-1)}
-                data-testid="button-prev-day"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={isToday ? "default" : "ghost"}
-                size="sm"
-                className="h-8 px-3"
-                onClick={goToToday}
-                data-testid="button-today"
-              >
-                Today
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => changeDate(1)}
-                data-testid="button-next-day"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-            
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button 
