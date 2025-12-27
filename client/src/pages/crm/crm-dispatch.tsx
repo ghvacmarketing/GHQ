@@ -271,8 +271,8 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
     left: `${leftPercent}%`,
     width: `${widthPercent}%`,
     minWidth: "60px",
-    // Never apply transform during resize
-    transform: !isResizing && transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    // Only apply transform while actively dragging (not after drop)
+    transform: isDragging && transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.5 : 1,
   };
 
