@@ -408,50 +408,50 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
     <div
       ref={entryRef}
       className={cn(
-        "group p-3 border rounded-lg bg-white dark:bg-card shadow-sm transition-all duration-200 border-l-4 hover:shadow-md hover:bg-gray-50/50 dark:hover:bg-muted/50",
+        "group py-2 px-2.5 rounded-md bg-white dark:bg-card/50 transition-all duration-200 border-l-2 hover:bg-gray-50/50 dark:hover:bg-muted/30 border border-border/30 dark:border-border/20",
         borderColor,
         isHighlighted && "ring-2 ring-primary animate-pulse"
       )}
       data-testid={`call-log-entry-${log.id}`}
     >
-      <div className="flex items-start sm:items-center justify-between gap-2 sm:gap-4 flex-col sm:flex-row">
-        <div className="flex-1 min-w-0 w-full sm:w-auto">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm">{log.clientName}</span>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-medium text-sm">{log.clientName}</span>
             {log.phone && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Phone className="h-3 w-3" />
+              <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
+                <Phone className="h-2.5 w-2.5" />
                 {log.phone}
               </span>
             )}
             {log.tag && (
-              <Badge variant="secondary" className={cn("text-xs", tagBadgeColors[log.tag] || "")}>
+              <Badge variant="secondary" className={cn("text-[10px] h-4 px-1", tagBadgeColors[log.tag] || "")}>
                 {log.tag}
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{log.description}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{log.description}</p>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="text-[10px] text-muted-foreground/70 cursor-default mt-1 inline-block">{relativeTime}</span>
+              <span className="text-[10px] text-muted-foreground/60 cursor-default">{relativeTime}</span>
             </TooltipTrigger>
             <TooltipContent>{exactTime}</TooltipContent>
           </Tooltip>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-6 w-6"
             onClick={() => onEdit(log)}
             data-testid={`button-edit-log-${log.id}`}
           >
-            <Edit2 className="h-3.5 w-3.5" />
+            <Edit2 className="h-3 w-3" />
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" data-testid={`button-delete-log-${log.id}`}>
-                <Trash2 className="h-3.5 w-3.5" />
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" data-testid={`button-delete-log-${log.id}`}>
+                <Trash2 className="h-3 w-3" />
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -696,33 +696,31 @@ function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRe
   return (
     <div ref={cardRef} data-testid={`date-card-${date}`}>
       <Collapsible open={isExpanded} onOpenChange={onToggle}>
-        <Card className="mb-3">
+        <div className="border-b border-border/50 dark:border-border/30">
           <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-3 px-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <CardTitle className="text-sm font-medium">{formattedDate}</CardTitle>
-                </div>
-                <Badge variant="secondary">{count} {count === 1 ? "entry" : "entries"}</Badge>
+            <button className="w-full flex items-center justify-between py-2 px-1 hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors text-left">
+              <div className="flex items-center gap-2">
+                {isExpanded ? (
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                )}
+                <span className="text-sm font-medium">{formattedDate}</span>
               </div>
-            </CardHeader>
+              <Badge variant="outline" className="text-xs h-5 px-1.5">{count}</Badge>
+            </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="pt-0 px-4 pb-4 space-y-3">
+            <div className="py-2 px-1 space-y-2">
               {!showForm && !editingLog && (
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="w-full"
+                  className="w-full h-8 text-xs"
                   onClick={() => setShowForm(true)}
                   data-testid="button-add-entry"
                 >
-                  <Plus className="h-4 w-4 mr-1" />
+                  <Plus className="h-3.5 w-3.5 mr-1" />
                   Add Entry
                 </Button>
               )}
@@ -737,11 +735,11 @@ function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRe
               )}
 
               {isLoading ? (
-                <div className="text-center text-sm text-muted-foreground py-4">Loading...</div>
+                <div className="text-center text-xs text-muted-foreground py-2">Loading...</div>
               ) : logs.length === 0 ? (
-                <div className="text-center text-sm text-muted-foreground py-4">No entries for this day</div>
+                <div className="text-center text-xs text-muted-foreground py-2">No entries</div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {logs.map((log) => (
                     <CallLogEntry
                       key={log.id}
@@ -754,9 +752,9 @@ function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRe
                   ))}
                 </div>
               )}
-            </CardContent>
+            </div>
           </CollapsibleContent>
-        </Card>
+        </div>
       </Collapsible>
     </div>
   );
@@ -771,8 +769,6 @@ interface WeeklyStatsProps {
 }
 
 function WeeklyStats({ days }: WeeklyStatsProps) {
-  const [isOpen, setIsOpen] = useState(true);
-
   const weeklyData = useMemo(() => {
     const today = startOfDay(new Date());
     const last7Days: { date: string; dayName: string; count: number }[] = [];
@@ -780,7 +776,7 @@ function WeeklyStats({ days }: WeeklyStatsProps) {
     for (let i = 6; i >= 0; i--) {
       const date = subDays(today, i);
       const dateStr = format(date, "yyyy-MM-dd");
-      const dayName = format(date, "EEE");
+      const dayName = format(date, "EEE").charAt(0);
       const dayData = days.find((d) => d.date === dateStr);
       last7Days.push({
         date: dateStr,
@@ -790,69 +786,33 @@ function WeeklyStats({ days }: WeeklyStatsProps) {
     }
 
     const totalCalls = last7Days.reduce((sum, d) => sum + d.count, 0);
-    const maxCount = Math.max(...last7Days.map((d) => d.count), 1);
 
-    return { last7Days, totalCalls, maxCount };
+    return { last7Days, totalCalls };
   }, [days]);
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="mb-4 bg-muted/30 dark:bg-muted/20">
-        <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-3 px-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {isOpen ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                )}
-                <CardTitle className="text-sm font-medium">This Week</CardTitle>
-              </div>
-              <Badge variant="secondary" className="font-semibold">
-                {weeklyData.totalCalls} {weeklyData.totalCalls === 1 ? "call" : "calls"}
-              </Badge>
-            </div>
-          </CardHeader>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <CardContent className="pt-0 px-4 pb-4">
-            <div className="space-y-2">
-              {weeklyData.last7Days.map((day) => {
-                const widthPercent = weeklyData.maxCount > 0 ? (day.count / weeklyData.maxCount) * 100 : 0;
-                const isToday = day.date === format(new Date(), "yyyy-MM-dd");
-                return (
-                  <div key={day.date} className="flex items-center gap-3" data-testid={`weekly-stat-${day.date}`}>
-                    <span className={cn(
-                      "w-10 text-xs font-medium",
-                      isToday && "text-primary font-semibold"
-                    )}>
-                      {day.dayName}
-                    </span>
-                    <div className="flex-1 h-5 bg-muted dark:bg-muted/50 rounded-sm overflow-hidden relative">
-                      <div
-                        className={cn(
-                          "h-full rounded-sm transition-all duration-300",
-                          isToday ? "bg-primary" : "bg-primary/60"
-                        )}
-                        style={{ width: `${widthPercent}%` }}
-                      />
-                    </div>
-                    <span className={cn(
-                      "w-6 text-xs text-right",
-                      day.count === 0 ? "text-muted-foreground" : "font-medium",
-                      isToday && "text-primary font-semibold"
-                    )}>
-                      {day.count}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
+    <div className="flex items-center gap-1.5 mb-3 py-2 px-3 bg-muted/20 dark:bg-muted/10 rounded-md border border-border/50" data-testid="weekly-stats">
+      {weeklyData.last7Days.map((day) => {
+        const isToday = day.date === format(new Date(), "yyyy-MM-dd");
+        return (
+          <div
+            key={day.date}
+            className={cn(
+              "flex flex-col items-center justify-center rounded-md px-1.5 py-1 min-w-[32px]",
+              isToday ? "bg-primary text-primary-foreground" : "bg-muted/50 dark:bg-muted/30"
+            )}
+            data-testid={`weekly-stat-${day.date}`}
+          >
+            <span className="text-[10px] font-medium">{day.dayName}</span>
+            <span className={cn("text-xs font-bold", !isToday && day.count === 0 && "text-muted-foreground")}>{day.count}</span>
+          </div>
+        );
+      })}
+      <div className="ml-auto flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground">Total:</span>
+        <Badge variant="secondary" className="text-xs font-semibold">{weeklyData.totalCalls}</Badge>
+      </div>
+    </div>
   );
 }
 
@@ -949,7 +909,7 @@ function DailyCallLog() {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <WeeklyStats days={days} />
 
       <div className="relative">
@@ -1046,8 +1006,8 @@ function DailyCallLog() {
           <p className="text-sm">Start by creating today's log</p>
         </div>
       ) : (
-        <ScrollArea className="h-[calc(100vh-280px)]">
-          <div className="space-y-2 pr-4">
+        <ScrollArea className="h-[calc(100vh-220px)]">
+          <div className="space-y-0 pr-4">
             {days.map((day) => (
               <DateCard
                 key={day.date}
@@ -1396,16 +1356,18 @@ interface WeatherData {
   stale: boolean;
 }
 
-function getWeatherIcon(shortForecast: string, isDaytime: boolean) {
+function getWeatherIcon(shortForecast: string, isDaytime: boolean, size: "sm" | "md" = "md") {
   const forecast = shortForecast.toLowerCase();
-  if (forecast.includes("rain") || forecast.includes("shower")) return <CloudRain className="h-8 w-8 text-blue-500" />;
-  if (forecast.includes("snow")) return <CloudSnow className="h-8 w-8 text-blue-300" />;
-  if (forecast.includes("cloud") || forecast.includes("overcast")) return <Cloud className="h-8 w-8 text-gray-400" />;
-  if (forecast.includes("wind")) return <Wind className="h-8 w-8 text-gray-500" />;
-  return isDaytime ? <Sun className="h-8 w-8 text-yellow-500" /> : <Cloud className="h-8 w-8 text-gray-600" />;
+  const className = size === "sm" ? "h-4 w-4" : "h-5 w-5";
+  if (forecast.includes("rain") || forecast.includes("shower")) return <CloudRain className={cn(className, "text-blue-500")} />;
+  if (forecast.includes("snow")) return <CloudSnow className={cn(className, "text-blue-300")} />;
+  if (forecast.includes("cloud") || forecast.includes("overcast")) return <Cloud className={cn(className, "text-gray-400")} />;
+  if (forecast.includes("wind")) return <Wind className={cn(className, "text-gray-500")} />;
+  return isDaytime ? <Sun className={cn(className, "text-yellow-500")} /> : <Cloud className={cn(className, "text-gray-600")} />;
 }
 
 function WeatherWidget() {
+  const [alertsOpen, setAlertsOpen] = useState(false);
   const { data: weather, isLoading, error } = useQuery<WeatherData>({
     queryKey: ["/api/weather"],
     staleTime: 1000 * 60 * 30,
@@ -1414,98 +1376,63 @@ function WeatherWidget() {
 
   if (isLoading) {
     return (
-      <Card className="mb-4" data-testid="weather-loading">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-muted animate-pulse" />
-            <div className="flex-1 space-y-2">
-              <div className="h-4 w-24 bg-muted animate-pulse rounded" />
-              <div className="h-3 w-32 bg-muted animate-pulse rounded" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="mb-2 py-2 px-3 bg-muted/20 dark:bg-muted/10 rounded-md border border-border/50 flex items-center gap-2" data-testid="weather-loading">
+        <div className="w-5 h-5 rounded-full bg-muted animate-pulse" />
+        <div className="h-4 w-20 bg-muted animate-pulse rounded" />
+        <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+      </div>
     );
   }
 
   if (error || !weather?.forecast?.properties?.periods?.length) {
     return (
-      <Card className="mb-4 border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800" data-testid="weather-unavailable">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3 text-amber-700 dark:text-amber-400">
-            <AlertTriangle className="h-5 w-5" />
-            <span className="text-sm">Weather data unavailable</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="mb-2 py-2 px-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-md border border-amber-200/50 dark:border-amber-800/50 flex items-center gap-2 text-amber-700 dark:text-amber-400" data-testid="weather-unavailable">
+        <AlertTriangle className="h-4 w-4" />
+        <span className="text-xs">Weather unavailable</span>
+      </div>
     );
   }
 
   const currentPeriod = weather.forecast.properties.periods[0];
-  const upcomingPeriods = weather.forecast.properties.periods.slice(1, 5);
   const activeAlerts = weather.alerts?.features || [];
-  const lastUpdated = weather.fetchedAt ? format(new Date(weather.fetchedAt), "h:mm a") : "";
 
   return (
-    <Card className="mb-4" data-testid="weather-widget">
-      <CardContent className="p-4">
-        {activeAlerts.length > 0 && (
-          <div className="mb-3 p-2 bg-red-100 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded-md" data-testid="weather-alerts">
-            {activeAlerts.slice(0, 2).map((alert, idx) => (
-              <div key={idx} className="flex items-start gap-2 text-red-700 dark:text-red-400 text-xs">
-                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                <span className="font-medium">{alert.properties.headline}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        
-        <div className="flex items-center gap-4" data-testid="weather-current">
-          {getWeatherIcon(currentPeriod.shortForecast, currentPeriod.isDaytime)}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold" data-testid="weather-temperature">
-                {currentPeriod.temperature}°{currentPeriod.temperatureUnit}
-              </span>
-              <span className="text-sm text-muted-foreground" data-testid="weather-period-name">
-                {currentPeriod.name}
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground truncate" data-testid="weather-short-forecast">
-              {currentPeriod.shortForecast}
-            </p>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-              <Wind className="h-3 w-3" />
-              <span>{currentPeriod.windSpeed} {currentPeriod.windDirection}</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="mt-4 pt-3 border-t" data-testid="weather-forecast">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {upcomingPeriods.map((period) => (
-              <div 
-                key={period.number} 
-                className="flex-shrink-0 text-center p-2 rounded-lg bg-muted/50 min-w-[70px]"
-                data-testid={`weather-period-${period.number}`}
-              >
-                <div className="text-xs font-medium truncate w-16">{period.name}</div>
-                <div className="my-1 flex justify-center">
-                  {getWeatherIcon(period.shortForecast, period.isDaytime)}
+    <div className="mb-2" data-testid="weather-widget">
+      {activeAlerts.length > 0 && (
+        <Collapsible open={alertsOpen} onOpenChange={setAlertsOpen}>
+          <CollapsibleTrigger asChild>
+            <button className="w-full mb-1 py-1.5 px-2 bg-red-100/80 dark:bg-red-950/40 border border-red-200/50 dark:border-red-800/50 rounded-md flex items-center gap-2 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/60 transition-colors" data-testid="weather-alerts-toggle">
+              <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="text-xs font-medium flex-1 text-left truncate">{activeAlerts.length} weather alert{activeAlerts.length > 1 ? "s" : ""}</span>
+              {alertsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="mb-1 p-2 bg-red-50/50 dark:bg-red-950/20 border border-red-200/30 dark:border-red-800/30 rounded-md space-y-1" data-testid="weather-alerts">
+              {activeAlerts.slice(0, 2).map((alert, idx) => (
+                <div key={idx} className="text-red-700 dark:text-red-400 text-xs">
+                  {alert.properties.headline}
                 </div>
-                <div className="text-sm font-bold">{period.temperature}°</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+      <div className="flex items-center gap-3 py-2 px-3 bg-muted/20 dark:bg-muted/10 rounded-md border border-border/50" data-testid="weather-current">
+        {getWeatherIcon(currentPeriod.shortForecast, currentPeriod.isDaytime)}
+        <span className="text-sm font-semibold" data-testid="weather-temperature">
+          {currentPeriod.temperature}°{currentPeriod.temperatureUnit}
+        </span>
+        <span className="text-xs text-muted-foreground truncate" data-testid="weather-short-forecast">
+          {currentPeriod.shortForecast}
+        </span>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
+          <Wind className="h-3 w-3" />
+          <span className="hidden sm:inline">{currentPeriod.windSpeed}</span>
+          <span className="sm:hidden">{currentPeriod.windSpeed.split(" ")[0]}</span>
         </div>
-        
-        {lastUpdated && (
-          <div className="mt-2 text-xs text-muted-foreground text-right" data-testid="weather-updated">
-            Updated {lastUpdated}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -1537,16 +1464,16 @@ export default function Voicemails() {
         </div>
       </header>
 
-      <main className="p-3 sm:p-4">
+      <main className="p-2 sm:p-3">
         <WeatherWidget />
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
-            <TabsTrigger value="call-logs" data-testid="tab-call-logs">
-              <Calendar className="h-4 w-4 mr-2" />
+          <TabsList className="grid w-full max-w-xs grid-cols-2 mb-2 h-8">
+            <TabsTrigger value="call-logs" className="text-xs" data-testid="tab-call-logs">
+              <Calendar className="h-3.5 w-3.5 mr-1.5" />
               Call Logs
             </TabsTrigger>
-            <TabsTrigger value="voicemails" data-testid="tab-voicemails">
-              <Phone className="h-4 w-4 mr-2" />
+            <TabsTrigger value="voicemails" className="text-xs" data-testid="tab-voicemails">
+              <Phone className="h-3.5 w-3.5 mr-1.5" />
               Voicemails
             </TabsTrigger>
           </TabsList>
