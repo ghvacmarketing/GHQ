@@ -1,0 +1,373 @@
+Replit Phase 0 Instructions (Foundation) — Roles: Admin / Technician / Sales
+Goal of Phase 0
+
+Create a production-ready foundation so we can safely build the CRM features on top:
+
+Postgres DB + migrations
+
+Secure authentication (email/password)
+
+Role-based access control (ADMIN / TECHNICIAN / SALES)
+
+Audit logs for key actions
+
+Webhook idempotency table (for Stripe/Textline/QBO later)
+
+Minimal “core entities” schema (customers + jobs) with basic endpoints
+
+Deliverable: A deployed app where users can log in, and role permissions are enforced on API routes and pages.
+
+1) Stack & project setup
+
+Use:
+
+Next.js + TypeScript
+
+Prisma ORM
+
+Postgres (Replit production DB)
+
+Server-side auth sessions (cookie-based)
+
+Folder conventions
+
+/app for pages (or /pages if using Pages router)
+
+/lib/auth, /lib/rbac, /lib/db, /lib/audit, /lib/webhooks
+
+/prisma/schema.prisma + migrations
+
+2) Environment variables (Replit Secrets)
+
+Create these secrets:
+
+DATABASE_URL
+
+SESSION_SECRET (long random string)
+
+APP_URL (deployment URL)
+
+Rule: No secrets in source code.
+
+3) Database schema (Prisma models)
+
+Create these Prisma models (UUIDs preferred):
+
+Users
+
+User
+
+id
+
+name
+
+email (unique)
+
+phone (nullable)
+
+role (enum: ADMIN, TECHNICIAN, SALES)
+
+passwordHash
+
+isActive
+
+createdAt
+
+Sessions
+
+Session
+
+id
+
+userId
+
+expiresAt
+
+createdAt
+
+Customers
+
+Customer
+
+id
+
+name
+
+phoneE164 (index)
+
+email (nullable, index)
+
+createdAt
+
+Properties (optional now, but recommended)
+
+Property
+
+id
+
+customerId
+
+address1, city, state, zip
+
+notes (nullable)
+
+Jobs
+
+Job
+
+id
+
+customerId
+
+propertyId (nullable)
+
+jobType (enum: SERVICE, MAINTENANCE, INSTALL, ESTIMATE)
+
+status (enum: NEW, SCHEDULED, DISPATCHED, EN_ROUTE, ONSITE, COMPLETED, INVOICED, PAID)
+
+createdAt
+
+Job assignments (for tech visibility)
+
+JobAssignment
+
+id
+
+jobId
+
+techUserId
+
+startAt (nullable)
+
+endAt (nullable)
+
+Job status events (timeline)
+
+JobStatusEvent
+
+id
+
+jobId
+
+status
+
+userId
+
+createdAt
+
+Audit log (non-negotiable)
+
+AuditLog
+
+id
+
+userId
+
+action (string)
+
+entityType (string)
+
+entityId (string)
+
+beforeJson (JSON)
+
+afterJson (JSON)
+
+createdAt
+
+Webhook idempotency table (for later integrations)
+
+WebhookEvent
+
+id
+
+provider (enum/string: STRIPE, TEXTLINE, QBO)
+
+providerEventId (unique)
+
+payloadJson (JSON)
+
+receivedAt
+
+processedAt (nullable)
+
+Deliverable: Initial migration created and applied.
+
+4) Authentication (email/password + DB sessions)
+
+Implement:
+
+POST /api/auth/login
+
+POST /api/auth/logout
+
+GET /api/auth/me
+
+Requirements:
+
+bcrypt password hashing
+
+session stored in DB
+
+secure cookie (httpOnly, secure, sameSite)
+
+block access for inactive users
+
+Create middleware:
+
+requireAuth(req) → returns user or 401
+
+requireRole(user, roles[]) → 403 if not allowed
+
+5) RBAC rules (only 3 roles)
+ADMIN
+
+Full access to everything
+
+Can create/disable users
+
+SALES
+
+Can create/edit customers
+
+Can create jobs
+
+Can view all jobs + customers
+
+Cannot manage users
+
+TECHNICIAN
+
+Can view ONLY:
+
+jobs assigned to them (JobAssignment.techUserId = me)
+
+customers tied to those jobs
+
+Can update job status for assigned jobs
+
+Can add job notes (we can add notes in Phase 1 if desired)
+
+Cannot see all customers list unless filtered to assigned jobs
+
+Deliverable: These rules are enforced server-side on every API endpoint.
+
+6) Minimal API endpoints (Phase 0)
+
+Implement these endpoints with RBAC:
+
+Customers
+
+GET /api/customers
+
+ADMIN/SALES: list all
+
+TECHNICIAN: list only customers who have a job assigned to them
+
+POST /api/customers
+
+ADMIN/SALES only
+
+GET /api/customers/:id
+
+ADMIN/SALES: allowed
+
+TECHNICIAN: allowed only if linked to an assigned job
+
+Jobs
+
+GET /api/jobs
+
+ADMIN/SALES: list all
+
+TECHNICIAN: list assigned only
+
+POST /api/jobs
+
+ADMIN/SALES only
+
+POST /api/jobs/:id/assign
+
+ADMIN/SALES only (assign a tech)
+
+POST /api/jobs/:id/status
+
+ADMIN/SALES: allowed
+
+TECHNICIAN: allowed only for assigned jobs
+
+This endpoint MUST create:
+
+a JobStatusEvent
+
+an AuditLog entry
+
+7) Audit logging (Phase 0 scope)
+
+Log these actions:
+
+User login/logout (optional)
+
+Customer create/update
+
+Job create
+
+Job assignment change
+
+Job status change
+
+AuditLog should include beforeJson and afterJson snapshots.
+
+8) Webhook ingestion helper (Phase 0 scaffold)
+
+Create helper:
+
+ingestWebhookEvent(provider, providerEventId, payload)
+
+if providerEventId already exists → return “duplicate ignored”
+
+else insert into WebhookEvent and return created row
+
+(No Stripe/Textline/QBO integration yet—just the safe pattern.)
+
+9) Bootstrap admin + seed script
+
+Create a seed script:
+
+Admin user: admin@yourdomain.com (password set via env or printed once)
+
+One tech user + one sales user
+
+One test customer + test job assigned to tech
+
+Deliverable: npm run seed creates these users.
+
+10) Simple UI pages (just enough to test)
+
+/login
+
+/dashboard
+
+/tech (shows “My Jobs” list for TECHNICIAN)
+
+/customers (ADMIN/SALES; TECH sees filtered list)
+
+These can be ugly—functionality first.
+
+Acceptance test checklist (Phase 0 “done”)
+
+Admin can log in and create a customer and job
+
+Sales can log in and create customers + jobs, assign techs
+
+Tech can log in and only see assigned jobs + related customers
+
+Tech can change status on assigned jobs only
+
+Every job status change creates:
+
+JobStatusEvent
+
+AuditLog entry
+
+Duplicate webhook events are ignored if same providerEventId

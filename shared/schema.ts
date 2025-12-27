@@ -1024,3 +1024,50 @@ export const weatherDaily = pgTable("weather_daily", {
 
 export type CallDaily = typeof callDaily.$inferSelect;
 export type WeatherDaily = typeof weatherDaily.$inferSelect;
+
+// Webhook Event table for idempotency (Stripe, Textline, QBO, etc.)
+export const webhookProviderEnum = ["stripe", "textline", "qbo", "other"] as const;
+export type WebhookProvider = typeof webhookProviderEnum[number];
+
+export const crmWebhookEvents = pgTable("crm_webhook_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").$type<WebhookProvider>().notNull(),
+  providerEventId: text("provider_event_id").notNull().unique(),
+  payloadJson: json("payload_json").$type<Record<string, unknown>>(),
+  receivedAt: timestamp("received_at").defaultNow(),
+  processedAt: timestamp("processed_at"),
+});
+
+export const insertCrmWebhookEventSchema = createInsertSchema(crmWebhookEvents).omit({
+  id: true,
+  receivedAt: true,
+});
+
+export type InsertCrmWebhookEvent = z.infer<typeof insertCrmWebhookEventSchema>;
+export type CrmWebhookEvent = typeof crmWebhookEvents.$inferSelect;
+
+// Insert schema for job assignments and notes
+export const insertCrmJobAssignmentSchema = createInsertSchema(crmJobAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmJobNoteSchema = createInsertSchema(crmJobNotes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmJobStatusEventSchema = createInsertSchema(crmJobStatusEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmSessionSchema = createInsertSchema(crmSessions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCrmJobAssignment = z.infer<typeof insertCrmJobAssignmentSchema>;
+export type InsertCrmJobNote = z.infer<typeof insertCrmJobNoteSchema>;
+export type InsertCrmJobStatusEvent = z.infer<typeof insertCrmJobStatusEventSchema>;
+export type InsertCrmSession = z.infer<typeof insertCrmSessionSchema>;
