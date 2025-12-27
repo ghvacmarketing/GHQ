@@ -1418,18 +1418,27 @@ function WeatherWidget() {
           </CollapsibleContent>
         </Collapsible>
       )}
-      <div className="flex items-center gap-3 py-2 px-3 bg-muted/20 dark:bg-muted/10 rounded-md border border-border/50" data-testid="weather-current">
-        {getWeatherIcon(currentPeriod.shortForecast, currentPeriod.isDaytime)}
-        <span className="text-sm font-semibold" data-testid="weather-temperature">
-          {currentPeriod.temperature}°{currentPeriod.temperatureUnit}
-        </span>
-        <span className="text-xs text-muted-foreground truncate" data-testid="weather-short-forecast">
-          {currentPeriod.shortForecast}
-        </span>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
-          <Wind className="h-3 w-3" />
-          <span className="hidden sm:inline">{currentPeriod.windSpeed}</span>
-          <span className="sm:hidden">{currentPeriod.windSpeed.split(" ")[0]}</span>
+      <div className="flex items-center gap-4 py-3 px-4 bg-gradient-to-r from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/30 rounded-lg border border-blue-100 dark:border-blue-900/50 shadow-sm" data-testid="weather-current">
+        <div className="flex-shrink-0">
+          {getWeatherIcon(currentPeriod.shortForecast, currentPeriod.isDaytime, "md")}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-foreground" data-testid="weather-temperature">
+              {currentPeriod.temperature}°
+            </span>
+            <span className="text-sm text-muted-foreground">{currentPeriod.name}</span>
+          </div>
+          <p className="text-sm text-muted-foreground truncate" data-testid="weather-short-forecast">
+            {currentPeriod.shortForecast}
+          </p>
+        </div>
+        <div className="flex flex-col items-end text-xs text-muted-foreground flex-shrink-0">
+          <div className="flex items-center gap-1">
+            <Wind className="h-3.5 w-3.5" />
+            <span>{currentPeriod.windSpeed}</span>
+          </div>
+          <span className="text-[10px]">{currentPeriod.windDirection}</span>
         </div>
       </div>
     </div>
