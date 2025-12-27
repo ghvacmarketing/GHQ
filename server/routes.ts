@@ -22,6 +22,8 @@ import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAuto
 import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, type QuoteGenerationInput } from "./services/quote-generation";
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook } from "./services/vector-store";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
+import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureDefaultAdminExists, CRM_SESSION_COOKIE } from "./crm-auth";
+import cookieParser from "cookie-parser";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -102,8 +104,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Add cookie parser for CRM authentication
+  app.use(cookieParser());
+
   // Setup employee portal authentication (passport strategies, login/logout routes)
   setupEmployeeAuth(app);
+
+  // Ensure default CRM admin user exists
+  ensureDefaultAdminExists().catch(console.error);
 
   // Configure multer for file uploads
   const upload = multer({
@@ -4435,6 +4443,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching documents:", error);
       res.status(500).json({ message: "Failed to fetch documents" });
+    }
+  });
+
+  // ============================================
+  // CRM AUTHENTICATION ROUTES
+  // ============================================
+
+  // POST /api/crm/auth/login - Login with email/password
+  app.post("/api/crm/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const user = await getCrmUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      if (!user.isActive) {
+        return res.status(401).json({ message: "Account is disabled" });
+      }
+
+      const isValid = await compareCrmPasswords(password, user.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      const userAgent = req.headers["user-agent"];
+      const ipAddress = req.ip || req.socket.remoteAddress;
+      const session = await createCrmSession(user.id, userAgent, ipAddress);
+
+      res.cookie(CRM_SESSION_COOKIE, session.sessionToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+        maxAge: 8 * 60 * 60 * 1000, // 8 hours
+      });
+
+      const { passwordHash, ...userWithoutPassword } = user;
+      return res.json({
+        message: "Login successful",
+        user: userWithoutPassword,
+      });
+    } catch (error) {
+      console.error("CRM login error:", error);
+      return res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // POST /api/crm/auth/logout - Destroy session
+  app.post("/api/crm/auth/logout", async (req, res) => {
+    try {
+      const sessionToken = req.cookies?.[CRM_SESSION_COOKIE];
+      if (sessionToken) {
+        await destroyCrmSession(sessionToken);
+      }
+      res.clearCookie(CRM_SESSION_COOKIE);
+      return res.json({ message: "Logged out successfully" });
+    } catch (error) {
+      console.error("CRM logout error:", error);
+      return res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
+  // GET /api/crm/auth/me - Get current authenticated CRM user
+  app.get("/api/crm/auth/me", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      const { passwordHash, ...userWithoutPassword } = user;
+      return res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("CRM get me error:", error);
+      return res.status(500).json({ message: "Failed to get user" });
+    }
+  });
+
+  // POST /api/crm/auth/gate - Verify gate password
+  app.post("/api/crm/auth/gate", (req, res) => {
+    try {
+      const { password } = req.body;
+
+      if (!password || typeof password !== "string") {
+        return res.status(400).json({ message: "Password is required" });
+      }
+
+      const isValid = verifyGatePassword(password);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid gate password" });
+      }
+
+      return res.json({ message: "Gate password verified", valid: true });
+    } catch (error) {
+      console.error("CRM gate verification error:", error);
+      return res.status(500).json({ message: "Verification failed" });
     }
   });
 
