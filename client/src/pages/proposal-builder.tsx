@@ -241,6 +241,7 @@ const CRAWLSPACE_CONSTANTS = {
   PILLAR_SIDE_IN: 16,
   PILLAR_HEIGHT_FT: 3,
   ROLL_AREA_12x100: 1200, // sqft per roll
+  LINER_MARKUP: 1.50, // 50% gross margin on liner
   DEHUMIDIFIER_MARKUP: 1.50, // 50% markup
   RECEPTACLE_ADD: 150, // $150 for receptacle box
   SIZE_BANDS: [1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000] // Extended bands
@@ -300,9 +301,9 @@ function calculateCrawlspacePricing(sqft: number, tierName: string): CrawlspaceP
   // Rolls needed
   const rollsNeeded = Math.ceil(totalLinerAreaSqft / CRAWLSPACE_CONSTANTS.ROLL_AREA_12x100);
   
-  // Liner material cost
+  // Liner material cost with 50% gross margin
   const linerInfo = LINER_ROLL_PRICES[tierName as keyof typeof LINER_ROLL_PRICES];
-  const linerMaterialCost = rollsNeeded * linerInfo.rollPrice;
+  const linerMaterialCost = rollsNeeded * linerInfo.rollPrice * CRAWLSPACE_CONSTANTS.LINER_MARKUP;
   
   // Labor cost
   const laborCost = bandSqft * CRAWLSPACE_CONSTANTS.LABOR_RATE_PER_SQFT;
