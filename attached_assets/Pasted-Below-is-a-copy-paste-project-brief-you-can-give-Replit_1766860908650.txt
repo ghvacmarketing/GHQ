@@ -1,0 +1,346 @@
+Below is a copy/paste project brief you can give Replit to start building a FieldEdge-like HVAC CRM (single company) with jobs + dispatch + invoicing + payments + Textline + QuickBooks + full customer history + technician mobile (PWA).
+
+0) Project name + goal
+
+Project: GHVAC CRM (FieldEdge-like)
+Goal: Replace FieldEdge with a custom CRM that supports:
+
+20k+ customers + full history/timeline
+
+Leads → jobs → dispatch → completion → invoice → payment
+
+Estimates/proposals (Good/Better/Best) + e-sign later
+
+Texting via Textline inside the CRM (2-way)
+
+QuickBooks Online integration (invoices + payments sync)
+
+Technician mobile experience (PWA) for job list + collect payment (pay link)
+
+Single company only (not multi-tenant).
+
+1) Non-negotiables (build these first)
+
+Postgres database (no “JSON-only” storage for core records)
+
+RBAC permissions (Admin / Office / Dispatcher / Sales / Tech)
+
+Audit log for all critical actions (invoice edits, payment status changes, job status changes)
+
+Webhooks are idempotent (Stripe/QBO/Textline can retry; we must not duplicate)
+
+Files stored in object storage (photos/PDFs not stored as blobs in Postgres)
+
+Backup/restore plan (DB + file storage)
+
+2) Recommended stack (keep it simple and production-ready)
+
+Frontend: React (Next.js preferred)
+
+Backend/API: Next.js API routes OR Node/Express (either is fine)
+
+ORM: Prisma (recommended)
+
+Database: Postgres (Replit production DB / Neon-backed)
+
+File storage: Replit App Storage (or S3-compatible)
+
+Auth: email/password + session cookies (JWT acceptable), bcrypt hashing
+
+Background jobs: a simple Postgres-backed job queue (table + worker)
+
+Deploy: Replit Deployment (Autoscale or Reserved VM). Use Reserved VM if you need always-on reliability for webhooks.
+
+3) Core entities (database tables)
+
+Implement these tables early. Use UUID primary keys.
+
+Users / security
+
+users(id, name, email, phone, role, password_hash, is_active, created_at)
+
+sessions(id, user_id, expires_at, created_at)
+
+audit_log(id, user_id, action, entity_type, entity_id, before_json, after_json, created_at)
+
+Customers / properties / equipment
+
+customers(id, name, company_name, email, phone_e164, tags_json, created_at)
+
+contacts(id, customer_id, name, phone_e164, email, is_primary)
+
+properties(id, customer_id, address1, city, state, zip, notes)
+
+equipment(id, property_id, type, brand, model, serial, install_date, notes)
+
+Leads + call/voicemail logs (optional but requested)
+
+leads(id, name, phone_e164, email, source, status, notes, created_at, customer_id nullable)
+
+call_log_days(id, date_yyyy_mm_dd unique)
+
+call_logs(id, day_id, customer_id nullable, client_name, phone_e164 nullable, description, created_by_user_id, created_at)
+
+voicemails(id, from_phone_e164, audio_url, transcription, status, linked_customer_id nullable, created_at)
+
+Jobs + dispatch + scheduling
+
+jobs(id, customer_id, property_id, job_type, status, priority, created_at)
+
+job_assignments(id, job_id, tech_user_id, start_at, end_at)
+
+job_status_events(id, job_id, status, user_id, created_at) (timeline)
+
+job_notes(id, job_id, user_id, body, created_at)
+
+attachments(id, entity_type, entity_id, file_url, file_name, mime_type, uploaded_by, created_at)
+
+Estimates / proposals
+
+estimates(id, job_id, version, status, total, pdf_url, created_at)
+
+estimate_options(id, estimate_id, name, json_breakdown, total)
+
+esign_envelopes(id, estimate_id, provider, envelope_id, status, signed_pdf_url, created_at)
+
+Invoices / payments (ledger-style)
+
+invoices(id, job_id, customer_id, status, subtotal, tax, total, balance_due, pdf_url, created_at)
+
+payments(id, invoice_id, provider, amount, status, provider_payment_id, created_at)
+
+payment_events(id, provider, provider_event_id unique, payload_json, received_at) (idempotency)
+
+Texting (Textline)
+
+message_threads(id, customer_id, last_message_at)
+
+messages(id, thread_id, direction, body, provider, provider_message_id, created_at, raw_json)
+
+webhook_events(id, provider, provider_event_id unique, payload_json, processed_at nullable) (idempotency)
+
+QuickBooks sync
+
+qbo_links(id, entity_type, entity_id, qbo_id, last_sync_at, sync_status, last_error)
+
+sync_jobs(id, type, payload_json, status, attempts, run_after, last_error) (queue)
+
+4) Pages/screens (MVP → full)
+Office/admin (desktop)
+
+Dashboard: today’s jobs, overdue invoices, unread voicemails, quick stats
+
+Customers:
+
+search by name/phone/address
+
+customer profile + properties + equipment
+
+full timeline (jobs, notes, invoices, payments, texts, calls)
+
+Leads: create/convert to job
+
+Jobs board:
+
+statuses like FieldEdge (New / Scheduled / Dispatched / En Route / On Site / Completed / Invoiced / Paid)
+
+Dispatch calendar:
+
+day/week view, assign tech, drag-drop (phase 2 if needed)
+
+Estimates/Proposals:
+
+build options (Good/Better/Best)
+
+generate PDF
+
+send via text/email link
+
+Invoices:
+
+create from job or accepted estimate
+
+“Send pay link”
+
+Messages:
+
+Textline inbox inside CRM
+
+Voicemails + Call Logs page (same page, as discussed)
+
+Settings:
+
+users/roles
+
+templates (text/email)
+
+integrations (Stripe/QBO/Textline keys + webhook status)
+
+pricebook (phase 3)
+
+Technician mobile (PWA) — V1
+
+/tech/jobs = “My Jobs Today”
+
+/tech/job/:id = customer info + address + notes + status buttons
+
+Button: Collect Payment (V1 = send customer pay link)
+
+Button: Mark Complete + signature capture (optional)
+
+Techs must only see jobs assigned to them.
+
+5) Critical workflows (acceptance criteria)
+Workflow A: Lead → Job
+
+Create lead (name/phone/source)
+
+Convert to customer + job
+
+Job appears in “New” status
+
+Workflow B: Dispatch
+
+Assign tech + schedule time
+
+Tech sees it in mobile list
+
+Job status events are recorded (audit + timeline)
+
+Workflow C: Job complete → invoice → payment
+
+Office or tech generates invoice
+
+Click “Send Pay Link” (SMS via Textline)
+
+Customer pays (Stripe)
+
+Stripe webhook marks payment received
+
+Invoice balance updates + receipt stored
+
+Payment pushed to QuickBooks (sync job)
+
+Workflow D: Texting (Textline)
+
+Inbound text creates/links to customer thread (match by phone)
+
+Outbound text from CRM appears in Textline and is stored in CRM
+
+Search customer → see full message history
+
+Workflow E: QuickBooks Online
+
+Invoices created in CRM sync to QBO
+
+Payments sync to QBO
+
+Sync has logs + retry + “resync” button
+
+6) Integrations (build order)
+1) Stripe (payments)
+
+Use Stripe Checkout or Payment Links style flow from invoices
+
+Webhook endpoint: /webhooks/stripe
+
+Idempotency: store provider_event_id and ignore duplicates
+
+Never store card data; store Stripe IDs only
+
+2) Textline
+
+Webhook endpoints:
+
+/webhooks/textline/inbound
+
+/webhooks/textline/outbound
+
+Normalize phone to E.164; match to customer
+
+Store raw payload + processed flag (idempotent)
+
+3) QuickBooks Online
+
+OAuth connect screen + token storage in encrypted secrets
+
+Sync queue worker:
+
+push invoice
+
+push payment
+
+Idempotent mapping via qbo_links
+
+7) Search (must be global and fast)
+
+Global search bar that searches:
+
+customer name
+
+phone
+
+address
+
+invoice #
+
+job id
+
+message contents (optional)
+
+call log entries
+
+Click result opens the record and highlights the relevant entry.
+
+Use DB indexes on phone, name, created_at, status.
+
+8) Data migration from FieldEdge (plan)
+
+We will import history in stages:
+
+Customers + contacts + properties
+
+Jobs/work orders (as “historical jobs”)
+
+Invoices + payments
+
+Notes
+
+Attachments (if exportable) → store in object storage and link
+
+Migration must:
+
+dedupe by phone/email
+
+keep original timestamps
+
+store source_system="FieldEdge" + source_id fields on imported rows
+
+Keep FieldEdge read-only for 60–90 days post cutover.
+
+9) Milestones (build in this order)
+
+Milestone 0: Auth + RBAC + database schema + audit log
+Milestone 1: Customers + jobs + job timeline + basic search
+Milestone 2: Dispatch scheduling + technician PWA job list
+Milestone 3: Invoicing + Stripe pay links + webhook reconciliation
+Milestone 4: Textline 2-way messaging + logging in timeline
+Milestone 5: QuickBooks Online sync (invoices + payments)
+Milestone 6: Estimates/proposals + PDF generation + optional e-sign
+Milestone 7: Reporting dashboards + polish + migration tooling
+
+10) What “done” looks like (minimum viable FieldEdge replacement)
+
+Office can schedule jobs and see status
+
+Techs can see jobs on phone and trigger payment link
+
+Customers can pay online
+
+Text messages are inside CRM (Textline integrated)
+
+QuickBooks has matching invoices/payments
+
+Every customer has a full history timeline
+
+Permissions + audit trail protect you

@@ -748,3 +748,237 @@ export type InsertCompensationAuditLog = z.infer<typeof insertCompensationAuditL
 export type CompensationAuditLog = typeof compensationAuditLog.$inferSelect;
 export type InsertEmployeeDocument = z.infer<typeof insertEmployeeDocumentSchema>;
 export type EmployeeDocument = typeof employeeDocuments.$inferSelect;
+
+// ============================================
+// GHVAC CRM Tables (FieldEdge Replacement)
+// ============================================
+
+// CRM User Roles
+export const crmUserRoleEnum = ["owner", "manager", "dispatcher", "sales", "tech", "viewer"] as const;
+export type CrmUserRole = typeof crmUserRoleEnum[number];
+
+// CRM Users
+export const crmUsers = pgTable("crm_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  phone: text("phone"),
+  role: text("role").$type<CrmUserRole>().notNull().default("viewer"),
+  passwordHash: text("password_hash").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// CRM Sessions
+export const crmSessions = pgTable("crm_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  sessionToken: text("session_token").notNull().unique(),
+  userAgent: text("user_agent"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow(),
+});
+
+// CRM Audit Log
+export const crmAuditLog = pgTable("crm_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  actorUserId: varchar("actor_user_id").references(() => crmUsers.id),
+  actorType: text("actor_type").$type<"user" | "system">().notNull().default("user"),
+  action: text("action").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: varchar("entity_id"),
+  metadata: json("metadata").$type<Record<string, unknown>>(),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// CRM Customers
+export const crmCustomers = pgTable("crm_customers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  companyName: text("company_name"),
+  email: text("email"),
+  phone: text("phone"),
+  tags: json("tags").$type<string[]>().default([]),
+  notes: text("notes"),
+  sourceSystem: text("source_system"),
+  sourceId: text("source_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CRM Properties (addresses linked to customers)
+export const crmProperties = pgTable("crm_properties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => crmCustomers.id, { onDelete: "cascade" }),
+  address1: text("address1").notNull(),
+  address2: text("address2"),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  zip: text("zip").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// CRM Equipment
+export const crmEquipment = pgTable("crm_equipment", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  propertyId: varchar("property_id").notNull().references(() => crmProperties.id, { onDelete: "cascade" }),
+  equipmentType: text("equipment_type").notNull(),
+  brand: text("brand"),
+  model: text("model"),
+  serialNumber: text("serial_number"),
+  installDate: date("install_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Job Status Enum
+export const crmJobStatusEnum = ["new", "scheduled", "dispatched", "en_route", "on_site", "completed", "invoiced", "paid", "cancelled"] as const;
+export type CrmJobStatus = typeof crmJobStatusEnum[number];
+
+// CRM Jobs
+export const crmJobs = pgTable("crm_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => crmCustomers.id),
+  propertyId: varchar("property_id").references(() => crmProperties.id),
+  jobType: text("job_type").notNull(),
+  status: text("status").$type<CrmJobStatus>().notNull().default("new"),
+  priority: text("priority").$type<"low" | "normal" | "high" | "urgent">().default("normal"),
+  description: text("description"),
+  scheduledStart: timestamp("scheduled_start"),
+  scheduledEnd: timestamp("scheduled_end"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CRM Job Assignments (techs assigned to jobs)
+export const crmJobAssignments = pgTable("crm_job_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => crmJobs.id, { onDelete: "cascade" }),
+  techUserId: varchar("tech_user_id").notNull().references(() => crmUsers.id),
+  startAt: timestamp("start_at"),
+  endAt: timestamp("end_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// CRM Job Status Events (timeline)
+export const crmJobStatusEvents = pgTable("crm_job_status_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => crmJobs.id, { onDelete: "cascade" }),
+  status: text("status").$type<CrmJobStatus>().notNull(),
+  userId: varchar("user_id").references(() => crmUsers.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// CRM Job Notes
+export const crmJobNotes = pgTable("crm_job_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => crmJobs.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => crmUsers.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Invoice Status Enum
+export const crmInvoiceStatusEnum = ["draft", "sent", "viewed", "partial", "paid", "void"] as const;
+export type CrmInvoiceStatus = typeof crmInvoiceStatusEnum[number];
+
+// CRM Invoices
+export const crmInvoices = pgTable("crm_invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  jobId: varchar("job_id").references(() => crmJobs.id),
+  customerId: varchar("customer_id").notNull().references(() => crmCustomers.id),
+  status: text("status").$type<CrmInvoiceStatus>().notNull().default("draft"),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  tax: decimal("tax", { precision: 10, scale: 2 }).notNull().default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  balanceDue: decimal("balance_due", { precision: 10, scale: 2 }).notNull(),
+  pdfUrl: text("pdf_url"),
+  dueDate: date("due_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CRM Payments
+export const crmPayments = pgTable("crm_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => crmInvoices.id),
+  provider: text("provider").$type<"stripe" | "check" | "cash" | "other">().notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").$type<"pending" | "completed" | "failed" | "refunded">().notNull().default("pending"),
+  providerPaymentId: text("provider_payment_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Insert schemas for CRM
+export const insertCrmUserSchema = createInsertSchema(crmUsers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmCustomerSchema = createInsertSchema(crmCustomers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCrmPropertySchema = createInsertSchema(crmProperties).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmEquipmentSchema = createInsertSchema(crmEquipment).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmJobSchema = createInsertSchema(crmJobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCrmInvoiceSchema = createInsertSchema(crmInvoices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCrmPaymentSchema = createInsertSchema(crmPayments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmAuditLogSchema = createInsertSchema(crmAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+// CRM Types
+export type InsertCrmUser = z.infer<typeof insertCrmUserSchema>;
+export type CrmUser = typeof crmUsers.$inferSelect;
+export type CrmSession = typeof crmSessions.$inferSelect;
+export type InsertCrmAuditLog = z.infer<typeof insertCrmAuditLogSchema>;
+export type CrmAuditLogEntry = typeof crmAuditLog.$inferSelect;
+export type InsertCrmCustomer = z.infer<typeof insertCrmCustomerSchema>;
+export type CrmCustomer = typeof crmCustomers.$inferSelect;
+export type InsertCrmProperty = z.infer<typeof insertCrmPropertySchema>;
+export type CrmProperty = typeof crmProperties.$inferSelect;
+export type InsertCrmEquipment = z.infer<typeof insertCrmEquipmentSchema>;
+export type CrmEquipmentItem = typeof crmEquipment.$inferSelect;
+export type InsertCrmJob = z.infer<typeof insertCrmJobSchema>;
+export type CrmJob = typeof crmJobs.$inferSelect;
+export type CrmJobAssignment = typeof crmJobAssignments.$inferSelect;
+export type CrmJobStatusEvent = typeof crmJobStatusEvents.$inferSelect;
+export type CrmJobNote = typeof crmJobNotes.$inferSelect;
+export type InsertCrmInvoice = z.infer<typeof insertCrmInvoiceSchema>;
+export type CrmInvoice = typeof crmInvoices.$inferSelect;
+export type InsertCrmPayment = z.infer<typeof insertCrmPaymentSchema>;
+export type CrmPayment = typeof crmPayments.$inferSelect;
