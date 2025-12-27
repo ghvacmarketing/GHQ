@@ -326,8 +326,8 @@ function JobCardOverlay({ job, timelineWidth }: { job: Job; timelineWidth: numbe
   
   return (
     <div
-      className={`rounded border ${colors.bg} ${colors.border} ${colors.text} px-3 py-1.5 shadow-md cursor-grabbing flex flex-col justify-center`}
-      style={{ width: `${widthPx}px`, height: '36px' }}
+      className={`rounded border ${colors.bg} ${colors.border} ${colors.text} px-3 py-1 shadow-md cursor-grabbing flex flex-col justify-center`}
+      style={{ width: `${widthPx}px`, height: '48px' }}
     >
       <p className="text-xs font-medium truncate">{job.customerName}</p>
       <p className="text-xs truncate opacity-70">{job.jobType}</p>
