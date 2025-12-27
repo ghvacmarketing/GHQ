@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Settings, Search, Plus, FileText, Mic } from "lucide-react";
 import { useLocation } from "wouter";
 import NavDropdown from "@/components/nav-dropdown";
+import MobileNav from "@/components/mobile-nav";
 import redlogo from "@assets/redlogo.webp";
 import type { Process } from "@shared/schema";
 import ProcessDetailView from "@/components/process-detail-view";
@@ -45,6 +46,7 @@ export default function ProcessesSystems() {
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="flex items-center justify-between p-3 sm:p-4">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <MobileNav />
             <img 
               src={redlogo} 
               alt="Giesbrecht HVAC" 

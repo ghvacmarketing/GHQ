@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { History, ChevronDown, ChevronUp, FileText, Calendar, User, ArrowLeft, Plus, Edit, UserPlus } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import MobileNav from "@/components/mobile-nav";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Quote } from "@shared/schema";
@@ -143,6 +144,7 @@ export default function QuotesHistory() {
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="flex items-center justify-between p-3 sm:p-4">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <MobileNav />
             <img 
               src={redlogo} 
               alt="Giesbrecht HVAC" 

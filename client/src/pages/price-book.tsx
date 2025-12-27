@@ -3,6 +3,7 @@ import { Settings, BookOpen, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import NavDropdown from "@/components/nav-dropdown";
+import MobileNav from "@/components/mobile-nav";
 import redlogo from "@assets/redlogo.webp";
 
 const SALESBOOK_OPTIONS = [
@@ -21,6 +22,7 @@ export default function PriceBook() {
       <header className="flex-shrink-0 bg-card border-b border-border shadow-sm">
         <div className="flex items-center justify-between p-3 sm:p-4">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <MobileNav />
             {selectedBook ? (
               <Button 
                 variant="ghost" 
