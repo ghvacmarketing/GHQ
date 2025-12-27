@@ -169,7 +169,7 @@ export default function Home() {
               className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
               data-testid="img-company-logo"
             />
-            <span className="text-sm sm:text-base font-semibold">Home</span>
+            <span className="text-sm sm:text-base font-semibold truncate">Home</span>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             <Link href="/crm/gate">

@@ -258,6 +258,7 @@ export default function ProcessBuilderVoice() {
               className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
               data-testid="img-company-logo"
             />
+            <span className="text-sm sm:text-base font-semibold truncate">New Process</span>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             <Button 

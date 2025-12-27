@@ -369,6 +369,7 @@ export default function QuoteEdit() {
               className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
               data-testid="img-company-logo"
             />
+            <span className="text-sm sm:text-base font-semibold truncate">Edit Quote</span>
           </div>
           <div className="flex items-center space-x-2 flex-shrink-0">
             <Link href="/history">

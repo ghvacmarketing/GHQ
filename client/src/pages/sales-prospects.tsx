@@ -344,6 +344,7 @@ export default function SalesProspects() {
               className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
               data-testid="img-company-logo"
             />
+            <span className="text-sm sm:text-base font-semibold truncate">Sales Prospects</span>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             <Button

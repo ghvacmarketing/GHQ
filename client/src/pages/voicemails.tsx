@@ -35,7 +35,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowLeft, GripVertical, Phone, Calendar, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, User } from "lucide-react";
+import { ArrowLeft, GripVertical, Phone, Calendar, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, User, Cloud, Sun, CloudRain, CloudSnow, Wind, Thermometer, AlertTriangle } from "lucide-react";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import MobileNav from "@/components/mobile-nav";
@@ -1261,6 +1261,154 @@ function VoicemailsKanban() {
   );
 }
 
+interface WeatherPeriod {
+  number: number;
+  name: string;
+  startTime: string;
+  endTime: string;
+  temperature: number;
+  temperatureUnit: string;
+  windSpeed: string;
+  windDirection: string;
+  shortForecast: string;
+  detailedForecast: string;
+  icon: string;
+  isDaytime: boolean;
+}
+
+interface WeatherAlert {
+  properties: {
+    headline: string;
+    severity: string;
+    event: string;
+    description: string;
+    expires: string;
+  };
+}
+
+interface WeatherData {
+  lat: string;
+  lon: string;
+  forecast: { properties: { periods: WeatherPeriod[] } };
+  hourly: { properties: { periods: WeatherPeriod[] } };
+  alerts: { features: WeatherAlert[] };
+  fetchedAt: string;
+  stale: boolean;
+}
+
+function getWeatherIcon(shortForecast: string, isDaytime: boolean) {
+  const forecast = shortForecast.toLowerCase();
+  if (forecast.includes("rain") || forecast.includes("shower")) return <CloudRain className="h-8 w-8 text-blue-500" />;
+  if (forecast.includes("snow")) return <CloudSnow className="h-8 w-8 text-blue-300" />;
+  if (forecast.includes("cloud") || forecast.includes("overcast")) return <Cloud className="h-8 w-8 text-gray-400" />;
+  if (forecast.includes("wind")) return <Wind className="h-8 w-8 text-gray-500" />;
+  return isDaytime ? <Sun className="h-8 w-8 text-yellow-500" /> : <Cloud className="h-8 w-8 text-gray-600" />;
+}
+
+function WeatherWidget() {
+  const { data: weather, isLoading, error } = useQuery<WeatherData>({
+    queryKey: ["/api/weather"],
+    staleTime: 1000 * 60 * 30,
+    retry: false,
+  });
+
+  if (isLoading) {
+    return (
+      <Card className="mb-4" data-testid="weather-loading">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-muted animate-pulse" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+              <div className="h-3 w-32 bg-muted animate-pulse rounded" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error || !weather?.forecast?.properties?.periods?.length) {
+    return (
+      <Card className="mb-4 border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800" data-testid="weather-unavailable">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3 text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="h-5 w-5" />
+            <span className="text-sm">Weather data unavailable</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const currentPeriod = weather.forecast.properties.periods[0];
+  const upcomingPeriods = weather.forecast.properties.periods.slice(1, 5);
+  const activeAlerts = weather.alerts?.features || [];
+  const lastUpdated = weather.fetchedAt ? format(new Date(weather.fetchedAt), "h:mm a") : "";
+
+  return (
+    <Card className="mb-4" data-testid="weather-widget">
+      <CardContent className="p-4">
+        {activeAlerts.length > 0 && (
+          <div className="mb-3 p-2 bg-red-100 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded-md" data-testid="weather-alerts">
+            {activeAlerts.slice(0, 2).map((alert, idx) => (
+              <div key={idx} className="flex items-start gap-2 text-red-700 dark:text-red-400 text-xs">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span className="font-medium">{alert.properties.headline}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <div className="flex items-center gap-4" data-testid="weather-current">
+          {getWeatherIcon(currentPeriod.shortForecast, currentPeriod.isDaytime)}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold" data-testid="weather-temperature">
+                {currentPeriod.temperature}°{currentPeriod.temperatureUnit}
+              </span>
+              <span className="text-sm text-muted-foreground" data-testid="weather-period-name">
+                {currentPeriod.name}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground truncate" data-testid="weather-short-forecast">
+              {currentPeriod.shortForecast}
+            </p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+              <Wind className="h-3 w-3" />
+              <span>{currentPeriod.windSpeed} {currentPeriod.windDirection}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-4 pt-3 border-t" data-testid="weather-forecast">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {upcomingPeriods.map((period) => (
+              <div 
+                key={period.number} 
+                className="flex-shrink-0 text-center p-2 rounded-lg bg-muted/50 min-w-[70px]"
+                data-testid={`weather-period-${period.number}`}
+              >
+                <div className="text-xs font-medium truncate w-16">{period.name}</div>
+                <div className="my-1 flex justify-center">
+                  {getWeatherIcon(period.shortForecast, period.isDaytime)}
+                </div>
+                <div className="text-sm font-bold">{period.temperature}°</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {lastUpdated && (
+          <div className="mt-2 text-xs text-muted-foreground text-right" data-testid="weather-updated">
+            Updated {lastUpdated}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Voicemails() {
   const [activeTab, setActiveTab] = useState("call-logs");
 
@@ -1281,6 +1429,7 @@ export default function Voicemails() {
               className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
               data-testid="img-company-logo"
             />
+            <span className="text-sm sm:text-base font-semibold truncate">Phone</span>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             <UserMenu />
@@ -1289,6 +1438,7 @@ export default function Voicemails() {
       </header>
 
       <main className="p-3 sm:p-4">
+        <WeatherWidget />
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
             <TabsTrigger value="voicemails" data-testid="tab-voicemails">

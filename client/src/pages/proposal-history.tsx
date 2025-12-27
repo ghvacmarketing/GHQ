@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, FileText, Calendar, User, ChevronDown, ChevronUp, Trash2, DollarSign, Package, Crown, Wrench, Home as HomeIcon, Download } from "lucide-react";
 import { Link } from "wouter";
 import MobileNav from "@/components/mobile-nav";
+import redlogo from "@assets/redlogo.webp";
 import { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -393,17 +394,24 @@ export default function ProposalHistory() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <MobileNav />
-          <Link href="/">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div className="flex items-center gap-2">
-            <FileText className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold">Proposal History</h1>
+      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
+        <div className="flex items-center justify-between p-3 sm:p-4">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <MobileNav />
+            <img 
+              src={redlogo} 
+              alt="Giesbrecht HVAC" 
+              className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
+              data-testid="img-company-logo"
+            />
+            <span className="text-sm sm:text-base font-semibold truncate">Proposal History</span>
+          </div>
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            <Link href="/">
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
           </div>
         </div>
       </header>

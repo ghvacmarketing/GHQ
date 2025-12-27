@@ -151,9 +151,7 @@ export default function QuotesHistory() {
               className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
               data-testid="img-company-logo"
             />
-            <div className="min-w-0">
-              <h1 className="font-semibold text-foreground text-sm sm:text-base truncate">Quote History</h1>
-            </div>
+            <span className="text-sm sm:text-base font-semibold truncate">Quote History</span>
           </div>
           <div className="flex items-center space-x-2 flex-shrink-0">
             <Badge variant="secondary" className="text-xs sm:text-sm">
