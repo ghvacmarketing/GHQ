@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { FileText, History, Settings, BookOpen, Book, UserCog, Wrench, ClipboardList, Voicemail, Users } from "lucide-react";
+import { FileText, History, Settings, BookOpen, Book, UserCog, Wrench, ClipboardList, Voicemail, Users, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -162,6 +162,16 @@ export default function Home() {
             <span className="text-sm sm:text-base font-semibold">Home</span>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+            <Link href="/crm/gate">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                data-testid="button-crm"
+                title="CRM"
+              >
+                <Briefcase className="h-4 w-4" />
+              </Button>
+            </Link>
             <Link href={isLoggedIntoPortal ? "/employee-portal" : "/employee-portal/login"}>
               <Button 
                 variant="ghost" 
