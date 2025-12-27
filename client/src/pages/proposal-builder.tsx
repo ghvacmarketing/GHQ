@@ -3954,7 +3954,7 @@ export default function ProposalBuilder() {
                       <SelectValue placeholder="Select size" />
                     </SelectTrigger>
                     <SelectContent>
-                      {[...CRAWLSPACE_CONSTANTS.SIZE_BANDS, 2250, 2500, 2750, 3000].map(sqft => (
+                      {CRAWLSPACE_CONSTANTS.SIZE_BANDS.map(sqft => (
                         <SelectItem key={sqft} value={sqft.toString()}>
                           {sqft.toLocaleString()} sqft
                         </SelectItem>
