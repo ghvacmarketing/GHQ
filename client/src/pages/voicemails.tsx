@@ -1441,13 +1441,13 @@ export default function Voicemails() {
         <WeatherWidget />
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
-            <TabsTrigger value="voicemails" data-testid="tab-voicemails">
-              <Phone className="h-4 w-4 mr-2" />
-              Voicemails
-            </TabsTrigger>
             <TabsTrigger value="call-logs" data-testid="tab-call-logs">
               <Calendar className="h-4 w-4 mr-2" />
               Call Logs
+            </TabsTrigger>
+            <TabsTrigger value="voicemails" data-testid="tab-voicemails">
+              <Phone className="h-4 w-4 mr-2" />
+              Voicemails
             </TabsTrigger>
           </TabsList>
 
