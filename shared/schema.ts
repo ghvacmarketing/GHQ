@@ -1001,3 +1001,26 @@ export const insertWeatherCacheSchema = createInsertSchema(weatherCache).omit({
 
 export type InsertWeatherCache = z.infer<typeof insertWeatherCacheSchema>;
 export type WeatherCache = typeof weatherCache.$inferSelect;
+
+export const callDaily = pgTable("call_daily", {
+  date: date("date").primaryKey(),
+  inboundCalls: integer("inbound_calls").notNull().default(0),
+  missedCalls: integer("missed_calls").default(0),
+  answeredCalls: integer("answered_calls").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const weatherDaily = pgTable("weather_daily", {
+  date: date("date").primaryKey(),
+  avgTempF: decimal("avg_temp_f", { precision: 5, scale: 2 }),
+  maxTempF: decimal("max_temp_f", { precision: 5, scale: 2 }),
+  minTempF: decimal("min_temp_f", { precision: 5, scale: 2 }),
+  cdd: decimal("cdd", { precision: 5, scale: 2 }).default("0"),
+  hdd: decimal("hdd", { precision: 5, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type CallDaily = typeof callDaily.$inferSelect;
+export type WeatherDaily = typeof weatherDaily.$inferSelect;

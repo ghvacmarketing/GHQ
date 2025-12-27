@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray, desc } from "drizzle-orm";
@@ -198,6 +198,11 @@ export interface IStorage {
   // Weather Cache operations
   getWeatherCache(): Promise<WeatherCache | undefined>;
   upsertWeatherCache(data: InsertWeatherCache): Promise<WeatherCache>;
+
+  // Weather Impact operations
+  upsertCallDaily(date: string, inboundCalls: number): Promise<void>;
+  upsertWeatherDaily(date: string, avgTemp: number, maxTemp: number, minTemp: number): Promise<void>;
+  getWeatherImpactData(startDate: string, endDate: string): Promise<{date: string, calls: number, hotIndex: number, coldIndex: number, avgTempF: number}[]>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -1425,6 +1430,66 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  // Weather Impact operations
+  async upsertCallDaily(date: string, inboundCalls: number): Promise<void> {
+    await db
+      .insert(callDaily)
+      .values({ date, inboundCalls, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: callDaily.date,
+        set: { inboundCalls, updatedAt: new Date() },
+      });
+  }
+
+  async upsertWeatherDaily(date: string, avgTemp: number, maxTemp: number, minTemp: number): Promise<void> {
+    const cdd = Math.max(0, avgTemp - 65);
+    const hdd = Math.max(0, 65 - avgTemp);
+    await db
+      .insert(weatherDaily)
+      .values({
+        date,
+        avgTempF: String(avgTemp),
+        maxTempF: String(maxTemp),
+        minTempF: String(minTemp),
+        cdd: String(cdd),
+        hdd: String(hdd),
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: weatherDaily.date,
+        set: {
+          avgTempF: String(avgTemp),
+          maxTempF: String(maxTemp),
+          minTempF: String(minTemp),
+          cdd: String(cdd),
+          hdd: String(hdd),
+          updatedAt: new Date(),
+        },
+      });
+  }
+
+  async getWeatherImpactData(startDate: string, endDate: string): Promise<{date: string, calls: number, hotIndex: number, coldIndex: number, avgTempF: number}[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        c.date,
+        c.inbound_calls as calls,
+        COALESCE(w.cdd, 0)::numeric as hot_index,
+        COALESCE(w.hdd, 0)::numeric as cold_index,
+        COALESCE(w.avg_temp_f, 0)::numeric as avg_temp_f
+      FROM call_daily c
+      LEFT JOIN weather_daily w ON c.date = w.date
+      WHERE c.date >= ${startDate} AND c.date <= ${endDate}
+      ORDER BY c.date ASC
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      calls: Number(row.calls),
+      hotIndex: Number(row.hot_index),
+      coldIndex: Number(row.cold_index),
+      avgTempF: Number(row.avg_temp_f),
+    }));
   }
 
   // Initialize default data if needed

@@ -22,6 +22,7 @@ import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAuto
 import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, type QuoteGenerationInput } from "./services/quote-generation";
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook } from "./services/vector-store";
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
+import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureDefaultAdminExists, CRM_SESSION_COOKIE } from "./crm-auth";
 import cookieParser from "cookie-parser";
@@ -4565,6 +4566,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/phone/weather-impact - returns weather impact data
+  app.get("/api/phone/weather-impact", async (req, res) => {
+    try {
+      const range = (req.query.range as string) || "month";
+      let days = 30;
+      if (range === "week") days = 7;
+      else if (range === "month") days = 30;
+      else if (range === "6month") days = 182;
+      else if (range === "year") days = 365;
+
+      const endDate = new Date().toISOString().split("T")[0];
+      const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+      const data = await storage.getWeatherImpactData(startDate, endDate);
+      return res.json({ data, updatedAt: new Date().toISOString() });
+    } catch (error) {
+      console.error("Error fetching weather impact data:", error);
+      return res.status(500).json({ message: "Failed to fetch weather impact data" });
+    }
+  });
+
   // POST /api/weather/refresh - triggers manual refresh (admin only)
   app.post("/api/weather/refresh", async (req, res) => {
     try {
@@ -4598,6 +4620,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Start daily weather refresh
     scheduleWeatherRefresh();
+
+    // Start weather impact jobs (refreshes call_daily and weather_daily every 6 hours)
+    scheduleWeatherImpactJobs();
 
     // Seed vector store with sales book if empty (async, don't block startup)
     seedVectorStoreWithSalesBook().then(success => {

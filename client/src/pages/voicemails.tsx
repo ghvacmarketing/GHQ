@@ -35,7 +35,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowLeft, GripVertical, Phone, Calendar, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, User, Cloud, Sun, CloudRain, CloudSnow, Wind, Thermometer, AlertTriangle } from "lucide-react";
+import { ArrowLeft, GripVertical, Phone, Calendar, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, User, Cloud, Sun, CloudRain, CloudSnow, Wind, Thermometer, AlertTriangle, BarChart3 } from "lucide-react";
+import { ScatterChart, Scatter, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import NavDropdown from "@/components/nav-dropdown";
 import UserMenu from "@/components/user-menu";
 import MobileNav from "@/components/mobile-nav";
@@ -1366,6 +1367,186 @@ function getWeatherIcon(shortForecast: string, isDaytime: boolean, size: "sm" | 
   return isDaytime ? <Sun className={cn(className, "text-yellow-500")} /> : <Cloud className={cn(className, "text-gray-600")} />;
 }
 
+interface WeatherImpactDataPoint {
+  date: string;
+  calls: number;
+  hotIndex: number;
+  coldIndex: number;
+  avgTempF: number;
+}
+
+interface WeatherImpactResponse {
+  data: WeatherImpactDataPoint[];
+  updatedAt: string;
+}
+
+function WeatherImpactTab() {
+  const [range, setRange] = useState("month");
+  const { data, isLoading, error } = useQuery<WeatherImpactResponse>({
+    queryKey: ["/api/phone/weather-impact", range],
+    queryFn: async () => {
+      const res = await fetch(`/api/phone/weather-impact?range=${range}`);
+      if (!res.ok) throw new Error("Failed to fetch weather impact data");
+      return res.json();
+    },
+  });
+
+  const rangeOptions = [
+    { value: "week", label: "Week" },
+    { value: "month", label: "Month" },
+    { value: "6month", label: "6 Months" },
+    { value: "year", label: "Year" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <Select value={range} onValueChange={setRange}>
+          <SelectTrigger className="w-[140px]" data-testid="select-weather-range">
+            <SelectValue placeholder="Select range" />
+          </SelectTrigger>
+          <SelectContent>
+            {rangeOptions.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {data?.updatedAt && (
+          <span className="text-xs text-muted-foreground" data-testid="weather-impact-updated">
+            Last Updated: {format(parseISO(data.updatedAt), "MMM d, yyyy h:mm a")}
+          </span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-muted-foreground">Loading weather impact data...</div>
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-destructive">Failed to load weather impact data</div>
+        </div>
+      ) : !data?.data?.length ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-muted-foreground">No weather impact data available for this range</div>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card data-testid="chart-hot-index">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Hot Index vs Calls</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        type="number" 
+                        dataKey="hotIndex" 
+                        name="Hot Index (CDD)" 
+                        tick={{ fontSize: 12 }}
+                        label={{ value: "CDD", position: "bottom", fontSize: 12 }}
+                      />
+                      <YAxis 
+                        type="number" 
+                        dataKey="calls" 
+                        name="Calls" 
+                        tick={{ fontSize: 12 }}
+                        label={{ value: "Calls", angle: -90, position: "left", fontSize: 12 }}
+                      />
+                      <RechartsTooltip 
+                        cursor={{ strokeDasharray: "3 3" }}
+                        content={({ active, payload }) => {
+                          if (active && payload?.length) {
+                            const point = payload[0].payload as WeatherImpactDataPoint;
+                            return (
+                              <div className="bg-popover border rounded-md p-2 text-xs shadow-md">
+                                <p className="font-medium">{point.date}</p>
+                                <p>Calls: {point.calls}</p>
+                                <p>Hot Index: {point.hotIndex.toFixed(1)}</p>
+                                <p>Avg Temp: {point.avgTempF.toFixed(1)}°F</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Scatter 
+                        data={data.data.filter(d => d.hotIndex > 0)} 
+                        fill="#ef4444" 
+                        fillOpacity={0.6}
+                      />
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="chart-cold-index">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Cold Index vs Calls</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        type="number" 
+                        dataKey="coldIndex" 
+                        name="Cold Index (HDD)" 
+                        tick={{ fontSize: 12 }}
+                        label={{ value: "HDD", position: "bottom", fontSize: 12 }}
+                      />
+                      <YAxis 
+                        type="number" 
+                        dataKey="calls" 
+                        name="Calls" 
+                        tick={{ fontSize: 12 }}
+                        label={{ value: "Calls", angle: -90, position: "left", fontSize: 12 }}
+                      />
+                      <RechartsTooltip 
+                        cursor={{ strokeDasharray: "3 3" }}
+                        content={({ active, payload }) => {
+                          if (active && payload?.length) {
+                            const point = payload[0].payload as WeatherImpactDataPoint;
+                            return (
+                              <div className="bg-popover border rounded-md p-2 text-xs shadow-md">
+                                <p className="font-medium">{point.date}</p>
+                                <p>Calls: {point.calls}</p>
+                                <p>Cold Index: {point.coldIndex.toFixed(1)}</p>
+                                <p>Avg Temp: {point.avgTempF.toFixed(1)}°F</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Scatter 
+                        data={data.data.filter(d => d.coldIndex > 0)} 
+                        fill="#3b82f6" 
+                        fillOpacity={0.6}
+                      />
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <p className="text-xs text-muted-foreground text-center" data-testid="weather-impact-note">
+            Hot Index = CDD base 65°F, Cold Index = HDD base 65°F
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function WeatherWidget() {
   const [alertsOpen, setAlertsOpen] = useState(false);
   const { data: weather, isLoading, error } = useQuery<WeatherData>({
@@ -1476,7 +1657,7 @@ export default function Voicemails() {
       <main className="p-2 sm:p-3">
         <WeatherWidget />
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-xs grid-cols-2 mb-2 h-8">
+          <TabsList className="grid w-full max-w-md grid-cols-3 mb-2 h-8">
             <TabsTrigger value="call-logs" className="text-xs" data-testid="tab-call-logs">
               <Calendar className="h-3.5 w-3.5 mr-1.5" />
               Call Logs
@@ -1484,6 +1665,10 @@ export default function Voicemails() {
             <TabsTrigger value="voicemails" className="text-xs" data-testid="tab-voicemails">
               <Phone className="h-3.5 w-3.5 mr-1.5" />
               Voicemails
+            </TabsTrigger>
+            <TabsTrigger value="weather" className="text-xs" data-testid="tab-weather">
+              <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+              Weather
             </TabsTrigger>
           </TabsList>
 
@@ -1493,6 +1678,10 @@ export default function Voicemails() {
 
           <TabsContent value="call-logs" className="mt-0">
             <DailyCallLog />
+          </TabsContent>
+
+          <TabsContent value="weather" className="mt-0">
+            <WeatherImpactTab />
           </TabsContent>
         </Tabs>
       </main>
