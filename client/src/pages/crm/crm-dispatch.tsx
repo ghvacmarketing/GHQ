@@ -370,7 +370,7 @@ function DroppableTechnicianRow({ tech, jobs, onResize, activeId }: DroppableTec
           {hours.map((hour) => (
             <div
               key={hour}
-              className="flex-1 border-r border-slate-50 last:border-r-0"
+              className="flex-1 border-r border-slate-200 last:border-r-0"
               style={{ minWidth: "50px" }}
             />
           ))}
@@ -628,7 +628,7 @@ export default function CrmDispatch() {
                       {hours.map((hour) => (
                         <div
                           key={hour}
-                          className="flex-1 text-center py-2 text-xs text-slate-400 border-r border-slate-50 last:border-r-0"
+                          className="flex-1 text-center py-2 text-xs text-slate-500 border-r border-slate-200 last:border-r-0"
                           style={{ minWidth: "50px" }}
                         >
                           {formatHour(hour)}
