@@ -21,6 +21,7 @@ import * as path from "path";
 import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAutoSync } from "./services/customer-sync";
 import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, type QuoteGenerationInput } from "./services/quote-generation";
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook } from "./services/vector-store";
+import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureDefaultAdminExists, CRM_SESSION_COOKIE } from "./crm-auth";
 import cookieParser from "cookie-parser";
@@ -4546,6 +4547,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // WEATHER API ENDPOINTS
+  // ============================================
+
+  // GET /api/weather - returns cached weather data
+  app.get("/api/weather", async (req, res) => {
+    try {
+      const cache = await getWeatherData();
+      if (!cache) {
+        return res.status(404).json({ message: "No weather data cached yet" });
+      }
+      return res.json(cache);
+    } catch (error) {
+      console.error("Error fetching weather cache:", error);
+      return res.status(500).json({ message: "Failed to fetch weather data" });
+    }
+  });
+
+  // POST /api/weather/refresh - triggers manual refresh (admin only)
+  app.post("/api/weather/refresh", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      const adminApiKey = process.env.ADMIN_API_KEY;
+
+      if (!adminApiKey || token !== adminApiKey) {
+        return res.status(401).json({ message: "Unauthorized - Admin API key required" });
+      }
+
+      const result = await refreshWeather();
+      if (result.success) {
+        return res.json({ message: "Weather data refreshed successfully" });
+      } else {
+        return res.status(500).json({ message: "Failed to refresh weather", error: result.error });
+      }
+    } catch (error) {
+      console.error("Error refreshing weather:", error);
+      return res.status(500).json({ message: "Failed to refresh weather data" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)
@@ -4553,6 +4595,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Start customer auto-sync (every 10 minutes)
     startAutoSync(10);
     console.log('Customer auto-sync started (every 10 minutes)');
+
+    // Start daily weather refresh
+    scheduleWeatherRefresh();
 
     // Seed vector store with sales book if empty (async, don't block startup)
     seedVectorStoreWithSalesBook().then(success => {

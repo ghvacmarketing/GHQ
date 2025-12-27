@@ -982,3 +982,22 @@ export type InsertCrmInvoice = z.infer<typeof insertCrmInvoiceSchema>;
 export type CrmInvoice = typeof crmInvoices.$inferSelect;
 export type InsertCrmPayment = z.infer<typeof insertCrmPaymentSchema>;
 export type CrmPayment = typeof crmPayments.$inferSelect;
+
+// Weather Cache table for storing weather.gov API data
+export const weatherCache = pgTable("weather_cache", {
+  id: integer("id").primaryKey().default(1),
+  lat: decimal("lat", { precision: 10, scale: 6 }).notNull(),
+  lon: decimal("lon", { precision: 10, scale: 6 }).notNull(),
+  forecastJson: json("forecast_json").$type<any>(),
+  hourlyJson: json("hourly_json").$type<any>(),
+  alertsJson: json("alerts_json").$type<any>(),
+  fetchedAt: timestamp("fetched_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+});
+
+export const insertWeatherCacheSchema = createInsertSchema(weatherCache).omit({
+  fetchedAt: true,
+});
+
+export type InsertWeatherCache = z.infer<typeof insertWeatherCacheSchema>;
+export type WeatherCache = typeof weatherCache.$inferSelect;

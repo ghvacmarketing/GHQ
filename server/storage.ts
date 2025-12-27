@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray, desc } from "drizzle-orm";
@@ -194,6 +194,10 @@ export interface IStorage {
   getEmployeeDocuments(userId: string | null): Promise<EmployeeDocument[]>;
   createEmployeeDocument(data: InsertEmployeeDocument): Promise<EmployeeDocument>;
   deleteEmployeeDocument(id: string): Promise<boolean>;
+
+  // Weather Cache operations
+  getWeatherCache(): Promise<WeatherCache | undefined>;
+  upsertWeatherCache(data: InsertWeatherCache): Promise<WeatherCache>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -1397,6 +1401,30 @@ export class DatabaseStorage implements IStorage {
   async deleteEmployeeDocument(id: string): Promise<boolean> {
     const result = await db.delete(employeeDocuments).where(eq(employeeDocuments.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Weather Cache operations
+  async getWeatherCache(): Promise<WeatherCache | undefined> {
+    const [cache] = await db.select().from(weatherCache).where(eq(weatherCache.id, 1));
+    return cache || undefined;
+  }
+
+  async upsertWeatherCache(data: InsertWeatherCache): Promise<WeatherCache> {
+    const existing = await this.getWeatherCache();
+    if (existing) {
+      const [updated] = await db
+        .update(weatherCache)
+        .set({ ...data, fetchedAt: new Date() })
+        .where(eq(weatherCache.id, 1))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(weatherCache)
+        .values({ ...data, id: 1, fetchedAt: new Date() })
+        .returning();
+      return created;
+    }
   }
 
   // Initialize default data if needed
