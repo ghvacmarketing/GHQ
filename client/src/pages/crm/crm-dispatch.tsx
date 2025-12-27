@@ -319,13 +319,15 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
   );
 }
 
-function JobCardOverlay({ job }: { job: Job }) {
+function JobCardOverlay({ job, timelineWidth }: { job: Job; timelineWidth: number }) {
   const colors = statusColors[job.status];
+  const duration = job.endTime - job.startTime;
+  const widthPx = Math.max(60, (duration / TOTAL_HOURS) * timelineWidth);
   
   return (
     <div
-      className={`rounded border ${colors.bg} ${colors.border} ${colors.text} px-2 py-1.5 shadow-md cursor-grabbing`}
-      style={{ width: '140px' }}
+      className={`rounded border ${colors.bg} ${colors.border} ${colors.text} px-3 py-1.5 shadow-md cursor-grabbing flex flex-col justify-center`}
+      style={{ width: `${widthPx}px`, height: '36px' }}
     >
       <p className="text-xs font-medium truncate">{job.customerName}</p>
       <p className="text-xs truncate opacity-70">{job.jobType}</p>
@@ -649,7 +651,7 @@ export default function CrmDispatch() {
               </ScrollArea>
               
               <DragOverlay>
-                {activeJob ? <JobCardOverlay job={activeJob} /> : null}
+                {activeJob ? <JobCardOverlay job={activeJob} timelineWidth={timelineRef.current?.offsetWidth || 780} /> : null}
               </DragOverlay>
             </DndContext>
           </CardContent>
