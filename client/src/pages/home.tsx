@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { FileText, History, Settings, BookOpen, Book, UserCog, Wrench, ClipboardList, Voicemail, Users, Briefcase } from "lucide-react";
+import { FileText, History, Settings, BookOpen, Book, UserCog, Wrench, ClipboardList, Phone, Users, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -92,6 +92,14 @@ export default function Home() {
     },
   ];
 
+  const phoneAction = {
+    title: "Phone",
+    description: "Manage voicemails and daily call logs",
+    icon: Phone,
+    href: "/voicemails",
+    testId: "link-phone"
+  };
+
   const installServiceActions = [
     {
       title: "Installation Department",
@@ -106,13 +114,6 @@ export default function Home() {
       icon: Wrench,
       href: "/service-pipeline",
       testId: "link-service"
-    },
-    {
-      title: "Voicemails & Call Logs",
-      description: "Manage voicemails and daily call logs",
-      icon: Voicemail,
-      href: "/voicemails",
-      testId: "link-voicemails"
     },
   ];
 
@@ -313,8 +314,33 @@ export default function Home() {
 
         <div className="space-y-6">
           <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3" data-testid="text-sell-section">
-              Sell
+            <Link href={phoneAction.href}>
+              <Card 
+                className="transition-all hover:shadow-md hover:border-primary/50 cursor-pointer group"
+                data-testid={phoneAction.testId}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                      <phoneAction.icon className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground text-base" data-testid={`text-${phoneAction.testId}-title`}>
+                        {phoneAction.title}
+                      </h3>
+                      <p className="text-sm text-muted-foreground" data-testid={`text-${phoneAction.testId}-description`}>
+                        {phoneAction.description}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3" data-testid="text-sales-section">
+              Sales
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {sellActions.map((action) => (

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, FileText, History, BookOpen, Book, UserCog, Wrench, ClipboardList, Voicemail, Home, Settings, FolderOpen, Users, Briefcase } from "lucide-react";
+import { Menu, FileText, History, BookOpen, Book, UserCog, Wrench, ClipboardList, Phone, Home, Settings, FolderOpen, Users, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 
 const navSections = [
   {
-    title: "Sell",
+    title: "Sales",
     items: [
       { label: "New Service Quote", href: "/quote", icon: FileText },
       { label: "Proposal Builder", href: "/proposal", icon: ClipboardList },
@@ -20,7 +20,6 @@ const navSections = [
     items: [
       { label: "Installation Dept.", href: "/installation", icon: Wrench },
       { label: "Service Dept.", href: "/service-pipeline", icon: Wrench },
-      { label: "Voicemails", href: "/voicemails", icon: Voicemail },
     ],
   },
   {
@@ -35,6 +34,7 @@ const navSections = [
   {
     title: "Admin",
     items: [
+      { label: "Phone", href: "/voicemails", icon: Phone },
       { label: "Settings", href: "/admin", icon: Settings },
       { label: "Employee Portal", href: "/employee-portal/login", icon: Users },
       { label: "CRM", href: "/crm/gate", icon: Briefcase },
