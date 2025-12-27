@@ -1,0 +1,144 @@
+We already have a Phone page in our CRM. Add a new section/tab inside the Phone page called “Weather Impact” (or “Calls vs Weather”). This should NOT be a separate Analytics page—keep it within the Phone page UI.
+
+UI Requirements (Phone Page)
+
+Add a dropdown at the top of this new section:
+
+Options: Week / Month / 6 Months / Year
+
+Default: Month
+
+Under the dropdown, show two graphs (stacked on mobile, side-by-side on desktop):
+
+Graph 1: “Hot Index vs Number of Calls”
+
+Graph 2: “Cold Index vs Number of Calls”
+
+When the dropdown changes, both graphs update.
+
+Data Requirements
+
+We need daily aggregated data to correlate calls with weather.
+
+Create or ensure these DB tables exist
+
+Table: call_daily
+
+date (YYYY-MM-DD, primary key)
+
+inbound_calls (int)
+
+optional: missed_calls, answered_calls, etc.
+
+Table: weather_daily
+
+date (YYYY-MM-DD, primary key)
+
+avg_temp_f (float)
+
+max_temp_f (float)
+
+min_temp_f (float)
+
+cdd (float) // Hot index = Cooling Degree Days = max(0, avg_temp_f - 65)
+
+hdd (float) // Cold index = Heating Degree Days = max(0, 65 - avg_temp_f)
+
+(We’re using CDD/HDD as the “hot/cold index” because it correlates well with HVAC call volume.)
+
+Background Jobs (scheduled)
+Job: refresh_weather_daily
+
+Use our existing NOAA/NWS server-side weather fetching/cached data (do not fetch weather in the browser).
+
+Compute daily stats:
+
+avg_temp_f, min_temp_f, max_temp_f
+
+cdd = max(0, avg_temp_f - 65)
+
+hdd = max(0, 65 - avg_temp_f)
+
+UPSERT into weather_daily
+
+Run daily (or every 6 hours). Always update at least last 2 days.
+
+Job: refresh_call_daily
+
+Pull inbound call logs from our phone integration (whatever provider we use).
+
+Group by date → inbound call count.
+
+UPSERT into call_daily
+
+Run daily (or every few hours).
+
+Backend API Endpoint (for the Phone page section)
+
+Create GET /api/phone/weather-impact?range=week|month|6month|year
+
+Range mapping:
+
+week: today - 7 days
+
+month: today - 30 days
+
+6month: today - 182 days
+
+year: today - 365 days
+
+The endpoint should return an array of objects sorted by date:
+
+date
+
+calls (COALESCE inbound_calls, 0)
+
+hot_index (cdd)
+
+cold_index (hdd)
+
+avg_temp_f
+
+Query logic:
+
+Join weather_daily with call_daily on date
+
+Ensure missing calls return 0
+
+If a date exists in calls but not weather (rare), either exclude or handle gracefully.
+
+Graph Behavior
+
+Both graphs should be scatter plots:
+
+Graph 1: Hot Index vs Calls
+
+X axis = hot_index (CDD)
+
+Y axis = calls
+
+Tooltip shows: date, calls, CDD, avg_temp_f
+
+Graph 2: Cold Index vs Calls
+
+X axis = cold_index (HDD)
+
+Y axis = calls
+
+Tooltip shows: date, calls, HDD, avg_temp_f
+
+Extra (nice to have, but optional)
+
+Show “Last Updated: {fetched_at}” from weather data or most recent date in weather_daily.
+
+Add a small note: “Hot Index = CDD base 65°F, Cold Index = HDD base 65°F”
+
+Security/Performance Rules
+
+Never expose weather API calls or API keys to the client.
+
+Client only calls our internal endpoint /api/phone/weather-impact.
+
+Use aggregated daily tables so the Phone page loads fast.
+
+Implement end-to-end: DB migration, scheduled jobs, endpoint, and the new section inside the Phone page.
