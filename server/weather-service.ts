@@ -81,5 +81,17 @@ export function scheduleWeatherRefresh(): void {
 }
 
 export async function getWeatherData() {
-  return storage.getWeatherCache();
+  const cache = await storage.getWeatherCache();
+  if (!cache) return null;
+  
+  // Transform to match frontend expectations
+  return {
+    lat: cache.lat,
+    lon: cache.lon,
+    forecast: cache.forecastJson,
+    hourly: cache.hourlyJson,
+    alerts: cache.alertsJson,
+    fetchedAt: cache.fetchedAt?.toISOString(),
+    stale: cache.expiresAt ? new Date() > cache.expiresAt : false,
+  };
 }
