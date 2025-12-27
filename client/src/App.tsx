@@ -24,6 +24,7 @@ import EmployeePortalAdmin from "@/pages/employee-portal-admin";
 import CrmGate from "@/pages/crm/crm-gate";
 import CrmLogin from "@/pages/crm/crm-login";
 import CrmDashboard from "@/pages/crm/crm-dashboard";
+import CrmDispatch from "@/pages/crm/crm-dispatch";
 import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import GlobalPasswordGate from "@/components/GlobalPasswordGate";
@@ -65,6 +66,7 @@ function Router() {
       <Route path="/employee-portal" component={EmployeePortal} />
       <Route path="/crm/gate" component={CrmGate} />
       <Route path="/crm/login" component={CrmLogin} />
+      <Route path="/crm/dispatch" component={CrmDispatch} />
       <Route path="/crm" component={CrmDashboard} />
       <Route component={NotFound} />
     </Switch>
