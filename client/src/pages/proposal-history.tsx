@@ -293,8 +293,9 @@ export default function ProposalHistory() {
           });
           
           doc.setFont("helvetica", "normal");
-          doc.text(item.qty.toString(), tableStartX + col1Width + 3, y + 5);
-          doc.text(`$${item.price.toLocaleString()}`, tableStartX + col1Width + col2Width + col3Width - 3, y + 5, { align: 'right' });
+          doc.text((item.qty || 1).toString(), tableStartX + col1Width + 3, y + 5);
+          const price = typeof item.price === 'number' ? item.price : (parseFloat(String(item.price)) || 0);
+          doc.text(`$${price.toLocaleString()}`, tableStartX + col1Width + col2Width + col3Width - 3, y + 5, { align: 'right' });
           
           y += rowHeight;
           rowIndex++;
@@ -311,20 +312,25 @@ export default function ProposalHistory() {
         doc.text(`$${(quoteData.subtotal || 0).toLocaleString()}`, tableStartX + contentWidth - 3, y, { align: 'right' });
         y += 6;
 
-        if (quoteData.elite_discount_active && quoteData.elite_discount_amount > 0) {
-          checkPageBreak(14);
-          doc.setFillColor(220, 255, 220);
-          doc.rect(tableStartX, y - 4, contentWidth, 12, 'F');
-          doc.setDrawColor(...BRAND_COLORS.eliteGreen);
-          doc.setLineWidth(1);
-          doc.rect(tableStartX, y - 4, contentWidth, 12, 'S');
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(...BRAND_COLORS.eliteGreen);
-          doc.text(`Elite Package Discount (${quoteData.elite_discount_percent}%):`, tableStartX + col1Width, y + 2);
-          doc.text(`-$${quoteData.elite_discount_amount.toLocaleString()}`, tableStartX + contentWidth - 3, y + 2, { align: 'right' });
-          y += 14;
-          doc.setTextColor(...BRAND_COLORS.text);
+        if (quoteData.elite_discount_active && quoteData.elite_discount_amount) {
+          const discountAmount = typeof quoteData.elite_discount_amount === 'number' 
+            ? quoteData.elite_discount_amount 
+            : (parseFloat(String(quoteData.elite_discount_amount)) || 0);
+          if (discountAmount > 0) {
+            checkPageBreak(14);
+            doc.setFillColor(220, 255, 220);
+            doc.rect(tableStartX, y - 4, contentWidth, 12, 'F');
+            doc.setDrawColor(...BRAND_COLORS.eliteGreen);
+            doc.setLineWidth(1);
+            doc.rect(tableStartX, y - 4, contentWidth, 12, 'S');
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(...BRAND_COLORS.eliteGreen);
+            doc.text(`Elite Package Discount (${quoteData.elite_discount_percent || 0}%):`, tableStartX + col1Width, y + 2);
+            doc.text(`-$${discountAmount.toLocaleString()}`, tableStartX + contentWidth - 3, y + 2, { align: 'right' });
+            y += 14;
+            doc.setTextColor(...BRAND_COLORS.text);
+          }
         }
 
         checkPageBreak(12);
@@ -334,7 +340,9 @@ export default function ProposalHistory() {
         doc.setFont("helvetica", "bold");
         doc.setTextColor(...BRAND_COLORS.white);
         doc.text("TOTAL:", tableStartX + col1Width, y + 7);
-        doc.text(`$${(quoteData.total || proposal.total).toLocaleString()}`, tableStartX + contentWidth - 3, y + 7, { align: 'right' });
+        const totalValue = quoteData.total || proposal.total;
+        const totalNum = typeof totalValue === 'number' ? totalValue : (parseFloat(String(totalValue)) || 0);
+        doc.text(`$${totalNum.toLocaleString()}`, tableStartX + contentWidth - 3, y + 7, { align: 'right' });
         y += 16;
         doc.setTextColor(...BRAND_COLORS.text);
       } else {

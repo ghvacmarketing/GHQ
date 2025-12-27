@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Settings, History, RotateCcw } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import NavDropdown from "@/components/nav-dropdown";
+import MobileNav from "@/components/mobile-nav";
 import giesbrechtLogo from "../assets/giesbrecht-logo.webp";
 import CustomerInfo from "@/components/customer-info";
 import PartsSelection from "@/components/parts-selection";
@@ -425,6 +426,7 @@ export default function QuoteGenerator() {
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="flex items-center justify-between p-3 sm:p-4">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <MobileNav />
             <img 
               src={redlogo} 
               alt="Giesbrecht HVAC" 
