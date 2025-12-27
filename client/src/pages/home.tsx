@@ -92,13 +92,22 @@ export default function Home() {
     },
   ];
 
-  const phoneAction = {
-    title: "Phone",
-    description: "Manage voicemails and daily call logs",
-    icon: Phone,
-    href: "/voicemails",
-    testId: "link-phone"
-  };
+  const adminActions = [
+    {
+      title: "Phone",
+      description: "Manage voicemails and daily call logs",
+      icon: Phone,
+      href: "/voicemails",
+      testId: "link-phone"
+    },
+    {
+      title: "Settings",
+      description: "Configure app settings",
+      icon: Settings,
+      href: "/admin",
+      testId: "link-admin-settings"
+    },
+  ];
 
   const installServiceActions = [
     {
@@ -314,31 +323,6 @@ export default function Home() {
 
         <div className="space-y-6">
           <div>
-            <Link href={phoneAction.href}>
-              <Card 
-                className="transition-all hover:shadow-md hover:border-primary/50 cursor-pointer group"
-                data-testid={phoneAction.testId}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
-                      <phoneAction.icon className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground text-base" data-testid={`text-${phoneAction.testId}-title`}>
-                        {phoneAction.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground" data-testid={`text-${phoneAction.testId}-description`}>
-                        {phoneAction.description}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
-
-          <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3" data-testid="text-sales-section">
               Sales
             </h2>
@@ -408,6 +392,38 @@ export default function Home() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {referenceActions.map((action) => (
+                <Link key={action.href} href={action.href}>
+                  <Card 
+                    className="transition-all hover:shadow-md hover:border-primary/50 cursor-pointer group"
+                    data-testid={action.testId}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                          <action.icon className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground text-sm" data-testid={`text-${action.testId}-title`}>
+                            {action.title}
+                          </h3>
+                          <p className="text-xs text-muted-foreground truncate" data-testid={`text-${action.testId}-description`}>
+                            {action.description}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3" data-testid="text-admin-section">
+              Admin
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {adminActions.map((action) => (
                 <Link key={action.href} href={action.href}>
                   <Card 
                     className="transition-all hover:shadow-md hover:border-primary/50 cursor-pointer group"

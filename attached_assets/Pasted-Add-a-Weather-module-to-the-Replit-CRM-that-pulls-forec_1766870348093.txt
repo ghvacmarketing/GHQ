@@ -1,0 +1,127 @@
+Add a “Weather” module to the Replit CRM that:
+
+pulls forecast + hourly + alerts from api.weather.gov
+
+runs once per day (or every few hours) on a schedule
+
+saves results to the database
+
+the app UI reads from the cached database row (no live external calls on every page load)
+
+Required Environment Variables (Secrets)
+
+WEATHER_LAT = main service area latitude
+
+WEATHER_LON = main service area longitude
+
+WEATHER_UA = a User-Agent string with contact info (ex: "GiesbrechtHVACCRM (ryo@ghvacinc.com)")
+
+Database: one cache table
+
+Table: weather_cache
+
+id (primary key, single row is fine)
+
+lat (number)
+
+lon (number)
+
+forecast_json (json)
+
+hourly_json (json)
+
+alerts_json (json)
+
+fetched_at (datetime)
+
+expires_at (datetime) // optional for cache freshness rules
+
+Core Logic: Fetch + Cache Job (runs on schedule)
+
+File: jobs/refresh_weather (name doesn’t matter)
+
+FUNCTION refresh_weather_job():
+
+  lat = ENV["WEATHER_LAT"]
+  lon = ENV["WEATHER_LON"]
+  userAgent = ENV["WEATHER_UA"]
+
+  REQUIRE lat, lon, userAgent exist
+
+  // ---------- STEP 1: Get forecast URLs via /points ----------
+  points_url = "https://api.weather.gov/points/{lat},{lon}"
+  points_resp = HTTP_GET(points_url, headers={
+    "User-Agent": userAgent,
+    "Accept": "application/geo+json"
+  })
+  IF points_resp.status NOT OK:
+      LOG error and EXIT (or retry once)
+
+  forecast_url = points_resp.json.properties.forecast
+  hourly_url   = points_resp.json.properties.forecastHourly
+
+  // ---------- STEP 2: Fetch forecast + hourly ----------
+  forecast_resp = HTTP_GET(forecast_url, headers={"User-Agent": userAgent, "Accept":"application/geo+json"})
+  hourly_resp   = HTTP_GET(hourly_url,   headers={"User-Agent": userAgent, "Accept":"application/geo+json"})
+
+  IF forecast_resp.status NOT OK OR hourly_resp.status NOT OK:
+      LOG error and EXIT
+
+  // ---------- STEP 3: Fetch alerts (optional but useful) ----------
+  alerts_url = "https://api.weather.gov/alerts/active?point={lat},{lon}"
+  alerts_resp = HTTP_GET(alerts_url, headers={"User-Agent": userAgent, "Accept":"application/geo+json"})
+  alerts_json = (alerts_resp.status OK) ? alerts_resp.json : EMPTY_JSON
+
+  // ---------- STEP 4: Save to DB (UPSERT single cache row) ----------
+  fetched_at = NOW()
+  expires_at = NOW() + 6 hours   // or 24 hours if only daily
+
+  DB_UPSERT(
+    table="weather_cache",
+    key={"id": 1},                       // keep it as one row
+    values={
+      "lat": lat,
+      "lon": lon,
+      "forecast_json": forecast_resp.json,
+      "hourly_json": hourly_resp.json,
+      "alerts_json": alerts_json,
+      "fetched_at": fetched_at,
+      "expires_at": expires_at
+    }
+  )
+
+  LOG "Weather cache updated", fetched_at
+END FUNCTION
+
+API Route: Serve Cached Weather to the App
+
+Route: GET /api/weather
+
+ROUTE GET "/api/weather":
+
+  row = DB_SELECT_ONE("weather_cache", where={"id":1})
+
+  IF row does not exist:
+      RETURN 404 JSON { "error": "Weather cache missing. Run refresh job." }
+
+  // Optional: if stale, trigger refresh (only if safe)
+  IF row.expires_at < NOW():
+      // either:
+      // (A) return stale data + message
+      // (B) queue refresh (preferred)
+      // (C) refresh inline ONLY if you have strict rate limits
+      // Keep it simple: return stale data + flag
+      stale = true
+  ELSE:
+      stale = false
+
+  RETURN 200 JSON {
+    "lat": row.lat,
+    "lon": row.lon,
+    "forecast": row.forecast_json,
+    "hourly": row.hourly_json,
+    "alerts": row.alerts_json,
+    "fetchedAt": row.fetched_at,
+    "stale": stale
+  }
+END ROUTE

@@ -793,17 +793,6 @@ export default function ServicePipeline() {
               className="h-8 sm:h-10 w-auto object-contain flex-shrink-0"
               data-testid="img-service-company-logo"
             />
-            <div className="min-w-0">
-              <NavDropdown
-                currentPageTitle="Service Department"
-                items={[
-                  { label: "Home", path: "/" },
-                  { label: "Sales Prospects", path: "/sales-prospects" },
-                  { label: "Installation Department", path: "/installation" },
-                  { label: "Service Department", path: "/service-pipeline" },
-                ]}
-              />
-            </div>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             <UserMenu />

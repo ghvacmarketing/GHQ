@@ -42,17 +42,6 @@ export default function PriceBook() {
                 data-testid="img-company-logo"
               />
             )}
-            <div className="min-w-0">
-              <NavDropdown 
-                currentPageTitle={currentBook ? currentBook.label : "Pricebook"}
-                items={[
-                  { label: "Home", path: "/" },
-                  { label: "Sales Prospects", path: "/sales-prospects" },
-                  { label: "Installation Department", path: "/installation" },
-                  { label: "Service Department", path: "/service-pipeline" },
-                ]}
-              />
-            </div>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             <Button 
