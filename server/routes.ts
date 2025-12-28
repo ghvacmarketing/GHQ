@@ -4793,6 +4793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/customers/:id - Get single customer
+  // Checks crmAccounts first (new model), then crmCustomers, then legacy customers table
   app.get("/api/crm/customers/:id", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -4800,27 +4801,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, req.params.id));
-      if (!customer) {
-        return res.status(404).json({ message: "Customer not found" });
-      }
+      const customerId = req.params.id;
 
-      if (isSalesOrAbove(user.role)) {
+      // Try crmAccounts first (new Account+Site+Contact model)
+      const accountWithDetails = await db
+        .select({
+          id: crmAccounts.id,
+          displayName: crmAccounts.displayName,
+          companyName: crmAccounts.companyName,
+          accountType: crmAccounts.accountType,
+          accountStatus: crmAccounts.accountStatus,
+          leadSource: crmAccounts.leadSource,
+          pinnedNote: crmAccounts.pinnedNote,
+          createdAt: crmAccounts.createdAt,
+          siteAddress1: crmSites.address1,
+          siteAddress2: crmSites.address2,
+          siteCity: crmSites.city,
+          siteState: crmSites.state,
+          siteZip: crmSites.zip,
+          contactPhone: crmContacts.phone,
+          contactEmail: crmContacts.email,
+          contactFirstName: crmContacts.firstName,
+          contactLastName: crmContacts.lastName,
+        })
+        .from(crmAccounts)
+        .leftJoin(crmSites, and(eq(crmSites.accountId, crmAccounts.id), eq(crmSites.isPrimary, true)))
+        .leftJoin(crmContacts, and(eq(crmContacts.accountId, crmAccounts.id), eq(crmContacts.isPrimary, true)))
+        .where(eq(crmAccounts.id, customerId))
+        .limit(1);
+
+      if (accountWithDetails.length > 0) {
+        // Apply same authorization as crmCustomers - sales+ can see all, techs only assigned jobs
+        if (!isSalesOrAbove(user.role)) {
+          // For techs, check if they have any job assignments linked to this account
+          const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.techUserId, user.id));
+          const jobIds = assignments.map(a => a.jobId);
+          if (jobIds.length === 0) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+          const jobs = await db.select().from(crmJobs).where(inArray(crmJobs.id, jobIds));
+          const hasAccess = jobs.some(j => j.customerId === customerId);
+          if (!hasAccess) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+        }
+
+        const acc = accountWithDetails[0];
+        const fullAddress = [acc.siteAddress1, acc.siteAddress2, acc.siteCity, acc.siteState, acc.siteZip]
+          .filter(Boolean).join(", ");
+        
+        const customer = {
+          id: acc.id,
+          name: acc.displayName,
+          companyName: acc.companyName,
+          customerType: acc.accountType?.toLowerCase() || "residential",
+          customerStatus: acc.accountStatus?.toLowerCase() || "prospect",
+          phone: acc.contactPhone,
+          email: acc.contactEmail,
+          notes: acc.pinnedNote,
+          fullAddress: fullAddress || null,
+          createdAt: acc.createdAt,
+          origin: 'crm_accounts' as const,
+        };
         return res.json(customer);
       }
 
-      const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.techUserId, user.id));
-      const jobIds = assignments.map(a => a.jobId);
-      if (jobIds.length === 0) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      const jobs = await db.select().from(crmJobs).where(inArray(crmJobs.id, jobIds));
-      const hasAccess = jobs.some(j => j.customerId === customer.id);
-      if (!hasAccess) {
-        return res.status(403).json({ message: "Access denied" });
+      // Fall back to crmCustomers table
+      const [crmCustomer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      if (crmCustomer) {
+        if (isSalesOrAbove(user.role)) {
+          return res.json({ ...crmCustomer, origin: 'crm_customers' });
+        }
+        const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.techUserId, user.id));
+        const jobIds = assignments.map(a => a.jobId);
+        if (jobIds.length === 0) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        const jobs = await db.select().from(crmJobs).where(inArray(crmJobs.id, jobIds));
+        const hasAccess = jobs.some(j => j.customerId === crmCustomer.id);
+        if (!hasAccess) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        return res.json({ ...crmCustomer, origin: 'crm_customers' });
       }
 
-      return res.json(customer);
+      // Fall back to legacy customers table
+      const [legacyCustomer] = await db.select().from(customers).where(eq(customers.id, customerId));
+      if (legacyCustomer) {
+        return res.json({
+          id: legacyCustomer.id,
+          name: legacyCustomer.displayName || legacyCustomer.name,
+          companyName: legacyCustomer.companyName,
+          customerType: legacyCustomer.customerType,
+          customerStatus: legacyCustomer.customerStatus,
+          phone: legacyCustomer.phone,
+          email: legacyCustomer.email,
+          notes: null,
+          fullAddress: legacyCustomer.fullAddress,
+          createdAt: legacyCustomer.createdAt,
+          origin: 'customers' as const,
+        });
+      }
+
+      return res.status(404).json({ message: "Customer not found" });
     } catch (error) {
       console.error("Error fetching CRM customer:", error);
       return res.status(500).json({ message: "Failed to fetch customer" });
@@ -5562,6 +5645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/customers/:id/jobs - Get jobs for a customer
+  // Supports customers from crmAccounts, crmCustomers, or legacy customers table
   app.get("/api/crm/customers/:id/jobs", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -5571,13 +5655,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const customerId = req.params.id;
       
-      // Verify customer exists
-      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
-      if (!customer) {
+      // Verify customer exists in any of the three tables
+      const [crmAccount] = await db.select({ id: crmAccounts.id }).from(crmAccounts).where(eq(crmAccounts.id, customerId));
+      const [crmCustomer] = await db.select({ id: crmCustomers.id }).from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      const [legacyCustomer] = await db.select({ id: customers.id }).from(customers).where(eq(customers.id, customerId));
+      
+      if (!crmAccount && !crmCustomer && !legacyCustomer) {
         return res.status(404).json({ message: "Customer not found" });
       }
 
-      // Get jobs for this customer
+      // Get jobs for this customer (jobs reference customerId which maps to crmCustomers)
+      // For crmAccounts, jobs would be linked via accountId column if exists, but currently linked via customerId
       const jobs = await db.select().from(crmJobs)
         .where(eq(crmJobs.customerId, customerId))
         .orderBy(desc(crmJobs.createdAt));
@@ -5612,6 +5700,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/customers/:id/notes - Get notes for a customer
+  // Supports customers from crmAccounts, crmCustomers, or legacy customers table
   app.get("/api/crm/customers/:id/notes", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -5621,9 +5710,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const customerId = req.params.id;
       
-      // Verify customer exists
-      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
-      if (!customer) {
+      // Verify customer exists in any of the three tables
+      const [crmAccount] = await db.select({ id: crmAccounts.id }).from(crmAccounts).where(eq(crmAccounts.id, customerId));
+      const [crmCustomer] = await db.select({ id: crmCustomers.id }).from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      const [legacyCustomer] = await db.select({ id: customers.id }).from(customers).where(eq(customers.id, customerId));
+      
+      if (!crmAccount && !crmCustomer && !legacyCustomer) {
         return res.status(404).json({ message: "Customer not found" });
       }
 
@@ -5663,9 +5755,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Note body is required" });
       }
       
-      // Verify customer exists
-      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
-      if (!customer) {
+      // Verify customer exists in any of the three tables
+      const [crmAccount] = await db.select({ id: crmAccounts.id }).from(crmAccounts).where(eq(crmAccounts.id, customerId));
+      const [crmCustomer] = await db.select({ id: crmCustomers.id }).from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      const [legacyCustomer] = await db.select({ id: customers.id }).from(customers).where(eq(customers.id, customerId));
+      
+      if (!crmAccount && !crmCustomer && !legacyCustomer) {
         return res.status(404).json({ message: "Customer not found" });
       }
 
