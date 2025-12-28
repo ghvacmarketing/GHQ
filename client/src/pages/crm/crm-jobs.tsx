@@ -1069,11 +1069,11 @@ export default function CrmJobs() {
                             <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
                             Searching...
                           </div>
-                        ) : (customersData?.customers?.filter(c => c.origin === 'crm').length || 0) === 0 ? (
+                        ) : (customersData?.customers?.length || 0) === 0 ? (
                           <CommandEmpty>No customers found.</CommandEmpty>
                         ) : (
                           <CommandGroup>
-                            {customersData?.customers?.filter(c => c.origin === 'crm').map((customer) => {
+                            {customersData?.customers?.map((customer) => {
                               const typeConfig = customerTypeColors[customer.customerType] || customerTypeColors.RESIDENTIAL;
                               const IconComponent = typeConfig.icon;
                               return (
