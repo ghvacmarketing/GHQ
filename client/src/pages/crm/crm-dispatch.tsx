@@ -51,95 +51,22 @@ interface Technician {
   color: string;
 }
 
-const placeholderTechnicians: Technician[] = [
-  { id: "1", name: "Mike T.", initials: "MT", color: "bg-blue-600" },
-  { id: "2", name: "Sarah J.", initials: "SJ", color: "bg-purple-600" },
-  { id: "3", name: "Carlos R.", initials: "CR", color: "bg-emerald-600" },
-  { id: "4", name: "Lisa M.", initials: "LM", color: "bg-amber-600" },
+const techColors = [
+  "bg-blue-600",
+  "bg-purple-600",
+  "bg-emerald-600",
+  "bg-amber-600",
+  "bg-rose-600",
+  "bg-cyan-600",
+  "bg-indigo-600",
+  "bg-teal-600",
 ];
 
-const initialJobs: Job[] = [
-  {
-    id: "1",
-    customerName: "Johnson Family",
-    jobType: "AC Repair",
-    startTime: 8,
-    endTime: 10,
-    status: "completed",
-    address: "123 Oak St",
-    technicianId: "1",
-  },
-  {
-    id: "2",
-    customerName: "Smith Residence",
-    jobType: "Furnace Install",
-    startTime: 10,
-    endTime: 14,
-    status: "in_progress",
-    address: "456 Maple Ave",
-    technicianId: "1",
-  },
-  {
-    id: "3",
-    customerName: "Williams Corp",
-    jobType: "HVAC Maintenance",
-    startTime: 9,
-    endTime: 11,
-    status: "scheduled",
-    address: "789 Business Blvd",
-    technicianId: "2",
-  },
-  {
-    id: "4",
-    customerName: "Garcia Home",
-    jobType: "Duct Cleaning",
-    startTime: 13,
-    endTime: 15,
-    status: "scheduled",
-    address: "321 Pine Rd",
-    technicianId: "2",
-  },
-  {
-    id: "5",
-    customerName: "Thompson Estate",
-    jobType: "Heat Pump Service",
-    startTime: 8,
-    endTime: 10,
-    status: "completed",
-    address: "555 Cedar Ln",
-    technicianId: "3",
-  },
-  {
-    id: "6",
-    customerName: "Anderson Family",
-    jobType: "AC Install",
-    startTime: 11,
-    endTime: 16,
-    status: "in_progress",
-    address: "999 Elm Dr",
-    technicianId: "3",
-  },
-  {
-    id: "7",
-    customerName: "Martinez Office",
-    jobType: "Thermostat Install",
-    startTime: 14,
-    endTime: 16,
-    status: "cancelled",
-    address: "222 Tech Park",
-    technicianId: "4",
-  },
-  {
-    id: "8",
-    customerName: "Brown Residence",
-    jobType: "Emergency Repair",
-    startTime: 17,
-    endTime: 19,
-    status: "scheduled",
-    address: "444 Sunset Blvd",
-    technicianId: "4",
-  },
-];
+function getInitials(name: string): string {
+  return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+}
+
+const initialJobs: Job[] = [];
 
 // 8am to 8pm (13 hours: 8,9,10,11,12,13,14,15,16,17,18,19,20)
 const START_HOUR = 8;
@@ -445,6 +372,20 @@ export default function CrmDispatch() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
+  const { data: crmUsersData } = useQuery<{ id: string; name: string; role: string; email: string }[]>({
+    queryKey: ["/api/crm/users"],
+    enabled: !!currentUser,
+  });
+
+  const technicians: Technician[] = (crmUsersData || [])
+    .filter(u => u.role !== "owner")
+    .map((u, idx) => ({
+      id: u.id,
+      name: u.name,
+      initials: getInitials(u.name),
+      color: techColors[idx % techColors.length],
+    }));
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       navigate("/crm/login");
@@ -637,7 +578,7 @@ export default function CrmDispatch() {
                     </div>
                   </div>
 
-                  {placeholderTechnicians.map((tech) => (
+                  {technicians.map((tech) => (
                     <DroppableTechnicianRow
                       key={tech.id}
                       tech={tech}
@@ -669,7 +610,7 @@ export default function CrmDispatch() {
                 <p className="text-sm text-slate-500 text-center py-4">No jobs match the current filter</p>
               ) : (
                 filteredJobs.map((job) => {
-                  const tech = placeholderTechnicians.find((t) => t.id === job.technicianId);
+                  const tech = technicians.find((t) => t.id === job.technicianId);
                   return tech ? (
                     <MobileJobCard key={job.id} job={job} technician={tech} />
                   ) : null;
