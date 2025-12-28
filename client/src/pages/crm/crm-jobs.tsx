@@ -54,6 +54,8 @@ import {
   Clock,
   UserCheck,
   ExternalLink,
+  Building2,
+  MapPin,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -68,11 +70,12 @@ import {
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import type { CrmUser, CrmJob, CrmCustomer } from "@shared/schema";
+import type { CrmUser, CrmJob, CrmAccount, CrmSite, CommercialProfile } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
 type JobWithDetails = CrmJob & {
-  customerName: string;
+  accountName: string;
+  siteAddress: string | null;
   assignedTechId: string | null;
   assignedTechName: string | null;
 };
@@ -95,11 +98,25 @@ type DispatchResponse = {
   date: string;
 };
 
-type CustomersResponse = {
-  customers: CrmCustomer[];
-  total: number;
-  page: number;
-  limit: number;
+type AccountWithInfo = CrmAccount & {
+  primarySite: CrmSite | null;
+  primaryContact: { firstName: string; lastName?: string; phone?: string } | null;
+};
+
+type AccountsResponse = {
+  accounts: AccountWithInfo[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+type AccountDetailResponse = CrmAccount & {
+  sites: CrmSite[];
+  contacts: any[];
+  profile: CommercialProfile | any | null;
 };
 
 const ITEMS_PER_PAGE = 50;
@@ -166,8 +183,9 @@ export default function CrmJobs() {
   const [page, setPage] = useState(1);
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [customerSearch, setCustomerSearch] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomer | null>(null);
+  const [accountSearch, setAccountSearch] = useState("");
+  const [selectedAccount, setSelectedAccount] = useState<AccountWithInfo | null>(null);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [jobType, setJobType] = useState<string>("SERVICE");
   const [priority, setPriority] = useState<string>("normal");
   const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
@@ -175,7 +193,12 @@ export default function CrmJobs() {
   const [startTime, setStartTime] = useState("09:00");
   const [duration, setDuration] = useState(60);
   const [description, setDescription] = useState("");
-  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [accountSearchOpen, setAccountSearchOpen] = useState(false);
+
+  const [tenantName, setTenantName] = useState("");
+  const [tenantPhone, setTenantPhone] = useState("");
+  const [accessInstructions, setAccessInstructions] = useState("");
+  const [poNumber, setPoNumber] = useState("");
 
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [selectedJobForSchedule, setSelectedJobForSchedule] = useState<JobWithDetails | null>(null);
@@ -185,7 +208,7 @@ export default function CrmJobs() {
   const [scheduleTechId, setScheduleTechId] = useState<string>("unassigned");
 
   const debouncedSearch = useDebounce(searchInput, 300);
-  const debouncedCustomerSearch = useDebounce(customerSearch, 300);
+  const debouncedAccountSearch = useDebounce(accountSearch, 300);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -245,26 +268,54 @@ export default function CrmJobs() {
     enabled: !!currentUser,
   });
 
-  const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
-    queryKey: ["/api/crm/customers", debouncedCustomerSearch],
+  const { data: accountsData, isLoading: accountsLoading } = useQuery<AccountsResponse>({
+    queryKey: ["/api/crm/accounts", debouncedAccountSearch],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (debouncedCustomerSearch) params.set("search", debouncedCustomerSearch);
+      if (debouncedAccountSearch) params.set("search", debouncedAccountSearch);
       params.set("limit", "10");
-      const res = await fetch(`/api/crm/customers?${params.toString()}`, {
+      const res = await fetch(`/api/crm/accounts?${params.toString()}`, {
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to fetch customers");
+      if (!res.ok) throw new Error("Failed to fetch accounts");
       return res.json();
     },
-    enabled: !!currentUser && createDialogOpen && customerSearchOpen,
+    enabled: !!currentUser && createDialogOpen && accountSearchOpen,
   });
+
+  const { data: accountDetailData } = useQuery<AccountDetailResponse>({
+    queryKey: ["/api/crm/accounts", selectedAccount?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/accounts/${selectedAccount!.id}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch account details");
+      return res.json();
+    },
+    enabled: !!selectedAccount?.id,
+  });
+
+  const sites = accountDetailData?.sites || [];
+  const selectedSite = sites.find(s => s.id === selectedSiteId);
+
+  useEffect(() => {
+    if (selectedSite) {
+      if (selectedSite.tenantName) setTenantName(selectedSite.tenantName);
+      if (selectedSite.tenantPhone) setTenantPhone(selectedSite.tenantPhone);
+      if (selectedSite.accessInstructions) setAccessInstructions(selectedSite.accessInstructions);
+    }
+  }, [selectedSite]);
 
   const technicians = dispatchData?.technicians?.filter(t => t.role === "tech") || [];
 
+  const isPropertyManager = selectedAccount?.accountType === "PROPERTY_MANAGER";
+  const isCommercial = selectedAccount?.accountType === "COMMERCIAL";
+  const requiresPO = isCommercial && (accountDetailData?.profile as CommercialProfile)?.requiresPO;
+
   const createJobMutation = useMutation({
     mutationFn: async (data: {
-      customerId: string;
+      accountId: string;
+      siteId: string;
       jobType: string;
       priority: string;
       description: string;
@@ -273,7 +324,8 @@ export default function CrmJobs() {
       assignedTechId: string | null;
     }) => {
       const jobRes = await apiRequest("POST", "/api/crm/jobs", {
-        customerId: data.customerId,
+        accountId: data.accountId,
+        siteId: data.siteId,
         jobType: data.jobType,
         priority: data.priority,
         description: data.description,
@@ -419,8 +471,9 @@ export default function CrmJobs() {
 
   const handleCloseDialog = () => {
     setCreateDialogOpen(false);
-    setCustomerSearch("");
-    setSelectedCustomer(null);
+    setAccountSearch("");
+    setSelectedAccount(null);
+    setSelectedSiteId("");
     setJobType("SERVICE");
     setPriority("normal");
     setAssignedTechId("unassigned");
@@ -428,7 +481,11 @@ export default function CrmJobs() {
     setStartTime("09:00");
     setDuration(60);
     setDescription("");
-    setCustomerSearchOpen(false);
+    setAccountSearchOpen(false);
+    setTenantName("");
+    setTenantPhone("");
+    setAccessInstructions("");
+    setPoNumber("");
   };
 
   const handleOpenScheduleDialog = (job: JobWithDetails) => {
@@ -482,16 +539,26 @@ export default function CrmJobs() {
 
   const descriptionError = description.trim() === "" ? "Description is required" : null;
   const durationError = duration < 15 ? "Duration must be at least 15 minutes" : null;
-  const customerError = !selectedCustomer ? "Customer is required" : null;
+  const accountError = !selectedAccount ? "Account is required" : null;
+  const siteError = !selectedSiteId ? "Site is required" : null;
   const dateError = !startDate ? "Start date is required" : null;
   
-  const isFormValid = selectedCustomer && startDate && description.trim() !== "" && duration >= 15;
+  const isFormValid = selectedAccount && selectedSiteId && startDate && description.trim() !== "" && duration >= 15;
 
   const handleSubmit = () => {
-    if (!selectedCustomer) {
+    if (!selectedAccount) {
       toast({
         title: "Error",
-        description: "Please select a customer",
+        description: "Please select an account",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedSiteId) {
+      toast({
+        title: "Error",
+        description: "Please select a site",
         variant: "destructive",
       });
       return;
@@ -531,11 +598,23 @@ export default function CrmJobs() {
     const scheduledEnd = new Date(scheduledStart);
     scheduledEnd.setMinutes(scheduledEnd.getMinutes() + duration);
 
+    let fullDescription = description.trim();
+    if (isPropertyManager && (tenantName || tenantPhone || accessInstructions)) {
+      fullDescription += `\n\n--- Tenant/Access Info ---`;
+      if (tenantName) fullDescription += `\nTenant: ${tenantName}`;
+      if (tenantPhone) fullDescription += `\nTenant Phone: ${tenantPhone}`;
+      if (accessInstructions) fullDescription += `\nAccess: ${accessInstructions}`;
+    }
+    if (requiresPO && poNumber) {
+      fullDescription += `\n\n--- PO Number: ${poNumber} ---`;
+    }
+
     createJobMutation.mutate({
-      customerId: selectedCustomer.id,
+      accountId: selectedAccount.id,
+      siteId: selectedSiteId,
       jobType,
       priority,
-      description: description.trim(),
+      description: fullDescription,
       scheduledStart: scheduledStart.toISOString(),
       scheduledEnd: scheduledEnd.toISOString(),
       assignedTechId: assignedTechId === "unassigned" ? null : assignedTechId,
@@ -618,7 +697,7 @@ export default function CrmJobs() {
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
-                placeholder="Search by customer name or job type..."
+                placeholder="Search by account name or job type..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="pl-10"
@@ -646,8 +725,9 @@ export default function CrmJobs() {
                       <TableRow className="bg-slate-50">
                         <TableHead>Date</TableHead>
                         <TableHead>Job Type</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Assigned Tech</TableHead>
+                        <TableHead>Account</TableHead>
+                        <TableHead>Site Address</TableHead>
+                        <TableHead>Tech</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Priority</TableHead>
                         <TableHead className="w-[50px]">Actions</TableHead>
@@ -671,8 +751,19 @@ export default function CrmJobs() {
                             <TableCell data-testid={`text-job-type-${job.id}`}>
                               {job.jobType || "—"}
                             </TableCell>
-                            <TableCell data-testid={`text-job-customer-${job.id}`}>
-                              {job.customerName}
+                            <TableCell data-testid={`text-job-account-${job.id}`}>
+                              <div className="flex items-center gap-1.5">
+                                <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                                {job.accountName || "—"}
+                              </div>
+                            </TableCell>
+                            <TableCell data-testid={`text-job-site-${job.id}`}>
+                              {job.siteAddress ? (
+                                <div className="flex items-center gap-1.5 text-sm text-slate-600">
+                                  <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                                  <span className="truncate max-w-[150px]">{job.siteAddress}</span>
+                                </div>
+                              ) : "—"}
                             </TableCell>
                             <TableCell data-testid={`text-job-tech-${job.id}`}>
                               {job.assignedTechName || "Unassigned"}
@@ -818,79 +909,103 @@ export default function CrmJobs() {
       </div>
 
       <Dialog open={createDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Job</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="customer-search">Customer *</Label>
-              {selectedCustomer ? (
+              <Label htmlFor="account-search">Account *</Label>
+              {selectedAccount ? (
                 <div className="flex items-center justify-between p-3 border rounded-md bg-slate-50">
                   <div>
-                    <p className="font-medium" data-testid="text-selected-customer">{selectedCustomer.name}</p>
-                    {selectedCustomer.phone && (
-                      <p className="text-sm text-slate-500">{selectedCustomer.phone}</p>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-slate-500" />
+                      <p className="font-medium" data-testid="text-selected-account">{selectedAccount.displayName}</p>
+                      <Badge variant="outline" className="text-xs">
+                        {selectedAccount.accountType}
+                      </Badge>
+                    </div>
+                    {selectedAccount.primarySite && (
+                      <p className="text-sm text-slate-500 mt-1">
+                        {selectedAccount.primarySite.address1}, {selectedAccount.primarySite.city}
+                      </p>
                     )}
                   </div>
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    onClick={() => setSelectedCustomer(null)}
-                    data-testid="button-clear-customer"
+                    onClick={() => {
+                      setSelectedAccount(null);
+                      setSelectedSiteId("");
+                      setTenantName("");
+                      setTenantPhone("");
+                      setAccessInstructions("");
+                      setPoNumber("");
+                    }}
+                    data-testid="button-clear-account"
                   >
                     Change
                   </Button>
                 </div>
               ) : (
-                <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                <Popover open={accountSearchOpen} onOpenChange={setAccountSearchOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
-                      aria-expanded={customerSearchOpen}
+                      aria-expanded={accountSearchOpen}
                       className="w-full justify-start text-left font-normal"
-                      data-testid="button-customer-search"
+                      data-testid="button-account-search"
                     >
                       <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                      Search customers...
+                      Search accounts...
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[400px] p-0" align="start">
+                  <PopoverContent className="w-[450px] p-0" align="start">
                     <Command shouldFilter={false}>
                       <CommandInput
-                        placeholder="Search by name, phone, or address..."
-                        value={customerSearch}
-                        onValueChange={setCustomerSearch}
-                        data-testid="input-customer-search"
+                        placeholder="Search by name or company..."
+                        value={accountSearch}
+                        onValueChange={setAccountSearch}
+                        data-testid="input-account-search"
                       />
                       <CommandList>
-                        {customersLoading ? (
+                        {accountsLoading ? (
                           <div className="py-6 text-center text-sm">
                             <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
                             Searching...
                           </div>
-                        ) : (customersData?.customers?.length || 0) === 0 ? (
-                          <CommandEmpty>No customers found.</CommandEmpty>
+                        ) : (accountsData?.accounts?.length || 0) === 0 ? (
+                          <CommandEmpty>No accounts found.</CommandEmpty>
                         ) : (
                           <CommandGroup>
-                            {customersData?.customers?.map((customer) => (
+                            {accountsData?.accounts?.map((account) => (
                               <CommandItem
-                                key={customer.id}
-                                value={customer.id}
+                                key={account.id}
+                                value={account.id}
                                 onSelect={() => {
-                                  setSelectedCustomer(customer);
-                                  setCustomerSearchOpen(false);
-                                  setCustomerSearch("");
+                                  setSelectedAccount(account);
+                                  setAccountSearchOpen(false);
+                                  setAccountSearch("");
+                                  setSelectedSiteId("");
                                 }}
                                 className="cursor-pointer"
-                                data-testid={`customer-option-${customer.id}`}
+                                data-testid={`account-option-${account.id}`}
                               >
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{customer.name}</span>
-                                  {customer.phone && (
-                                    <span className="text-sm text-slate-500">{customer.phone}</span>
+                                <div className="flex flex-col w-full">
+                                  <div className="flex items-center gap-2">
+                                    <Building2 className="h-4 w-4 text-slate-400" />
+                                    <span className="font-medium">{account.displayName}</span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {account.accountType}
+                                    </Badge>
+                                  </div>
+                                  {account.primarySite && (
+                                    <span className="text-sm text-slate-500 ml-6">
+                                      {account.primarySite.address1}, {account.primarySite.city}
+                                    </span>
                                   )}
                                 </div>
                               </CommandItem>
@@ -903,6 +1018,96 @@ export default function CrmJobs() {
                 </Popover>
               )}
             </div>
+
+            {selectedAccount && (
+              <div className="space-y-2">
+                <Label htmlFor="site-select">Site *</Label>
+                <Select value={selectedSiteId} onValueChange={setSelectedSiteId}>
+                  <SelectTrigger data-testid="select-site">
+                    <SelectValue placeholder="Select a site" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sites.length === 0 ? (
+                      <SelectItem value="no-sites" disabled>No sites available</SelectItem>
+                    ) : (
+                      sites.map((site) => (
+                        <SelectItem key={site.id} value={site.id} data-testid={`site-option-${site.id}`}>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{site.siteName || site.address1}</span>
+                            {site.isPrimary && <Badge variant="secondary" className="text-xs">Primary</Badge>}
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {selectedSite && (
+                  <p className="text-sm text-slate-500">
+                    {selectedSite.address1}, {selectedSite.city}, {selectedSite.state} {selectedSite.zip}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {isPropertyManager && selectedSiteId && (
+              <div className="space-y-3 p-3 border rounded-md bg-amber-50 border-amber-200">
+                <div className="flex items-center gap-2 text-amber-800">
+                  <Building2 className="h-4 w-4" />
+                  <Label className="font-medium">Tenant/Access Info</Label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="tenant-name" className="text-sm">Tenant Name</Label>
+                    <Input
+                      id="tenant-name"
+                      placeholder="Tenant name"
+                      value={tenantName}
+                      onChange={(e) => setTenantName(e.target.value)}
+                      data-testid="input-tenant-name"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="tenant-phone" className="text-sm">Tenant Phone</Label>
+                    <Input
+                      id="tenant-phone"
+                      placeholder="Tenant phone"
+                      value={tenantPhone}
+                      onChange={(e) => setTenantPhone(e.target.value)}
+                      data-testid="input-tenant-phone"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="access-instructions" className="text-sm">Access Instructions</Label>
+                  <Textarea
+                    id="access-instructions"
+                    placeholder="Gate codes, key locations, etc."
+                    value={accessInstructions}
+                    onChange={(e) => setAccessInstructions(e.target.value)}
+                    rows={2}
+                    data-testid="textarea-access-instructions"
+                  />
+                </div>
+              </div>
+            )}
+
+            {requiresPO && (
+              <div className="space-y-2 p-3 border rounded-md bg-blue-50 border-blue-200">
+                <div className="flex items-center gap-2 text-blue-800">
+                  <Building2 className="h-4 w-4" />
+                  <Label htmlFor="po-number" className="font-medium">PO Number</Label>
+                  <span className="text-xs text-blue-600">(Required for invoicing)</span>
+                </div>
+                <Input
+                  id="po-number"
+                  placeholder="Enter PO number"
+                  value={poNumber}
+                  onChange={(e) => setPoNumber(e.target.value)}
+                  data-testid="input-po-number"
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1066,8 +1271,11 @@ export default function CrmJobs() {
           {selectedJobForSchedule && (
             <div className="space-y-4 py-4">
               <div className="p-3 bg-slate-50 rounded-md border">
-                <p className="text-sm text-slate-500">Customer</p>
-                <p className="font-medium" data-testid="text-schedule-customer">{selectedJobForSchedule.customerName}</p>
+                <p className="text-sm text-slate-500">Account</p>
+                <p className="font-medium" data-testid="text-schedule-account">{selectedJobForSchedule.accountName}</p>
+                {selectedJobForSchedule.siteAddress && (
+                  <p className="text-sm text-slate-500 mt-1">{selectedJobForSchedule.siteAddress}</p>
+                )}
                 <p className="text-sm text-slate-500 mt-1">Job Type: {selectedJobForSchedule.jobType || "—"}</p>
               </div>
 

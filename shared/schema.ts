@@ -851,8 +851,10 @@ export type CrmJobStatus = typeof crmJobStatusEnum[number];
 // CRM Jobs
 export const crmJobs = pgTable("crm_jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  customerId: varchar("customer_id").notNull().references(() => crmCustomers.id),
+  customerId: varchar("customer_id").references(() => crmCustomers.id),
   propertyId: varchar("property_id").references(() => crmProperties.id),
+  accountId: varchar("account_id").references(() => crmAccounts.id),
+  siteId: varchar("site_id").references(() => crmSites.id),
   jobType: text("job_type").notNull(),
   status: text("status").$type<CrmJobStatus>().notNull().default("new"),
   priority: text("priority").$type<"low" | "normal" | "high" | "urgent">().default("normal"),

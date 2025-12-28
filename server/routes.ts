@@ -4782,11 +4782,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(inArray(crmJobs.id, allowedJobIds));
       }
 
-      // Search filter (customer name or job type)
+      // Search filter (account name or job type)
       if (search) {
         const searchPattern = `%${search.toLowerCase()}%`;
         conditions.push(
-          sql`(LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmJobs.jobType}) LIKE ${searchPattern})`
+          sql`(LOWER(${crmAccounts.displayName}) LIKE ${searchPattern} OR LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmJobs.jobType}) LIKE ${searchPattern})`
         );
       }
 
@@ -4796,23 +4796,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const countResult = await db.select({ count: sql<number>`count(*)` })
         .from(crmJobs)
         .leftJoin(crmCustomers, eq(crmJobs.customerId, crmCustomers.id))
+        .leftJoin(crmAccounts, eq(crmJobs.accountId, crmAccounts.id))
         .where(whereClause);
       const total = Number(countResult[0]?.count || 0);
 
-      // Get jobs with customer info
-      const jobsWithCustomers = await db.select({
+      // Get jobs with customer/account/site info
+      const jobsWithInfo = await db.select({
         job: crmJobs,
         customerName: crmCustomers.name,
+        accountName: crmAccounts.displayName,
+        siteAddress1: crmSites.address1,
+        siteCity: crmSites.city,
+        siteState: crmSites.state,
       })
         .from(crmJobs)
         .leftJoin(crmCustomers, eq(crmJobs.customerId, crmCustomers.id))
+        .leftJoin(crmAccounts, eq(crmJobs.accountId, crmAccounts.id))
+        .leftJoin(crmSites, eq(crmJobs.siteId, crmSites.id))
         .where(whereClause)
         .orderBy(desc(crmJobs.scheduledStart), desc(crmJobs.createdAt))
         .limit(limit)
         .offset(offset);
 
       // Get assignments for these jobs
-      const jobIds = jobsWithCustomers.map(j => j.job.id);
+      const jobIds = jobsWithInfo.map(j => j.job.id);
       let assignmentsMap: Record<string, { techId: string; techName: string }> = {};
       
       if (jobIds.length > 0) {
@@ -4831,9 +4838,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Combine data
-      const jobs = jobsWithCustomers.map(({ job, customerName }) => ({
+      const jobs = jobsWithInfo.map(({ job, customerName, accountName, siteAddress1, siteCity, siteState }) => ({
         ...job,
-        customerName: customerName || "Unknown Customer",
+        accountName: accountName || customerName || "Unknown",
+        siteAddress: siteAddress1 ? `${siteAddress1}, ${siteCity}, ${siteState}` : null,
         assignedTechId: assignmentsMap[job.id]?.techId || null,
         assignedTechName: assignmentsMap[job.id]?.techName || null,
       }));
@@ -4924,9 +4932,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid job data", errors: parsed.error.errors });
       }
 
-      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, parsed.data.customerId));
-      if (!customer) {
-        return res.status(400).json({ message: "Customer not found" });
+      // Validate account and site if using new Account model
+      if (parsed.data.accountId) {
+        const [account] = await db.select().from(crmAccounts).where(eq(crmAccounts.id, parsed.data.accountId));
+        if (!account) {
+          return res.status(400).json({ message: "Account not found" });
+        }
+
+        if (parsed.data.siteId) {
+          const [site] = await db.select().from(crmSites).where(
+            and(
+              eq(crmSites.id, parsed.data.siteId),
+              eq(crmSites.accountId, parsed.data.accountId)
+            )
+          );
+          if (!site) {
+            return res.status(400).json({ message: "Site not found or doesn't belong to account" });
+          }
+        }
+      } else if (parsed.data.customerId) {
+        // Legacy: validate customer if using old model
+        const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, parsed.data.customerId));
+        if (!customer) {
+          return res.status(400).json({ message: "Customer not found" });
+        }
+      } else {
+        return res.status(400).json({ message: "Either accountId or customerId is required" });
       }
 
       const [job] = await db.insert(crmJobs).values(parsed.data as any).returning();
@@ -4943,7 +4974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "job.created",
         "job",
         job.id,
-        { customerId: job.customerId, jobType: job.jobType },
+        { accountId: job.accountId, siteId: job.siteId, customerId: job.customerId, jobType: job.jobType },
         req.ip
       );
 
@@ -6356,6 +6387,408 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error refreshing weather:", error);
       return res.status(500).json({ message: "Failed to refresh weather data" });
+    }
+  });
+
+  // =============================================
+  // ACCOUNT MIGRATION ENDPOINTS
+  // =============================================
+
+  // POST /api/crm/accounts/migrate-from-customers - Migrate existing crmCustomers to new Account model
+  app.post("/api/crm/accounts/migrate-from-customers", requireCrmAdmin, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      const results = {
+        accountsCreated: 0,
+        sitesCreated: 0,
+        contactsCreated: 0,
+        errors: [] as string[],
+        migrated: [] as { customerId: string; customerName: string; accountId: string }[],
+      };
+
+      // Get all existing customers with their properties
+      const allCustomers = await db.select().from(crmCustomers);
+      const allProperties = await db.select().from(crmProperties);
+
+      for (const customer of allCustomers) {
+        try {
+          // Map customerType to AccountType
+          let accountType: AccountType = "RESIDENTIAL";
+          if (customer.customerType === "commercial") {
+            accountType = "COMMERCIAL";
+          } else if (customer.customerType === "property_manager") {
+            accountType = "PROPERTY_MANAGER";
+          }
+
+          // Map customerStatus to AccountStatus
+          let accountStatus: AccountStatus = "PROSPECT";
+          if (customer.customerStatus === "client") {
+            accountStatus = "ACTIVE";
+          }
+
+          // Create the Account
+          const [account] = await db.insert(crmAccounts).values({
+            displayName: customer.name,
+            companyName: customer.companyName,
+            accountType,
+            accountStatus,
+            tags: customer.tags || [],
+            sourceSystem: customer.sourceSystem || "migration",
+            sourceId: customer.id,
+          }).returning();
+          results.accountsCreated++;
+
+          // Get properties for this customer
+          const customerProperties = allProperties.filter(p => p.customerId === customer.id);
+
+          if (customerProperties.length > 0) {
+            // Create a site for each property
+            for (let i = 0; i < customerProperties.length; i++) {
+              const prop = customerProperties[i];
+              await db.insert(crmSites).values({
+                accountId: account.id,
+                siteName: prop.notes || `Site ${i + 1}`,
+                address1: prop.address1,
+                address2: prop.address2,
+                city: prop.city,
+                state: prop.state,
+                zip: prop.zip,
+                isPrimary: i === 0,
+                notes: prop.notes,
+              });
+              results.sitesCreated++;
+            }
+          } else {
+            // Create a placeholder site
+            await db.insert(crmSites).values({
+              accountId: account.id,
+              siteName: "Primary Site",
+              address1: "Address pending",
+              city: "Unknown",
+              state: "GA",
+              zip: "00000",
+              isPrimary: true,
+            });
+            results.sitesCreated++;
+          }
+
+          // Create contact from customer's phone/email
+          if (customer.phone || customer.email) {
+            const nameParts = customer.name.split(" ");
+            const firstName = nameParts[0] || customer.name;
+            const lastName = nameParts.slice(1).join(" ") || undefined;
+
+            await db.insert(crmContacts).values({
+              accountId: account.id,
+              firstName,
+              lastName,
+              phone: customer.phone,
+              email: customer.email,
+              contactRole: "PRIMARY",
+              isPrimary: true,
+            });
+            results.contactsCreated++;
+          }
+
+          results.migrated.push({
+            customerId: customer.id,
+            customerName: customer.name,
+            accountId: account.id,
+          });
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          results.errors.push(`Failed to migrate customer ${customer.name} (${customer.id}): ${errorMsg}`);
+        }
+      }
+
+      await logCrmAudit(
+        currentUser?.id || null,
+        "accounts.migrated_from_customers",
+        "system",
+        null,
+        { 
+          accountsCreated: results.accountsCreated, 
+          sitesCreated: results.sitesCreated, 
+          contactsCreated: results.contactsCreated,
+          errors: results.errors.length,
+        },
+        req.ip
+      );
+
+      return res.json({
+        success: true,
+        message: `Migration complete: ${results.accountsCreated} accounts, ${results.sitesCreated} sites, ${results.contactsCreated} contacts created`,
+        ...results,
+      });
+    } catch (error) {
+      console.error("Error migrating customers to accounts:", error);
+      return res.status(500).json({ message: "Failed to migrate customers", error: String(error) });
+    }
+  });
+
+  // POST /api/crm/accounts/import-csv - Import accounts from CSV file
+  app.post("/api/crm/accounts/import-csv", requireCrmAdmin, uploadMiddleware.single("file"), async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ message: "No CSV file uploaded" });
+      }
+
+      const results = {
+        accountsCreated: 0,
+        sitesCreated: 0,
+        contactsCreated: 0,
+        skipped: 0,
+        errors: [] as string[],
+        imported: [] as { displayName: string; accountId: string }[],
+      };
+
+      const csvContent = file.buffer.toString("utf-8");
+      const lines = csvContent.split("\n").filter(line => line.trim());
+      
+      // Skip header row
+      const dataLines = lines.slice(1);
+
+      for (let i = 0; i < dataLines.length; i++) {
+        const line = dataLines[i];
+        try {
+          const columns = parseCSVLine(line);
+          const [displayName, customerType, fullAddress, phone, email, leadSource] = columns;
+
+          if (!displayName || displayName.trim() === "") {
+            results.skipped++;
+            continue;
+          }
+
+          const cleanDisplayName = displayName.replace(/^"|"$/g, "").trim();
+          
+          // Determine account type: COMMERCIAL if company-like name
+          const isCommercial = customerType?.toLowerCase().includes("commercial") ||
+            /\b(llc|inc|corp|company|co\.|ltd|properties|management|enterprises|services|construction|restaurant|church|school|bank|hospital|medical|clinic|hotel|motel|inn|apt|apartments)\b/i.test(cleanDisplayName);
+          
+          const accountType: AccountType = isCommercial ? "COMMERCIAL" : "RESIDENTIAL";
+
+          // Map lead source
+          let mappedLeadSource: string | undefined;
+          if (leadSource) {
+            const ls = leadSource.toLowerCase();
+            if (ls.includes("referral")) mappedLeadSource = "REFERRAL";
+            else if (ls.includes("google")) mappedLeadSource = "GOOGLE";
+            else if (ls.includes("facebook")) mappedLeadSource = "FACEBOOK";
+            else if (ls.includes("yelp")) mappedLeadSource = "YELP";
+            else if (ls.includes("home advisor")) mappedLeadSource = "HOME_ADVISOR";
+            else if (ls.includes("angi")) mappedLeadSource = "ANGI";
+            else if (ls.includes("thumbtack")) mappedLeadSource = "THUMBTACK";
+            else if (ls.includes("website")) mappedLeadSource = "WEBSITE";
+            else if (ls.includes("phone") || ls.includes("call")) mappedLeadSource = "PHONE";
+            else if (ls.includes("repeat") || ls.includes("existing")) mappedLeadSource = "REPEAT_CUSTOMER";
+            else if (ls.includes("fieldedge")) mappedLeadSource = "FIELDEDGE";
+            else mappedLeadSource = "OTHER";
+          }
+
+          // Create account
+          const [account] = await db.insert(crmAccounts).values({
+            displayName: cleanDisplayName,
+            accountType,
+            accountStatus: "ACTIVE",
+            leadSource: mappedLeadSource as any,
+            sourceSystem: "csv_import",
+          }).returning();
+          results.accountsCreated++;
+
+          // Parse address: "Address - City State Zip"
+          let address1 = "Address pending";
+          let city = "Unknown";
+          let state = "GA";
+          let zip = "00000";
+
+          if (fullAddress && fullAddress.trim() !== "" && fullAddress !== "-") {
+            const addressParts = fullAddress.split(" - ");
+            if (addressParts.length >= 2) {
+              address1 = addressParts[0].trim();
+              const cityStateZip = addressParts[1].trim();
+              // Parse "City State Zip" - e.g., "Grovetown GA 30813"
+              const cszMatch = cityStateZip.match(/^(.+?)\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i);
+              if (cszMatch) {
+                city = cszMatch[1].trim();
+                state = cszMatch[2].toUpperCase();
+                zip = cszMatch[3];
+              } else {
+                // Try without zip
+                const csMatch = cityStateZip.match(/^(.+?)\s+([A-Z]{2})$/i);
+                if (csMatch) {
+                  city = csMatch[1].trim();
+                  state = csMatch[2].toUpperCase();
+                }
+              }
+            } else if (addressParts.length === 1 && addressParts[0].trim() !== "") {
+              address1 = addressParts[0].trim();
+            }
+          }
+
+          // Create site
+          await db.insert(crmSites).values({
+            accountId: account.id,
+            siteName: "Primary Site",
+            address1,
+            city,
+            state,
+            zip,
+            isPrimary: true,
+          });
+          results.sitesCreated++;
+
+          // Create contact if phone or email exists
+          if ((phone && phone.trim() !== "") || (email && email.trim() !== "")) {
+            const nameParts = cleanDisplayName.replace(/^"|"$/g, "").split(/[,\s]+/).filter(p => p);
+            let firstName = nameParts[0] || cleanDisplayName;
+            let lastName: string | undefined;
+            
+            // Handle "Last, First" format
+            if (cleanDisplayName.includes(",")) {
+              const commaParts = cleanDisplayName.split(",").map(p => p.trim());
+              if (commaParts.length >= 2) {
+                lastName = commaParts[0];
+                firstName = commaParts[1];
+              }
+            } else if (nameParts.length > 1) {
+              lastName = nameParts.slice(1).join(" ");
+            }
+
+            await db.insert(crmContacts).values({
+              accountId: account.id,
+              firstName,
+              lastName,
+              phone: phone?.trim() || undefined,
+              email: email?.trim() || undefined,
+              contactRole: "PRIMARY",
+              isPrimary: true,
+            });
+            results.contactsCreated++;
+          }
+
+          results.imported.push({
+            displayName: cleanDisplayName,
+            accountId: account.id,
+          });
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          results.errors.push(`Row ${i + 2}: ${errorMsg}`);
+        }
+      }
+
+      await logCrmAudit(
+        currentUser?.id || null,
+        "accounts.imported_from_csv",
+        "system",
+        null,
+        { 
+          accountsCreated: results.accountsCreated, 
+          sitesCreated: results.sitesCreated, 
+          contactsCreated: results.contactsCreated,
+          skipped: results.skipped,
+          errors: results.errors.length,
+        },
+        req.ip
+      );
+
+      return res.json({
+        success: true,
+        message: `Import complete: ${results.accountsCreated} accounts, ${results.sitesCreated} sites, ${results.contactsCreated} contacts created (${results.skipped} skipped)`,
+        ...results,
+      });
+    } catch (error) {
+      console.error("Error importing CSV:", error);
+      return res.status(500).json({ message: "Failed to import CSV", error: String(error) });
+    }
+  });
+
+  // GET /api/crm/accounts - List accounts with search and pagination
+  app.get("/api/crm/accounts", requireCrmAuth, async (req, res) => {
+    try {
+      const { search, accountType, accountStatus, page = "1", limit = "50" } = req.query;
+      const pageNum = parseInt(page as string);
+      const limitNum = Math.min(parseInt(limit as string), 100);
+      const offset = (pageNum - 1) * limitNum;
+
+      let query = db.select().from(crmAccounts);
+      const conditions = [];
+
+      if (search) {
+        conditions.push(
+          or(
+            ilike(crmAccounts.displayName, `%${search}%`),
+            ilike(crmAccounts.companyName, `%${search}%`)
+          )
+        );
+      }
+      if (accountType) {
+        conditions.push(eq(crmAccounts.accountType, accountType as AccountType));
+      }
+      if (accountStatus) {
+        conditions.push(eq(crmAccounts.accountStatus, accountStatus as AccountStatus));
+      }
+
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+
+      const accounts = await query.limit(limitNum).offset(offset).orderBy(desc(crmAccounts.createdAt));
+      
+      // Get total count
+      const countResult = await db.select({ count: sql<number>`count(*)` }).from(crmAccounts);
+      const total = Number(countResult[0]?.count || 0);
+
+      return res.json({
+        accounts,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+      return res.status(500).json({ message: "Failed to fetch accounts" });
+    }
+  });
+
+  // GET /api/crm/accounts/:id - Get account with sites and contacts
+  app.get("/api/crm/accounts/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const [account] = await db.select().from(crmAccounts).where(eq(crmAccounts.id, req.params.id));
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      const sites = await db.select().from(crmSites).where(eq(crmSites.accountId, account.id));
+      const contacts = await db.select().from(crmContacts).where(eq(crmContacts.accountId, account.id));
+
+      // Get profile based on account type
+      let profile = null;
+      if (account.accountType === "RESIDENTIAL") {
+        const [rp] = await db.select().from(residentialProfiles).where(eq(residentialProfiles.accountId, account.id));
+        profile = rp;
+      } else if (account.accountType === "PROPERTY_MANAGER") {
+        const [pmp] = await db.select().from(propertyManagerProfiles).where(eq(propertyManagerProfiles.accountId, account.id));
+        profile = pmp;
+      } else if (account.accountType === "COMMERCIAL") {
+        const [cp] = await db.select().from(commercialProfiles).where(eq(commercialProfiles.accountId, account.id));
+        profile = cp;
+      }
+
+      return res.json({
+        ...account,
+        sites,
+        contacts,
+        profile,
+      });
+    } catch (error) {
+      console.error("Error fetching account:", error);
+      return res.status(500).json({ message: "Failed to fetch account" });
     }
   });
 
