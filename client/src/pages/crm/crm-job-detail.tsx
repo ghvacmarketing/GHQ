@@ -37,10 +37,16 @@ import {
   Navigation,
   UserCheck,
   RefreshCw,
+  Plus,
+  CalendarPlus,
+  ClipboardList,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
-import type { CrmUser, CrmJob, CrmCustomer, CrmProperty } from "@shared/schema";
+import type { CrmUser, CrmJob, CrmCustomer, CrmProperty, CrmWorkOrder } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType } from "@shared/schema";
 
 type JobDetail = CrmJob & {
   customerName: string;
@@ -196,9 +202,17 @@ export default function CrmJobDetail() {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [reassignDialogOpen, setReassignDialogOpen] = useState(false);
   const [jobTypeDialogOpen, setJobTypeDialogOpen] = useState(false);
+  const [workOrderDialogOpen, setWorkOrderDialogOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [selectedTechId, setSelectedTechId] = useState<string>("");
   const [selectedJobType, setSelectedJobType] = useState<string>("");
+  const [workOrderForm, setWorkOrderForm] = useState({
+    visitType: "initial" as WorkOrderVisitType,
+    scheduledDate: "",
+    startTime: "",
+    endTime: "",
+    assignedTechId: "",
+  });
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -241,10 +255,20 @@ export default function CrmJobDetail() {
       if (!res.ok) throw new Error("Failed to fetch technicians");
       return res.json();
     },
-    enabled: !!currentUser && reassignDialogOpen,
+    enabled: !!currentUser && (reassignDialogOpen || workOrderDialogOpen),
   });
 
   const technicians = dispatchData?.technicians?.filter((t) => t.role === "tech") || [];
+
+  const { data: workOrders, isLoading: workOrdersLoading } = useQuery<CrmWorkOrder[]>({
+    queryKey: ["/api/crm/work-orders", jobId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/jobs/${jobId}/work-orders`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch work orders");
+      return res.json();
+    },
+    enabled: !!currentUser && !!jobId,
+  });
 
   const updateStatusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
@@ -330,6 +354,74 @@ export default function CrmJobDetail() {
     if (selectedJobType) {
       updateJobTypeMutation.mutate(selectedJobType);
     }
+  };
+
+  const createWorkOrderMutation = useMutation({
+    mutationFn: async () => {
+      const startTime = workOrderForm.startTime || "08:00";
+      const endTime = workOrderForm.endTime || "17:00";
+      const scheduledStart = workOrderForm.scheduledDate
+        ? new Date(`${workOrderForm.scheduledDate}T${startTime}`)
+        : null;
+      const scheduledEnd = workOrderForm.scheduledDate
+        ? new Date(`${workOrderForm.scheduledDate}T${endTime}`)
+        : null;
+
+      const res = await apiRequest("POST", "/api/crm/work-orders", {
+        jobId,
+        visitType: workOrderForm.visitType,
+        scheduledStart: scheduledStart?.toISOString(),
+        scheduledEnd: scheduledEnd?.toISOString(),
+        assignedTechId: workOrderForm.assignedTechId || null,
+        status: "scheduled",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Work order created successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", jobId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+      setWorkOrderDialogOpen(false);
+      setWorkOrderForm({
+        visitType: "initial",
+        scheduledDate: "",
+        startTime: "",
+        endTime: "",
+        assignedTechId: "",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create work order",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateWorkOrder = () => {
+    if (workOrderForm.scheduledDate) {
+      createWorkOrderMutation.mutate();
+    }
+  };
+
+  const visitTypeLabels: Record<string, string> = {
+    initial: "Initial Visit",
+    return: "Return Visit",
+    follow_up: "Follow-up",
+    install_day_1: "Install Day 1",
+    install_day_2: "Install Day 2",
+    maintenance: "Maintenance",
+    inspection: "Inspection",
+  };
+
+  const workOrderStatusColors: Record<string, { bg: string; text: string }> = {
+    scheduled: { bg: "bg-blue-100", text: "text-blue-700" },
+    dispatched: { bg: "bg-purple-100", text: "text-purple-700" },
+    en_route: { bg: "bg-amber-100", text: "text-amber-700" },
+    on_site: { bg: "bg-orange-100", text: "text-orange-700" },
+    completed: { bg: "bg-green-100", text: "text-green-700" },
+    cancelled: { bg: "bg-red-100", text: "text-red-500" },
   };
 
   if (authLoading || jobLoading) {
@@ -459,6 +551,14 @@ export default function CrmJobDetail() {
                 <Wrench className="h-4 w-4 mr-2" />
                 Change Type
               </Button>
+              <Button
+                onClick={() => setWorkOrderDialogOpen(true)}
+                className="bg-[#711419] hover:bg-[#5a1014]"
+                data-testid="button-schedule-visit"
+              >
+                <CalendarPlus className="h-4 w-4 mr-2" />
+                Schedule Visit
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -568,6 +668,86 @@ export default function CrmJobDetail() {
                 >
                   {job.description || "No description provided."}
                 </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <ClipboardList className="h-5 w-5 text-slate-500" />
+                    Work Orders / Visits
+                  </CardTitle>
+                  <Button
+                    size="sm"
+                    onClick={() => setWorkOrderDialogOpen(true)}
+                    className="bg-[#711419] hover:bg-[#5a1014]"
+                    data-testid="button-add-work-order"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {workOrdersLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                ) : workOrders && workOrders.length > 0 ? (
+                  <div className="space-y-3">
+                    {workOrders.map((wo) => {
+                      const statusStyle = workOrderStatusColors[wo.status] || workOrderStatusColors.scheduled;
+                      return (
+                        <div
+                          key={wo.id}
+                          className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border"
+                          data-testid={`work-order-${wo.id}`}
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-slate-900">
+                                Visit #{wo.workOrderNumber}
+                              </span>
+                              <Badge className={`${statusStyle.bg} ${statusStyle.text} text-xs`}>
+                                {wo.status.replace("_", " ")}
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-slate-600 mt-1">
+                              <span>{visitTypeLabels[wo.visitType || "initial"]}</span>
+                              {wo.scheduledStart && (
+                                <span className="ml-2">
+                                  • {format(new Date(wo.scheduledStart), "MMM d 'at' h:mm a")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/crm/work-orders/${wo.id}`)}
+                            data-testid={`button-view-wo-${wo.id}`}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-slate-500">
+                    <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No work orders scheduled</p>
+                    <Button
+                      variant="link"
+                      className="text-[#711419] mt-2"
+                      onClick={() => setWorkOrderDialogOpen(true)}
+                    >
+                      Schedule first visit
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -761,6 +941,102 @@ export default function CrmJobDetail() {
               data-testid="button-save-job-type"
             >
               {updateJobTypeMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={workOrderDialogOpen} onOpenChange={setWorkOrderDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Schedule Visit</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Visit Type</Label>
+              <Select
+                value={workOrderForm.visitType}
+                onValueChange={(v) => setWorkOrderForm({ ...workOrderForm, visitType: v as WorkOrderVisitType })}
+              >
+                <SelectTrigger data-testid="select-visit-type">
+                  <SelectValue placeholder="Select visit type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {workOrderVisitTypeEnum.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {visitTypeLabels[type]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Scheduled Date *</Label>
+              <Input
+                type="date"
+                value={workOrderForm.scheduledDate}
+                onChange={(e) => setWorkOrderForm({ ...workOrderForm, scheduledDate: e.target.value })}
+                data-testid="input-scheduled-date"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Time</Label>
+                <Input
+                  type="time"
+                  value={workOrderForm.startTime}
+                  onChange={(e) => setWorkOrderForm({ ...workOrderForm, startTime: e.target.value })}
+                  data-testid="input-start-time"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>End Time</Label>
+                <Input
+                  type="time"
+                  value={workOrderForm.endTime}
+                  onChange={(e) => setWorkOrderForm({ ...workOrderForm, endTime: e.target.value })}
+                  data-testid="input-end-time"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Assign Technician (optional)</Label>
+              <Select
+                value={workOrderForm.assignedTechId}
+                onValueChange={(v) => setWorkOrderForm({ ...workOrderForm, assignedTechId: v })}
+              >
+                <SelectTrigger data-testid="select-assign-tech">
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Unassigned</SelectItem>
+                  {technicians.map((tech) => (
+                    <SelectItem key={tech.id} value={tech.id}>
+                      {tech.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setWorkOrderDialogOpen(false)}
+              data-testid="button-cancel-work-order"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateWorkOrder}
+              disabled={createWorkOrderMutation.isPending || !workOrderForm.scheduledDate}
+              className="bg-[#711419] hover:bg-[#5a1014]"
+              data-testid="button-create-work-order"
+            >
+              {createWorkOrderMutation.isPending ? "Creating..." : "Schedule Visit"}
             </Button>
           </DialogFooter>
         </DialogContent>

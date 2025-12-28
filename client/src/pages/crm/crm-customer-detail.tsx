@@ -33,6 +33,7 @@ import {
   MessageSquare,
   Send,
   Briefcase,
+  CalendarPlus,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -43,6 +44,7 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType } from "@shared/schema";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -98,10 +100,11 @@ export default function CrmCustomerDetail() {
   const params = useParams<{ id: string }>();
   const customerId = params.id;
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [scheduleVisitDialogOpen, setScheduleVisitDialogOpen] = useState(false);
   const [noteBody, setNoteBody] = useState("");
   const { toast } = useToast();
 
-  // Form state
+  // Form state for New Job dialog
   const [jobType, setJobType] = useState<string>("SERVICE");
   const [priority, setPriority] = useState<string>("normal");
   const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
@@ -111,6 +114,29 @@ export default function CrmCustomerDetail() {
   const [description, setDescription] = useState<string>("");
   const [durationError, setDurationError] = useState<string>("");
   const [descriptionError, setDescriptionError] = useState<string>("");
+
+  // Form state for Schedule Visit dialog
+  const [visitJobId, setVisitJobId] = useState<string>("");
+  const [visitType, setVisitType] = useState<WorkOrderVisitType>("initial");
+  const [visitDate, setVisitDate] = useState<Date | undefined>(new Date());
+  const [visitStartTime, setVisitStartTime] = useState<string>("08:00");
+  const [visitEndTime, setVisitEndTime] = useState<string>("10:00");
+  const [visitTechId, setVisitTechId] = useState<string>("unassigned");
+  const [createNewJobForVisit, setCreateNewJobForVisit] = useState(false);
+  const [newJobTypeForVisit, setNewJobTypeForVisit] = useState<string>("SERVICE");
+  const [newJobDescForVisit, setNewJobDescForVisit] = useState<string>("");
+
+  const resetVisitForm = () => {
+    setVisitJobId("");
+    setVisitType("initial");
+    setVisitDate(new Date());
+    setVisitStartTime("08:00");
+    setVisitEndTime("10:00");
+    setVisitTechId("unassigned");
+    setCreateNewJobForVisit(false);
+    setNewJobTypeForVisit("SERVICE");
+    setNewJobDescForVisit("");
+  };
 
   const resetForm = () => {
     setJobType("SERVICE");
@@ -156,7 +182,7 @@ export default function CrmCustomerDetail() {
       if (!res.ok) throw new Error("Failed to fetch technicians");
       return res.json();
     },
-    enabled: !!currentUser && createDialogOpen,
+    enabled: !!currentUser && (createDialogOpen || scheduleVisitDialogOpen),
   });
 
   interface CustomerNoteWithUser extends CrmCustomerNote {
@@ -243,6 +269,86 @@ export default function CrmCustomerDetail() {
     setCreateDialogOpen(false);
     resetForm();
   };
+
+  const handleCloseVisitDialog = () => {
+    setScheduleVisitDialogOpen(false);
+    resetVisitForm();
+  };
+
+  const scheduleVisitMutation = useMutation({
+    mutationFn: async () => {
+      if (!visitDate) throw new Error("Visit date is required");
+      
+      let jobIdToUse = visitJobId;
+      
+      // If creating a new job for this visit
+      if (createNewJobForVisit) {
+        const [hours, minutes] = visitStartTime.split(":").map(Number);
+        const scheduledStart = new Date(visitDate);
+        scheduledStart.setHours(hours, minutes, 0, 0);
+        
+        const [endHours, endMinutes] = visitEndTime.split(":").map(Number);
+        const scheduledEnd = new Date(visitDate);
+        scheduledEnd.setHours(endHours, endMinutes, 0, 0);
+
+        const jobRes = await apiRequest("POST", "/api/crm/jobs", {
+          customerId,
+          jobType: newJobTypeForVisit,
+          description: newJobDescForVisit || null,
+          priority: "normal",
+          status: "scheduled",
+          scheduledStart: scheduledStart.toISOString(),
+          scheduledEnd: scheduledEnd.toISOString(),
+        });
+        const newJob = await jobRes.json();
+        jobIdToUse = newJob.id;
+      }
+      
+      if (!jobIdToUse) throw new Error("Job is required");
+
+      const [hours, minutes] = visitStartTime.split(":").map(Number);
+      const scheduledStart = new Date(visitDate);
+      scheduledStart.setHours(hours, minutes, 0, 0);
+      
+      const [endHours, endMinutes] = visitEndTime.split(":").map(Number);
+      const scheduledEnd = new Date(visitDate);
+      scheduledEnd.setHours(endHours, endMinutes, 0, 0);
+
+      const res = await apiRequest("POST", "/api/crm/work-orders", {
+        jobId: jobIdToUse,
+        visitType,
+        scheduledStart: scheduledStart.toISOString(),
+        scheduledEnd: scheduledEnd.toISOString(),
+        assignedTechId: visitTechId !== "unassigned" ? visitTechId : null,
+        status: "scheduled",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Visit scheduled successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      setScheduleVisitDialogOpen(false);
+      resetVisitForm();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to schedule visit",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmitVisit = () => {
+    if (visitDate && (visitJobId || createNewJobForVisit)) {
+      scheduleVisitMutation.mutate();
+    }
+  };
+
+  const isVisitFormValid = visitDate && (visitJobId || (createNewJobForVisit && newJobTypeForVisit));
 
   const deleteJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
@@ -337,14 +443,29 @@ export default function CrmCustomerDetail() {
             Back to Customers
           </Button>
 
-          <Dialog open={createDialogOpen} onOpenChange={(open) => open ? setCreateDialogOpen(true) : handleCloseDialog()}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-create-job">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Job
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+          <div className="flex items-center gap-2">
+            <Button 
+              onClick={() => setCreateDialogOpen(true)}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-new-job"
+            >
+              <Briefcase className="h-4 w-4 mr-2" />
+              New Job
+            </Button>
+            <Button 
+              onClick={() => setScheduleVisitDialogOpen(true)}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-schedule-visit"
+            >
+              <CalendarPlus className="h-4 w-4 mr-2" />
+              Schedule Visit
+            </Button>
+          </div>
+        </div>
+
+        {/* New Job Dialog */}
+        <Dialog open={createDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
+          <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Create Job</DialogTitle>
                 <DialogDescription>
@@ -497,8 +618,188 @@ export default function CrmCustomerDetail() {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
-        </div>
+        </Dialog>
+
+        {/* Schedule Visit Dialog */}
+        <Dialog open={scheduleVisitDialogOpen} onOpenChange={(open) => !open && handleCloseVisitDialog()}>
+          <DialogContent className="sm:max-w-[550px]">
+            <DialogHeader>
+              <DialogTitle>Schedule Visit</DialogTitle>
+              <DialogDescription>
+                Schedule a visit for {customer.name}. Work orders must be linked to a job.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              {/* Job Selection */}
+              <div className="space-y-2">
+                <Label>Select Job *</Label>
+                <Select 
+                  value={createNewJobForVisit ? "new" : visitJobId} 
+                  onValueChange={(value) => {
+                    if (value === "new") {
+                      setCreateNewJobForVisit(true);
+                      setVisitJobId("");
+                    } else {
+                      setCreateNewJobForVisit(false);
+                      setVisitJobId(value);
+                    }
+                  }}
+                >
+                  <SelectTrigger data-testid="select-visit-job">
+                    <SelectValue placeholder="Select a job or create new" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new" data-testid="visit-job-new">
+                      + Create New Job
+                    </SelectItem>
+                    {jobs?.map((job) => (
+                      <SelectItem key={job.id} value={job.id} data-testid={`visit-job-${job.id}`}>
+                        {job.jobType} - {job.description?.slice(0, 30) || "No description"}{job.description && job.description.length > 30 ? "..." : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* New Job Fields (if creating new) */}
+              {createNewJobForVisit && (
+                <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                  <p className="text-sm font-medium text-slate-700">New Job Details</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Job Type *</Label>
+                      <Select value={newJobTypeForVisit} onValueChange={setNewJobTypeForVisit}>
+                        <SelectTrigger data-testid="select-new-visit-job-type">
+                          <SelectValue placeholder="Select job type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {JOB_TYPES.map((type) => (
+                            <SelectItem key={type} value={type} data-testid={`new-visit-job-type-${type}`}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Description</Label>
+                      <Input
+                        placeholder="Job description..."
+                        value={newJobDescForVisit}
+                        onChange={(e) => setNewJobDescForVisit(e.target.value)}
+                        data-testid="input-new-visit-job-desc"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Visit Type */}
+              <div className="space-y-2">
+                <Label>Visit Type *</Label>
+                <Select value={visitType} onValueChange={(v) => setVisitType(v as WorkOrderVisitType)}>
+                  <SelectTrigger data-testid="select-visit-type">
+                    <SelectValue placeholder="Select visit type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workOrderVisitTypeEnum.map((type) => (
+                      <SelectItem key={type} value={type} data-testid={`visit-type-${type}`}>
+                        {type.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Date and Time */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Date *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !visitDate && "text-muted-foreground"
+                        )}
+                        data-testid="button-visit-date"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {visitDate ? format(visitDate, "MMM d") : "Pick"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={visitDate}
+                        onSelect={setVisitDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-2">
+                  <Label>Start Time</Label>
+                  <Input
+                    type="time"
+                    value={visitStartTime}
+                    onChange={(e) => setVisitStartTime(e.target.value)}
+                    data-testid="input-visit-start-time"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Time</Label>
+                  <Input
+                    type="time"
+                    value={visitEndTime}
+                    onChange={(e) => setVisitEndTime(e.target.value)}
+                    data-testid="input-visit-end-time"
+                  />
+                </div>
+              </div>
+
+              {/* Technician */}
+              <div className="space-y-2">
+                <Label>Assign Tech (optional)</Label>
+                <Select value={visitTechId} onValueChange={setVisitTechId}>
+                  <SelectTrigger data-testid="select-visit-tech">
+                    <SelectValue placeholder="Select technician" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned" data-testid="visit-tech-unassigned">
+                      Unassigned
+                    </SelectItem>
+                    {technicians.map((tech) => (
+                      <SelectItem key={tech.id} value={tech.id} data-testid={`visit-tech-${tech.id}`}>
+                        {tech.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={handleCloseVisitDialog}
+                data-testid="button-cancel-visit"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmitVisit}
+                disabled={scheduleVisitMutation.isPending || !isVisitFormValid}
+                className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                data-testid="button-submit-visit"
+              >
+                {scheduleVisitMutation.isPending ? "Scheduling..." : "Schedule Visit"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Card data-testid="card-customer-info">
           <CardHeader>

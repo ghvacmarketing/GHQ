@@ -5207,6 +5207,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/jobs/:id/work-orders - Get work orders for a job
+  app.get("/api/crm/jobs/:id/work-orders", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const jobId = req.params.id;
+      const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, jobId));
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      const workOrders = await storage.getWorkOrdersByJobId(jobId);
+      return res.json(workOrders);
+    } catch (error) {
+      console.error("Error fetching work orders for job:", error);
+      return res.status(500).json({ message: "Failed to fetch work orders" });
+    }
+  });
+
   // POST /api/crm/jobs/:id/status - Update job status
   app.post("/api/crm/jobs/:id/status", requireCrmAuth, async (req, res) => {
     try {
