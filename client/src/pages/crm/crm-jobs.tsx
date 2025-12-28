@@ -82,6 +82,12 @@ type JobWithDetails = CrmJob & {
   siteAddress: string | null;
   assignedTechId: string | null;
   assignedTechName: string | null;
+  nextScheduledAt: string | null;
+  lastCompletedAt: string | null;
+  derivedStatus: string;
+  hasUpcoming: boolean;
+  allWorkOrdersCompleted: boolean;
+  workOrderCount: number;
 };
 
 type JobsResponse = {
@@ -125,24 +131,27 @@ type AccountDetailResponse = CrmAccount & {
 
 const ITEMS_PER_PAGE = 50;
 
-type FilterTab = "all" | "upcoming" | "past" | "completed" | "incomplete" | "cancelled";
+type FilterTab = "all" | "upcoming" | "past" | "complete" | "incomplete" | "cancelled";
 
-const filterTabConfig: Record<FilterTab, { label: string; status?: string; dateFilter?: string }> = {
+const filterTabConfig: Record<FilterTab, { label: string }> = {
   all: { label: "All Jobs" },
-  upcoming: { label: "Upcoming", dateFilter: "upcoming" },
-  past: { label: "Past", dateFilter: "past" },
-  completed: { label: "Complete", status: "completed" },
+  upcoming: { label: "Upcoming" },
+  past: { label: "Past" },
+  complete: { label: "Complete" },
   incomplete: { label: "Incomplete" },
-  cancelled: { label: "Canceled", status: "cancelled" },
+  cancelled: { label: "Canceled" },
 };
 
 const statusColors: Record<string, { bg: string; text: string; border: string }> = {
   new: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-200" },
+  needs_scheduling: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-200" },
   scheduled: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
+  in_progress: { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
   dispatched: { bg: "bg-purple-100", text: "text-purple-700", border: "border-purple-200" },
   en_route: { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
   on_site: { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
   completed: { bg: "bg-green-100", text: "text-green-700", border: "border-green-200" },
+  closed: { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-200" },
   invoiced: { bg: "bg-teal-100", text: "text-teal-700", border: "border-teal-200" },
   paid: { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-200" },
   cancelled: { bg: "bg-red-100", text: "text-red-500", border: "border-red-200" },
@@ -156,12 +165,15 @@ const priorityColors: Record<string, { bg: string; text: string; border: string 
 };
 
 const statusLabels: Record<string, string> = {
-  new: "New",
+  new: "Needs Scheduling",
+  needs_scheduling: "Needs Scheduling",
   scheduled: "Scheduled",
+  in_progress: "In Progress",
   dispatched: "Dispatched",
   en_route: "En Route",
   on_site: "On Site",
   completed: "Completed",
+  closed: "Closed",
   invoiced: "Invoiced",
   paid: "Paid",
   cancelled: "Cancelled",
@@ -235,16 +247,8 @@ export default function CrmJobs() {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
     
-    const tabConfig = filterTabConfig[activeTab];
-    
-    if (tabConfig.status) {
-      params.set("status", tabConfig.status);
-    } else if (activeTab === "incomplete") {
-      params.set("status", "all");
-    }
-    
-    if (tabConfig.dateFilter) {
-      params.set("dateFilter", tabConfig.dateFilter);
+    if (activeTab !== "all") {
+      params.set("tab", activeTab);
     }
     
     params.set("page", String(page));
@@ -726,7 +730,7 @@ export default function CrmJobs() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-slate-50">
-                        <TableHead>Date</TableHead>
+                        <TableHead>Next Visit</TableHead>
                         <TableHead>Job Type</TableHead>
                         <TableHead>Account</TableHead>
                         <TableHead>Site Address</TableHead>
@@ -738,7 +742,7 @@ export default function CrmJobs() {
                     </TableHeader>
                     <TableBody>
                       {jobs.map((job) => {
-                        const statusStyle = statusColors[job.status] || statusColors.new;
+                        const statusStyle = statusColors[job.derivedStatus] || statusColors.new;
                         const priorityStyle = priorityColors[job.priority || "normal"] || priorityColors.normal;
                         
                         return (
@@ -749,7 +753,7 @@ export default function CrmJobs() {
                             data-testid={`row-job-${job.id}`}
                           >
                             <TableCell className="font-medium" data-testid={`text-job-date-${job.id}`}>
-                              {formatDateDisplay(job.scheduledStart)}
+                              {job.nextScheduledAt ? formatDateDisplay(job.nextScheduledAt) : "—"}
                             </TableCell>
                             <TableCell data-testid={`text-job-type-${job.id}`}>
                               {job.jobType || "—"}
@@ -777,7 +781,7 @@ export default function CrmJobs() {
                                 className={`${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}
                                 data-testid={`badge-job-status-${job.id}`}
                               >
-                                {statusLabels[job.status] || job.status}
+                                {statusLabels[job.derivedStatus] || job.derivedStatus}
                               </Badge>
                             </TableCell>
                             <TableCell>

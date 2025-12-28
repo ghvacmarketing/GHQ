@@ -4919,8 +4919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const search = (req.query.search as string) || "";
-      const status = (req.query.status as string) || "all";
-      const dateFilter = (req.query.dateFilter as string) || "all";
+      const tab = (req.query.tab as string) || "all";
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
       const offset = (page - 1) * limit;
@@ -4928,16 +4927,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conditions: any[] = [];
       const now = new Date();
 
-      // Status filter
-      if (status && status !== "all") {
-        conditions.push(eq(crmJobs.status, status));
-      }
-
-      // Date filter
-      if (dateFilter === "upcoming") {
-        conditions.push(sql`${crmJobs.scheduledStart} >= ${now}`);
-      } else if (dateFilter === "past") {
-        conditions.push(sql`${crmJobs.scheduledStart} < ${now}`);
+      // Pre-filter cancelled jobs at DB level for cancelled tab
+      if (tab === "cancelled") {
+        conditions.push(eq(crmJobs.status, "cancelled"));
       }
 
       // For techs, limit to their assigned jobs
@@ -4961,15 +4953,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-      // Get total count
-      const countResult = await db.select({ count: sql<number>`count(*)` })
-        .from(crmJobs)
-        .leftJoin(crmCustomers, eq(crmJobs.customerId, crmCustomers.id))
-        .leftJoin(crmAccounts, eq(crmJobs.accountId, crmAccounts.id))
-        .where(whereClause);
-      const total = Number(countResult[0]?.count || 0);
-
-      // Get jobs with customer/account/site info
+      // Get jobs with customer/account/site info and work order aggregations
       const jobsWithInfo = await db.select({
         job: crmJobs,
         customerName: crmCustomers.name,
@@ -4983,15 +4967,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(crmAccounts, eq(crmJobs.accountId, crmAccounts.id))
         .leftJoin(crmSites, eq(crmJobs.siteId, crmSites.id))
         .where(whereClause)
-        .orderBy(desc(crmJobs.scheduledStart), desc(crmJobs.createdAt))
-        .limit(limit)
-        .offset(offset);
+        .orderBy(desc(crmJobs.scheduledStart), desc(crmJobs.createdAt));
 
-      // Get assignments for these jobs
-      const jobIds = jobsWithInfo.map(j => j.job.id);
+      // Get all job IDs for work order aggregation
+      const allJobIds = jobsWithInfo.map(j => j.job.id);
+      
+      // Get work orders for all jobs
+      let workOrdersMap: Record<string, { 
+        workOrders: Array<{ status: string; scheduledStart: Date | null; scheduledEnd: Date | null }>;
+      }> = {};
+      
+      if (allJobIds.length > 0) {
+        const workOrders = await db.select({
+          jobId: crmWorkOrders.jobId,
+          status: crmWorkOrders.status,
+          scheduledStart: crmWorkOrders.scheduledStart,
+          scheduledEnd: crmWorkOrders.scheduledEnd,
+        })
+          .from(crmWorkOrders)
+          .where(inArray(crmWorkOrders.jobId, allJobIds));
+        
+        workOrders.forEach(wo => {
+          if (!workOrdersMap[wo.jobId]) {
+            workOrdersMap[wo.jobId] = { workOrders: [] };
+          }
+          workOrdersMap[wo.jobId].workOrders.push({
+            status: wo.status,
+            scheduledStart: wo.scheduledStart,
+            scheduledEnd: wo.scheduledEnd,
+          });
+        });
+      }
+
+      // Get invoices for all jobs to check if all are paid
+      let invoicesMap: Record<string, Array<{ status: string }>> = {};
+      if (allJobIds.length > 0) {
+        const invoices = await db.select({
+          jobId: crmInvoices.jobId,
+          status: crmInvoices.status,
+        })
+          .from(crmInvoices)
+          .where(inArray(crmInvoices.jobId, allJobIds));
+        
+        invoices.forEach(inv => {
+          if (!invoicesMap[inv.jobId]) {
+            invoicesMap[inv.jobId] = [];
+          }
+          invoicesMap[inv.jobId].push({ status: inv.status });
+        });
+      }
+
+      // Compute derived fields for each job
+      const completedStatuses = ['completed', 'invoiced', 'paid'];
+      const inProgressStatuses = ['dispatched', 'en_route', 'on_site'];
+
+      const jobsWithDerived = jobsWithInfo.map(({ job, customerName, accountName, siteAddress1, siteCity, siteState }) => {
+        const workOrderData = workOrdersMap[job.id]?.workOrders || [];
+        const invoiceData = invoicesMap[job.id] || [];
+        
+        // Compute nextScheduledAt: earliest upcoming work order scheduledStart
+        const upcomingWorkOrders = workOrderData.filter(wo => 
+          wo.scheduledStart && new Date(wo.scheduledStart) > now
+        );
+        const nextScheduledAt = upcomingWorkOrders.length > 0
+          ? upcomingWorkOrders.reduce((earliest, wo) => {
+              const woDate = new Date(wo.scheduledStart!);
+              return !earliest || woDate < earliest ? woDate : earliest;
+            }, null as Date | null)
+          : null;
+
+        // Compute lastCompletedAt: latest completed work order (use scheduledEnd or scheduledStart as fallback)
+        const completedWorkOrders = workOrderData.filter(wo => 
+          completedStatuses.includes(wo.status) && (wo.scheduledEnd || wo.scheduledStart)
+        );
+        const lastCompletedAt = completedWorkOrders.length > 0
+          ? completedWorkOrders.reduce((latest, wo) => {
+              const woDate = new Date((wo.scheduledEnd || wo.scheduledStart)!);
+              return !latest || woDate > latest ? woDate : latest;
+            }, null as Date | null)
+          : null;
+
+        // Compute workOrderCount
+        const workOrderCount = workOrderData.length;
+
+        // Compute allWorkOrdersCompleted
+        const allWorkOrdersCompleted = workOrderCount > 0 && 
+          workOrderData.every(wo => completedStatuses.includes(wo.status));
+
+        // Compute hasUpcoming
+        const hasUpcoming = nextScheduledAt !== null;
+
+        // Compute derivedStatus
+        let derivedStatus: string;
+        if (job.status === 'cancelled') {
+          derivedStatus = 'cancelled';
+        } else if (workOrderCount === 0) {
+          derivedStatus = 'new';
+        } else if (workOrderData.some(wo => inProgressStatuses.includes(wo.status))) {
+          derivedStatus = 'in_progress';
+        } else if (allWorkOrdersCompleted && !hasUpcoming) {
+          // Check if all invoices are paid OR job.completedAt exists
+          const allInvoicesPaid = invoiceData.length > 0 && 
+            invoiceData.every(inv => inv.status === 'paid');
+          if (allInvoicesPaid || job.completedAt) {
+            derivedStatus = 'closed';
+          } else {
+            derivedStatus = 'completed';
+          }
+        } else if (hasUpcoming) {
+          derivedStatus = 'scheduled';
+        } else {
+          derivedStatus = 'new';
+        }
+
+        return {
+          ...job,
+          accountName: accountName || customerName || "Unknown",
+          siteAddress: siteAddress1 ? `${siteAddress1}, ${siteCity}, ${siteState}` : null,
+          nextScheduledAt,
+          lastCompletedAt,
+          derivedStatus,
+          hasUpcoming,
+          allWorkOrdersCompleted,
+          workOrderCount,
+        };
+      });
+
+      // Apply tab-based filtering on computed fields
+      let filteredJobs = jobsWithDerived;
+      switch (tab) {
+        case "upcoming":
+          // Jobs with nextScheduledAt in the future
+          filteredJobs = jobsWithDerived.filter(job => job.hasUpcoming);
+          break;
+        case "past":
+          // No upcoming work orders and has at least one work order (completed visits)
+          filteredJobs = jobsWithDerived.filter(job => 
+            !job.hasUpcoming && job.workOrderCount > 0 && job.derivedStatus !== 'cancelled'
+          );
+          break;
+        case "complete":
+          // All work orders completed
+          filteredJobs = jobsWithDerived.filter(job => 
+            job.allWorkOrdersCompleted || job.derivedStatus === 'completed' || job.derivedStatus === 'closed'
+          );
+          break;
+        case "incomplete":
+          // Anything not complete and not cancelled
+          filteredJobs = jobsWithDerived.filter(job => 
+            job.derivedStatus !== 'completed' && 
+            job.derivedStatus !== 'closed' && 
+            job.derivedStatus !== 'cancelled'
+          );
+          break;
+        case "cancelled":
+          // Already filtered at DB level
+          break;
+        default:
+          // "all" - no additional filtering
+          break;
+      }
+
+      // Get total count after filtering
+      const total = filteredJobs.length;
+
+      // Apply pagination
+      const paginatedJobs = filteredJobs.slice(offset, offset + limit);
+      const paginatedJobIds = paginatedJobs.map(j => j.id);
+
+      // Get assignments for paginated jobs
       let assignmentsMap: Record<string, { techId: string; techName: string }> = {};
       
-      if (jobIds.length > 0) {
+      if (paginatedJobIds.length > 0) {
         const assignments = await db.select({
           jobId: crmJobAssignments.jobId,
           techId: crmJobAssignments.techUserId,
@@ -4999,18 +5146,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
           .from(crmJobAssignments)
           .leftJoin(crmUsers, eq(crmJobAssignments.techUserId, crmUsers.id))
-          .where(inArray(crmJobAssignments.jobId, jobIds));
+          .where(inArray(crmJobAssignments.jobId, paginatedJobIds));
         
         assignments.forEach(a => {
           assignmentsMap[a.jobId] = { techId: a.techId, techName: a.techName || "Unknown" };
         });
       }
 
-      // Combine data
-      const jobs = jobsWithInfo.map(({ job, customerName, accountName, siteAddress1, siteCity, siteState }) => ({
+      // Add assignment info to jobs
+      const jobs = paginatedJobs.map(job => ({
         ...job,
-        accountName: accountName || customerName || "Unknown",
-        siteAddress: siteAddress1 ? `${siteAddress1}, ${siteCity}, ${siteState}` : null,
         assignedTechId: assignmentsMap[job.id]?.techId || null,
         assignedTechName: assignmentsMap[job.id]?.techName || null,
       }));
