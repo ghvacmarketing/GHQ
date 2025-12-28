@@ -4741,7 +4741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/jobs - List jobs
+  // GET /api/crm/jobs - List jobs with search, filters, and pagination
   app.get("/api/crm/jobs", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -4749,18 +4749,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      if (isSalesOrAbove(user.role)) {
-        const jobs = await db.select().from(crmJobs).orderBy(desc(crmJobs.createdAt));
-        return res.json(jobs);
-      } else {
-        const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.techUserId, user.id));
-        if (assignments.length === 0) {
-          return res.json([]);
-        }
-        const jobIds = assignments.map(a => a.jobId);
-        const jobs = await db.select().from(crmJobs).where(inArray(crmJobs.id, jobIds)).orderBy(desc(crmJobs.createdAt));
-        return res.json(jobs);
+      const search = (req.query.search as string) || "";
+      const status = (req.query.status as string) || "all";
+      const dateFilter = (req.query.dateFilter as string) || "all";
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+      const offset = (page - 1) * limit;
+
+      const conditions: any[] = [];
+      const now = new Date();
+
+      // Status filter
+      if (status && status !== "all") {
+        conditions.push(eq(crmJobs.status, status));
       }
+
+      // Date filter
+      if (dateFilter === "upcoming") {
+        conditions.push(sql`${crmJobs.scheduledStart} >= ${now}`);
+      } else if (dateFilter === "past") {
+        conditions.push(sql`${crmJobs.scheduledStart} < ${now}`);
+      }
+
+      // For techs, limit to their assigned jobs
+      let allowedJobIds: string[] | null = null;
+      if (!isSalesOrAbove(user.role)) {
+        const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.techUserId, user.id));
+        allowedJobIds = assignments.map(a => a.jobId);
+        if (allowedJobIds.length === 0) {
+          return res.json({ jobs: [], total: 0, page, limit });
+        }
+        conditions.push(inArray(crmJobs.id, allowedJobIds));
+      }
+
+      // Search filter (customer name or job type)
+      if (search) {
+        const searchPattern = `%${search.toLowerCase()}%`;
+        conditions.push(
+          sql`(LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmJobs.jobType}) LIKE ${searchPattern})`
+        );
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      // Get total count
+      const countResult = await db.select({ count: sql<number>`count(*)` })
+        .from(crmJobs)
+        .leftJoin(crmCustomers, eq(crmJobs.customerId, crmCustomers.id))
+        .where(whereClause);
+      const total = Number(countResult[0]?.count || 0);
+
+      // Get jobs with customer info
+      const jobsWithCustomers = await db.select({
+        job: crmJobs,
+        customerName: crmCustomers.name,
+      })
+        .from(crmJobs)
+        .leftJoin(crmCustomers, eq(crmJobs.customerId, crmCustomers.id))
+        .where(whereClause)
+        .orderBy(desc(crmJobs.scheduledStart), desc(crmJobs.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      // Get assignments for these jobs
+      const jobIds = jobsWithCustomers.map(j => j.job.id);
+      let assignmentsMap: Record<string, { techId: string; techName: string }> = {};
+      
+      if (jobIds.length > 0) {
+        const assignments = await db.select({
+          jobId: crmJobAssignments.jobId,
+          techId: crmJobAssignments.techUserId,
+          techName: crmUsers.name,
+        })
+          .from(crmJobAssignments)
+          .leftJoin(crmUsers, eq(crmJobAssignments.techUserId, crmUsers.id))
+          .where(inArray(crmJobAssignments.jobId, jobIds));
+        
+        assignments.forEach(a => {
+          assignmentsMap[a.jobId] = { techId: a.techId, techName: a.techName || "Unknown" };
+        });
+      }
+
+      // Combine data
+      const jobs = jobsWithCustomers.map(({ job, customerName }) => ({
+        ...job,
+        customerName: customerName || "Unknown Customer",
+        assignedTechId: assignmentsMap[job.id]?.techId || null,
+        assignedTechName: assignmentsMap[job.id]?.techName || null,
+      }));
+
+      return res.json({ jobs, total, page, limit });
     } catch (error) {
       console.error("Error fetching CRM jobs:", error);
       return res.status(500).json({ message: "Failed to fetch jobs" });
