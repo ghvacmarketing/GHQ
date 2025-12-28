@@ -873,7 +873,7 @@ export const crmJobs = pgTable("crm_jobs", {
 
 // CRM Work Orders (scheduled visits linked to jobs)
 // Work Order Visit Types
-export const workOrderVisitTypeEnum = ["initial", "return", "follow_up", "install_day_1", "install_day_2", "maintenance", "inspection"] as const;
+export const workOrderVisitTypeEnum = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
 export type WorkOrderVisitType = typeof workOrderVisitTypeEnum[number];
 
 export const crmWorkOrders = pgTable("crm_work_orders", {

@@ -5036,9 +5036,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerName: crmCustomers.name,
         customerPhone: crmCustomers.phone,
         customerEmail: crmCustomers.email,
+        accountName: crmAccounts.displayName,
       })
         .from(crmJobs)
         .leftJoin(crmCustomers, eq(crmJobs.customerId, crmCustomers.id))
+        .leftJoin(crmAccounts, eq(crmJobs.accountId, crmAccounts.id))
         .where(eq(crmJobs.id, jobId));
 
       if (!jobWithCustomer) {
@@ -5133,7 +5135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       return res.json({
         ...jobWithCustomer.job,
-        customerName: jobWithCustomer.customerName || "Unknown Customer",
+        customerName: jobWithCustomer.accountName || jobWithCustomer.customerName || "Unknown Customer",
         customerPhone: jobWithCustomer.customerPhone || null,
         customerEmail: jobWithCustomer.customerEmail || null,
         assignedTechId: assignment?.techId || null,

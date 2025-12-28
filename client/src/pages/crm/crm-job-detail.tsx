@@ -153,13 +153,10 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
 };
 
 const visitTypeLabels: Record<string, string> = {
-  initial: "Initial Visit",
-  return: "Return Visit",
-  follow_up: "Follow-up",
-  install_day_1: "Install Day 1",
-  install_day_2: "Install Day 2",
-  maintenance: "Maintenance",
-  inspection: "Inspection",
+  SERVICE: "Service",
+  INSTALL: "Install",
+  MAINTENANCE: "Maintenance",
+  SALES: "Sales",
 };
 
 const workOrderStatusSteps = ["scheduled", "en_route", "on_site", "completed"] as const;
@@ -265,7 +262,7 @@ export default function CrmJobDetail() {
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrderWithTech | null>(null);
   const [selectedWoStatus, setSelectedWoStatus] = useState<string>("");
   const [workOrderForm, setWorkOrderForm] = useState({
-    visitType: "initial" as WorkOrderVisitType,
+    visitType: "SERVICE" as WorkOrderVisitType,
     scheduledDate: "",
     startTime: "",
     endTime: "",
@@ -359,7 +356,7 @@ export default function CrmJobDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
       setWorkOrderDialogOpen(false);
       setWorkOrderForm({
-        visitType: "initial",
+        visitType: "SERVICE",
         scheduledDate: "",
         startTime: "",
         endTime: "",
@@ -508,62 +505,6 @@ export default function CrmJobDetail() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge
-                  className={`${jobTypeStyle.bg} ${jobTypeStyle.text}`}
-                  data-testid="badge-job-type"
-                >
-                  {job.jobType}
-                </Badge>
-                <Badge
-                  className={`${priorityStyle.bg} ${priorityStyle.text} capitalize`}
-                  data-testid="badge-priority"
-                >
-                  {job.priority || "normal"}
-                </Badge>
-                <Badge
-                  className={`${derivedStatusStyle.bg} ${derivedStatusStyle.text} ${derivedStatusStyle.border} border`}
-                  data-testid="badge-derived-status"
-                >
-                  {statusLabels[job.derivedStatus] || job.derivedStatus}
-                </Badge>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => setWorkOrderDialogOpen(true)}
-                  className="bg-[#711419] hover:bg-[#5a1014]"
-                  data-testid="button-schedule-visit"
-                >
-                  <CalendarPlus className="h-4 w-4 mr-2" />
-                  Create Work Order
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate(`/crm/invoices/new?jobId=${jobId}`)}
-                  data-testid="button-create-invoice"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Create Invoice
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" data-testid="button-job-actions">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => setDeleteConfirmOpen(true)}
-                      className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                      data-testid="menu-item-delete-job"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Job
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -606,7 +547,7 @@ export default function CrmJobDetail() {
                                   Visit #{wo.workOrderNumber || index + 1}
                                 </span>
                                 <span className="text-sm text-slate-600">
-                                  {visitTypeLabels[wo.visitType || "initial"]}
+                                  {visitTypeLabels[wo.visitType || "SERVICE"]}
                                 </span>
                                 <Badge className={`${woStatusStyle.bg} ${woStatusStyle.text} text-xs`}>
                                   {statusLabels[wo.status] || wo.status}
@@ -891,7 +832,7 @@ export default function CrmJobDetail() {
           <div className="py-4">
             {selectedWorkOrder && (
               <p className="text-sm text-slate-600 mb-4">
-                Updating Visit #{selectedWorkOrder.workOrderNumber} ({visitTypeLabels[selectedWorkOrder.visitType || "initial"]})
+                Updating Visit #{selectedWorkOrder.workOrderNumber} ({visitTypeLabels[selectedWorkOrder.visitType || "SERVICE"]})
               </p>
             )}
             <Select value={selectedWoStatus} onValueChange={setSelectedWoStatus}>
