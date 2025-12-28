@@ -899,7 +899,7 @@ export default function CrmJobDetail() {
                   <SelectTrigger data-testid="select-start-time">
                     <SelectValue placeholder="Select time" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent side="bottom">
                     <SelectItem value="08:00">8:00 AM</SelectItem>
                     <SelectItem value="09:00">9:00 AM</SelectItem>
                     <SelectItem value="10:00">10:00 AM</SelectItem>
@@ -925,7 +925,7 @@ export default function CrmJobDetail() {
                   <SelectTrigger data-testid="select-end-time">
                     <SelectValue placeholder="Select time" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent side="bottom">
                     <SelectItem value="08:00">8:00 AM</SelectItem>
                     <SelectItem value="09:00">9:00 AM</SelectItem>
                     <SelectItem value="10:00">10:00 AM</SelectItem>
