@@ -794,6 +794,13 @@ export const crmAuditLog = pgTable("crm_audit_log", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// CRM Customer Type and Status Enums
+export const crmCustomerTypeEnum = ["residential", "commercial", "property_manager"] as const;
+export type CrmCustomerType = typeof crmCustomerTypeEnum[number];
+
+export const crmCustomerStatusEnum = ["prospect", "client"] as const;
+export type CrmCustomerStatus = typeof crmCustomerStatusEnum[number];
+
 // CRM Customers
 export const crmCustomers = pgTable("crm_customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -801,6 +808,8 @@ export const crmCustomers = pgTable("crm_customers", {
   companyName: text("company_name"),
   email: text("email"),
   phone: text("phone"),
+  customerType: text("customer_type").$type<CrmCustomerType>().default("residential"),
+  customerStatus: text("customer_status").$type<CrmCustomerStatus>().default("client"),
   tags: json("tags").$type<string[]>().default([]),
   notes: text("notes"),
   sourceSystem: text("source_system"),

@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, insertCrmCustomerSchema, insertCrmJobSchema } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, insertCrmCustomerSchema, insertCrmJobSchema } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -14,7 +14,7 @@ import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
-import { eq, inArray, desc } from "drizzle-orm";
+import { eq, inArray, desc, sql, and } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -4552,7 +4552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CRM API ENDPOINTS
   // ============================================
 
-  // GET /api/crm/customers - List customers
+  // GET /api/crm/customers - List customers with search, filters, and pagination
   app.get("/api/crm/customers", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -4560,23 +4560,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      if (isSalesOrAbove(user.role)) {
-        const customers = await db.select().from(crmCustomers).orderBy(desc(crmCustomers.createdAt));
-        return res.json(customers);
-      } else {
+      const {
+        search,
+        customerType,
+        customerStatus,
+        dateFrom,
+        dateTo,
+        page = "1",
+        limit = "50",
+      } = req.query as Record<string, string | undefined>;
+
+      const pageNum = Math.max(1, parseInt(page) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 50));
+      const offset = (pageNum - 1) * limitNum;
+
+      // Build conditions
+      const conditions: any[] = [];
+
+      // Search filter (name, email, phone)
+      if (search && search.trim()) {
+        const searchTerm = `%${search.trim().toLowerCase()}%`;
+        conditions.push(
+          sql`(LOWER(${crmCustomers.name}) LIKE ${searchTerm} OR LOWER(${crmCustomers.email}) LIKE ${searchTerm} OR ${crmCustomers.phone} LIKE ${searchTerm})`
+        );
+      }
+
+      // Customer type filter
+      if (customerType && customerType !== "all") {
+        conditions.push(eq(crmCustomers.customerType, customerType));
+      }
+
+      // Customer status filter
+      if (customerStatus && customerStatus !== "all") {
+        conditions.push(eq(crmCustomers.customerStatus, customerStatus));
+      }
+
+      // Date range filter
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        if (!isNaN(fromDate.getTime())) {
+          conditions.push(sql`${crmCustomers.createdAt} >= ${fromDate}`);
+        }
+      }
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        if (!isNaN(toDate.getTime())) {
+          toDate.setHours(23, 59, 59, 999);
+          conditions.push(sql`${crmCustomers.createdAt} <= ${toDate}`);
+        }
+      }
+
+      // For non-sales users, filter to only customers they have access to
+      let customerIdFilter: string[] | null = null;
+      if (!isSalesOrAbove(user.role)) {
         const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.techUserId, user.id));
         if (assignments.length === 0) {
-          return res.json([]);
+          return res.json({ customers: [], total: 0, page: pageNum, limit: limitNum, totalPages: 0 });
         }
         const jobIds = assignments.map(a => a.jobId);
         const jobs = await db.select().from(crmJobs).where(inArray(crmJobs.id, jobIds));
-        const customerIds = Array.from(new Set(jobs.map(j => j.customerId)));
-        if (customerIds.length === 0) {
-          return res.json([]);
+        customerIdFilter = Array.from(new Set(jobs.map(j => j.customerId)));
+        if (customerIdFilter.length === 0) {
+          return res.json({ customers: [], total: 0, page: pageNum, limit: limitNum, totalPages: 0 });
         }
-        const customers = await db.select().from(crmCustomers).where(inArray(crmCustomers.id, customerIds));
-        return res.json(customers);
+        conditions.push(inArray(crmCustomers.id, customerIdFilter));
       }
+
+      // Build the query with conditions
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      // Get total count
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(crmCustomers)
+        .where(whereClause);
+      const total = Number(countResult?.count || 0);
+
+      // Get paginated customers with properties
+      const customers = await db
+        .select()
+        .from(crmCustomers)
+        .where(whereClause)
+        .orderBy(desc(crmCustomers.createdAt))
+        .limit(limitNum)
+        .offset(offset);
+
+      // Fetch properties for these customers
+      const customerIds = customers.map(c => c.id);
+      const properties = customerIds.length > 0
+        ? await db.select().from(crmProperties).where(inArray(crmProperties.customerId, customerIds))
+        : [];
+
+      // Map properties to customers (using first property as primary address)
+      const propertyMap = new Map<string, typeof properties[0]>();
+      for (const prop of properties) {
+        if (!propertyMap.has(prop.customerId)) {
+          propertyMap.set(prop.customerId, prop);
+        }
+      }
+
+      const customersWithAddress = customers.map(c => ({
+        ...c,
+        fullAddress: propertyMap.has(c.id)
+          ? [propertyMap.get(c.id)!.address1, propertyMap.get(c.id)!.city, propertyMap.get(c.id)!.state, propertyMap.get(c.id)!.zip].filter(Boolean).join(", ")
+          : null,
+      }));
+
+      return res.json({
+        customers: customersWithAddress,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      });
     } catch (error) {
       console.error("Error fetching CRM customers:", error);
       return res.status(500).json({ message: "Failed to fetch customers" });
