@@ -14,6 +14,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -48,6 +58,7 @@ import {
   Paperclip,
   ExternalLink,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -243,6 +254,7 @@ export default function CrmJobDetail() {
 
   const [workOrderDialogOpen, setWorkOrderDialogOpen] = useState(false);
   const [updateWoStatusDialogOpen, setUpdateWoStatusDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrderWithTech | null>(null);
   const [selectedWoStatus, setSelectedWoStatus] = useState<string>("");
   const [workOrderForm, setWorkOrderForm] = useState({
@@ -355,6 +367,30 @@ export default function CrmJobDetail() {
       });
     },
   });
+
+  const deleteJobMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/crm/jobs/${jobId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Job deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
+      navigate("/crm/jobs");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete job",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteJob = () => {
+    deleteJobMutation.mutate();
+    setDeleteConfirmOpen(false);
+  };
 
   const handleUpdateWorkOrderStatus = () => {
     if (selectedWorkOrder && selectedWoStatus) {
@@ -502,6 +538,15 @@ export default function CrmJobDetail() {
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   Create Invoice
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  data-testid="button-delete-job"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
                 </Button>
               </div>
             </div>
@@ -966,6 +1011,28 @@ export default function CrmJobDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent data-testid="dialog-delete-job">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this job? This action cannot be undone.
+              All associated work orders, invoices, and quotes will also be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteJob}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-confirm-delete"
+            >
+              {deleteJobMutation.isPending ? "Deleting..." : "Delete Job"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </CrmLayout>
   );
 }
