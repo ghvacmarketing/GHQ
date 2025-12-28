@@ -1,13 +1,17 @@
 import { useEffect, useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { getQueryFn } from "@/lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Table,
   TableBody,
@@ -17,15 +21,41 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Search,
   ChevronLeft,
   ChevronRight,
   Briefcase,
   Plus,
+  CalendarIcon,
+  Loader2,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import type { CrmUser, CrmJob } from "@shared/schema";
+import type { CrmUser, CrmJob, CrmCustomer } from "@shared/schema";
+import { cn } from "@/lib/utils";
 
 type JobWithDetails = CrmJob & {
   customerName: string;
@@ -35,6 +65,24 @@ type JobWithDetails = CrmJob & {
 
 type JobsResponse = {
   jobs: JobWithDetails[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+type DispatchResponse = {
+  technicians: Array<{
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  }>;
+  jobs: any[];
+  date: string;
+};
+
+type CustomersResponse = {
+  customers: CrmCustomer[];
   total: number;
   page: number;
   limit: number;
@@ -84,6 +132,9 @@ const statusLabels: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+const JOB_TYPES = ["SERVICE", "INSTALL", "MAINTENANCE", "ESTIMATE", "WARRANTY"] as const;
+const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
   useEffect(() => {
@@ -95,11 +146,25 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function CrmJobs() {
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [page, setPage] = useState(1);
+  
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomer | null>(null);
+  const [jobType, setJobType] = useState<string>("SERVICE");
+  const [priority, setPriority] = useState<string>("normal");
+  const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
+  const [startDate, setStartDate] = useState<Date | undefined>(new Date());
+  const [startTime, setStartTime] = useState("09:00");
+  const [duration, setDuration] = useState(60);
+  const [description, setDescription] = useState("");
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 300);
+  const debouncedCustomerSearch = useDebounce(customerSearch, 300);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -149,6 +214,170 @@ export default function CrmJobs() {
     enabled: !!currentUser,
   });
 
+  const { data: dispatchData } = useQuery<DispatchResponse>({
+    queryKey: ["/api/crm/dispatch"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/dispatch", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch technicians");
+      return res.json();
+    },
+    enabled: !!currentUser && createDialogOpen,
+  });
+
+  const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
+    queryKey: ["/api/crm/customers", debouncedCustomerSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (debouncedCustomerSearch) params.set("search", debouncedCustomerSearch);
+      params.set("limit", "10");
+      const res = await fetch(`/api/crm/customers?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch customers");
+      return res.json();
+    },
+    enabled: !!currentUser && createDialogOpen && customerSearchOpen,
+  });
+
+  const technicians = dispatchData?.technicians?.filter(t => t.role === "tech") || [];
+
+  const createJobMutation = useMutation({
+    mutationFn: async (data: {
+      customerId: string;
+      jobType: string;
+      priority: string;
+      description: string;
+      scheduledStart: string;
+      scheduledEnd: string;
+      assignedTechId: string | null;
+    }) => {
+      const jobRes = await apiRequest("POST", "/api/crm/jobs", {
+        customerId: data.customerId,
+        jobType: data.jobType,
+        priority: data.priority,
+        description: data.description,
+        scheduledStart: data.scheduledStart,
+        scheduledEnd: data.scheduledEnd,
+      });
+      const job = await jobRes.json();
+      
+      let assignmentFailed = false;
+      if (data.assignedTechId) {
+        try {
+          await apiRequest("POST", `/api/crm/jobs/${job.id}/assign`, {
+            techUserId: data.assignedTechId,
+            startAt: data.scheduledStart,
+            endAt: data.scheduledEnd,
+          });
+        } catch (error) {
+          assignmentFailed = true;
+        }
+      }
+      
+      return { job, assignmentFailed };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+      if (result.assignmentFailed) {
+        toast({
+          title: "Job created",
+          description: "The job was created but technician assignment failed. Please assign manually.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Job created",
+          description: "The job has been created successfully.",
+        });
+      }
+      handleCloseDialog();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create job",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCloseDialog = () => {
+    setCreateDialogOpen(false);
+    setCustomerSearch("");
+    setSelectedCustomer(null);
+    setJobType("SERVICE");
+    setPriority("normal");
+    setAssignedTechId("unassigned");
+    setStartDate(new Date());
+    setStartTime("09:00");
+    setDuration(60);
+    setDescription("");
+    setCustomerSearchOpen(false);
+  };
+
+  const descriptionError = description.trim() === "" ? "Description is required" : null;
+  const durationError = duration < 15 ? "Duration must be at least 15 minutes" : null;
+  const customerError = !selectedCustomer ? "Customer is required" : null;
+  const dateError = !startDate ? "Start date is required" : null;
+  
+  const isFormValid = selectedCustomer && startDate && description.trim() !== "" && duration >= 15;
+
+  const handleSubmit = () => {
+    if (!selectedCustomer) {
+      toast({
+        title: "Error",
+        description: "Please select a customer",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!startDate) {
+      toast({
+        title: "Error",
+        description: "Please select a start date",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (description.trim() === "") {
+      toast({
+        title: "Error",
+        description: "Please enter a description",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (duration < 15) {
+      toast({
+        title: "Error",
+        description: "Duration must be at least 15 minutes",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const [hours, minutes] = startTime.split(":").map(Number);
+    const scheduledStart = new Date(startDate);
+    scheduledStart.setHours(hours, minutes, 0, 0);
+    
+    const scheduledEnd = new Date(scheduledStart);
+    scheduledEnd.setMinutes(scheduledEnd.getMinutes() + duration);
+
+    createJobMutation.mutate({
+      customerId: selectedCustomer.id,
+      jobType,
+      priority,
+      description: description.trim(),
+      scheduledStart: scheduledStart.toISOString(),
+      scheduledEnd: scheduledEnd.toISOString(),
+      assignedTechId: assignedTechId === "unassigned" ? null : assignedTechId,
+    });
+  };
+
   const jobs = useMemo(() => {
     let result = jobsData?.jobs || [];
     if (activeTab === "incomplete") {
@@ -160,7 +389,7 @@ export default function CrmJobs() {
   const total = activeTab === "incomplete" ? jobs.length : (jobsData?.total || 0);
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
-  const formatDate = (dateStr: string | Date | null) => {
+  const formatDateDisplay = (dateStr: string | Date | null) => {
     if (!dateStr) return "—";
     try {
       return format(new Date(dateStr), "MMM d, yyyy h:mm a");
@@ -203,7 +432,7 @@ export default function CrmJobs() {
             variant="default"
             className="gap-2"
             data-testid="button-create-job"
-            onClick={() => navigate("/crm/dispatch")}
+            onClick={() => setCreateDialogOpen(true)}
           >
             <Plus className="h-4 w-4" />
             Create Job
@@ -272,7 +501,7 @@ export default function CrmJobs() {
                             data-testid={`row-job-${job.id}`}
                           >
                             <TableCell className="font-medium" data-testid={`text-job-date-${job.id}`}>
-                              {formatDate(job.scheduledStart)}
+                              {formatDateDisplay(job.scheduledStart)}
                             </TableCell>
                             <TableCell data-testid={`text-job-type-${job.id}`}>
                               {job.jobType || "—"}
@@ -342,6 +571,246 @@ export default function CrmJobs() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={createDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Create Job</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="customer-search">Customer *</Label>
+              {selectedCustomer ? (
+                <div className="flex items-center justify-between p-3 border rounded-md bg-slate-50">
+                  <div>
+                    <p className="font-medium" data-testid="text-selected-customer">{selectedCustomer.name}</p>
+                    {selectedCustomer.phone && (
+                      <p className="text-sm text-slate-500">{selectedCustomer.phone}</p>
+                    )}
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setSelectedCustomer(null)}
+                    data-testid="button-clear-customer"
+                  >
+                    Change
+                  </Button>
+                </div>
+              ) : (
+                <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={customerSearchOpen}
+                      className="w-full justify-start text-left font-normal"
+                      data-testid="button-customer-search"
+                    >
+                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                      Search customers...
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder="Search by name, phone, or address..."
+                        value={customerSearch}
+                        onValueChange={setCustomerSearch}
+                        data-testid="input-customer-search"
+                      />
+                      <CommandList>
+                        {customersLoading ? (
+                          <div className="py-6 text-center text-sm">
+                            <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                            Searching...
+                          </div>
+                        ) : (customersData?.customers?.length || 0) === 0 ? (
+                          <CommandEmpty>No customers found.</CommandEmpty>
+                        ) : (
+                          <CommandGroup>
+                            {customersData?.customers?.map((customer) => (
+                              <CommandItem
+                                key={customer.id}
+                                value={customer.id}
+                                onSelect={() => {
+                                  setSelectedCustomer(customer);
+                                  setCustomerSearchOpen(false);
+                                  setCustomerSearch("");
+                                }}
+                                className="cursor-pointer"
+                                data-testid={`customer-option-${customer.id}`}
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{customer.name}</span>
+                                  {customer.phone && (
+                                    <span className="text-sm text-slate-500">{customer.phone}</span>
+                                  )}
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="job-type">Job Type *</Label>
+                <Select value={jobType} onValueChange={setJobType}>
+                  <SelectTrigger data-testid="select-job-type">
+                    <SelectValue placeholder="Select job type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {JOB_TYPES.map((type) => (
+                      <SelectItem key={type} value={type} data-testid={`job-type-${type}`}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="priority">Priority</Label>
+                <Select value={priority} onValueChange={setPriority}>
+                  <SelectTrigger data-testid="select-priority">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORITIES.map((p) => (
+                      <SelectItem key={p} value={p} className="capitalize" data-testid={`priority-${p}`}>
+                        {p.charAt(0).toUpperCase() + p.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tech">Primary Tech</Label>
+              <Select value={assignedTechId} onValueChange={setAssignedTechId}>
+                <SelectTrigger data-testid="select-tech">
+                  <SelectValue placeholder="Select technician" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned" data-testid="tech-unassigned">
+                    Unassigned
+                  </SelectItem>
+                  {technicians.map((tech) => (
+                    <SelectItem key={tech.id} value={tech.id} data-testid={`tech-${tech.id}`}>
+                      {tech.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !startDate && "text-muted-foreground"
+                      )}
+                      data-testid="button-start-date"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? format(startDate, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={startDate}
+                      onSelect={setStartDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="start-time">Start Time *</Label>
+                <Input
+                  id="start-time"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  data-testid="input-start-time"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="duration">Duration (minutes) *</Label>
+              <Input
+                id="duration"
+                type="number"
+                min={15}
+                step={15}
+                value={duration}
+                onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
+                className={durationError ? "border-red-500" : ""}
+                data-testid="input-duration"
+              />
+              {durationError && (
+                <p className="text-sm text-red-500" data-testid="error-duration">{durationError}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description *</Label>
+              <Textarea
+                id="description"
+                placeholder="Work order description..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className={descriptionError ? "border-red-500" : ""}
+                data-testid="textarea-description"
+              />
+              {descriptionError && (
+                <p className="text-sm text-red-500" data-testid="error-description">{descriptionError}</p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleCloseDialog}
+              data-testid="button-cancel-create"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={createJobMutation.isPending || !isFormValid}
+              data-testid="button-submit-create"
+            >
+              {createJobMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Job"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </CrmLayout>
   );
 }
