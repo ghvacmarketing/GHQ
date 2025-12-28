@@ -423,6 +423,46 @@ export default function CrmJobDetail() {
           </div>
         </div>
 
+        <Card className="bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200">
+          <CardContent className="p-4">
+            <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
+              <Button
+                onClick={() => {
+                  setSelectedStatus(job.status);
+                  setStatusDialogOpen(true);
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="button-change-status"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Update Status
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedTechId(job.assignedTechId || "");
+                  setReassignDialogOpen(true);
+                }}
+                data-testid="button-reassign"
+              >
+                <UserCheck className="h-4 w-4 mr-2" />
+                Reassign Tech
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedJobType(job.jobType || "SERVICE");
+                  setJobTypeDialogOpen(true);
+                }}
+                data-testid="button-change-job-type"
+              >
+                <Wrench className="h-4 w-4 mr-2" />
+                Change Type
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardContent className="p-4">
             <StatusProgressBar status={job.status} />
@@ -607,49 +647,6 @@ export default function CrmJobDetail() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setSelectedStatus(job.status);
-                    setStatusDialogOpen(true);
-                  }}
-                  data-testid="button-change-status"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Change Status
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setSelectedTechId(job.assignedTechId || "");
-                    setReassignDialogOpen(true);
-                  }}
-                  data-testid="button-reassign"
-                >
-                  <UserCheck className="h-4 w-4 mr-2" />
-                  Reassign Technician
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setSelectedJobType(job.jobType || "SERVICE");
-                    setJobTypeDialogOpen(true);
-                  }}
-                  data-testid="button-change-job-type"
-                >
-                  <Wrench className="h-4 w-4 mr-2" />
-                  Change Job Type
-                </Button>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>

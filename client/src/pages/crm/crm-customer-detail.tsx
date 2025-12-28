@@ -25,7 +25,15 @@ import {
   Clock,
   AlertCircle,
   Trash2,
+  ExternalLink,
+  MoreVertical,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmCustomer, CrmJob } from "@shared/schema";
@@ -392,30 +400,51 @@ export default function CrmCustomerDetail() {
                       <TableCell>{formatDate(job.scheduledStart)}</TableCell>
                       <TableCell>{job.assignedTechName || "Unassigned"}</TableCell>
                       <TableCell>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50" data-testid={`button-delete-job-${job.id}`}>
-                              <Trash2 className="h-4 w-4" />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" data-testid={`button-actions-job-${job.id}`}>
+                              <MoreVertical className="h-4 w-4" />
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Job?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete this {job.jobType} job. This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteJobMutation.mutate(job.id)}
-                                className="bg-red-600 hover:bg-red-700"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => navigate(`/crm/jobs/${job.id}`)}
+                              data-testid={`action-view-job-${job.id}`}
+                            >
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              View / Edit Job
+                            </DropdownMenuItem>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem
+                                  onSelect={(e) => e.preventDefault()}
+                                  className="text-red-600 focus:text-red-600"
+                                  data-testid={`action-delete-job-${job.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Job
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Job?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete this {job.jobType} job. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteJobMutation.mutate(job.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
