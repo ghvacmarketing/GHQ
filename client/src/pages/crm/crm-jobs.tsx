@@ -691,9 +691,14 @@ export default function CrmJobs() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as FilterTab)}>
-          <TabsList className="grid w-full grid-cols-6" data-testid="tabs-job-filter">
+          <TabsList className="flex w-full h-9 p-0.5 gap-0.5" data-testid="tabs-job-filter">
             {Object.entries(filterTabConfig).map(([key, config]) => (
-              <TabsTrigger key={key} value={key} data-testid={`tab-${key}`}>
+              <TabsTrigger 
+                key={key} 
+                value={key} 
+                data-testid={`tab-${key}`}
+                className="flex-1 text-xs px-2 py-1.5 data-[state=active]:bg-[#711419] data-[state=active]:text-white"
+              >
                 {config.label}
               </TabsTrigger>
             ))}
