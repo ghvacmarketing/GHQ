@@ -466,7 +466,10 @@ export default function CrmAccountDetail() {
     );
   }
 
-  const { account, sites, contacts, jobs, residentialProfile, propertyManagerProfile, commercialProfile } = accountData;
+  const { account, residentialProfile, propertyManagerProfile, commercialProfile } = accountData;
+  const sites = accountData.sites || [];
+  const contacts = accountData.contacts || [];
+  const jobs = accountData.jobs || [];
   const typeColors = accountTypeColors[account.accountType];
   const statusColorSet = accountStatusColors[account.accountStatus];
 
