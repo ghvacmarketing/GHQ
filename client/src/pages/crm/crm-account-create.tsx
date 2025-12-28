@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -159,6 +159,21 @@ export default function CrmAccountCreate() {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [parentSearchQuery, setParentSearchQuery] = useState("");
   const [showParentSearch, setShowParentSearch] = useState(false);
+  const stepContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-focus first input when step changes
+  useEffect(() => {
+    setTimeout(() => {
+      if (stepContainerRef.current) {
+        const firstInput = stepContainerRef.current.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+          'input:not([type="hidden"]):not([disabled]), textarea:not([disabled])'
+        );
+        if (firstInput) {
+          firstInput.focus();
+        }
+      }
+    }, 100);
+  }, [currentStep]);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -238,11 +253,11 @@ export default function CrmAccountCreate() {
       };
 
       if (formData.accountType === "RESIDENTIAL") {
-        payload.residentialProfile = {
+        payload.profile = {
           specialInstructions: formData.specialInstructions || null,
         };
       } else if (formData.accountType === "PROPERTY_MANAGER") {
-        payload.propertyManagerProfile = {
+        payload.profile = {
           managementCompanyName: formData.managementCompanyName || null,
           portfolioSize: formData.portfolioSize ? parseInt(formData.portfolioSize) : null,
           requiresApprovalBefore: formData.requiresApprovalBefore,
@@ -251,7 +266,7 @@ export default function CrmAccountCreate() {
           netTerms: parseInt(formData.pmNetTerms) || 30,
         };
       } else if (formData.accountType === "COMMERCIAL") {
-        payload.commercialProfile = {
+        payload.profile = {
           taxExempt: formData.taxExempt,
           taxExemptNumber: formData.taxExempt ? formData.taxExemptNumber : null,
           requiresPO: formData.requiresPO,
@@ -416,7 +431,7 @@ export default function CrmAccountCreate() {
         </div>
 
         <Card className="bg-white shadow-sm">
-          <CardContent className="p-6">
+          <CardContent ref={stepContainerRef} className="p-6">
             {currentStep === 1 && (
               <div className="space-y-6">
                 <CardHeader className="px-0 pt-0">
