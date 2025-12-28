@@ -974,6 +974,71 @@ export const crmPayments = pgTable("crm_payments", {
 });
 
 // =============================================
+// CRM QUOTES (Separate from AI Quote Generator)
+// =============================================
+
+export const crmQuoteStatusEnum = ["draft", "sent", "viewed", "accepted", "declined", "expired"] as const;
+export type CrmQuoteStatus = typeof crmQuoteStatusEnum[number];
+
+export const crmQuotes = pgTable("crm_quotes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteNumber: text("quote_number").notNull().unique(),
+  jobId: varchar("job_id").references(() => crmJobs.id),
+  accountId: varchar("account_id").references(() => crmAccounts.id),
+  siteId: varchar("site_id").references(() => crmSites.id),
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  // Customer info (can be standalone without linked entities)
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  serviceAddress: text("service_address"),
+  // Quote details
+  title: text("title"),
+  description: text("description"),
+  lineItems: json("line_items").$type<CrmQuoteLineItem[]>().default([]),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull().default("0"),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 4 }).default("0.0825"),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  laborTotal: decimal("labor_total", { precision: 10, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull().default("0"),
+  // Status and workflow
+  status: text("status").$type<CrmQuoteStatus>().notNull().default("draft"),
+  validUntil: timestamp("valid_until"),
+  sentAt: timestamp("sent_at"),
+  viewedAt: timestamp("viewed_at"),
+  acceptedAt: timestamp("accepted_at"),
+  declinedAt: timestamp("declined_at"),
+  // Assignment
+  createdById: varchar("created_by_id").references(() => crmUsers.id),
+  assignedToId: varchar("assigned_to_id").references(() => crmUsers.id),
+  // Notes
+  internalNotes: text("internal_notes"),
+  customerNotes: text("customer_notes"),
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type CrmQuoteLineItem = {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  type: "part" | "labor" | "service" | "other";
+  partNumber?: string;
+};
+
+export const insertCrmQuoteSchema = createInsertSchema(crmQuotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCrmQuote = z.infer<typeof insertCrmQuoteSchema>;
+export type CrmQuote = typeof crmQuotes.$inferSelect;
+
+// =============================================
 // NEW ACCOUNT + SITE + CONTACT MODEL
 // =============================================
 

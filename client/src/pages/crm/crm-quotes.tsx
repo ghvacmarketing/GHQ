@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { getQueryFn } from "@/lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,16 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import {
   Search,
@@ -36,20 +46,22 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  ExternalLink,
+  Edit,
+  Plus,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  X,
-  Filter,
   RotateCcw,
+  Trash2,
+  Send,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format, subDays, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
-import type { CrmUser, Quote } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import type { CrmUser, CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 
 type QuotesResponse = {
-  quotes: Quote[];
+  quotes: CrmQuote[];
   pagination: {
     page: number;
     limit: number;
@@ -62,7 +74,7 @@ type QuotesResponse = {
 
 const ITEMS_PER_PAGE = 25;
 
-type SortField = "quoteNumber" | "customerName" | "technician" | "createdAt" | "status" | "total";
+type SortField = "quoteNumber" | "customerName" | "createdAt" | "status" | "total";
 type SortDirection = "asc" | "desc";
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -76,20 +88,26 @@ function useDebounce<T>(value: T, delay: number): T {
 
 const statusLabels: Record<string, string> = {
   draft: "Draft",
-  pending: "Pending",
+  sent: "Sent",
+  viewed: "Viewed",
   accepted: "Accepted",
+  declined: "Declined",
+  expired: "Expired",
 };
 
 const statusColors: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700 border-slate-200",
-  pending: "bg-amber-100 text-amber-700 border-amber-200",
+  sent: "bg-blue-100 text-blue-700 border-blue-200",
+  viewed: "bg-purple-100 text-purple-700 border-purple-200",
   accepted: "bg-green-100 text-green-700 border-green-200",
+  declined: "bg-red-100 text-red-700 border-red-200",
+  expired: "bg-orange-100 text-orange-700 border-orange-200",
 };
 
 const tabFilters = [
   { key: "all", label: "All" },
   { key: "accepted", label: "Accepted" },
-  { key: "pending", label: "Pending" },
+  { key: "sent", label: "Sent" },
   { key: "draft", label: "Draft" },
   { key: "last90", label: "Last 90 Days" },
   { key: "last30", label: "Last 30 Days" },
@@ -107,10 +125,12 @@ const amountRanges = [
 
 export default function CrmQuotes() {
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [page, setPage] = useState(1);
-  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [selectedQuote, setSelectedQuote] = useState<CrmQuote | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   
   // Sorting state
   const [sortField, setSortField] = useState<SortField>("createdAt");
@@ -118,10 +138,18 @@ export default function CrmQuotes() {
   
   // Additional filters
   const [amountFilter, setAmountFilter] = useState("all");
-  const [technicianFilter, setTechnicianFilter] = useState("all");
   const [dateFromFilter, setDateFromFilter] = useState("");
   const [dateToFilter, setDateToFilter] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
+
+  // Create form state
+  const [createForm, setCreateForm] = useState({
+    customerName: "",
+    customerEmail: "",
+    customerPhone: "",
+    serviceAddress: "",
+    title: "",
+    description: "",
+  });
 
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -138,12 +166,12 @@ export default function CrmQuotes() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, activeTab, amountFilter, technicianFilter, dateFromFilter, dateToFilter]);
+  }, [debouncedSearch, activeTab, amountFilter, dateFromFilter, dateToFilter]);
 
   const { data: quotesData, isLoading: quotesLoading } = useQuery<QuotesResponse>({
-    queryKey: ["/api/quotes", page],
+    queryKey: ["/api/crm/quotes", page],
     queryFn: async () => {
-      const res = await fetch(`/api/quotes?page=${page}&limit=${ITEMS_PER_PAGE}`, {
+      const res = await fetch(`/api/crm/quotes?page=${page}&limit=${ITEMS_PER_PAGE}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch quotes");
@@ -152,20 +180,47 @@ export default function CrmQuotes() {
     enabled: !!currentUser,
   });
 
-  // Get unique technicians for the filter dropdown
-  const uniqueTechnicians = useMemo(() => {
-    if (!quotesData?.quotes) return [];
-    const techs = new Set<string>();
-    quotesData.quotes.forEach((quote) => {
-      if (quote.technician) techs.add(quote.technician);
-    });
-    return Array.from(techs).sort();
-  }, [quotesData?.quotes]);
+  const createQuoteMutation = useMutation({
+    mutationFn: async (data: typeof createForm) => {
+      const res = await apiRequest("POST", "/api/crm/quotes", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setShowCreateDialog(false);
+      setCreateForm({
+        customerName: "",
+        customerEmail: "",
+        customerPhone: "",
+        serviceAddress: "",
+        title: "",
+        description: "",
+      });
+      toast({ title: "Quote created successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create quote", variant: "destructive" });
+    },
+  });
+
+  const deleteQuoteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/crm/quotes/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setSelectedQuote(null);
+      toast({ title: "Quote deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete quote", variant: "destructive" });
+    },
+  });
 
   // Count quotes by status for tab badges
   const statusCounts = useMemo(() => {
-    if (!quotesData?.quotes) return { accepted: 0, pending: 0, draft: 0 };
-    const counts = { accepted: 0, pending: 0, draft: 0 };
+    if (!quotesData?.quotes) return { accepted: 0, sent: 0, draft: 0 };
+    const counts = { accepted: 0, sent: 0, draft: 0 };
     quotesData.quotes.forEach((quote) => {
       const status = quote.status || "draft";
       if (status in counts) counts[status as keyof typeof counts]++;
@@ -182,12 +237,12 @@ export default function CrmQuotes() {
       const searchLower = debouncedSearch.toLowerCase();
       filtered = filtered.filter((quote) => {
         const customerName = quote.customerName?.toLowerCase() || "";
-        const technician = quote.technician?.toLowerCase() || "";
-        const quoteId = quote.id?.toLowerCase() || "";
+        const quoteNumber = quote.quoteNumber?.toLowerCase() || "";
+        const title = quote.title?.toLowerCase() || "";
         return (
           customerName.includes(searchLower) ||
-          technician.includes(searchLower) ||
-          quoteId.includes(searchLower)
+          quoteNumber.includes(searchLower) ||
+          title.includes(searchLower)
         );
       });
     }
@@ -195,8 +250,8 @@ export default function CrmQuotes() {
     // Tab filter (status or date-based)
     if (activeTab === "accepted") {
       filtered = filtered.filter((quote) => quote.status === "accepted");
-    } else if (activeTab === "pending") {
-      filtered = filtered.filter((quote) => quote.status === "pending");
+    } else if (activeTab === "sent") {
+      filtered = filtered.filter((quote) => quote.status === "sent");
     } else if (activeTab === "draft") {
       filtered = filtered.filter((quote) => quote.status === "draft");
     } else if (activeTab === "last90") {
@@ -231,11 +286,6 @@ export default function CrmQuotes() {
       });
     }
 
-    // Technician filter
-    if (technicianFilter !== "all") {
-      filtered = filtered.filter((quote) => quote.technician === technicianFilter);
-    }
-
     // Date range filter
     if (dateFromFilter) {
       const fromDate = startOfDay(new Date(dateFromFilter));
@@ -257,16 +307,12 @@ export default function CrmQuotes() {
 
       switch (sortField) {
         case "quoteNumber":
-          aVal = getQuoteNumber(a);
-          bVal = getQuoteNumber(b);
+          aVal = a.quoteNumber || "";
+          bVal = b.quoteNumber || "";
           break;
         case "customerName":
           aVal = a.customerName || "";
           bVal = b.customerName || "";
-          break;
-        case "technician":
-          aVal = a.technician || "";
-          bVal = b.technician || "";
           break;
         case "createdAt":
           aVal = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -295,7 +341,7 @@ export default function CrmQuotes() {
     });
 
     return filtered;
-  }, [quotesData?.quotes, debouncedSearch, activeTab, amountFilter, technicianFilter, dateFromFilter, dateToFilter, sortField, sortDirection]);
+  }, [quotesData?.quotes, debouncedSearch, activeTab, amountFilter, dateFromFilter, dateToFilter, sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -318,7 +364,6 @@ export default function CrmQuotes() {
   const resetFilters = () => {
     setActiveTab("all");
     setAmountFilter("all");
-    setTechnicianFilter("all");
     setDateFromFilter("");
     setDateToFilter("");
     setSearchInput("");
@@ -326,7 +371,7 @@ export default function CrmQuotes() {
     setSortDirection("desc");
   };
 
-  const hasActiveFilters = activeTab !== "all" || amountFilter !== "all" || technicianFilter !== "all" || dateFromFilter || dateToFilter || debouncedSearch;
+  const hasActiveFilters = activeTab !== "all" || amountFilter !== "all" || dateFromFilter || dateToFilter || debouncedSearch;
 
   const formatCurrency = (value: string | number | null) => {
     if (value === null || value === undefined) return "$0.00";
@@ -346,11 +391,13 @@ export default function CrmQuotes() {
     }
   };
 
-  const getQuoteNumber = (quote: Quote) => {
-    if (!quote.createdAt) return quote.id.slice(0, 8).toUpperCase();
-    const date = new Date(quote.createdAt);
-    const dateStr = format(date, "yyMMdd");
-    return `Q-${dateStr}-${quote.id.slice(0, 4).toUpperCase()}`;
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.customerName.trim()) {
+      toast({ title: "Customer name is required", variant: "destructive" });
+      return;
+    }
+    createQuoteMutation.mutate(createForm);
   };
 
   if (authLoading) {
@@ -378,27 +425,29 @@ export default function CrmQuotes() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-slate-900" data-testid="text-quotes-title">
-              Quotes
+              CRM Quotes
             </h1>
-            <span className="text-sm text-slate-500">•••</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
-                placeholder="Search by Name, Address, WO # and..."
+                placeholder="Search by customer, quote #..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="pl-9 h-9 w-64 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419]"
                 data-testid="input-search"
               />
             </div>
-            <Link href="/quote">
-              <Button size="sm" className="bg-[#711419] hover:bg-[#5a1014]" data-testid="button-create-quote">
-                <FileText className="h-4 w-4 mr-1" />
-                New Quote
-              </Button>
-            </Link>
+            <Button 
+              size="sm" 
+              className="bg-[#711419] hover:bg-[#5a1014]" 
+              onClick={() => setShowCreateDialog(true)}
+              data-testid="button-create-quote"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Quote
+            </Button>
           </div>
         </div>
 
@@ -406,7 +455,7 @@ export default function CrmQuotes() {
         <div className="flex items-center gap-4 border-b border-slate-200 overflow-x-auto pb-0">
           {tabFilters.map((tab) => {
             const count = tab.key === "accepted" ? statusCounts.accepted 
-              : tab.key === "pending" ? statusCounts.pending 
+              : tab.key === "sent" ? statusCounts.sent 
               : tab.key === "draft" ? statusCounts.draft 
               : null;
             
@@ -443,18 +492,6 @@ export default function CrmQuotes() {
             <SelectContent>
               {amountRanges.map((range) => (
                 <SelectItem key={range.key} value={range.key}>{range.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={technicianFilter} onValueChange={setTechnicianFilter}>
-            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-technician-filter">
-              <SelectValue placeholder="Technician" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Technicians</SelectItem>
-              {uniqueTechnicians.map((tech) => (
-                <SelectItem key={tech} value={tech}>{tech}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -527,16 +564,7 @@ export default function CrmQuotes() {
                       {getSortIcon("customerName")}
                     </div>
                   </TableHead>
-                  <TableHead 
-                    className="font-semibold cursor-pointer hover:bg-slate-100 select-none hidden md:table-cell"
-                    onClick={() => handleSort("technician")}
-                    data-testid="sort-technician"
-                  >
-                    <div className="flex items-center">
-                      Technician
-                      {getSortIcon("technician")}
-                    </div>
-                  </TableHead>
+                  <TableHead className="font-semibold hidden lg:table-cell">Title</TableHead>
                   <TableHead 
                     className="font-semibold cursor-pointer hover:bg-slate-100 select-none"
                     onClick={() => handleSort("createdAt")}
@@ -577,7 +605,6 @@ export default function CrmQuotes() {
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                       <TableCell className="hidden lg:table-cell"><Skeleton className="h-5 w-48" /></TableCell>
-                      <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
@@ -586,21 +613,24 @@ export default function CrmQuotes() {
                   ))
                 ) : filteredAndSortedQuotes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12">
+                    <TableCell colSpan={7} className="text-center py-12">
                       <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
                       <p className="text-slate-500 font-medium">No quotes found</p>
                       <p className="text-slate-400 text-sm mt-1">
                         {hasActiveFilters
                           ? "Try adjusting your search or filters"
-                          : "Create your first quote using the AI Quote Generator"}
+                          : "Create your first CRM quote"}
                       </p>
                       {!hasActiveFilters && (
-                        <Link href="/quote">
-                          <Button variant="outline" className="mt-4" data-testid="button-create-first-quote">
-                            <FileText className="h-4 w-4 mr-2" />
-                            Create Quote
-                          </Button>
-                        </Link>
+                        <Button 
+                          variant="outline" 
+                          className="mt-4" 
+                          onClick={() => setShowCreateDialog(true)}
+                          data-testid="button-create-first-quote"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Quote
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>
@@ -613,7 +643,7 @@ export default function CrmQuotes() {
                       onClick={() => setSelectedQuote(quote)}
                     >
                       <TableCell className="font-medium text-slate-900">
-                        {getQuoteNumber(quote)}
+                        {quote.quoteNumber}
                       </TableCell>
                       <TableCell className="text-slate-600">
                         <div className="flex items-center gap-1.5">
@@ -623,8 +653,8 @@ export default function CrmQuotes() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-slate-600 hidden md:table-cell">
-                        {quote.technician || "—"}
+                      <TableCell className="text-slate-500 text-sm hidden lg:table-cell max-w-[200px] truncate">
+                        {quote.title || "—"}
                       </TableCell>
                       <TableCell className="text-slate-600">
                         {formatDate(quote.createdAt)}
@@ -651,16 +681,6 @@ export default function CrmQuotes() {
                           >
                             <Eye className="h-3 w-3" />
                           </Button>
-                          <Link href={`/quote/edit/${quote.id}`}>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2"
-                              data-testid={`button-edit-${quote.id}`}
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </Link>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -702,14 +722,15 @@ export default function CrmQuotes() {
         </Card>
       </div>
 
+      {/* Quote Detail Sheet */}
       <Sheet open={!!selectedQuote} onOpenChange={(open) => !open && setSelectedQuote(null)}>
         <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle data-testid="text-quote-detail-title">
-              Quote {selectedQuote ? getQuoteNumber(selectedQuote) : ""}
+              Quote {selectedQuote?.quoteNumber || ""}
             </SheetTitle>
             <SheetDescription>
-              Service quote details
+              CRM quote details
             </SheetDescription>
           </SheetHeader>
 
@@ -723,12 +744,18 @@ export default function CrmQuotes() {
                 >
                   {statusLabels[selectedQuote.status || "draft"] || selectedQuote.status}
                 </Badge>
-                <Link href={`/quote/edit/${selectedQuote.id}`}>
-                  <Button variant="outline" size="sm" data-testid="button-edit-quote">
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    Edit Quote
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => deleteQuoteMutation.mutate(selectedQuote.id)}
+                    disabled={deleteQuoteMutation.isPending}
+                    className="text-red-600 hover:text-red-700"
+                    data-testid="button-delete-quote"
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
-                </Link>
+                </div>
               </div>
 
               <div className="bg-slate-50 rounded-lg p-4 space-y-2">
@@ -738,12 +765,30 @@ export default function CrmQuotes() {
                     {selectedQuote.customerName || "—"}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Technician</span>
-                  <span className="font-medium text-slate-900" data-testid="text-technician">
-                    {selectedQuote.technician || "—"}
-                  </span>
-                </div>
+                {selectedQuote.customerEmail && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Email</span>
+                    <span className="font-medium text-slate-900">
+                      {selectedQuote.customerEmail}
+                    </span>
+                  </div>
+                )}
+                {selectedQuote.customerPhone && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Phone</span>
+                    <span className="font-medium text-slate-900">
+                      {selectedQuote.customerPhone}
+                    </span>
+                  </div>
+                )}
+                {selectedQuote.serviceAddress && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Address</span>
+                    <span className="font-medium text-slate-900 text-right max-w-[200px]">
+                      {selectedQuote.serviceAddress}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-slate-600">Created</span>
                   <span className="font-medium text-slate-900" data-testid="text-created-date">
@@ -752,20 +797,37 @@ export default function CrmQuotes() {
                 </div>
               </div>
 
+              {selectedQuote.title && (
+                <>
+                  <Separator />
+                  <div>
+                    <h4 className="font-semibold text-slate-900 mb-2">Title</h4>
+                    <p className="text-slate-600">{selectedQuote.title}</p>
+                  </div>
+                </>
+              )}
+
+              {selectedQuote.description && (
+                <div>
+                  <h4 className="font-semibold text-slate-900 mb-2">Description</h4>
+                  <p className="text-slate-600 whitespace-pre-wrap">{selectedQuote.description}</p>
+                </div>
+              )}
+
               <Separator />
 
               <div className="space-y-3">
                 <h4 className="font-semibold text-slate-900">Quote Breakdown</h4>
                 
-                {selectedQuote.parts && (selectedQuote.parts as any[]).length > 0 && (
+                {selectedQuote.lineItems && (selectedQuote.lineItems as CrmQuoteLineItem[]).length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-sm font-medium text-slate-700">Parts & Materials</p>
-                    {(selectedQuote.parts as any[]).map((part, idx) => (
+                    <p className="text-sm font-medium text-slate-700">Line Items</p>
+                    {(selectedQuote.lineItems as CrmQuoteLineItem[]).map((item, idx) => (
                       <div key={idx} className="flex justify-between text-sm">
                         <span className="text-slate-600">
-                          {part.name || part.partName} x{part.quantity || 1}
+                          {item.description} x{item.quantity}
                         </span>
-                        <span className="text-slate-900">{formatCurrency(part.total || part.price)}</span>
+                        <span className="text-slate-900">{formatCurrency(item.amount)}</span>
                       </div>
                     ))}
                   </div>
@@ -780,11 +842,11 @@ export default function CrmQuotes() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Labor</span>
-                    <span className="text-slate-900">{formatCurrency(selectedQuote.labor)}</span>
+                    <span className="text-slate-900">{formatCurrency(selectedQuote.laborTotal)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Tax</span>
-                    <span className="text-slate-900">{formatCurrency(selectedQuote.tax)}</span>
+                    <span className="text-slate-900">{formatCurrency(selectedQuote.taxAmount)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-semibold">
@@ -799,6 +861,97 @@ export default function CrmQuotes() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Create Quote Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Quote</DialogTitle>
+            <DialogDescription>
+              Enter customer information to create a new CRM quote.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="customerName">Customer Name *</Label>
+              <Input
+                id="customerName"
+                value={createForm.customerName}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, customerName: e.target.value }))}
+                placeholder="Enter customer name"
+                data-testid="input-customer-name"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="customerEmail">Email</Label>
+                <Input
+                  id="customerEmail"
+                  type="email"
+                  value={createForm.customerEmail}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, customerEmail: e.target.value }))}
+                  placeholder="email@example.com"
+                  data-testid="input-customer-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customerPhone">Phone</Label>
+                <Input
+                  id="customerPhone"
+                  value={createForm.customerPhone}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                  placeholder="(555) 123-4567"
+                  data-testid="input-customer-phone"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="serviceAddress">Service Address</Label>
+              <Input
+                id="serviceAddress"
+                value={createForm.serviceAddress}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, serviceAddress: e.target.value }))}
+                placeholder="123 Main St, City, State"
+                data-testid="input-service-address"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="title">Quote Title</Label>
+              <Input
+                id="title"
+                value={createForm.title}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="e.g., AC Unit Replacement"
+                data-testid="input-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={createForm.description}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe the work to be done..."
+                rows={3}
+                data-testid="input-description"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                className="bg-[#711419] hover:bg-[#5a1014]"
+                disabled={createQuoteMutation.isPending}
+                data-testid="button-submit-create"
+              >
+                {createQuoteMutation.isPending ? "Creating..." : "Create Quote"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </CrmLayout>
   );
 }

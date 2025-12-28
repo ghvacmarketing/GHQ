@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -7716,6 +7716,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting invoice line item:", error);
       return res.status(500).json({ message: "Failed to delete invoice line item" });
+    }
+  });
+
+  // =============================================
+  // CRM QUOTES ROUTES (Separate from AI Quote Generator)
+  // =============================================
+
+  // GET /api/crm/quotes - List CRM quotes with filters
+  app.get("/api/crm/quotes", requireCrmAuth, async (req, res) => {
+    try {
+      const { status, assignedToId, search, page = "1", limit = "25" } = req.query;
+      const pageNum = parseInt(page as string) || 1;
+      const limitNum = Math.min(parseInt(limit as string) || 25, 100);
+      const offset = (pageNum - 1) * limitNum;
+
+      let query = db.select().from(crmQuotes);
+      
+      const conditions: any[] = [];
+      if (status && status !== "all") {
+        conditions.push(eq(crmQuotes.status, status as string));
+      }
+      if (assignedToId) {
+        conditions.push(eq(crmQuotes.assignedToId, assignedToId as string));
+      }
+      if (search) {
+        const searchLower = `%${(search as string).toLowerCase()}%`;
+        conditions.push(
+          sql`(LOWER(${crmQuotes.customerName}) LIKE ${searchLower} OR LOWER(${crmQuotes.quoteNumber}) LIKE ${searchLower})`
+        );
+      }
+
+      const baseQuery = conditions.length > 0
+        ? db.select().from(crmQuotes).where(and(...conditions))
+        : db.select().from(crmQuotes);
+
+      const [countResult, quotes] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` }).from(crmQuotes).where(conditions.length > 0 ? and(...conditions) : undefined),
+        baseQuery.orderBy(desc(crmQuotes.createdAt)).limit(limitNum).offset(offset),
+      ]);
+
+      const total = Number(countResult[0]?.count || 0);
+
+      return res.json({
+        quotes,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+          hasNextPage: pageNum * limitNum < total,
+          hasPrevPage: pageNum > 1,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching CRM quotes:", error);
+      return res.status(500).json({ message: "Failed to fetch quotes" });
+    }
+  });
+
+  // GET /api/crm/quotes/:id - Get single CRM quote
+  app.get("/api/crm/quotes/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const quote = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!quote[0]) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+      return res.json(quote[0]);
+    } catch (error) {
+      console.error("Error fetching CRM quote:", error);
+      return res.status(500).json({ message: "Failed to fetch quote" });
+    }
+  });
+
+  // POST /api/crm/quotes - Create CRM quote
+  app.post("/api/crm/quotes", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Generate quote number: Q-YYMMDD-XXXX
+      const now = new Date();
+      const dateStr = now.toISOString().slice(2, 10).replace(/-/g, "");
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const quoteNumber = `Q-${dateStr}-${randomSuffix}`;
+
+      const { customerName, ...rest } = req.body;
+      if (!customerName) {
+        return res.status(400).json({ message: "Customer name is required" });
+      }
+
+      const [newQuote] = await db.insert(crmQuotes).values({
+        ...rest,
+        customerName,
+        quoteNumber,
+        createdById: user.id,
+      }).returning();
+
+      await logCrmAudit(
+        user.id,
+        "quote.created",
+        "crm_quote",
+        newQuote.id,
+        { quoteNumber },
+        req.ip
+      );
+
+      return res.status(201).json(newQuote);
+    } catch (error) {
+      console.error("Error creating CRM quote:", error);
+      return res.status(500).json({ message: "Failed to create quote" });
+    }
+  });
+
+  // PATCH /api/crm/quotes/:id - Update CRM quote
+  app.patch("/api/crm/quotes/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const existing = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!existing[0]) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      const [updated] = await db.update(crmQuotes)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(eq(crmQuotes.id, req.params.id))
+        .returning();
+
+      await logCrmAudit(
+        user.id,
+        "quote.updated",
+        "crm_quote",
+        req.params.id,
+        { changes: Object.keys(req.body) },
+        req.ip
+      );
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating CRM quote:", error);
+      return res.status(500).json({ message: "Failed to update quote" });
+    }
+  });
+
+  // DELETE /api/crm/quotes/:id - Delete CRM quote
+  app.delete("/api/crm/quotes/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const existing = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!existing[0]) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      await db.delete(crmQuotes).where(eq(crmQuotes.id, req.params.id));
+
+      await logCrmAudit(
+        user.id,
+        "quote.deleted",
+        "crm_quote",
+        req.params.id,
+        { quoteNumber: existing[0].quoteNumber },
+        req.ip
+      );
+
+      return res.json({ message: "Quote deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting CRM quote:", error);
+      return res.status(500).json({ message: "Failed to delete quote" });
     }
   });
 
