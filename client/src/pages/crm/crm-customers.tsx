@@ -89,9 +89,9 @@ export default function CrmCustomers() {
     if (customerType !== "all") params.set("customerType", customerType);
     if (statusTab !== "all") {
       const statusMap: Record<string, string> = {
-        prospects: "Prospect",
-        active: "Active",
-        inactive: "Inactive",
+        prospects: "prospect",
+        active: "client",
+        inactive: "inactive",
       };
       if (statusMap[statusTab]) {
         params.set("customerStatus", statusMap[statusTab]);
@@ -139,18 +139,25 @@ export default function CrmCustomers() {
 
   const formatCustomerStatus = (status: string | null) => {
     if (!status) return "Unknown";
-    return status;
+    const statusMap: Record<string, string> = {
+      prospect: "Prospect",
+      client: "Active",
+      inactive: "Inactive",
+      "do not service": "Do Not Service",
+    };
+    return statusMap[status.toLowerCase()] || status;
   };
 
   const getStatusBadgeClass = (status: string | null) => {
-    switch (status) {
-      case "Prospect":
+    const normalizedStatus = status?.toLowerCase() || "";
+    switch (normalizedStatus) {
+      case "prospect":
         return "bg-slate-100 text-slate-700 border-slate-200";
-      case "Active":
+      case "client":
         return "bg-green-100 text-green-700 border-green-200";
-      case "Inactive":
+      case "inactive":
         return "bg-yellow-100 text-yellow-700 border-yellow-200";
-      case "Do Not Service":
+      case "do not service":
         return "bg-red-100 text-red-700 border-red-200";
       default:
         return "bg-slate-100 text-slate-600 border-slate-200";
