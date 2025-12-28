@@ -28,7 +28,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Info,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
 import type { CrmUser, CrmCustomer } from "@shared/schema";
@@ -217,90 +223,112 @@ export default function CrmCustomers() {
           </Link>
         </div>
 
-        <Card className="bg-white border shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setStatusTab("all")}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    statusTab === "all"
-                      ? "bg-slate-800 text-white shadow-md"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                  data-testid="tab-status-all"
-                >
-                  <span className="w-2 h-2 rounded-full bg-slate-400" />
-                  All
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                    statusTab === "all" ? "bg-white/20" : "bg-slate-200"
-                  }`}>
-                    {statsData?.total?.toLocaleString() || "—"}
-                  </span>
-                </button>
-                <button
-                  onClick={() => setStatusTab("prospects")}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    statusTab === "prospects"
-                      ? "bg-amber-500 text-white shadow-md"
-                      : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                  }`}
-                  data-testid="tab-status-prospects"
-                >
-                  <span className="w-2 h-2 rounded-full bg-amber-400" />
-                  Prospects
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                    statusTab === "prospects" ? "bg-white/20" : "bg-amber-100"
-                  }`}>
-                    {statsData?.prospects?.toLocaleString() || "—"}
-                  </span>
-                </button>
-                <button
-                  onClick={() => setStatusTab("customers")}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    statusTab === "customers"
-                      ? "bg-green-500 text-white shadow-md"
-                      : "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
-                  }`}
-                  data-testid="tab-status-customers"
-                >
-                  <span className="w-2 h-2 rounded-full bg-green-400" />
-                  Customers
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                    statusTab === "customers" ? "bg-white/20" : "bg-green-100"
-                  }`}>
-                    {statsData?.customers?.toLocaleString() || "—"}
-                  </span>
-                </button>
-              </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setStatusTab("all")}
+            className={`px-4 py-1.5 rounded-full text-sm border transition-colors ${
+              statusTab === "all"
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+            }`}
+            data-testid="tab-status-all"
+          >
+            All ({statsData?.total?.toLocaleString() || 0})
+          </button>
+          <button
+            onClick={() => setStatusTab("prospects")}
+            className={`px-4 py-1.5 rounded-full text-sm border transition-colors ${
+              statusTab === "prospects"
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+            }`}
+            data-testid="tab-status-prospects"
+          >
+            Prospects ({statsData?.prospects?.toLocaleString() || 0})
+          </button>
+          <button
+            onClick={() => setStatusTab("customers")}
+            className={`px-4 py-1.5 rounded-full text-sm border transition-colors ${
+              statusTab === "customers"
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+            }`}
+            data-testid="tab-status-customers"
+          >
+            Customers ({statsData?.customers?.toLocaleString() || 0})
+          </button>
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    placeholder="Search by name, phone, or address..."
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    className="pl-10"
-                    data-testid="input-search"
-                  />
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm text-slate-600 border border-slate-300 bg-white hover:bg-slate-50 transition-colors"
+                data-testid="button-legend"
+              >
+                <Info className="h-3.5 w-3.5" />
+                Legend
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-4" align="start">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Customer Type</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded bg-blue-100 border border-blue-200" />
+                      <span className="text-sm text-slate-700">Residential</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded bg-amber-100 border border-amber-200" />
+                      <span className="text-sm text-slate-700">Commercial</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded bg-purple-100 border border-purple-200" />
+                      <span className="text-sm text-slate-700">Property Manager</span>
+                    </div>
+                  </div>
                 </div>
-
-                <Select value={customerType} onValueChange={setCustomerType}>
-                  <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-customer-type">
-                    <SelectValue placeholder="Customer Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="Residential">Residential</SelectItem>
-                    <SelectItem value="Property Manager">Property Manager</SelectItem>
-                    <SelectItem value="Commercial">Commercial</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Status</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span className="text-sm text-slate-700">Prospect</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="text-sm text-slate-700">Customer</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </PopoverContent>
+          </Popover>
+
+          <div className="flex-1" />
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-9 w-48 h-9"
+              data-testid="input-search"
+            />
+          </div>
+
+          <Select value={customerType} onValueChange={setCustomerType}>
+            <SelectTrigger className="w-[160px] h-9" data-testid="select-customer-type">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="Residential">Residential</SelectItem>
+              <SelectItem value="Property Manager">Property Manager</SelectItem>
+              <SelectItem value="Commercial">Commercial</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         <Card className="bg-white border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
