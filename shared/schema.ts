@@ -896,6 +896,15 @@ export const crmJobNotes = pgTable("crm_job_notes", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// CRM Customer Notes
+export const crmCustomerNotes = pgTable("crm_customer_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => crmCustomers.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => crmUsers.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Invoice Status Enum
 export const crmInvoiceStatusEnum = ["draft", "sent", "viewed", "partial", "paid", "void"] as const;
 export type CrmInvoiceStatus = typeof crmInvoiceStatusEnum[number];
@@ -1175,6 +1184,8 @@ export type CrmJob = typeof crmJobs.$inferSelect;
 export type CrmJobAssignment = typeof crmJobAssignments.$inferSelect;
 export type CrmJobStatusEvent = typeof crmJobStatusEvents.$inferSelect;
 export type CrmJobNote = typeof crmJobNotes.$inferSelect;
+export type CrmCustomerNote = typeof crmCustomerNotes.$inferSelect;
+export type InsertCrmCustomerNote = typeof crmCustomerNotes.$inferInsert;
 export type InsertCrmInvoice = z.infer<typeof insertCrmInvoiceSchema>;
 export type CrmInvoice = typeof crmInvoices.$inferSelect;
 export type InsertCrmPayment = z.infer<typeof insertCrmPaymentSchema>;

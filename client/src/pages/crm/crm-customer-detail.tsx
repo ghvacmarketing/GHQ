@@ -30,6 +30,9 @@ import {
   ExternalLink,
   MoreVertical,
   CalendarIcon,
+  MessageSquare,
+  Send,
+  Briefcase,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -39,8 +42,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import type { CrmUser, CrmCustomer, CrmJob } from "@shared/schema";
-import { format } from "date-fns";
+import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote } from "@shared/schema";
+import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
 const JOB_TYPES = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
@@ -95,6 +98,7 @@ export default function CrmCustomerDetail() {
   const params = useParams<{ id: string }>();
   const customerId = params.id;
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [noteBody, setNoteBody] = useState("");
   const { toast } = useToast();
 
   // Form state
@@ -153,6 +157,20 @@ export default function CrmCustomerDetail() {
       return res.json();
     },
     enabled: !!currentUser && createDialogOpen,
+  });
+
+  interface CustomerNoteWithUser extends CrmCustomerNote {
+    userName: string | null;
+  }
+
+  const { data: notes, isLoading: notesLoading } = useQuery<CustomerNoteWithUser[]>({
+    queryKey: ["/api/crm/customers", customerId, "notes"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${customerId}/notes`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch notes");
+      return res.json();
+    },
+    enabled: !!currentUser && !!customerId,
   });
 
   const technicians = dispatchData?.technicians?.filter((t) => t.role === "tech") || [];
@@ -244,6 +262,32 @@ export default function CrmCustomerDetail() {
       });
     },
   });
+
+  const addNoteMutation = useMutation({
+    mutationFn: async (body: string) => {
+      const res = await apiRequest("POST", `/api/crm/customers/${customerId}/notes`, { body });
+      if (!res.ok) throw new Error("Failed to add note");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Note added" });
+      setNoteBody("");
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "notes"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to add note",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddNote = () => {
+    if (noteBody.trim()) {
+      addNoteMutation.mutate(noteBody.trim());
+    }
+  };
 
   if (authLoading || customerLoading) {
     return (
@@ -494,6 +538,120 @@ export default function CrmCustomerDetail() {
                 <p className="text-sm text-slate-600">{customer.notes}</p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card data-testid="card-stat-total">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-slate-100">
+                  <Briefcase className="h-5 w-5 text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Total Jobs</p>
+                  <p className="text-2xl font-semibold">{jobs?.length || 0}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card data-testid="card-stat-active">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-100">
+                  <Clock className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Active Jobs</p>
+                  <p className="text-2xl font-semibold">{activeJobs.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card data-testid="card-stat-completed">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-100">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Completed</p>
+                  <p className="text-2xl font-semibold">{completedJobs.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Notes & Activity Timeline */}
+        <Card data-testid="card-notes">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-blue-500" />
+              Notes & Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Add Note Form */}
+              <div className="flex gap-2">
+                <Textarea
+                  placeholder="Add a note about this customer..."
+                  value={noteBody}
+                  onChange={(e) => setNoteBody(e.target.value)}
+                  rows={2}
+                  className="flex-1"
+                  data-testid="textarea-note"
+                />
+                <Button
+                  onClick={handleAddNote}
+                  disabled={!noteBody.trim() || addNoteMutation.isPending}
+                  className="self-end"
+                  data-testid="button-add-note"
+                >
+                  {addNoteMutation.isPending ? (
+                    "Adding..."
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-1" />
+                      Add
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Notes Timeline */}
+              {notesLoading ? (
+                <div className="space-y-3 py-4">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : notes && notes.length > 0 ? (
+                <div className="border-l-2 border-slate-200 pl-4 space-y-4 mt-4">
+                  {notes.map((note) => (
+                    <div key={note.id} className="relative" data-testid={`note-${note.id}`}>
+                      <div className="absolute -left-[21px] top-0 w-2.5 h-2.5 bg-blue-500 rounded-full" />
+                      <div className="bg-slate-50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-sm text-slate-700">
+                            {note.userName || "Unknown User"}
+                          </span>
+                          <span className="text-xs text-slate-400" title={note.createdAt ? format(new Date(note.createdAt), "PPP p") : ""}>
+                            {note.createdAt
+                              ? formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })
+                              : "—"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{note.body}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 text-center py-4">No notes yet</p>
+              )}
+            </div>
           </CardContent>
         </Card>
 

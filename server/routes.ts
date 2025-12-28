@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -5608,6 +5608,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching customer jobs:", error);
       return res.status(500).json({ message: "Failed to fetch customer jobs" });
+    }
+  });
+
+  // GET /api/crm/customers/:id/notes - Get notes for a customer
+  app.get("/api/crm/customers/:id/notes", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const customerId = req.params.id;
+      
+      // Verify customer exists
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      // Get notes for this customer with user names
+      const notes = await db.select({
+        id: crmCustomerNotes.id,
+        customerId: crmCustomerNotes.customerId,
+        userId: crmCustomerNotes.userId,
+        body: crmCustomerNotes.body,
+        createdAt: crmCustomerNotes.createdAt,
+        userName: crmUsers.name,
+      })
+        .from(crmCustomerNotes)
+        .leftJoin(crmUsers, eq(crmCustomerNotes.userId, crmUsers.id))
+        .where(eq(crmCustomerNotes.customerId, customerId))
+        .orderBy(desc(crmCustomerNotes.createdAt));
+
+      return res.json(notes);
+    } catch (error) {
+      console.error("Error fetching customer notes:", error);
+      return res.status(500).json({ message: "Failed to fetch customer notes" });
+    }
+  });
+
+  // POST /api/crm/customers/:id/notes - Create a note for a customer
+  app.post("/api/crm/customers/:id/notes", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const customerId = req.params.id;
+      const { body } = req.body;
+
+      if (!body || typeof body !== "string" || !body.trim()) {
+        return res.status(400).json({ message: "Note body is required" });
+      }
+      
+      // Verify customer exists
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      // Create the note
+      const [newNote] = await db.insert(crmCustomerNotes).values({
+        customerId,
+        userId: user.id,
+        body: body.trim(),
+      }).returning();
+
+      // Return with user name
+      return res.json({
+        ...newNote,
+        userName: user.name,
+      });
+    } catch (error) {
+      console.error("Error creating customer note:", error);
+      return res.status(500).json({ message: "Failed to create customer note" });
     }
   });
 
