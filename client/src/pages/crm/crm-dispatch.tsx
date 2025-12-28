@@ -103,8 +103,9 @@ function getJobDisplayTimes(job: DispatchJob): { startHour: number; endHour: num
   }
   const start = new Date(job.scheduledStart);
   const end = new Date(job.scheduledEnd);
-  const startHour = Math.max(START_HOUR, Math.min(END_HOUR, start.getHours() + start.getMinutes() / 60));
-  const endHour = Math.max(START_HOUR, Math.min(END_HOUR, end.getHours() + end.getMinutes() / 60));
+  // Use UTC hours since times are stored and queried in UTC
+  const startHour = Math.max(START_HOUR, Math.min(END_HOUR, start.getUTCHours() + start.getUTCMinutes() / 60));
+  const endHour = Math.max(START_HOUR, Math.min(END_HOUR, end.getUTCHours() + end.getUTCMinutes() / 60));
   return { startHour, endHour: endHour > startHour ? endHour : startHour + 1 };
 }
 
