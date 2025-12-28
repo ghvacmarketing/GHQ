@@ -309,7 +309,12 @@ export default function CrmAccountCreate() {
       toast({ title: "Account created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
-      navigate(`/crm/customers`);
+      // PM accounts go directly to detail page for setup workflow
+      if (data?.account?.accountType === "PROPERTY_MANAGER" && data?.account?.id) {
+        navigate(`/crm/accounts/${data.account.id}`);
+      } else {
+        navigate(`/crm/customers`);
+      }
     },
     onError: (error: any) => {
       toast({

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -40,6 +40,8 @@ import {
   FileText,
   Clock,
   CheckCircle2,
+  Circle,
+  LayoutDashboard,
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -210,6 +212,12 @@ export default function CrmAccountDetail() {
   });
 
   const technicians = dispatchData?.technicians?.filter((t) => t.role === "tech") || [];
+
+  useEffect(() => {
+    if (accountData?.account?.accountType === "PROPERTY_MANAGER") {
+      setActiveTab("overview");
+    }
+  }, [accountData?.account?.accountType]);
 
   const resetSiteForm = () => {
     setSiteForm({
@@ -520,7 +528,13 @@ export default function CrmAccountDetail() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className={`grid w-full ${account.accountType === "PROPERTY_MANAGER" ? "grid-cols-5" : "grid-cols-4"}`}>
+            {account.accountType === "PROPERTY_MANAGER" && (
+              <TabsTrigger value="overview" data-testid="tab-overview">
+                <LayoutDashboard className="h-4 w-4 mr-2" />
+                Overview
+              </TabsTrigger>
+            )}
             <TabsTrigger value="sites" data-testid="tab-sites">
               <MapPin className="h-4 w-4 mr-2" />
               Sites ({sites.length})
@@ -538,6 +552,212 @@ export default function CrmAccountDetail() {
               Profile
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="overview" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      resetSiteForm();
+                      setSiteDialogOpen(true);
+                    }}
+                    data-testid="button-quick-add-site"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Site
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      resetContactForm();
+                      setContactDialogOpen(true);
+                    }}
+                    data-testid="button-quick-add-contact"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Contact
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      resetJobForm();
+                      setJobDialogOpen(true);
+                    }}
+                    data-testid="button-quick-create-job"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Job
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg">Account Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {account.companyName && (
+                    <div>
+                      <Label className="text-slate-500 text-sm">Company Name</Label>
+                      <p className="font-medium">{account.companyName}</p>
+                    </div>
+                  )}
+                  {account.accountType === "PROPERTY_MANAGER" && propertyManagerProfile?.portfolioSize && (
+                    <div>
+                      <Label className="text-slate-500 text-sm">Portfolio Size</Label>
+                      <p className="font-medium">{propertyManagerProfile.portfolioSize} properties</p>
+                    </div>
+                  )}
+                  {(() => {
+                    const primaryContact = contacts.find((c) => c.isPrimary);
+                    if (primaryContact) {
+                      return (
+                        <div>
+                          <Label className="text-slate-500 text-sm">Primary Contact</Label>
+                          <p className="font-medium">
+                            {primaryContact.firstName} {primaryContact.lastName}
+                          </p>
+                          {primaryContact.phone && (
+                            <p className="text-sm text-slate-500">
+                              <Phone className="h-3 w-3 inline mr-1" />
+                              {primaryContact.phone}
+                            </p>
+                          )}
+                          {primaryContact.email && (
+                            <p className="text-sm text-slate-500">
+                              <Mail className="h-3 w-3 inline mr-1" />
+                              {primaryContact.email}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+
+            {account.accountType === "PROPERTY_MANAGER" && (
+              <Card>
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Setup Checklist</CardTitle>
+                    {(() => {
+                      const hasSite = sites.length > 0;
+                      const hasOpsContact = contacts.some((c) => c.contactRole === "FACILITIES" || c.contactRole === "PRIMARY");
+                      const hasApContact = contacts.some((c) => c.contactRole === "AP" || c.contactRole === "BILLING");
+                      const hasJob = jobs.length > 0;
+                      const completedCount = [hasSite, hasOpsContact, hasApContact, hasJob].filter(Boolean).length;
+                      const percentage = Math.round((completedCount / 4) * 100);
+                      return (
+                        <Badge className={cn(
+                          percentage === 100 ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700",
+                          "border-0"
+                        )} data-testid="badge-checklist-percentage">
+                          {percentage}% Complete
+                        </Badge>
+                      );
+                    })()}
+                  </div>
+                  <CardDescription>Complete these steps to fully set up this property manager account</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {(() => {
+                      const hasSite = sites.length > 0;
+                      const hasOpsContact = contacts.some((c) => c.contactRole === "FACILITIES" || c.contactRole === "PRIMARY");
+                      const hasApContact = contacts.some((c) => c.contactRole === "AP" || c.contactRole === "BILLING");
+                      const hasJob = jobs.length > 0;
+
+                      const checklistItems = [
+                        {
+                          id: "site",
+                          label: "Add at least 1 Site/Property",
+                          completed: hasSite,
+                          action: () => {
+                            resetSiteForm();
+                            setSiteDialogOpen(true);
+                          },
+                          buttonLabel: "Add Site",
+                        },
+                        {
+                          id: "ops-contact",
+                          label: "Add Ops Contact (Facilities or Primary)",
+                          completed: hasOpsContact,
+                          action: () => {
+                            resetContactForm();
+                            setContactDialogOpen(true);
+                          },
+                          buttonLabel: "Add Contact",
+                        },
+                        {
+                          id: "ap-contact",
+                          label: "Add AP/Billing Contact",
+                          completed: hasApContact,
+                          action: () => {
+                            resetContactForm();
+                            setContactForm((prev) => ({ ...prev, contactRole: "AP" as ContactRole }));
+                            setContactDialogOpen(true);
+                          },
+                          buttonLabel: "Add Contact",
+                        },
+                        {
+                          id: "job",
+                          label: "Create first Job",
+                          completed: hasJob,
+                          action: () => {
+                            resetJobForm();
+                            setJobDialogOpen(true);
+                          },
+                          buttonLabel: "Create Job",
+                        },
+                      ];
+
+                      return checklistItems.map((item, index) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                          data-testid={`checklist-item-${item.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {item.completed ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <Circle className="h-5 w-5 text-slate-300" />
+                            )}
+                            <span className={cn(
+                              "font-medium",
+                              item.completed ? "text-slate-500 line-through" : "text-slate-700"
+                            )}>
+                              Step {index + 1}: {item.label}
+                            </span>
+                          </div>
+                          {!item.completed && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={item.action}
+                              data-testid={`button-checklist-${item.id}`}
+                            >
+                              {item.buttonLabel}
+                            </Button>
+                          )}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
 
           <TabsContent value="sites" className="space-y-4">
             <Card>

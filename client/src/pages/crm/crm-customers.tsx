@@ -35,6 +35,8 @@ import type { CrmUser, CrmCustomer } from "@shared/schema";
 
 type CustomerWithAddress = CrmCustomer & {
   fullAddress: string | null;
+  origin?: 'crm_customers' | 'crm_accounts';
+  accountId?: string | null;
 };
 
 type CustomersResponse = {
@@ -313,7 +315,17 @@ export default function CrmCustomers() {
                       key={customer.id}
                       className="cursor-pointer hover:bg-slate-50 transition-colors"
                       data-testid={`row-customer-${customer.id}`}
-                      onClick={() => navigate(`/crm/customers/${customer.id}`)}
+                      onClick={() => {
+                        // CRM accounts go to account detail page, legacy customers to customer detail
+                        if (customer.origin === 'crm_accounts') {
+                          if (customer.accountId) {
+                            navigate(`/crm/accounts/${customer.accountId}`);
+                          }
+                          // Skip navigation if CRM account lacks accountId (shouldn't happen)
+                        } else {
+                          navigate(`/crm/customers/${customer.id}`);
+                        }
+                      }}
                     >
                       <TableCell className="font-medium text-slate-900">
                         {customer.name}
