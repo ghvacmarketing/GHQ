@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,12 +9,30 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   CalendarDays,
   User,
   Clock,
   MapPin,
+  ExternalLink,
+  UserX,
+  XCircle,
+  Loader2,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmJob } from "@shared/schema";
@@ -113,9 +131,10 @@ interface DraggableJobCardProps {
   job: DispatchJob;
   onResize: (jobId: string, newStart: number, newEnd: number) => void;
   isDragging?: boolean;
+  onClick?: (jobId: string) => void;
 }
 
-function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) {
+function DraggableJobCard({ job, onResize, isDragging, onClick }: DraggableJobCardProps) {
   const colors = statusColors[job.status] || statusColors.new;
   const { startHour, endHour } = getJobDisplayTimes(job);
   
@@ -246,6 +265,10 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
         className="flex flex-col h-full justify-center px-3 py-1 cursor-grab"
         {...attributes}
         {...listeners}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.(job.id);
+        }}
       >
         <p className="text-xs font-medium truncate">{job.customerName}</p>
         <p className="text-xs truncate opacity-70">{job.jobType}</p>
@@ -276,9 +299,10 @@ interface DroppableTechnicianRowProps {
   jobs: DispatchJob[];
   onResize: (jobId: string, newStart: number, newEnd: number) => void;
   activeId: string | null;
+  onJobClick?: (jobId: string) => void;
 }
 
-function DroppableTechnicianRow({ tech, jobs, onResize, activeId }: DroppableTechnicianRowProps) {
+function DroppableTechnicianRow({ tech, jobs, onResize, activeId, onJobClick }: DroppableTechnicianRowProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: `technician-${tech.id}`,
     data: { technicianId: tech.id },
@@ -318,6 +342,7 @@ function DroppableTechnicianRow({ tech, jobs, onResize, activeId }: DroppableTec
             job={job} 
             onResize={onResize}
             isDragging={activeId === job.id}
+            onClick={onJobClick}
           />
         ))}
       </div>
@@ -325,7 +350,7 @@ function DroppableTechnicianRow({ tech, jobs, onResize, activeId }: DroppableTec
   );
 }
 
-function UnassignedRow({ jobs, onResize, activeId }: { jobs: DispatchJob[]; onResize: (jobId: string, newStart: number, newEnd: number) => void; activeId: string | null }) {
+function UnassignedRow({ jobs, onResize, activeId, onJobClick }: { jobs: DispatchJob[]; onResize: (jobId: string, newStart: number, newEnd: number) => void; activeId: string | null; onJobClick?: (jobId: string) => void }) {
   const { isOver, setNodeRef } = useDroppable({
     id: `technician-unassigned`,
     data: { technicianId: null },
@@ -364,6 +389,7 @@ function UnassignedRow({ jobs, onResize, activeId }: { jobs: DispatchJob[]; onRe
             job={job} 
             onResize={onResize}
             isDragging={activeId === job.id}
+            onClick={onJobClick}
           />
         ))}
       </div>
@@ -371,12 +397,16 @@ function UnassignedRow({ jobs, onResize, activeId }: { jobs: DispatchJob[]; onRe
   );
 }
 
-function MobileJobCard({ job, technician }: { job: DispatchJob; technician?: Technician }) {
+function MobileJobCard({ job, technician, onClick }: { job: DispatchJob; technician?: Technician; onClick?: (jobId: string) => void }) {
   const colors = statusColors[job.status] || statusColors.new;
   const { startHour, endHour } = getJobDisplayTimes(job);
 
   return (
-    <Card className={`${colors.bg} ${colors.border} border`} data-testid={`mobile-job-card-${job.id}`}>
+    <Card 
+      className={`${colors.bg} ${colors.border} border cursor-pointer hover:shadow-md transition-shadow`} 
+      data-testid={`mobile-job-card-${job.id}`}
+      onClick={() => onClick?.(job.id)}
+    >
       <CardContent className="p-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -415,7 +445,18 @@ export default function CrmDispatch() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [localJobs, setLocalJobs] = useState<DispatchJob[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [newNote, setNewNote] = useState("");
   const { toast } = useToast();
+  
+  const selectedJob = selectedJobId ? localJobs.find(j => j.id === selectedJobId) : null;
+
+  const handleJobClick = useCallback((jobId: string) => {
+    setSelectedJobId(jobId);
+    setIsSheetOpen(true);
+    setNewNote("");
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -477,6 +518,73 @@ export default function CrmDispatch() {
       }
     },
   });
+
+  const handleStatusChange = useCallback((newStatus: JobStatus) => {
+    if (!selectedJobId) return;
+    updateJobMutation.mutate({
+      jobId: selectedJobId,
+      updates: { status: newStatus },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Status updated", description: `Job status changed to ${statusLabels[newStatus]}` });
+        setLocalJobs(prev => prev.map(j => 
+          j.id === selectedJobId ? { ...j, status: newStatus } : j
+        ));
+      }
+    });
+  }, [selectedJobId, updateJobMutation, toast]);
+
+  const handleUnassign = useCallback(() => {
+    if (!selectedJobId) return;
+    updateJobMutation.mutate({
+      jobId: selectedJobId,
+      updates: { assignedTechId: null },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Technician unassigned", description: "Job moved to unassigned queue" });
+        setLocalJobs(prev => prev.map(j => 
+          j.id === selectedJobId ? { ...j, assignedTechId: null } : j
+        ));
+      }
+    });
+  }, [selectedJobId, updateJobMutation, toast]);
+
+  const handleCancelJob = useCallback(() => {
+    if (!selectedJobId) return;
+    updateJobMutation.mutate({
+      jobId: selectedJobId,
+      updates: { status: "cancelled" },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Job cancelled", description: "The job has been cancelled" });
+        setLocalJobs(prev => prev.map(j => 
+          j.id === selectedJobId ? { ...j, status: "cancelled" as JobStatus } : j
+        ));
+        setIsSheetOpen(false);
+      }
+    });
+  }, [selectedJobId, updateJobMutation, toast]);
+
+  const handleSaveNotes = useCallback(() => {
+    if (!selectedJobId || !newNote.trim()) return;
+    const currentJob = localJobs.find(j => j.id === selectedJobId);
+    const updatedDescription = currentJob?.description 
+      ? `${currentJob.description}\n\n---\n${new Date().toLocaleDateString()}: ${newNote.trim()}`
+      : newNote.trim();
+    
+    updateJobMutation.mutate({
+      jobId: selectedJobId,
+      updates: { description: updatedDescription },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Notes saved", description: "Job notes have been updated" });
+        setLocalJobs(prev => prev.map(j => 
+          j.id === selectedJobId ? { ...j, description: updatedDescription } : j
+        ));
+        setNewNote("");
+      }
+    });
+  }, [selectedJobId, newNote, localJobs, updateJobMutation, toast]);
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -716,6 +824,7 @@ export default function CrmDispatch() {
                     jobs={unassignedJobs}
                     onResize={resizeJob}
                     activeId={activeId}
+                    onJobClick={handleJobClick}
                   />
 
                   {technicians.map((tech) => (
@@ -725,6 +834,7 @@ export default function CrmDispatch() {
                       jobs={getJobsForTechnician(tech.id)}
                       onResize={resizeJob}
                       activeId={activeId}
+                      onJobClick={handleJobClick}
                     />
                   ))}
 
@@ -757,7 +867,7 @@ export default function CrmDispatch() {
               ) : (
                 filteredJobs.map((job) => {
                   const tech = technicians.find((t) => t.id === job.assignedTechId);
-                  return <MobileJobCard key={job.id} job={job} technician={tech} />;
+                  return <MobileJobCard key={job.id} job={job} technician={tech} onClick={handleJobClick} />;
                 })
               )}
             </CardContent>
@@ -778,6 +888,181 @@ export default function CrmDispatch() {
           </CardContent>
         </Card>
       </div>
+
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto" data-testid="job-detail-sheet">
+          {selectedJob && (
+            <>
+              <SheetHeader>
+                <SheetTitle className="text-lg" data-testid="sheet-job-title">Job Details</SheetTitle>
+                <SheetDescription>View and manage job information</SheetDescription>
+              </SheetHeader>
+
+              <div className="mt-6 space-y-6">
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-slate-900">Job Information</h3>
+                  
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">Customer</span>
+                      <Link 
+                        href={`/crm/customers/${selectedJob.customerId}`}
+                        className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                        data-testid="link-customer-detail"
+                      >
+                        {selectedJob.customerName}
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">Job Type</span>
+                      <span className="text-sm font-medium text-slate-900" data-testid="text-job-type">{selectedJob.jobType}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">Priority</span>
+                      <Badge 
+                        variant={selectedJob.priority === "urgent" ? "destructive" : selectedJob.priority === "high" ? "default" : "secondary"}
+                        data-testid="badge-priority"
+                      >
+                        {selectedJob.priority || "normal"}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">Scheduled</span>
+                      <span className="text-sm font-medium text-slate-900" data-testid="text-scheduled-time">
+                        {(() => {
+                          const { startHour, endHour } = getJobDisplayTimes(selectedJob);
+                          return `${formatHour(Math.floor(startHour))} - ${formatHour(Math.floor(endHour))}`;
+                        })()}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">Status</span>
+                      <Badge 
+                        className={`${statusColors[selectedJob.status]?.bg} ${statusColors[selectedJob.status]?.text} ${statusColors[selectedJob.status]?.border} border`}
+                        data-testid="badge-status"
+                      >
+                        {statusLabels[selectedJob.status] || selectedJob.status}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">Assigned Tech</span>
+                      <span className="text-sm font-medium text-slate-900" data-testid="text-assigned-tech">
+                        {technicians.find(t => t.id === selectedJob.assignedTechId)?.name || "Unassigned"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-900">Update Status</h3>
+                  <div className="flex flex-wrap gap-2" data-testid="status-buttons">
+                    {(["scheduled", "dispatched", "en_route", "on_site", "completed"] as JobStatus[]).map((status) => (
+                      <Button
+                        key={status}
+                        size="sm"
+                        variant={selectedJob.status === status ? "default" : "outline"}
+                        onClick={() => handleStatusChange(status)}
+                        disabled={updateJobMutation.isPending}
+                        data-testid={`button-status-${status}`}
+                      >
+                        {updateJobMutation.isPending && selectedJob.status !== status ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : null}
+                        {statusLabels[status]}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-900">Notes / Description</h3>
+                  {selectedJob.description && (
+                    <div className="bg-slate-50 rounded-md p-3 text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-description">
+                      {selectedJob.description}
+                    </div>
+                  )}
+                  <Textarea
+                    placeholder="Add notes to this job..."
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    className="min-h-[80px]"
+                    data-testid="textarea-notes"
+                  />
+                  <Button 
+                    onClick={handleSaveNotes}
+                    disabled={!newNote.trim() || updateJobMutation.isPending}
+                    size="sm"
+                    data-testid="button-save-notes"
+                  >
+                    {updateJobMutation.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                    Save Notes
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-900">Quick Actions</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleUnassign}
+                      disabled={!selectedJob.assignedTechId || updateJobMutation.isPending}
+                      data-testid="button-unassign"
+                    >
+                      <UserX className="h-4 w-4 mr-1" />
+                      Unassign
+                    </Button>
+                    
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={selectedJob.status === "cancelled" || updateJobMutation.isPending}
+                          data-testid="button-cancel-job"
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          Cancel Job
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Cancel this job?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will mark the job as cancelled. This action cannot be easily undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel data-testid="button-cancel-dialog-cancel">Keep Job</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={handleCancelJob}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            data-testid="button-confirm-cancel"
+                          >
+                            Yes, Cancel Job
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </CrmLayout>
   );
 }
