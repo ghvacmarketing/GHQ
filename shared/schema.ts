@@ -872,11 +872,16 @@ export const crmJobs = pgTable("crm_jobs", {
 });
 
 // CRM Work Orders (scheduled visits linked to jobs)
+// Work Order Visit Types
+export const workOrderVisitTypeEnum = ["initial", "return", "follow_up", "install_day_1", "install_day_2", "maintenance", "inspection"] as const;
+export type WorkOrderVisitType = typeof workOrderVisitTypeEnum[number];
+
 export const crmWorkOrders = pgTable("crm_work_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   jobId: varchar("job_id").notNull().references(() => crmJobs.id, { onDelete: "cascade" }),
   workOrderNumber: integer("work_order_number").notNull().default(1),
   assignedTechId: varchar("assigned_tech_id").references(() => crmUsers.id),
+  visitType: text("visit_type").$type<WorkOrderVisitType>().default("initial"),
   scheduledStart: timestamp("scheduled_start"),
   scheduledEnd: timestamp("scheduled_end"),
   status: text("status").$type<WorkOrderStatus>().notNull().default("scheduled"),
