@@ -4845,6 +4845,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/jobs/:id - Get single job with full details
+  app.get("/api/crm/jobs/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const jobId = req.params.id;
+      const [jobWithCustomer] = await db.select({
+        job: crmJobs,
+        customerName: crmCustomers.name,
+      })
+        .from(crmJobs)
+        .leftJoin(crmCustomers, eq(crmJobs.customerId, crmCustomers.id))
+        .where(eq(crmJobs.id, jobId));
+
+      if (!jobWithCustomer) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      // Check access for techs
+      if (!isSalesOrAbove(user.role)) {
+        const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.jobId, jobId));
+        const isAssigned = assignments.some(a => a.techUserId === user.id);
+        if (!isAssigned) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      // Get assignment info
+      const [assignment] = await db.select({
+        techId: crmJobAssignments.techUserId,
+        techName: crmUsers.name,
+        techEmail: crmUsers.email,
+        startAt: crmJobAssignments.startAt,
+        endAt: crmJobAssignments.endAt,
+      })
+        .from(crmJobAssignments)
+        .leftJoin(crmUsers, eq(crmJobAssignments.techUserId, crmUsers.id))
+        .where(eq(crmJobAssignments.jobId, jobId))
+        .limit(1);
+
+      // Get property info if available
+      let property = null;
+      if (jobWithCustomer.job.propertyId) {
+        const [prop] = await db.select().from(crmProperties).where(eq(crmProperties.id, jobWithCustomer.job.propertyId));
+        property = prop || null;
+      }
+
+      // Get first property for customer if job has no property
+      if (!property) {
+        const [firstProp] = await db.select().from(crmProperties).where(eq(crmProperties.customerId, jobWithCustomer.job.customerId)).limit(1);
+        property = firstProp || null;
+      }
+
+      return res.json({
+        ...jobWithCustomer.job,
+        customerName: jobWithCustomer.customerName || "Unknown Customer",
+        assignedTechId: assignment?.techId || null,
+        assignedTechName: assignment?.techName || null,
+        assignedTechEmail: assignment?.techEmail || null,
+        property,
+      });
+    } catch (error) {
+      console.error("Error fetching CRM job:", error);
+      return res.status(500).json({ message: "Failed to fetch job" });
+    }
+  });
+
   // POST /api/crm/jobs - Create job (ADMIN/SALES only)
   app.post("/api/crm/jobs", requireCrmSalesOrAbove, async (req, res) => {
     try {

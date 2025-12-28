@@ -97,6 +97,42 @@ const statusColors: Record<string, { bg: string; border: string; text: string }>
   cancelled: { bg: "bg-red-50", border: "border-red-200", text: "text-red-500" },
 };
 
+const jobTypeColors: Record<string, { bg: string; border: string; text: string }> = {
+  SERVICE: { bg: "bg-sky-100", border: "border-sky-200", text: "text-sky-900" },
+  MAINTENANCE: { bg: "bg-emerald-100", border: "border-emerald-200", text: "text-emerald-900" },
+  INSTALL: { bg: "bg-amber-100", border: "border-amber-200", text: "text-amber-900" },
+  SALES: { bg: "bg-rose-100", border: "border-rose-200", text: "text-rose-900" },
+};
+
+const statusStripeColors: Record<string, string> = {
+  new: "border-l-slate-400",
+  scheduled: "border-l-blue-500",
+  dispatched: "border-l-purple-500",
+  en_route: "border-l-amber-500",
+  on_site: "border-l-orange-500",
+  completed: "border-l-green-500",
+  invoiced: "border-l-green-500",
+  paid: "border-l-green-500",
+  cancelled: "border-l-red-500",
+};
+
+const priorityBadgeColors: Record<string, { bg: string; text: string; border: string }> = {
+  urgent: { bg: "bg-red-500", text: "text-white", border: "border-red-600" },
+  high: { bg: "bg-orange-500", text: "text-white", border: "border-orange-600" },
+  normal: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
+  low: { bg: "bg-gray-100", text: "text-gray-600", border: "border-gray-300" },
+};
+
+function getJobTypeColor(jobType: string | null | undefined): { bg: string; border: string; text: string } {
+  if (!jobType) return jobTypeColors.SERVICE;
+  const upperType = jobType.toUpperCase();
+  if (upperType.includes("SERVICE")) return jobTypeColors.SERVICE;
+  if (upperType.includes("MAINTENANCE")) return jobTypeColors.MAINTENANCE;
+  if (upperType.includes("INSTALL")) return jobTypeColors.INSTALL;
+  if (upperType.includes("SALES")) return jobTypeColors.SALES;
+  return jobTypeColors.SERVICE;
+}
+
 const statusLabels: Record<string, string> = {
   new: "New",
   scheduled: "Scheduled",
@@ -135,7 +171,10 @@ interface DraggableJobCardProps {
 }
 
 function DraggableJobCard({ job, onResize, isDragging, onClick }: DraggableJobCardProps) {
-  const colors = statusColors[job.status] || statusColors.new;
+  const jobColors = getJobTypeColor(job.jobType);
+  const statusStripe = statusStripeColors[job.status] || statusStripeColors.new;
+  const priorityStyle = priorityBadgeColors[job.priority || "normal"] || priorityBadgeColors.normal;
+  const isCompletedStatus = ["completed", "invoiced", "paid", "cancelled"].includes(job.status);
   const { startHour, endHour } = getJobDisplayTimes(job);
   
   const cardRef = useRef<HTMLDivElement>(null);
@@ -239,10 +278,19 @@ function DraggableJobCard({ job, onResize, isDragging, onClick }: DraggableJobCa
         setNodeRef(node);
         (cardRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
-      className={`absolute top-1 bottom-1 rounded border ${colors.bg} ${colors.border} ${colors.text} overflow-hidden ${isDragging ? 'z-50' : ''}`}
+      className={`absolute top-1 bottom-1 rounded border-l-4 ${jobColors.bg} ${jobColors.border} ${jobColors.text} ${statusStripe} overflow-hidden ${isDragging ? 'z-50' : ''} ${isCompletedStatus ? 'opacity-60' : ''}`}
       style={style}
       data-testid={`job-card-${job.id}`}
     >
+      {job.priority && job.priority !== "normal" && (
+        <div 
+          className={`absolute top-0.5 right-1 px-1 py-0 text-[9px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}
+          data-testid={`priority-badge-${job.id}`}
+        >
+          {job.priority.toUpperCase()}
+        </div>
+      )}
+      
       <div
         className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-20 flex items-center justify-center hover:bg-black/10"
         onMouseDown={(e) => handleResizeStart(e, 'left')}
@@ -278,16 +326,26 @@ function DraggableJobCard({ job, onResize, isDragging, onClick }: DraggableJobCa
 }
 
 function JobCardOverlay({ job, timelineWidth }: { job: DispatchJob; timelineWidth: number }) {
-  const colors = statusColors[job.status] || statusColors.new;
+  const jobColors = getJobTypeColor(job.jobType);
+  const statusStripe = statusStripeColors[job.status] || statusStripeColors.new;
+  const priorityStyle = priorityBadgeColors[job.priority || "normal"] || priorityBadgeColors.normal;
+  const isCompletedStatus = ["completed", "invoiced", "paid", "cancelled"].includes(job.status);
   const { startHour, endHour } = getJobDisplayTimes(job);
   const duration = endHour - startHour;
   const widthPx = Math.max(60, (duration / TOTAL_HOURS) * timelineWidth);
   
   return (
     <div
-      className={`rounded border ${colors.bg} ${colors.border} ${colors.text} px-3 py-1 shadow-md cursor-grabbing flex flex-col justify-center`}
+      className={`rounded border-l-4 ${jobColors.bg} ${jobColors.border} ${jobColors.text} ${statusStripe} px-3 py-1 shadow-md cursor-grabbing flex flex-col justify-center relative ${isCompletedStatus ? 'opacity-60' : ''}`}
       style={{ width: `${widthPx}px`, height: '48px' }}
     >
+      {job.priority && job.priority !== "normal" && (
+        <div 
+          className={`absolute top-0.5 right-1 px-1 py-0 text-[9px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}
+        >
+          {job.priority.toUpperCase()}
+        </div>
+      )}
       <p className="text-xs font-medium truncate">{job.customerName}</p>
       <p className="text-xs truncate opacity-70">{job.jobType}</p>
     </div>
@@ -398,22 +456,33 @@ function UnassignedRow({ jobs, onResize, activeId, onJobClick }: { jobs: Dispatc
 }
 
 function MobileJobCard({ job, technician, onClick }: { job: DispatchJob; technician?: Technician; onClick?: (jobId: string) => void }) {
-  const colors = statusColors[job.status] || statusColors.new;
+  const jobColors = getJobTypeColor(job.jobType);
+  const statusStripe = statusStripeColors[job.status] || statusStripeColors.new;
+  const priorityStyle = priorityBadgeColors[job.priority || "normal"] || priorityBadgeColors.normal;
+  const isCompletedStatus = ["completed", "invoiced", "paid", "cancelled"].includes(job.status);
   const { startHour, endHour } = getJobDisplayTimes(job);
 
   return (
     <Card 
-      className={`${colors.bg} ${colors.border} border cursor-pointer hover:shadow-md transition-shadow`} 
+      className={`${jobColors.bg} ${jobColors.border} border border-l-4 ${statusStripe} cursor-pointer hover:shadow-md transition-shadow ${isCompletedStatus ? 'opacity-60' : ''}`} 
       data-testid={`mobile-job-card-${job.id}`}
       onClick={() => onClick?.(job.id)}
     >
-      <CardContent className="p-3">
+      <CardContent className="p-3 relative">
+        {job.priority && job.priority !== "normal" && (
+          <div 
+            className={`absolute top-2 right-2 px-1.5 py-0.5 text-[10px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}
+            data-testid={`mobile-priority-badge-${job.id}`}
+          >
+            {job.priority.toUpperCase()}
+          </div>
+        )}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <p className={`font-semibold text-sm ${colors.text}`}>{job.customerName}</p>
-            <p className={`text-xs ${colors.text} opacity-80`}>{job.jobType}</p>
+            <p className={`font-semibold text-sm ${jobColors.text}`}>{job.customerName}</p>
+            <p className={`text-xs ${jobColors.text} opacity-80`}>{job.jobType}</p>
           </div>
-          <Badge variant="outline" className={`${colors.text} ${colors.border} text-xs`}>
+          <Badge variant="outline" className={`text-xs ${job.priority && job.priority !== "normal" ? 'mr-12' : ''}`}>
             {statusLabels[job.status] || job.status}
           </Badge>
         </div>
