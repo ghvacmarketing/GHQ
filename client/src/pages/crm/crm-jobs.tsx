@@ -28,6 +28,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -51,20 +61,14 @@ import {
   CalendarIcon,
   Loader2,
   MoreVertical,
-  Clock,
-  UserCheck,
-  ExternalLink,
   Building2,
   MapPin,
+  Trash2,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -206,6 +210,8 @@ export default function CrmJobs() {
   const [scheduleTime, setScheduleTime] = useState("09:00");
   const [scheduleDuration, setScheduleDuration] = useState(60);
   const [scheduleTechId, setScheduleTechId] = useState<string>("unassigned");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState<JobWithDetails | null>(null);
 
   const debouncedSearch = useDebounce(searchInput, 300);
   const debouncedAccountSearch = useDebounce(accountSearch, 300);
@@ -468,6 +474,40 @@ export default function CrmJobs() {
       });
     },
   });
+
+  const deleteJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const res = await apiRequest("DELETE", `/api/crm/jobs/${jobId}`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to delete job");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+      toast({
+        title: "Job deleted",
+        description: "The job has been deleted successfully.",
+      });
+      setDeleteConfirmOpen(false);
+      setJobToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete job",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteJob = () => {
+    if (jobToDelete) {
+      deleteJobMutation.mutate(jobToDelete.id);
+    }
+  };
 
   const handleCloseDialog = () => {
     setCreateDialogOpen(false);
@@ -801,67 +841,16 @@ export default function CrmJobs() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem
-                                    onClick={() => handleOpenScheduleDialog(job)}
-                                    data-testid={`action-schedule-${job.id}`}
-                                  >
-                                    <Clock className="mr-2 h-4 w-4" />
-                                    Schedule
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger data-testid={`action-assign-tech-${job.id}`}>
-                                      <UserCheck className="mr-2 h-4 w-4" />
-                                      Assign Tech
-                                    </DropdownMenuSubTrigger>
-                                    <DropdownMenuSubContent>
-                                      <DropdownMenuItem
-                                        onClick={() => assignTechMutation.mutate({ jobId: job.id, techId: null })}
-                                        data-testid={`assign-tech-unassigned-${job.id}`}
-                                      >
-                                        Unassigned
-                                      </DropdownMenuItem>
-                                      {technicians.map((tech) => (
-                                        <DropdownMenuItem
-                                          key={tech.id}
-                                          onClick={() => assignTechMutation.mutate({ jobId: job.id, techId: tech.id })}
-                                          data-testid={`assign-tech-${tech.id}-${job.id}`}
-                                        >
-                                          {tech.name}
-                                        </DropdownMenuItem>
-                                      ))}
-                                    </DropdownMenuSubContent>
-                                  </DropdownMenuSub>
-                                  <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger data-testid={`action-change-status-${job.id}`}>
-                                      Change Status
-                                    </DropdownMenuSubTrigger>
-                                    <DropdownMenuSubContent>
-                                      {["new", "scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"].map((status) => (
-                                        <DropdownMenuItem
-                                          key={status}
-                                          onClick={() => updateStatusMutation.mutate({ jobId: job.id, status })}
-                                          disabled={job.status === status}
-                                          data-testid={`status-${status}-${job.id}`}
-                                        >
-                                          <Badge 
-                                            variant="outline" 
-                                            className={`${statusColors[status]?.bg} ${statusColors[status]?.text} ${statusColors[status]?.border} mr-2`}
-                                          >
-                                            {statusLabels[status]}
-                                          </Badge>
-                                        </DropdownMenuItem>
-                                      ))}
-                                    </DropdownMenuSubContent>
-                                  </DropdownMenuSub>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      navigate(`/crm/jobs/${job.id}`);
+                                      setJobToDelete(job);
+                                      setDeleteConfirmOpen(true);
                                     }}
-                                    data-testid={`action-open-job-${job.id}`}
+                                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                    data-testid={`action-delete-${job.id}`}
                                   >
-                                    <ExternalLink className="mr-2 h-4 w-4" />
-                                    Open Job
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete Job
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -1378,6 +1367,33 @@ export default function CrmJobs() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent data-testid="dialog-delete-job">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this job? This action cannot be undone.
+              All associated work orders, invoices, and quotes will also be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => setJobToDelete(null)}
+              data-testid="button-cancel-delete"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteJob}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-confirm-delete"
+            >
+              {deleteJobMutation.isPending ? "Deleting..." : "Delete Job"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </CrmLayout>
   );
 }
