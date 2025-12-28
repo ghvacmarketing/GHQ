@@ -345,7 +345,7 @@ export default function CrmJobDetail() {
         visitType: workOrderForm.visitType,
         scheduledStart: scheduledStart?.toISOString(),
         scheduledEnd: scheduledEnd?.toISOString(),
-        assignedTechId: workOrderForm.assignedTechId || null,
+        assignedTechId: workOrderForm.assignedTechId && workOrderForm.assignedTechId !== "unassigned" ? workOrderForm.assignedTechId : null,
         status: "scheduled",
       });
       return res.json();

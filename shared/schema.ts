@@ -881,7 +881,7 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   jobId: varchar("job_id").notNull().references(() => crmJobs.id, { onDelete: "cascade" }),
   workOrderNumber: integer("work_order_number").notNull().default(1),
   assignedTechId: varchar("assigned_tech_id").references(() => crmUsers.id),
-  visitType: text("visit_type").$type<WorkOrderVisitType>().default("initial"),
+  visitType: text("visit_type").$type<WorkOrderVisitType>().default("SERVICE"),
   scheduledStart: timestamp("scheduled_start"),
   scheduledEnd: timestamp("scheduled_end"),
   status: text("status").$type<WorkOrderStatus>().notNull().default("scheduled"),
