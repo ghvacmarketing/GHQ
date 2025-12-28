@@ -1,7 +1,7 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, or, and, ilike, sql, notInArray, desc } from "drizzle-orm";
+import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc } from "drizzle-orm";
 
 export interface IStorage {
   // Quote operations
@@ -203,6 +203,29 @@ export interface IStorage {
   upsertCallDaily(date: string, inboundCalls: number): Promise<void>;
   upsertWeatherDaily(date: string, avgTemp: number, maxTemp: number, minTemp: number): Promise<void>;
   getWeatherImpactData(startDate: string, endDate: string): Promise<{date: string, calls: number, hotIndex: number, coldIndex: number, avgTempF: number}[]>;
+
+  // CRM WorkOrder operations
+  createWorkOrder(data: InsertCrmWorkOrder): Promise<CrmWorkOrder>;
+  getWorkOrder(id: string): Promise<CrmWorkOrder | undefined>;
+  getWorkOrdersByJobId(jobId: string): Promise<CrmWorkOrder[]>;
+  getWorkOrdersByDateRange(startDate: Date, endDate: Date): Promise<CrmWorkOrder[]>;
+  getWorkOrdersByTechId(techId: string, date?: Date): Promise<CrmWorkOrder[]>;
+  updateWorkOrder(id: string, data: Partial<InsertCrmWorkOrder>): Promise<CrmWorkOrder | undefined>;
+  deleteWorkOrder(id: string): Promise<boolean>;
+
+  // CRM Invoice operations
+  createInvoice(data: InsertCrmInvoice): Promise<CrmInvoice>;
+  getInvoice(id: string): Promise<CrmInvoice | undefined>;
+  getInvoices(filters?: { jobId?: string; customerId?: string; status?: string; workOrderId?: string }): Promise<CrmInvoice[]>;
+  getInvoiceWithLineItems(id: string): Promise<{ invoice: CrmInvoice; lineItems: CrmInvoiceLineItem[] } | undefined>;
+  updateInvoice(id: string, data: Partial<InsertCrmInvoice>): Promise<CrmInvoice | undefined>;
+  deleteInvoice(id: string): Promise<boolean>;
+
+  // CRM Invoice Line Item operations
+  createInvoiceLineItem(data: InsertCrmInvoiceLineItem): Promise<CrmInvoiceLineItem>;
+  getInvoiceLineItems(invoiceId: string): Promise<CrmInvoiceLineItem[]>;
+  updateInvoiceLineItem(id: string, data: Partial<InsertCrmInvoiceLineItem>): Promise<CrmInvoiceLineItem | undefined>;
+  deleteInvoiceLineItem(id: string): Promise<boolean>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -1490,6 +1513,172 @@ export class DatabaseStorage implements IStorage {
       coldIndex: Number(row.cold_index),
       avgTempF: Number(row.avg_temp_f),
     }));
+  }
+
+  // CRM WorkOrder operations
+  async createWorkOrder(data: InsertCrmWorkOrder): Promise<CrmWorkOrder> {
+    const [workOrder] = await db
+      .insert(crmWorkOrders)
+      .values(data as typeof crmWorkOrders.$inferInsert)
+      .returning();
+    return workOrder;
+  }
+
+  async getWorkOrder(id: string): Promise<CrmWorkOrder | undefined> {
+    const [workOrder] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, id));
+    return workOrder || undefined;
+  }
+
+  async getWorkOrdersByJobId(jobId: string): Promise<CrmWorkOrder[]> {
+    return await db
+      .select()
+      .from(crmWorkOrders)
+      .where(eq(crmWorkOrders.jobId, jobId))
+      .orderBy(asc(crmWorkOrders.workOrderNumber));
+  }
+
+  async getWorkOrdersByDateRange(startDate: Date, endDate: Date): Promise<CrmWorkOrder[]> {
+    return await db
+      .select()
+      .from(crmWorkOrders)
+      .where(
+        and(
+          gte(crmWorkOrders.scheduledStart, startDate),
+          lte(crmWorkOrders.scheduledStart, endDate)
+        )
+      )
+      .orderBy(asc(crmWorkOrders.scheduledStart));
+  }
+
+  async getWorkOrdersByTechId(techId: string, date?: Date): Promise<CrmWorkOrder[]> {
+    if (date) {
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      return await db
+        .select()
+        .from(crmWorkOrders)
+        .where(
+          and(
+            eq(crmWorkOrders.assignedTechId, techId),
+            gte(crmWorkOrders.scheduledStart, startOfDay),
+            lte(crmWorkOrders.scheduledStart, endOfDay)
+          )
+        )
+        .orderBy(asc(crmWorkOrders.scheduledStart));
+    }
+    
+    return await db
+      .select()
+      .from(crmWorkOrders)
+      .where(eq(crmWorkOrders.assignedTechId, techId))
+      .orderBy(asc(crmWorkOrders.scheduledStart));
+  }
+
+  async updateWorkOrder(id: string, data: Partial<InsertCrmWorkOrder>): Promise<CrmWorkOrder | undefined> {
+    const [workOrder] = await db
+      .update(crmWorkOrders)
+      .set({ ...data, updatedAt: new Date() } as Partial<typeof crmWorkOrders.$inferInsert>)
+      .where(eq(crmWorkOrders.id, id))
+      .returning();
+    return workOrder || undefined;
+  }
+
+  async deleteWorkOrder(id: string): Promise<boolean> {
+    const result = await db.delete(crmWorkOrders).where(eq(crmWorkOrders.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // CRM Invoice operations
+  async createInvoice(data: InsertCrmInvoice): Promise<CrmInvoice> {
+    const [invoice] = await db
+      .insert(crmInvoices)
+      .values(data)
+      .returning();
+    return invoice;
+  }
+
+  async getInvoice(id: string): Promise<CrmInvoice | undefined> {
+    const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, id));
+    return invoice || undefined;
+  }
+
+  async getInvoices(filters?: { jobId?: string; customerId?: string; status?: string; workOrderId?: string }): Promise<CrmInvoice[]> {
+    const conditions: ReturnType<typeof eq>[] = [];
+    
+    if (filters?.jobId) {
+      conditions.push(eq(crmInvoices.jobId, filters.jobId));
+    }
+    if (filters?.customerId) {
+      conditions.push(eq(crmInvoices.customerId, filters.customerId));
+    }
+    if (filters?.status) {
+      conditions.push(eq(crmInvoices.status, filters.status as any));
+    }
+    if (filters?.workOrderId) {
+      conditions.push(eq(crmInvoices.workOrderId, filters.workOrderId));
+    }
+    
+    if (conditions.length > 0) {
+      return await db.select().from(crmInvoices).where(and(...conditions)).orderBy(desc(crmInvoices.createdAt));
+    }
+    
+    return await db.select().from(crmInvoices).orderBy(desc(crmInvoices.createdAt));
+  }
+
+  async getInvoiceWithLineItems(id: string): Promise<{ invoice: CrmInvoice; lineItems: CrmInvoiceLineItem[] } | undefined> {
+    const invoice = await this.getInvoice(id);
+    if (!invoice) return undefined;
+    
+    const lineItems = await this.getInvoiceLineItems(id);
+    return { invoice, lineItems };
+  }
+
+  async updateInvoice(id: string, data: Partial<InsertCrmInvoice>): Promise<CrmInvoice | undefined> {
+    const [invoice] = await db
+      .update(crmInvoices)
+      .set({ ...data, updatedAt: new Date() } as Partial<typeof crmInvoices.$inferInsert>)
+      .where(eq(crmInvoices.id, id))
+      .returning();
+    return invoice || undefined;
+  }
+
+  async deleteInvoice(id: string): Promise<boolean> {
+    const result = await db.delete(crmInvoices).where(eq(crmInvoices.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // CRM Invoice Line Item operations
+  async createInvoiceLineItem(data: InsertCrmInvoiceLineItem): Promise<CrmInvoiceLineItem> {
+    const [lineItem] = await db
+      .insert(crmInvoiceLineItems)
+      .values(data)
+      .returning();
+    return lineItem;
+  }
+
+  async getInvoiceLineItems(invoiceId: string): Promise<CrmInvoiceLineItem[]> {
+    return await db
+      .select()
+      .from(crmInvoiceLineItems)
+      .where(eq(crmInvoiceLineItems.invoiceId, invoiceId))
+      .orderBy(asc(crmInvoiceLineItems.sortOrder));
+  }
+
+  async updateInvoiceLineItem(id: string, data: Partial<InsertCrmInvoiceLineItem>): Promise<CrmInvoiceLineItem | undefined> {
+    const [lineItem] = await db
+      .update(crmInvoiceLineItems)
+      .set(data)
+      .where(eq(crmInvoiceLineItems.id, id))
+      .returning();
+    return lineItem || undefined;
+  }
+
+  async deleteInvoiceLineItem(id: string): Promise<boolean> {
+    const result = await db.delete(crmInvoiceLineItems).where(eq(crmInvoiceLineItems.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   // Initialize default data if needed

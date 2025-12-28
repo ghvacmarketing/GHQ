@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -7061,6 +7061,558 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching account:", error);
       return res.status(500).json({ message: "Failed to fetch account" });
+    }
+  });
+
+  // ============================================
+  // CRM WORK ORDER ROUTES
+  // ============================================
+
+  // GET /api/crm/work-orders - List work orders with optional filters
+  app.get("/api/crm/work-orders", requireCrmAuth, async (req, res) => {
+    try {
+      const { jobId, techId, date, status } = req.query;
+
+      let workOrders: CrmWorkOrder[] = [];
+
+      if (jobId) {
+        workOrders = await storage.getWorkOrdersByJobId(jobId as string);
+      } else if (techId && date) {
+        const dateObj = new Date(date as string);
+        workOrders = await storage.getWorkOrdersByTechId(techId as string, dateObj);
+      } else if (techId) {
+        workOrders = await storage.getWorkOrdersByTechId(techId as string);
+      } else if (date) {
+        const dateObj = new Date(date as string);
+        const startOfDay = new Date(dateObj);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(dateObj);
+        endOfDay.setHours(23, 59, 59, 999);
+        workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);
+      } else {
+        const today = new Date();
+        const startOfDay = new Date(today);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfMonth = new Date(today);
+        endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+        workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfMonth);
+      }
+
+      if (status) {
+        workOrders = workOrders.filter(wo => wo.status === status);
+      }
+
+      return res.json(workOrders);
+    } catch (error) {
+      console.error("Error fetching work orders:", error);
+      return res.status(500).json({ message: "Failed to fetch work orders" });
+    }
+  });
+
+  // GET /api/crm/work-orders/:id - Get single work order with job details
+  app.get("/api/crm/work-orders/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const workOrder = await storage.getWorkOrder(req.params.id);
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+
+      const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, workOrder.jobId));
+      let customer = null;
+      if (job?.customerId) {
+        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, job.customerId));
+        customer = cust || null;
+      }
+
+      let tech = null;
+      if (workOrder.assignedTechId) {
+        const [t] = await db.select().from(crmUsers).where(eq(crmUsers.id, workOrder.assignedTechId));
+        tech = t || null;
+      }
+
+      return res.json({
+        ...workOrder,
+        job: job || null,
+        customer,
+        tech,
+      });
+    } catch (error) {
+      console.error("Error fetching work order:", error);
+      return res.status(500).json({ message: "Failed to fetch work order" });
+    }
+  });
+
+  // POST /api/crm/work-orders - Create work order
+  app.post("/api/crm/work-orders", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const result = insertCrmWorkOrderSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid work order data", errors: result.error.flatten() });
+      }
+
+      const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, result.data.jobId));
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      const existingWorkOrders = await storage.getWorkOrdersByJobId(result.data.jobId);
+      const workOrderNumber = existingWorkOrders.length + 1;
+
+      const workOrder = await storage.createWorkOrder({
+        ...result.data,
+        workOrderNumber,
+      });
+
+      await logCrmAudit(
+        user.id,
+        "work_order.created",
+        "work_order",
+        workOrder.id,
+        { jobId: workOrder.jobId, workOrderNumber },
+        req.ip
+      );
+
+      return res.status(201).json(workOrder);
+    } catch (error) {
+      console.error("Error creating work order:", error);
+      return res.status(500).json({ message: "Failed to create work order" });
+    }
+  });
+
+  // PATCH /api/crm/work-orders/:id - Update work order
+  app.patch("/api/crm/work-orders/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const existingWorkOrder = await storage.getWorkOrder(req.params.id);
+      if (!existingWorkOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+
+      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, checklist, partsUsed, startedAt, completedAt } = req.body;
+
+      const updateData: Partial<InsertCrmWorkOrder> = {};
+      if (status !== undefined) updateData.status = status;
+      if (assignedTechId !== undefined) updateData.assignedTechId = assignedTechId;
+      if (scheduledStart !== undefined) updateData.scheduledStart = scheduledStart ? new Date(scheduledStart) : null;
+      if (scheduledEnd !== undefined) updateData.scheduledEnd = scheduledEnd ? new Date(scheduledEnd) : null;
+      if (techNotes !== undefined) updateData.techNotes = techNotes;
+      if (checklist !== undefined) updateData.checklist = checklist;
+      if (partsUsed !== undefined) updateData.partsUsed = partsUsed;
+      if (startedAt !== undefined) updateData.startedAt = startedAt ? new Date(startedAt) : null;
+      if (completedAt !== undefined) updateData.completedAt = completedAt ? new Date(completedAt) : null;
+
+      const workOrder = await storage.updateWorkOrder(req.params.id, updateData);
+
+      await logCrmAudit(
+        user.id,
+        "work_order.updated",
+        "work_order",
+        req.params.id,
+        { updates: Object.keys(updateData) },
+        req.ip
+      );
+
+      return res.json(workOrder);
+    } catch (error) {
+      console.error("Error updating work order:", error);
+      return res.status(500).json({ message: "Failed to update work order" });
+    }
+  });
+
+  // DELETE /api/crm/work-orders/:id - Delete work order
+  app.delete("/api/crm/work-orders/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const existingWorkOrder = await storage.getWorkOrder(req.params.id);
+      if (!existingWorkOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+
+      const deleted = await storage.deleteWorkOrder(req.params.id);
+      if (!deleted) {
+        return res.status(500).json({ message: "Failed to delete work order" });
+      }
+
+      await logCrmAudit(
+        user.id,
+        "work_order.deleted",
+        "work_order",
+        req.params.id,
+        { jobId: existingWorkOrder.jobId },
+        req.ip
+      );
+
+      return res.json({ message: "Work order deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting work order:", error);
+      return res.status(500).json({ message: "Failed to delete work order" });
+    }
+  });
+
+  // GET /api/crm/dispatch/work-orders - Get work orders for dispatch board
+  app.get("/api/crm/dispatch/work-orders", requireCrmAuth, async (req, res) => {
+    try {
+      const dateParam = req.query.date as string;
+      const date = dateParam ? new Date(dateParam) : new Date();
+
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);
+
+      const enrichedWorkOrders = await Promise.all(
+        workOrders.map(async (wo) => {
+          const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, wo.jobId));
+
+          let customer = null;
+          if (job?.customerId) {
+            const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, job.customerId));
+            customer = cust || null;
+          }
+
+          let tech = null;
+          if (wo.assignedTechId) {
+            const [t] = await db.select().from(crmUsers).where(eq(crmUsers.id, wo.assignedTechId));
+            tech = t || null;
+          }
+
+          return {
+            ...wo,
+            job: job || null,
+            customer,
+            tech,
+          };
+        })
+      );
+
+      return res.json(enrichedWorkOrders);
+    } catch (error) {
+      console.error("Error fetching dispatch work orders:", error);
+      return res.status(500).json({ message: "Failed to fetch dispatch work orders" });
+    }
+  });
+
+  // ============================================
+  // CRM INVOICE ROUTES
+  // ============================================
+
+  // GET /api/crm/invoices - List invoices with filters
+  app.get("/api/crm/invoices", requireCrmAuth, async (req, res) => {
+    try {
+      const { jobId, customerId, status, workOrderId } = req.query;
+      
+      const filters: { jobId?: string; customerId?: string; status?: string; workOrderId?: string } = {};
+      if (jobId) filters.jobId = jobId as string;
+      if (customerId) filters.customerId = customerId as string;
+      if (status) filters.status = status as string;
+      if (workOrderId) filters.workOrderId = workOrderId as string;
+      
+      const invoices = await storage.getInvoices(Object.keys(filters).length > 0 ? filters : undefined);
+      
+      const enrichedInvoices = await Promise.all(
+        invoices.map(async (invoice) => {
+          let customer = null;
+          if (invoice.customerId) {
+            const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, invoice.customerId));
+            customer = cust || null;
+          }
+          
+          let job = null;
+          if (invoice.jobId) {
+            const [j] = await db.select().from(crmJobs).where(eq(crmJobs.id, invoice.jobId));
+            job = j || null;
+          }
+          
+          return {
+            ...invoice,
+            customer,
+            job,
+          };
+        })
+      );
+      
+      return res.json(enrichedInvoices);
+    } catch (error) {
+      console.error("Error fetching invoices:", error);
+      return res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  // GET /api/crm/invoices/:id - Get invoice with line items
+  app.get("/api/crm/invoices/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const result = await storage.getInvoiceWithLineItems(req.params.id);
+      
+      if (!result) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      let customer = null;
+      if (result.invoice.customerId) {
+        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, result.invoice.customerId));
+        customer = cust || null;
+      }
+      
+      let job = null;
+      if (result.invoice.jobId) {
+        const [j] = await db.select().from(crmJobs).where(eq(crmJobs.id, result.invoice.jobId));
+        job = j || null;
+      }
+      
+      return res.json({
+        ...result.invoice,
+        lineItems: result.lineItems,
+        customer,
+        job,
+      });
+    } catch (error) {
+      console.error("Error fetching invoice:", error);
+      return res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+
+  // POST /api/crm/invoices - Create invoice with optional line items
+  app.post("/api/crm/invoices", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { lineItems, ...invoiceData } = req.body;
+      
+      const parseResult = insertCrmInvoiceSchema.safeParse(invoiceData);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: parseResult.error.errors 
+        });
+      }
+      
+      const invoice = await storage.createInvoice(parseResult.data);
+      
+      let createdLineItems: CrmInvoiceLineItem[] = [];
+      if (lineItems && Array.isArray(lineItems)) {
+        for (const item of lineItems) {
+          const lineItemData = { ...item, invoiceId: invoice.id };
+          const lineItemParseResult = insertCrmInvoiceLineItemSchema.safeParse(lineItemData);
+          if (lineItemParseResult.success) {
+            const createdItem = await storage.createInvoiceLineItem(lineItemParseResult.data);
+            createdLineItems.push(createdItem);
+          }
+        }
+      }
+      
+      await logCrmAudit(
+        user.id,
+        "invoice.created",
+        "invoice",
+        invoice.id,
+        { invoiceNumber: invoice.invoiceNumber, customerId: invoice.customerId, total: invoice.total },
+        req.ip
+      );
+      
+      return res.status(201).json({ ...invoice, lineItems: createdLineItems });
+    } catch (error) {
+      console.error("Error creating invoice:", error);
+      return res.status(500).json({ message: "Failed to create invoice" });
+    }
+  });
+
+  // PATCH /api/crm/invoices/:id - Update invoice
+  app.patch("/api/crm/invoices/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const existingInvoice = await storage.getInvoice(req.params.id);
+      if (!existingInvoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      const updatedInvoice = await storage.updateInvoice(req.params.id, req.body);
+      
+      await logCrmAudit(
+        user.id,
+        "invoice.updated",
+        "invoice",
+        req.params.id,
+        { changes: req.body },
+        req.ip
+      );
+      
+      return res.json(updatedInvoice);
+    } catch (error) {
+      console.error("Error updating invoice:", error);
+      return res.status(500).json({ message: "Failed to update invoice" });
+    }
+  });
+
+  // DELETE /api/crm/invoices/:id - Delete invoice
+  app.delete("/api/crm/invoices/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const existingInvoice = await storage.getInvoice(req.params.id);
+      if (!existingInvoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      const deleted = await storage.deleteInvoice(req.params.id);
+      if (!deleted) {
+        return res.status(500).json({ message: "Failed to delete invoice" });
+      }
+      
+      await logCrmAudit(
+        user.id,
+        "invoice.deleted",
+        "invoice",
+        req.params.id,
+        { invoiceNumber: existingInvoice.invoiceNumber },
+        req.ip
+      );
+      
+      return res.json({ message: "Invoice deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting invoice:", error);
+      return res.status(500).json({ message: "Failed to delete invoice" });
+    }
+  });
+
+  // POST /api/crm/invoices/:id/line-items - Add line item to invoice
+  app.post("/api/crm/invoices/:id/line-items", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      const lineItemData = { ...req.body, invoiceId: req.params.id };
+      const parseResult = insertCrmInvoiceLineItemSchema.safeParse(lineItemData);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: parseResult.error.errors 
+        });
+      }
+      
+      const lineItem = await storage.createInvoiceLineItem(parseResult.data);
+      
+      await logCrmAudit(
+        user.id,
+        "invoice_line_item.created",
+        "invoice_line_item",
+        lineItem.id,
+        { invoiceId: req.params.id, description: lineItem.description },
+        req.ip
+      );
+      
+      return res.status(201).json(lineItem);
+    } catch (error) {
+      console.error("Error creating invoice line item:", error);
+      return res.status(500).json({ message: "Failed to create invoice line item" });
+    }
+  });
+
+  // PATCH /api/crm/invoices/:id/line-items/:lineItemId - Update line item
+  app.patch("/api/crm/invoices/:id/line-items/:lineItemId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      const lineItems = await storage.getInvoiceLineItems(req.params.id);
+      const existingLineItem = lineItems.find(li => li.id === req.params.lineItemId);
+      if (!existingLineItem) {
+        return res.status(404).json({ message: "Line item not found" });
+      }
+      
+      const updatedLineItem = await storage.updateInvoiceLineItem(req.params.lineItemId, req.body);
+      
+      await logCrmAudit(
+        user.id,
+        "invoice_line_item.updated",
+        "invoice_line_item",
+        req.params.lineItemId,
+        { invoiceId: req.params.id, changes: req.body },
+        req.ip
+      );
+      
+      return res.json(updatedLineItem);
+    } catch (error) {
+      console.error("Error updating invoice line item:", error);
+      return res.status(500).json({ message: "Failed to update invoice line item" });
+    }
+  });
+
+  // DELETE /api/crm/invoices/:id/line-items/:lineItemId - Delete line item
+  app.delete("/api/crm/invoices/:id/line-items/:lineItemId", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      const lineItems = await storage.getInvoiceLineItems(req.params.id);
+      const existingLineItem = lineItems.find(li => li.id === req.params.lineItemId);
+      if (!existingLineItem) {
+        return res.status(404).json({ message: "Line item not found" });
+      }
+      
+      const deleted = await storage.deleteInvoiceLineItem(req.params.lineItemId);
+      if (!deleted) {
+        return res.status(500).json({ message: "Failed to delete line item" });
+      }
+      
+      await logCrmAudit(
+        user.id,
+        "invoice_line_item.deleted",
+        "invoice_line_item",
+        req.params.lineItemId,
+        { invoiceId: req.params.id },
+        req.ip
+      );
+      
+      return res.json({ message: "Line item deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting invoice line item:", error);
+      return res.status(500).json({ message: "Failed to delete invoice line item" });
     }
   });
 
