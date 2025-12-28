@@ -58,6 +58,7 @@ import {
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format, subDays, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
 import type { CrmUser, CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 
 type QuotesResponse = {
@@ -395,6 +396,12 @@ export default function CrmQuotes() {
     e.preventDefault();
     if (!createForm.customerName.trim()) {
       toast({ title: "Customer name is required", variant: "destructive" });
+      return;
+    }
+    const hasPhoneError = createForm.customerPhone && !validatePhone(createForm.customerPhone);
+    const hasEmailError = createForm.customerEmail && !validateEmail(createForm.customerEmail);
+    if (hasPhoneError || hasEmailError) {
+      toast({ title: "Please fix validation errors", variant: "destructive" });
       return;
     }
     createQuoteMutation.mutate(createForm);
@@ -863,7 +870,19 @@ export default function CrmQuotes() {
       </Sheet>
 
       {/* Create Quote Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+      <Dialog open={showCreateDialog} onOpenChange={(open) => {
+        setShowCreateDialog(open);
+        if (!open) {
+          setCreateForm({
+            customerName: "",
+            customerEmail: "",
+            customerPhone: "",
+            serviceAddress: "",
+            title: "",
+            description: "",
+          });
+        }
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Create New Quote</DialogTitle>
@@ -889,20 +908,33 @@ export default function CrmQuotes() {
                   id="customerEmail"
                   type="email"
                   value={createForm.customerEmail}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, customerEmail: e.target.value }))}
+                  onChange={(e) => {
+                    setCreateForm(prev => ({ ...prev, customerEmail: e.target.value }));
+                  }}
                   placeholder="email@example.com"
+                  className={createForm.customerEmail && !validateEmail(createForm.customerEmail) ? "border-red-500" : ""}
                   data-testid="input-customer-email"
                 />
+                {createForm.customerEmail && !validateEmail(createForm.customerEmail) && (
+                  <p className="text-sm text-red-500">Please enter a valid email</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customerPhone">Phone</Label>
                 <Input
                   id="customerPhone"
                   value={createForm.customerPhone}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                  onChange={(e) => {
+                    const formatted = formatPhoneNumber(e.target.value);
+                    setCreateForm(prev => ({ ...prev, customerPhone: formatted }));
+                  }}
                   placeholder="(555) 123-4567"
+                  className={createForm.customerPhone && !validatePhone(createForm.customerPhone) ? "border-red-500" : ""}
                   data-testid="input-customer-phone"
                 />
+                {createForm.customerPhone && !validatePhone(createForm.customerPhone) && (
+                  <p className="text-sm text-red-500">Please enter a 10-digit phone number</p>
+                )}
               </div>
             </div>
             <div className="space-y-2">

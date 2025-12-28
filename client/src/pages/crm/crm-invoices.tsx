@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
+import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
 import type { CrmUser, CrmCustomer, CrmJob, CrmInvoice, CrmInvoiceLineItem, CrmInvoiceStatus, CrmPayment } from "@shared/schema";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -350,6 +351,12 @@ export default function CrmInvoices() {
     e.preventDefault();
     if (!createForm.customerName.trim()) {
       toast({ title: "Customer name is required", variant: "destructive" });
+      return;
+    }
+    const hasPhoneError = createForm.customerPhone && !validatePhone(createForm.customerPhone);
+    const hasEmailError = createForm.customerEmail && !validateEmail(createForm.customerEmail);
+    if (hasPhoneError || hasEmailError) {
+      toast({ title: "Please fix validation errors", variant: "destructive" });
       return;
     }
     createInvoiceMutation.mutate(createForm);
@@ -857,7 +864,20 @@ export default function CrmInvoices() {
       </Dialog>
 
       {/* Create Invoice Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+      <Dialog open={showCreateDialog} onOpenChange={(open) => {
+        setShowCreateDialog(open);
+        if (!open) {
+          setCreateForm({
+            customerName: "",
+            customerEmail: "",
+            customerPhone: "",
+            serviceAddress: "",
+            description: "",
+            subtotal: "",
+            taxAmount: "",
+          });
+        }
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Create New Invoice</DialogTitle>
@@ -883,20 +903,33 @@ export default function CrmInvoices() {
                   id="customerEmail"
                   type="email"
                   value={createForm.customerEmail}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, customerEmail: e.target.value }))}
+                  onChange={(e) => {
+                    setCreateForm(prev => ({ ...prev, customerEmail: e.target.value }));
+                  }}
                   placeholder="email@example.com"
+                  className={createForm.customerEmail && !validateEmail(createForm.customerEmail) ? "border-red-500" : ""}
                   data-testid="input-create-customer-email"
                 />
+                {createForm.customerEmail && !validateEmail(createForm.customerEmail) && (
+                  <p className="text-sm text-red-500">Please enter a valid email</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customerPhone">Phone</Label>
                 <Input
                   id="customerPhone"
                   value={createForm.customerPhone}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                  onChange={(e) => {
+                    const formatted = formatPhoneNumber(e.target.value);
+                    setCreateForm(prev => ({ ...prev, customerPhone: formatted }));
+                  }}
                   placeholder="(555) 123-4567"
+                  className={createForm.customerPhone && !validatePhone(createForm.customerPhone) ? "border-red-500" : ""}
                   data-testid="input-create-customer-phone"
                 />
+                {createForm.customerPhone && !validatePhone(createForm.customerPhone) && (
+                  <p className="text-sm text-red-500">Please enter a 10-digit phone number</p>
+                )}
               </div>
             </div>
             <div className="space-y-2">
