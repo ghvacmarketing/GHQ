@@ -499,10 +499,11 @@ export default function CrmJobDetail() {
                 >
                   {job.jobType} for {job.customerName}
                 </h1>
-                <p className="text-sm text-slate-500 mt-1" data-testid="text-job-subtitle">
-                  {job.customerName}
-                  {propertyAddress && ` • ${propertyAddress}`}
-                </p>
+                {propertyAddress && (
+                  <p className="text-sm text-slate-500 mt-1" data-testid="text-job-subtitle">
+                    {propertyAddress}
+                  </p>
+                )}
               </div>
 
             </div>
@@ -878,25 +879,6 @@ export default function CrmJobDetail() {
             <DialogTitle>Create Work Order</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Visit Type</Label>
-              <Select
-                value={workOrderForm.visitType}
-                onValueChange={(v) => setWorkOrderForm({ ...workOrderForm, visitType: v as WorkOrderVisitType })}
-              >
-                <SelectTrigger data-testid="select-visit-type">
-                  <SelectValue placeholder="Select visit type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {workOrderVisitTypeEnum.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {visitTypeLabels[type]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <Label>Scheduled Date *</Label>
               <Input

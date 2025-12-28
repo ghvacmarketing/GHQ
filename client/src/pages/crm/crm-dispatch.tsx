@@ -896,7 +896,7 @@ export default function CrmDispatch() {
             <PopoverContent className="w-[340px] p-0" align="end">
               <div className="p-4 space-y-4">
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Visit Type (Background)</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Job Type (Background)</p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 rounded bg-sky-100 border border-sky-200" />
