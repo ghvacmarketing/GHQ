@@ -27,6 +27,7 @@ import CrmDashboard from "@/pages/crm/crm-dashboard";
 import CrmDispatch from "@/pages/crm/crm-dispatch";
 import CrmCustomers from "@/pages/crm/crm-customers";
 import CrmCustomerDetail from "@/pages/crm/crm-customer-detail";
+import CrmAccountCreate from "@/pages/crm/crm-account-create";
 import CrmJobs from "@/pages/crm/crm-jobs";
 import CrmJobDetail from "@/pages/crm/crm-job-detail";
 import NotFound from "@/pages/not-found";
@@ -73,6 +74,7 @@ function Router() {
       <Route path="/crm/dispatch" component={CrmDispatch} />
       <Route path="/crm/jobs/:id" component={CrmJobDetail} />
       <Route path="/crm/jobs" component={CrmJobs} />
+      <Route path="/crm/accounts/new" component={CrmAccountCreate} />
       <Route path="/crm/customers/:id" component={CrmCustomerDetail} />
       <Route path="/crm/customers" component={CrmCustomers} />
       <Route path="/crm" component={CrmDashboard} />

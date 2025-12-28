@@ -1,0 +1,1291 @@
+import { useEffect, useState, useMemo } from "react";
+import { useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Separator } from "@/components/ui/separator";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Building2,
+  Home,
+  Users,
+  Check,
+  CalendarIcon,
+  Search,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
+import { CrmLayout } from "@/components/crm/crm-layout";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import type { CrmUser, AccountType, AccountStatus, LeadSource, CrmAccount } from "@shared/schema";
+
+const ACCOUNT_TYPES: { value: AccountType; label: string; description: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: "RESIDENTIAL", label: "Residential", description: "Individual homeowners and renters", icon: Home },
+  { value: "PROPERTY_MANAGER", label: "Property Manager", description: "Property management companies with multiple sites", icon: Users },
+  { value: "COMMERCIAL", label: "Commercial", description: "Business and commercial properties", icon: Building2 },
+];
+
+const ACCOUNT_STATUSES: { value: AccountStatus; label: string }[] = [
+  { value: "PROSPECT", label: "Prospect" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "INACTIVE", label: "Inactive" },
+  { value: "DO_NOT_SERVICE", label: "Do Not Service" },
+];
+
+const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
+  { value: "WEBSITE", label: "Website" },
+  { value: "REFERRAL", label: "Referral" },
+  { value: "GOOGLE", label: "Google" },
+  { value: "FACEBOOK", label: "Facebook" },
+  { value: "YELP", label: "Yelp" },
+  { value: "HOME_ADVISOR", label: "HomeAdvisor" },
+  { value: "ANGI", label: "Angi" },
+  { value: "THUMBTACK", label: "Thumbtack" },
+  { value: "WALK_IN", label: "Walk-In" },
+  { value: "PHONE", label: "Phone" },
+  { value: "REPEAT_CUSTOMER", label: "Repeat Customer" },
+  { value: "FIELDEDGE", label: "FieldEdge" },
+  { value: "OTHER", label: "Other" },
+];
+
+const MEMBERSHIP_PLANS = ["None", "Basic", "Silver", "Gold", "Platinum"];
+const SERVICE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const TIME_SLOTS = ["Morning (8AM-12PM)", "Afternoon (12PM-4PM)", "Evening (4PM-7PM)", "Flexible"];
+const BILLING_METHODS = ["Invoice", "Credit Card on File", "Check", "ACH"];
+
+type FormStep = 1 | 2 | 3 | 4 | 5;
+
+interface FormData {
+  accountType: AccountType;
+  status: AccountStatus;
+  firstName: string;
+  lastName: string;
+  companyName: string;
+  displayName: string;
+  parentAccountId: string;
+  customerSince: Date;
+  leadSource: LeadSource | "";
+  noCallRecording: boolean;
+  pinnedNote: string;
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  zip: string;
+  accessInstructions: string;
+  gateCode: string;
+  membershipPlan: string;
+  preferredServiceDay: string;
+  preferredTimeSlot: string;
+  specialInstructions: string;
+  managementCompanyName: string;
+  portfolioSize: string;
+  requiresApprovalBefore: boolean;
+  approvalThreshold: string;
+  defaultBillingMethod: string;
+  pmNetTerms: string;
+  tenantName: string;
+  tenantPhone: string;
+  tenantEmail: string;
+  taxExempt: boolean;
+  taxExemptNumber: string;
+  requiresPO: boolean;
+  poPrefix: string;
+  commercialNetTerms: string;
+  billingAddressDifferent: boolean;
+  billingAddress: string;
+  billingCity: string;
+  billingState: string;
+  billingZip: string;
+  w9OnFile: boolean;
+}
+
+const initialFormData: FormData = {
+  accountType: "RESIDENTIAL",
+  status: "PROSPECT",
+  firstName: "",
+  lastName: "",
+  companyName: "",
+  displayName: "",
+  parentAccountId: "",
+  customerSince: new Date(),
+  leadSource: "",
+  noCallRecording: false,
+  pinnedNote: "",
+  address1: "",
+  address2: "",
+  city: "",
+  state: "",
+  zip: "",
+  accessInstructions: "",
+  gateCode: "",
+  membershipPlan: "None",
+  preferredServiceDay: "",
+  preferredTimeSlot: "",
+  specialInstructions: "",
+  managementCompanyName: "",
+  portfolioSize: "",
+  requiresApprovalBefore: false,
+  approvalThreshold: "",
+  defaultBillingMethod: "",
+  pmNetTerms: "30",
+  tenantName: "",
+  tenantPhone: "",
+  tenantEmail: "",
+  taxExempt: false,
+  taxExemptNumber: "",
+  requiresPO: false,
+  poPrefix: "",
+  commercialNetTerms: "30",
+  billingAddressDifferent: false,
+  billingAddress: "",
+  billingCity: "",
+  billingState: "",
+  billingZip: "",
+  w9OnFile: false,
+};
+
+export default function CrmAccountCreate() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [currentStep, setCurrentStep] = useState<FormStep>(1);
+  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [parentSearchQuery, setParentSearchQuery] = useState("");
+  const [showParentSearch, setShowParentSearch] = useState(false);
+
+  const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
+    queryKey: ["/api/crm/auth/me"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
+  useEffect(() => {
+    if (!authLoading && !currentUser) {
+      navigate("/crm/login");
+    }
+  }, [authLoading, currentUser, navigate]);
+
+  const { data: accountsForParentSearch } = useQuery<{ accounts: CrmAccount[] }>({
+    queryKey: ["/api/crm/accounts", "search", parentSearchQuery],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/accounts?search=${encodeURIComponent(parentSearchQuery)}&limit=10`, { credentials: "include" });
+      if (!res.ok) return { accounts: [] };
+      return res.json();
+    },
+    enabled: !!currentUser && parentSearchQuery.length > 1,
+  });
+
+  const generateDisplayName = useMemo(() => {
+    const { firstName, lastName, companyName } = formData;
+    if (companyName) {
+      return companyName;
+    }
+    const parts = [firstName, lastName].filter(Boolean);
+    return parts.join(" ");
+  }, [formData.firstName, formData.lastName, formData.companyName]);
+
+  useEffect(() => {
+    if (!formData.displayName || formData.displayName === generateDisplayName) {
+      setFormData(prev => ({ ...prev, displayName: generateDisplayName }));
+    }
+  }, [generateDisplayName]);
+
+  const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const createAccountMutation = useMutation({
+    mutationFn: async () => {
+      const payload: any = {
+        account: {
+          displayName: formData.displayName,
+          companyName: formData.companyName || null,
+          accountType: formData.accountType,
+          accountStatus: formData.status,
+          leadSource: formData.leadSource || null,
+          parentAccountId: formData.parentAccountId || null,
+          customerSince: formData.customerSince.toISOString().split("T")[0],
+          pinnedNote: formData.pinnedNote || null,
+          noCallRecording: formData.noCallRecording,
+        },
+        sites: [{
+          address1: formData.address1,
+          address2: formData.address2 || null,
+          city: formData.city,
+          state: formData.state,
+          zip: formData.zip,
+          isPrimary: true,
+          accessInstructions: formData.accessInstructions || null,
+          gateCode: formData.gateCode || null,
+          tenantName: formData.accountType === "PROPERTY_MANAGER" ? (formData.tenantName || null) : null,
+          tenantPhone: formData.accountType === "PROPERTY_MANAGER" ? (formData.tenantPhone || null) : null,
+          tenantEmail: formData.accountType === "PROPERTY_MANAGER" ? (formData.tenantEmail || null) : null,
+        }],
+        contacts: [{
+          firstName: formData.firstName,
+          lastName: formData.lastName || null,
+          contactRole: "PRIMARY",
+          isPrimary: true,
+        }],
+      };
+
+      if (formData.accountType === "RESIDENTIAL") {
+        payload.residentialProfile = {
+          membershipPlan: formData.membershipPlan !== "None" ? formData.membershipPlan : null,
+          preferredServiceDay: formData.preferredServiceDay || null,
+          preferredTimeSlot: formData.preferredTimeSlot || null,
+          specialInstructions: formData.specialInstructions || null,
+        };
+      } else if (formData.accountType === "PROPERTY_MANAGER") {
+        payload.propertyManagerProfile = {
+          managementCompanyName: formData.managementCompanyName || null,
+          portfolioSize: formData.portfolioSize ? parseInt(formData.portfolioSize) : null,
+          requiresApprovalBefore: formData.requiresApprovalBefore,
+          approvalThreshold: formData.requiresApprovalBefore && formData.approvalThreshold ? formData.approvalThreshold : null,
+          defaultBillingMethod: formData.defaultBillingMethod || null,
+          netTerms: parseInt(formData.pmNetTerms) || 30,
+        };
+      } else if (formData.accountType === "COMMERCIAL") {
+        payload.commercialProfile = {
+          taxExempt: formData.taxExempt,
+          taxExemptNumber: formData.taxExempt ? formData.taxExemptNumber : null,
+          requiresPO: formData.requiresPO,
+          poPrefix: formData.requiresPO ? formData.poPrefix : null,
+          netTerms: parseInt(formData.commercialNetTerms) || 30,
+          billingAddress: formData.billingAddressDifferent ? formData.billingAddress : null,
+          billingCity: formData.billingAddressDifferent ? formData.billingCity : null,
+          billingState: formData.billingAddressDifferent ? formData.billingState : null,
+          billingZip: formData.billingAddressDifferent ? formData.billingZip : null,
+          w9OnFile: formData.w9OnFile,
+        };
+      }
+
+      const res = await apiRequest("POST", "/api/crm/accounts", payload);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Account created successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
+      navigate(`/crm/customers`);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to create account",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const validateStep = (step: FormStep): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+
+    switch (step) {
+      case 1:
+        break;
+      case 2:
+        if (!formData.firstName.trim()) errors.push("First name is required");
+        if (!formData.displayName.trim()) errors.push("Display name is required");
+        if ((formData.accountType === "COMMERCIAL" || formData.accountType === "PROPERTY_MANAGER") && !formData.companyName.trim()) {
+          errors.push("Company name is required for commercial and property manager accounts");
+        }
+        break;
+      case 3:
+        if (!formData.address1.trim()) errors.push("Address Line 1 is required");
+        if (!formData.city.trim()) errors.push("City is required");
+        if (!formData.state.trim()) errors.push("State is required");
+        if (!formData.zip.trim()) errors.push("ZIP code is required");
+        break;
+      case 4:
+        break;
+      case 5:
+        const step2Validation = validateStep(2);
+        const step3Validation = validateStep(3);
+        errors.push(...step2Validation.errors, ...step3Validation.errors);
+        break;
+    }
+
+    return { valid: errors.length === 0, errors };
+  };
+
+  const canProceed = (step: FormStep): boolean => {
+    return validateStep(step).valid;
+  };
+
+  const handleNext = () => {
+    if (currentStep < 5 && canProceed(currentStep)) {
+      setCurrentStep((prev) => (prev + 1) as FormStep);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep((prev) => (prev - 1) as FormStep);
+    }
+  };
+
+  const handleSubmit = () => {
+    const validation = validateStep(5);
+    if (validation.valid) {
+      createAccountMutation.mutate();
+    } else {
+      toast({
+        title: "Please fix validation errors",
+        description: validation.errors.join(", "),
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <Skeleton className="h-12 w-64" />
+          <Skeleton className="h-96 w-full rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return null;
+  }
+
+  const steps = [
+    { number: 1, label: "Account Type" },
+    { number: 2, label: "Basic Info" },
+    { number: 3, label: "Location" },
+    { number: 4, label: "Details" },
+    { number: 5, label: "Review" },
+  ];
+
+  return (
+    <CrmLayout currentUser={currentUser}>
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/crm/customers")} data-testid="button-back">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Create New Customer</h1>
+            <p className="text-slate-500 text-sm mt-1">Add a new account to your CRM</p>
+          </div>
+          <Badge className="ml-2 bg-blue-100 text-blue-700 border-blue-200" data-testid="badge-status">
+            {ACCOUNT_STATUSES.find(s => s.value === formData.status)?.label || "PROSPECT"}
+          </Badge>
+        </div>
+
+        <div className="flex items-center justify-between mb-8">
+          {steps.map((step, index) => (
+            <div key={step.number} className="flex items-center">
+              <div
+                className={cn(
+                  "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors",
+                  currentStep === step.number
+                    ? "border-indigo-600 bg-indigo-600 text-white"
+                    : currentStep > step.number
+                    ? "border-green-500 bg-green-500 text-white"
+                    : "border-slate-300 bg-white text-slate-400"
+                )}
+                data-testid={`step-indicator-${step.number}`}
+              >
+                {currentStep > step.number ? <Check className="h-5 w-5" /> : step.number}
+              </div>
+              <span
+                className={cn(
+                  "ml-2 text-sm font-medium hidden sm:block",
+                  currentStep === step.number ? "text-indigo-600" : "text-slate-500"
+                )}
+              >
+                {step.label}
+              </span>
+              {index < steps.length - 1 && (
+                <div
+                  className={cn(
+                    "w-12 lg:w-24 h-0.5 mx-2",
+                    currentStep > step.number ? "bg-green-500" : "bg-slate-200"
+                  )}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+
+        <Card className="bg-white shadow-sm">
+          <CardContent className="p-6">
+            {currentStep === 1 && (
+              <div className="space-y-6">
+                <CardHeader className="px-0 pt-0">
+                  <CardTitle>Select Account Type</CardTitle>
+                  <CardDescription>Choose the type of account you're creating</CardDescription>
+                </CardHeader>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {ACCOUNT_TYPES.map((type) => {
+                    const Icon = type.icon;
+                    const isSelected = formData.accountType === type.value;
+                    return (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => updateField("accountType", type.value)}
+                        className={cn(
+                          "flex flex-col items-center p-6 rounded-lg border-2 transition-all text-left",
+                          isSelected
+                            ? "border-indigo-600 bg-indigo-50"
+                            : "border-slate-200 hover:border-indigo-300 hover:bg-slate-50"
+                        )}
+                        data-testid={`select-type-${type.value.toLowerCase()}`}
+                      >
+                        <div
+                          className={cn(
+                            "p-3 rounded-full mb-3",
+                            isSelected ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"
+                          )}
+                        >
+                          <Icon className="h-6 w-6" />
+                        </div>
+                        <h3 className={cn("font-semibold", isSelected ? "text-indigo-600" : "text-slate-900")}>
+                          {type.label}
+                        </h3>
+                        <p className="text-sm text-slate-500 text-center mt-1">{type.description}</p>
+                        {isSelected && (
+                          <div className="mt-3">
+                            <Check className="h-5 w-5 text-indigo-600" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {currentStep === 2 && (
+              <div className="space-y-6">
+                <CardHeader className="px-0 pt-0">
+                  <CardTitle>Basic Account Information</CardTitle>
+                  <CardDescription>Enter the primary details for this account</CardDescription>
+                </CardHeader>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name *</Label>
+                    <Input
+                      id="firstName"
+                      placeholder="Type Here"
+                      value={formData.firstName}
+                      onChange={(e) => updateField("firstName", e.target.value)}
+                      data-testid="input-first-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      placeholder="Type Here"
+                      value={formData.lastName}
+                      onChange={(e) => updateField("lastName", e.target.value)}
+                      data-testid="input-last-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="companyName">
+                      Company Name {(formData.accountType === "COMMERCIAL" || formData.accountType === "PROPERTY_MANAGER") && "*"}
+                    </Label>
+                    <Input
+                      id="companyName"
+                      placeholder="Type Here"
+                      value={formData.companyName}
+                      onChange={(e) => updateField("companyName", e.target.value)}
+                      data-testid="input-company-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="displayName">Display Name *</Label>
+                    <Input
+                      id="displayName"
+                      placeholder="Type Here"
+                      value={formData.displayName}
+                      onChange={(e) => updateField("displayName", e.target.value)}
+                      data-testid="input-display-name"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label>Parent Account</Label>
+                    <Popover open={showParentSearch} onOpenChange={setShowParentSearch}>
+                      <PopoverTrigger asChild>
+                        <div className="relative">
+                          <Input
+                            placeholder="Type Here"
+                            value={parentSearchQuery}
+                            onChange={(e) => setParentSearchQuery(e.target.value)}
+                            onFocus={() => setShowParentSearch(true)}
+                            data-testid="input-parent-account"
+                          />
+                          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        </div>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0" align="start">
+                        <div className="max-h-60 overflow-auto">
+                          {accountsForParentSearch?.accounts?.map((account) => (
+                            <button
+                              key={account.id}
+                              type="button"
+                              className="w-full text-left px-3 py-2 hover:bg-slate-100 text-sm"
+                              onClick={() => {
+                                updateField("parentAccountId", account.id);
+                                setParentSearchQuery(account.displayName);
+                                setShowParentSearch(false);
+                              }}
+                            >
+                              {account.displayName}
+                            </button>
+                          ))}
+                          {(!accountsForParentSearch?.accounts || accountsForParentSearch.accounts.length === 0) && parentSearchQuery.length > 1 && (
+                            <p className="px-3 py-2 text-sm text-slate-500">No accounts found</p>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Customer Type</Label>
+                    <Badge className="w-full justify-center py-2 bg-slate-100 text-slate-700 border-slate-200" data-testid="badge-customer-type">
+                      {ACCOUNT_TYPES.find(t => t.value === formData.accountType)?.label}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Customer Since</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                          data-testid="button-customer-since"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {format(formData.customerSince, "MM/dd/yyyy")}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={formData.customerSince}
+                          onSelect={(date) => date && updateField("customerSince", date)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Customer Lead Source</Label>
+                    <Select
+                      value={formData.leadSource}
+                      onValueChange={(val) => updateField("leadSource", val as LeadSource)}
+                    >
+                      <SelectTrigger data-testid="select-lead-source">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LEAD_SOURCES.map((source) => (
+                          <SelectItem key={source.value} value={source.value}>{source.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(val) => updateField("status", val as AccountStatus)}
+                    >
+                      <SelectTrigger data-testid="select-status">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ACCOUNT_STATUSES.map((status) => (
+                          <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="noCallRecording"
+                    checked={formData.noCallRecording}
+                    onCheckedChange={(checked) => updateField("noCallRecording", !!checked)}
+                    data-testid="checkbox-no-call-recording"
+                  />
+                  <Label htmlFor="noCallRecording" className="text-sm">No Call Recording</Label>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pinnedNote">Pinned Note</Label>
+                  <Textarea
+                    id="pinnedNote"
+                    placeholder="Type Here"
+                    value={formData.pinnedNote}
+                    onChange={(e) => updateField("pinnedNote", e.target.value)}
+                    rows={3}
+                    data-testid="textarea-pinned-note"
+                  />
+                </div>
+              </div>
+            )}
+
+            {currentStep === 3 && (
+              <div className="space-y-6">
+                <CardHeader className="px-0 pt-0">
+                  <CardTitle>Physical Location Details</CardTitle>
+                  <CardDescription>Enter the primary service location for this account</CardDescription>
+                </CardHeader>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="address1">Address Line 1 *</Label>
+                    <Input
+                      id="address1"
+                      placeholder="Type Here"
+                      value={formData.address1}
+                      onChange={(e) => updateField("address1", e.target.value)}
+                      data-testid="input-address1"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="address2">Address Line 2</Label>
+                    <Input
+                      id="address2"
+                      placeholder="Type Here"
+                      value={formData.address2}
+                      onChange={(e) => updateField("address2", e.target.value)}
+                      data-testid="input-address2"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City *</Label>
+                    <Input
+                      id="city"
+                      placeholder="Type Here"
+                      value={formData.city}
+                      onChange={(e) => updateField("city", e.target.value)}
+                      data-testid="input-city"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="state">State/Prov *</Label>
+                    <Input
+                      id="state"
+                      placeholder="Type Here"
+                      value={formData.state}
+                      onChange={(e) => updateField("state", e.target.value)}
+                      data-testid="input-state"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="zip">Zip *</Label>
+                    <Input
+                      id="zip"
+                      placeholder="Type Here"
+                      value={formData.zip}
+                      onChange={(e) => updateField("zip", e.target.value)}
+                      data-testid="input-zip"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="accessInstructions">Access Instructions</Label>
+                    <Textarea
+                      id="accessInstructions"
+                      placeholder="Type Here"
+                      value={formData.accessInstructions}
+                      onChange={(e) => updateField("accessInstructions", e.target.value)}
+                      rows={2}
+                      data-testid="textarea-access-instructions"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gateCode">Gate Code</Label>
+                    <Input
+                      id="gateCode"
+                      placeholder="Type Here"
+                      value={formData.gateCode}
+                      onChange={(e) => updateField("gateCode", e.target.value)}
+                      data-testid="input-gate-code"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 4 && (
+              <div className="space-y-6">
+                <CardHeader className="px-0 pt-0">
+                  <CardTitle>
+                    {formData.accountType === "RESIDENTIAL" && "Residential Details"}
+                    {formData.accountType === "PROPERTY_MANAGER" && "Property Manager Details"}
+                    {formData.accountType === "COMMERCIAL" && "Commercial Details"}
+                  </CardTitle>
+                  <CardDescription>Enter additional details specific to this account type</CardDescription>
+                </CardHeader>
+
+                {formData.accountType === "RESIDENTIAL" && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Membership Plan</Label>
+                        <Select
+                          value={formData.membershipPlan}
+                          onValueChange={(val) => updateField("membershipPlan", val)}
+                        >
+                          <SelectTrigger data-testid="select-membership-plan">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MEMBERSHIP_PLANS.map((plan) => (
+                              <SelectItem key={plan} value={plan}>{plan}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Preferred Service Day</Label>
+                        <Select
+                          value={formData.preferredServiceDay}
+                          onValueChange={(val) => updateField("preferredServiceDay", val)}
+                        >
+                          <SelectTrigger data-testid="select-preferred-day">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SERVICE_DAYS.map((day) => (
+                              <SelectItem key={day} value={day}>{day}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Preferred Time Slot</Label>
+                        <Select
+                          value={formData.preferredTimeSlot}
+                          onValueChange={(val) => updateField("preferredTimeSlot", val)}
+                        >
+                          <SelectTrigger data-testid="select-preferred-time">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIME_SLOTS.map((slot) => (
+                              <SelectItem key={slot} value={slot}>{slot}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="specialInstructions">Special Instructions</Label>
+                      <Textarea
+                        id="specialInstructions"
+                        placeholder="Any special preferences or instructions..."
+                        value={formData.specialInstructions}
+                        onChange={(e) => updateField("specialInstructions", e.target.value)}
+                        rows={3}
+                        data-testid="textarea-special-instructions"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {formData.accountType === "PROPERTY_MANAGER" && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="managementCompanyName">Management Company Name</Label>
+                        <Input
+                          id="managementCompanyName"
+                          placeholder="Type Here"
+                          value={formData.managementCompanyName}
+                          onChange={(e) => updateField("managementCompanyName", e.target.value)}
+                          data-testid="input-management-company"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="portfolioSize">Portfolio Size</Label>
+                        <Input
+                          id="portfolioSize"
+                          type="number"
+                          placeholder="Number of properties"
+                          value={formData.portfolioSize}
+                          onChange={(e) => updateField("portfolioSize", e.target.value)}
+                          data-testid="input-portfolio-size"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="requiresApprovalBefore"
+                        checked={formData.requiresApprovalBefore}
+                        onCheckedChange={(checked) => updateField("requiresApprovalBefore", !!checked)}
+                        data-testid="checkbox-requires-approval"
+                      />
+                      <Label htmlFor="requiresApprovalBefore" className="text-sm">Requires Approval Before Work</Label>
+                    </div>
+                    {formData.requiresApprovalBefore && (
+                      <div className="space-y-2 ml-6">
+                        <Label htmlFor="approvalThreshold">Approval Threshold ($)</Label>
+                        <Input
+                          id="approvalThreshold"
+                          type="number"
+                          placeholder="Dollar amount"
+                          value={formData.approvalThreshold}
+                          onChange={(e) => updateField("approvalThreshold", e.target.value)}
+                          data-testid="input-approval-threshold"
+                        />
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Default Billing Method</Label>
+                        <Select
+                          value={formData.defaultBillingMethod}
+                          onValueChange={(val) => updateField("defaultBillingMethod", val)}
+                        >
+                          <SelectTrigger data-testid="select-billing-method">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {BILLING_METHODS.map((method) => (
+                              <SelectItem key={method} value={method}>{method}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pmNetTerms">Net Terms</Label>
+                        <Input
+                          id="pmNetTerms"
+                          type="number"
+                          value={formData.pmNetTerms}
+                          onChange={(e) => updateField("pmNetTerms", e.target.value)}
+                          data-testid="input-pm-net-terms"
+                        />
+                      </div>
+                    </div>
+                    <Separator />
+                    <h4 className="font-medium text-slate-900">Tenant Information (for this site)</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="tenantName">Tenant Name</Label>
+                        <Input
+                          id="tenantName"
+                          placeholder="Type Here"
+                          value={formData.tenantName}
+                          onChange={(e) => updateField("tenantName", e.target.value)}
+                          data-testid="input-tenant-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="tenantPhone">Tenant Phone</Label>
+                        <Input
+                          id="tenantPhone"
+                          placeholder="Type Here"
+                          value={formData.tenantPhone}
+                          onChange={(e) => updateField("tenantPhone", e.target.value)}
+                          data-testid="input-tenant-phone"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="tenantEmail">Tenant Email</Label>
+                        <Input
+                          id="tenantEmail"
+                          type="email"
+                          placeholder="Type Here"
+                          value={formData.tenantEmail}
+                          onChange={(e) => updateField("tenantEmail", e.target.value)}
+                          data-testid="input-tenant-email"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {formData.accountType === "COMMERCIAL" && (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="taxExempt"
+                        checked={formData.taxExempt}
+                        onCheckedChange={(checked) => updateField("taxExempt", !!checked)}
+                        data-testid="checkbox-tax-exempt"
+                      />
+                      <Label htmlFor="taxExempt" className="text-sm">Tax Exempt</Label>
+                    </div>
+                    {formData.taxExempt && (
+                      <div className="space-y-2 ml-6">
+                        <Label htmlFor="taxExemptNumber">Tax Exempt Number</Label>
+                        <Input
+                          id="taxExemptNumber"
+                          placeholder="Type Here"
+                          value={formData.taxExemptNumber}
+                          onChange={(e) => updateField("taxExemptNumber", e.target.value)}
+                          data-testid="input-tax-exempt-number"
+                        />
+                      </div>
+                    )}
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="requiresPO"
+                        checked={formData.requiresPO}
+                        onCheckedChange={(checked) => updateField("requiresPO", !!checked)}
+                        data-testid="checkbox-requires-po"
+                      />
+                      <Label htmlFor="requiresPO" className="text-sm">Requires PO</Label>
+                    </div>
+                    {formData.requiresPO && (
+                      <div className="space-y-2 ml-6">
+                        <Label htmlFor="poPrefix">PO Prefix</Label>
+                        <Input
+                          id="poPrefix"
+                          placeholder="Type Here"
+                          value={formData.poPrefix}
+                          onChange={(e) => updateField("poPrefix", e.target.value)}
+                          data-testid="input-po-prefix"
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="commercialNetTerms">Net Terms</Label>
+                      <Input
+                        id="commercialNetTerms"
+                        type="number"
+                        value={formData.commercialNetTerms}
+                        onChange={(e) => updateField("commercialNetTerms", e.target.value)}
+                        className="w-48"
+                        data-testid="input-commercial-net-terms"
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="billingAddressDifferent"
+                        checked={formData.billingAddressDifferent}
+                        onCheckedChange={(checked) => updateField("billingAddressDifferent", !!checked)}
+                        data-testid="checkbox-billing-different"
+                      />
+                      <Label htmlFor="billingAddressDifferent" className="text-sm">Billing address different from site</Label>
+                    </div>
+                    {formData.billingAddressDifferent && (
+                      <div className="ml-6 space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="billingAddress">Billing Address</Label>
+                          <Input
+                            id="billingAddress"
+                            placeholder="Type Here"
+                            value={formData.billingAddress}
+                            onChange={(e) => updateField("billingAddress", e.target.value)}
+                            data-testid="input-billing-address"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="billingCity">City</Label>
+                            <Input
+                              id="billingCity"
+                              placeholder="Type Here"
+                              value={formData.billingCity}
+                              onChange={(e) => updateField("billingCity", e.target.value)}
+                              data-testid="input-billing-city"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="billingState">State</Label>
+                            <Input
+                              id="billingState"
+                              placeholder="Type Here"
+                              value={formData.billingState}
+                              onChange={(e) => updateField("billingState", e.target.value)}
+                              data-testid="input-billing-state"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="billingZip">Zip</Label>
+                            <Input
+                              id="billingZip"
+                              placeholder="Type Here"
+                              value={formData.billingZip}
+                              onChange={(e) => updateField("billingZip", e.target.value)}
+                              data-testid="input-billing-zip"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="w9OnFile"
+                        checked={formData.w9OnFile}
+                        onCheckedChange={(checked) => updateField("w9OnFile", !!checked)}
+                        data-testid="checkbox-w9-on-file"
+                      />
+                      <Label htmlFor="w9OnFile" className="text-sm">W9 On File</Label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {currentStep === 5 && (
+              <div className="space-y-6">
+                <CardHeader className="px-0 pt-0">
+                  <CardTitle>Review & Create</CardTitle>
+                  <CardDescription>Review all information before creating the account</CardDescription>
+                </CardHeader>
+
+                {!validateStep(5).valid && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-red-800">Please fix the following errors:</h4>
+                      <ul className="mt-1 text-sm text-red-700 list-disc list-inside">
+                        {validateStep(5).errors.map((error, index) => (
+                          <li key={index}>{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-slate-900 border-b pb-2">Account Information</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Account Type:</span>
+                        <span className="font-medium">{ACCOUNT_TYPES.find(t => t.value === formData.accountType)?.label}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Status:</span>
+                        <Badge className="bg-blue-100 text-blue-700">{formData.status}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Display Name:</span>
+                        <span className="font-medium">{formData.displayName || "—"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">First Name:</span>
+                        <span>{formData.firstName || "—"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Last Name:</span>
+                        <span>{formData.lastName || "—"}</span>
+                      </div>
+                      {formData.companyName && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Company:</span>
+                          <span>{formData.companyName}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Customer Since:</span>
+                        <span>{format(formData.customerSince, "MM/dd/yyyy")}</span>
+                      </div>
+                      {formData.leadSource && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Lead Source:</span>
+                          <span>{LEAD_SOURCES.find(s => s.value === formData.leadSource)?.label}</span>
+                        </div>
+                      )}
+                      {formData.noCallRecording && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">No Call Recording:</span>
+                          <span>Yes</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-slate-900 border-b pb-2">Primary Location</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Address:</span>
+                        <span className="text-right">
+                          {formData.address1 || "—"}
+                          {formData.address2 && <><br />{formData.address2}</>}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">City, State, ZIP:</span>
+                        <span>{[formData.city, formData.state, formData.zip].filter(Boolean).join(", ") || "—"}</span>
+                      </div>
+                      {formData.gateCode && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Gate Code:</span>
+                          <span>{formData.gateCode}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {formData.accountType === "RESIDENTIAL" && (formData.membershipPlan !== "None" || formData.preferredServiceDay || formData.preferredTimeSlot) && (
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-slate-900 border-b pb-2">Residential Details</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      {formData.membershipPlan !== "None" && (
+                        <div>
+                          <span className="text-slate-500 block">Membership:</span>
+                          <span className="font-medium">{formData.membershipPlan}</span>
+                        </div>
+                      )}
+                      {formData.preferredServiceDay && (
+                        <div>
+                          <span className="text-slate-500 block">Preferred Day:</span>
+                          <span className="font-medium">{formData.preferredServiceDay}</span>
+                        </div>
+                      )}
+                      {formData.preferredTimeSlot && (
+                        <div>
+                          <span className="text-slate-500 block">Preferred Time:</span>
+                          <span className="font-medium">{formData.preferredTimeSlot}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {formData.accountType === "PROPERTY_MANAGER" && (
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-slate-900 border-b pb-2">Property Manager Details</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                      {formData.managementCompanyName && (
+                        <div>
+                          <span className="text-slate-500 block">Management Company:</span>
+                          <span className="font-medium">{formData.managementCompanyName}</span>
+                        </div>
+                      )}
+                      {formData.portfolioSize && (
+                        <div>
+                          <span className="text-slate-500 block">Portfolio Size:</span>
+                          <span className="font-medium">{formData.portfolioSize}</span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-slate-500 block">Net Terms:</span>
+                        <span className="font-medium">{formData.pmNetTerms} days</span>
+                      </div>
+                      {formData.requiresApprovalBefore && (
+                        <div>
+                          <span className="text-slate-500 block">Approval Required:</span>
+                          <span className="font-medium">Yes {formData.approvalThreshold && `(over $${formData.approvalThreshold})`}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {formData.accountType === "COMMERCIAL" && (
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-slate-900 border-b pb-2">Commercial Details</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-slate-500 block">Net Terms:</span>
+                        <span className="font-medium">{formData.commercialNetTerms} days</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Tax Exempt:</span>
+                        <span className="font-medium">{formData.taxExempt ? `Yes (${formData.taxExemptNumber || "—"})` : "No"}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Requires PO:</span>
+                        <span className="font-medium">{formData.requiresPO ? `Yes (${formData.poPrefix || "—"})` : "No"}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">W9 On File:</span>
+                        <span className="font-medium">{formData.w9OnFile ? "Yes" : "No"}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {formData.pinnedNote && (
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-slate-900 border-b pb-2">Pinned Note</h3>
+                    <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">{formData.pinnedNote}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-between">
+          <Button
+            variant="outline"
+            onClick={handleBack}
+            disabled={currentStep === 1}
+            data-testid="button-back-step"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div className="flex gap-2">
+            {currentStep < 5 ? (
+              <Button onClick={handleNext} disabled={!canProceed(currentStep)} data-testid="button-next-step">
+                Next
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSubmit}
+                disabled={!validateStep(5).valid || createAccountMutation.isPending}
+                data-testid="button-create-account"
+              >
+                {createAccountMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Account"
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </CrmLayout>
+  );
+}
