@@ -536,7 +536,7 @@ export default function CrmJobDetail() {
                   data-testid="button-schedule-visit"
                 >
                   <CalendarPlus className="h-4 w-4 mr-2" />
-                  Schedule Visit
+                  Create Work Order
                 </Button>
                 <Button
                   variant="outline"
@@ -584,7 +584,7 @@ export default function CrmJobDetail() {
                     data-testid="button-add-work-order"
                   >
                     <Plus className="h-4 w-4 mr-1" />
-                    Add Visit
+                    Add Work Order
                   </Button>
                 </div>
               </CardHeader>
@@ -934,7 +934,7 @@ export default function CrmJobDetail() {
       <Dialog open={workOrderDialogOpen} onOpenChange={setWorkOrderDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Schedule Visit</DialogTitle>
+            <DialogTitle>Create Work Order</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -997,7 +997,7 @@ export default function CrmJobDetail() {
                   <SelectValue placeholder="Unassigned" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
                   {technicians.map((tech) => (
                     <SelectItem key={tech.id} value={tech.id}>
                       {tech.name}
@@ -1021,7 +1021,7 @@ export default function CrmJobDetail() {
               className="bg-[#711419] hover:bg-[#5a1014]"
               data-testid="button-create-work-order"
             >
-              {createWorkOrderMutation.isPending ? "Creating..." : "Schedule Visit"}
+              {createWorkOrderMutation.isPending ? "Creating..." : "Create Work Order"}
             </Button>
           </DialogFooter>
         </DialogContent>

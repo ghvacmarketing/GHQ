@@ -325,9 +325,6 @@ export default function CrmJobs() {
       jobType: string;
       priority: string;
       description: string;
-      scheduledStart: string;
-      scheduledEnd: string;
-      assignedTechId: string | null;
     }) => {
       const jobRes = await apiRequest("POST", "/api/crm/jobs", {
         accountId: data.accountId,
@@ -335,25 +332,11 @@ export default function CrmJobs() {
         jobType: data.jobType,
         priority: data.priority,
         description: data.description,
-        scheduledStart: data.scheduledStart,
-        scheduledEnd: data.scheduledEnd,
+        status: "new",
       });
       const job = await jobRes.json();
       
-      let assignmentFailed = false;
-      if (data.assignedTechId) {
-        try {
-          await apiRequest("POST", `/api/crm/jobs/${job.id}/assign`, {
-            techUserId: data.assignedTechId,
-            startAt: data.scheduledStart,
-            endAt: data.scheduledEnd,
-          });
-        } catch (error) {
-          assignmentFailed = true;
-        }
-      }
-      
-      return { job, assignmentFailed };
+      return { job, assignmentFailed: false };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
@@ -578,12 +561,11 @@ export default function CrmJobs() {
   };
 
   const descriptionError = description.trim() === "" ? "Description is required" : null;
-  const durationError = duration < 15 ? "Duration must be at least 15 minutes" : null;
   const accountError = !selectedAccount ? "Account is required" : null;
   const siteError = !selectedSiteId ? "Site is required" : null;
-  const dateError = !startDate ? "Start date is required" : null;
+  const priorityError = !priority ? "Priority is required" : null;
   
-  const isFormValid = selectedAccount && selectedSiteId && startDate && description.trim() !== "" && duration >= 15;
+  const isFormValid = selectedAccount && selectedSiteId && description.trim() !== "" && priority;
 
   const handleSubmit = () => {
     if (!selectedAccount) {
@@ -604,10 +586,10 @@ export default function CrmJobs() {
       return;
     }
 
-    if (!startDate) {
+    if (!priority) {
       toast({
         title: "Error",
-        description: "Please select a start date",
+        description: "Please select a priority",
         variant: "destructive",
       });
       return;
@@ -621,22 +603,6 @@ export default function CrmJobs() {
       });
       return;
     }
-
-    if (duration < 15) {
-      toast({
-        title: "Error",
-        description: "Duration must be at least 15 minutes",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const [hours, minutes] = startTime.split(":").map(Number);
-    const scheduledStart = new Date(startDate);
-    scheduledStart.setHours(hours, minutes, 0, 0);
-    
-    const scheduledEnd = new Date(scheduledStart);
-    scheduledEnd.setMinutes(scheduledEnd.getMinutes() + duration);
 
     let fullDescription = description.trim();
     if (isPropertyManager && (tenantName || tenantPhone || accessInstructions)) {
@@ -655,9 +621,6 @@ export default function CrmJobs() {
       jobType,
       priority,
       description: fullDescription,
-      scheduledStart: scheduledStart.toISOString(),
-      scheduledEnd: scheduledEnd.toISOString(),
-      assignedTechId: assignedTechId === "unassigned" ? null : assignedTechId,
     });
   };
 
@@ -1116,7 +1079,7 @@ export default function CrmJobs() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="priority">Priority</Label>
+                <Label htmlFor="priority">Priority *</Label>
                 <Select value={priority} onValueChange={setPriority}>
                   <SelectTrigger data-testid="select-priority">
                     <SelectValue placeholder="Select priority" />
@@ -1130,82 +1093,6 @@ export default function CrmJobs() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="tech">Primary Tech</Label>
-              <Select value={assignedTechId} onValueChange={setAssignedTechId}>
-                <SelectTrigger data-testid="select-tech">
-                  <SelectValue placeholder="Select technician" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned" data-testid="tech-unassigned">
-                    Unassigned
-                  </SelectItem>
-                  {technicians.map((tech) => (
-                    <SelectItem key={tech.id} value={tech.id} data-testid={`tech-${tech.id}`}>
-                      {tech.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Start Date *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !startDate && "text-muted-foreground"
-                      )}
-                      data-testid="button-start-date"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? format(startDate, "PPP") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={startDate}
-                      onSelect={setStartDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="start-time">Start Time *</Label>
-                <Input
-                  id="start-time"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  data-testid="input-start-time"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="duration">Duration (minutes) *</Label>
-              <Input
-                id="duration"
-                type="number"
-                min={15}
-                step={15}
-                value={duration}
-                onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
-                className={durationError ? "border-red-500" : ""}
-                data-testid="input-duration"
-              />
-              {durationError && (
-                <p className="text-sm text-red-500" data-testid="error-duration">{durationError}</p>
-              )}
             </div>
 
             <div className="space-y-2">
