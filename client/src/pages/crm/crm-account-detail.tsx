@@ -60,6 +60,7 @@ import type {
 } from "@shared/schema";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
 
 const CONTACT_ROLES: ContactRole[] = [
   "OWNER", "PM", "TENANT", "AP", "FACILITIES",
@@ -178,6 +179,10 @@ export default function CrmAccountDetail() {
     notes: "",
     siteId: "",
   });
+  const [contactEmailError, setContactEmailError] = useState("");
+  const [contactPhoneError, setContactPhoneError] = useState("");
+  const [tenantEmailError, setTenantEmailError] = useState("");
+  const [tenantPhoneError, setTenantPhoneError] = useState("");
 
   const [jobForm, setJobForm] = useState({
     jobType: "SERVICE",
@@ -247,6 +252,8 @@ export default function CrmAccountDetail() {
       tenantPhone: "",
       tenantEmail: "",
     });
+    setTenantEmailError("");
+    setTenantPhoneError("");
     setEditingSite(null);
   };
 
@@ -263,6 +270,8 @@ export default function CrmAccountDetail() {
       siteId: "",
     });
     setEditingContact(null);
+    setContactEmailError("");
+    setContactPhoneError("");
   };
 
   const resetJobForm = () => {
@@ -1270,17 +1279,37 @@ export default function CrmAccountDetail() {
                       <Label>Tenant Phone</Label>
                       <Input
                         value={siteForm.tenantPhone}
-                        onChange={(e) => setSiteForm({ ...siteForm, tenantPhone: e.target.value })}
+                        onChange={(e) => {
+                          const formatted = formatPhoneNumber(e.target.value);
+                          setSiteForm({ ...siteForm, tenantPhone: formatted });
+                          if (formatted && !validatePhone(formatted)) {
+                            setTenantPhoneError("Please enter a 10-digit phone number");
+                          } else {
+                            setTenantPhoneError("");
+                          }
+                        }}
+                        placeholder="(555) 555-5555"
+                        className={tenantPhoneError ? "border-red-500" : ""}
                         data-testid="input-tenant-phone"
                       />
+                      {tenantPhoneError && <p className="text-sm text-red-500 mt-1">{tenantPhoneError}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label>Tenant Email</Label>
                       <Input
                         value={siteForm.tenantEmail}
                         onChange={(e) => setSiteForm({ ...siteForm, tenantEmail: e.target.value })}
+                        onBlur={() => {
+                          if (siteForm.tenantEmail && !validateEmail(siteForm.tenantEmail)) {
+                            setTenantEmailError("Please enter a valid email (e.g., name@example.com)");
+                          } else {
+                            setTenantEmailError("");
+                          }
+                        }}
+                        className={tenantEmailError ? "border-red-500" : ""}
                         data-testid="input-tenant-email"
                       />
+                      {tenantEmailError && <p className="text-sm text-red-500 mt-1">{tenantEmailError}</p>}
                     </div>
                   </div>
                 </>
@@ -1299,8 +1328,20 @@ export default function CrmAccountDetail() {
                 Cancel
               </Button>
               <Button
-                onClick={() => editingSite ? updateSiteMutation.mutate() : createSiteMutation.mutate()}
-                disabled={!siteForm.address1 || !siteForm.city || !siteForm.state || !siteForm.zip || createSiteMutation.isPending || updateSiteMutation.isPending}
+                onClick={() => {
+                  let hasErrors = false;
+                  if (siteForm.tenantEmail && !validateEmail(siteForm.tenantEmail)) {
+                    setTenantEmailError("Please enter a valid email");
+                    hasErrors = true;
+                  }
+                  if (siteForm.tenantPhone && !validatePhone(siteForm.tenantPhone)) {
+                    setTenantPhoneError("Please enter a valid 10-digit phone number");
+                    hasErrors = true;
+                  }
+                  if (hasErrors) return;
+                  editingSite ? updateSiteMutation.mutate() : createSiteMutation.mutate();
+                }}
+                disabled={!siteForm.address1 || !siteForm.city || !siteForm.state || !siteForm.zip || createSiteMutation.isPending || updateSiteMutation.isPending || !!tenantEmailError || !!tenantPhoneError}
                 data-testid="button-save-site"
               >
                 {createSiteMutation.isPending || updateSiteMutation.isPending ? "Saving..." : editingSite ? "Update Site" : "Add Site"}
@@ -1341,9 +1382,20 @@ export default function CrmAccountDetail() {
                   <Label>Phone</Label>
                   <Input
                     value={contactForm.phone}
-                    onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                    onChange={(e) => {
+                      const formatted = formatPhoneNumber(e.target.value);
+                      setContactForm({ ...contactForm, phone: formatted });
+                      if (formatted && !validatePhone(formatted)) {
+                        setContactPhoneError("Please enter a 10-digit phone number");
+                      } else {
+                        setContactPhoneError("");
+                      }
+                    }}
+                    placeholder="(555) 555-5555"
+                    className={contactPhoneError ? "border-red-500" : ""}
                     data-testid="input-contact-phone"
                   />
+                  {contactPhoneError && <p className="text-sm text-red-500 mt-1">{contactPhoneError}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
@@ -1351,8 +1403,17 @@ export default function CrmAccountDetail() {
                     type="email"
                     value={contactForm.email}
                     onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                    onBlur={() => {
+                      if (contactForm.email && !validateEmail(contactForm.email)) {
+                        setContactEmailError("Please enter a valid email (e.g., name@example.com)");
+                      } else {
+                        setContactEmailError("");
+                      }
+                    }}
+                    className={contactEmailError ? "border-red-500" : ""}
                     data-testid="input-contact-email"
                   />
+                  {contactEmailError && <p className="text-sm text-red-500 mt-1">{contactEmailError}</p>}
                 </div>
               </div>
               <div className="space-y-2">
@@ -1422,8 +1483,20 @@ export default function CrmAccountDetail() {
                 Cancel
               </Button>
               <Button
-                onClick={() => editingContact ? updateContactMutation.mutate() : createContactMutation.mutate()}
-                disabled={!contactForm.firstName || createContactMutation.isPending || updateContactMutation.isPending}
+                onClick={() => {
+                  let hasErrors = false;
+                  if (contactForm.email && !validateEmail(contactForm.email)) {
+                    setContactEmailError("Please enter a valid email");
+                    hasErrors = true;
+                  }
+                  if (contactForm.phone && !validatePhone(contactForm.phone)) {
+                    setContactPhoneError("Please enter a valid 10-digit phone number");
+                    hasErrors = true;
+                  }
+                  if (hasErrors) return;
+                  editingContact ? updateContactMutation.mutate() : createContactMutation.mutate();
+                }}
+                disabled={!contactForm.firstName || createContactMutation.isPending || updateContactMutation.isPending || !!contactEmailError || !!contactPhoneError}
                 data-testid="button-save-contact"
               >
                 {createContactMutation.isPending || updateContactMutation.isPending ? "Saving..." : editingContact ? "Update Contact" : "Add Contact"}

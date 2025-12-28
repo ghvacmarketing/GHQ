@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, ArrowLeft, Users, FileText, Plus, Edit, DollarSign, Receipt, UserX, ChevronDown, ChevronUp, Home, Shield, Clock, User } from "lucide-react";
 import type { PortalUser, EmployeeProfile, Compensation, CompensationAuditLog } from "@shared/schema";
+import { validateEmail } from "@/lib/form-utils";
 
 type EmployeeWithProfile = {
   user: PortalUser;
@@ -69,6 +70,7 @@ export default function EmployeePortalAdmin() {
     hoursWorked: "",
     fileUrl: "",
   });
+  const [newEmployeeEmailError, setNewEmployeeEmailError] = useState("");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<PortalUser | null>({
     queryKey: ["/api/employee-portal/me"],
@@ -178,6 +180,7 @@ export default function EmployeePortalAdmin() {
       position: "",
       hireDate: "",
     });
+    setNewEmployeeEmailError("");
   };
 
   const resetCompensationForm = () => {
@@ -263,6 +266,10 @@ export default function EmployeePortalAdmin() {
   };
 
   const handleSubmitEmployee = () => {
+    if (newEmployee.email && !validateEmail(newEmployee.email)) {
+      setNewEmployeeEmailError("Please enter a valid email");
+      return;
+    }
     createEmployeeMutation.mutate(newEmployee);
   };
 
@@ -638,10 +645,18 @@ export default function EmployeePortalAdmin() {
                 type="email"
                 value={newEmployee.username}
                 onChange={(e) => setNewEmployee({ ...newEmployee, username: e.target.value, email: e.target.value })}
+                onBlur={() => {
+                  if (newEmployee.username && !validateEmail(newEmployee.username)) {
+                    setNewEmployeeEmailError("Please enter a valid email (e.g., name@example.com)");
+                  } else {
+                    setNewEmployeeEmailError("");
+                  }
+                }}
                 placeholder="employee@company.com"
-                className="h-11"
+                className={`h-11 ${newEmployeeEmailError ? "border-red-500" : ""}`}
                 data-testid="input-new-email"
               />
+              {newEmployeeEmailError && <p className="text-sm text-red-500 mt-1">{newEmployeeEmailError}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password *</Label>
@@ -744,7 +759,7 @@ export default function EmployeePortalAdmin() {
             </Button>
             <Button
               onClick={handleSubmitEmployee}
-              disabled={createEmployeeMutation.isPending || !newEmployee.username || !newEmployee.password || !newEmployee.firstName || !newEmployee.lastName}
+              disabled={createEmployeeMutation.isPending || !newEmployee.username || !newEmployee.password || !newEmployee.firstName || !newEmployee.lastName || !!newEmployeeEmailError}
               className="rounded-full"
               data-testid="button-submit-add"
             >
