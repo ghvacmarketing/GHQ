@@ -53,11 +53,13 @@ import {
   Calendar as CalendarIcon,
   X,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmJob, CrmInvoice, CrmInvoiceLineItem, CrmInvoiceStatus, CrmPayment } from "@shared/schema";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 type InvoiceWithRelations = CrmInvoice & {
   customer: CrmCustomer | null;
@@ -113,6 +115,16 @@ export default function CrmInvoices() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"check" | "cash" | "other">("check");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    customerName: "",
+    customerEmail: "",
+    customerPhone: "",
+    serviceAddress: "",
+    description: "",
+    subtotal: "",
+    taxAmount: "",
+  });
 
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -171,6 +183,52 @@ export default function CrmInvoices() {
       if (selectedInvoiceId) {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", selectedInvoiceId] });
       }
+    },
+  });
+
+  const createInvoiceMutation = useMutation({
+    mutationFn: async (data: {
+      customerName: string;
+      customerEmail?: string;
+      customerPhone?: string;
+      serviceAddress?: string;
+      description?: string;
+      subtotal: string;
+      taxAmount: string;
+    }) => {
+      const subtotal = parseFloat(data.subtotal) || 0;
+      const taxAmount = parseFloat(data.taxAmount) || 0;
+      const total = subtotal + taxAmount;
+      
+      const res = await apiRequest("POST", "/api/crm/invoices", {
+        customerName: data.customerName,
+        customerEmail: data.customerEmail || null,
+        customerPhone: data.customerPhone || null,
+        serviceAddress: data.serviceAddress || null,
+        description: data.description || null,
+        subtotal: subtotal.toFixed(2),
+        tax: taxAmount.toFixed(2),
+        total: total.toFixed(2),
+        balanceDue: total.toFixed(2),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      setShowCreateDialog(false);
+      setCreateForm({
+        customerName: "",
+        customerEmail: "",
+        customerPhone: "",
+        serviceAddress: "",
+        description: "",
+        subtotal: "",
+        taxAmount: "",
+      });
+      toast({ title: "Invoice created successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create invoice", variant: "destructive" });
     },
   });
 
@@ -288,6 +346,15 @@ export default function CrmInvoices() {
     setEndDate(undefined);
   };
 
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.customerName.trim()) {
+      toast({ title: "Customer name is required", variant: "destructive" });
+      return;
+    }
+    createInvoiceMutation.mutate(createForm);
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
@@ -311,6 +378,15 @@ export default function CrmInvoices() {
           <h1 className="text-xl font-bold text-slate-900" data-testid="text-invoices-title">
             Invoices
           </h1>
+          <Button 
+            size="sm" 
+            className="bg-[#711419] hover:bg-[#5a1014]" 
+            onClick={() => setShowCreateDialog(true)}
+            data-testid="button-create-invoice"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            New Invoice
+          </Button>
         </div>
 
         <div className="relative">
@@ -777,6 +853,118 @@ export default function CrmInvoices() {
               Record Payment
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Invoice Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Invoice</DialogTitle>
+            <DialogDescription>
+              Enter customer and invoice details.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="customerName">Customer Name *</Label>
+              <Input
+                id="customerName"
+                value={createForm.customerName}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, customerName: e.target.value }))}
+                placeholder="Enter customer name"
+                data-testid="input-create-customer-name"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="customerEmail">Email</Label>
+                <Input
+                  id="customerEmail"
+                  type="email"
+                  value={createForm.customerEmail}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, customerEmail: e.target.value }))}
+                  placeholder="email@example.com"
+                  data-testid="input-create-customer-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customerPhone">Phone</Label>
+                <Input
+                  id="customerPhone"
+                  value={createForm.customerPhone}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                  placeholder="(555) 123-4567"
+                  data-testid="input-create-customer-phone"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="serviceAddress">Service Address</Label>
+              <Input
+                id="serviceAddress"
+                value={createForm.serviceAddress}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, serviceAddress: e.target.value }))}
+                placeholder="123 Main St, City, State"
+                data-testid="input-create-service-address"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={createForm.description}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe the work performed..."
+                rows={2}
+                data-testid="input-create-description"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="subtotal">Subtotal ($)</Label>
+                <Input
+                  id="subtotal"
+                  type="number"
+                  step="0.01"
+                  value={createForm.subtotal}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, subtotal: e.target.value }))}
+                  placeholder="0.00"
+                  data-testid="input-create-subtotal"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="taxAmount">Tax ($)</Label>
+                <Input
+                  id="taxAmount"
+                  type="number"
+                  step="0.01"
+                  value={createForm.taxAmount}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, taxAmount: e.target.value }))}
+                  placeholder="0.00"
+                  data-testid="input-create-tax"
+                />
+              </div>
+            </div>
+            {(createForm.subtotal || createForm.taxAmount) && (
+              <div className="text-right text-sm text-slate-600">
+                Total: {formatCurrency((parseFloat(createForm.subtotal) || 0) + (parseFloat(createForm.taxAmount) || 0))}
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                className="bg-[#711419] hover:bg-[#5a1014]"
+                disabled={createInvoiceMutation.isPending}
+                data-testid="button-submit-create-invoice"
+              >
+                {createInvoiceMutation.isPending ? "Creating..." : "Create Invoice"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </CrmLayout>
