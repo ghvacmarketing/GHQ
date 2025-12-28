@@ -5401,22 +5401,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignments = await db.select().from(crmJobAssignments);
 
       // Get jobs scheduled for this day OR unassigned jobs (no scheduledStart)
+      // Join with both crmCustomers (legacy) and crmAccounts (new model)
       const scheduledJobs = await db.select({
         job: crmJobs,
-        customerName: crmCustomers.name,
+        legacyCustomerName: crmCustomers.name,
+        accountName: crmAccounts.displayName,
       }).from(crmJobs)
         .leftJoin(crmCustomers, eq(crmJobs.customerId, crmCustomers.id))
+        .leftJoin(crmAccounts, eq(crmJobs.accountId, crmAccounts.id))
         .where(
           sql`(${crmJobs.scheduledStart} >= ${startOfDay} AND ${crmJobs.scheduledStart} <= ${endOfDay})
               OR ${crmJobs.scheduledStart} IS NULL`
         );
 
       // Build jobs with assignment info
-      const jobsWithAssignments = scheduledJobs.map(({ job, customerName }) => {
+      const jobsWithAssignments = scheduledJobs.map(({ job, legacyCustomerName, accountName }) => {
         const assignment = assignments.find(a => a.jobId === job.id);
+        // Use account name if available (new model), otherwise legacy customer name
+        const customerName = accountName || legacyCustomerName || "Unknown Customer";
         return {
           ...job,
-          customerName: customerName || "Unknown Customer",
+          customerName,
           assignedTechId: assignment?.techUserId || null,
           assignmentId: assignment?.id || null,
         };
