@@ -464,6 +464,7 @@ export default function CrmDispatch() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch", dateString] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
     },
     onError: (error: Error) => {
       toast({
