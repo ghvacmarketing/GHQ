@@ -510,13 +510,13 @@ export default function CrmJobDetail() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-3 space-y-6">
-            <Card>
-              <CardHeader className="pb-3">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <Card className="shadow-sm">
+              <CardHeader className="pb-4 border-b bg-slate-50/50">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <ClipboardList className="h-5 w-5 text-slate-500" />
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                    <ClipboardList className="h-5 w-5 text-[#711419]" />
                     Work Orders
                   </CardTitle>
                   <Button
@@ -526,11 +526,11 @@ export default function CrmJobDetail() {
                     data-testid="button-add-work-order"
                   >
                     <Plus className="h-4 w-4 mr-1" />
-                    Add Work Order
+                    Add
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-4">
                 {job.workOrders && job.workOrders.length > 0 ? (
                   <div className="space-y-3">
                     {job.workOrders.map((wo, index) => {
@@ -538,7 +538,7 @@ export default function CrmJobDetail() {
                       return (
                         <div
                           key={wo.id}
-                          className="p-4 bg-slate-50 rounded-lg border border-slate-200"
+                          className="p-4 bg-white rounded-lg border border-slate-200 hover:border-slate-300 hover:shadow-sm transition-all"
                           data-testid={`work-order-card-${wo.id}`}
                         >
                           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -547,14 +547,10 @@ export default function CrmJobDetail() {
                                 <span className="font-semibold text-slate-900">
                                   Visit #{wo.workOrderNumber || index + 1}
                                 </span>
-                                <span className="text-sm text-slate-600">
-                                  {visitTypeLabels[wo.visitType || "SERVICE"]}
-                                </span>
                                 <Badge className={`${woStatusStyle.bg} ${woStatusStyle.text} text-xs`}>
                                   {statusLabels[wo.status] || wo.status}
                                 </Badge>
                               </div>
-
                               <div className="flex items-center gap-4 text-sm text-slate-600">
                                 <div className="flex items-center gap-1">
                                   <Calendar className="h-3.5 w-3.5" />
@@ -565,90 +561,194 @@ export default function CrmJobDetail() {
                                   <span>{formatTimeRange(wo.scheduledStart, wo.scheduledEnd)}</span>
                                 </div>
                               </div>
-
                               <div className="flex items-center gap-1 text-sm">
                                 <User className="h-3.5 w-3.5 text-slate-400" />
                                 <span className={wo.techName ? "text-slate-700" : "text-slate-400 italic"}>
                                   {wo.techName || "Unassigned"}
                                 </span>
                               </div>
-
                               <div className="pt-1">
                                 <WorkOrderStatusSteps status={wo.status} />
                               </div>
                             </div>
-
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openUpdateStatusDialog(wo)}
-                                data-testid={`button-update-wo-status-${wo.id}`}
-                              >
-                                <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                                Update Status
-                              </Button>
-                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openUpdateStatusDialog(wo)}
+                              data-testid={`button-update-wo-status-${wo.id}`}
+                            >
+                              <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                              Update
+                            </Button>
                           </div>
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-slate-500">
-                    <ClipboardList className="h-10 w-10 mx-auto mb-3 opacity-40" />
-                    <p className="font-medium">No work orders scheduled</p>
+                  <div className="text-center py-10 text-slate-500">
+                    <ClipboardList className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium text-slate-600">No work orders yet</p>
+                    <p className="text-sm text-slate-400 mt-1">Schedule the first visit for this job</p>
                     <Button
-                      variant="link"
-                      className="text-[#711419] mt-2"
+                      className="mt-4 bg-[#711419] hover:bg-[#5a1014]"
                       onClick={() => setWorkOrderDialogOpen(true)}
                       data-testid="button-schedule-first-visit"
                     >
-                      Schedule first visit
+                      <Plus className="h-4 w-4 mr-1" />
+                      Create Work Order
                     </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="notes" className="border rounded-lg bg-white">
-                <AccordionTrigger className="px-4 hover:no-underline" data-testid="accordion-notes">
-                  <div className="flex items-center gap-2">
-                    <StickyNote className="h-5 w-5 text-slate-500" />
-                    <span className="font-semibold">Notes & Attachments</span>
+            <Card className="shadow-sm">
+              <CardHeader className="pb-4 border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                    <FileText className="h-5 w-5 text-[#711419]" />
+                    Quotes
+                  </CardTitle>
+                  <Button
+                    size="sm"
+                    onClick={() => navigate(`/crm/quotes/new?jobId=${jobId}`)}
+                    className="bg-[#711419] hover:bg-[#5a1014]"
+                    data-testid="button-add-quote"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                {job.quotes && job.quotes.length > 0 ? (
+                  <div className="space-y-2">
+                    {job.quotes.map((quote: any) => {
+                      const quoteStatusStyle = statusColors[quote.status] || statusColors.draft;
+                      return (
+                        <div
+                          key={quote.id}
+                          className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200 hover:border-slate-300 hover:shadow-sm transition-all cursor-pointer"
+                          onClick={() => navigate(`/crm/quotes/${quote.id}`)}
+                          data-testid={`quote-row-${quote.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
+                              <FileText className="h-5 w-5 text-slate-500" />
+                            </div>
+                            <div>
+                              <span className="font-medium text-slate-900">Quote #{quote.quoteNumber || quote.id.slice(-6)}</span>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <Badge className={`${quoteStatusStyle.bg} ${quoteStatusStyle.text} text-xs`}>
+                                  {quote.status}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                          <span className="font-semibold text-slate-900">
+                            {formatCurrency(quote.total)}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4">
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="text-sm font-medium text-slate-700 mb-2">Job Description</h4>
-                      <p className="text-sm text-slate-600">
-                        {job.description || "No description added yet."}
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-1">
-                        <Paperclip className="h-4 w-4" />
-                        Attachments
-                      </h4>
-                      <p className="text-sm text-slate-500 italic">No attachments</p>
-                    </div>
+                ) : (
+                  <div className="text-center py-10 text-slate-500">
+                    <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium text-slate-600">No quotes yet</p>
+                    <p className="text-sm text-slate-400 mt-1">Create a quote for this job</p>
+                    <Button
+                      className="mt-4 bg-[#711419] hover:bg-[#5a1014]"
+                      onClick={() => navigate(`/crm/quotes/new?jobId=${jobId}`)}
+                      data-testid="button-create-first-quote"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Create Quote
+                    </Button>
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+              <CardHeader className="pb-4 border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                    <DollarSign className="h-5 w-5 text-[#711419]" />
+                    Invoices
+                  </CardTitle>
+                  <Button
+                    size="sm"
+                    onClick={() => navigate(`/crm/invoices/new?jobId=${jobId}`)}
+                    className="bg-[#711419] hover:bg-[#5a1014]"
+                    data-testid="button-add-invoice"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                {job.invoices && job.invoices.length > 0 ? (
+                  <div className="space-y-2">
+                    {job.invoices.map((inv) => {
+                      const invStatusStyle = statusColors[inv.status] || statusColors.draft;
+                      return (
+                        <div
+                          key={inv.id}
+                          className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200 hover:border-slate-300 hover:shadow-sm transition-all cursor-pointer"
+                          onClick={() => navigate(`/crm/invoices/${inv.id}`)}
+                          data-testid={`invoice-row-${inv.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
+                              <DollarSign className="h-5 w-5 text-slate-500" />
+                            </div>
+                            <div>
+                              <span className="font-medium text-slate-900">Invoice #{inv.invoiceNumber}</span>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <Badge className={`${invStatusStyle.bg} ${invStatusStyle.text} text-xs`}>
+                                  {inv.status}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                          <span className="font-semibold text-slate-900">
+                            {formatCurrency(inv.total)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-10 text-slate-500">
+                    <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium text-slate-600">No invoices yet</p>
+                    <p className="text-sm text-slate-400 mt-1">Create an invoice for this job</p>
+                    <Button
+                      className="mt-4 bg-[#711419] hover:bg-[#5a1014]"
+                      onClick={() => navigate(`/crm/invoices/new?jobId=${jobId}`)}
+                      data-testid="button-create-first-invoice"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Create Invoice
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <User className="h-5 w-5 text-slate-500" />
+          <div className="space-y-6">
+            <Card className="shadow-sm sticky top-4">
+              <CardHeader className="pb-3 border-b bg-slate-50/50">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <User className="h-4 w-4 text-[#711419]" />
                   Customer & Site
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="pt-4 space-y-3">
                 <div>
                   <Button
                     variant="link"
@@ -660,114 +760,76 @@ export default function CrmJobDetail() {
                     <ExternalLink className="h-3 w-3 ml-1" />
                   </Button>
                 </div>
-
                 {job.customerPhone && (
-                  <div className="flex items-center gap-2 text-slate-600">
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
                     <Phone className="h-4 w-4 text-slate-400" />
-                    <a
-                      href={`tel:${job.customerPhone}`}
-                      className="hover:text-[#711419]"
-                      data-testid="link-phone"
-                    >
+                    <a href={`tel:${job.customerPhone}`} className="hover:text-[#711419]" data-testid="link-phone">
                       {job.customerPhone}
                     </a>
                   </div>
                 )}
-
                 {job.customerEmail && (
-                  <div className="flex items-center gap-2 text-slate-600">
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
                     <Mail className="h-4 w-4 text-slate-400" />
-                    <a
-                      href={`mailto:${job.customerEmail}`}
-                      className="hover:text-[#711419] truncate"
-                      data-testid="link-email"
-                    >
+                    <a href={`mailto:${job.customerEmail}`} className="hover:text-[#711419] truncate" data-testid="link-email">
                       {job.customerEmail}
                     </a>
                   </div>
                 )}
-
                 {job.property && (
-                  <div className="pt-2 border-t">
+                  <div className="pt-3 border-t">
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="text-sm text-slate-500 mb-1">Property Address</p>
-                        <p className="font-medium text-slate-900" data-testid="text-address-line1">
+                        <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Property</p>
+                        <p className="font-medium text-sm text-slate-900" data-testid="text-address-line1">
                           {job.property.address1}
                         </p>
-                        {job.property.address2 && (
-                          <p className="text-slate-600 text-sm">{job.property.address2}</p>
-                        )}
                         <p className="text-slate-600 text-sm" data-testid="text-address-city">
                           {job.property.city}, {job.property.state} {job.property.zip}
                         </p>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        asChild
-                        data-testid="button-directions"
-                      >
-                        <a
-                          href={getGoogleMapsUrl(job.property)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
+                      <Button variant="ghost" size="sm" asChild data-testid="button-directions">
+                        <a href={getGoogleMapsUrl(job.property)} target="_blank" rel="noopener noreferrer">
                           <Navigation className="h-4 w-4" />
                         </a>
                       </Button>
                     </div>
-                    {job.property.notes && (
-                      <div className="mt-2 p-2 bg-amber-50 rounded text-sm text-amber-800">
-                        <span className="font-medium">Property Notes:</span> {job.property.notes}
-                      </div>
-                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <DollarSign className="h-5 w-5 text-slate-500" />
+            <Card className="shadow-sm">
+              <CardHeader className="pb-3 border-b bg-slate-50/50">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <DollarSign className="h-4 w-4 text-[#711419]" />
                   Financial Summary
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
+              <CardContent className="pt-4">
+                <div className="space-y-3 text-sm">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600">Quotes</span>
+                    <span className="text-slate-600">Quotes</span>
                     <span className="font-medium" data-testid="text-quote-summary">
                       {formatCurrency(job.financialSummary?.quoteTotal || 0)}
-                      <span className="text-xs text-slate-500 ml-1">
-                        ({job.financialSummary?.quoteCount || 0} quote{(job.financialSummary?.quoteCount || 0) !== 1 ? "s" : ""}, {job.financialSummary?.acceptedQuoteCount || 0} accepted)
-                      </span>
                     </span>
                   </div>
-
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600">Total Invoiced</span>
+                    <span className="text-slate-600">Total Invoiced</span>
                     <span className="font-medium" data-testid="text-total-invoiced">
                       {formatCurrency(job.financialSummary?.totalInvoiced || 0)}
                     </span>
                   </div>
-
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600">Total Paid</span>
+                    <span className="text-slate-600">Total Paid</span>
                     <span className="font-medium text-green-600" data-testid="text-total-paid">
                       {formatCurrency(job.financialSummary?.totalPaid || 0)}
                     </span>
                   </div>
-
-                  <div className="flex justify-between items-center pt-2 border-t">
-                    <span className="text-sm font-medium text-slate-700">Balance Due</span>
+                  <div className="flex justify-between items-center pt-3 border-t">
+                    <span className="font-semibold text-slate-700">Balance Due</span>
                     <span
-                      className={`font-bold ${
-                        (job.financialSummary?.balanceDue || 0) > 0
-                          ? "text-red-600"
-                          : "text-slate-700"
-                      }`}
+                      className={`font-bold ${(job.financialSummary?.balanceDue || 0) > 0 ? "text-red-600" : "text-slate-700"}`}
                       data-testid="text-balance-due"
                     >
                       {formatCurrency(job.financialSummary?.balanceDue || 0)}
@@ -777,50 +839,26 @@ export default function CrmJobDetail() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <FileText className="h-5 w-5 text-slate-500" />
-                    Invoices
-                  </CardTitle>
-                  <span className="text-sm text-slate-500">
-                    {job.invoices?.length || 0} invoice{(job.invoices?.length || 0) !== 1 ? "s" : ""}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {job.invoices && job.invoices.length > 0 ? (
-                  <div className="space-y-2">
-                    {job.invoices.map((inv) => {
-                      const invStatusStyle = statusColors[inv.status] || statusColors.draft;
-                      return (
-                        <div
-                          key={inv.id}
-                          className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-100 hover:bg-slate-100 cursor-pointer"
-                          onClick={() => navigate(`/crm/invoices/${inv.id}`)}
-                          data-testid={`invoice-row-${inv.id}`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm text-slate-900">
-                              #{inv.invoiceNumber}
-                            </span>
-                            <Badge className={`${invStatusStyle.bg} ${invStatusStyle.text} text-xs`}>
-                              {inv.status}
-                            </Badge>
-                          </div>
-                          <span className="font-medium text-sm">
-                            {formatCurrency(inv.total)}
-                          </span>
-                        </div>
-                      );
-                    })}
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="notes" className="border rounded-lg bg-white shadow-sm">
+                <AccordionTrigger className="px-4 hover:no-underline" data-testid="accordion-notes">
+                  <div className="flex items-center gap-2">
+                    <StickyNote className="h-4 w-4 text-[#711419]" />
+                    <span className="font-semibold text-sm">Notes & Attachments</span>
                   </div>
-                ) : (
-                  <p className="text-sm text-slate-500 text-center py-4">No invoices yet</p>
-                )}
-              </CardContent>
-            </Card>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Description</h4>
+                      <p className="text-sm text-slate-600">
+                        {job.description || "No description added yet."}
+                      </p>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
         </div>
       </div>
