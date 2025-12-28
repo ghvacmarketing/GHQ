@@ -875,7 +875,7 @@ export default function CrmDispatch() {
                 Legend
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80" align="end">
+            <PopoverContent className="w-72" align="end">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <span className="text-sm font-semibold text-slate-700">Job Type (Background)</span>
@@ -926,16 +926,6 @@ export default function CrmDispatch() {
                       <div className="w-4 h-4 rounded border-l-4 border-l-green-500 bg-green-50" />
                       <span className="text-xs text-slate-600">Completed</span>
                     </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <span className="text-sm font-semibold text-slate-700">Priority (Badge)</span>
-                  <div className="flex flex-wrap gap-2">
-                    <div className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500 text-white">URGENT</div>
-                    <div className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-orange-500 text-white">HIGH</div>
-                    <div className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-700">NORMAL</div>
-                    <div className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gray-100 text-gray-600">LOW</div>
                   </div>
                 </div>
               </div>
