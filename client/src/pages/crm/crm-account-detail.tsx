@@ -1283,7 +1283,7 @@ export default function CrmAccountDetail() {
                           const formatted = formatPhoneNumber(e.target.value);
                           setSiteForm({ ...siteForm, tenantPhone: formatted });
                           if (formatted && !validatePhone(formatted)) {
-                            setTenantPhoneError("Please enter a 10-digit phone number");
+                            setTenantPhoneError("Please enter a valid phone number");
                           } else {
                             setTenantPhoneError("");
                           }
@@ -1335,7 +1335,7 @@ export default function CrmAccountDetail() {
                     hasErrors = true;
                   }
                   if (siteForm.tenantPhone && !validatePhone(siteForm.tenantPhone)) {
-                    setTenantPhoneError("Please enter a valid 10-digit phone number");
+                    setTenantPhoneError("Please enter a valid phone number");
                     hasErrors = true;
                   }
                   if (hasErrors) return;

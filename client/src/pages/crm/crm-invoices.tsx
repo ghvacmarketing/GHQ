@@ -928,7 +928,7 @@ export default function CrmInvoices() {
                   data-testid="input-create-customer-phone"
                 />
                 {createForm.customerPhone && !validatePhone(createForm.customerPhone) && (
-                  <p className="text-sm text-red-500">Please enter a 10-digit phone number</p>
+                  <p className="text-sm text-red-500">Please enter a valid phone number</p>
                 )}
               </div>
             </div>

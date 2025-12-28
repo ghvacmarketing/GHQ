@@ -586,7 +586,7 @@ export default function CrmAccountCreate() {
                           data-testid="input-main-office-phone"
                         />
                         {formData.pmMainOfficePhone && !validatePhone(formData.pmMainOfficePhone) && (
-                          <p className="text-sm text-red-500 mt-1">Please enter a 10-digit phone number</p>
+                          <p className="text-sm text-red-500 mt-1">Please enter a valid phone number</p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -686,7 +686,7 @@ export default function CrmAccountCreate() {
                           data-testid="input-phone"
                         />
                         {formData.phone && !validatePhone(formData.phone) && (
-                          <p className="text-sm text-red-500 mt-1">Please enter a 10-digit phone number</p>
+                          <p className="text-sm text-red-500 mt-1">Please enter a valid phone number</p>
                         )}
                       </div>
                       <div className="space-y-2">
