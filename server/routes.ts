@@ -5116,9 +5116,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           break;
         case "completed":
-          // All work orders completed or closed
+          // All work orders completed
           filteredJobs = jobsWithDerived.filter(job => 
-            job.derivedStatus === 'completed' || job.derivedStatus === 'closed'
+            job.derivedStatus === 'completed'
+          );
+          break;
+        case "closed":
+          // Job fully closed (all invoices paid)
+          filteredJobs = jobsWithDerived.filter(job => 
+            job.derivedStatus === 'closed'
           );
           break;
         case "cancelled":

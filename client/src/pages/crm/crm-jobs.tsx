@@ -131,13 +131,16 @@ type AccountDetailResponse = CrmAccount & {
 
 const ITEMS_PER_PAGE = 50;
 
-type FilterTab = "all" | "needs_scheduling" | "scheduled" | "in_progress";
+type FilterTab = "all" | "needs_scheduling" | "scheduled" | "in_progress" | "completed" | "closed" | "cancelled";
 
 const filterTabConfig: Record<FilterTab, { label: string }> = {
   all: { label: "All Jobs" },
   needs_scheduling: { label: "New / Needs Scheduling" },
   scheduled: { label: "Scheduled" },
   in_progress: { label: "In Progress" },
+  completed: { label: "Completed" },
+  closed: { label: "Closed" },
+  cancelled: { label: "Cancelled" },
 };
 
 const statusColors: Record<string, { bg: string; text: string; border: string }> = {
