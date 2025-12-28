@@ -824,34 +824,6 @@ export default function CrmAccountDetail() {
               <CardContent>
                 {account.accountType === "RESIDENTIAL" && residentialProfile && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <Label className="text-slate-500 text-sm">Membership Plan</Label>
-                      <p className="font-medium">{residentialProfile.membershipPlan || "None"}</p>
-                    </div>
-                    {residentialProfile.membershipStartDate && (
-                      <div>
-                        <Label className="text-slate-500 text-sm">Membership Start</Label>
-                        <p className="font-medium">{formatDate(residentialProfile.membershipStartDate)}</p>
-                      </div>
-                    )}
-                    {residentialProfile.membershipEndDate && (
-                      <div>
-                        <Label className="text-slate-500 text-sm">Membership End</Label>
-                        <p className="font-medium">{formatDate(residentialProfile.membershipEndDate)}</p>
-                      </div>
-                    )}
-                    {residentialProfile.preferredServiceDay && (
-                      <div>
-                        <Label className="text-slate-500 text-sm">Preferred Service Day</Label>
-                        <p className="font-medium">{residentialProfile.preferredServiceDay}</p>
-                      </div>
-                    )}
-                    {residentialProfile.preferredTimeSlot && (
-                      <div>
-                        <Label className="text-slate-500 text-sm">Preferred Time Slot</Label>
-                        <p className="font-medium">{residentialProfile.preferredTimeSlot}</p>
-                      </div>
-                    )}
                     {residentialProfile.specialInstructions && (
                       <div className="md:col-span-2">
                         <Label className="text-slate-500 text-sm">Special Instructions</Label>

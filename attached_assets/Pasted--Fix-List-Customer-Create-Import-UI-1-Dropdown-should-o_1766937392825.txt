@@ -1,0 +1,202 @@
+✅ Fix List (Customer Create / Import / UI)
+1) Dropdown should open downward (bottom), not upward
+
+Problem: the dropdown menu is rendering above the input.
+
+Do:
+
+Force the dropdown menu placement to bottom and prevent “flip” behavior.
+
+If the dropdown uses a library:
+
+react-select: set menuPlacement="bottom" and (often) menuPosition="fixed", and ensure the container isn’t clipping (no overflow: hidden on parents).
+
+Popper / floating-ui: set placement to bottom-start and disable flip (or set fallback placements that still prioritize bottom).
+
+If it’s a custom dropdown: render the menu after the input and position it below using measured element bounds.
+
+Acceptance:
+
+Dropdown always opens below the field (even near bottom of screen it should scroll internally, not flip above).
+
+2) Remove Status option from “Create Customer” completely
+
+Do:
+
+Remove “Status” field from the create customer UI entirely.
+
+Also remove it from:
+
+client payload / form schema
+
+server validation requirements (if it’s required, make it server-defaulted)
+
+On the backend: set a default like status = "Active" (or whatever your default is) automatically.
+
+Acceptance:
+
+User cannot set status while creating a customer.
+
+New customers still get a valid status automatically.
+
+3) Make the “Next” button flow more seamless when entering client info
+
+Do:
+
+Improve multi-step UX:
+
+On “Next”, auto-focus the first input of the next section.
+
+Support pressing Enter to go to next field (or next step if last field).
+
+Inline validation: show errors only for fields in the current step.
+
+Persist step state so hitting back doesn’t wipe fields.
+
+Disable “Next” only when required fields in that step are invalid; otherwise keep it fast.
+
+Acceptance:
+
+“Next” feels instant, focuses the next field, and doesn’t force extra clicks.
+
+Minimal friction / no unnecessary required fields blocking.
+
+4) Remove Membership Plan from “Customer Details”
+
+Do:
+
+Delete/hide membership plan from the details view.
+
+Also remove it from:
+
+details API response mapping (optional)
+
+customer schema display components
+
+Acceptance:
+
+Membership plan is not shown anywhere in customer details.
+
+5) Customer creation not saving to database
+
+Problem: customer is created in UI but DB doesn’t update.
+
+Do (debug + fix):
+
+Verify the create flow end-to-end:
+
+Frontend POST /customers is actually being called
+
+Server route is receiving the request body
+
+DB insert is executed and awaited
+
+Server returns 201 with the created customer record (including its DB id)
+
+Frontend updates local state from the response OR refetches list
+
+Common fixes:
+
+Missing await on DB write
+
+Create route returns success before DB commit
+
+Frontend closes modal before request completes
+
+Request body doesn’t match backend schema → backend silently fails
+
+Error swallowed in catch without showing toast/log
+
+Acceptance:
+
+After clicking Save/Create, customer appears immediately after refresh.
+
+DB shows the new row.
+
+Errors display clearly if create fails.
+
+6) “More customers than the CSV” + duplicates
+
+Problem: duplicates exist; customer count exceeds original CSV.
+
+Do:
+
+Identify duplicate source:
+
+Import was run multiple times without dedupe
+
+Import script uses “create” instead of “upsert”
+
+No unique constraints (email/phone) so duplicates allowed
+
+Add dedupe protection for future imports:
+
+When importing CSV: use upsert by a stable key:
+
+Prefer: email
+
+Else phone
+
+Else (name + address) combo
+
+Add DB constraints (recommended):
+
+unique index on normalized email (lowercased, trimmed) if present
+
+unique index on normalized phone if present
+
+Clean existing duplicates:
+
+Write a one-time cleanup script:
+
+group by (email) and/or (phone)
+
+keep the “best” record (most filled fields / newest)
+
+reattach related records (jobs/invoices/notes) to kept record
+
+delete extras
+
+Acceptance:
+
+Importing the same CSV twice does NOT increase customer count.
+
+Existing duplicates are removed/merged cleanly.
+
+7) Remove “Preferences for time and day”
+
+Do:
+
+Remove “preferred time” and “preferred day” fields from:
+
+create form
+
+edit form
+
+details view
+
+API payloads and server schema validation
+
+DB columns can remain temporarily, but do not require or use them
+
+Acceptance:
+
+No time/day preference fields anywhere in the UI.
+
+No backend validation errors referencing those fields.
+
+Final QA Checklist (must pass)
+
+ Dropdown opens below input consistently
+
+ No “Status” field when creating customer
+
+ “Next” flow: autofocus + Enter navigation + minimal blocking
+
+ “Membership Plan” removed from details
+
+ Creating customer persists to DB and survives refresh
+
+ Customer count matches CSV (no duplicates added on re-import)
+
+ Time/day preference fields removed everywhere

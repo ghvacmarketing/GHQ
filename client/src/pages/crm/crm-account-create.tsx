@@ -44,13 +44,6 @@ const ACCOUNT_TYPES: { value: AccountType; label: string; description: string; i
   { value: "COMMERCIAL", label: "Commercial", description: "Business and commercial properties", icon: Building2 },
 ];
 
-const ACCOUNT_STATUSES: { value: AccountStatus; label: string }[] = [
-  { value: "PROSPECT", label: "Prospect" },
-  { value: "ACTIVE", label: "Active" },
-  { value: "INACTIVE", label: "Inactive" },
-  { value: "DO_NOT_SERVICE", label: "Do Not Service" },
-];
-
 const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
   { value: "WEBSITE", label: "Website" },
   { value: "REFERRAL", label: "Referral" },
@@ -67,9 +60,6 @@ const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
   { value: "OTHER", label: "Other" },
 ];
 
-const MEMBERSHIP_PLANS = ["None", "Basic", "Silver", "Gold", "Platinum"];
-const SERVICE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const TIME_SLOTS = ["Morning (8AM-12PM)", "Afternoon (12PM-4PM)", "Evening (4PM-7PM)", "Flexible"];
 const BILLING_METHODS = ["Invoice", "Credit Card on File", "Check", "ACH"];
 
 type FormStep = 1 | 2 | 3 | 4 | 5;
@@ -95,9 +85,6 @@ interface FormData {
   zip: string;
   accessInstructions: string;
   gateCode: string;
-  membershipPlan: string;
-  preferredServiceDay: string;
-  preferredTimeSlot: string;
   specialInstructions: string;
   managementCompanyName: string;
   portfolioSize: string;
@@ -142,9 +129,6 @@ const initialFormData: FormData = {
   zip: "",
   accessInstructions: "",
   gateCode: "",
-  membershipPlan: "None",
-  preferredServiceDay: "",
-  preferredTimeSlot: "",
   specialInstructions: "",
   managementCompanyName: "",
   portfolioSize: "",
@@ -255,9 +239,6 @@ export default function CrmAccountCreate() {
 
       if (formData.accountType === "RESIDENTIAL") {
         payload.residentialProfile = {
-          membershipPlan: formData.membershipPlan !== "None" ? formData.membershipPlan : null,
-          preferredServiceDay: formData.preferredServiceDay || null,
-          preferredTimeSlot: formData.preferredTimeSlot || null,
           specialInstructions: formData.specialInstructions || null,
         };
       } else if (formData.accountType === "PROPERTY_MANAGER") {
@@ -396,9 +377,6 @@ export default function CrmAccountCreate() {
             <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Create New Customer</h1>
             <p className="text-slate-500 text-sm mt-1">Add a new account to your CRM</p>
           </div>
-          <Badge className="ml-2 bg-blue-100 text-blue-700 border-blue-200" data-testid="badge-status">
-            {ACCOUNT_STATUSES.find(s => s.value === formData.status)?.label || "PROSPECT"}
-          </Badge>
         </div>
 
         <div className="flex items-center justify-between mb-8">
@@ -644,28 +622,9 @@ export default function CrmAccountCreate() {
                       <SelectTrigger data-testid="select-lead-source">
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent position="popper" sideOffset={4}>
                         {LEAD_SOURCES.map((source) => (
                           <SelectItem key={source.value} value={source.value}>{source.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(val) => updateField("status", val as AccountStatus)}
-                    >
-                      <SelectTrigger data-testid="select-status">
-                        <SelectValue placeholder="Select" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ACCOUNT_STATUSES.map((status) => (
-                          <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -798,58 +757,6 @@ export default function CrmAccountCreate() {
 
                 {formData.accountType === "RESIDENTIAL" && (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Membership Plan</Label>
-                        <Select
-                          value={formData.membershipPlan}
-                          onValueChange={(val) => updateField("membershipPlan", val)}
-                        >
-                          <SelectTrigger data-testid="select-membership-plan">
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {MEMBERSHIP_PLANS.map((plan) => (
-                              <SelectItem key={plan} value={plan}>{plan}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Preferred Service Day</Label>
-                        <Select
-                          value={formData.preferredServiceDay}
-                          onValueChange={(val) => updateField("preferredServiceDay", val)}
-                        >
-                          <SelectTrigger data-testid="select-preferred-day">
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {SERVICE_DAYS.map((day) => (
-                              <SelectItem key={day} value={day}>{day}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Preferred Time Slot</Label>
-                        <Select
-                          value={formData.preferredTimeSlot}
-                          onValueChange={(val) => updateField("preferredTimeSlot", val)}
-                        >
-                          <SelectTrigger data-testid="select-preferred-time">
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {TIME_SLOTS.map((slot) => (
-                              <SelectItem key={slot} value={slot}>{slot}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="specialInstructions">Special Instructions</Label>
                       <Textarea
@@ -921,7 +828,7 @@ export default function CrmAccountCreate() {
                           <SelectTrigger data-testid="select-billing-method">
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent position="popper" sideOffset={4}>
                             {BILLING_METHODS.map((method) => (
                               <SelectItem key={method} value={method}>{method}</SelectItem>
                             ))}
@@ -1131,10 +1038,6 @@ export default function CrmAccountCreate() {
                         <span className="font-medium">{ACCOUNT_TYPES.find(t => t.value === formData.accountType)?.label}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Status:</span>
-                        <Badge className="bg-blue-100 text-blue-700">{formData.status}</Badge>
-                      </div>
-                      <div className="flex justify-between">
                         <span className="text-slate-500">Display Name:</span>
                         <span className="font-medium">{formData.displayName || "—"}</span>
                       </div>
@@ -1202,32 +1105,6 @@ export default function CrmAccountCreate() {
                     </div>
                   </div>
                 </div>
-
-                {formData.accountType === "RESIDENTIAL" && (formData.membershipPlan !== "None" || formData.preferredServiceDay || formData.preferredTimeSlot) && (
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-slate-900 border-b pb-2">Residential Details</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      {formData.membershipPlan !== "None" && (
-                        <div>
-                          <span className="text-slate-500 block">Membership:</span>
-                          <span className="font-medium">{formData.membershipPlan}</span>
-                        </div>
-                      )}
-                      {formData.preferredServiceDay && (
-                        <div>
-                          <span className="text-slate-500 block">Preferred Day:</span>
-                          <span className="font-medium">{formData.preferredServiceDay}</span>
-                        </div>
-                      )}
-                      {formData.preferredTimeSlot && (
-                        <div>
-                          <span className="text-slate-500 block">Preferred Time:</span>
-                          <span className="font-medium">{formData.preferredTimeSlot}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 {formData.accountType === "PROPERTY_MANAGER" && (
                   <div className="space-y-4">
