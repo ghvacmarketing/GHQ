@@ -493,7 +493,7 @@ export default function CrmAccountCreate() {
                   <CardDescription>Enter the primary details for this account</CardDescription>
                 </CardHeader>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${formData.accountType !== "RESIDENTIAL" ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-4`}>
                   <div className="space-y-2">
                     <Label htmlFor="firstName">First Name *</Label>
                     <Input
@@ -514,18 +514,20 @@ export default function CrmAccountCreate() {
                       data-testid="input-last-name"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName">
-                      Company Name {(formData.accountType === "COMMERCIAL" || formData.accountType === "PROPERTY_MANAGER") && "*"}
-                    </Label>
-                    <Input
-                      id="companyName"
-                      placeholder="Type Here"
-                      value={formData.companyName}
-                      onChange={(e) => updateField("companyName", e.target.value)}
-                      data-testid="input-company-name"
-                    />
-                  </div>
+                  {formData.accountType !== "RESIDENTIAL" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="companyName">
+                        Company Name {(formData.accountType === "COMMERCIAL" || formData.accountType === "PROPERTY_MANAGER") && "*"}
+                      </Label>
+                      <Input
+                        id="companyName"
+                        placeholder="Type Here"
+                        value={formData.companyName}
+                        onChange={(e) => updateField("companyName", e.target.value)}
+                        data-testid="input-company-name"
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="displayName">Display Name *</Label>
                     <Input
@@ -563,45 +565,47 @@ export default function CrmAccountCreate() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <Label>Parent Account</Label>
-                    <Popover open={showParentSearch} onOpenChange={setShowParentSearch}>
-                      <PopoverTrigger asChild>
-                        <div className="relative">
-                          <Input
-                            placeholder="Type Here"
-                            value={parentSearchQuery}
-                            onChange={(e) => setParentSearchQuery(e.target.value)}
-                            onFocus={() => setShowParentSearch(true)}
-                            data-testid="input-parent-account"
-                          />
-                          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                        </div>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0" align="start">
-                        <div className="max-h-60 overflow-auto">
-                          {accountsForParentSearch?.accounts?.map((account) => (
-                            <button
-                              key={account.id}
-                              type="button"
-                              className="w-full text-left px-3 py-2 hover:bg-slate-100 text-sm"
-                              onClick={() => {
-                                updateField("parentAccountId", account.id);
-                                setParentSearchQuery(account.displayName);
-                                setShowParentSearch(false);
-                              }}
-                            >
-                              {account.displayName}
-                            </button>
-                          ))}
-                          {(!accountsForParentSearch?.accounts || accountsForParentSearch.accounts.length === 0) && parentSearchQuery.length > 1 && (
-                            <p className="px-3 py-2 text-sm text-slate-500">No accounts found</p>
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${formData.accountType !== "RESIDENTIAL" ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-4`}>
+                  {formData.accountType !== "RESIDENTIAL" && (
+                    <div className="space-y-2">
+                      <Label>Parent Account</Label>
+                      <Popover open={showParentSearch} onOpenChange={setShowParentSearch}>
+                        <PopoverTrigger asChild>
+                          <div className="relative">
+                            <Input
+                              placeholder="Type Here"
+                              value={parentSearchQuery}
+                              onChange={(e) => setParentSearchQuery(e.target.value)}
+                              onFocus={() => setShowParentSearch(true)}
+                              data-testid="input-parent-account"
+                            />
+                            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                          </div>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0" align="start">
+                          <div className="max-h-60 overflow-auto">
+                            {accountsForParentSearch?.accounts?.map((account) => (
+                              <button
+                                key={account.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 hover:bg-slate-100 text-sm"
+                                onClick={() => {
+                                  updateField("parentAccountId", account.id);
+                                  setParentSearchQuery(account.displayName);
+                                  setShowParentSearch(false);
+                                }}
+                              >
+                                {account.displayName}
+                              </button>
+                            ))}
+                            {(!accountsForParentSearch?.accounts || accountsForParentSearch.accounts.length === 0) && parentSearchQuery.length > 1 && (
+                              <p className="px-3 py-2 text-sm text-slate-500">No accounts found</p>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Customer Type</Label>
                     <Badge className="w-full justify-center py-2 bg-slate-100 text-slate-700 border-slate-200" data-testid="badge-customer-type">

@@ -32,15 +32,14 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
-import type { CrmUser, CrmAccount, CrmSite, CrmContact, AccountType, AccountStatus } from "@shared/schema";
+import type { CrmUser, CrmCustomer } from "@shared/schema";
 
-type AccountWithDetails = CrmAccount & {
-  primarySite: CrmSite | null;
-  primaryContact: CrmContact | null;
+type CustomerWithAddress = CrmCustomer & {
+  fullAddress: string | null;
 };
 
-type AccountsResponse = {
-  accounts: AccountWithDetails[];
+type CustomersResponse = {
+  customers: CustomerWithAddress[];
   pagination: {
     page: number;
     limit: number;
@@ -63,7 +62,7 @@ function useDebounce<T>(value: T, delay: number): T {
 export default function CrmCustomers() {
   const [, navigate] = useLocation();
   const [searchInput, setSearchInput] = useState("");
-  const [accountType, setAccountType] = useState("all");
+  const [customerType, setCustomerType] = useState("all");
   const [statusTab, setStatusTab] = useState("all");
   const [page, setPage] = useState(1);
 
@@ -82,99 +81,87 @@ export default function CrmCustomers() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, accountType, statusTab]);
+  }, [debouncedSearch, customerType, statusTab]);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
-    if (accountType !== "all") params.set("accountType", accountType);
+    if (customerType !== "all") params.set("customerType", customerType);
     if (statusTab !== "all") {
-      const statusMap: Record<string, AccountStatus> = {
-        prospects: "PROSPECT",
-        active: "ACTIVE",
-        inactive: "INACTIVE",
+      const statusMap: Record<string, string> = {
+        prospects: "Prospect",
+        active: "Active",
+        inactive: "Inactive",
       };
       if (statusMap[statusTab]) {
-        params.set("accountStatus", statusMap[statusTab]);
+        params.set("customerStatus", statusMap[statusTab]);
       }
     }
     params.set("page", String(page));
     params.set("limit", String(ITEMS_PER_PAGE));
     return params.toString();
-  }, [debouncedSearch, accountType, statusTab, page]);
+  }, [debouncedSearch, customerType, statusTab, page]);
 
-  const { data: accountsData, isLoading: accountsLoading } = useQuery<AccountsResponse>({
-    queryKey: ["/api/crm/accounts", queryParams],
+  const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
+    queryKey: ["/api/crm/customers", queryParams],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/accounts?${queryParams}`, {
+      const res = await fetch(`/api/crm/customers?${queryParams}`, {
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to fetch accounts");
+      if (!res.ok) throw new Error("Failed to fetch customers");
       return res.json();
     },
     enabled: !!currentUser,
   });
 
-  const formatAccountType = (type: AccountType) => {
-    const map: Record<AccountType, string> = {
-      RESIDENTIAL: "Residential",
-      PROPERTY_MANAGER: "Property Manager",
-      COMMERCIAL: "Commercial",
+  const formatCustomerType = (type: string | null) => {
+    if (!type) return "Unknown";
+    const map: Record<string, string> = {
+      Residential: "Residential",
+      Commercial: "Commercial",
+      "Property Manager": "Property Manager",
     };
     return map[type] || type;
   };
 
-  const getAccountTypeBadgeClass = (type: AccountType) => {
+  const getCustomerTypeBadgeClass = (type: string | null) => {
     switch (type) {
-      case "RESIDENTIAL":
+      case "Residential":
         return "bg-blue-100 text-blue-700 border-blue-200";
-      case "PROPERTY_MANAGER":
+      case "Property Manager":
         return "bg-purple-100 text-purple-700 border-purple-200";
-      case "COMMERCIAL":
+      case "Commercial":
         return "bg-amber-100 text-amber-700 border-amber-200";
       default:
         return "bg-slate-100 text-slate-600 border-slate-200";
     }
   };
 
-  const formatAccountStatus = (status: AccountStatus) => {
-    const map: Record<AccountStatus, string> = {
-      PROSPECT: "Prospect",
-      ACTIVE: "Active",
-      INACTIVE: "Inactive",
-      DO_NOT_SERVICE: "Do Not Service",
-    };
-    return map[status] || status;
+  const formatCustomerStatus = (status: string | null) => {
+    if (!status) return "Unknown";
+    return status;
   };
 
-  const getStatusBadgeClass = (status: AccountStatus) => {
+  const getStatusBadgeClass = (status: string | null) => {
     switch (status) {
-      case "PROSPECT":
+      case "Prospect":
         return "bg-slate-100 text-slate-700 border-slate-200";
-      case "ACTIVE":
+      case "Active":
         return "bg-green-100 text-green-700 border-green-200";
-      case "INACTIVE":
+      case "Inactive":
         return "bg-yellow-100 text-yellow-700 border-yellow-200";
-      case "DO_NOT_SERVICE":
+      case "Do Not Service":
         return "bg-red-100 text-red-700 border-red-200";
       default:
         return "bg-slate-100 text-slate-600 border-slate-200";
     }
   };
 
-  const formatPrimarySite = (site: CrmSite | null) => {
-    if (!site) return "—";
-    const parts = [site.address1, site.city, site.state, site.zip].filter(Boolean);
-    return parts.join(", ") || "—";
+  const formatAddress = (customer: CustomerWithAddress) => {
+    return customer.fullAddress || "—";
   };
 
-  const formatPrimaryContact = (contact: CrmContact | null) => {
-    if (!contact) return { name: "—", phone: "" };
-    const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "—";
-    return { name, phone: contact.phone || "" };
-  };
-
-  const formatCustomerSince = (date: string | null) => {
+  const formatCustomerSince = (date: Date | null) => {
     if (!date) return "—";
     try {
       return format(new Date(date), "MMM d, yyyy");
@@ -199,26 +186,26 @@ export default function CrmCustomers() {
     return null;
   }
 
-  const accounts = accountsData?.accounts || [];
-  const total = accountsData?.pagination?.total || 0;
-  const totalPages = accountsData?.pagination?.totalPages || 0;
+  const customers = customersData?.customers || [];
+  const total = customersData?.pagination?.total || 0;
+  const totalPages = customersData?.pagination?.totalPages || 0;
 
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-accounts-title">
-              Accounts
+            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-customers-title">
+              Customers
             </h1>
             <p className="text-slate-500 text-sm mt-1">
-              <span className="font-medium text-slate-700" data-testid="text-accounts-count">
-                {total.toLocaleString()} accounts
+              <span className="font-medium text-slate-700" data-testid="text-customers-count">
+                {total.toLocaleString()} customers
               </span>
             </p>
           </div>
           <Link href="/crm/accounts/new">
-            <Button data-testid="button-create-account">
+            <Button data-testid="button-create-customer">
               <Plus className="h-4 w-4 mr-2" />
               Create Account
             </Button>
@@ -241,7 +228,7 @@ export default function CrmCustomers() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Search by name or company..."
+                    placeholder="Search by name, phone, or address..."
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
                     className="pl-10"
@@ -249,15 +236,15 @@ export default function CrmCustomers() {
                   />
                 </div>
 
-                <Select value={accountType} onValueChange={setAccountType}>
-                  <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-account-type">
-                    <SelectValue placeholder="Account Type" />
+                <Select value={customerType} onValueChange={setCustomerType}>
+                  <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-customer-type">
+                    <SelectValue placeholder="Customer Type" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="RESIDENTIAL">Residential</SelectItem>
-                    <SelectItem value="PROPERTY_MANAGER">Property Manager</SelectItem>
-                    <SelectItem value="COMMERCIAL">Commercial</SelectItem>
+                    <SelectItem value="Residential">Residential</SelectItem>
+                    <SelectItem value="Property Manager">Property Manager</SelectItem>
+                    <SelectItem value="Commercial">Commercial</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -270,16 +257,16 @@ export default function CrmCustomers() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-slate-50">
-                  <TableHead className="font-semibold">Display Name</TableHead>
-                  <TableHead className="font-semibold">Account Type</TableHead>
-                  <TableHead className="font-semibold">Account Status</TableHead>
-                  <TableHead className="font-semibold hidden md:table-cell">Primary Site</TableHead>
-                  <TableHead className="font-semibold hidden lg:table-cell">Primary Contact</TableHead>
+                  <TableHead className="font-semibold">Name</TableHead>
+                  <TableHead className="font-semibold">Type</TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold hidden md:table-cell">Address</TableHead>
+                  <TableHead className="font-semibold hidden lg:table-cell">Phone</TableHead>
                   <TableHead className="font-semibold hidden sm:table-cell">Customer Since</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {accountsLoading ? (
+                {customersLoading ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-5 w-32" /></TableCell>
@@ -290,69 +277,54 @@ export default function CrmCustomers() {
                       <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
                     </TableRow>
                   ))
-                ) : accounts.length === 0 ? (
+                ) : customers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-12">
                       <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                      <p className="text-slate-500 font-medium">No accounts found</p>
+                      <p className="text-slate-500 font-medium">No customers found</p>
                       <p className="text-slate-400 text-sm mt-1">
                         Try adjusting your search or filters
                       </p>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  accounts.map((account) => {
-                    const primaryContact = formatPrimaryContact(account.primaryContact);
-                    return (
-                      <TableRow
-                        key={account.id}
-                        className="cursor-pointer hover:bg-slate-50 transition-colors"
-                        data-testid={`row-account-${account.id}`}
-                        onClick={() => navigate(`/crm/accounts/${account.id}`)}
-                      >
-                        <TableCell className="font-medium text-slate-900">
-                          {account.displayName}
-                          {account.companyName && (
-                            <span className="text-slate-500 text-sm block">
-                              {account.companyName}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={getAccountTypeBadgeClass(account.accountType)}
-                          >
-                            {formatAccountType(account.accountType)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={getStatusBadgeClass(account.accountStatus)}
-                          >
-                            {formatAccountStatus(account.accountStatus)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell text-slate-600 max-w-xs truncate">
-                          {formatPrimarySite(account.primarySite)}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell text-slate-600">
-                          <div>
-                            <span>{primaryContact.name}</span>
-                            {primaryContact.phone && (
-                              <span className="text-slate-400 text-sm block">
-                                {primaryContact.phone}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell text-slate-600">
-                          {formatCustomerSince(account.customerSince)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+                  customers.map((customer) => (
+                    <TableRow
+                      key={customer.id}
+                      className="cursor-pointer hover:bg-slate-50 transition-colors"
+                      data-testid={`row-customer-${customer.id}`}
+                      onClick={() => navigate(`/crm/customers/${customer.id}`)}
+                    >
+                      <TableCell className="font-medium text-slate-900">
+                        {customer.name}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={getCustomerTypeBadgeClass(customer.customerType)}
+                        >
+                          {formatCustomerType(customer.customerType)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={getStatusBadgeClass(customer.customerStatus)}
+                        >
+                          {formatCustomerStatus(customer.customerStatus)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-slate-600 max-w-xs truncate">
+                        {formatAddress(customer)}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-slate-600">
+                        {customer.phone || "—"}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell text-slate-600">
+                        {formatCustomerSince(customer.createdAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
@@ -362,7 +334,7 @@ export default function CrmCustomers() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t bg-slate-50">
               <p className="text-sm text-slate-600">
                 Showing {((page - 1) * ITEMS_PER_PAGE) + 1} to{" "}
-                {Math.min(page * ITEMS_PER_PAGE, total)} of {total.toLocaleString()} accounts
+                {Math.min(page * ITEMS_PER_PAGE, total)} of {total.toLocaleString()} customers
               </p>
               <div className="flex items-center gap-2">
                 <Button
