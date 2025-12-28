@@ -4641,6 +4641,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/customers/stats - Get customer counts by status
+  app.get("/api/crm/customers/stats", requireCrmAuth, async (req, res) => {
+    try {
+      const [prospectsResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(customers)
+        .where(sql`LOWER(${customers.customerStatus}) = 'prospect'`);
+      
+      const [customersResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(customers)
+        .where(sql`LOWER(${customers.customerStatus}) = 'customer'`);
+      
+      const [totalResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(customers);
+
+      return res.json({
+        prospects: Number(prospectsResult?.count || 0),
+        customers: Number(customersResult?.count || 0),
+        total: Number(totalResult?.count || 0),
+      });
+    } catch (error) {
+      console.error("Error fetching customer stats:", error);
+      return res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
   // POST /api/crm/customers - Create customer (ADMIN/SALES only)
   app.post("/api/crm/customers", requireCrmSalesOrAbove, async (req, res) => {
     try {

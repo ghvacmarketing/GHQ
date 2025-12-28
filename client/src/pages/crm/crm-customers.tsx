@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -113,6 +112,16 @@ export default function CrmCustomers() {
     enabled: !!currentUser,
   });
 
+  const { data: statsData } = useQuery<{ prospects: number; customers: number; total: number }>({
+    queryKey: ["/api/crm/customers/stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/customers/stats", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch stats");
+      return res.json();
+    },
+    enabled: !!currentUser,
+  });
+
   const formatCustomerType = (type: string | null) => {
     if (!type) return "Residential";
     const normalizedType = type.toLowerCase();
@@ -211,13 +220,59 @@ export default function CrmCustomers() {
         <Card className="bg-white border shadow-sm">
           <CardContent className="p-4">
             <div className="flex flex-col gap-4">
-              <Tabs value={statusTab} onValueChange={setStatusTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="all" data-testid="tab-status-all">All</TabsTrigger>
-                  <TabsTrigger value="prospects" data-testid="tab-status-prospects">Prospects</TabsTrigger>
-                  <TabsTrigger value="customers" data-testid="tab-status-customers">Customers</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setStatusTab("all")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    statusTab === "all"
+                      ? "bg-slate-800 text-white shadow-md"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                  data-testid="tab-status-all"
+                >
+                  <span className="w-2 h-2 rounded-full bg-slate-400" />
+                  All
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                    statusTab === "all" ? "bg-white/20" : "bg-slate-200"
+                  }`}>
+                    {statsData?.total?.toLocaleString() || "—"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setStatusTab("prospects")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    statusTab === "prospects"
+                      ? "bg-amber-500 text-white shadow-md"
+                      : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                  }`}
+                  data-testid="tab-status-prospects"
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  Prospects
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                    statusTab === "prospects" ? "bg-white/20" : "bg-amber-100"
+                  }`}>
+                    {statsData?.prospects?.toLocaleString() || "—"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setStatusTab("customers")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    statusTab === "customers"
+                      ? "bg-green-500 text-white shadow-md"
+                      : "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
+                  }`}
+                  data-testid="tab-status-customers"
+                >
+                  <span className="w-2 h-2 rounded-full bg-green-400" />
+                  Customers
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                    statusTab === "customers" ? "bg-white/20" : "bg-green-100"
+                  }`}>
+                    {statsData?.customers?.toLocaleString() || "—"}
+                  </span>
+                </button>
+              </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
