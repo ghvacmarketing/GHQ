@@ -34,9 +34,12 @@ import {
   XCircle,
   Loader2,
   Info,
+  FileText,
+  CheckSquare,
+  Package,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import type { CrmUser, CrmJob } from "@shared/schema";
+import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, WorkOrderStatus } from "@shared/schema";
 import {
   DndContext,
   closestCenter,
@@ -50,13 +53,19 @@ import {
   useDraggable,
 } from "@dnd-kit/core";
 
-type JobStatus = "new" | "scheduled" | "dispatched" | "en_route" | "on_site" | "completed" | "invoiced" | "paid" | "cancelled";
-type FilterStatus = "all" | "new" | "scheduled" | "dispatched" | "en_route" | "on_site" | "completed";
+type FilterStatus = "all" | "scheduled" | "dispatched" | "en_route" | "on_site" | "completed";
 
-interface DispatchJob extends CrmJob {
+interface DispatchWorkOrder extends CrmWorkOrder {
+  job: CrmJob | null;
+  customer: CrmCustomer | null;
+  tech: CrmUser | null;
   customerName: string;
-  assignedTechId: string | null;
-  assignmentId: string | null;
+  customerPhone: string | null;
+  propertyAddress: string | null;
+  jobType: string;
+  priority: string | null;
+  description: string | null;
+  techName: string | null;
 }
 
 interface Technician {
@@ -87,14 +96,11 @@ const TOTAL_HOURS = END_HOUR - START_HOUR;
 const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i + START_HOUR);
 
 const statusColors: Record<string, { bg: string; border: string; text: string }> = {
-  new: { bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-700" },
   scheduled: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
   dispatched: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700" },
   en_route: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" },
   on_site: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" },
   completed: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
-  invoiced: { bg: "bg-teal-50", border: "border-teal-200", text: "text-teal-700" },
-  paid: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" },
   cancelled: { bg: "bg-red-50", border: "border-red-200", text: "text-red-500" },
 };
 
@@ -106,14 +112,11 @@ const jobTypeColors: Record<string, { bg: string; border: string; text: string }
 };
 
 const statusStripeColors: Record<string, string> = {
-  new: "border-l-slate-400",
   scheduled: "border-l-blue-500",
   dispatched: "border-l-purple-500",
   en_route: "border-l-amber-500",
   on_site: "border-l-orange-500",
   completed: "border-l-green-500",
-  invoiced: "border-l-green-500",
-  paid: "border-l-green-500",
   cancelled: "border-l-red-500",
 };
 
@@ -135,14 +138,11 @@ function getJobTypeColor(jobType: string | null | undefined): { bg: string; bord
 }
 
 const statusLabels: Record<string, string> = {
-  new: "New",
   scheduled: "Scheduled",
   dispatched: "Dispatched",
   en_route: "En Route",
   on_site: "On Site",
   completed: "Completed",
-  invoiced: "Invoiced",
-  paid: "Paid",
   cancelled: "Cancelled",
 };
 
@@ -152,31 +152,30 @@ function formatHour(hour: number): string {
   return `${hour}am`;
 }
 
-function getJobDisplayTimes(job: DispatchJob): { startHour: number; endHour: number } {
-  if (!job.scheduledStart || !job.scheduledEnd) {
+function getWorkOrderDisplayTimes(workOrder: DispatchWorkOrder): { startHour: number; endHour: number } {
+  if (!workOrder.scheduledStart || !workOrder.scheduledEnd) {
     return { startHour: START_HOUR, endHour: START_HOUR + 1 };
   }
-  const start = new Date(job.scheduledStart);
-  const end = new Date(job.scheduledEnd);
-  // Use local hours since users schedule jobs in their local timezone
+  const start = new Date(workOrder.scheduledStart);
+  const end = new Date(workOrder.scheduledEnd);
   const startHour = Math.max(START_HOUR, Math.min(END_HOUR, start.getHours() + start.getMinutes() / 60));
   const endHour = Math.max(START_HOUR, Math.min(END_HOUR, end.getHours() + end.getMinutes() / 60));
   return { startHour, endHour: endHour > startHour ? endHour : startHour + 1 };
 }
 
-interface DraggableJobCardProps {
-  job: DispatchJob;
-  onResize: (jobId: string, newStart: number, newEnd: number) => void;
+interface DraggableWorkOrderCardProps {
+  workOrder: DispatchWorkOrder;
+  onResize: (workOrderId: string, newStart: number, newEnd: number) => void;
   isDragging?: boolean;
-  onClick?: (jobId: string) => void;
+  onClick?: (workOrderId: string) => void;
 }
 
-function DraggableJobCard({ job, onResize, isDragging, onClick }: DraggableJobCardProps) {
-  const jobColors = getJobTypeColor(job.jobType);
-  const statusStripe = statusStripeColors[job.status] || statusStripeColors.new;
-  const priorityStyle = priorityBadgeColors[job.priority || "normal"] || priorityBadgeColors.normal;
-  const isCompletedStatus = ["completed", "invoiced", "paid", "cancelled"].includes(job.status);
-  const { startHour, endHour } = getJobDisplayTimes(job);
+function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: DraggableWorkOrderCardProps) {
+  const jobColors = getJobTypeColor(workOrder.jobType);
+  const statusStripe = statusStripeColors[workOrder.status] || statusStripeColors.scheduled;
+  const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
+  const isCompletedStatus = ["completed", "cancelled"].includes(workOrder.status);
+  const { startHour, endHour } = getWorkOrderDisplayTimes(workOrder);
   
   const cardRef = useRef<HTMLDivElement>(null);
   const [isResizingLeft, setIsResizingLeft] = useState(false);
@@ -197,8 +196,8 @@ function DraggableJobCard({ job, onResize, isDragging, onClick }: DraggableJobCa
   }, [startHour, endHour, isResizing]);
   
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: job.id,
-    data: { job },
+    id: workOrder.id,
+    data: { workOrder },
     disabled: isResizing,
   });
 
@@ -243,9 +242,9 @@ function DraggableJobCard({ job, onResize, isDragging, onClick }: DraggableJobCa
 
     const handleMouseUp = () => {
       if (isResizingLeft) {
-        onResize(job.id, visualStart, originalEnd.current);
+        onResize(workOrder.id, visualStart, originalEnd.current);
       } else if (isResizingRight) {
-        onResize(job.id, originalStart.current, visualEnd);
+        onResize(workOrder.id, originalStart.current, visualEnd);
       }
       setIsResizingLeft(false);
       setIsResizingRight(false);
@@ -258,7 +257,7 @@ function DraggableJobCard({ job, onResize, isDragging, onClick }: DraggableJobCa
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, isResizingLeft, isResizingRight, job.id, visualStart, visualEnd, onResize]);
+  }, [isResizing, isResizingLeft, isResizingRight, workOrder.id, visualStart, visualEnd, onResize]);
 
   const displayStart = isResizing ? visualStart : startHour;
   const displayEnd = isResizing ? visualEnd : endHour;
@@ -281,14 +280,14 @@ function DraggableJobCard({ job, onResize, isDragging, onClick }: DraggableJobCa
       }}
       className={`absolute top-1 bottom-1 rounded border-l-4 ${jobColors.bg} ${jobColors.border} ${jobColors.text} ${statusStripe} overflow-hidden ${isDragging ? 'z-50' : ''} ${isCompletedStatus ? 'opacity-60' : ''}`}
       style={style}
-      data-testid={`job-card-${job.id}`}
+      data-testid={`workorder-card-${workOrder.id}`}
     >
-      {job.priority && job.priority !== "normal" && (
+      {workOrder.priority && workOrder.priority !== "normal" && (
         <div 
           className={`absolute top-0.5 right-1 px-1 py-0 text-[9px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}
-          data-testid={`priority-badge-${job.id}`}
+          data-testid={`priority-badge-${workOrder.id}`}
         >
-          {job.priority.toUpperCase()}
+          {workOrder.priority.toUpperCase()}
         </div>
       )}
       
@@ -296,7 +295,7 @@ function DraggableJobCard({ job, onResize, isDragging, onClick }: DraggableJobCa
         className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-20 flex items-center justify-center hover:bg-black/10"
         onMouseDown={(e) => handleResizeStart(e, 'left')}
         onPointerDown={(e) => e.stopPropagation()}
-        data-testid={`resize-left-${job.id}`}
+        data-testid={`resize-left-${workOrder.id}`}
       >
         <div className="w-0.5 h-4 bg-current opacity-30 rounded" />
       </div>
@@ -305,7 +304,7 @@ function DraggableJobCard({ job, onResize, isDragging, onClick }: DraggableJobCa
         className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize z-20 flex items-center justify-center hover:bg-black/10"
         onMouseDown={(e) => handleResizeStart(e, 'right')}
         onPointerDown={(e) => e.stopPropagation()}
-        data-testid={`resize-right-${job.id}`}
+        data-testid={`resize-right-${workOrder.id}`}
       >
         <div className="w-0.5 h-4 bg-current opacity-30 rounded" />
       </div>
@@ -316,22 +315,22 @@ function DraggableJobCard({ job, onResize, isDragging, onClick }: DraggableJobCa
         {...listeners}
         onClick={(e) => {
           e.stopPropagation();
-          onClick?.(job.id);
+          onClick?.(workOrder.id);
         }}
       >
-        <p className="text-xs font-medium truncate">{job.customerName}</p>
-        <p className="text-xs truncate opacity-70">{job.jobType}</p>
+        <p className="text-xs font-medium truncate">{workOrder.customerName}</p>
+        <p className="text-xs truncate opacity-70">{workOrder.jobType} #{workOrder.workOrderNumber}</p>
       </div>
     </div>
   );
 }
 
-function JobCardOverlay({ job, timelineWidth }: { job: DispatchJob; timelineWidth: number }) {
-  const jobColors = getJobTypeColor(job.jobType);
-  const statusStripe = statusStripeColors[job.status] || statusStripeColors.new;
-  const priorityStyle = priorityBadgeColors[job.priority || "normal"] || priorityBadgeColors.normal;
-  const isCompletedStatus = ["completed", "invoiced", "paid", "cancelled"].includes(job.status);
-  const { startHour, endHour } = getJobDisplayTimes(job);
+function WorkOrderCardOverlay({ workOrder, timelineWidth }: { workOrder: DispatchWorkOrder; timelineWidth: number }) {
+  const jobColors = getJobTypeColor(workOrder.jobType);
+  const statusStripe = statusStripeColors[workOrder.status] || statusStripeColors.scheduled;
+  const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
+  const isCompletedStatus = ["completed", "cancelled"].includes(workOrder.status);
+  const { startHour, endHour } = getWorkOrderDisplayTimes(workOrder);
   const duration = endHour - startHour;
   const widthPx = Math.max(60, (duration / TOTAL_HOURS) * timelineWidth);
   
@@ -340,28 +339,28 @@ function JobCardOverlay({ job, timelineWidth }: { job: DispatchJob; timelineWidt
       className={`rounded border-l-4 ${jobColors.bg} ${jobColors.border} ${jobColors.text} ${statusStripe} px-3 py-1 shadow-md cursor-grabbing flex flex-col justify-center relative ${isCompletedStatus ? 'opacity-60' : ''}`}
       style={{ width: `${widthPx}px`, height: '48px' }}
     >
-      {job.priority && job.priority !== "normal" && (
+      {workOrder.priority && workOrder.priority !== "normal" && (
         <div 
           className={`absolute top-0.5 right-1 px-1 py-0 text-[9px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}
         >
-          {job.priority.toUpperCase()}
+          {workOrder.priority.toUpperCase()}
         </div>
       )}
-      <p className="text-xs font-medium truncate">{job.customerName}</p>
-      <p className="text-xs truncate opacity-70">{job.jobType}</p>
+      <p className="text-xs font-medium truncate">{workOrder.customerName}</p>
+      <p className="text-xs truncate opacity-70">{workOrder.jobType} #{workOrder.workOrderNumber}</p>
     </div>
   );
 }
 
 interface DroppableTechnicianRowProps {
   tech: Technician;
-  jobs: DispatchJob[];
-  onResize: (jobId: string, newStart: number, newEnd: number) => void;
+  workOrders: DispatchWorkOrder[];
+  onResize: (workOrderId: string, newStart: number, newEnd: number) => void;
   activeId: string | null;
-  onJobClick?: (jobId: string) => void;
+  onWorkOrderClick?: (workOrderId: string) => void;
 }
 
-function DroppableTechnicianRow({ tech, jobs, onResize, activeId, onJobClick }: DroppableTechnicianRowProps) {
+function DroppableTechnicianRow({ tech, workOrders, onResize, activeId, onWorkOrderClick }: DroppableTechnicianRowProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: `technician-${tech.id}`,
     data: { technicianId: tech.id },
@@ -374,7 +373,7 @@ function DroppableTechnicianRow({ tech, jobs, onResize, activeId, onJobClick }: 
       data-testid={`technician-row-${tech.id}`}
     >
       <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 flex items-center">
-        <div className={`w-1 h-10 rounded-full mr-2 ${jobs.length > 0 ? 'bg-green-500' : 'bg-slate-300'}`} />
+        <div className={`w-1 h-10 rounded-full mr-2 ${workOrders.length > 0 ? 'bg-green-500' : 'bg-slate-300'}`} />
         <div className="w-10 h-10 rounded bg-slate-200 flex items-center justify-center mr-2 flex-shrink-0">
           <svg className="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
@@ -382,7 +381,7 @@ function DroppableTechnicianRow({ tech, jobs, onResize, activeId, onJobClick }: 
         </div>
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-800 truncate">{tech.name}</p>
-          <p className="text-xs text-slate-400">{jobs.length} jobs today</p>
+          <p className="text-xs text-slate-400">{workOrders.length} work orders</p>
         </div>
       </div>
       <div ref={setNodeRef} className={`flex-1 relative h-14 ${isOver ? 'bg-slate-50' : ''}`}>
@@ -395,13 +394,13 @@ function DroppableTechnicianRow({ tech, jobs, onResize, activeId, onJobClick }: 
             />
           ))}
         </div>
-        {jobs.map((job) => (
-          <DraggableJobCard 
-            key={job.id} 
-            job={job} 
+        {workOrders.map((wo) => (
+          <DraggableWorkOrderCard 
+            key={wo.id} 
+            workOrder={wo} 
             onResize={onResize}
-            isDragging={activeId === job.id}
-            onClick={onJobClick}
+            isDragging={activeId === wo.id}
+            onClick={onWorkOrderClick}
           />
         ))}
       </div>
@@ -409,7 +408,7 @@ function DroppableTechnicianRow({ tech, jobs, onResize, activeId, onJobClick }: 
   );
 }
 
-function UnassignedRow({ jobs, onResize, activeId, onJobClick }: { jobs: DispatchJob[]; onResize: (jobId: string, newStart: number, newEnd: number) => void; activeId: string | null; onJobClick?: (jobId: string) => void }) {
+function UnassignedRow({ workOrders, onResize, activeId, onWorkOrderClick }: { workOrders: DispatchWorkOrder[]; onResize: (workOrderId: string, newStart: number, newEnd: number) => void; activeId: string | null; onWorkOrderClick?: (workOrderId: string) => void }) {
   const { isOver, setNodeRef } = useDroppable({
     id: `technician-unassigned`,
     data: { technicianId: null },
@@ -421,7 +420,7 @@ function UnassignedRow({ jobs, onResize, activeId, onJobClick }: { jobs: Dispatc
       data-testid="unassigned-row"
     >
       <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 flex items-center">
-        <div className={`w-1 h-10 rounded-full mr-2 ${jobs.length > 0 ? 'bg-amber-500' : 'bg-slate-300'}`} />
+        <div className={`w-1 h-10 rounded-full mr-2 ${workOrders.length > 0 ? 'bg-amber-500' : 'bg-slate-300'}`} />
         <div className="w-10 h-10 rounded bg-slate-300 flex items-center justify-center mr-2 flex-shrink-0">
           <svg className="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
@@ -429,7 +428,7 @@ function UnassignedRow({ jobs, onResize, activeId, onJobClick }: { jobs: Dispatc
         </div>
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-800">Unassigned</p>
-          <p className="text-xs text-amber-600">{jobs.length} pending</p>
+          <p className="text-xs text-amber-600">{workOrders.length} pending</p>
         </div>
       </div>
       <div ref={setNodeRef} className={`flex-1 relative h-14 ${isOver ? 'bg-amber-50' : ''}`}>
@@ -442,13 +441,13 @@ function UnassignedRow({ jobs, onResize, activeId, onJobClick }: { jobs: Dispatc
             />
           ))}
         </div>
-        {jobs.map((job) => (
-          <DraggableJobCard 
-            key={job.id} 
-            job={job} 
+        {workOrders.map((wo) => (
+          <DraggableWorkOrderCard 
+            key={wo.id} 
+            workOrder={wo} 
             onResize={onResize}
-            isDragging={activeId === job.id}
-            onClick={onJobClick}
+            isDragging={activeId === wo.id}
+            onClick={onWorkOrderClick}
           />
         ))}
       </div>
@@ -456,35 +455,35 @@ function UnassignedRow({ jobs, onResize, activeId, onJobClick }: { jobs: Dispatc
   );
 }
 
-function MobileJobCard({ job, technician, onClick }: { job: DispatchJob; technician?: Technician; onClick?: (jobId: string) => void }) {
-  const jobColors = getJobTypeColor(job.jobType);
-  const statusStripe = statusStripeColors[job.status] || statusStripeColors.new;
-  const priorityStyle = priorityBadgeColors[job.priority || "normal"] || priorityBadgeColors.normal;
-  const isCompletedStatus = ["completed", "invoiced", "paid", "cancelled"].includes(job.status);
-  const { startHour, endHour } = getJobDisplayTimes(job);
+function MobileWorkOrderCard({ workOrder, technician, onClick }: { workOrder: DispatchWorkOrder; technician?: Technician; onClick?: (workOrderId: string) => void }) {
+  const jobColors = getJobTypeColor(workOrder.jobType);
+  const statusStripe = statusStripeColors[workOrder.status] || statusStripeColors.scheduled;
+  const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
+  const isCompletedStatus = ["completed", "cancelled"].includes(workOrder.status);
+  const { startHour, endHour } = getWorkOrderDisplayTimes(workOrder);
 
   return (
     <Card 
       className={`${jobColors.bg} ${jobColors.border} border border-l-4 ${statusStripe} cursor-pointer hover:shadow-md transition-shadow ${isCompletedStatus ? 'opacity-60' : ''}`} 
-      data-testid={`mobile-job-card-${job.id}`}
-      onClick={() => onClick?.(job.id)}
+      data-testid={`mobile-workorder-card-${workOrder.id}`}
+      onClick={() => onClick?.(workOrder.id)}
     >
       <CardContent className="p-3 relative">
-        {job.priority && job.priority !== "normal" && (
+        {workOrder.priority && workOrder.priority !== "normal" && (
           <div 
             className={`absolute top-2 right-2 px-1.5 py-0.5 text-[10px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}
-            data-testid={`mobile-priority-badge-${job.id}`}
+            data-testid={`mobile-priority-badge-${workOrder.id}`}
           >
-            {job.priority.toUpperCase()}
+            {workOrder.priority.toUpperCase()}
           </div>
         )}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <p className={`font-semibold text-sm ${jobColors.text}`}>{job.customerName}</p>
-            <p className={`text-xs ${jobColors.text} opacity-80`}>{job.jobType}</p>
+            <p className={`font-semibold text-sm ${jobColors.text}`}>{workOrder.customerName}</p>
+            <p className={`text-xs ${jobColors.text} opacity-80`}>{workOrder.jobType} #{workOrder.workOrderNumber}</p>
           </div>
-          <Badge variant="outline" className={`text-xs ${job.priority && job.priority !== "normal" ? 'mr-12' : ''}`}>
-            {statusLabels[job.status] || job.status}
+          <Badge variant="outline" className={`text-xs ${workOrder.priority && workOrder.priority !== "normal" ? 'mr-12' : ''}`}>
+            {statusLabels[workOrder.status] || workOrder.status}
           </Badge>
         </div>
         <div className="flex items-center gap-4 mt-2 text-xs text-slate-600">
@@ -494,7 +493,7 @@ function MobileJobCard({ job, technician, onClick }: { job: DispatchJob; technic
           </div>
           <div className="flex items-center gap-1">
             <User className="h-3 w-3" />
-            <span>{technician?.name || "Unassigned"}</span>
+            <span>{technician?.name || workOrder.techName || "Unassigned"}</span>
           </div>
         </div>
       </CardContent>
@@ -504,8 +503,21 @@ function MobileJobCard({ job, technician, onClick }: { job: DispatchJob; technic
 
 interface DispatchData {
   technicians: { id: string; name: string; email: string; role: string }[];
-  jobs: DispatchJob[];
+  workOrders: DispatchWorkOrder[];
   date: string;
+}
+
+function enrichWorkOrder(wo: any): DispatchWorkOrder {
+  return {
+    ...wo,
+    customerName: wo.customer?.name || "Unknown Customer",
+    customerPhone: wo.customer?.phone || null,
+    propertyAddress: wo.customer?.address1 || null,
+    jobType: wo.job?.jobType || "Service",
+    priority: wo.job?.priority || "normal",
+    description: wo.job?.description || null,
+    techName: wo.tech?.name || null,
+  };
 }
 
 export default function CrmDispatch() {
@@ -514,16 +526,16 @@ export default function CrmDispatch() {
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [localJobs, setLocalJobs] = useState<DispatchJob[]>([]);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [localWorkOrders, setLocalWorkOrders] = useState<DispatchWorkOrder[]>([]);
+  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
   const { toast } = useToast();
   
-  const selectedJob = selectedJobId ? localJobs.find(j => j.id === selectedJobId) : null;
+  const selectedWorkOrder = selectedWorkOrderId ? localWorkOrders.find(wo => wo.id === selectedWorkOrderId) : null;
 
-  const handleJobClick = useCallback((jobId: string) => {
-    setSelectedJobId(jobId);
+  const handleWorkOrderClick = useCallback((workOrderId: string) => {
+    setSelectedWorkOrderId(workOrderId);
     setIsSheetOpen(true);
     setNewNote("");
   }, []);
@@ -543,10 +555,15 @@ export default function CrmDispatch() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
-  const { data: dispatchData, isLoading: dispatchLoading } = useQuery<DispatchData>({
-    queryKey: ["/api/crm/dispatch", dateString],
+  const { data: techniciansData } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
+    queryKey: ["/api/crm/users"],
+    enabled: !!currentUser,
+  });
+
+  const { data: workOrdersData, isLoading: workOrdersLoading } = useQuery<any[]>({
+    queryKey: ["/api/crm/dispatch/work-orders", dateString],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/dispatch?date=${dateString}`, { credentials: "include" });
+      const res = await fetch(`/api/crm/dispatch/work-orders?date=${dateString}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch dispatch data");
       return res.json();
     },
@@ -554,12 +571,12 @@ export default function CrmDispatch() {
   });
 
   useEffect(() => {
-    if (dispatchData?.jobs) {
-      setLocalJobs(dispatchData.jobs);
+    if (workOrdersData) {
+      setLocalWorkOrders(workOrdersData.map(enrichWorkOrder));
     }
-  }, [dispatchData?.jobs]);
+  }, [workOrdersData]);
 
-  const technicians: Technician[] = (dispatchData?.technicians || [])
+  const technicians: Technician[] = (techniciansData || [])
     .filter(u => u.role !== "owner")
     .map((u, idx) => ({
       id: u.id,
@@ -568,93 +585,93 @@ export default function CrmDispatch() {
       color: techColors[idx % techColors.length],
     }));
 
-  const updateJobMutation = useMutation({
-    mutationFn: async (data: { jobId: string; updates: any }) => {
-      const res = await apiRequest("PATCH", `/api/crm/jobs/${data.jobId}`, data.updates);
+  const updateWorkOrderMutation = useMutation({
+    mutationFn: async (data: { workOrderId: string; updates: any }) => {
+      const res = await apiRequest("PATCH", `/api/crm/work-orders/${data.workOrderId}`, data.updates);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch", dateString] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders", dateString] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to update job",
+        title: "Failed to update work order",
         description: error.message,
         variant: "destructive",
       });
-      if (dispatchData?.jobs) {
-        setLocalJobs(dispatchData.jobs);
+      if (workOrdersData) {
+        setLocalWorkOrders(workOrdersData.map(enrichWorkOrder));
       }
     },
   });
 
-  const handleStatusChange = useCallback((newStatus: JobStatus) => {
-    if (!selectedJobId) return;
-    updateJobMutation.mutate({
-      jobId: selectedJobId,
+  const handleStatusChange = useCallback((newStatus: WorkOrderStatus) => {
+    if (!selectedWorkOrderId) return;
+    updateWorkOrderMutation.mutate({
+      workOrderId: selectedWorkOrderId,
       updates: { status: newStatus },
     }, {
       onSuccess: () => {
-        toast({ title: "Status updated", description: `Job status changed to ${statusLabels[newStatus]}` });
-        setLocalJobs(prev => prev.map(j => 
-          j.id === selectedJobId ? { ...j, status: newStatus } : j
+        toast({ title: "Status updated", description: `Work order status changed to ${statusLabels[newStatus]}` });
+        setLocalWorkOrders(prev => prev.map(wo => 
+          wo.id === selectedWorkOrderId ? { ...wo, status: newStatus } : wo
         ));
       }
     });
-  }, [selectedJobId, updateJobMutation, toast]);
+  }, [selectedWorkOrderId, updateWorkOrderMutation, toast]);
 
   const handleUnassign = useCallback(() => {
-    if (!selectedJobId) return;
-    updateJobMutation.mutate({
-      jobId: selectedJobId,
+    if (!selectedWorkOrderId) return;
+    updateWorkOrderMutation.mutate({
+      workOrderId: selectedWorkOrderId,
       updates: { assignedTechId: null, scheduledStart: null, scheduledEnd: null },
     }, {
       onSuccess: () => {
-        toast({ title: "Technician unassigned", description: "Job moved to unassigned queue" });
-        setLocalJobs(prev => prev.map(j => 
-          j.id === selectedJobId ? { ...j, assignedTechId: null, scheduledStart: null, scheduledEnd: null } as DispatchJob : j
+        toast({ title: "Technician unassigned", description: "Work order moved to unassigned queue" });
+        setLocalWorkOrders(prev => prev.map(wo => 
+          wo.id === selectedWorkOrderId ? { ...wo, assignedTechId: null, scheduledStart: null, scheduledEnd: null, techName: null } as DispatchWorkOrder : wo
         ));
       }
     });
-  }, [selectedJobId, updateJobMutation, toast]);
+  }, [selectedWorkOrderId, updateWorkOrderMutation, toast]);
 
-  const handleCancelJob = useCallback(() => {
-    if (!selectedJobId) return;
-    updateJobMutation.mutate({
-      jobId: selectedJobId,
+  const handleCancelWorkOrder = useCallback(() => {
+    if (!selectedWorkOrderId) return;
+    updateWorkOrderMutation.mutate({
+      workOrderId: selectedWorkOrderId,
       updates: { status: "cancelled", scheduledStart: null, scheduledEnd: null },
     }, {
       onSuccess: () => {
-        toast({ title: "Job cancelled", description: "The job has been cancelled" });
-        setLocalJobs(prev => prev.map(j => 
-          j.id === selectedJobId ? { ...j, status: "cancelled" as JobStatus, scheduledStart: null, scheduledEnd: null } as DispatchJob : j
+        toast({ title: "Work order cancelled", description: "The work order has been cancelled" });
+        setLocalWorkOrders(prev => prev.map(wo => 
+          wo.id === selectedWorkOrderId ? { ...wo, status: "cancelled" as WorkOrderStatus, scheduledStart: null, scheduledEnd: null } as DispatchWorkOrder : wo
         ));
         setIsSheetOpen(false);
       }
     });
-  }, [selectedJobId, updateJobMutation, toast]);
+  }, [selectedWorkOrderId, updateWorkOrderMutation, toast]);
 
   const handleSaveNotes = useCallback(() => {
-    if (!selectedJobId || !newNote.trim()) return;
-    const currentJob = localJobs.find(j => j.id === selectedJobId);
-    const updatedDescription = currentJob?.description 
-      ? `${currentJob.description}\n\n---\n${new Date().toLocaleDateString()}: ${newNote.trim()}`
+    if (!selectedWorkOrderId || !newNote.trim()) return;
+    const currentWO = localWorkOrders.find(wo => wo.id === selectedWorkOrderId);
+    const updatedNotes = currentWO?.techNotes 
+      ? `${currentWO.techNotes}\n\n---\n${new Date().toLocaleDateString()}: ${newNote.trim()}`
       : newNote.trim();
     
-    updateJobMutation.mutate({
-      jobId: selectedJobId,
-      updates: { description: updatedDescription },
+    updateWorkOrderMutation.mutate({
+      workOrderId: selectedWorkOrderId,
+      updates: { techNotes: updatedNotes },
     }, {
       onSuccess: () => {
-        toast({ title: "Notes saved", description: "Job notes have been updated" });
-        setLocalJobs(prev => prev.map(j => 
-          j.id === selectedJobId ? { ...j, description: updatedDescription } : j
+        toast({ title: "Notes saved", description: "Work order notes have been updated" });
+        setLocalWorkOrders(prev => prev.map(wo => 
+          wo.id === selectedWorkOrderId ? { ...wo, techNotes: updatedNotes } : wo
         ));
         setNewNote("");
       }
     });
-  }, [selectedJobId, newNote, localJobs, updateJobMutation, toast]);
+  }, [selectedWorkOrderId, newNote, localWorkOrders, updateWorkOrderMutation, toast]);
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -662,17 +679,15 @@ export default function CrmDispatch() {
     }
   }, [authLoading, currentUser, navigate]);
 
-  const resizeJob = useCallback((jobId: string, newStart: number, newEnd: number) => {
-    const job = localJobs.find(j => j.id === jobId);
-    if (!job) return;
+  const resizeWorkOrder = useCallback((workOrderId: string, newStart: number, newEnd: number) => {
+    const wo = localWorkOrders.find(w => w.id === workOrderId);
+    if (!wo) return;
 
-    // Create dates in local timezone
     const startHourInt = Math.floor(newStart);
     const startMinutes = Math.round((newStart % 1) * 60);
     const endHourInt = Math.floor(newEnd);
     const endMinutes = Math.round((newEnd % 1) * 60);
     
-    // Create local Date objects and convert to ISO
     const startDate = new Date(selectedDate);
     startDate.setHours(startHourInt, startMinutes, 0, 0);
     const endDate = new Date(selectedDate);
@@ -681,18 +696,18 @@ export default function CrmDispatch() {
     const scheduledStartISO = startDate.toISOString();
     const scheduledEndISO = endDate.toISOString();
 
-    setLocalJobs(prev => prev.map(j =>
-      j.id === jobId ? { ...j, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any } : j
+    setLocalWorkOrders(prev => prev.map(w =>
+      w.id === workOrderId ? { ...w, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any } : w
     ));
 
-    updateJobMutation.mutate({
-      jobId,
+    updateWorkOrderMutation.mutate({
+      workOrderId,
       updates: {
         scheduledStart: scheduledStartISO,
         scheduledEnd: scheduledEndISO,
       },
     });
-  }, [localJobs, selectedDate, updateJobMutation]);
+  }, [localWorkOrders, selectedDate, updateWorkOrderMutation]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -707,15 +722,15 @@ export default function CrmDispatch() {
     if (!over) return;
     
     const overId = over.id as string;
-    const jobId = active.id as string;
-    const job = localJobs.find(j => j.id === jobId);
+    const workOrderId = active.id as string;
+    const wo = localWorkOrders.find(w => w.id === workOrderId);
     
-    if (!job) return;
+    if (!wo) return;
     
     if (overId.startsWith('technician-')) {
       const newTechId = overId.replace('technician-', '');
       const isUnassigned = newTechId === 'unassigned';
-      const { startHour, endHour } = getJobDisplayTimes(job);
+      const { startHour, endHour } = getWorkOrderDisplayTimes(wo);
       const duration = endHour - startHour;
       
       const timelineWidth = timelineRef.current?.offsetWidth || 780;
@@ -726,13 +741,11 @@ export default function CrmDispatch() {
       newStartHour = Math.max(START_HOUR, Math.min(newStartHour, END_HOUR - duration));
       const newEndHour = newStartHour + duration;
 
-      // Create dates in local timezone
       const startHourInt = Math.floor(newStartHour);
       const startMinutes = Math.round((newStartHour % 1) * 60);
       const endHourInt = Math.floor(newEndHour);
       const endMinutes = Math.round((newEndHour % 1) * 60);
       
-      // Create local Date objects and convert to ISO
       const startDate = new Date(selectedDate);
       startDate.setHours(startHourInt, startMinutes, 0, 0);
       const endDate = new Date(selectedDate);
@@ -741,14 +754,16 @@ export default function CrmDispatch() {
       const scheduledStartISO = startDate.toISOString();
       const scheduledEndISO = endDate.toISOString();
 
-      setLocalJobs(prev => prev.map(j => 
-        j.id === jobId 
-          ? { ...j, assignedTechId: isUnassigned ? null : newTechId, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any } 
-          : j
+      const newTech = isUnassigned ? null : technicians.find(t => t.id === newTechId);
+
+      setLocalWorkOrders(prev => prev.map(w => 
+        w.id === workOrderId 
+          ? { ...w, assignedTechId: isUnassigned ? null : newTechId, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any, techName: newTech?.name || null } 
+          : w
       ));
 
-      updateJobMutation.mutate({
-        jobId,
+      updateWorkOrderMutation.mutate({
+        workOrderId,
         updates: {
           assignedTechId: isUnassigned ? null : newTechId,
           scheduledStart: scheduledStartISO,
@@ -756,19 +771,19 @@ export default function CrmDispatch() {
         },
       });
     }
-  }, [localJobs, selectedDate, updateJobMutation]);
+  }, [localWorkOrders, selectedDate, updateWorkOrderMutation, technicians]);
 
-  const filteredJobs = localJobs.filter((job) => {
+  const filteredWorkOrders = localWorkOrders.filter((wo) => {
     if (filter === "all") return true;
-    if (filter === "completed") return ["completed", "invoiced", "paid"].includes(job.status);
-    return job.status === filter;
+    if (filter === "completed") return wo.status === "completed";
+    return wo.status === filter;
   });
 
-  const unassignedJobs = filteredJobs.filter(job => !job.assignedTechId);
+  const unassignedWorkOrders = filteredWorkOrders.filter(wo => !wo.assignedTechId);
 
-  const getJobsForTechnician = useCallback((techId: string) => {
-    return filteredJobs.filter((job) => job.assignedTechId === techId);
-  }, [filteredJobs]);
+  const getWorkOrdersForTechnician = useCallback((techId: string) => {
+    return filteredWorkOrders.filter((wo) => wo.assignedTechId === techId);
+  }, [filteredWorkOrders]);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
@@ -784,9 +799,9 @@ export default function CrmDispatch() {
     year: "numeric",
   });
 
-  const activeJob = activeId ? localJobs.find(job => job.id === activeId) : null;
+  const activeWorkOrder = activeId ? localWorkOrders.find(wo => wo.id === activeId) : null;
 
-  if (authLoading || dispatchLoading) {
+  if (authLoading || workOrdersLoading) {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
@@ -816,7 +831,7 @@ export default function CrmDispatch() {
             </h1>
             <p className="text-slate-500 text-sm flex items-center gap-2 mt-1">
               <CalendarDays className="h-4 w-4" />
-              Schedule and manage technician assignments
+              Schedule and manage work orders
             </p>
           </div>
 
@@ -846,15 +861,12 @@ export default function CrmDispatch() {
         </div>
 
         <div className="flex flex-wrap gap-2 items-center" data-testid="filter-buttons">
-          {(["all", "new", "scheduled", "dispatched", "en_route", "on_site", "completed"] as FilterStatus[]).map((status) => {
+          {(["all", "scheduled", "dispatched", "en_route", "on_site", "completed"] as FilterStatus[]).map((status) => {
             const count = status === "all" 
-              ? localJobs.length 
-              : status === "completed" 
-                ? localJobs.filter(j => ["completed", "invoiced", "paid"].includes(j.status)).length
-                : localJobs.filter(j => j.status === status).length;
+              ? localWorkOrders.length 
+              : localWorkOrders.filter(wo => wo.status === status).length;
             const labels: Record<FilterStatus, string> = {
               all: "All",
-              new: "New",
               scheduled: "Scheduled",
               dispatched: "Dispatched",
               en_route: "En Route",
@@ -909,10 +921,6 @@ export default function CrmDispatch() {
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Status (Left Stripe)</p>
                   <div className="grid grid-cols-3 gap-x-3 gap-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-slate-400 flex-shrink-0" />
-                      <span className="text-sm text-slate-700">New</span>
-                    </div>
-                    <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
                       <span className="text-sm text-slate-700">Scheduled</span>
                     </div>
@@ -932,6 +940,10 @@ export default function CrmDispatch() {
                       <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
                       <span className="text-sm text-slate-700">Completed</span>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                      <span className="text-sm text-slate-700">Cancelled</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -942,7 +954,7 @@ export default function CrmDispatch() {
         <Card className="bg-white border hidden lg:block" data-testid="card-timeline">
           <CardHeader className="py-3 px-4">
             <CardTitle className="text-base font-medium text-slate-800">
-              Daily Schedule - {localJobs.length} jobs
+              Daily Schedule - {localWorkOrders.length} work orders
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -972,26 +984,26 @@ export default function CrmDispatch() {
                   </div>
 
                   <UnassignedRow 
-                    jobs={unassignedJobs}
-                    onResize={resizeJob}
+                    workOrders={unassignedWorkOrders}
+                    onResize={resizeWorkOrder}
                     activeId={activeId}
-                    onJobClick={handleJobClick}
+                    onWorkOrderClick={handleWorkOrderClick}
                   />
 
                   {technicians.map((tech) => (
                     <DroppableTechnicianRow
                       key={tech.id}
                       tech={tech}
-                      jobs={getJobsForTechnician(tech.id)}
-                      onResize={resizeJob}
+                      workOrders={getWorkOrdersForTechnician(tech.id)}
+                      onResize={resizeWorkOrder}
                       activeId={activeId}
-                      onJobClick={handleJobClick}
+                      onWorkOrderClick={handleWorkOrderClick}
                     />
                   ))}
 
-                  {localJobs.length === 0 && (
+                  {localWorkOrders.length === 0 && (
                     <div className="p-8 text-center text-slate-500">
-                      No jobs scheduled for this date
+                      No work orders scheduled for this date
                     </div>
                   )}
                 </div>
@@ -999,26 +1011,26 @@ export default function CrmDispatch() {
               </ScrollArea>
               
               <DragOverlay>
-                {activeJob ? <JobCardOverlay job={activeJob} timelineWidth={timelineRef.current?.offsetWidth || 780} /> : null}
+                {activeWorkOrder ? <WorkOrderCardOverlay workOrder={activeWorkOrder} timelineWidth={timelineRef.current?.offsetWidth || 780} /> : null}
               </DragOverlay>
             </DndContext>
           </CardContent>
         </Card>
 
-        <div className="lg:hidden space-y-4" data-testid="mobile-job-list">
+        <div className="lg:hidden space-y-4" data-testid="mobile-workorder-list">
           <Card className="bg-white border">
             <CardHeader className="py-3 px-4">
               <CardTitle className="text-base font-medium text-slate-800">
-                Today's Jobs ({filteredJobs.length})
+                Today's Work Orders ({filteredWorkOrders.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {filteredJobs.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-4">No jobs match the current filter</p>
+              {filteredWorkOrders.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">No work orders match the current filter</p>
               ) : (
-                filteredJobs.map((job) => {
-                  const tech = technicians.find((t) => t.id === job.assignedTechId);
-                  return <MobileJobCard key={job.id} job={job} technician={tech} onClick={handleJobClick} />;
+                filteredWorkOrders.map((wo) => {
+                  const tech = technicians.find((t) => t.id === wo.assignedTechId);
+                  return <MobileWorkOrderCard key={wo.id} workOrder={wo} technician={tech} onClick={handleWorkOrderClick} />;
                 })
               )}
             </CardContent>
@@ -1028,43 +1040,47 @@ export default function CrmDispatch() {
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto" data-testid="job-detail-sheet">
-          {selectedJob && (
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto" data-testid="workorder-detail-sheet">
+          {selectedWorkOrder && (
             <>
               <SheetHeader>
-                <SheetTitle className="text-lg" data-testid="sheet-job-title">Job Details</SheetTitle>
-                <SheetDescription>View and manage job information</SheetDescription>
+                <SheetTitle className="text-lg" data-testid="sheet-workorder-title">Work Order #{selectedWorkOrder.workOrderNumber}</SheetTitle>
+                <SheetDescription>View and manage work order details</SheetDescription>
               </SheetHeader>
 
               <div className="mt-6 space-y-6">
                 <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-slate-900">Job Information</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Work Order Information</h3>
                   
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Customer</span>
-                      <Link 
-                        href={`/crm/customers/${selectedJob.customerId}`}
-                        className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                        data-testid="link-customer-detail"
-                      >
-                        {selectedJob.customerName}
-                        <ExternalLink className="h-3 w-3" />
-                      </Link>
+                      {selectedWorkOrder.job?.customerId ? (
+                        <Link 
+                          href={`/crm/customers/${selectedWorkOrder.job.customerId}`}
+                          className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                          data-testid="link-customer-detail"
+                        >
+                          {selectedWorkOrder.customerName}
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      ) : (
+                        <span className="text-sm font-medium text-slate-900">{selectedWorkOrder.customerName}</span>
+                      )}
                     </div>
                     
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Job Type</span>
-                      <span className="text-sm font-medium text-slate-900" data-testid="text-job-type">{selectedJob.jobType}</span>
+                      <span className="text-sm font-medium text-slate-900" data-testid="text-job-type">{selectedWorkOrder.jobType}</span>
                     </div>
                     
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Priority</span>
                       <Badge 
-                        variant={selectedJob.priority === "urgent" ? "destructive" : selectedJob.priority === "high" ? "default" : "secondary"}
+                        variant={selectedWorkOrder.priority === "urgent" ? "destructive" : selectedWorkOrder.priority === "high" ? "default" : "secondary"}
                         data-testid="badge-priority"
                       >
-                        {selectedJob.priority || "normal"}
+                        {selectedWorkOrder.priority || "normal"}
                       </Badge>
                     </div>
                     
@@ -1072,7 +1088,7 @@ export default function CrmDispatch() {
                       <span className="text-sm text-slate-500">Scheduled</span>
                       <span className="text-sm font-medium text-slate-900" data-testid="text-scheduled-time">
                         {(() => {
-                          const { startHour, endHour } = getJobDisplayTimes(selectedJob);
+                          const { startHour, endHour } = getWorkOrderDisplayTimes(selectedWorkOrder);
                           return `${formatHour(Math.floor(startHour))} - ${formatHour(Math.floor(endHour))}`;
                         })()}
                       </span>
@@ -1081,19 +1097,26 @@ export default function CrmDispatch() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Status</span>
                       <Badge 
-                        className={`${statusColors[selectedJob.status]?.bg} ${statusColors[selectedJob.status]?.text} ${statusColors[selectedJob.status]?.border} border`}
+                        className={`${statusColors[selectedWorkOrder.status]?.bg} ${statusColors[selectedWorkOrder.status]?.text} ${statusColors[selectedWorkOrder.status]?.border} border`}
                         data-testid="badge-status"
                       >
-                        {statusLabels[selectedJob.status] || selectedJob.status}
+                        {statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}
                       </Badge>
                     </div>
                     
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Assigned Tech</span>
                       <span className="text-sm font-medium text-slate-900" data-testid="text-assigned-tech">
-                        {technicians.find(t => t.id === selectedJob.assignedTechId)?.name || "Unassigned"}
+                        {technicians.find(t => t.id === selectedWorkOrder.assignedTechId)?.name || selectedWorkOrder.techName || "Unassigned"}
                       </span>
                     </div>
+
+                    {selectedWorkOrder.customerPhone && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-500">Phone</span>
+                        <span className="text-sm font-medium text-slate-900">{selectedWorkOrder.customerPhone}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1102,16 +1125,16 @@ export default function CrmDispatch() {
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-slate-900">Update Status</h3>
                   <div className="flex flex-wrap gap-2" data-testid="status-buttons">
-                    {(["scheduled", "dispatched", "en_route", "on_site", "completed"] as JobStatus[]).map((status) => (
+                    {(["scheduled", "dispatched", "en_route", "on_site", "completed"] as WorkOrderStatus[]).map((status) => (
                       <Button
                         key={status}
                         size="sm"
-                        variant={selectedJob.status === status ? "default" : "outline"}
+                        variant={selectedWorkOrder.status === status ? "default" : "outline"}
                         onClick={() => handleStatusChange(status)}
-                        disabled={updateJobMutation.isPending}
+                        disabled={updateWorkOrderMutation.isPending}
                         data-testid={`button-status-${status}`}
                       >
-                        {updateJobMutation.isPending && selectedJob.status !== status ? (
+                        {updateWorkOrderMutation.isPending && selectedWorkOrder.status !== status ? (
                           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                         ) : null}
                         {statusLabels[status]}
@@ -1122,41 +1145,98 @@ export default function CrmDispatch() {
 
                 <Separator />
 
+                {selectedWorkOrder.checklist && selectedWorkOrder.checklist.length > 0 && (
+                  <>
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                        <CheckSquare className="h-4 w-4" />
+                        Checklist
+                      </h3>
+                      <div className="space-y-2">
+                        {selectedWorkOrder.checklist.map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-sm">
+                            <span className={`w-4 h-4 rounded border flex items-center justify-center ${item.completed ? 'bg-green-500 border-green-500 text-white' : 'border-slate-300'}`}>
+                              {item.completed && '✓'}
+                            </span>
+                            <span className={item.completed ? 'text-slate-500 line-through' : 'text-slate-700'}>{item.item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <Separator />
+                  </>
+                )}
+
+                {selectedWorkOrder.partsUsed && selectedWorkOrder.partsUsed.length > 0 && (
+                  <>
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Parts Used
+                      </h3>
+                      <div className="space-y-2">
+                        {selectedWorkOrder.partsUsed.map((part, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-sm">
+                            <span className="text-slate-700">{part.name} x{part.qty}</span>
+                            <span className="text-slate-500">${(part.price * part.qty).toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <Separator />
+                  </>
+                )}
+
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Notes / Description</h3>
-                  {selectedJob.description && (
-                    <div className="bg-slate-50 rounded-md p-3 text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-description">
-                      {selectedJob.description}
+                  <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Tech Notes
+                  </h3>
+                  {selectedWorkOrder.techNotes && (
+                    <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 whitespace-pre-wrap">
+                      {selectedWorkOrder.techNotes}
                     </div>
                   )}
                   <Textarea
-                    placeholder="Add notes to this job..."
+                    placeholder="Add notes about this work order..."
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
                     className="min-h-[80px]"
                     data-testid="textarea-notes"
                   />
                   <Button 
+                    size="sm" 
                     onClick={handleSaveNotes}
-                    disabled={!newNote.trim() || updateJobMutation.isPending}
-                    size="sm"
+                    disabled={!newNote.trim() || updateWorkOrderMutation.isPending}
                     data-testid="button-save-notes"
                   >
-                    {updateJobMutation.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                    {updateWorkOrderMutation.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
                     Save Notes
                   </Button>
                 </div>
 
+                {selectedWorkOrder.description && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-slate-900">Job Description</h3>
+                      <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 whitespace-pre-wrap">
+                        {selectedWorkOrder.description}
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 <Separator />
 
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Quick Actions</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Actions</h3>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={handleUnassign}
-                      disabled={!selectedJob.assignedTechId || updateJobMutation.isPending}
+                      disabled={updateWorkOrderMutation.isPending || !selectedWorkOrder.assignedTechId}
                       data-testid="button-unassign"
                     >
                       <UserX className="h-4 w-4 mr-1" />
@@ -1166,36 +1246,47 @@ export default function CrmDispatch() {
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
-                          variant="destructive"
+                          variant="outline"
                           size="sm"
-                          disabled={selectedJob.status === "cancelled" || updateJobMutation.isPending}
-                          data-testid="button-cancel-job"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          disabled={updateWorkOrderMutation.isPending}
+                          data-testid="button-cancel-workorder"
                         >
                           <XCircle className="h-4 w-4 mr-1" />
-                          Cancel Job
+                          Cancel Work Order
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Cancel this job?</AlertDialogTitle>
+                          <AlertDialogTitle>Cancel Work Order?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This will mark the job as cancelled. This action cannot be easily undone.
+                            Are you sure you want to cancel this work order? This action cannot be easily undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel data-testid="button-cancel-dialog-cancel">Keep Job</AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={handleCancelJob}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            data-testid="button-confirm-cancel"
-                          >
-                            Yes, Cancel Job
+                          <AlertDialogCancel>Keep Work Order</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleCancelWorkOrder} className="bg-red-600 hover:bg-red-700">
+                            Cancel Work Order
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
                 </div>
+
+                {selectedWorkOrder.jobId && (
+                  <>
+                    <Separator />
+                    <div className="pt-2">
+                      <Link href={`/crm/jobs/${selectedWorkOrder.jobId}`}>
+                        <Button variant="outline" size="sm" className="w-full" data-testid="link-view-job">
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View Parent Job
+                        </Button>
+                      </Link>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}

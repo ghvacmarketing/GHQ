@@ -7109,6 +7109,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/work-orders/list - List enriched work orders with date range and filters
+  app.get("/api/crm/work-orders/list", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const { dateFrom, dateTo, techId, status } = req.query;
+
+      let startDate: Date;
+      let endDate: Date;
+
+      if (dateFrom) {
+        startDate = new Date(dateFrom as string);
+      } else {
+        startDate = new Date();
+        startDate.setHours(0, 0, 0, 0);
+      }
+
+      if (dateTo) {
+        endDate = new Date(dateTo as string);
+      } else {
+        endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + 1);
+        endDate.setHours(23, 59, 59, 999);
+      }
+
+      let workOrders = await storage.getWorkOrdersByDateRange(startDate, endDate);
+
+      if (techId) {
+        workOrders = workOrders.filter(wo => wo.assignedTechId === techId);
+      }
+
+      if (status) {
+        workOrders = workOrders.filter(wo => wo.status === status);
+      }
+
+      const enrichedWorkOrders = await Promise.all(
+        workOrders.map(async (wo) => {
+          const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, wo.jobId));
+
+          let customer = null;
+          if (job?.customerId) {
+            const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, job.customerId));
+            customer = cust || null;
+          }
+
+          let tech = null;
+          if (wo.assignedTechId) {
+            const [t] = await db.select().from(crmUsers).where(eq(crmUsers.id, wo.assignedTechId));
+            tech = t || null;
+          }
+
+          return {
+            ...wo,
+            job: job || null,
+            customer,
+            tech,
+          };
+        })
+      );
+
+      return res.json(enrichedWorkOrders);
+    } catch (error) {
+      console.error("Error fetching work orders list:", error);
+      return res.status(500).json({ message: "Failed to fetch work orders list" });
+    }
+  });
+
   // GET /api/crm/work-orders/:id - Get single work order with job details
   app.get("/api/crm/work-orders/:id", requireCrmAuth, async (req, res) => {
     try {
@@ -7197,7 +7262,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Work order not found" });
       }
 
-      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, checklist, partsUsed, startedAt, completedAt } = req.body;
+      const allowedFields = insertCrmWorkOrderSchema.partial().pick({
+        status: true,
+        assignedTechId: true,
+        scheduledStart: true,
+        scheduledEnd: true,
+        checklist: true,
+        partsUsed: true,
+        techNotes: true,
+        startedAt: true,
+        completedAt: true,
+      });
+
+      const result = allowedFields.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid request body", 
+          errors: result.error.flatten().fieldErrors 
+        });
+      }
+
+      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, checklist, partsUsed, startedAt, completedAt } = result.data;
 
       const updateData: Partial<InsertCrmWorkOrder> = {};
       if (status !== undefined) updateData.status = status;
@@ -7446,15 +7531,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!existingInvoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
+
+      const allowedFields = insertCrmInvoiceSchema.partial().pick({
+        status: true,
+        subtotal: true,
+        tax: true,
+        total: true,
+        balanceDue: true,
+        dueDate: true,
+        pdfUrl: true,
+      });
+
+      const result = allowedFields.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid request body", 
+          errors: result.error.flatten().fieldErrors 
+        });
+      }
       
-      const updatedInvoice = await storage.updateInvoice(req.params.id, req.body);
+      const updatedInvoice = await storage.updateInvoice(req.params.id, result.data);
       
       await logCrmAudit(
         user.id,
         "invoice.updated",
         "invoice",
         req.params.id,
-        { changes: req.body },
+        { changes: result.data },
         req.ip
       );
       

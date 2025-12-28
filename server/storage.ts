@@ -1595,7 +1595,7 @@ export class DatabaseStorage implements IStorage {
   async createInvoice(data: InsertCrmInvoice): Promise<CrmInvoice> {
     const [invoice] = await db
       .insert(crmInvoices)
-      .values(data)
+      .values([data])
       .returning();
     return invoice;
   }
