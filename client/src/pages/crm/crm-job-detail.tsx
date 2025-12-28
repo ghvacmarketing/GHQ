@@ -892,21 +892,55 @@ export default function CrmJobDetail() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start Time</Label>
-                <Input
-                  type="time"
+                <Select
                   value={workOrderForm.startTime}
-                  onChange={(e) => setWorkOrderForm({ ...workOrderForm, startTime: e.target.value })}
-                  data-testid="input-start-time"
-                />
+                  onValueChange={(v) => setWorkOrderForm({ ...workOrderForm, startTime: v })}
+                >
+                  <SelectTrigger data-testid="select-start-time">
+                    <SelectValue placeholder="Select time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="08:00">8:00 AM</SelectItem>
+                    <SelectItem value="09:00">9:00 AM</SelectItem>
+                    <SelectItem value="10:00">10:00 AM</SelectItem>
+                    <SelectItem value="11:00">11:00 AM</SelectItem>
+                    <SelectItem value="12:00">12:00 PM</SelectItem>
+                    <SelectItem value="13:00">1:00 PM</SelectItem>
+                    <SelectItem value="14:00">2:00 PM</SelectItem>
+                    <SelectItem value="15:00">3:00 PM</SelectItem>
+                    <SelectItem value="16:00">4:00 PM</SelectItem>
+                    <SelectItem value="17:00">5:00 PM</SelectItem>
+                    <SelectItem value="18:00">6:00 PM</SelectItem>
+                    <SelectItem value="19:00">7:00 PM</SelectItem>
+                    <SelectItem value="20:00">8:00 PM</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>End Time</Label>
-                <Input
-                  type="time"
+                <Select
                   value={workOrderForm.endTime}
-                  onChange={(e) => setWorkOrderForm({ ...workOrderForm, endTime: e.target.value })}
-                  data-testid="input-end-time"
-                />
+                  onValueChange={(v) => setWorkOrderForm({ ...workOrderForm, endTime: v })}
+                >
+                  <SelectTrigger data-testid="select-end-time">
+                    <SelectValue placeholder="Select time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="08:00">8:00 AM</SelectItem>
+                    <SelectItem value="09:00">9:00 AM</SelectItem>
+                    <SelectItem value="10:00">10:00 AM</SelectItem>
+                    <SelectItem value="11:00">11:00 AM</SelectItem>
+                    <SelectItem value="12:00">12:00 PM</SelectItem>
+                    <SelectItem value="13:00">1:00 PM</SelectItem>
+                    <SelectItem value="14:00">2:00 PM</SelectItem>
+                    <SelectItem value="15:00">3:00 PM</SelectItem>
+                    <SelectItem value="16:00">4:00 PM</SelectItem>
+                    <SelectItem value="17:00">5:00 PM</SelectItem>
+                    <SelectItem value="18:00">6:00 PM</SelectItem>
+                    <SelectItem value="19:00">7:00 PM</SelectItem>
+                    <SelectItem value="20:00">8:00 PM</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
