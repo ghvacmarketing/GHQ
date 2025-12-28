@@ -875,7 +875,7 @@ export default function CrmDispatch() {
                 Legend
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0" align="end">
+            <PopoverContent className="w-[340px] p-0" align="end">
               <div className="p-4 space-y-4">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Job Type (Background)</p>
@@ -903,27 +903,27 @@ export default function CrmDispatch() {
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Status (Left Stripe)</p>
                   <div className="grid grid-cols-3 gap-x-3 gap-y-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-slate-400" />
+                      <span className="w-2 h-2 rounded-full bg-slate-400 flex-shrink-0" />
                       <span className="text-sm text-slate-700">New</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
                       <span className="text-sm text-slate-700">Scheduled</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-purple-500" />
+                      <span className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0" />
                       <span className="text-sm text-slate-700">Dispatched</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
                       <span className="text-sm text-slate-700">En Route</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-orange-500" />
+                      <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
                       <span className="text-sm text-slate-700">On Site</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
                       <span className="text-sm text-slate-700">Completed</span>
                     </div>
                   </div>
