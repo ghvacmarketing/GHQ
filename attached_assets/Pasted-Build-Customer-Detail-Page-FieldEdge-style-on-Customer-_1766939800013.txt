@@ -1,0 +1,323 @@
+Build: Customer Detail Page (FieldEdge-style) on Customer Name Click
+Goal
+
+When a user clicks a customer in the customer list, open a Customer Detail page that shows:
+
+customer header (name + tag)
+
+key contact/address/business info
+
+summary “stat cards” (jobs/work orders/invoices/quotes/agreements/equipment)
+
+timeline/activity feed + notes
+
+attachments panel
+
+edit button
+
+Route should be:
+
+/customers/:customerId
+
+1) Navigation + Click Behavior
+Customer List behavior
+
+Customer rows show name + phone/email (optional).
+
+Clicking the customer name (or row) navigates to:
+
+/customers/{id}
+
+Customer Detail top actions
+
+Buttons at top-right:
+
+History (opens timeline filter or activity modal)
+
+Edit Customer (navigates to /customers/:id/edit or opens edit modal)
+
+2) Page Layout (match the screenshot structure)
+A) Header Row
+
+Left side:
+
+Large title: Customer: {Last, First} (or full name)
+
+Small subtitle: “since {createdDate} · {type}” (optional)
+
+A pill/tag like: Prospect / Active / Inactive (read-only, not editable here)
+
+Right side:
+
+Buttons: History, Edit Customer
+
+B) Info Strip (3 blocks across)
+
+Create 3 “info blocks” in one row:
+
+Address
+
+Street, City, State, Zip
+
+If blank: show “No address on record”
+
+Primary Contact Information
+
+Phone (click-to-call)
+
+Email (click-to-email)
+
+Business Profile
+
+Terms (ex: “Due on receipt”)
+
+Tax group (optional)
+
+(Keep these as read-only display cards.)
+
+3) Summary Stat Cards Row (like FieldEdge tiles)
+
+Create a grid of small cards that each shows:
+
+Title
+
+Status indicator (Open / Overdue / Pending)
+
+A big number / amount
+
+A small secondary number like “Completed”
+
+Cards to include:
+
+Overview (last service date + “On record count”)
+
+Jobs (Open count + Completed count)
+
+Work Orders (Open + Completed)
+
+Invoices (Overdue count + Total $ outstanding)
+
+Quotes (Pending count + Total $ pending)
+
+Agreements (Active count)
+
+Equipment (For replacement count + total items)
+
+Card Click Behavior
+
+Each card is clickable and routes to filtered lists:
+
+/customers/:id/jobs
+
+/customers/:id/work-orders
+
+/customers/:id/invoices
+
+/customers/:id/quotes
+
+/customers/:id/agreements
+
+/customers/:id/equipment
+
+4) Timeline + Notes (main body left)
+Timeline section
+
+Show chronological “activity feed” items (most recent on top):
+
+created customer
+
+created work order
+
+quote created
+
+invoice sent/paid
+
+notes added
+
+Each item shows:
+
+timestamp
+
+user/tech name
+
+action text
+
+link to the object (ex: “Work Order #27571” clickable)
+
+Notes entry (like “Customer Notes”)
+
+A text box “Type here…”
+
+Button Save Note
+
+On save:
+
+POST note
+
+instantly appears in timeline as a note activity
+
+5) Attachments (main body right)
+
+Create an attachments panel:
+
+Search icon / sort option
+
+Button: Add Attachment
+
+List attachments (filename, date, uploaded by)
+
+If none: “There are no attachments associated with this Customer.”
+
+Upload should support:
+
+PDF, JPG/PNG, DOCX
+
+Store metadata in DB + file in storage (local disk for now, or S3 later)
+
+6) Backend Data Model (minimum needed)
+
+Create tables/collections like:
+
+Customers
+
+id
+
+firstName, lastName (or companyName)
+
+statusTag (Prospect/Active/etc)
+
+createdAt
+
+addressId
+
+primaryContactId
+
+terms (optional)
+
+taxGroup (optional)
+
+Contacts
+
+id
+
+customerId
+
+name
+
+phone
+
+email
+
+Jobs / WorkOrders / Invoices / Quotes / Agreements / Equipment
+
+Each needs:
+
+id
+
+customerId
+
+status
+
+createdAt
+
+totals (money where needed)
+
+Notes
+
+id
+
+customerId
+
+text
+
+createdAt
+
+createdByUserId
+
+Attachments
+
+id
+
+customerId
+
+filename
+
+url/path
+
+uploadedAt
+
+uploadedByUserId
+
+ActivityLog (recommended)
+
+Store “timeline events” here so the timeline is easy:
+
+id
+
+customerId
+
+type (NOTE, WORK_ORDER_CREATED, INVOICE_SENT, etc.)
+
+refType + refId (links to work order/invoice/quote)
+
+message
+
+createdAt
+
+createdByUserId
+
+7) API Endpoints Needed
+
+Implement these endpoints (or equivalent):
+
+Customer detail
+
+GET /api/customers/:id
+
+returns customer + address + primaryContact + business profile
+
+Stats for the cards (fast single response)
+
+GET /api/customers/:id/summary
+
+returns counts + totals for jobs/work orders/invoices/quotes/agreements/equipment + lastServiceDate
+
+Timeline feed
+
+GET /api/customers/:id/activity?limit=50&cursor=...
+
+POST /api/customers/:id/notes
+
+Attachments
+
+GET /api/customers/:id/attachments
+
+POST /api/customers/:id/attachments (multipart upload)
+
+8) Performance + UX Requirements
+
+Customer detail page loads in 2 requests max:
+
+/customers/:id (core info)
+
+/customers/:id/summary + /activity (can be parallel)
+
+Timeline supports pagination (“load more” or infinite scroll)
+
+Show skeleton loaders while fetching
+
+If customer not found: show clean error state
+
+9) Acceptance Criteria
+
+Clicking a customer opens /customers/:id
+
+Header shows customer name + tag
+
+Address/contact/business blocks display correctly
+
+Stat cards show correct counts/totals and link to filtered lists
+
+Timeline shows real events + notes can be saved and appear instantly
+
+Attachments can be uploaded and listed

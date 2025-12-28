@@ -226,7 +226,6 @@ export default function CrmAccountCreate() {
           parentAccountId: formData.parentAccountId || null,
           customerSince: formData.customerSince.toISOString().split("T")[0],
           pinnedNote: formData.pinnedNote || null,
-          noCallRecording: formData.noCallRecording,
         },
         sites: [{
           address1: formData.address1,
@@ -620,16 +619,6 @@ export default function CrmAccountCreate() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="noCallRecording"
-                    checked={formData.noCallRecording}
-                    onCheckedChange={(checked) => updateField("noCallRecording", !!checked)}
-                    data-testid="checkbox-no-call-recording"
-                  />
-                  <Label htmlFor="noCallRecording" className="text-sm">No Call Recording</Label>
                 </div>
 
                 <div className="space-y-2">
@@ -1046,12 +1035,6 @@ export default function CrmAccountCreate() {
                         <div className="flex justify-between">
                           <span className="text-slate-500">Lead Source:</span>
                           <span>{LEAD_SOURCES.find(s => s.value === formData.leadSource)?.label}</span>
-                        </div>
-                      )}
-                      {formData.noCallRecording && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">No Call Recording:</span>
-                          <span>Yes</span>
                         </div>
                       )}
                     </div>
