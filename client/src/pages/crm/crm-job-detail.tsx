@@ -195,8 +195,10 @@ export default function CrmJobDetail() {
 
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [reassignDialogOpen, setReassignDialogOpen] = useState(false);
+  const [jobTypeDialogOpen, setJobTypeDialogOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [selectedTechId, setSelectedTechId] = useState<string>("");
+  const [selectedJobType, setSelectedJobType] = useState<string>("");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -298,6 +300,35 @@ export default function CrmJobDetail() {
   const handleReassign = () => {
     if (selectedTechId) {
       reassignMutation.mutate(selectedTechId);
+    }
+  };
+
+  const updateJobTypeMutation = useMutation({
+    mutationFn: async (newJobType: string) => {
+      const res = await apiRequest("PATCH", `/api/crm/jobs/${jobId}`, {
+        jobType: newJobType,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Job type updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs", jobId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+      setJobTypeDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update job type",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleJobTypeChange = () => {
+    if (selectedJobType) {
+      updateJobTypeMutation.mutate(selectedJobType);
     }
   };
 
@@ -605,6 +636,18 @@ export default function CrmJobDetail() {
                   <UserCheck className="h-4 w-4 mr-2" />
                   Reassign Technician
                 </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    setSelectedJobType(job.jobType || "SERVICE");
+                    setJobTypeDialogOpen(true);
+                  }}
+                  data-testid="button-change-job-type"
+                >
+                  <Wrench className="h-4 w-4 mr-2" />
+                  Change Job Type
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -684,6 +727,43 @@ export default function CrmJobDetail() {
               data-testid="button-save-reassign"
             >
               {reassignMutation.isPending ? "Saving..." : "Reassign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={jobTypeDialogOpen} onOpenChange={setJobTypeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Job Type</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={selectedJobType} onValueChange={setSelectedJobType}>
+              <SelectTrigger data-testid="select-job-type">
+                <SelectValue placeholder="Select job type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SERVICE">Service</SelectItem>
+                <SelectItem value="INSTALL">Install</SelectItem>
+                <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                <SelectItem value="SALES">Sales</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setJobTypeDialogOpen(false)}
+              data-testid="button-cancel-job-type"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleJobTypeChange}
+              disabled={updateJobTypeMutation.isPending || !selectedJobType}
+              data-testid="button-save-job-type"
+            >
+              {updateJobTypeMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

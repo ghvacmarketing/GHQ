@@ -244,16 +244,10 @@ export default function CrmCustomerDetail() {
                               <SelectValue placeholder="Select job type" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="hvac_repair">HVAC Repair</SelectItem>
-                              <SelectItem value="hvac_maintenance">HVAC Maintenance</SelectItem>
-                              <SelectItem value="hvac_install">HVAC Installation</SelectItem>
-                              <SelectItem value="ac_repair">AC Repair</SelectItem>
-                              <SelectItem value="ac_maintenance">AC Maintenance</SelectItem>
-                              <SelectItem value="heating_repair">Heating Repair</SelectItem>
-                              <SelectItem value="heating_maintenance">Heating Maintenance</SelectItem>
-                              <SelectItem value="inspection">Inspection</SelectItem>
-                              <SelectItem value="estimate">Estimate/Quote</SelectItem>
-                              <SelectItem value="other">Other</SelectItem>
+                              <SelectItem value="SERVICE">Service</SelectItem>
+                              <SelectItem value="INSTALL">Install</SelectItem>
+                              <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                              <SelectItem value="SALES">Sales</SelectItem>
                             </SelectContent>
                           </Select>
                         </FormControl>

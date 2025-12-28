@@ -146,7 +146,7 @@ const statusLabels: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
-const JOB_TYPES = ["SERVICE", "INSTALL", "MAINTENANCE", "ESTIMATE", "WARRANTY"] as const;
+const JOB_TYPES = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
 function useDebounce<T>(value: T, delay: number): T {
