@@ -1,0 +1,109 @@
+GOAL
+Turn the existing UI (Customers page + Dispatch Board) into a real CRM by connecting both screens to ONE shared Postgres database via Prisma, with a job lifecycle and technician scheduling. No more mock data.
+
+STACK (keep what we already chose)
+- Next.js + TypeScript (App Router)
+- Prisma ORM
+- Postgres (Replit production DB or Postgres connection string)
+- Cookie-based server sessions
+- RBAC roles: OWNER/ADMIN, OFFICE, TECH
+
+DEFINITION: “CONNECTED LIKE FIELDEDGE”
+Both the Customers screen and Dispatch Board must read/write the SAME underlying Job records.
+- Customers page shows customers from DB, and lets user create a job for a customer.
+- Dispatch board shows jobs for a given date, grouped by technician and time.
+- When a job is assigned/scheduled from dispatch, that same job instantly appears updated on customer/job pages.
+- Click a job card on dispatch goes to job details (and shows customer info).
+- Click a customer goes to customer details page (and shows job history).
+
+PHASE 1 (MVP DATA MODEL) — IMPLEMENT THESE PRISMA MODELS
+Create these models and migrate:
+1) User
+- id, email, passwordHash (or provider id), role (OWNER/ADMIN/OFFICE/TECH), createdAt
+2) Technician
+- id, userId (unique), displayName, color, active
+3) Customer
+- id, displayName, firstName, lastName, phone, email, addressLine1, city, state, zip, type (RESIDENTIAL/COMMERCIAL), status, createdAt
+4) Job
+- id
+- customerId (FK)
+- assignedTechId (FK, nullable)
+- jobType (REPAIR/MAINTENANCE/INSTALL/DUCT/etc)
+- status (UNASSIGNED/SCHEDULED/IN_PROGRESS/COMPLETED/CANCELLED)
+- scheduledStart (datetime nullable)
+- scheduledEnd (datetime nullable)
+- title/summary (string)
+- notes (text)
+- createdAt, updatedAt
+
+REQUIREMENTS FOR PERFORMANCE
+- Customers list must be paginated (cursor or offset), NOT loading 13k+ rows at once.
+- Customer search must support name/phone/email/address.
+- Dispatch query must fetch only jobs for a day range (start-of-day to end-of-day).
+
+PHASE 2 — API / SERVER ACTIONS (SINGLE SOURCE OF TRUTH)
+Implement these routes (or server actions) and make BOTH pages use them:
+
+A) Customers
+1) GET /api/customers?search=&cursor=&limit=
+- Returns paginated customers + total count
+- Search across displayName/phone/email/address
+2) GET /api/customers/[id]
+- Returns customer + recent jobs
+
+B) Jobs
+3) POST /api/jobs
+- Body: { customerId, jobType, title, notes? }
+- Creates a new Job with status=UNASSIGNED and no assignedTechId/schedule
+4) GET /api/dispatch?date=YYYY-MM-DD
+- Returns:
+  - technicians list
+  - jobs scheduled on that date (and unassigned jobs optionally)
+- Jobs should include customer displayName and jobType/status/time for rendering cards
+5) PATCH /api/jobs/[id]
+- Used by dispatch and job detail edits:
+  - assign tech: { assignedTechId }
+  - schedule: { scheduledStart, scheduledEnd }
+  - status changes
+  - notes/title updates
+
+RBAC / SECURITY RULES (VERY IMPORTANT)
+- Enforce permissions on the API (not only in UI):
+  - OWNER/ADMIN/OFFICE can view all customers/jobs and schedule/assign.
+  - TECH can only view jobs assigned to them (and update status/notes for those).
+- Validate all inputs (zod).
+- Never trust client-side role checks alone.
+
+DISPATCH BOARD WIRING (REPLACE MOCK DATA)
+- Dispatch board must call GET /api/dispatch?date=...
+- Render lanes per technician
+- Render job cards positioned by scheduledStart/scheduledEnd
+- Add interactions:
+  1) Assign job to tech (drag into lane OR dropdown) -> PATCH /api/jobs/[id] { assignedTechId, status:SCHEDULED }
+  2) Move time slot (drag in timeline) -> PATCH /api/jobs/[id] { scheduledStart, scheduledEnd }
+- Use optimistic UI: update instantly, rollback if API fails.
+
+IMPORTANT GUARDRAILS (MVP FIELD EDGE BEHAVIOR)
+1) Prevent double-booking:
+- When scheduling a job for a tech, server must check overlap:
+  - reject if scheduledStart < existingEnd AND scheduledEnd > existingStart for same tech same day
+2) Add audit log (simple):
+- Table AuditLog: id, userId, entityType, entityId, action, beforeJson, afterJson, createdAt
+- Record every PATCH to a job (assignment/schedule/status)
+
+CUSTOMERS PAGE WIRING (REPLACE MOCK DATA)
+- Customers table uses GET /api/customers with pagination + search
+- Clicking a customer -> /customers/[id] with job history
+- “Create Job” button on customer page calls POST /api/jobs then routes user to /dispatch or /jobs/[id]
+
+DELIVERABLE (DEFINITION OF DONE)
+- Customers page loads from DB with search + pagination
+- Dispatch board loads from DB for selected date
+- Creating a job for a customer creates a DB job that appears in Dispatch (unassigned list)
+- Assigning/scheduling from Dispatch persists and shows everywhere
+- Tech role only sees their own assigned jobs
+- Double-booking prevented server-side
+- Audit logs recorded for job changes
+
+DO NOT BUILD MORE PAGES YET
+Do not add invoices/payments/texting until the above loop works end-to-end.
