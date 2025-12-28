@@ -293,7 +293,7 @@ export default function CrmCustomerDetail() {
             Back to Customers
           </Button>
 
-          <Dialog open={createDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
+          <Dialog open={createDialogOpen} onOpenChange={(open) => open ? setCreateDialogOpen(true) : handleCloseDialog()}>
             <DialogTrigger asChild>
               <Button data-testid="button-create-job">
                 <Plus className="h-4 w-4 mr-2" />
