@@ -289,15 +289,16 @@ function DroppableTechnicianRow({ tech, jobs, onResize, activeId }: DroppableTec
       className={`flex border-b border-slate-100 last:border-b-0 ${isOver ? 'bg-slate-50' : ''}`}
       data-testid={`technician-row-${tech.id}`}
     >
-      <div className="w-40 flex-shrink-0 p-2 border-r border-slate-100">
-        <div className="flex items-center gap-2">
-          <div className={`w-7 h-7 rounded-full ${tech.color} flex items-center justify-center text-white text-xs font-medium`}>
-            {tech.initials}
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-800">{tech.name}</p>
-            <p className="text-xs text-slate-400">{jobs.length} jobs</p>
-          </div>
+      <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 flex items-center">
+        <div className={`w-1 h-10 rounded-full mr-2 ${jobs.length > 0 ? 'bg-green-500' : 'bg-slate-300'}`} />
+        <div className="w-10 h-10 rounded bg-slate-200 flex items-center justify-center mr-2 flex-shrink-0">
+          <svg className="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-slate-800 truncate">{tech.name}</p>
+          <p className="text-xs text-slate-400">{jobs.length} jobs today</p>
         </div>
       </div>
       <div ref={setNodeRef} className={`flex-1 relative h-14 ${isOver ? 'bg-slate-50' : ''}`}>
@@ -334,15 +335,16 @@ function UnassignedRow({ jobs, onResize, activeId }: { jobs: DispatchJob[]; onRe
       className={`flex border-b-2 border-slate-200 ${isOver ? 'bg-amber-50' : 'bg-amber-50/30'}`}
       data-testid="unassigned-row"
     >
-      <div className="w-40 flex-shrink-0 p-2 border-r border-slate-100">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-slate-400 flex items-center justify-center text-white text-xs font-medium">
-            ?
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-800">Unassigned</p>
-            <p className="text-xs text-slate-400">{jobs.length} jobs</p>
-          </div>
+      <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 flex items-center">
+        <div className={`w-1 h-10 rounded-full mr-2 ${jobs.length > 0 ? 'bg-amber-500' : 'bg-slate-300'}`} />
+        <div className="w-10 h-10 rounded bg-slate-300 flex items-center justify-center mr-2 flex-shrink-0">
+          <svg className="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+          </svg>
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-slate-800">Unassigned</p>
+          <p className="text-xs text-amber-600">{jobs.length} pending</p>
         </div>
       </div>
       <div ref={setNodeRef} className={`flex-1 relative h-14 ${isOver ? 'bg-amber-50' : ''}`}>
@@ -685,8 +687,8 @@ export default function CrmDispatch() {
               <ScrollArea className="w-full">
                 <div className="min-w-[800px]">
                   <div className="flex border-b border-slate-100">
-                    <div className="w-40 flex-shrink-0 p-2 border-r border-slate-100 text-xs font-medium text-slate-500">
-                      Technician
+                    <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 text-sm font-medium text-slate-700">
+                      Technicians
                     </div>
                     <div ref={timelineRef} className="flex-1 flex">
                       {hours.map((hour) => (
