@@ -730,11 +730,10 @@ export default function CrmJobs() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-slate-50">
-                        <TableHead>Next Visit</TableHead>
+                        <TableHead>Date</TableHead>
                         <TableHead>Job Type</TableHead>
                         <TableHead>Account</TableHead>
                         <TableHead>Site Address</TableHead>
-                        <TableHead>Tech</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Priority</TableHead>
                         <TableHead className="w-[50px]">Actions</TableHead>
@@ -753,7 +752,7 @@ export default function CrmJobs() {
                             data-testid={`row-job-${job.id}`}
                           >
                             <TableCell className="font-medium" data-testid={`text-job-date-${job.id}`}>
-                              {job.nextScheduledAt ? formatDateDisplay(job.nextScheduledAt) : "—"}
+                              {job.createdAt ? formatDateDisplay(job.createdAt) : "—"}
                             </TableCell>
                             <TableCell data-testid={`text-job-type-${job.id}`}>
                               {job.jobType || "—"}
@@ -771,9 +770,6 @@ export default function CrmJobs() {
                                   <span className="truncate max-w-[150px]">{job.siteAddress}</span>
                                 </div>
                               ) : "—"}
-                            </TableCell>
-                            <TableCell data-testid={`text-job-tech-${job.id}`}>
-                              {job.assignedTechName || "Unassigned"}
                             </TableCell>
                             <TableCell>
                               <Badge 
