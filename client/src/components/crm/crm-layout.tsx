@@ -20,10 +20,10 @@ import {
   Settings,
   LogOut,
   Menu,
-  Building2,
   ChevronRight,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
+import ghqLogo from "@assets/redlogo.webp";
 
 interface CrmLayoutProps {
   children: React.ReactNode;
@@ -90,8 +90,8 @@ function NavItemComponent({
       <div
         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 group ${
           isActive
-            ? "bg-indigo-600 text-white"
-            : "text-slate-300 hover:bg-slate-800 hover:text-white"
+            ? "bg-white/20 text-white font-semibold"
+            : "text-white/80 hover:bg-white/10 hover:text-white"
         }`}
         data-testid={`nav-item-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
       >
@@ -150,17 +150,15 @@ function SidebarContent({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900">
-      <div className="p-4 border-b border-slate-800">
+    <div className="flex flex-col h-full bg-[#711419]">
+      <div className="p-4 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-600 rounded-lg">
-            <Building2 className="h-6 w-6 text-white" />
-          </div>
+          <img src={ghqLogo} alt="GHQ Logo" className="h-10 w-10 rounded-lg object-contain bg-white p-1" />
           <div>
             <h1 className="text-lg font-bold text-white" data-testid="text-sidebar-title">
-              GHVAC CRM
+              GHQ
             </h1>
-            <p className="text-xs text-slate-400">Management System</p>
+            <p className="text-xs text-white/60">Management System</p>
           </div>
         </div>
       </div>
@@ -169,7 +167,7 @@ function SidebarContent({
         <div className="space-y-6">
           {navSections.map((section) => (
             <div key={section.title}>
-              <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">
                 {section.title}
               </p>
               <div className="space-y-1">
@@ -187,10 +185,10 @@ function SidebarContent({
         </div>
       </ScrollArea>
 
-      <div className="p-3 border-t border-slate-800">
+      <div className="p-3 border-t border-white/10">
         <Link href="/" onClick={onItemClick}>
           <div
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all text-slate-300 hover:bg-slate-800 hover:text-white mb-2"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all text-white/80 hover:bg-white/10 hover:text-white mb-2"
             data-testid="nav-item-home"
           >
             <Home className="h-5 w-5" />
@@ -198,9 +196,9 @@ function SidebarContent({
           </div>
         </Link>
 
-        <div className="p-3 bg-slate-800/50 rounded-lg">
+        <div className="p-3 bg-white/10 rounded-lg">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-sm">
               {currentUser.name
                 .split(" ")
                 .map((n) => n[0])
@@ -228,7 +226,7 @@ function SidebarContent({
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-700"
+            className="w-full justify-start text-white/70 hover:text-white hover:bg-white/10"
             onClick={() => logoutMutation.mutate()}
             disabled={logoutMutation.isPending}
             data-testid="button-sidebar-logout"
@@ -272,9 +270,9 @@ export function CrmLayout({ children, currentUser }: CrmLayoutProps) {
               </SheetContent>
             </Sheet>
             <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-indigo-600" />
-              <span className="font-bold text-indigo-600" data-testid="text-mobile-title">
-                GHVAC CRM
+              <img src={ghqLogo} alt="GHQ Logo" className="h-7 w-7 rounded object-contain" />
+              <span className="font-bold text-[#711419]" data-testid="text-mobile-title">
+                GHQ
               </span>
             </div>
           </div>
@@ -282,7 +280,7 @@ export function CrmLayout({ children, currentUser }: CrmLayoutProps) {
             <span className="text-sm font-medium text-slate-600">
               {currentUser.name.split(" ")[0]}
             </span>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold text-xs">
+            <div className="w-8 h-8 rounded-full bg-[#711419] flex items-center justify-center text-white font-semibold text-xs">
               {currentUser.name
                 .split(" ")
                 .map((n) => n[0])
