@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -30,24 +31,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
   Calendar,
   Clock,
-  MapPin,
   User,
   Phone,
   Mail,
@@ -56,23 +44,23 @@ import {
   XCircle,
   Navigation,
   Plus,
-  CalendarPlus,
   ClipboardList,
   DollarSign,
   FileText,
-  StickyNote,
-  Paperclip,
   ExternalLink,
   RefreshCw,
-  Trash2,
-  MoreVertical,
+  LayoutDashboard,
+  MessageSquare,
+  Image as ImageIcon,
+  Settings,
+  ArrowRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
 import type { CrmUser, CrmJob, CrmProperty, CrmWorkOrder, CrmInvoice, CrmQuote } from "@shared/schema";
-import { workOrderVisitTypeEnum, workOrderStatusEnum, type WorkOrderVisitType, type WorkOrderStatus } from "@shared/schema";
+import { workOrderStatusEnum, type WorkOrderVisitType } from "@shared/schema";
 
 type WorkOrderWithTech = CrmWorkOrder & {
   techName?: string | null;
@@ -143,13 +131,6 @@ const statusColors: Record<string, { bg: string; text: string; border: string }>
   pending: { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
   partial: { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
   overdue: { bg: "bg-red-100", text: "text-red-700", border: "border-red-200" },
-};
-
-const priorityColors: Record<string, { bg: string; text: string }> = {
-  low: { bg: "bg-slate-100", text: "text-slate-600" },
-  normal: { bg: "bg-blue-100", text: "text-blue-600" },
-  high: { bg: "bg-amber-100", text: "text-amber-600" },
-  urgent: { bg: "bg-red-100", text: "text-red-600" },
 };
 
 const visitTypeLabels: Record<string, string> = {
@@ -256,6 +237,7 @@ export default function CrmJobDetail() {
   const jobId = params.id;
   const { toast } = useToast();
 
+  const [activeTab, setActiveTab] = useState("overview");
   const [workOrderDialogOpen, setWorkOrderDialogOpen] = useState(false);
   const [updateWoStatusDialogOpen, setUpdateWoStatusDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -417,22 +399,25 @@ export default function CrmJobDetail() {
     setUpdateWoStatusDialogOpen(true);
   };
 
+  const getNextScheduledWorkOrder = () => {
+    if (!job?.workOrders || job.workOrders.length === 0) return null;
+    const upcoming = job.workOrders
+      .filter(wo => wo.scheduledStart && new Date(wo.scheduledStart) >= new Date())
+      .sort((a, b) => new Date(a.scheduledStart!).getTime() - new Date(b.scheduledStart!).getTime());
+    return upcoming[0] || null;
+  };
+
   if (authLoading || jobLoading) {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-6xl mx-auto space-y-6">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-24 w-full rounded-xl" />
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <div className="lg:col-span-3 space-y-4">
-              <Skeleton className="h-64 rounded-xl" />
-              <Skeleton className="h-32 rounded-xl" />
-            </div>
-            <div className="lg:col-span-2 space-y-4">
-              <Skeleton className="h-48 rounded-xl" />
-              <Skeleton className="h-32 rounded-xl" />
-              <Skeleton className="h-48 rounded-xl" />
-            </div>
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Skeleton className="h-48 rounded-xl" />
+            <Skeleton className="h-48 rounded-xl" />
+            <Skeleton className="h-48 rounded-xl" />
           </div>
         </div>
       </div>
@@ -466,13 +451,11 @@ export default function CrmJobDetail() {
     );
   }
 
-  const derivedStatusStyle = statusColors[job.derivedStatus] || statusColors.new;
-  const priorityStyle = priorityColors[job.priority || "normal"] || priorityColors.normal;
-  const jobTypeStyle = { bg: "bg-slate-100", text: "text-slate-700" };
-
   const propertyAddress = job.property
     ? [job.property.address1, job.property.city, job.property.state].filter(Boolean).join(", ")
     : null;
+
+  const nextWorkOrder = getNextScheduledWorkOrder();
 
   return (
     <CrmLayout currentUser={currentUser}>
@@ -505,13 +488,232 @@ export default function CrmJobDetail() {
                   </p>
                 )}
               </div>
-
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="w-full justify-start bg-white border rounded-lg p-1 h-auto flex-wrap gap-1">
+            <TabsTrigger
+              value="overview"
+              data-testid="tab-overview"
+              className="data-[state=active]:bg-[#711419] data-[state=active]:text-white px-3 py-2"
+            >
+              <LayoutDashboard className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="work-orders"
+              data-testid="tab-work-orders"
+              className="data-[state=active]:bg-[#711419] data-[state=active]:text-white px-3 py-2"
+            >
+              <ClipboardList className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Work Orders</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="quotes"
+              data-testid="tab-quotes"
+              className="data-[state=active]:bg-[#711419] data-[state=active]:text-white px-3 py-2"
+            >
+              <FileText className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Quotes</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="invoices"
+              data-testid="tab-invoices"
+              className="data-[state=active]:bg-[#711419] data-[state=active]:text-white px-3 py-2"
+            >
+              <DollarSign className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Invoices & Payments</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="notes"
+              data-testid="tab-notes"
+              className="data-[state=active]:bg-[#711419] data-[state=active]:text-white px-3 py-2"
+            >
+              <MessageSquare className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Notes / Activity</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="files"
+              data-testid="tab-files"
+              className="data-[state=active]:bg-[#711419] data-[state=active]:text-white px-3 py-2"
+            >
+              <ImageIcon className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Files / Photos</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="equipment"
+              data-testid="tab-equipment"
+              className="data-[state=active]:bg-[#711419] data-[state=active]:text-white px-3 py-2"
+            >
+              <Settings className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Equipment</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3 border-b bg-slate-50/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <User className="h-4 w-4 text-[#711419]" />
+                    Customer & Site
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-3">
+                  <div>
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto text-base font-semibold text-slate-900 hover:text-[#711419]"
+                      onClick={() => navigate(`/crm/customers/${job.customerId}`)}
+                      data-testid="link-customer"
+                    >
+                      {job.customerName}
+                      <ExternalLink className="h-3 w-3 ml-1" />
+                    </Button>
+                  </div>
+                  {job.customerPhone && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <Phone className="h-4 w-4 text-slate-400" />
+                      <a href={`tel:${job.customerPhone}`} className="hover:text-[#711419]" data-testid="link-phone">
+                        {job.customerPhone}
+                      </a>
+                    </div>
+                  )}
+                  {job.customerEmail && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <Mail className="h-4 w-4 text-slate-400" />
+                      <a href={`mailto:${job.customerEmail}`} className="hover:text-[#711419] truncate" data-testid="link-email">
+                        {job.customerEmail}
+                      </a>
+                    </div>
+                  )}
+                  {job.property && (
+                    <div className="pt-3 border-t">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Property</p>
+                          <p className="font-medium text-sm text-slate-900" data-testid="text-address-line1">
+                            {job.property.address1}
+                          </p>
+                          <p className="text-slate-600 text-sm" data-testid="text-address-city">
+                            {job.property.city}, {job.property.state} {job.property.zip}
+                          </p>
+                        </div>
+                        <Button variant="ghost" size="sm" asChild data-testid="button-directions">
+                          <a href={getGoogleMapsUrl(job.property)} target="_blank" rel="noopener noreferrer">
+                            <Navigation className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3 border-b bg-slate-50/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <DollarSign className="h-4 w-4 text-[#711419]" />
+                    Financial Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-600">Quotes</span>
+                      <span className="font-medium" data-testid="text-quote-summary">
+                        {formatCurrency(job.financialSummary?.quoteTotal || 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-600">Total Invoiced</span>
+                      <span className="font-medium" data-testid="text-total-invoiced">
+                        {formatCurrency(job.financialSummary?.totalInvoiced || 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-600">Total Paid</span>
+                      <span className="font-medium text-green-600" data-testid="text-total-paid">
+                        {formatCurrency(job.financialSummary?.totalPaid || 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center pt-3 border-t">
+                      <span className="font-semibold text-slate-700">Balance Due</span>
+                      <span
+                        className={`font-bold ${(job.financialSummary?.balanceDue || 0) > 0 ? "text-red-600" : "text-slate-700"}`}
+                        data-testid="text-balance-due"
+                      >
+                        {formatCurrency(job.financialSummary?.balanceDue || 0)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-4">
+                <Card className="shadow-sm cursor-pointer hover:border-[#711419]/30 transition-colors" onClick={() => setActiveTab("work-orders")}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                          <ClipboardList className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900">{job.workOrders?.length || 0} Work Orders</p>
+                          <p className="text-xs text-slate-500">
+                            {nextWorkOrder ? `Next: ${formatShortDate(nextWorkOrder.scheduledStart)}` : "No upcoming visits"}
+                          </p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-slate-400" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-sm cursor-pointer hover:border-[#711419]/30 transition-colors" onClick={() => setActiveTab("quotes")}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                          <FileText className="h-5 w-5 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900">{job.quotes?.length || 0} Quotes</p>
+                          <p className="text-xs text-slate-500">
+                            {job.financialSummary?.acceptedQuoteCount || 0} accepted
+                          </p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-slate-400" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-sm cursor-pointer hover:border-[#711419]/30 transition-colors" onClick={() => setActiveTab("invoices")}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                          <DollarSign className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900">{job.invoices?.length || 0} Invoices</p>
+                          <p className="text-xs text-slate-500">
+                            Balance: {formatCurrency(job.financialSummary?.balanceDue || 0)}
+                          </p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-slate-400" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="work-orders" className="mt-6">
             <Card className="shadow-sm">
               <CardHeader className="pb-4 border-b bg-slate-50/50">
                 <div className="flex items-center justify-between">
@@ -602,7 +804,9 @@ export default function CrmJobDetail() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
 
+          <TabsContent value="quotes" className="mt-6">
             <Card className="shadow-sm">
               <CardHeader className="pb-4 border-b bg-slate-50/50">
                 <div className="flex items-center justify-between">
@@ -670,13 +874,15 @@ export default function CrmJobDetail() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
 
+          <TabsContent value="invoices" className="mt-6">
             <Card className="shadow-sm">
               <CardHeader className="pb-4 border-b bg-slate-50/50">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-lg font-semibold">
                     <DollarSign className="h-5 w-5 text-[#711419]" />
-                    Invoices
+                    Invoices & Payments
                   </CardTitle>
                   <Button
                     size="sm"
@@ -738,129 +944,41 @@ export default function CrmJobDetail() {
                 )}
               </CardContent>
             </Card>
-          </div>
+          </TabsContent>
 
-          <div className="space-y-6">
-            <Card className="shadow-sm sticky top-4">
-              <CardHeader className="pb-3 border-b bg-slate-50/50">
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <User className="h-4 w-4 text-[#711419]" />
-                  Customer & Site
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4 space-y-3">
-                <div>
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-base font-semibold text-slate-900 hover:text-[#711419]"
-                    onClick={() => navigate(`/crm/customers/${job.customerId}`)}
-                    data-testid="link-customer"
-                  >
-                    {job.customerName}
-                    <ExternalLink className="h-3 w-3 ml-1" />
-                  </Button>
-                </div>
-                {job.customerPhone && (
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Phone className="h-4 w-4 text-slate-400" />
-                    <a href={`tel:${job.customerPhone}`} className="hover:text-[#711419]" data-testid="link-phone">
-                      {job.customerPhone}
-                    </a>
-                  </div>
-                )}
-                {job.customerEmail && (
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Mail className="h-4 w-4 text-slate-400" />
-                    <a href={`mailto:${job.customerEmail}`} className="hover:text-[#711419] truncate" data-testid="link-email">
-                      {job.customerEmail}
-                    </a>
-                  </div>
-                )}
-                {job.property && (
-                  <div className="pt-3 border-t">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Property</p>
-                        <p className="font-medium text-sm text-slate-900" data-testid="text-address-line1">
-                          {job.property.address1}
-                        </p>
-                        <p className="text-slate-600 text-sm" data-testid="text-address-city">
-                          {job.property.city}, {job.property.state} {job.property.zip}
-                        </p>
-                      </div>
-                      <Button variant="ghost" size="sm" asChild data-testid="button-directions">
-                        <a href={getGoogleMapsUrl(job.property)} target="_blank" rel="noopener noreferrer">
-                          <Navigation className="h-4 w-4" />
-                        </a>
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
+          <TabsContent value="notes" className="mt-6">
             <Card className="shadow-sm">
-              <CardHeader className="pb-3 border-b bg-slate-50/50">
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <DollarSign className="h-4 w-4 text-[#711419]" />
-                  Financial Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600">Quotes</span>
-                    <span className="font-medium" data-testid="text-quote-summary">
-                      {formatCurrency(job.financialSummary?.quoteTotal || 0)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600">Total Invoiced</span>
-                    <span className="font-medium" data-testid="text-total-invoiced">
-                      {formatCurrency(job.financialSummary?.totalInvoiced || 0)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600">Total Paid</span>
-                    <span className="font-medium text-green-600" data-testid="text-total-paid">
-                      {formatCurrency(job.financialSummary?.totalPaid || 0)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pt-3 border-t">
-                    <span className="font-semibold text-slate-700">Balance Due</span>
-                    <span
-                      className={`font-bold ${(job.financialSummary?.balanceDue || 0) > 0 ? "text-red-600" : "text-slate-700"}`}
-                      data-testid="text-balance-due"
-                    >
-                      {formatCurrency(job.financialSummary?.balanceDue || 0)}
-                    </span>
-                  </div>
-                </div>
+              <CardContent className="py-16 text-center">
+                <MessageSquare className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-slate-700 mb-2">Notes & Activity</h3>
+                <p className="text-slate-500">Coming soon</p>
+                <p className="text-sm text-slate-400 mt-2">Audit timeline and notes will be displayed here</p>
               </CardContent>
             </Card>
+          </TabsContent>
 
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="notes" className="border rounded-lg bg-white shadow-sm">
-                <AccordionTrigger className="px-4 hover:no-underline" data-testid="accordion-notes">
-                  <div className="flex items-center gap-2">
-                    <StickyNote className="h-4 w-4 text-[#711419]" />
-                    <span className="font-semibold text-sm">Notes & Attachments</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4">
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Description</h4>
-                      <p className="text-sm text-slate-600">
-                        {job.description || "No description added yet."}
-                      </p>
-                    </div>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </div>
-        </div>
+          <TabsContent value="files" className="mt-6">
+            <Card className="shadow-sm">
+              <CardContent className="py-16 text-center">
+                <ImageIcon className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-slate-700 mb-2">Files & Photos</h3>
+                <p className="text-slate-500">Coming soon</p>
+                <p className="text-sm text-slate-400 mt-2">Attachments and photos will be displayed here</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="equipment" className="mt-6">
+            <Card className="shadow-sm">
+              <CardContent className="py-16 text-center">
+                <Settings className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-slate-700 mb-2">Equipment</h3>
+                <p className="text-slate-500">Coming soon</p>
+                <p className="text-sm text-slate-400 mt-2">Equipment tied to this site/job will be displayed here</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Dialog open={updateWoStatusDialogOpen} onOpenChange={setUpdateWoStatusDialogOpen}>
