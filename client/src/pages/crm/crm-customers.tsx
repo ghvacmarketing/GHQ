@@ -340,6 +340,7 @@ export default function CrmCustomers() {
                       key={customer.id}
                       className="cursor-pointer hover:bg-slate-50 transition-colors"
                       data-testid={`row-customer-${customer.id}`}
+                      onClick={() => navigate(`/crm/customers/${customer.id}`)}
                     >
                       <TableCell className="font-medium text-slate-900">
                         {customer.name}

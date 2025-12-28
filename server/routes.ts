@@ -5003,6 +5003,280 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/dispatch - Get dispatch board data for a specific date
+  app.get("/api/crm/dispatch", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const dateParam = req.query.date as string;
+      let targetDate: Date;
+      
+      if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+        targetDate = new Date(dateParam + "T00:00:00");
+      } else {
+        targetDate = new Date();
+        targetDate.setHours(0, 0, 0, 0);
+      }
+
+      const startOfDay = new Date(targetDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // Get technicians (exclude owner role)
+      const technicians = await db.select({
+        id: crmUsers.id,
+        name: crmUsers.name,
+        email: crmUsers.email,
+        role: crmUsers.role,
+      }).from(crmUsers).where(
+        and(
+          sql`${crmUsers.role} != 'owner'`,
+          eq(crmUsers.isActive, true)
+        )
+      );
+
+      // Get all job assignments for the date
+      const assignments = await db.select().from(crmJobAssignments);
+
+      // Get jobs scheduled for this day OR unassigned jobs (no scheduledStart)
+      const scheduledJobs = await db.select({
+        job: crmJobs,
+        customerName: crmCustomers.name,
+      }).from(crmJobs)
+        .leftJoin(crmCustomers, eq(crmJobs.customerId, crmCustomers.id))
+        .where(
+          sql`(${crmJobs.scheduledStart} >= ${startOfDay} AND ${crmJobs.scheduledStart} <= ${endOfDay})
+              OR ${crmJobs.scheduledStart} IS NULL`
+        );
+
+      // Build jobs with assignment info
+      const jobsWithAssignments = scheduledJobs.map(({ job, customerName }) => {
+        const assignment = assignments.find(a => a.jobId === job.id);
+        return {
+          ...job,
+          customerName: customerName || "Unknown Customer",
+          assignedTechId: assignment?.techUserId || null,
+          assignmentId: assignment?.id || null,
+        };
+      });
+
+      return res.json({
+        technicians,
+        jobs: jobsWithAssignments,
+        date: targetDate.toISOString().split("T")[0],
+      });
+    } catch (error) {
+      console.error("Error fetching dispatch data:", error);
+      return res.status(500).json({ message: "Failed to fetch dispatch data" });
+    }
+  });
+
+  // PATCH /api/crm/jobs/:id - Update job (with permissions and double-booking check)
+  app.patch("/api/crm/jobs/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const jobId = req.params.id;
+      const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, jobId));
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      const { assignedTechId, scheduledStart, scheduledEnd, status, description, notes } = req.body;
+
+      // Check permissions
+      const isAdminOrSales = isSalesOrAbove(user.role);
+      
+      if (!isAdminOrSales) {
+        // Techs can only update jobs assigned to them, and only status/notes
+        const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.jobId, jobId));
+        const isAssigned = assignments.some(a => a.techUserId === user.id);
+        
+        if (!isAssigned) {
+          return res.status(403).json({ message: "Access denied - not assigned to this job" });
+        }
+
+        // Techs can only update status and notes
+        if (assignedTechId !== undefined || scheduledStart !== undefined || scheduledEnd !== undefined) {
+          return res.status(403).json({ message: "Access denied - techs can only update status and notes" });
+        }
+      }
+
+      // Double-booking check if assigning tech + time
+      if (assignedTechId && scheduledStart && scheduledEnd) {
+        const newStart = new Date(scheduledStart);
+        const newEnd = new Date(scheduledEnd);
+        
+        // Get all assignments for the tech
+        const techAssignments = await db.select().from(crmJobAssignments)
+          .where(eq(crmJobAssignments.techUserId, assignedTechId));
+        
+        const techJobIds = techAssignments.map(a => a.jobId).filter(id => id !== jobId);
+        
+        if (techJobIds.length > 0) {
+          // Check for overlapping jobs on the same day
+          const dayStart = new Date(newStart);
+          dayStart.setHours(0, 0, 0, 0);
+          const dayEnd = new Date(newStart);
+          dayEnd.setHours(23, 59, 59, 999);
+
+          const overlappingJobs = await db.select().from(crmJobs)
+            .where(
+              and(
+                inArray(crmJobs.id, techJobIds),
+                sql`${crmJobs.scheduledStart} IS NOT NULL`,
+                sql`${crmJobs.scheduledEnd} IS NOT NULL`,
+                sql`${crmJobs.scheduledStart} < ${newEnd}`,
+                sql`${crmJobs.scheduledEnd} > ${newStart}`
+              )
+            );
+
+          if (overlappingJobs.length > 0) {
+            return res.status(400).json({
+              message: "Double booking detected - technician has overlapping jobs",
+              conflictingJobs: overlappingJobs.map(j => ({ id: j.id, scheduledStart: j.scheduledStart, scheduledEnd: j.scheduledEnd })),
+            });
+          }
+        }
+      }
+
+      // Build update data
+      const updateData: Record<string, any> = { updatedAt: new Date() };
+      const changes: Record<string, any> = {};
+
+      if (scheduledStart !== undefined) {
+        updateData.scheduledStart = scheduledStart ? new Date(scheduledStart) : null;
+        changes.scheduledStart = { old: job.scheduledStart, new: updateData.scheduledStart };
+      }
+      if (scheduledEnd !== undefined) {
+        updateData.scheduledEnd = scheduledEnd ? new Date(scheduledEnd) : null;
+        changes.scheduledEnd = { old: job.scheduledEnd, new: updateData.scheduledEnd };
+      }
+      if (status !== undefined) {
+        updateData.status = status;
+        changes.status = { old: job.status, new: status };
+        if (status === "completed" && !job.completedAt) {
+          updateData.completedAt = new Date();
+        }
+      }
+      if (description !== undefined) {
+        updateData.description = description;
+        changes.description = { old: job.description, new: description };
+      }
+
+      // Update the job
+      const [updatedJob] = await db.update(crmJobs).set(updateData).where(eq(crmJobs.id, jobId)).returning();
+
+      // Handle tech assignment
+      if (assignedTechId !== undefined && isAdminOrSales) {
+        // Remove existing assignments for this job
+        await db.delete(crmJobAssignments).where(eq(crmJobAssignments.jobId, jobId));
+        
+        if (assignedTechId) {
+          // Create new assignment
+          await db.insert(crmJobAssignments).values({
+            jobId,
+            techUserId: assignedTechId,
+            startAt: updateData.scheduledStart || job.scheduledStart,
+            endAt: updateData.scheduledEnd || job.scheduledEnd,
+          });
+          changes.assignedTechId = { old: null, new: assignedTechId };
+        }
+      }
+
+      // Log status event if status changed
+      if (status !== undefined && status !== job.status) {
+        await db.insert(crmJobStatusEvents).values({
+          jobId,
+          status,
+          userId: user.id,
+          notes: notes || null,
+        });
+      }
+
+      // Create audit log entry
+      await logCrmAudit(
+        user.id,
+        "job.updated",
+        "job",
+        jobId,
+        changes,
+        req.ip
+      );
+
+      // Get the updated job with assignment info
+      const [assignment] = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.jobId, jobId));
+      const [customer] = await db.select({ name: crmCustomers.name }).from(crmCustomers).where(eq(crmCustomers.id, updatedJob.customerId));
+
+      return res.json({
+        ...updatedJob,
+        customerName: customer?.name || "Unknown Customer",
+        assignedTechId: assignment?.techUserId || null,
+        assignmentId: assignment?.id || null,
+      });
+    } catch (error) {
+      console.error("Error updating job:", error);
+      return res.status(500).json({ message: "Failed to update job" });
+    }
+  });
+
+  // GET /api/crm/customers/:id/jobs - Get jobs for a customer
+  app.get("/api/crm/customers/:id/jobs", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const customerId = req.params.id;
+      
+      // Verify customer exists
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      // Get jobs for this customer
+      const jobs = await db.select().from(crmJobs)
+        .where(eq(crmJobs.customerId, customerId))
+        .orderBy(desc(crmJobs.createdAt));
+
+      // Get assignments for these jobs
+      const jobIds = jobs.map(j => j.id);
+      const assignments = jobIds.length > 0 
+        ? await db.select().from(crmJobAssignments).where(inArray(crmJobAssignments.jobId, jobIds))
+        : [];
+
+      // Get tech names
+      const techIds = [...new Set(assignments.map(a => a.techUserId))];
+      const techs = techIds.length > 0
+        ? await db.select({ id: crmUsers.id, name: crmUsers.name }).from(crmUsers).where(inArray(crmUsers.id, techIds))
+        : [];
+
+      const jobsWithInfo = jobs.map(job => {
+        const assignment = assignments.find(a => a.jobId === job.id);
+        const tech = assignment ? techs.find(t => t.id === assignment.techUserId) : null;
+        return {
+          ...job,
+          assignedTechId: assignment?.techUserId || null,
+          assignedTechName: tech?.name || null,
+        };
+      });
+
+      return res.json(jobsWithInfo);
+    } catch (error) {
+      console.error("Error fetching customer jobs:", error);
+      return res.status(500).json({ message: "Failed to fetch customer jobs" });
+    }
+  });
+
   // ============================================
   // WEATHER API ENDPOINTS
   // ============================================

@@ -26,6 +26,7 @@ import CrmLogin from "@/pages/crm/crm-login";
 import CrmDashboard from "@/pages/crm/crm-dashboard";
 import CrmDispatch from "@/pages/crm/crm-dispatch";
 import CrmCustomers from "@/pages/crm/crm-customers";
+import CrmCustomerDetail from "@/pages/crm/crm-customer-detail";
 import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import GlobalPasswordGate from "@/components/GlobalPasswordGate";
@@ -68,6 +69,7 @@ function Router() {
       <Route path="/crm/gate" component={CrmGate} />
       <Route path="/crm/login" component={CrmLogin} />
       <Route path="/crm/dispatch" component={CrmDispatch} />
+      <Route path="/crm/customers/:id" component={CrmCustomerDetail} />
       <Route path="/crm/customers" component={CrmCustomers} />
       <Route path="/crm" component={CrmDashboard} />
       <Route component={NotFound} />

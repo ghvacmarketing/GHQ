@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { getQueryFn } from "@/lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { useToast } from "@/hooks/use-toast";
 import {
   CalendarDays,
   User,
@@ -16,7 +17,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import type { CrmUser } from "@shared/schema";
+import type { CrmUser, CrmJob } from "@shared/schema";
 import {
   DndContext,
   closestCenter,
@@ -30,18 +31,13 @@ import {
   useDraggable,
 } from "@dnd-kit/core";
 
-type JobStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
+type JobStatus = "new" | "scheduled" | "dispatched" | "en_route" | "on_site" | "completed" | "invoiced" | "paid" | "cancelled";
 type FilterStatus = "all" | "unassigned" | "in_progress" | "completed";
 
-interface Job {
-  id: string;
+interface DispatchJob extends CrmJob {
   customerName: string;
-  jobType: string;
-  startTime: number;
-  endTime: number;
-  status: JobStatus;
-  address?: string;
-  technicianId: string;
+  assignedTechId: string | null;
+  assignmentId: string | null;
 }
 
 interface Technician {
@@ -66,25 +62,32 @@ function getInitials(name: string): string {
   return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
-const initialJobs: Job[] = [];
-
-// 8am to 8pm (13 hours: 8,9,10,11,12,13,14,15,16,17,18,19,20)
 const START_HOUR = 8;
 const END_HOUR = 20;
-const TOTAL_HOURS = END_HOUR - START_HOUR; // 12 hours
-const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i + START_HOUR); // 8am-7pm (12 slots)
+const TOTAL_HOURS = END_HOUR - START_HOUR;
+const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i + START_HOUR);
 
-const statusColors: Record<JobStatus, { bg: string; border: string; text: string }> = {
+const statusColors: Record<string, { bg: string; border: string; text: string }> = {
+  new: { bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-700" },
   scheduled: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
-  in_progress: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" },
+  dispatched: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700" },
+  en_route: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" },
+  on_site: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" },
   completed: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
-  cancelled: { bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-500" },
+  invoiced: { bg: "bg-teal-50", border: "border-teal-200", text: "text-teal-700" },
+  paid: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" },
+  cancelled: { bg: "bg-red-50", border: "border-red-200", text: "text-red-500" },
 };
 
-const statusLabels: Record<JobStatus, string> = {
+const statusLabels: Record<string, string> = {
+  new: "New",
   scheduled: "Scheduled",
-  in_progress: "In Progress",
+  dispatched: "Dispatched",
+  en_route: "En Route",
+  on_site: "On Site",
   completed: "Completed",
+  invoiced: "Invoiced",
+  paid: "Paid",
   cancelled: "Cancelled",
 };
 
@@ -94,35 +97,45 @@ function formatHour(hour: number): string {
   return `${hour}am`;
 }
 
+function getJobDisplayTimes(job: DispatchJob): { startHour: number; endHour: number } {
+  if (!job.scheduledStart || !job.scheduledEnd) {
+    return { startHour: START_HOUR, endHour: START_HOUR + 1 };
+  }
+  const start = new Date(job.scheduledStart);
+  const end = new Date(job.scheduledEnd);
+  const startHour = Math.max(START_HOUR, Math.min(END_HOUR, start.getHours() + start.getMinutes() / 60));
+  const endHour = Math.max(START_HOUR, Math.min(END_HOUR, end.getHours() + end.getMinutes() / 60));
+  return { startHour, endHour: endHour > startHour ? endHour : startHour + 1 };
+}
+
 interface DraggableJobCardProps {
-  job: Job;
+  job: DispatchJob;
   onResize: (jobId: string, newStart: number, newEnd: number) => void;
   isDragging?: boolean;
 }
 
 function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) {
-  const colors = statusColors[job.status];
+  const colors = statusColors[job.status] || statusColors.new;
+  const { startHour, endHour } = getJobDisplayTimes(job);
   
   const cardRef = useRef<HTMLDivElement>(null);
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const [isResizingRight, setIsResizingRight] = useState(false);
-  const [visualStart, setVisualStart] = useState(job.startTime);
-  const [visualEnd, setVisualEnd] = useState(job.endTime);
+  const [visualStart, setVisualStart] = useState(startHour);
+  const [visualEnd, setVisualEnd] = useState(endHour);
   const resizeStartX = useRef(0);
-  const originalStart = useRef(job.startTime);
-  const originalEnd = useRef(job.endTime);
+  const originalStart = useRef(startHour);
+  const originalEnd = useRef(endHour);
   
   const isResizing = isResizingLeft || isResizingRight;
   
-  // Sync visual state when not resizing
   useEffect(() => {
     if (!isResizing) {
-      setVisualStart(job.startTime);
-      setVisualEnd(job.endTime);
+      setVisualStart(startHour);
+      setVisualEnd(endHour);
     }
-  }, [job.startTime, job.endTime, isResizing]);
+  }, [startHour, endHour, isResizing]);
   
-  // Disable dragging while resizing
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: job.id,
     data: { job },
@@ -133,17 +146,17 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
     e.stopPropagation();
     e.preventDefault();
     resizeStartX.current = e.clientX;
-    originalStart.current = job.startTime;
-    originalEnd.current = job.endTime;
-    setVisualStart(job.startTime);
-    setVisualEnd(job.endTime);
+    originalStart.current = startHour;
+    originalEnd.current = endHour;
+    setVisualStart(startHour);
+    setVisualEnd(endHour);
     
     if (side === 'left') {
       setIsResizingLeft(true);
     } else {
       setIsResizingRight(true);
     }
-  }, [job.startTime, job.endTime]);
+  }, [startHour, endHour]);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -169,7 +182,6 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
     };
 
     const handleMouseUp = () => {
-      // Commit the final values on mouseup
       if (isResizingLeft) {
         onResize(job.id, visualStart, originalEnd.current);
       } else if (isResizingRight) {
@@ -188,9 +200,8 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
     };
   }, [isResizing, isResizingLeft, isResizingRight, job.id, visualStart, visualEnd, onResize]);
 
-  // Use visual state for positioning during resize
-  const displayStart = isResizing ? visualStart : job.startTime;
-  const displayEnd = isResizing ? visualEnd : job.endTime;
+  const displayStart = isResizing ? visualStart : startHour;
+  const displayEnd = isResizing ? visualEnd : endHour;
   const widthPercent = ((displayEnd - displayStart) / TOTAL_HOURS) * 100;
   const leftPercent = ((displayStart - START_HOUR) / TOTAL_HOURS) * 100;
 
@@ -198,7 +209,6 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
     left: `${leftPercent}%`,
     width: `${widthPercent}%`,
     minWidth: "60px",
-    // Only apply transform while actively dragging (not after drop)
     transform: isDragging && transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.5 : 1,
   };
@@ -213,7 +223,6 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
       style={style}
       data-testid={`job-card-${job.id}`}
     >
-      {/* Left resize handle - visible on hover */}
       <div
         className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-20 flex items-center justify-center hover:bg-black/10"
         onMouseDown={(e) => handleResizeStart(e, 'left')}
@@ -223,7 +232,6 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
         <div className="w-0.5 h-4 bg-current opacity-30 rounded" />
       </div>
       
-      {/* Right resize handle - visible on hover */}
       <div
         className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize z-20 flex items-center justify-center hover:bg-black/10"
         onMouseDown={(e) => handleResizeStart(e, 'right')}
@@ -233,7 +241,6 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
         <div className="w-0.5 h-4 bg-current opacity-30 rounded" />
       </div>
 
-      {/* Draggable center content */}
       <div 
         className="flex flex-col h-full justify-center px-3 py-1 cursor-grab"
         {...attributes}
@@ -246,9 +253,10 @@ function DraggableJobCard({ job, onResize, isDragging }: DraggableJobCardProps) 
   );
 }
 
-function JobCardOverlay({ job, timelineWidth }: { job: Job; timelineWidth: number }) {
-  const colors = statusColors[job.status];
-  const duration = job.endTime - job.startTime;
+function JobCardOverlay({ job, timelineWidth }: { job: DispatchJob; timelineWidth: number }) {
+  const colors = statusColors[job.status] || statusColors.new;
+  const { startHour, endHour } = getJobDisplayTimes(job);
+  const duration = endHour - startHour;
   const widthPx = Math.max(60, (duration / TOTAL_HOURS) * timelineWidth);
   
   return (
@@ -264,7 +272,7 @@ function JobCardOverlay({ job, timelineWidth }: { job: Job; timelineWidth: numbe
 
 interface DroppableTechnicianRowProps {
   tech: Technician;
-  jobs: Job[];
+  jobs: DispatchJob[];
   onResize: (jobId: string, newStart: number, newEnd: number) => void;
   activeId: string | null;
 }
@@ -315,8 +323,54 @@ function DroppableTechnicianRow({ tech, jobs, onResize, activeId }: DroppableTec
   );
 }
 
-function MobileJobCard({ job, technician }: { job: Job; technician: Technician }) {
-  const colors = statusColors[job.status];
+function UnassignedRow({ jobs, onResize, activeId }: { jobs: DispatchJob[]; onResize: (jobId: string, newStart: number, newEnd: number) => void; activeId: string | null }) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `technician-unassigned`,
+    data: { technicianId: null },
+  });
+
+  return (
+    <div
+      className={`flex border-b-2 border-slate-200 ${isOver ? 'bg-amber-50' : 'bg-amber-50/30'}`}
+      data-testid="unassigned-row"
+    >
+      <div className="w-40 flex-shrink-0 p-2 border-r border-slate-100">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-slate-400 flex items-center justify-center text-white text-xs font-medium">
+            ?
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-800">Unassigned</p>
+            <p className="text-xs text-slate-400">{jobs.length} jobs</p>
+          </div>
+        </div>
+      </div>
+      <div ref={setNodeRef} className={`flex-1 relative h-14 ${isOver ? 'bg-amber-50' : ''}`}>
+        <div className="absolute inset-0 flex">
+          {hours.map((hour) => (
+            <div
+              key={hour}
+              className="flex-1 border-r border-slate-200 last:border-r-0"
+              style={{ minWidth: "50px" }}
+            />
+          ))}
+        </div>
+        {jobs.map((job) => (
+          <DraggableJobCard 
+            key={job.id} 
+            job={job} 
+            onResize={onResize}
+            isDragging={activeId === job.id}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MobileJobCard({ job, technician }: { job: DispatchJob; technician?: Technician }) {
+  const colors = statusColors[job.status] || statusColors.new;
+  const { startHour, endHour } = getJobDisplayTimes(job);
 
   return (
     <Card className={`${colors.bg} ${colors.border} border`} data-testid={`mobile-job-card-${job.id}`}>
@@ -327,37 +381,38 @@ function MobileJobCard({ job, technician }: { job: Job; technician: Technician }
             <p className={`text-xs ${colors.text} opacity-80`}>{job.jobType}</p>
           </div>
           <Badge variant="outline" className={`${colors.text} ${colors.border} text-xs`}>
-            {statusLabels[job.status]}
+            {statusLabels[job.status] || job.status}
           </Badge>
         </div>
         <div className="flex items-center gap-4 mt-2 text-xs text-slate-600">
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            <span>{formatHour(job.startTime)} - {formatHour(job.endTime)}</span>
+            <span>{formatHour(Math.floor(startHour))} - {formatHour(Math.floor(endHour))}</span>
           </div>
           <div className="flex items-center gap-1">
             <User className="h-3 w-3" />
-            <span>{technician.name}</span>
+            <span>{technician?.name || "Unassigned"}</span>
           </div>
         </div>
-        {job.address && (
-          <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
-            <MapPin className="h-3 w-3" />
-            <span>{job.address}</span>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
+}
+
+interface DispatchData {
+  technicians: { id: string; name: string; email: string; role: string }[];
+  jobs: DispatchJob[];
+  date: string;
 }
 
 export default function CrmDispatch() {
   const [, navigate] = useLocation();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [filter, setFilter] = useState<FilterStatus>("all");
-  const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [localJobs, setLocalJobs] = useState<DispatchJob[]>([]);
+  const { toast } = useToast();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -367,17 +422,30 @@ export default function CrmDispatch() {
     })
   );
 
+  const dateString = selectedDate.toISOString().split("T")[0];
+
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
-  const { data: crmUsersData } = useQuery<{ id: string; name: string; role: string; email: string }[]>({
-    queryKey: ["/api/crm/users"],
+  const { data: dispatchData, isLoading: dispatchLoading } = useQuery<DispatchData>({
+    queryKey: ["/api/crm/dispatch", dateString],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/dispatch?date=${dateString}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch dispatch data");
+      return res.json();
+    },
     enabled: !!currentUser,
   });
 
-  const technicians: Technician[] = (crmUsersData || [])
+  useEffect(() => {
+    if (dispatchData?.jobs) {
+      setLocalJobs(dispatchData.jobs);
+    }
+  }, [dispatchData?.jobs]);
+
+  const technicians: Technician[] = (dispatchData?.technicians || [])
     .filter(u => u.role !== "owner")
     .map((u, idx) => ({
       id: u.id,
@@ -386,23 +454,54 @@ export default function CrmDispatch() {
       color: techColors[idx % techColors.length],
     }));
 
+  const updateJobMutation = useMutation({
+    mutationFn: async (data: { jobId: string; updates: any }) => {
+      const res = await apiRequest("PATCH", `/api/crm/jobs/${data.jobId}`, data.updates);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch", dateString] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update job",
+        description: error.message,
+        variant: "destructive",
+      });
+      if (dispatchData?.jobs) {
+        setLocalJobs(dispatchData.jobs);
+      }
+    },
+  });
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       navigate("/crm/login");
     }
   }, [authLoading, currentUser, navigate]);
 
-  const moveJobToTechnician = useCallback((jobId: string, newTechId: string) => {
-    setJobs(prev => prev.map(job => 
-      job.id === jobId ? { ...job, technicianId: newTechId } : job
-    ));
-  }, []);
-
   const resizeJob = useCallback((jobId: string, newStart: number, newEnd: number) => {
-    setJobs(prev => prev.map(job =>
-      job.id === jobId ? { ...job, startTime: newStart, endTime: newEnd } : job
+    const job = localJobs.find(j => j.id === jobId);
+    if (!job) return;
+
+    const baseDate = selectedDate;
+    const scheduledStart = new Date(baseDate);
+    scheduledStart.setHours(Math.floor(newStart), (newStart % 1) * 60, 0, 0);
+    const scheduledEnd = new Date(baseDate);
+    scheduledEnd.setHours(Math.floor(newEnd), (newEnd % 1) * 60, 0, 0);
+
+    setLocalJobs(prev => prev.map(j =>
+      j.id === jobId ? { ...j, scheduledStart, scheduledEnd } : j
     ));
-  }, []);
+
+    updateJobMutation.mutate({
+      jobId,
+      updates: {
+        scheduledStart: scheduledStart.toISOString(),
+        scheduledEnd: scheduledEnd.toISOString(),
+      },
+    });
+  }, [localJobs, selectedDate, updateJobMutation]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -418,40 +517,58 @@ export default function CrmDispatch() {
     
     const overId = over.id as string;
     const jobId = active.id as string;
-    const job = jobs.find(j => j.id === jobId);
+    const job = localJobs.find(j => j.id === jobId);
     
     if (!job) return;
     
     if (overId.startsWith('technician-')) {
       const newTechId = overId.replace('technician-', '');
-      const duration = job.endTime - job.startTime;
+      const isUnassigned = newTechId === 'unassigned';
+      const { startHour, endHour } = getJobDisplayTimes(job);
+      const duration = endHour - startHour;
       
       const timelineWidth = timelineRef.current?.offsetWidth || 780;
       const hoursPerPixel = TOTAL_HOURS / timelineWidth;
       const deltaHours = Math.round(delta.x * hoursPerPixel);
       
-      let newStart = job.startTime + deltaHours;
-      newStart = Math.max(START_HOUR, Math.min(newStart, END_HOUR - duration));
-      const newEnd = newStart + duration;
-      
-      setJobs(prev => prev.map(j => 
+      let newStartHour = startHour + deltaHours;
+      newStartHour = Math.max(START_HOUR, Math.min(newStartHour, END_HOUR - duration));
+      const newEndHour = newStartHour + duration;
+
+      const scheduledStart = new Date(selectedDate);
+      scheduledStart.setHours(Math.floor(newStartHour), (newStartHour % 1) * 60, 0, 0);
+      const scheduledEnd = new Date(selectedDate);
+      scheduledEnd.setHours(Math.floor(newEndHour), (newEndHour % 1) * 60, 0, 0);
+
+      setLocalJobs(prev => prev.map(j => 
         j.id === jobId 
-          ? { ...j, technicianId: newTechId, startTime: newStart, endTime: newEnd } 
+          ? { ...j, assignedTechId: isUnassigned ? null : newTechId, scheduledStart, scheduledEnd } 
           : j
       ));
-    }
-  }, [jobs]);
 
-  const filteredJobs = jobs.filter((job) => {
+      updateJobMutation.mutate({
+        jobId,
+        updates: {
+          assignedTechId: isUnassigned ? null : newTechId,
+          scheduledStart: scheduledStart.toISOString(),
+          scheduledEnd: scheduledEnd.toISOString(),
+        },
+      });
+    }
+  }, [localJobs, selectedDate, updateJobMutation]);
+
+  const filteredJobs = localJobs.filter((job) => {
     if (filter === "all") return true;
-    if (filter === "unassigned") return !job.technicianId;
-    if (filter === "in_progress") return job.status === "in_progress";
-    if (filter === "completed") return job.status === "completed";
+    if (filter === "unassigned") return !job.assignedTechId;
+    if (filter === "in_progress") return ["dispatched", "en_route", "on_site"].includes(job.status);
+    if (filter === "completed") return ["completed", "invoiced", "paid"].includes(job.status);
     return true;
   });
 
+  const unassignedJobs = filteredJobs.filter(job => !job.assignedTechId);
+
   const getJobsForTechnician = useCallback((techId: string) => {
-    return filteredJobs.filter((job) => job.technicianId === techId);
+    return filteredJobs.filter((job) => job.assignedTechId === techId);
   }, [filteredJobs]);
 
   const handleDateSelect = (date: Date | undefined) => {
@@ -468,9 +585,9 @@ export default function CrmDispatch() {
     year: "numeric",
   });
 
-  const activeJob = activeId ? jobs.find(job => job.id === activeId) : null;
+  const activeJob = activeId ? localJobs.find(job => job.id === activeId) : null;
 
-  if (authLoading) {
+  if (authLoading || dispatchLoading) {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
@@ -539,7 +656,7 @@ export default function CrmDispatch() {
               data-testid={`filter-${status}`}
             >
               {status === "all" && "All Jobs"}
-              {status === "unassigned" && "Unassigned"}
+              {status === "unassigned" && `Unassigned (${unassignedJobs.length})`}
               {status === "in_progress" && "In Progress"}
               {status === "completed" && "Completed"}
             </Button>
@@ -549,7 +666,7 @@ export default function CrmDispatch() {
         <Card className="bg-white border hidden lg:block" data-testid="card-timeline">
           <CardHeader className="py-3 px-4">
             <CardTitle className="text-base font-medium text-slate-800">
-              Daily Schedule
+              Daily Schedule - {localJobs.length} jobs
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -578,6 +695,12 @@ export default function CrmDispatch() {
                     </div>
                   </div>
 
+                  <UnassignedRow 
+                    jobs={unassignedJobs}
+                    onResize={resizeJob}
+                    activeId={activeId}
+                  />
+
                   {technicians.map((tech) => (
                     <DroppableTechnicianRow
                       key={tech.id}
@@ -587,6 +710,12 @@ export default function CrmDispatch() {
                       activeId={activeId}
                     />
                   ))}
+
+                  {localJobs.length === 0 && (
+                    <div className="p-8 text-center text-slate-500">
+                      No jobs scheduled for this date
+                    </div>
+                  )}
                 </div>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
@@ -602,7 +731,7 @@ export default function CrmDispatch() {
           <Card className="bg-white border">
             <CardHeader className="py-3 px-4">
               <CardTitle className="text-base font-medium text-slate-800">
-                Today's Jobs
+                Today's Jobs ({filteredJobs.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -610,10 +739,8 @@ export default function CrmDispatch() {
                 <p className="text-sm text-slate-500 text-center py-4">No jobs match the current filter</p>
               ) : (
                 filteredJobs.map((job) => {
-                  const tech = technicians.find((t) => t.id === job.technicianId);
-                  return tech ? (
-                    <MobileJobCard key={job.id} job={job} technician={tech} />
-                  ) : null;
+                  const tech = technicians.find((t) => t.id === job.assignedTechId);
+                  return <MobileJobCard key={job.id} job={job} technician={tech} />;
                 })
               )}
             </CardContent>
@@ -624,7 +751,7 @@ export default function CrmDispatch() {
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-4">
               <span className="text-sm font-medium text-slate-600">Status Legend:</span>
-              {(Object.keys(statusColors) as JobStatus[]).map((status) => (
+              {["new", "scheduled", "dispatched", "en_route", "on_site", "completed"].map((status) => (
                 <div key={status} className="flex items-center gap-2">
                   <div className={`w-4 h-4 rounded ${statusColors[status].bg} ${statusColors[status].border} border`} />
                   <span className="text-sm text-slate-600">{statusLabels[status]}</span>
