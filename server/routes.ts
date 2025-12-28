@@ -5187,42 +5187,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Double-booking check: runs if we have a tech AND scheduled times (from request or existing)
-      // Determine effective techId: from request, or look up existing assignment
-      let effectiveTechId = assignedTechId;
-      if (effectiveTechId === undefined) {
+      // OVERLAP VALIDATION: Check for double-booking BEFORE any changes
+      // This runs when:
+      // 1. Assigning a tech to an already-scheduled job (only assignedTechId sent, use existing times)
+      // 2. Changing times for an already-assigned job (only times sent, lookup existing tech)
+      // 3. Both at once (tech AND times in request)
+      
+      // Determine effective techId: use request value if provided, otherwise lookup existing assignment
+      let effectiveTechId: string | null = null;
+      if (assignedTechId !== undefined) {
+        effectiveTechId = assignedTechId;
+      } else {
         const existingAssignment = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.jobId, jobId));
         effectiveTechId = existingAssignment[0]?.techUserId || null;
       }
 
-      // Determine effective times: from request, or from existing job
-      const effectiveStart = scheduledStart !== undefined 
-        ? (scheduledStart ? new Date(scheduledStart) : null)
-        : job.scheduledStart;
-      const effectiveEnd = scheduledEnd !== undefined 
-        ? (scheduledEnd ? new Date(scheduledEnd) : null)
-        : job.scheduledEnd;
+      // Determine effective times: use request values if provided, otherwise use job's existing times
+      let effectiveStart: Date | null = null;
+      if (scheduledStart !== undefined) {
+        effectiveStart = scheduledStart ? new Date(scheduledStart) : null;
+      } else if (job.scheduledStart) {
+        effectiveStart = job.scheduledStart instanceof Date ? job.scheduledStart : new Date(job.scheduledStart);
+      }
 
-      // Run overlap check if we have techId AND both times
+      let effectiveEnd: Date | null = null;
+      if (scheduledEnd !== undefined) {
+        effectiveEnd = scheduledEnd ? new Date(scheduledEnd) : null;
+      } else if (job.scheduledEnd) {
+        effectiveEnd = job.scheduledEnd instanceof Date ? job.scheduledEnd : new Date(job.scheduledEnd);
+      }
+
+      // Run overlap check if we have a tech AND both scheduled times
       if (effectiveTechId && effectiveStart && effectiveEnd) {
-        const newStart = new Date(effectiveStart);
-        const newEnd = new Date(effectiveEnd);
-        
-        // Get all assignments for the tech
+        // Query ALL jobs assigned to the target tech (not just current assignments)
         const techAssignments = await db.select().from(crmJobAssignments)
           .where(eq(crmJobAssignments.techUserId, effectiveTechId));
         
-        const techJobIds = techAssignments.map(a => a.jobId).filter(id => id !== jobId);
+        // Exclude current job from overlap check
+        const otherJobIds = techAssignments.map(a => a.jobId).filter(id => id !== jobId);
         
-        if (techJobIds.length > 0) {
+        if (otherJobIds.length > 0) {
+          // Check for time overlap: start1 < end2 AND end1 > start2
           const overlappingJobs = await db.select().from(crmJobs)
             .where(
               and(
-                inArray(crmJobs.id, techJobIds),
+                inArray(crmJobs.id, otherJobIds),
                 sql`${crmJobs.scheduledStart} IS NOT NULL`,
                 sql`${crmJobs.scheduledEnd} IS NOT NULL`,
-                sql`${crmJobs.scheduledStart} < ${newEnd}`,
-                sql`${crmJobs.scheduledEnd} > ${newStart}`
+                sql`${crmJobs.scheduledStart} < ${effectiveEnd}`,
+                sql`${crmJobs.scheduledEnd} > ${effectiveStart}`
               )
             );
 

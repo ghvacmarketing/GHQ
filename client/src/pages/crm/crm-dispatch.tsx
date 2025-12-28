@@ -538,12 +538,12 @@ export default function CrmDispatch() {
     if (!selectedJobId) return;
     updateJobMutation.mutate({
       jobId: selectedJobId,
-      updates: { assignedTechId: null },
+      updates: { assignedTechId: null, scheduledStart: null, scheduledEnd: null },
     }, {
       onSuccess: () => {
         toast({ title: "Technician unassigned", description: "Job moved to unassigned queue" });
         setLocalJobs(prev => prev.map(j => 
-          j.id === selectedJobId ? { ...j, assignedTechId: null } : j
+          j.id === selectedJobId ? { ...j, assignedTechId: null, scheduledStart: null, scheduledEnd: null } as DispatchJob : j
         ));
       }
     });
@@ -553,12 +553,12 @@ export default function CrmDispatch() {
     if (!selectedJobId) return;
     updateJobMutation.mutate({
       jobId: selectedJobId,
-      updates: { status: "cancelled" },
+      updates: { status: "cancelled", scheduledStart: null, scheduledEnd: null },
     }, {
       onSuccess: () => {
         toast({ title: "Job cancelled", description: "The job has been cancelled" });
         setLocalJobs(prev => prev.map(j => 
-          j.id === selectedJobId ? { ...j, status: "cancelled" as JobStatus } : j
+          j.id === selectedJobId ? { ...j, status: "cancelled" as JobStatus, scheduledStart: null, scheduledEnd: null } as DispatchJob : j
         ));
         setIsSheetOpen(false);
       }
