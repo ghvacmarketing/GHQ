@@ -661,7 +661,8 @@ export default function CrmJobs() {
                         return (
                           <TableRow
                             key={job.id}
-                            className="hover:bg-slate-50"
+                            className="hover:bg-slate-50 cursor-pointer"
+                            onClick={() => navigate(`/crm/jobs/${job.id}`)}
                             data-testid={`row-job-${job.id}`}
                           >
                             <TableCell className="font-medium" data-testid={`text-job-date-${job.id}`}>
@@ -701,6 +702,7 @@ export default function CrmJobs() {
                                     variant="ghost" 
                                     size="icon" 
                                     className="h-8 w-8"
+                                    onClick={(e) => e.stopPropagation()}
                                     data-testid={`button-job-actions-${job.id}`}
                                   >
                                     <MoreVertical className="h-4 w-4" />
@@ -761,7 +763,10 @@ export default function CrmJobs() {
                                   </DropdownMenuSub>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
-                                    onClick={() => navigate("/crm/dispatch")}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/crm/jobs/${job.id}`);
+                                    }}
                                     data-testid={`action-open-job-${job.id}`}
                                   >
                                     <ExternalLink className="mr-2 h-4 w-4" />
