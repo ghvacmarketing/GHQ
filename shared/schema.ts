@@ -849,6 +849,10 @@ export const crmEquipment = pgTable("crm_equipment", {
 export const crmJobStatusEnum = ["new", "scheduled", "dispatched", "en_route", "on_site", "completed", "invoiced", "paid", "cancelled"] as const;
 export type CrmJobStatus = typeof crmJobStatusEnum[number];
 
+// WorkOrder Status Enum  
+export const workOrderStatusEnum = ["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"] as const;
+export type WorkOrderStatus = typeof workOrderStatusEnum[number];
+
 // CRM Jobs
 export const crmJobs = pgTable("crm_jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -862,6 +866,24 @@ export const crmJobs = pgTable("crm_jobs", {
   description: text("description"),
   scheduledStart: timestamp("scheduled_start"),
   scheduledEnd: timestamp("scheduled_end"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CRM Work Orders (scheduled visits linked to jobs)
+export const crmWorkOrders = pgTable("crm_work_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => crmJobs.id, { onDelete: "cascade" }),
+  workOrderNumber: integer("work_order_number").notNull().default(1),
+  assignedTechId: varchar("assigned_tech_id").references(() => crmUsers.id),
+  scheduledStart: timestamp("scheduled_start"),
+  scheduledEnd: timestamp("scheduled_end"),
+  status: text("status").$type<WorkOrderStatus>().notNull().default("scheduled"),
+  checklist: json("checklist").$type<{ item: string; completed: boolean }[]>(),
+  partsUsed: json("parts_used").$type<{ partId: string; name: string; qty: number; price: number }[]>(),
+  techNotes: text("tech_notes"),
+  startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -914,6 +936,7 @@ export const crmInvoices = pgTable("crm_invoices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   invoiceNumber: text("invoice_number").notNull().unique(),
   jobId: varchar("job_id").references(() => crmJobs.id),
+  workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id),
   customerId: varchar("customer_id").notNull().references(() => crmCustomers.id),
   status: text("status").$type<CrmInvoiceStatus>().notNull().default("draft"),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
@@ -924,6 +947,18 @@ export const crmInvoices = pgTable("crm_invoices", {
   dueDate: date("due_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CRM Invoice Line Items
+export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => crmInvoices.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // CRM Payments
@@ -1167,6 +1202,17 @@ export const insertCrmAuditLogSchema = createInsertSchema(crmAuditLog).omit({
   createdAt: true,
 });
 
+export const insertCrmWorkOrderSchema = createInsertSchema(crmWorkOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCrmInvoiceLineItemSchema = createInsertSchema(crmInvoiceLineItems).omit({
+  id: true,
+  createdAt: true,
+});
+
 // CRM Types
 export type InsertCrmUser = z.infer<typeof insertCrmUserSchema>;
 export type CrmUser = typeof crmUsers.$inferSelect;
@@ -1190,6 +1236,10 @@ export type InsertCrmInvoice = z.infer<typeof insertCrmInvoiceSchema>;
 export type CrmInvoice = typeof crmInvoices.$inferSelect;
 export type InsertCrmPayment = z.infer<typeof insertCrmPaymentSchema>;
 export type CrmPayment = typeof crmPayments.$inferSelect;
+export type InsertCrmWorkOrder = z.infer<typeof insertCrmWorkOrderSchema>;
+export type CrmWorkOrder = typeof crmWorkOrders.$inferSelect;
+export type InsertCrmInvoiceLineItem = z.infer<typeof insertCrmInvoiceLineItemSchema>;
+export type CrmInvoiceLineItem = typeof crmInvoiceLineItems.$inferSelect;
 
 // Weather Cache table for storing weather.gov API data
 export const weatherCache = pgTable("weather_cache", {
