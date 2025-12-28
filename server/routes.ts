@@ -5022,7 +5022,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/jobs/:id - Get single job with full details
+  // GET /api/crm/jobs/:id - Get single job with full details (case file)
   app.get("/api/crm/jobs/:id", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -5034,6 +5034,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [jobWithCustomer] = await db.select({
         job: crmJobs,
         customerName: crmCustomers.name,
+        customerPhone: crmCustomers.phone,
+        customerEmail: crmCustomers.email,
       })
         .from(crmJobs)
         .leftJoin(crmCustomers, eq(crmJobs.customerId, crmCustomers.id))
@@ -5078,13 +5080,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         property = firstProp || null;
       }
 
+      // Get work orders with tech info
+      const workOrdersRaw = await db.select({
+        workOrder: crmWorkOrders,
+        techName: crmUsers.name,
+      })
+        .from(crmWorkOrders)
+        .leftJoin(crmUsers, eq(crmWorkOrders.assignedTechId, crmUsers.id))
+        .where(eq(crmWorkOrders.jobId, jobId))
+        .orderBy(crmWorkOrders.scheduledStart);
+
+      const workOrders = workOrdersRaw.map(wo => ({
+        ...wo.workOrder,
+        techName: wo.techName || null,
+      }));
+
+      // Derive job status from work orders
+      let derivedStatus = "new";
+      if (workOrders.length > 0) {
+        const statuses = workOrders.map(wo => wo.status);
+        if (statuses.every(s => s === "completed")) {
+          derivedStatus = "completed";
+        } else if (statuses.some(s => s === "on_site")) {
+          derivedStatus = "on_site";
+        } else if (statuses.some(s => s === "en_route")) {
+          derivedStatus = "en_route";
+        } else if (statuses.some(s => s === "dispatched")) {
+          derivedStatus = "dispatched";
+        } else if (statuses.some(s => s === "scheduled")) {
+          derivedStatus = "scheduled";
+        }
+      }
+
+      // Get invoices for this job
+      const invoices = await db.select()
+        .from(crmInvoices)
+        .where(eq(crmInvoices.jobId, jobId))
+        .orderBy(crmInvoices.createdAt);
+
+      // Get quotes for this job
+      const quotes = await db.select()
+        .from(crmQuotes)
+        .where(eq(crmQuotes.jobId, jobId))
+        .orderBy(crmQuotes.createdAt);
+
+      // Calculate financial summary
+      const totalInvoiced = invoices.reduce((sum, inv) => sum + parseFloat(inv.total || "0"), 0);
+      const totalPaid = invoices.reduce((sum, inv) => sum + parseFloat(inv.total || "0") - parseFloat(inv.balanceDue || "0"), 0);
+      const balanceDue = invoices.reduce((sum, inv) => sum + parseFloat(inv.balanceDue || "0"), 0);
+      const quoteTotal = quotes.reduce((sum, q) => sum + parseFloat(q.total || "0"), 0);
+      const acceptedQuotes = quotes.filter(q => q.status === "accepted");
+
       return res.json({
         ...jobWithCustomer.job,
         customerName: jobWithCustomer.customerName || "Unknown Customer",
+        customerPhone: jobWithCustomer.customerPhone || null,
+        customerEmail: jobWithCustomer.customerEmail || null,
         assignedTechId: assignment?.techId || null,
         assignedTechName: assignment?.techName || null,
         assignedTechEmail: assignment?.techEmail || null,
         property,
+        workOrders,
+        derivedStatus,
+        invoices,
+        quotes,
+        financialSummary: {
+          quoteTotal,
+          quoteCount: quotes.length,
+          acceptedQuoteCount: acceptedQuotes.length,
+          totalInvoiced,
+          totalPaid,
+          balanceDue,
+          invoiceCount: invoices.length,
+        },
       });
     } catch (error) {
       console.error("Error fetching CRM job:", error);
