@@ -584,77 +584,6 @@ export default function CrmCustomerDetail() {
           </Card>
         </div>
 
-        {/* Notes & Activity Timeline */}
-        <Card data-testid="card-notes">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-blue-500" />
-              Notes & Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Add Note Form */}
-              <div className="flex gap-2">
-                <Textarea
-                  placeholder="Add a note about this customer..."
-                  value={noteBody}
-                  onChange={(e) => setNoteBody(e.target.value)}
-                  rows={2}
-                  className="flex-1"
-                  data-testid="textarea-note"
-                />
-                <Button
-                  onClick={handleAddNote}
-                  disabled={!noteBody.trim() || addNoteMutation.isPending}
-                  className="self-end"
-                  data-testid="button-add-note"
-                >
-                  {addNoteMutation.isPending ? (
-                    "Adding..."
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-1" />
-                      Add
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {/* Notes Timeline */}
-              {notesLoading ? (
-                <div className="space-y-3 py-4">
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                </div>
-              ) : notes && notes.length > 0 ? (
-                <div className="border-l-2 border-slate-200 pl-4 space-y-4 mt-4">
-                  {notes.map((note) => (
-                    <div key={note.id} className="relative" data-testid={`note-${note.id}`}>
-                      <div className="absolute -left-[21px] top-0 w-2.5 h-2.5 bg-blue-500 rounded-full" />
-                      <div className="bg-slate-50 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium text-sm text-slate-700">
-                            {note.userName || "Unknown User"}
-                          </span>
-                          <span className="text-xs text-slate-400" title={note.createdAt ? format(new Date(note.createdAt), "PPP p") : ""}>
-                            {note.createdAt
-                              ? formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })
-                              : "—"}
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{note.body}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500 text-center py-4">No notes yet</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
         <Card data-testid="card-active-jobs">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -784,6 +713,77 @@ export default function CrmCustomerDetail() {
                 </TableBody>
               </Table>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Notes & Activity Timeline */}
+        <Card data-testid="card-notes">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-blue-500" />
+              Notes & Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Add Note Form */}
+              <div className="flex gap-2">
+                <Textarea
+                  placeholder="Add a note about this customer..."
+                  value={noteBody}
+                  onChange={(e) => setNoteBody(e.target.value)}
+                  rows={2}
+                  className="flex-1"
+                  data-testid="textarea-note"
+                />
+                <Button
+                  onClick={handleAddNote}
+                  disabled={!noteBody.trim() || addNoteMutation.isPending}
+                  className="self-end"
+                  data-testid="button-add-note"
+                >
+                  {addNoteMutation.isPending ? (
+                    "Adding..."
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-1" />
+                      Add
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Notes Timeline */}
+              {notesLoading ? (
+                <div className="space-y-3 py-4">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : notes && notes.length > 0 ? (
+                <div className="border-l-2 border-slate-200 pl-4 space-y-4 mt-4">
+                  {notes.map((note) => (
+                    <div key={note.id} className="relative" data-testid={`note-${note.id}`}>
+                      <div className="absolute -left-[21px] top-0 w-2.5 h-2.5 bg-blue-500 rounded-full" />
+                      <div className="bg-slate-50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-sm text-slate-700">
+                            {note.userName || "Unknown User"}
+                          </span>
+                          <span className="text-xs text-slate-400" title={note.createdAt ? format(new Date(note.createdAt), "PPP p") : ""}>
+                            {note.createdAt
+                              ? formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })
+                              : "—"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{note.body}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 text-center py-4">No notes yet</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
