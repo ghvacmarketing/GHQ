@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, insertCrmCustomerSchema, insertCrmJobSchema } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -14,7 +14,7 @@ import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
-import { eq, inArray, desc, sql, and } from "drizzle-orm";
+import { eq, inArray, desc, sql, and, or, ilike, asc, count } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -5491,6 +5491,809 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching customer jobs:", error);
       return res.status(500).json({ message: "Failed to fetch customer jobs" });
+    }
+  });
+
+  // ============================================
+  // CRM ACCOUNTS API ENDPOINTS (NEW ACCOUNT MODEL)
+  // ============================================
+
+  // Helper function to validate account based on type
+  async function validateAccountByType(
+    accountId: string,
+    accountType: AccountType,
+    profile?: any
+  ): Promise<{ valid: boolean; errors: string[] }> {
+    const errors: string[] = [];
+
+    // Get sites and contacts for this account
+    const sites = await db.select().from(crmSites).where(eq(crmSites.accountId, accountId));
+    const contacts = await db.select().from(crmContacts).where(eq(crmContacts.accountId, accountId));
+
+    switch (accountType) {
+      case "RESIDENTIAL":
+        if (sites.length === 0) {
+          errors.push("Residential accounts must have at least 1 site");
+        }
+        if (contacts.length === 0) {
+          errors.push("Residential accounts must have at least 1 contact");
+        }
+        break;
+
+      case "PROPERTY_MANAGER":
+        const pmContacts = contacts.filter(c => c.contactRole === "PM");
+        const apOrBillingContacts = contacts.filter(c => c.contactRole === "AP" || c.contactRole === "BILLING");
+        if (pmContacts.length === 0) {
+          errors.push("Property Manager accounts must have at least 1 PM contact");
+        }
+        if (apOrBillingContacts.length === 0) {
+          errors.push("Property Manager accounts must have at least 1 AP or Billing contact");
+        }
+        break;
+
+      case "COMMERCIAL":
+        const facilitiesOrDecisionMaker = contacts.filter(
+          c => c.contactRole === "FACILITIES" || c.contactRole === "DECISION_MAKER"
+        );
+        if (facilitiesOrDecisionMaker.length === 0) {
+          errors.push("Commercial accounts must have at least 1 Facilities or Decision Maker contact");
+        }
+        // Check if requiresPO is enabled
+        if (profile?.requiresPO) {
+          const apContacts = contacts.filter(c => c.contactRole === "AP");
+          if (apContacts.length === 0) {
+            errors.push("Commercial accounts with requiresPO enabled must have at least 1 AP contact");
+          }
+        }
+        break;
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  // GET /api/crm/accounts - List accounts with pagination, search, and filtering
+  app.get("/api/crm/accounts", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 25, 100);
+      const offset = (page - 1) * limit;
+      const search = req.query.search as string;
+      const accountType = req.query.accountType as AccountType;
+      const accountStatus = req.query.accountStatus as AccountStatus;
+
+      // Build where conditions
+      const conditions: any[] = [];
+
+      if (search) {
+        conditions.push(
+          or(
+            ilike(crmAccounts.displayName, `%${search}%`),
+            ilike(crmAccounts.companyName, `%${search}%`)
+          )
+        );
+      }
+
+      if (accountType) {
+        conditions.push(eq(crmAccounts.accountType, accountType));
+      }
+
+      if (accountStatus) {
+        conditions.push(eq(crmAccounts.accountStatus, accountStatus));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      // Get total count
+      const [countResult] = await db.select({ count: count() }).from(crmAccounts).where(whereClause);
+      const total = countResult?.count || 0;
+
+      // Get accounts with pagination
+      const accounts = await db
+        .select()
+        .from(crmAccounts)
+        .where(whereClause)
+        .orderBy(asc(crmAccounts.displayName))
+        .limit(limit)
+        .offset(offset);
+
+      // Get primary sites for each account
+      const accountIds = accounts.map(a => a.id);
+      const primarySites = accountIds.length > 0
+        ? await db.select().from(crmSites).where(
+            and(
+              inArray(crmSites.accountId, accountIds),
+              eq(crmSites.isPrimary, true)
+            )
+          )
+        : [];
+
+      // Get primary contacts for each account
+      const primaryContacts = accountIds.length > 0
+        ? await db.select().from(crmContacts).where(
+            and(
+              inArray(crmContacts.accountId, accountIds),
+              eq(crmContacts.isPrimary, true)
+            )
+          )
+        : [];
+
+      const accountsWithInfo = accounts.map(account => ({
+        ...account,
+        primarySite: primarySites.find(s => s.accountId === account.id) || null,
+        primaryContact: primaryContacts.find(c => c.accountId === account.id) || null,
+      }));
+
+      return res.json({
+        accounts: accountsWithInfo,
+        pagination: {
+          page,
+          limit,
+          total: Number(total),
+          totalPages: Math.ceil(Number(total) / limit),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+      return res.status(500).json({ message: "Failed to fetch accounts" });
+    }
+  });
+
+  // POST /api/crm/accounts - Create new account with optional sites, contacts, and profile
+  app.post("/api/crm/accounts", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { account, sites, contacts, profile } = req.body;
+
+      // Validate account data
+      const accountResult = insertCrmAccountSchema.safeParse(account);
+      if (!accountResult.success) {
+        return res.status(400).json({
+          message: "Invalid account data",
+          errors: accountResult.error.flatten(),
+        });
+      }
+
+      // Create account
+      const [newAccount] = await db.insert(crmAccounts).values(accountResult.data).returning();
+
+      // Create sites if provided
+      let createdSites: any[] = [];
+      if (sites && Array.isArray(sites) && sites.length > 0) {
+        for (const site of sites) {
+          const siteData = { ...site, accountId: newAccount.id };
+          const siteResult = insertCrmSiteSchema.safeParse(siteData);
+          if (siteResult.success) {
+            const [createdSite] = await db.insert(crmSites).values(siteResult.data).returning();
+            createdSites.push(createdSite);
+          }
+        }
+      }
+
+      // Create contacts if provided
+      let createdContacts: any[] = [];
+      if (contacts && Array.isArray(contacts) && contacts.length > 0) {
+        for (const contact of contacts) {
+          const contactData = { ...contact, accountId: newAccount.id };
+          const contactResult = insertCrmContactSchema.safeParse(contactData);
+          if (contactResult.success) {
+            const [createdContact] = await db.insert(crmContacts).values(contactResult.data).returning();
+            createdContacts.push(createdContact);
+          }
+        }
+      }
+
+      // Create type-specific profile if provided
+      let createdProfile: any = null;
+      if (profile) {
+        const profileData = { ...profile, accountId: newAccount.id };
+        switch (newAccount.accountType) {
+          case "RESIDENTIAL":
+            const resResult = insertResidentialProfileSchema.safeParse(profileData);
+            if (resResult.success) {
+              const [p] = await db.insert(residentialProfiles).values(resResult.data).returning();
+              createdProfile = p;
+            }
+            break;
+          case "PROPERTY_MANAGER":
+            const pmResult = insertPropertyManagerProfileSchema.safeParse(profileData);
+            if (pmResult.success) {
+              const [p] = await db.insert(propertyManagerProfiles).values(pmResult.data).returning();
+              createdProfile = p;
+            }
+            break;
+          case "COMMERCIAL":
+            const commResult = insertCommercialProfileSchema.safeParse(profileData);
+            if (commResult.success) {
+              const [p] = await db.insert(commercialProfiles).values(commResult.data).returning();
+              createdProfile = p;
+            }
+            break;
+        }
+      }
+
+      // Log audit
+      await logCrmAudit(
+        user.id,
+        "account.created",
+        "account",
+        newAccount.id,
+        { displayName: newAccount.displayName, accountType: newAccount.accountType },
+        req.ip
+      );
+
+      return res.status(201).json({
+        account: newAccount,
+        sites: createdSites,
+        contacts: createdContacts,
+        profile: createdProfile,
+      });
+    } catch (error) {
+      console.error("Error creating account:", error);
+      return res.status(500).json({ message: "Failed to create account" });
+    }
+  });
+
+  // GET /api/crm/accounts/:id - Get single account with sites, contacts, and profile
+  app.get("/api/crm/accounts/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const accountId = req.params.id;
+
+      // Get account
+      const [account] = await db.select().from(crmAccounts).where(eq(crmAccounts.id, accountId));
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      // Get sites
+      const sites = await db.select().from(crmSites).where(eq(crmSites.accountId, accountId)).orderBy(desc(crmSites.isPrimary), asc(crmSites.siteName));
+
+      // Get contacts
+      const contacts = await db.select().from(crmContacts).where(eq(crmContacts.accountId, accountId)).orderBy(desc(crmContacts.isPrimary), asc(crmContacts.firstName));
+
+      // Get type-specific profile
+      let profile: any = null;
+      switch (account.accountType) {
+        case "RESIDENTIAL":
+          const [resProfile] = await db.select().from(residentialProfiles).where(eq(residentialProfiles.accountId, accountId));
+          profile = resProfile || null;
+          break;
+        case "PROPERTY_MANAGER":
+          const [pmProfile] = await db.select().from(propertyManagerProfiles).where(eq(propertyManagerProfiles.accountId, accountId));
+          profile = pmProfile || null;
+          break;
+        case "COMMERCIAL":
+          const [commProfile] = await db.select().from(commercialProfiles).where(eq(commercialProfiles.accountId, accountId));
+          profile = commProfile || null;
+          break;
+      }
+
+      // Validate account structure
+      const validation = await validateAccountByType(accountId, account.accountType, profile);
+
+      return res.json({
+        account,
+        sites,
+        contacts,
+        profile,
+        validation,
+      });
+    } catch (error) {
+      console.error("Error fetching account:", error);
+      return res.status(500).json({ message: "Failed to fetch account" });
+    }
+  });
+
+  // PUT /api/crm/accounts/:id - Update account
+  app.put("/api/crm/accounts/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const accountId = req.params.id;
+      const { account: accountData, profile: profileData } = req.body;
+
+      // Verify account exists
+      const [existingAccount] = await db.select().from(crmAccounts).where(eq(crmAccounts.id, accountId));
+      if (!existingAccount) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      // Update account
+      const [updatedAccount] = await db.update(crmAccounts)
+        .set({ ...accountData, updatedAt: new Date() })
+        .where(eq(crmAccounts.id, accountId))
+        .returning();
+
+      // Update or create profile if provided
+      let updatedProfile: any = null;
+      if (profileData) {
+        const profileDataWithAccount = { ...profileData, accountId };
+
+        switch (updatedAccount.accountType) {
+          case "RESIDENTIAL":
+            const [existingRes] = await db.select().from(residentialProfiles).where(eq(residentialProfiles.accountId, accountId));
+            if (existingRes) {
+              const [p] = await db.update(residentialProfiles)
+                .set({ ...profileDataWithAccount, updatedAt: new Date() })
+                .where(eq(residentialProfiles.accountId, accountId))
+                .returning();
+              updatedProfile = p;
+            } else {
+              const resResult = insertResidentialProfileSchema.safeParse(profileDataWithAccount);
+              if (resResult.success) {
+                const [p] = await db.insert(residentialProfiles).values(resResult.data).returning();
+                updatedProfile = p;
+              }
+            }
+            break;
+          case "PROPERTY_MANAGER":
+            const [existingPm] = await db.select().from(propertyManagerProfiles).where(eq(propertyManagerProfiles.accountId, accountId));
+            if (existingPm) {
+              const [p] = await db.update(propertyManagerProfiles)
+                .set({ ...profileDataWithAccount, updatedAt: new Date() })
+                .where(eq(propertyManagerProfiles.accountId, accountId))
+                .returning();
+              updatedProfile = p;
+            } else {
+              const pmResult = insertPropertyManagerProfileSchema.safeParse(profileDataWithAccount);
+              if (pmResult.success) {
+                const [p] = await db.insert(propertyManagerProfiles).values(pmResult.data).returning();
+                updatedProfile = p;
+              }
+            }
+            break;
+          case "COMMERCIAL":
+            const [existingComm] = await db.select().from(commercialProfiles).where(eq(commercialProfiles.accountId, accountId));
+            if (existingComm) {
+              const [p] = await db.update(commercialProfiles)
+                .set({ ...profileDataWithAccount, updatedAt: new Date() })
+                .where(eq(commercialProfiles.accountId, accountId))
+                .returning();
+              updatedProfile = p;
+            } else {
+              const commResult = insertCommercialProfileSchema.safeParse(profileDataWithAccount);
+              if (commResult.success) {
+                const [p] = await db.insert(commercialProfiles).values(commResult.data).returning();
+                updatedProfile = p;
+              }
+            }
+            break;
+        }
+      }
+
+      // Log audit
+      await logCrmAudit(
+        user.id,
+        "account.updated",
+        "account",
+        accountId,
+        { displayName: updatedAccount.displayName, accountType: updatedAccount.accountType },
+        req.ip
+      );
+
+      // Validate updated account
+      const validation = await validateAccountByType(accountId, updatedAccount.accountType, updatedProfile);
+
+      return res.json({
+        account: updatedAccount,
+        profile: updatedProfile,
+        validation,
+      });
+    } catch (error) {
+      console.error("Error updating account:", error);
+      return res.status(500).json({ message: "Failed to update account" });
+    }
+  });
+
+  // DELETE /api/crm/accounts/:id - Delete account
+  app.delete("/api/crm/accounts/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const accountId = req.params.id;
+
+      // Verify account exists
+      const [account] = await db.select().from(crmAccounts).where(eq(crmAccounts.id, accountId));
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      // Delete account (cascade will delete sites, contacts, profiles)
+      await db.delete(crmAccounts).where(eq(crmAccounts.id, accountId));
+
+      // Log audit
+      await logCrmAudit(
+        user.id,
+        "account.deleted",
+        "account",
+        accountId,
+        { displayName: account.displayName, accountType: account.accountType },
+        req.ip
+      );
+
+      return res.json({ message: "Account deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      return res.status(500).json({ message: "Failed to delete account" });
+    }
+  });
+
+  // ============================================
+  // CRM SITES API ENDPOINTS
+  // ============================================
+
+  // GET /api/crm/accounts/:accountId/sites - List sites for account
+  app.get("/api/crm/accounts/:accountId/sites", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const accountId = req.params.accountId;
+
+      // Verify account exists
+      const [account] = await db.select().from(crmAccounts).where(eq(crmAccounts.id, accountId));
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      const sites = await db.select().from(crmSites)
+        .where(eq(crmSites.accountId, accountId))
+        .orderBy(desc(crmSites.isPrimary), asc(crmSites.siteName));
+
+      return res.json(sites);
+    } catch (error) {
+      console.error("Error fetching sites:", error);
+      return res.status(500).json({ message: "Failed to fetch sites" });
+    }
+  });
+
+  // POST /api/crm/accounts/:accountId/sites - Create site
+  app.post("/api/crm/accounts/:accountId/sites", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const accountId = req.params.accountId;
+
+      // Verify account exists
+      const [account] = await db.select().from(crmAccounts).where(eq(crmAccounts.id, accountId));
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      const siteData = { ...req.body, accountId };
+      const siteResult = insertCrmSiteSchema.safeParse(siteData);
+      if (!siteResult.success) {
+        return res.status(400).json({
+          message: "Invalid site data",
+          errors: siteResult.error.flatten(),
+        });
+      }
+
+      // If this site is set as primary, unset other primary sites
+      if (siteResult.data.isPrimary) {
+        await db.update(crmSites)
+          .set({ isPrimary: false })
+          .where(eq(crmSites.accountId, accountId));
+      }
+
+      const [site] = await db.insert(crmSites).values(siteResult.data).returning();
+
+      // Log audit
+      await logCrmAudit(
+        user.id,
+        "site.created",
+        "site",
+        site.id,
+        { accountId, address: `${site.address1}, ${site.city}, ${site.state}` },
+        req.ip
+      );
+
+      return res.status(201).json(site);
+    } catch (error) {
+      console.error("Error creating site:", error);
+      return res.status(500).json({ message: "Failed to create site" });
+    }
+  });
+
+  // PUT /api/crm/accounts/:accountId/sites/:siteId - Update site
+  app.put("/api/crm/accounts/:accountId/sites/:siteId", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { accountId, siteId } = req.params;
+
+      // Verify site exists and belongs to account
+      const [existingSite] = await db.select().from(crmSites)
+        .where(and(eq(crmSites.id, siteId), eq(crmSites.accountId, accountId)));
+      if (!existingSite) {
+        return res.status(404).json({ message: "Site not found" });
+      }
+
+      // If setting as primary, unset other primary sites
+      if (req.body.isPrimary) {
+        await db.update(crmSites)
+          .set({ isPrimary: false })
+          .where(and(eq(crmSites.accountId, accountId), sql`id != ${siteId}`));
+      }
+
+      const [updatedSite] = await db.update(crmSites)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(eq(crmSites.id, siteId))
+        .returning();
+
+      // Log audit
+      await logCrmAudit(
+        user.id,
+        "site.updated",
+        "site",
+        siteId,
+        { accountId, address: `${updatedSite.address1}, ${updatedSite.city}, ${updatedSite.state}` },
+        req.ip
+      );
+
+      return res.json(updatedSite);
+    } catch (error) {
+      console.error("Error updating site:", error);
+      return res.status(500).json({ message: "Failed to update site" });
+    }
+  });
+
+  // DELETE /api/crm/accounts/:accountId/sites/:siteId - Delete site
+  app.delete("/api/crm/accounts/:accountId/sites/:siteId", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { accountId, siteId } = req.params;
+
+      // Verify site exists and belongs to account
+      const [site] = await db.select().from(crmSites)
+        .where(and(eq(crmSites.id, siteId), eq(crmSites.accountId, accountId)));
+      if (!site) {
+        return res.status(404).json({ message: "Site not found" });
+      }
+
+      await db.delete(crmSites).where(eq(crmSites.id, siteId));
+
+      // Log audit
+      await logCrmAudit(
+        user.id,
+        "site.deleted",
+        "site",
+        siteId,
+        { accountId, address: `${site.address1}, ${site.city}, ${site.state}` },
+        req.ip
+      );
+
+      return res.json({ message: "Site deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting site:", error);
+      return res.status(500).json({ message: "Failed to delete site" });
+    }
+  });
+
+  // ============================================
+  // CRM CONTACTS API ENDPOINTS
+  // ============================================
+
+  // GET /api/crm/accounts/:accountId/contacts - List contacts for account
+  app.get("/api/crm/accounts/:accountId/contacts", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const accountId = req.params.accountId;
+
+      // Verify account exists
+      const [account] = await db.select().from(crmAccounts).where(eq(crmAccounts.id, accountId));
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      const contacts = await db.select().from(crmContacts)
+        .where(eq(crmContacts.accountId, accountId))
+        .orderBy(desc(crmContacts.isPrimary), asc(crmContacts.firstName));
+
+      return res.json(contacts);
+    } catch (error) {
+      console.error("Error fetching contacts:", error);
+      return res.status(500).json({ message: "Failed to fetch contacts" });
+    }
+  });
+
+  // POST /api/crm/accounts/:accountId/contacts - Create contact
+  app.post("/api/crm/accounts/:accountId/contacts", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const accountId = req.params.accountId;
+
+      // Verify account exists
+      const [account] = await db.select().from(crmAccounts).where(eq(crmAccounts.id, accountId));
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      const contactData = { ...req.body, accountId };
+      const contactResult = insertCrmContactSchema.safeParse(contactData);
+      if (!contactResult.success) {
+        return res.status(400).json({
+          message: "Invalid contact data",
+          errors: contactResult.error.flatten(),
+        });
+      }
+
+      // If this contact is set as primary, unset other primary contacts
+      if (contactResult.data.isPrimary) {
+        await db.update(crmContacts)
+          .set({ isPrimary: false })
+          .where(eq(crmContacts.accountId, accountId));
+      }
+
+      const [contact] = await db.insert(crmContacts).values(contactResult.data).returning();
+
+      // Log audit
+      await logCrmAudit(
+        user.id,
+        "contact.created",
+        "contact",
+        contact.id,
+        { accountId, name: `${contact.firstName} ${contact.lastName || ""}`.trim(), role: contact.contactRole },
+        req.ip
+      );
+
+      return res.status(201).json(contact);
+    } catch (error) {
+      console.error("Error creating contact:", error);
+      return res.status(500).json({ message: "Failed to create contact" });
+    }
+  });
+
+  // PUT /api/crm/accounts/:accountId/contacts/:contactId - Update contact
+  app.put("/api/crm/accounts/:accountId/contacts/:contactId", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { accountId, contactId } = req.params;
+
+      // Verify contact exists and belongs to account
+      const [existingContact] = await db.select().from(crmContacts)
+        .where(and(eq(crmContacts.id, contactId), eq(crmContacts.accountId, accountId)));
+      if (!existingContact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+
+      // If setting as primary, unset other primary contacts
+      if (req.body.isPrimary) {
+        await db.update(crmContacts)
+          .set({ isPrimary: false })
+          .where(and(eq(crmContacts.accountId, accountId), sql`id != ${contactId}`));
+      }
+
+      const [updatedContact] = await db.update(crmContacts)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(eq(crmContacts.id, contactId))
+        .returning();
+
+      // Log audit
+      await logCrmAudit(
+        user.id,
+        "contact.updated",
+        "contact",
+        contactId,
+        { accountId, name: `${updatedContact.firstName} ${updatedContact.lastName || ""}`.trim(), role: updatedContact.contactRole },
+        req.ip
+      );
+
+      return res.json(updatedContact);
+    } catch (error) {
+      console.error("Error updating contact:", error);
+      return res.status(500).json({ message: "Failed to update contact" });
+    }
+  });
+
+  // DELETE /api/crm/accounts/:accountId/contacts/:contactId - Delete contact
+  app.delete("/api/crm/accounts/:accountId/contacts/:contactId", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { accountId, contactId } = req.params;
+
+      // Verify contact exists and belongs to account
+      const [contact] = await db.select().from(crmContacts)
+        .where(and(eq(crmContacts.id, contactId), eq(crmContacts.accountId, accountId)));
+      if (!contact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+
+      await db.delete(crmContacts).where(eq(crmContacts.id, contactId));
+
+      // Log audit
+      await logCrmAudit(
+        user.id,
+        "contact.deleted",
+        "contact",
+        contactId,
+        { accountId, name: `${contact.firstName} ${contact.lastName || ""}`.trim(), role: contact.contactRole },
+        req.ip
+      );
+
+      return res.json({ message: "Contact deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      return res.status(500).json({ message: "Failed to delete contact" });
+    }
+  });
+
+  // POST /api/crm/accounts/:id/validate - Validate account structure by type
+  app.post("/api/crm/accounts/:id/validate", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const accountId = req.params.id;
+
+      // Get account
+      const [account] = await db.select().from(crmAccounts).where(eq(crmAccounts.id, accountId));
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      // Get profile for commercial accounts
+      let profile: any = null;
+      if (account.accountType === "COMMERCIAL") {
+        const [commProfile] = await db.select().from(commercialProfiles).where(eq(commercialProfiles.accountId, accountId));
+        profile = commProfile;
+      }
+
+      const validation = await validateAccountByType(accountId, account.accountType, profile);
+
+      return res.json(validation);
+    } catch (error) {
+      console.error("Error validating account:", error);
+      return res.status(500).json({ message: "Failed to validate account" });
     }
   });
 
