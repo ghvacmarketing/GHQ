@@ -5096,7 +5096,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/crm/jobs", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
-      const parsed = insertCrmJobSchema.safeParse(req.body);
+      
+      // Convert date strings to Date objects before validation
+      const body = { ...req.body };
+      if (body.scheduledStart && typeof body.scheduledStart === 'string') {
+        body.scheduledStart = new Date(body.scheduledStart);
+      }
+      if (body.scheduledEnd && typeof body.scheduledEnd === 'string') {
+        body.scheduledEnd = new Date(body.scheduledEnd);
+      }
+      
+      const parsed = insertCrmJobSchema.safeParse(body);
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid job data", errors: parsed.error.errors });
       }
