@@ -197,33 +197,38 @@ export default function CrmCustomers() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-customers-title">
-              Customers
-            </h1>
-            <p className="text-slate-500 text-sm mt-1">
-              <span className="font-medium text-slate-700" data-testid="text-customers-count">
-                {total.toLocaleString()} customers
-              </span>
-            </p>
-          </div>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-slate-900" data-testid="text-customers-title">
+            Customers
+          </h1>
           <Link href="/crm/accounts/new">
-            <Button data-testid="button-create-customer">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Account
+            <Button size="sm" data-testid="button-create-customer">
+              <Plus className="h-4 w-4 mr-1" />
+              New
             </Button>
           </Link>
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+          <Input
+            placeholder="Search by name, phone, email, or address..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="pl-12 h-12 text-base bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419]"
+            data-testid="input-search"
+            autoFocus
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setStatusTab("all")}
-            className={`px-4 py-1.5 rounded-full text-sm border transition-colors ${
+            className={`px-3 py-1 rounded-full text-xs border transition-colors ${
               statusTab === "all"
                 ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
             }`}
             data-testid="tab-status-all"
           >
@@ -231,10 +236,10 @@ export default function CrmCustomers() {
           </button>
           <button
             onClick={() => setStatusTab("prospects")}
-            className={`px-4 py-1.5 rounded-full text-sm border transition-colors ${
+            className={`px-3 py-1 rounded-full text-xs border transition-colors ${
               statusTab === "prospects"
                 ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
             }`}
             data-testid="tab-status-prospects"
           >
@@ -242,10 +247,10 @@ export default function CrmCustomers() {
           </button>
           <button
             onClick={() => setStatusTab("customers")}
-            className={`px-4 py-1.5 rounded-full text-sm border transition-colors ${
+            className={`px-3 py-1 rounded-full text-xs border transition-colors ${
               statusTab === "customers"
                 ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
             }`}
             data-testid="tab-status-customers"
           >
@@ -254,19 +259,8 @@ export default function CrmCustomers() {
 
           <div className="flex-1" />
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-9 w-48 h-9"
-              data-testid="input-search"
-            />
-          </div>
-
           <Select value={customerType} onValueChange={setCustomerType}>
-            <SelectTrigger className="w-[160px] h-9" data-testid="select-customer-type">
+            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-customer-type">
               <SelectValue placeholder="All Types" />
             </SelectTrigger>
             <SelectContent>
