@@ -605,29 +605,6 @@ export default function CrmAccountCreate() {
                     </Badge>
                   </div>
                   <div className="space-y-2">
-                    <Label>Customer Since</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                          data-testid="button-customer-since"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {format(formData.customerSince, "MM/dd/yyyy")}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={formData.customerSince}
-                          onSelect={(date) => date && updateField("customerSince", date)}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="space-y-2">
                     <Label>Customer Lead Source</Label>
                     <Select
                       value={formData.leadSource}
@@ -732,28 +709,16 @@ export default function CrmAccountCreate() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="accessInstructions">Access Instructions</Label>
-                    <Textarea
-                      id="accessInstructions"
-                      placeholder="Type Here"
-                      value={formData.accessInstructions}
-                      onChange={(e) => updateField("accessInstructions", e.target.value)}
-                      rows={2}
-                      data-testid="textarea-access-instructions"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="gateCode">Gate Code</Label>
-                    <Input
-                      id="gateCode"
-                      placeholder="Type Here"
-                      value={formData.gateCode}
-                      onChange={(e) => updateField("gateCode", e.target.value)}
-                      data-testid="input-gate-code"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="accessInstructions">Access Instructions</Label>
+                  <Textarea
+                    id="accessInstructions"
+                    placeholder="Type Here"
+                    value={formData.accessInstructions}
+                    onChange={(e) => updateField("accessInstructions", e.target.value)}
+                    rows={2}
+                    data-testid="textarea-access-instructions"
+                  />
                 </div>
               </div>
             )}
@@ -1077,10 +1042,6 @@ export default function CrmAccountCreate() {
                         <span className="text-slate-500">Email:</span>
                         <span>{formData.email || "—"}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Customer Since:</span>
-                        <span>{format(formData.customerSince, "MM/dd/yyyy")}</span>
-                      </div>
                       {formData.leadSource && (
                         <div className="flex justify-between">
                           <span className="text-slate-500">Lead Source:</span>
@@ -1110,12 +1071,6 @@ export default function CrmAccountCreate() {
                         <span className="text-slate-500">City, State, ZIP:</span>
                         <span>{[formData.city, formData.state, formData.zip].filter(Boolean).join(", ") || "—"}</span>
                       </div>
-                      {formData.gateCode && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Gate Code:</span>
-                          <span>{formData.gateCode}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
