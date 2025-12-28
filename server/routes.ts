@@ -5012,19 +5012,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const dateParam = req.query.date as string;
-      let targetDate: Date;
       
+      // Parse date in UTC to avoid timezone issues
+      let targetDateStr: string;
       if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
-        targetDate = new Date(dateParam + "T00:00:00");
+        targetDateStr = dateParam;
       } else {
-        targetDate = new Date();
-        targetDate.setHours(0, 0, 0, 0);
+        const now = new Date();
+        targetDateStr = now.toISOString().split("T")[0];
       }
 
-      const startOfDay = new Date(targetDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(targetDate);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Use UTC-based date range for consistent querying
+      const startOfDay = new Date(targetDateStr + "T00:00:00.000Z");
+      const endOfDay = new Date(targetDateStr + "T23:59:59.999Z");
 
       // Get technicians (exclude owner role)
       const technicians = await db.select({
@@ -5067,7 +5067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({
         technicians,
         jobs: jobsWithAssignments,
-        date: targetDate.toISOString().split("T")[0],
+        date: targetDateStr,
       });
     } catch (error) {
       console.error("Error fetching dispatch data:", error);
@@ -5224,6 +5224,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating job:", error);
       return res.status(500).json({ message: "Failed to update job" });
+    }
+  });
+
+  // DELETE /api/crm/jobs/:id - Delete job (ADMIN/SALES only)
+  app.delete("/api/crm/jobs/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const jobId = req.params.id;
+
+      const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, jobId));
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      // Delete related records first (assignments, status events)
+      await db.delete(crmJobAssignments).where(eq(crmJobAssignments.jobId, jobId));
+      await db.delete(crmJobStatusEvents).where(eq(crmJobStatusEvents.jobId, jobId));
+
+      // Delete the job
+      await db.delete(crmJobs).where(eq(crmJobs.id, jobId));
+
+      // Log the deletion
+      await logCrmAudit(
+        user?.id || null,
+        "job.deleted",
+        "job",
+        jobId,
+        { customerId: job.customerId, jobType: job.jobType },
+        req.ip
+      );
+
+      return res.json({ message: "Job deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting job:", error);
+      return res.status(500).json({ message: "Failed to delete job" });
     }
   });
 

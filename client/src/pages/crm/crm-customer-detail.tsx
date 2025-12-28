@@ -24,7 +24,9 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
+  Trash2,
 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmCustomer, CrmJob } from "@shared/schema";
 import { useForm } from "react-hook-form";
@@ -146,6 +148,25 @@ export default function CrmCustomerDetail() {
   const onSubmit = (data: CreateJobFormData) => {
     createJobMutation.mutate(data);
   };
+
+  const deleteJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const res = await apiRequest("DELETE", `/api/crm/jobs/${jobId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Job deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete job",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   if (authLoading || customerLoading) {
     return (
@@ -357,6 +378,7 @@ export default function CrmCustomerDetail() {
                     <TableHead>Priority</TableHead>
                     <TableHead>Scheduled</TableHead>
                     <TableHead>Technician</TableHead>
+                    <TableHead className="w-16">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -375,6 +397,32 @@ export default function CrmCustomerDetail() {
                       </TableCell>
                       <TableCell>{formatDate(job.scheduledStart)}</TableCell>
                       <TableCell>{job.assignedTechName || "Unassigned"}</TableCell>
+                      <TableCell>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50" data-testid={`button-delete-job-${job.id}`}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Job?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete this {job.jobType} job. This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteJobMutation.mutate(job.id)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
