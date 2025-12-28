@@ -92,6 +92,11 @@ interface FormData {
   approvalThreshold: string;
   defaultBillingMethod: string;
   pmNetTerms: string;
+  pmBillingTerms: string;
+  pmDefaultBillTo: string;
+  pmMainOfficePhone: string;
+  pmMainOfficeEmail: string;
+  pmBillingApEmail: string;
   tenantName: string;
   tenantPhone: string;
   tenantEmail: string;
@@ -136,6 +141,11 @@ const initialFormData: FormData = {
   approvalThreshold: "",
   defaultBillingMethod: "",
   pmNetTerms: "30",
+  pmBillingTerms: "NET_30",
+  pmDefaultBillTo: "PM",
+  pmMainOfficePhone: "",
+  pmMainOfficeEmail: "",
+  pmBillingApEmail: "",
   tenantName: "",
   tenantPhone: "",
   tenantEmail: "",
@@ -199,13 +209,17 @@ export default function CrmAccountCreate() {
   });
 
   const generateDisplayName = useMemo(() => {
-    const { firstName, lastName, companyName } = formData;
+    const { firstName, lastName, companyName, accountType } = formData;
+    // For PM accounts, always use company name
+    if (accountType === "PROPERTY_MANAGER") {
+      return companyName || "";
+    }
     if (companyName) {
       return companyName;
     }
     const parts = [firstName, lastName].filter(Boolean);
     return parts.join(" ");
-  }, [formData.firstName, formData.lastName, formData.companyName]);
+  }, [formData.firstName, formData.lastName, formData.companyName, formData.accountType]);
 
   useEffect(() => {
     if (!displayNameManuallyEdited) {
@@ -249,19 +263,24 @@ export default function CrmAccountCreate() {
           isPrimary: true,
           accessInstructions: formData.accessInstructions || null,
           gateCode: formData.gateCode || null,
-          tenantName: formData.accountType === "PROPERTY_MANAGER" ? (formData.tenantName || null) : null,
-          tenantPhone: formData.accountType === "PROPERTY_MANAGER" ? (formData.tenantPhone || null) : null,
-          tenantEmail: formData.accountType === "PROPERTY_MANAGER" ? (formData.tenantEmail || null) : null,
+          // For PM accounts, this is HQ address - no tenant info here
+          // Tenant info will be per-property (added when creating sites later)
         }],
-        contacts: [{
+        contacts: [],
+      };
+
+      // For PM accounts: don't create a contact from person fields (they don't have first/last name)
+      // For Residential/Commercial: create contact from the person info
+      if (formData.accountType !== "PROPERTY_MANAGER") {
+        payload.contacts = [{
           firstName: formData.firstName,
           lastName: formData.lastName || null,
           phone: formData.phone || null,
           email: formData.email || null,
           contactRole: "PRIMARY",
           isPrimary: true,
-        }],
-      };
+        }];
+      }
 
       if (formData.accountType === "RESIDENTIAL") {
         payload.profile = {
@@ -269,12 +288,16 @@ export default function CrmAccountCreate() {
         };
       } else if (formData.accountType === "PROPERTY_MANAGER") {
         payload.profile = {
-          managementCompanyName: formData.managementCompanyName || null,
+          managementCompanyName: formData.companyName || null, // Use company name from step 2
           portfolioSize: formData.portfolioSize ? parseInt(formData.portfolioSize) : null,
           requiresApprovalBefore: formData.requiresApprovalBefore,
           approvalThreshold: formData.requiresApprovalBefore && formData.approvalThreshold ? formData.approvalThreshold : null,
           defaultBillingMethod: formData.defaultBillingMethod || null,
-          netTerms: parseInt(formData.pmNetTerms) || 30,
+          billingTerms: formData.pmBillingTerms || "NET_30",
+          defaultBillTo: formData.pmDefaultBillTo || "PM",
+          mainOfficePhone: formData.pmMainOfficePhone || null,
+          mainOfficeEmail: formData.pmMainOfficeEmail || null,
+          billingApEmail: formData.pmBillingApEmail || null,
         };
       } else if (formData.accountType === "COMMERCIAL") {
         payload.profile = {
@@ -316,11 +339,18 @@ export default function CrmAccountCreate() {
       case 1:
         break;
       case 2:
-        if (!formData.firstName.trim()) errors.push("First name is required");
-        if (!formData.displayName.trim()) errors.push("Display name is required");
-        if ((formData.accountType === "COMMERCIAL" || formData.accountType === "PROPERTY_MANAGER") && !formData.companyName.trim()) {
-          errors.push("Company name is required for commercial and property manager accounts");
+        // PM accounts: company name + main office phone required, NOT first/last name
+        if (formData.accountType === "PROPERTY_MANAGER") {
+          if (!formData.companyName.trim()) errors.push("Company name is required for property manager accounts");
+          if (!formData.pmMainOfficePhone.trim()) errors.push("Main office phone is required");
+        } else {
+          // Residential & Commercial: first name required
+          if (!formData.firstName.trim()) errors.push("First name is required");
+          if (formData.accountType === "COMMERCIAL" && !formData.companyName.trim()) {
+            errors.push("Company name is required for commercial accounts");
+          }
         }
+        if (!formData.displayName.trim()) errors.push("Display name is required");
         break;
       case 3:
         if (!formData.address1.trim()) errors.push("Address Line 1 is required");
@@ -493,81 +523,153 @@ export default function CrmAccountCreate() {
             {currentStep === 2 && (
               <div className="space-y-6">
                 <CardHeader className="px-0 pt-0">
-                  <CardTitle>Basic Account Information</CardTitle>
-                  <CardDescription>Enter the primary details for this account</CardDescription>
+                  <CardTitle>
+                    {formData.accountType === "PROPERTY_MANAGER" ? "Company Information" : "Basic Account Information"}
+                  </CardTitle>
+                  <CardDescription>
+                    {formData.accountType === "PROPERTY_MANAGER" 
+                      ? "Enter the property management company details. Contacts can be added after creation."
+                      : "Enter the primary details for this account"}
+                  </CardDescription>
                 </CardHeader>
 
-                <div className={`grid grid-cols-1 md:grid-cols-2 ${formData.accountType !== "RESIDENTIAL" ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-4`}>
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name *</Label>
-                    <Input
-                      id="firstName"
-                      placeholder="Type Here"
-                      value={formData.firstName}
-                      onChange={(e) => updateField("firstName", e.target.value)}
-                      data-testid="input-first-name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input
-                      id="lastName"
-                      placeholder="Type Here"
-                      value={formData.lastName}
-                      onChange={(e) => updateField("lastName", e.target.value)}
-                      data-testid="input-last-name"
-                    />
-                  </div>
-                  {formData.accountType !== "RESIDENTIAL" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="companyName">
-                        Company Name {(formData.accountType === "COMMERCIAL" || formData.accountType === "PROPERTY_MANAGER") && "*"}
-                      </Label>
-                      <Input
-                        id="companyName"
-                        placeholder="Type Here"
-                        value={formData.companyName}
-                        onChange={(e) => updateField("companyName", e.target.value)}
-                        data-testid="input-company-name"
-                      />
+                {/* Property Manager: Company-focused fields */}
+                {formData.accountType === "PROPERTY_MANAGER" ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="companyName">Company Name *</Label>
+                        <Input
+                          id="companyName"
+                          placeholder="ABC Property Management"
+                          value={formData.companyName}
+                          onChange={(e) => updateField("companyName", e.target.value)}
+                          data-testid="input-company-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="displayName">Display Name *</Label>
+                        <Input
+                          id="displayName"
+                          placeholder="Auto-filled from company name"
+                          value={formData.displayName}
+                          onChange={(e) => handleDisplayNameChange(e.target.value)}
+                          data-testid="input-display-name"
+                        />
+                      </div>
                     </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="displayName">Display Name *</Label>
-                    <Input
-                      id="displayName"
-                      placeholder="Type Here"
-                      value={formData.displayName}
-                      onChange={(e) => handleDisplayNameChange(e.target.value)}
-                      data-testid="input-display-name"
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="(xxx) xxx-xxxx"
-                      value={formData.phone}
-                      onChange={(e) => updateField("phone", e.target.value)}
-                      data-testid="input-phone"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="email@example.com"
-                      value={formData.email}
-                      onChange={(e) => updateField("email", e.target.value)}
-                      data-testid="input-email"
-                    />
-                  </div>
-                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="pmMainOfficePhone">Main Office Phone *</Label>
+                        <Input
+                          id="pmMainOfficePhone"
+                          type="tel"
+                          placeholder="(xxx) xxx-xxxx"
+                          value={formData.pmMainOfficePhone}
+                          onChange={(e) => updateField("pmMainOfficePhone", e.target.value)}
+                          data-testid="input-main-office-phone"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pmMainOfficeEmail">Main Office Email</Label>
+                        <Input
+                          id="pmMainOfficeEmail"
+                          type="email"
+                          placeholder="office@company.com"
+                          value={formData.pmMainOfficeEmail}
+                          onChange={(e) => updateField("pmMainOfficeEmail", e.target.value)}
+                          data-testid="input-main-office-email"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pmBillingApEmail">Billing / AP Email</Label>
+                        <Input
+                          id="pmBillingApEmail"
+                          type="email"
+                          placeholder="ap@company.com"
+                          value={formData.pmBillingApEmail}
+                          onChange={(e) => updateField("pmBillingApEmail", e.target.value)}
+                          data-testid="input-billing-ap-email"
+                        />
+                        <p className="text-xs text-slate-500">Recommended for invoice routing</p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Residential & Commercial: Person-focused fields */}
+                    <div className={`grid grid-cols-1 md:grid-cols-2 ${formData.accountType === "COMMERCIAL" ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-4`}>
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name *</Label>
+                        <Input
+                          id="firstName"
+                          placeholder="Type Here"
+                          value={formData.firstName}
+                          onChange={(e) => updateField("firstName", e.target.value)}
+                          data-testid="input-first-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          placeholder="Type Here"
+                          value={formData.lastName}
+                          onChange={(e) => updateField("lastName", e.target.value)}
+                          data-testid="input-last-name"
+                        />
+                      </div>
+                      {formData.accountType === "COMMERCIAL" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="companyName">Company Name *</Label>
+                          <Input
+                            id="companyName"
+                            placeholder="Type Here"
+                            value={formData.companyName}
+                            onChange={(e) => updateField("companyName", e.target.value)}
+                            data-testid="input-company-name"
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="displayName">Display Name *</Label>
+                        <Input
+                          id="displayName"
+                          placeholder="Type Here"
+                          value={formData.displayName}
+                          onChange={(e) => handleDisplayNameChange(e.target.value)}
+                          data-testid="input-display-name"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Phone</Label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder="(xxx) xxx-xxxx"
+                          value={formData.phone}
+                          onChange={(e) => updateField("phone", e.target.value)}
+                          data-testid="input-phone"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="email@example.com"
+                          value={formData.email}
+                          onChange={(e) => updateField("email", e.target.value)}
+                          data-testid="input-email"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div className={`grid grid-cols-1 md:grid-cols-2 ${formData.accountType !== "RESIDENTIAL" ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-4`}>
                   {formData.accountType !== "RESIDENTIAL" && (
@@ -635,10 +737,14 @@ export default function CrmAccountCreate() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="pinnedNote">Pinned Note</Label>
+                  <Label htmlFor="pinnedNote">
+                    {formData.accountType === "PROPERTY_MANAGER" ? "Important Instructions (Pinned Note)" : "Pinned Note"}
+                  </Label>
                   <Textarea
                     id="pinnedNote"
-                    placeholder="Type Here"
+                    placeholder={formData.accountType === "PROPERTY_MANAGER" 
+                      ? "Special billing instructions, approval processes, or other important notes..."
+                      : "Type Here"}
                     value={formData.pinnedNote}
                     onChange={(e) => updateField("pinnedNote", e.target.value)}
                     rows={3}
@@ -651,8 +757,14 @@ export default function CrmAccountCreate() {
             {currentStep === 3 && (
               <div className="space-y-6">
                 <CardHeader className="px-0 pt-0">
-                  <CardTitle>Physical Location Details</CardTitle>
-                  <CardDescription>Enter the primary service location for this account</CardDescription>
+                  <CardTitle>
+                    {formData.accountType === "PROPERTY_MANAGER" ? "Company HQ / Mailing Address" : "Physical Location Details"}
+                  </CardTitle>
+                  <CardDescription>
+                    {formData.accountType === "PROPERTY_MANAGER"
+                      ? "Enter the company headquarters or billing address. Service properties can be added after creation."
+                      : "Enter the primary service location for this account"}
+                  </CardDescription>
                 </CardHeader>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -754,54 +866,44 @@ export default function CrmAccountCreate() {
 
                 {formData.accountType === "PROPERTY_MANAGER" && (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <h4 className="font-medium text-slate-900">Billing & Payment Terms</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="managementCompanyName">Management Company Name</Label>
-                        <Input
-                          id="managementCompanyName"
-                          placeholder="Type Here"
-                          value={formData.managementCompanyName}
-                          onChange={(e) => updateField("managementCompanyName", e.target.value)}
-                          data-testid="input-management-company"
-                        />
+                        <Label>Billing Terms</Label>
+                        <Select
+                          value={formData.pmBillingTerms}
+                          onValueChange={(val) => updateField("pmBillingTerms", val)}
+                        >
+                          <SelectTrigger data-testid="select-billing-terms">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" sideOffset={4}>
+                            <SelectItem value="DUE_ON_RECEIPT">Due on Receipt</SelectItem>
+                            <SelectItem value="NET_15">Net 15</SelectItem>
+                            <SelectItem value="NET_30">Net 30</SelectItem>
+                            <SelectItem value="NET_45">Net 45</SelectItem>
+                            <SelectItem value="NET_60">Net 60</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="portfolioSize">Portfolio Size</Label>
-                        <Input
-                          id="portfolioSize"
-                          type="number"
-                          placeholder="Number of properties"
-                          value={formData.portfolioSize}
-                          onChange={(e) => updateField("portfolioSize", e.target.value)}
-                          data-testid="input-portfolio-size"
-                        />
+                        <Label>Default Bill-To</Label>
+                        <Select
+                          value={formData.pmDefaultBillTo}
+                          onValueChange={(val) => updateField("pmDefaultBillTo", val)}
+                        >
+                          <SelectTrigger data-testid="select-default-bill-to">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" sideOffset={4}>
+                            <SelectItem value="PM">Property Manager</SelectItem>
+                            <SelectItem value="OWNER">Owner</SelectItem>
+                            <SelectItem value="TENANT">Tenant</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="requiresApprovalBefore"
-                        checked={formData.requiresApprovalBefore}
-                        onCheckedChange={(checked) => updateField("requiresApprovalBefore", !!checked)}
-                        data-testid="checkbox-requires-approval"
-                      />
-                      <Label htmlFor="requiresApprovalBefore" className="text-sm">Requires Approval Before Work</Label>
-                    </div>
-                    {formData.requiresApprovalBefore && (
-                      <div className="space-y-2 ml-6">
-                        <Label htmlFor="approvalThreshold">Approval Threshold ($)</Label>
-                        <Input
-                          id="approvalThreshold"
-                          type="number"
-                          placeholder="Dollar amount"
-                          value={formData.approvalThreshold}
-                          onChange={(e) => updateField("approvalThreshold", e.target.value)}
-                          data-testid="input-approval-threshold"
-                        />
-                      </div>
-                    )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Default Billing Method</Label>
+                        <Label>Default Payment Method</Label>
                         <Select
                           value={formData.defaultBillingMethod}
                           onValueChange={(val) => updateField("defaultBillingMethod", val)}
@@ -816,51 +918,55 @@ export default function CrmAccountCreate() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="pmNetTerms">Net Terms</Label>
-                        <Input
-                          id="pmNetTerms"
-                          type="number"
-                          value={formData.pmNetTerms}
-                          onChange={(e) => updateField("pmNetTerms", e.target.value)}
-                          data-testid="input-pm-net-terms"
-                        />
-                      </div>
                     </div>
+
                     <Separator />
-                    <h4 className="font-medium text-slate-900">Tenant Information (for this site)</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="tenantName">Tenant Name</Label>
+                    <h4 className="font-medium text-slate-900">Approval Settings</h4>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="requiresApprovalBefore"
+                        checked={formData.requiresApprovalBefore}
+                        onCheckedChange={(checked) => updateField("requiresApprovalBefore", !!checked)}
+                        data-testid="checkbox-requires-approval"
+                      />
+                      <Label htmlFor="requiresApprovalBefore" className="text-sm">Requires Approval Before Work</Label>
+                    </div>
+                    {formData.requiresApprovalBefore && (
+                      <div className="space-y-2 ml-6">
+                        <Label htmlFor="approvalThreshold">Approval Limit ($)</Label>
                         <Input
-                          id="tenantName"
-                          placeholder="Type Here"
-                          value={formData.tenantName}
-                          onChange={(e) => updateField("tenantName", e.target.value)}
-                          data-testid="input-tenant-name"
+                          id="approvalThreshold"
+                          type="number"
+                          placeholder="Amount above which approval is required"
+                          value={formData.approvalThreshold}
+                          onChange={(e) => updateField("approvalThreshold", e.target.value)}
+                          className="w-48"
+                          data-testid="input-approval-threshold"
                         />
+                        <p className="text-xs text-slate-500">Leave blank if all work requires approval</p>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="tenantPhone">Tenant Phone</Label>
-                        <Input
-                          id="tenantPhone"
-                          placeholder="Type Here"
-                          value={formData.tenantPhone}
-                          onChange={(e) => updateField("tenantPhone", e.target.value)}
-                          data-testid="input-tenant-phone"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="tenantEmail">Tenant Email</Label>
-                        <Input
-                          id="tenantEmail"
-                          type="email"
-                          placeholder="Type Here"
-                          value={formData.tenantEmail}
-                          onChange={(e) => updateField("tenantEmail", e.target.value)}
-                          data-testid="input-tenant-email"
-                        />
-                      </div>
+                    )}
+
+                    <Separator />
+                    <h4 className="font-medium text-slate-900">Portfolio Information</h4>
+                    <div className="space-y-2">
+                      <Label htmlFor="portfolioSize">Portfolio Size (# of properties)</Label>
+                      <Input
+                        id="portfolioSize"
+                        type="number"
+                        placeholder="Approximate number of properties managed"
+                        value={formData.portfolioSize}
+                        onChange={(e) => updateField("portfolioSize", e.target.value)}
+                        className="w-48"
+                        data-testid="input-portfolio-size"
+                      />
+                    </div>
+                    
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mt-4">
+                      <p className="text-sm text-blue-800">
+                        After creating this account, you can add <strong>Sites/Properties</strong> (service addresses) 
+                        and <strong>Contacts</strong> (ops, AP, etc.) from the account detail page.
+                      </p>
                     </div>
                   </div>
                 )}

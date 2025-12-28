@@ -1157,6 +1157,11 @@ export const propertyManagerProfiles = pgTable("property_manager_profiles", {
   netTerms: integer("net_terms").default(30),
   managementCompanyName: text("management_company_name"),
   portfolioSize: integer("portfolio_size"),
+  billingTerms: text("billing_terms").default("NET_30"), // DUE_ON_RECEIPT, NET_15, NET_30, NET_45, NET_60
+  defaultBillTo: text("default_bill_to").default("PM"), // PM, OWNER, TENANT
+  mainOfficePhone: text("main_office_phone"),
+  mainOfficeEmail: text("main_office_email"),
+  billingApEmail: text("billing_ap_email"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
