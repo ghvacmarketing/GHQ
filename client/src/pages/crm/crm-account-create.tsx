@@ -222,7 +222,6 @@ export default function CrmAccountCreate() {
           displayName: formData.displayName,
           companyName: formData.companyName || null,
           accountType: formData.accountType,
-          accountStatus: formData.status,
           leadSource: formData.leadSource || null,
           parentAccountId: formData.parentAccountId || null,
           customerSince: formData.customerSince.toISOString().split("T")[0],
