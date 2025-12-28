@@ -133,7 +133,7 @@ export default function CrmWorkOrders() {
 
   const [editingChecklist, setEditingChecklist] = useState<{ item: string; completed: boolean }[] | null>(null);
   const [editingTechNotes, setEditingTechNotes] = useState<string>("");
-  const [reassignTechId, setReassignTechId] = useState<string>("");
+  const [reassignTechId, setReassignTechId] = useState<string>("unassigned");
   const [newStatus, setNewStatus] = useState<string>("");
   const [rescheduleStart, setRescheduleStart] = useState<Date | null>(null);
   const [rescheduleEnd, setRescheduleEnd] = useState<Date | null>(null);
@@ -315,7 +315,7 @@ export default function CrmWorkOrders() {
         visitType: createForm.visitType,
         scheduledStart: scheduledStart?.toISOString(),
         scheduledEnd: scheduledEnd?.toISOString(),
-        assignedTechId: createForm.assignedTechId || null,
+        assignedTechId: createForm.assignedTechId === "unassigned" ? null : (createForm.assignedTechId || null),
         status: "scheduled",
       });
       return res.json();
@@ -349,7 +349,7 @@ export default function CrmWorkOrders() {
       setSelectedWorkOrder(data);
       setEditingChecklist(data.checklist || []);
       setEditingTechNotes(data.techNotes || "");
-      setReassignTechId(data.assignedTechId || "");
+      setReassignTechId(data.assignedTechId || "unassigned");
       setNewStatus(data.status);
       setRescheduleStart(data.scheduledStart ? new Date(data.scheduledStart) : null);
       setRescheduleEnd(data.scheduledEnd ? new Date(data.scheduledEnd) : null);
@@ -388,7 +388,7 @@ export default function CrmWorkOrders() {
     if (selectedWorkOrder) {
       updateWorkOrderMutation.mutate({
         id: selectedWorkOrder.id,
-        updates: { assignedTechId: reassignTechId || null },
+        updates: { assignedTechId: reassignTechId === "unassigned" ? null : (reassignTechId || null) },
       });
     }
   };
@@ -871,7 +871,7 @@ export default function CrmWorkOrders() {
                           <SelectValue placeholder="Reassign Tech" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Unassigned</SelectItem>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
                           {technicians.map((tech) => (
                             <SelectItem key={tech.id} value={tech.id}>
                               {tech.name}
@@ -1244,7 +1244,7 @@ export default function CrmWorkOrders() {
                     <SelectValue placeholder="Unassigned" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
                     {technicians.map((tech) => (
                       <SelectItem key={tech.id} value={tech.id}>
                         {tech.name}
