@@ -31,6 +31,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -59,6 +65,7 @@ import {
   ExternalLink,
   RefreshCw,
   Trash2,
+  MoreVertical,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -539,15 +546,23 @@ export default function CrmJobDetail() {
                   <FileText className="h-4 w-4 mr-2" />
                   Create Invoice
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setDeleteConfirmOpen(true)}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  data-testid="button-delete-job"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" data-testid="button-job-actions">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => setDeleteConfirmOpen(true)}
+                      className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                      data-testid="menu-item-delete-job"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Job
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </CardContent>
