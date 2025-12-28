@@ -870,61 +870,61 @@ export default function CrmDispatch() {
           
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm" className="ml-2" data-testid="button-legend">
-                <Info className="h-4 w-4 mr-1" />
+              <Button variant="outline" size="sm" className="ml-2 text-slate-600" data-testid="button-legend">
+                <Info className="h-4 w-4 mr-1.5" />
                 Legend
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-72" align="end">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <span className="text-sm font-semibold text-slate-700">Job Type (Background)</span>
-                  <div className="flex flex-wrap gap-2">
-                    <div className="flex items-center gap-1.5">
+            <PopoverContent className="w-80 p-0" align="end">
+              <div className="p-4 space-y-4">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Job Type (Background)</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div className="flex items-center gap-2">
                       <div className="w-4 h-4 rounded bg-sky-100 border border-sky-200" />
-                      <span className="text-xs text-slate-600">Service</span>
+                      <span className="text-sm text-slate-700">Service</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                       <div className="w-4 h-4 rounded bg-emerald-100 border border-emerald-200" />
-                      <span className="text-xs text-slate-600">Maintenance</span>
+                      <span className="text-sm text-slate-700">Maintenance</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                       <div className="w-4 h-4 rounded bg-amber-100 border border-amber-200" />
-                      <span className="text-xs text-slate-600">Install</span>
+                      <span className="text-sm text-slate-700">Install</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                       <div className="w-4 h-4 rounded bg-rose-100 border border-rose-200" />
-                      <span className="text-xs text-slate-600">Sales</span>
+                      <span className="text-sm text-slate-700">Sales</span>
                     </div>
                   </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <span className="text-sm font-semibold text-slate-700">Status (Left Stripe)</span>
-                  <div className="flex flex-wrap gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-4 h-4 rounded border-l-4 border-l-slate-400 bg-slate-50" />
-                      <span className="text-xs text-slate-600">New</span>
+                <div className="border-t border-slate-100 pt-4">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Status (Left Stripe)</p>
+                  <div className="grid grid-cols-3 gap-x-3 gap-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-slate-400" />
+                      <span className="text-sm text-slate-700">New</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-4 h-4 rounded border-l-4 border-l-blue-500 bg-blue-50" />
-                      <span className="text-xs text-slate-600">Scheduled</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="text-sm text-slate-700">Scheduled</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-4 h-4 rounded border-l-4 border-l-purple-500 bg-purple-50" />
-                      <span className="text-xs text-slate-600">Dispatched</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-purple-500" />
+                      <span className="text-sm text-slate-700">Dispatched</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-4 h-4 rounded border-l-4 border-l-amber-500 bg-amber-50" />
-                      <span className="text-xs text-slate-600">En Route</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span className="text-sm text-slate-700">En Route</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-4 h-4 rounded border-l-4 border-l-orange-500 bg-orange-50" />
-                      <span className="text-xs text-slate-600">On Site</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-orange-500" />
+                      <span className="text-sm text-slate-700">On Site</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-4 h-4 rounded border-l-4 border-l-green-500 bg-green-50" />
-                      <span className="text-xs text-slate-600">Completed</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="text-sm text-slate-700">Completed</span>
                     </div>
                   </div>
                 </div>

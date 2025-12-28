@@ -28,13 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  Info,
 } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
 import type { CrmUser, CrmCustomer } from "@shared/schema";
@@ -257,52 +251,6 @@ export default function CrmCustomers() {
           >
             Customers ({statsData?.customers?.toLocaleString() || 0})
           </button>
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm text-slate-600 border border-slate-300 bg-white hover:bg-slate-50 transition-colors"
-                data-testid="button-legend"
-              >
-                <Info className="h-3.5 w-3.5" />
-                Legend
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-4" align="start">
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Customer Type</p>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded bg-blue-100 border border-blue-200" />
-                      <span className="text-sm text-slate-700">Residential</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded bg-amber-100 border border-amber-200" />
-                      <span className="text-sm text-slate-700">Commercial</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded bg-purple-100 border border-purple-200" />
-                      <span className="text-sm text-slate-700">Property Manager</span>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Status</p>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-amber-500" />
-                      <span className="text-sm text-slate-700">Prospect</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-green-500" />
-                      <span className="text-sm text-slate-700">Customer</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
 
           <div className="flex-1" />
 
