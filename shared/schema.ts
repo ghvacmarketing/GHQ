@@ -381,7 +381,8 @@ export type ImportBatch = typeof importBatches.$inferSelect;
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   displayName: text("display_name").notNull(),
-  customerType: text("customer_type"), // Residential, Commercial, etc.
+  customerType: text("customer_type"), // Residential, Commercial, Property Manager
+  customerStatus: text("customer_status"), // Customer, Prospect
   fullAddress: text("full_address"),
   phone: text("phone"),
   email: text("email"),

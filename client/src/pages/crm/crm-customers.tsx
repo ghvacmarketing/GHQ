@@ -90,8 +90,7 @@ export default function CrmCustomers() {
     if (statusTab !== "all") {
       const statusMap: Record<string, string> = {
         prospects: "prospect",
-        active: "client",
-        inactive: "inactive",
+        customers: "customer",
       };
       if (statusMap[statusTab]) {
         params.set("customerStatus", statusMap[statusTab]);
@@ -115,50 +114,40 @@ export default function CrmCustomers() {
   });
 
   const formatCustomerType = (type: string | null) => {
-    if (!type) return "Unknown";
-    const map: Record<string, string> = {
-      Residential: "Residential",
-      Commercial: "Commercial",
-      "Property Manager": "Property Manager",
-    };
-    return map[type] || type;
+    if (!type) return "Residential";
+    const normalizedType = type.toLowerCase();
+    if (normalizedType === "residential") return "Residential";
+    if (normalizedType === "commercial") return "Commercial";
+    if (normalizedType === "property manager" || normalizedType === "property_manager") return "Property Manager";
+    return "Residential";
   };
 
   const getCustomerTypeBadgeClass = (type: string | null) => {
-    switch (type) {
-      case "Residential":
-        return "bg-blue-100 text-blue-700 border-blue-200";
-      case "Property Manager":
-        return "bg-purple-100 text-purple-700 border-purple-200";
-      case "Commercial":
-        return "bg-amber-100 text-amber-700 border-amber-200";
-      default:
-        return "bg-slate-100 text-slate-600 border-slate-200";
+    const normalizedType = type?.toLowerCase() || "";
+    if (normalizedType === "commercial") {
+      return "bg-amber-100 text-amber-700 border-amber-200";
     }
+    if (normalizedType === "property manager" || normalizedType === "property_manager") {
+      return "bg-purple-100 text-purple-700 border-purple-200";
+    }
+    return "bg-blue-100 text-blue-700 border-blue-200";
   };
 
   const formatCustomerStatus = (status: string | null) => {
     if (!status) return "Unknown";
-    const statusMap: Record<string, string> = {
-      prospect: "Prospect",
-      client: "Active",
-      inactive: "Inactive",
-      "do not service": "Do Not Service",
-    };
-    return statusMap[status.toLowerCase()] || status;
+    const normalizedStatus = status.toLowerCase();
+    if (normalizedStatus === "prospect") return "Prospect";
+    if (normalizedStatus === "customer") return "Customer";
+    return status;
   };
 
   const getStatusBadgeClass = (status: string | null) => {
     const normalizedStatus = status?.toLowerCase() || "";
     switch (normalizedStatus) {
       case "prospect":
-        return "bg-slate-100 text-slate-700 border-slate-200";
-      case "client":
+        return "bg-amber-100 text-amber-700 border-amber-200";
+      case "customer":
         return "bg-green-100 text-green-700 border-green-200";
-      case "inactive":
-        return "bg-yellow-100 text-yellow-700 border-yellow-200";
-      case "do not service":
-        return "bg-red-100 text-red-700 border-red-200";
       default:
         return "bg-slate-100 text-slate-600 border-slate-200";
     }
@@ -223,11 +212,10 @@ export default function CrmCustomers() {
           <CardContent className="p-4">
             <div className="flex flex-col gap-4">
               <Tabs value={statusTab} onValueChange={setStatusTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="all" data-testid="tab-status-all">All</TabsTrigger>
                   <TabsTrigger value="prospects" data-testid="tab-status-prospects">Prospects</TabsTrigger>
-                  <TabsTrigger value="active" data-testid="tab-status-active">Active</TabsTrigger>
-                  <TabsTrigger value="inactive" data-testid="tab-status-inactive">Inactive</TabsTrigger>
+                  <TabsTrigger value="customers" data-testid="tab-status-customers">Customers</TabsTrigger>
                 </TabsList>
               </Tabs>
 

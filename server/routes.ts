@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -4553,6 +4553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
 
   // GET /api/crm/customers - List customers with search, filters, and pagination
+  // Now queries the `customers` table which is synced from Google Sheets
   app.get("/api/crm/customers", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -4564,8 +4565,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         search,
         customerType,
         customerStatus,
-        dateFrom,
-        dateTo,
         page = "1",
         limit = "50",
       } = req.query as Record<string, string | undefined>;
@@ -4577,53 +4576,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Build conditions
       const conditions: any[] = [];
 
-      // Search filter (name, email, phone)
+      // Search filter (name, email, phone, address)
       if (search && search.trim()) {
         const searchTerm = `%${search.trim().toLowerCase()}%`;
         conditions.push(
-          sql`(LOWER(${crmCustomers.name}) LIKE ${searchTerm} OR LOWER(${crmCustomers.email}) LIKE ${searchTerm} OR ${crmCustomers.phone} LIKE ${searchTerm})`
+          sql`(LOWER(${customers.displayName}) LIKE ${searchTerm} OR LOWER(${customers.email}) LIKE ${searchTerm} OR ${customers.phone} LIKE ${searchTerm} OR LOWER(${customers.fullAddress}) LIKE ${searchTerm})`
         );
       }
 
-      // Customer type filter
+      // Customer type filter (case-insensitive)
       if (customerType && customerType !== "all") {
-        conditions.push(eq(crmCustomers.customerType, customerType));
+        conditions.push(sql`LOWER(${customers.customerType}) = LOWER(${customerType})`);
       }
 
-      // Customer status filter
+      // Customer status filter (case-insensitive)
       if (customerStatus && customerStatus !== "all") {
-        conditions.push(eq(crmCustomers.customerStatus, customerStatus));
-      }
-
-      // Date range filter
-      if (dateFrom) {
-        const fromDate = new Date(dateFrom);
-        if (!isNaN(fromDate.getTime())) {
-          conditions.push(sql`${crmCustomers.createdAt} >= ${fromDate}`);
-        }
-      }
-      if (dateTo) {
-        const toDate = new Date(dateTo);
-        if (!isNaN(toDate.getTime())) {
-          toDate.setHours(23, 59, 59, 999);
-          conditions.push(sql`${crmCustomers.createdAt} <= ${toDate}`);
-        }
-      }
-
-      // For non-sales users, filter to only customers they have access to
-      let customerIdFilter: string[] | null = null;
-      if (!isSalesOrAbove(user.role)) {
-        const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.techUserId, user.id));
-        if (assignments.length === 0) {
-          return res.json({ customers: [], total: 0, page: pageNum, limit: limitNum, totalPages: 0 });
-        }
-        const jobIds = assignments.map(a => a.jobId);
-        const jobs = await db.select().from(crmJobs).where(inArray(crmJobs.id, jobIds));
-        customerIdFilter = Array.from(new Set(jobs.map(j => j.customerId)));
-        if (customerIdFilter.length === 0) {
-          return res.json({ customers: [], total: 0, page: pageNum, limit: limitNum, totalPages: 0 });
-        }
-        conditions.push(inArray(crmCustomers.id, customerIdFilter));
+        conditions.push(sql`LOWER(${customers.customerStatus}) = LOWER(${customerStatus})`);
       }
 
       // Build the query with conditions
@@ -4632,46 +4600,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get total count
       const [countResult] = await db
         .select({ count: sql<number>`count(*)` })
-        .from(crmCustomers)
+        .from(customers)
         .where(whereClause);
       const total = Number(countResult?.count || 0);
 
-      // Get paginated customers with properties
-      const customers = await db
+      // Get paginated customers
+      const customerList = await db
         .select()
-        .from(crmCustomers)
+        .from(customers)
         .where(whereClause)
-        .orderBy(desc(crmCustomers.createdAt))
+        .orderBy(desc(customers.createdAt))
         .limit(limitNum)
         .offset(offset);
 
-      // Fetch properties for these customers
-      const customerIds = customers.map(c => c.id);
-      const properties = customerIds.length > 0
-        ? await db.select().from(crmProperties).where(inArray(crmProperties.customerId, customerIds))
-        : [];
-
-      // Map properties to customers (using first property as primary address)
-      const propertyMap = new Map<string, typeof properties[0]>();
-      for (const prop of properties) {
-        if (!propertyMap.has(prop.customerId)) {
-          propertyMap.set(prop.customerId, prop);
-        }
-      }
-
-      const customersWithAddress = customers.map(c => ({
-        ...c,
-        fullAddress: propertyMap.has(c.id)
-          ? [propertyMap.get(c.id)!.address1, propertyMap.get(c.id)!.city, propertyMap.get(c.id)!.state, propertyMap.get(c.id)!.zip].filter(Boolean).join(", ")
-          : null,
+      // Transform to expected response format
+      const customersResponse = customerList.map(c => ({
+        id: c.id,
+        name: c.displayName,
+        customerType: c.customerType,
+        customerStatus: c.customerStatus,
+        fullAddress: c.fullAddress,
+        phone: c.phone,
+        email: c.email,
+        leadSource: c.leadSource,
+        createdAt: c.createdAt,
       }));
 
       return res.json({
-        customers: customersWithAddress,
-        total,
-        page: pageNum,
-        limit: limitNum,
-        totalPages: Math.ceil(total / limitNum),
+        customers: customersResponse,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
       });
     } catch (error) {
       console.error("Error fetching CRM customers:", error);

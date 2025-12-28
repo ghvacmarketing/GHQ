@@ -23,6 +23,7 @@ interface SyncStatus {
 interface SheetRow {
   "Display Name"?: string;
   "Customer Type"?: string;
+  "Customer Status"?: string;
   "Full Address"?: string;
   "Phone"?: string;
   "Email"?: string;
@@ -117,6 +118,7 @@ class CustomerSyncService {
     const dataString = JSON.stringify({
       displayName: row["Display Name"] || '',
       customerType: row["Customer Type"] || '',
+      customerStatus: row["Customer Status"] || '',
       fullAddress: row["Full Address"] || '',
       phone: row["Phone"] || '',
       email: row["Email"] || '',
@@ -154,9 +156,19 @@ class CustomerSyncService {
   private transformRowToCustomer(row: SheetRow): InsertCustomer {
     const checksum = this.calculateRowChecksum(row);
     
+    // Normalize customer type - default to Residential if empty
+    let customerType = row["Customer Type"]?.trim() || null;
+    if (!customerType) {
+      customerType = "Residential";
+    }
+    
+    // Normalize customer status - "Customer" or "Prospect"
+    const customerStatus = row["Customer Status"]?.trim() || "Customer";
+    
     return {
       displayName: row["Display Name"]?.trim() || 'Unknown',
-      customerType: row["Customer Type"]?.trim() || null,
+      customerType,
+      customerStatus,
       fullAddress: row["Full Address"]?.trim() || null,
       phone: this.cleanPhoneNumber(row["Phone"]),
       email: row["Email"]?.trim() || null,
