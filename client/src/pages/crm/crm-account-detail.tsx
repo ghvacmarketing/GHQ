@@ -148,6 +148,8 @@ export default function CrmAccountDetail() {
   const [deleteContactId, setDeleteContactId] = useState<string | null>(null);
   const [editingSite, setEditingSite] = useState<CrmSite | null>(null);
   const [editingContact, setEditingContact] = useState<CrmContact | null>(null);
+  const [editAccountDialogOpen, setEditAccountDialogOpen] = useState(false);
+  const [editAccountForm, setEditAccountForm] = useState({ displayName: "", companyName: "", pinnedNote: "" });
 
   const [siteForm, setSiteForm] = useState({
     siteName: "",
@@ -218,6 +220,16 @@ export default function CrmAccountDetail() {
       setActiveTab("overview");
     }
   }, [accountData?.account?.accountType]);
+
+  useEffect(() => {
+    if (editAccountDialogOpen && accountData?.account) {
+      setEditAccountForm({
+        displayName: accountData.account.displayName || "",
+        companyName: accountData.account.companyName || "",
+        pinnedNote: accountData.account.pinnedNote || "",
+      });
+    }
+  }, [editAccountDialogOpen, accountData?.account]);
 
   const resetSiteForm = () => {
     setSiteForm({
@@ -430,6 +442,21 @@ export default function CrmAccountDetail() {
     },
   });
 
+  const updateAccountMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/crm/accounts/${accountId}`, editAccountForm);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Account updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/accounts", accountId] });
+      setEditAccountDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update account", description: error.message, variant: "destructive" });
+    },
+  });
+
   if (authLoading || accountLoading) {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
@@ -472,6 +499,8 @@ export default function CrmAccountDetail() {
   const jobs = accountData.jobs || [];
   const typeColors = accountTypeColors[account.accountType];
   const statusColorSet = accountStatusColors[account.accountStatus];
+  const primarySite = sites.find(s => s.isPrimary);
+  const displaySites = account.accountType === "PROPERTY_MANAGER" ? sites.filter(s => !s.isPrimary) : sites;
 
   const AccountTypeIcon = account.accountType === "RESIDENTIAL" ? Home : account.accountType === "PROPERTY_MANAGER" ? Users : Building2;
 
@@ -517,9 +546,9 @@ export default function CrmAccountDetail() {
                   </div>
                 </div>
               </div>
-              <Button variant="outline" data-testid="button-edit-account">
+              <Button variant="outline" data-testid="button-edit-customer" onClick={() => setEditAccountDialogOpen(true)}>
                 <Pencil className="h-4 w-4 mr-2" />
-                Edit Account
+                Edit Customer
               </Button>
             </div>
             {account.pinnedNote && (
@@ -540,7 +569,7 @@ export default function CrmAccountDetail() {
             )}
             <TabsTrigger value="sites" data-testid="tab-sites">
               <MapPin className="h-4 w-4 mr-2" />
-              Sites ({sites.length})
+              Sites ({displaySites.length})
             </TabsTrigger>
             <TabsTrigger value="contacts" data-testid="tab-contacts">
               <User className="h-4 w-4 mr-2" />
@@ -559,50 +588,7 @@ export default function CrmAccountDetail() {
           <TabsContent value="overview" className="space-y-4">
             <Card>
               <CardHeader className="pb-4">
-                <CardTitle className="text-lg">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      resetSiteForm();
-                      setSiteDialogOpen(true);
-                    }}
-                    data-testid="button-quick-add-site"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Site
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      resetContactForm();
-                      setContactDialogOpen(true);
-                    }}
-                    data-testid="button-quick-add-contact"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Contact
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      resetJobForm();
-                      setJobDialogOpen(true);
-                    }}
-                    data-testid="button-quick-create-job"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Job
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg">Account Summary</CardTitle>
+                <CardTitle className="text-lg">Customer Summary</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -644,6 +630,14 @@ export default function CrmAccountDetail() {
                     }
                     return null;
                   })()}
+                  {primarySite && (
+                    <div>
+                      <Label className="text-slate-500 text-sm">HQ / Mailing Address</Label>
+                      <p className="font-medium">{primarySite.address1}</p>
+                      {primarySite.address2 && <p className="text-sm text-slate-500">{primarySite.address2}</p>}
+                      <p className="text-sm text-slate-500">{primarySite.city}, {primarySite.state} {primarySite.zip}</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -654,7 +648,7 @@ export default function CrmAccountDetail() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">Setup Checklist</CardTitle>
                     {(() => {
-                      const hasSite = sites.length > 0;
+                      const hasSite = displaySites.length > 0;
                       const hasOpsContact = contacts.some((c) => c.contactRole === "FACILITIES" || c.contactRole === "PRIMARY");
                       const hasApContact = contacts.some((c) => c.contactRole === "AP" || c.contactRole === "BILLING");
                       const hasJob = jobs.length > 0;
@@ -675,7 +669,7 @@ export default function CrmAccountDetail() {
                 <CardContent>
                   <div className="space-y-4">
                     {(() => {
-                      const hasSite = sites.length > 0;
+                      const hasSite = displaySites.length > 0;
                       const hasOpsContact = contacts.some((c) => c.contactRole === "FACILITIES" || c.contactRole === "PRIMARY");
                       const hasApContact = contacts.some((c) => c.contactRole === "AP" || c.contactRole === "BILLING");
                       const hasJob = jobs.length > 0;
@@ -779,14 +773,14 @@ export default function CrmAccountDetail() {
                 </Button>
               </CardHeader>
               <CardContent>
-                {sites.length === 0 ? (
+                {displaySites.length === 0 ? (
                   <div className="text-center py-8 text-slate-500">
                     <MapPin className="h-12 w-12 mx-auto mb-2 opacity-50" />
                     <p>No sites added yet</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {sites.map((site) => (
+                    {displaySites.map((site) => (
                       <div
                         key={site.id}
                         className="flex items-start justify-between p-4 border rounded-lg hover:bg-slate-50"
@@ -1593,6 +1587,58 @@ export default function CrmAccountDetail() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <Dialog open={editAccountDialogOpen} onOpenChange={(open) => setEditAccountDialogOpen(open)}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Edit Customer</DialogTitle>
+              <DialogDescription>
+                Update customer information
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Display Name *</Label>
+                <Input
+                  placeholder="Customer display name"
+                  value={editAccountForm.displayName}
+                  onChange={(e) => setEditAccountForm({ ...editAccountForm, displayName: e.target.value })}
+                  data-testid="input-edit-display-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Company Name</Label>
+                <Input
+                  placeholder="Company name (optional)"
+                  value={editAccountForm.companyName}
+                  onChange={(e) => setEditAccountForm({ ...editAccountForm, companyName: e.target.value })}
+                  data-testid="input-edit-company-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Pinned Note</Label>
+                <Textarea
+                  placeholder="Add a pinned note that will be displayed prominently on this account"
+                  value={editAccountForm.pinnedNote}
+                  onChange={(e) => setEditAccountForm({ ...editAccountForm, pinnedNote: e.target.value })}
+                  data-testid="input-edit-pinned-note"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditAccountDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => updateAccountMutation.mutate()}
+                disabled={!editAccountForm.displayName || updateAccountMutation.isPending}
+                data-testid="button-save-account"
+              >
+                {updateAccountMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </CrmLayout>
   );
