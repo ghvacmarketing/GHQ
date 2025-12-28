@@ -131,15 +131,13 @@ type AccountDetailResponse = CrmAccount & {
 
 const ITEMS_PER_PAGE = 50;
 
-type FilterTab = "all" | "upcoming" | "past" | "complete" | "incomplete" | "cancelled";
+type FilterTab = "all" | "needs_scheduling" | "scheduled" | "in_progress";
 
 const filterTabConfig: Record<FilterTab, { label: string }> = {
   all: { label: "All Jobs" },
-  upcoming: { label: "Upcoming" },
-  past: { label: "Past" },
-  complete: { label: "Complete" },
-  incomplete: { label: "Incomplete" },
-  cancelled: { label: "Canceled" },
+  needs_scheduling: { label: "New / Needs Scheduling" },
+  scheduled: { label: "Scheduled" },
+  in_progress: { label: "In Progress" },
 };
 
 const statusColors: Record<string, { bg: string; text: string; border: string }> = {
@@ -165,8 +163,8 @@ const priorityColors: Record<string, { bg: string; text: string; border: string 
 };
 
 const statusLabels: Record<string, string> = {
-  new: "Needs Scheduling",
-  needs_scheduling: "Needs Scheduling",
+  new: "New / Needs Scheduling",
+  needs_scheduling: "New / Needs Scheduling",
   scheduled: "Scheduled",
   in_progress: "In Progress",
   dispatched: "Dispatched",

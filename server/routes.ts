@@ -5062,7 +5062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (job.status === 'cancelled') {
           derivedStatus = 'cancelled';
         } else if (workOrderCount === 0) {
-          derivedStatus = 'new';
+          derivedStatus = 'needs_scheduling';
         } else if (workOrderData.some(wo => inProgressStatuses.includes(wo.status))) {
           derivedStatus = 'in_progress';
         } else if (allWorkOrdersCompleted && !hasUpcoming) {
@@ -5077,7 +5077,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (hasUpcoming) {
           derivedStatus = 'scheduled';
         } else {
-          derivedStatus = 'new';
+          // Has work orders but none upcoming or active - past visits only
+          derivedStatus = 'completed';
         }
 
         return {
@@ -5096,28 +5097,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Apply tab-based filtering on computed fields
       let filteredJobs = jobsWithDerived;
       switch (tab) {
-        case "upcoming":
-          // Jobs with nextScheduledAt in the future
-          filteredJobs = jobsWithDerived.filter(job => job.hasUpcoming);
-          break;
-        case "past":
-          // No upcoming work orders and has at least one work order (completed visits)
+        case "needs_scheduling":
+          // Jobs with no work orders yet or no upcoming visits
           filteredJobs = jobsWithDerived.filter(job => 
-            !job.hasUpcoming && job.workOrderCount > 0 && job.derivedStatus !== 'cancelled'
+            job.derivedStatus === 'needs_scheduling'
           );
           break;
-        case "complete":
-          // All work orders completed
+        case "scheduled":
+          // Has at least one future work order, but none are in active status
           filteredJobs = jobsWithDerived.filter(job => 
-            job.allWorkOrdersCompleted || job.derivedStatus === 'completed' || job.derivedStatus === 'closed'
+            job.derivedStatus === 'scheduled'
           );
           break;
-        case "incomplete":
-          // Anything not complete and not cancelled
+        case "in_progress":
+          // Any work order is dispatched/en_route/on_site
           filteredJobs = jobsWithDerived.filter(job => 
-            job.derivedStatus !== 'completed' && 
-            job.derivedStatus !== 'closed' && 
-            job.derivedStatus !== 'cancelled'
+            job.derivedStatus === 'in_progress'
+          );
+          break;
+        case "completed":
+          // All work orders completed or closed
+          filteredJobs = jobsWithDerived.filter(job => 
+            job.derivedStatus === 'completed' || job.derivedStatus === 'closed'
           );
           break;
         case "cancelled":
