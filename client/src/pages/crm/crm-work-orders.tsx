@@ -14,6 +14,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -56,6 +64,35 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfDay, endOfDay } from "date-fns";
 import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, WorkOrderStatus } from "@shared/schema";
+
+const JOB_TYPES = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
+const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+
+type CustomerWithInfo = {
+  id: string;
+  name: string;
+  customerType: string;
+  fullAddress: string | null;
+};
+
+type CustomersResponse = {
+  customers: CustomerWithInfo[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
 
 interface EnrichedWorkOrder extends CrmWorkOrder {
   job: CrmJob | null;
@@ -111,6 +148,21 @@ export default function CrmWorkOrders() {
     assignedTechId: "",
   });
 
+  const [createNewJob, setCreateNewJob] = useState(false);
+  const [newJobType, setNewJobType] = useState<string>("SERVICE");
+  const [newJobPriority, setNewJobPriority] = useState<string>("normal");
+  const [newJobDescription, setNewJobDescription] = useState<string>("");
+  const [newJobCustomerId, setNewJobCustomerId] = useState<string>("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithInfo | null>(null);
+  const [newJobStartDate, setNewJobStartDate] = useState<Date | undefined>(new Date());
+  const [newJobStartTime, setNewJobStartTime] = useState<string>("08:00");
+  const [newJobDuration, setNewJobDuration] = useState<number>(120);
+  const [newJobTechId, setNewJobTechId] = useState<string>("unassigned");
+
+  const debouncedCustomerSearch = useDebounce(customerSearch, 300);
+
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
@@ -138,6 +190,29 @@ export default function CrmWorkOrders() {
   });
 
   const jobs = jobsData?.jobs || [];
+
+  const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
+    queryKey: ["/api/crm/customers", debouncedCustomerSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (debouncedCustomerSearch) params.set("search", debouncedCustomerSearch);
+      params.set("limit", "10");
+      const res = await fetch(`/api/crm/customers?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch customers");
+      return res.json();
+    },
+    enabled: !!currentUser && createDialogOpen && createNewJob && customerSearchOpen,
+  });
+
+  const customers = customersData?.customers || [];
+
+  useEffect(() => {
+    if (createDialogOpen && jobs.length === 0) {
+      setCreateNewJob(true);
+    }
+  }, [createDialogOpen, jobs.length]);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -174,8 +249,60 @@ export default function CrmWorkOrders() {
     },
   });
 
+  const resetCreateForm = () => {
+    setCreateForm({
+      jobId: "",
+      visitType: "initial",
+      scheduledDate: "",
+      startTime: "08:00",
+      endTime: "17:00",
+      assignedTechId: "",
+    });
+    setCreateNewJob(false);
+    setNewJobType("SERVICE");
+    setNewJobPriority("normal");
+    setNewJobDescription("");
+    setNewJobCustomerId("");
+    setCustomerSearch("");
+    setSelectedCustomer(null);
+    setCustomerSearchOpen(false);
+    setNewJobStartDate(new Date());
+    setNewJobStartTime("08:00");
+    setNewJobDuration(120);
+    setNewJobTechId("unassigned");
+  };
+
   const createWorkOrderMutation = useMutation({
     mutationFn: async () => {
+      let jobId = createForm.jobId;
+
+      if (createNewJob) {
+        if (!newJobCustomerId) throw new Error("Customer is required");
+        if (!newJobDescription.trim()) throw new Error("Job description is required");
+        if (!newJobStartDate) throw new Error("Start date is required");
+        if (newJobDuration < 15) throw new Error("Duration must be at least 15 minutes");
+
+        const [hours, minutes] = newJobStartTime.split(":").map(Number);
+        const scheduledStart = new Date(newJobStartDate);
+        scheduledStart.setHours(hours, minutes, 0, 0);
+        
+        const scheduledEnd = new Date(scheduledStart);
+        scheduledEnd.setMinutes(scheduledEnd.getMinutes() + newJobDuration);
+
+        const jobRes = await apiRequest("POST", "/api/crm/jobs", {
+          customerId: newJobCustomerId,
+          jobType: newJobType,
+          priority: newJobPriority,
+          description: newJobDescription,
+          status: newJobTechId !== "unassigned" ? "scheduled" : "new",
+          assignedTechId: newJobTechId !== "unassigned" ? newJobTechId : null,
+          scheduledStart: scheduledStart.toISOString(),
+          scheduledEnd: scheduledEnd.toISOString(),
+        });
+        const newJob = await jobRes.json();
+        jobId = newJob.id;
+      }
+
       const scheduledStart = createForm.scheduledDate
         ? new Date(`${createForm.scheduledDate}T${createForm.startTime}`)
         : null;
@@ -184,7 +311,7 @@ export default function CrmWorkOrders() {
         : null;
 
       const res = await apiRequest("POST", "/api/crm/work-orders", {
-        jobId: createForm.jobId,
+        jobId,
         visitType: createForm.visitType,
         scheduledStart: scheduledStart?.toISOString(),
         scheduledEnd: scheduledEnd?.toISOString(),
@@ -195,16 +322,10 @@ export default function CrmWorkOrders() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
       toast({ title: "Work order created", description: "New work order has been scheduled." });
       setCreateDialogOpen(false);
-      setCreateForm({
-        jobId: "",
-        visitType: "initial",
-        scheduledDate: "",
-        startTime: "08:00",
-        endTime: "17:00",
-        assignedTechId: "",
-      });
+      resetCreateForm();
     },
     onError: (error: Error) => {
       toast({ title: "Creation failed", description: error.message, variant: "destructive" });
@@ -834,30 +955,234 @@ export default function CrmWorkOrders() {
           </SheetContent>
         </Sheet>
 
-        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-          <DialogContent className="max-w-md" data-testid="dialog-create-work-order">
+        <Dialog open={createDialogOpen} onOpenChange={(open) => {
+          setCreateDialogOpen(open);
+          if (!open) resetCreateForm();
+        }}>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="dialog-create-work-order">
             <DialogHeader>
               <DialogTitle>Create Work Order</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Job (required)</Label>
-                <Select
-                  value={createForm.jobId}
-                  onValueChange={(v) => setCreateForm({ ...createForm, jobId: v })}
-                >
-                  <SelectTrigger data-testid="select-job">
-                    <SelectValue placeholder="Select a job" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jobs.map((job) => (
-                      <SelectItem key={job.id} value={job.id}>
-                        {job.jobType} - #{job.id.slice(0, 8)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {jobs.length === 0 ? (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-700">
+                  No existing jobs found. Create a new job below.
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="createNewJob"
+                      checked={createNewJob}
+                      onCheckedChange={(checked) => {
+                        setCreateNewJob(!!checked);
+                        if (checked) {
+                          setCreateForm({ ...createForm, jobId: "" });
+                        }
+                      }}
+                      data-testid="checkbox-create-new-job"
+                    />
+                    <Label htmlFor="createNewJob" className="cursor-pointer">
+                      Create a new job
+                    </Label>
+                  </div>
+
+                  {!createNewJob && (
+                    <div className="space-y-2">
+                      <Label>Job (required)</Label>
+                      <Select
+                        value={createForm.jobId}
+                        onValueChange={(v) => setCreateForm({ ...createForm, jobId: v })}
+                      >
+                        <SelectTrigger data-testid="select-job">
+                          <SelectValue placeholder="Select a job" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {jobs.map((job) => (
+                            <SelectItem key={job.id} value={job.id}>
+                              {job.jobType} - #{job.id.slice(0, 8)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {createNewJob && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Customer (required)</Label>
+                    <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={customerSearchOpen}
+                          className="w-full justify-between font-normal"
+                          data-testid="button-select-customer"
+                        >
+                          {selectedCustomer ? selectedCustomer.name : "Search for a customer..."}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[350px] p-0" align="start">
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            placeholder="Type to search customers..."
+                            value={customerSearch}
+                            onValueChange={setCustomerSearch}
+                            data-testid="input-customer-search"
+                          />
+                          <CommandList>
+                            {customersLoading ? (
+                              <div className="p-4 text-center text-sm text-slate-500">
+                                Loading...
+                              </div>
+                            ) : customers.length === 0 ? (
+                              <CommandEmpty>No customers found.</CommandEmpty>
+                            ) : (
+                              <CommandGroup>
+                                {customers.map((customer) => (
+                                  <CommandItem
+                                    key={customer.id}
+                                    value={customer.id}
+                                    onSelect={() => {
+                                      setSelectedCustomer(customer);
+                                      setNewJobCustomerId(customer.id);
+                                      setCustomerSearchOpen(false);
+                                      setCustomerSearch("");
+                                    }}
+                                    data-testid={`customer-option-${customer.id}`}
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{customer.name}</span>
+                                      {customer.fullAddress && (
+                                        <span className="text-xs text-slate-500">{customer.fullAddress}</span>
+                                      )}
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Job Type</Label>
+                    <Select value={newJobType} onValueChange={setNewJobType}>
+                      <SelectTrigger data-testid="select-new-job-type">
+                        <SelectValue placeholder="Select job type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {JOB_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select value={newJobPriority} onValueChange={setNewJobPriority}>
+                      <SelectTrigger data-testid="select-new-job-priority">
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PRIORITIES.map((priority) => (
+                          <SelectItem key={priority} value={priority}>
+                            {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Description (required)</Label>
+                    <Textarea
+                      value={newJobDescription}
+                      onChange={(e) => setNewJobDescription(e.target.value)}
+                      placeholder="Describe the job..."
+                      className="min-h-[80px]"
+                      data-testid="textarea-new-job-description"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Primary Tech (optional)</Label>
+                    <Select value={newJobTechId} onValueChange={setNewJobTechId}>
+                      <SelectTrigger data-testid="select-new-job-tech">
+                        <SelectValue placeholder="Unassigned" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {technicians.map((tech) => (
+                          <SelectItem key={tech.id} value={tech.id}>
+                            {tech.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Start Date (required)</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                          data-testid="button-new-job-start-date"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {newJobStartDate ? format(newJobStartDate, "MMM d, yyyy") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={newJobStartDate}
+                          onSelect={setNewJobStartDate}
+                          data-testid="calendar-new-job-start-date"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Start Time (required)</Label>
+                      <Input
+                        type="time"
+                        value={newJobStartTime}
+                        onChange={(e) => setNewJobStartTime(e.target.value)}
+                        data-testid="input-new-job-start-time"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Duration (minutes)</Label>
+                      <Input
+                        type="number"
+                        min={15}
+                        value={newJobDuration}
+                        onChange={(e) => setNewJobDuration(parseInt(e.target.value) || 15)}
+                        data-testid="input-new-job-duration"
+                      />
+                      {newJobDuration < 15 && (
+                        <p className="text-xs text-red-500">Minimum 15 minutes</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <Separator />
+                </>
+              )}
 
               <div className="space-y-2">
                 <Label>Visit Type</Label>
@@ -932,14 +1257,23 @@ export default function CrmWorkOrders() {
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setCreateDialogOpen(false)}
+                onClick={() => {
+                  setCreateDialogOpen(false);
+                  resetCreateForm();
+                }}
                 data-testid="button-cancel-create"
               >
                 Cancel
               </Button>
               <Button
                 onClick={() => createWorkOrderMutation.mutate()}
-                disabled={createWorkOrderMutation.isPending || !createForm.jobId || !createForm.scheduledDate}
+                disabled={
+                  createWorkOrderMutation.isPending ||
+                  !createForm.scheduledDate ||
+                  (createNewJob
+                    ? !newJobCustomerId || !newJobDescription.trim() || !newJobStartDate || newJobDuration < 15
+                    : !createForm.jobId)
+                }
                 className="bg-[#711419] hover:bg-[#5a1014]"
                 data-testid="button-submit-create"
               >
