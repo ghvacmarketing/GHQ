@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -64,6 +65,9 @@ import {
   Building2,
   MapPin,
   Trash2,
+  Home,
+  Users,
+  ShieldCheck,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -108,13 +112,21 @@ type DispatchResponse = {
   date: string;
 };
 
-type AccountWithInfo = CrmAccount & {
-  primarySite: CrmSite | null;
-  primaryContact: { firstName: string; lastName?: string; phone?: string } | null;
+type CustomerWithInfo = {
+  id: string;
+  name: string;
+  customerType: string;
+  customerStatus: string;
+  fullAddress: string | null;
+  phone: string | null;
+  email: string | null;
+  leadSource: string | null;
+  createdAt: string;
+  origin: 'crm' | 'legacy';
 };
 
-type AccountsResponse = {
-  accounts: AccountWithInfo[];
+type CustomersResponse = {
+  customers: CustomerWithInfo[];
   pagination: {
     page: number;
     limit: number;
@@ -127,6 +139,24 @@ type AccountDetailResponse = CrmAccount & {
   sites: CrmSite[];
   contacts: any[];
   profile: CommercialProfile | any | null;
+};
+
+const customerTypeColors: Record<string, { bg: string; text: string; icon: any }> = {
+  RESIDENTIAL: { bg: "bg-green-100", text: "text-green-700", icon: Home },
+  Residential: { bg: "bg-green-100", text: "text-green-700", icon: Home },
+  PROPERTY_MANAGER: { bg: "bg-blue-100", text: "text-blue-700", icon: Users },
+  "Property Manager": { bg: "bg-blue-100", text: "text-blue-700", icon: Users },
+  COMMERCIAL: { bg: "bg-purple-100", text: "text-purple-700", icon: Building2 },
+  Commercial: { bg: "bg-purple-100", text: "text-purple-700", icon: Building2 },
+};
+
+const getCustomerTypeDisplay = (type: string): string => {
+  const typeMap: Record<string, string> = {
+    RESIDENTIAL: "Residential",
+    PROPERTY_MANAGER: "Property Manager",
+    COMMERCIAL: "Commercial",
+  };
+  return typeMap[type] || type;
 };
 
 const ITEMS_PER_PAGE = 50;
@@ -200,8 +230,8 @@ export default function CrmJobs() {
   const [page, setPage] = useState(1);
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [accountSearch, setAccountSearch] = useState("");
-  const [selectedAccount, setSelectedAccount] = useState<AccountWithInfo | null>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithInfo | null>(null);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [jobType, setJobType] = useState<string>("SERVICE");
   const [priority, setPriority] = useState<string>("normal");
@@ -210,12 +240,23 @@ export default function CrmJobs() {
   const [startTime, setStartTime] = useState("09:00");
   const [duration, setDuration] = useState(60);
   const [description, setDescription] = useState("");
-  const [accountSearchOpen, setAccountSearchOpen] = useState(false);
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
 
   const [tenantName, setTenantName] = useState("");
   const [tenantPhone, setTenantPhone] = useState("");
   const [accessInstructions, setAccessInstructions] = useState("");
   const [poNumber, setPoNumber] = useState("");
+  
+  const [preferredContactMethod, setPreferredContactMethod] = useState<string>("");
+  const [accessNotes, setAccessNotes] = useState("");
+  
+  const [unitNumber, setUnitNumber] = useState("");
+  const [billTo, setBillTo] = useState<string>("bill_pm");
+  const [approvalRequired, setApprovalRequired] = useState(false);
+  
+  const [siteContact, setSiteContact] = useState("");
+  const [customSiteContact, setCustomSiteContact] = useState("");
+  const [afterHoursNotes, setAfterHoursNotes] = useState("");
 
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [selectedJobForSchedule, setSelectedJobForSchedule] = useState<JobWithDetails | null>(null);
@@ -227,7 +268,7 @@ export default function CrmJobs() {
   const [jobToDelete, setJobToDelete] = useState<JobWithDetails | null>(null);
 
   const debouncedSearch = useDebounce(searchInput, 300);
-  const debouncedAccountSearch = useDebounce(accountSearch, 300);
+  const debouncedCustomerSearch = useDebounce(customerSearch, 300);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -279,31 +320,31 @@ export default function CrmJobs() {
     enabled: !!currentUser,
   });
 
-  const { data: accountsData, isLoading: accountsLoading } = useQuery<AccountsResponse>({
-    queryKey: ["/api/crm/accounts", debouncedAccountSearch],
+  const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
+    queryKey: ["/api/crm/customers", debouncedCustomerSearch],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (debouncedAccountSearch) params.set("search", debouncedAccountSearch);
+      if (debouncedCustomerSearch) params.set("search", debouncedCustomerSearch);
       params.set("limit", "10");
-      const res = await fetch(`/api/crm/accounts?${params.toString()}`, {
+      const res = await fetch(`/api/crm/customers?${params.toString()}`, {
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to fetch accounts");
+      if (!res.ok) throw new Error("Failed to fetch customers");
       return res.json();
     },
-    enabled: !!currentUser && createDialogOpen && accountSearchOpen,
+    enabled: !!currentUser && createDialogOpen && customerSearchOpen,
   });
 
   const { data: accountDetailData } = useQuery<AccountDetailResponse>({
-    queryKey: ["/api/crm/accounts", selectedAccount?.id],
+    queryKey: ["/api/crm/accounts", selectedCustomer?.id],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/accounts/${selectedAccount!.id}`, {
+      const res = await fetch(`/api/crm/accounts/${selectedCustomer!.id}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch account details");
       return res.json();
     },
-    enabled: !!selectedAccount?.id,
+    enabled: !!selectedCustomer?.id && selectedCustomer?.origin === 'crm',
   });
 
   const sites = accountDetailData?.sites || [];
@@ -317,11 +358,21 @@ export default function CrmJobs() {
     }
   }, [selectedSite]);
 
-  const technicians = dispatchData?.technicians?.filter(t => t.role === "tech") || [];
+  useEffect(() => {
+    if (sites.length === 1 && !selectedSiteId) {
+      setSelectedSiteId(sites[0].id);
+    }
+  }, [sites, selectedSiteId]);
 
-  const isPropertyManager = selectedAccount?.accountType === "PROPERTY_MANAGER";
-  const isCommercial = selectedAccount?.accountType === "COMMERCIAL";
+  const technicians = dispatchData?.technicians?.filter(t => t.role === "tech") || [];
+  const contacts = accountDetailData?.contacts || [];
+
+  const customerType = selectedCustomer?.customerType?.toUpperCase() || "";
+  const isResidential = customerType === "RESIDENTIAL";
+  const isPropertyManager = customerType === "PROPERTY_MANAGER";
+  const isCommercial = customerType === "COMMERCIAL";
   const requiresPO = isCommercial && (accountDetailData?.profile as CommercialProfile)?.requiresPO;
+  const isTaxExempt = isCommercial && (accountDetailData?.profile as CommercialProfile)?.taxExempt;
 
   const createJobMutation = useMutation({
     mutationFn: async (data: {
@@ -499,8 +550,8 @@ export default function CrmJobs() {
 
   const handleCloseDialog = () => {
     setCreateDialogOpen(false);
-    setAccountSearch("");
-    setSelectedAccount(null);
+    setCustomerSearch("");
+    setSelectedCustomer(null);
     setSelectedSiteId("");
     setJobType("SERVICE");
     setPriority("normal");
@@ -509,11 +560,19 @@ export default function CrmJobs() {
     setStartTime("09:00");
     setDuration(60);
     setDescription("");
-    setAccountSearchOpen(false);
+    setCustomerSearchOpen(false);
     setTenantName("");
     setTenantPhone("");
     setAccessInstructions("");
     setPoNumber("");
+    setPreferredContactMethod("");
+    setAccessNotes("");
+    setUnitNumber("");
+    setBillTo("bill_pm");
+    setApprovalRequired(false);
+    setSiteContact("");
+    setCustomSiteContact("");
+    setAfterHoursNotes("");
   };
 
   const handleOpenScheduleDialog = (job: JobWithDetails) => {
@@ -566,23 +625,35 @@ export default function CrmJobs() {
   };
 
   const descriptionError = description.trim() === "" ? "Description is required" : null;
-  const accountError = !selectedAccount ? "Account is required" : null;
-  const siteError = !selectedSiteId ? "Site is required" : null;
+  const customerError = !selectedCustomer ? "Customer is required" : null;
+  const siteError = selectedCustomer?.origin === 'crm' && !selectedSiteId ? "Site is required" : null;
   const priorityError = !priority ? "Priority is required" : null;
   
-  const isFormValid = selectedAccount && selectedSiteId && description.trim() !== "" && priority;
+  const needsSiteSelection = selectedCustomer?.origin === 'crm';
+  
+  // Customer-type specific validation
+  const commercialPOValid = !isCommercial || !requiresPO || poNumber.trim() !== "";
+  const effectiveSiteContact = siteContact === "other" ? customSiteContact : siteContact;
+  const commercialContactValid = !isCommercial || effectiveSiteContact.trim() !== "";
+  
+  const isFormValid = selectedCustomer && 
+    (!needsSiteSelection || selectedSiteId) && 
+    description.trim() !== "" && 
+    priority &&
+    commercialPOValid &&
+    commercialContactValid;
 
   const handleSubmit = () => {
-    if (!selectedAccount) {
+    if (!selectedCustomer) {
       toast({
         title: "Error",
-        description: "Please select an account",
+        description: "Please select a customer",
         variant: "destructive",
       });
       return;
     }
 
-    if (!selectedSiteId) {
+    if (needsSiteSelection && !selectedSiteId) {
       toast({
         title: "Error",
         description: "Please select a site",
@@ -609,20 +680,60 @@ export default function CrmJobs() {
       return;
     }
 
-    let fullDescription = description.trim();
-    if (isPropertyManager && (tenantName || tenantPhone || accessInstructions)) {
-      fullDescription += `\n\n--- Tenant/Access Info ---`;
-      if (tenantName) fullDescription += `\nTenant: ${tenantName}`;
-      if (tenantPhone) fullDescription += `\nTenant Phone: ${tenantPhone}`;
-      if (accessInstructions) fullDescription += `\nAccess: ${accessInstructions}`;
+    if (isCommercial && requiresPO && poNumber.trim() === "") {
+      toast({
+        title: "Error",
+        description: "PO Number is required for this commercial customer",
+        variant: "destructive",
+      });
+      return;
     }
-    if (requiresPO && poNumber) {
-      fullDescription += `\n\n--- PO Number: ${poNumber} ---`;
+
+    const effectiveContact = siteContact === "other" ? customSiteContact : siteContact;
+    if (isCommercial && effectiveContact.trim() === "") {
+      toast({
+        title: "Error",
+        description: "Site Contact is required for commercial customers",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let fullDescription = description.trim();
+    
+    if (isResidential) {
+      if (preferredContactMethod || accessNotes) {
+        fullDescription += `\n\n--- Residential Info ---`;
+        if (preferredContactMethod) fullDescription += `\nPreferred Contact: ${preferredContactMethod}`;
+        if (accessNotes) fullDescription += `\nAccess Notes: ${accessNotes}`;
+      }
+    }
+    
+    if (isPropertyManager) {
+      if (tenantName || tenantPhone || accessInstructions || unitNumber || billTo || approvalRequired) {
+        fullDescription += `\n\n--- Property Manager Info ---`;
+        if (unitNumber) fullDescription += `\nUnit #: ${unitNumber}`;
+        if (tenantName) fullDescription += `\nTenant: ${tenantName}`;
+        if (tenantPhone) fullDescription += `\nTenant Phone: ${tenantPhone}`;
+        if (accessInstructions) fullDescription += `\nAccess: ${accessInstructions}`;
+        fullDescription += `\nBill To: ${billTo === 'bill_pm' ? 'Bill PM' : 'Bill Tenant/Owner'}`;
+        if (approvalRequired) fullDescription += `\nApproval Required: Yes`;
+      }
+    }
+    
+    if (isCommercial) {
+      if (poNumber || effectiveContact || afterHoursNotes) {
+        fullDescription += `\n\n--- Commercial Info ---`;
+        if (poNumber) fullDescription += `\nPO Number: ${poNumber}`;
+        if (effectiveContact) fullDescription += `\nSite Contact: ${effectiveContact}`;
+        if (afterHoursNotes) fullDescription += `\nAccess/After-Hours: ${afterHoursNotes}`;
+        if (isTaxExempt) fullDescription += `\nTax Exempt: Yes`;
+      }
     }
 
     createJobMutation.mutate({
-      accountId: selectedAccount.id,
-      siteId: selectedSiteId,
+      accountId: selectedCustomer.id,
+      siteId: selectedSiteId || sites[0]?.id || "",
       jobType,
       priority,
       description: fullDescription,
@@ -874,20 +985,36 @@ export default function CrmJobs() {
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="account-search">Account *</Label>
-              {selectedAccount ? (
+              <Label htmlFor="customer-search">Customer *</Label>
+              {selectedCustomer ? (
                 <div className="flex items-center justify-between p-3 border rounded-md bg-slate-50">
                   <div>
                     <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-slate-500" />
-                      <p className="font-medium" data-testid="text-selected-account">{selectedAccount.displayName}</p>
-                      <Badge variant="outline" className="text-xs">
-                        {selectedAccount.accountType}
-                      </Badge>
+                      {(() => {
+                        const typeConfig = customerTypeColors[selectedCustomer.customerType] || customerTypeColors.RESIDENTIAL;
+                        const IconComponent = typeConfig.icon;
+                        return <IconComponent className="h-4 w-4 text-slate-500" />;
+                      })()}
+                      <p className="font-medium" data-testid="text-selected-customer">{selectedCustomer.name}</p>
+                      {(() => {
+                        const typeConfig = customerTypeColors[selectedCustomer.customerType];
+                        if (!typeConfig) return null;
+                        return (
+                          <Badge className={cn("text-xs", typeConfig.bg, typeConfig.text)}>
+                            {getCustomerTypeDisplay(selectedCustomer.customerType)}
+                          </Badge>
+                        );
+                      })()}
+                      {isTaxExempt && (
+                        <Badge className="text-xs bg-emerald-100 text-emerald-700">
+                          <ShieldCheck className="h-3 w-3 mr-1" />
+                          Tax Exempt
+                        </Badge>
+                      )}
                     </div>
-                    {selectedAccount.primarySite && (
+                    {selectedCustomer.fullAddress && (
                       <p className="text-sm text-slate-500 mt-1">
-                        {selectedAccount.primarySite.address1}, {selectedAccount.primarySite.city}
+                        {selectedCustomer.fullAddress}
                       </p>
                     )}
                   </div>
@@ -895,79 +1022,90 @@ export default function CrmJobs() {
                     variant="ghost" 
                     size="sm" 
                     onClick={() => {
-                      setSelectedAccount(null);
+                      setSelectedCustomer(null);
                       setSelectedSiteId("");
                       setTenantName("");
                       setTenantPhone("");
                       setAccessInstructions("");
                       setPoNumber("");
+                      setPreferredContactMethod("");
+                      setAccessNotes("");
+                      setUnitNumber("");
+                      setBillTo("bill_pm");
+                      setApprovalRequired(false);
+                      setSiteContact("");
+                      setAfterHoursNotes("");
                     }}
-                    data-testid="button-clear-account"
+                    data-testid="button-clear-customer"
                   >
                     Change
                   </Button>
                 </div>
               ) : (
-                <Popover open={accountSearchOpen} onOpenChange={setAccountSearchOpen}>
+                <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
-                      aria-expanded={accountSearchOpen}
+                      aria-expanded={customerSearchOpen}
                       className="w-full justify-start text-left font-normal"
-                      data-testid="button-account-search"
+                      data-testid="button-customer-search"
                     >
                       <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                      Search accounts...
+                      Search customers...
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[450px] p-0" align="start">
                     <Command shouldFilter={false}>
                       <CommandInput
-                        placeholder="Search by name or company..."
-                        value={accountSearch}
-                        onValueChange={setAccountSearch}
-                        data-testid="input-account-search"
+                        placeholder="Search customers..."
+                        value={customerSearch}
+                        onValueChange={setCustomerSearch}
+                        data-testid="input-customer-search"
                       />
                       <CommandList>
-                        {accountsLoading ? (
+                        {customersLoading ? (
                           <div className="py-6 text-center text-sm">
                             <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
                             Searching...
                           </div>
-                        ) : (accountsData?.accounts?.length || 0) === 0 ? (
-                          <CommandEmpty>No accounts found.</CommandEmpty>
+                        ) : (customersData?.customers?.filter(c => c.origin === 'crm').length || 0) === 0 ? (
+                          <CommandEmpty>No customers found.</CommandEmpty>
                         ) : (
                           <CommandGroup>
-                            {accountsData?.accounts?.map((account) => (
-                              <CommandItem
-                                key={account.id}
-                                value={account.id}
-                                onSelect={() => {
-                                  setSelectedAccount(account);
-                                  setAccountSearchOpen(false);
-                                  setAccountSearch("");
-                                  setSelectedSiteId("");
-                                }}
-                                className="cursor-pointer"
-                                data-testid={`account-option-${account.id}`}
-                              >
-                                <div className="flex flex-col w-full">
-                                  <div className="flex items-center gap-2">
-                                    <Building2 className="h-4 w-4 text-slate-400" />
-                                    <span className="font-medium">{account.displayName}</span>
-                                    <Badge variant="outline" className="text-xs">
-                                      {account.accountType}
-                                    </Badge>
+                            {customersData?.customers?.filter(c => c.origin === 'crm').map((customer) => {
+                              const typeConfig = customerTypeColors[customer.customerType] || customerTypeColors.RESIDENTIAL;
+                              const IconComponent = typeConfig.icon;
+                              return (
+                                <CommandItem
+                                  key={customer.id}
+                                  value={customer.id}
+                                  onSelect={() => {
+                                    setSelectedCustomer(customer);
+                                    setCustomerSearchOpen(false);
+                                    setCustomerSearch("");
+                                    setSelectedSiteId("");
+                                  }}
+                                  className="cursor-pointer"
+                                  data-testid={`customer-option-${customer.id}`}
+                                >
+                                  <div className="flex flex-col w-full">
+                                    <div className="flex items-center gap-2">
+                                      <IconComponent className="h-4 w-4 text-slate-400" />
+                                      <span className="font-medium">{customer.name}</span>
+                                      <Badge className={cn("text-xs", typeConfig.bg, typeConfig.text)}>
+                                        {getCustomerTypeDisplay(customer.customerType)}
+                                      </Badge>
+                                    </div>
+                                    {customer.fullAddress && (
+                                      <span className="text-sm text-slate-500 ml-6">
+                                        {customer.fullAddress}
+                                      </span>
+                                    )}
                                   </div>
-                                  {account.primarySite && (
-                                    <span className="text-sm text-slate-500 ml-6">
-                                      {account.primarySite.address1}, {account.primarySite.city}
-                                    </span>
-                                  )}
-                                </div>
-                              </CommandItem>
-                            ))}
+                                </CommandItem>
+                              );
+                            })}
                           </CommandGroup>
                         )}
                       </CommandList>
@@ -977,7 +1115,7 @@ export default function CrmJobs() {
               )}
             </div>
 
-            {selectedAccount && (
+            {selectedCustomer && needsSiteSelection && (
               <div className="space-y-2">
                 <Label htmlFor="site-select">Site *</Label>
                 <Select value={selectedSiteId} onValueChange={setSelectedSiteId}>
@@ -1008,13 +1146,59 @@ export default function CrmJobs() {
               </div>
             )}
 
-            {isPropertyManager && selectedSiteId && (
-              <div className="space-y-3 p-3 border rounded-md bg-amber-50 border-amber-200">
-                <div className="flex items-center gap-2 text-amber-800">
-                  <Building2 className="h-4 w-4" />
-                  <Label className="font-medium">Tenant/Access Info</Label>
+            {isResidential && selectedCustomer && (
+              <div className="space-y-3 p-3 border rounded-md bg-green-50 border-green-200">
+                <div className="flex items-center gap-2 text-green-800">
+                  <Home className="h-4 w-4" />
+                  <Label className="font-medium">Residential Info</Label>
+                  <span className="text-xs text-green-600">(Optional)</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="preferred-contact" className="text-sm">Preferred Contact Method</Label>
+                    <Select value={preferredContactMethod} onValueChange={setPreferredContactMethod}>
+                      <SelectTrigger data-testid="select-preferred-contact">
+                        <SelectValue placeholder="Select method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="phone">Phone</SelectItem>
+                        <SelectItem value="text">Text</SelectItem>
+                        <SelectItem value="email">Email</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="access-notes" className="text-sm">Access Notes</Label>
+                  <Textarea
+                    id="access-notes"
+                    placeholder="Gate codes, pet info, etc."
+                    value={accessNotes}
+                    onChange={(e) => setAccessNotes(e.target.value)}
+                    rows={2}
+                    data-testid="textarea-access-notes"
+                  />
+                </div>
+              </div>
+            )}
+
+            {isPropertyManager && selectedCustomer && (
+              <div className="space-y-3 p-3 border rounded-md bg-blue-50 border-blue-200">
+                <div className="flex items-center gap-2 text-blue-800">
+                  <Users className="h-4 w-4" />
+                  <Label className="font-medium">Property Manager Info</Label>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="unit-number" className="text-sm">Unit #</Label>
+                    <Input
+                      id="unit-number"
+                      placeholder="Unit number"
+                      value={unitNumber}
+                      onChange={(e) => setUnitNumber(e.target.value)}
+                      data-testid="input-unit-number"
+                    />
+                  </div>
                   <div className="space-y-1">
                     <Label htmlFor="tenant-name" className="text-sm">Tenant Name</Label>
                     <Input
@@ -1036,6 +1220,31 @@ export default function CrmJobs() {
                     />
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="bill-to" className="text-sm">Bill To</Label>
+                    <Select value={billTo} onValueChange={setBillTo}>
+                      <SelectTrigger data-testid="select-bill-to">
+                        <SelectValue placeholder="Select billing" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bill_pm">Bill PM</SelectItem>
+                        <SelectItem value="bill_tenant">Bill Tenant/Owner</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1 flex items-end">
+                    <div className="flex items-center space-x-2 pb-2">
+                      <Switch
+                        id="approval-required"
+                        checked={approvalRequired}
+                        onCheckedChange={setApprovalRequired}
+                        data-testid="switch-approval-required"
+                      />
+                      <Label htmlFor="approval-required" className="text-sm cursor-pointer">Approval Required</Label>
+                    </div>
+                  </div>
+                </div>
                 <div className="space-y-1">
                   <Label htmlFor="access-instructions" className="text-sm">Access Instructions</Label>
                   <Textarea
@@ -1050,20 +1259,81 @@ export default function CrmJobs() {
               </div>
             )}
 
-            {requiresPO && (
-              <div className="space-y-2 p-3 border rounded-md bg-blue-50 border-blue-200">
-                <div className="flex items-center gap-2 text-blue-800">
+            {isCommercial && selectedCustomer && (
+              <div className="space-y-3 p-3 border rounded-md bg-purple-50 border-purple-200">
+                <div className="flex items-center gap-2 text-purple-800">
                   <Building2 className="h-4 w-4" />
-                  <Label htmlFor="po-number" className="font-medium">PO Number</Label>
-                  <span className="text-xs text-blue-600">(Required for invoicing)</span>
+                  <Label className="font-medium">Commercial Info</Label>
+                  {isTaxExempt && (
+                    <Badge className="text-xs bg-emerald-100 text-emerald-700">
+                      <ShieldCheck className="h-3 w-3 mr-1" />
+                      Tax Exempt
+                    </Badge>
+                  )}
                 </div>
-                <Input
-                  id="po-number"
-                  placeholder="Enter PO number"
-                  value={poNumber}
-                  onChange={(e) => setPoNumber(e.target.value)}
-                  data-testid="input-po-number"
-                />
+                {requiresPO && (
+                  <div className="space-y-1">
+                    <Label htmlFor="po-number" className="text-sm">
+                      PO Number <span className="text-purple-600">(Required for invoicing)</span>
+                    </Label>
+                    <Input
+                      id="po-number"
+                      placeholder="Enter PO number"
+                      value={poNumber}
+                      onChange={(e) => setPoNumber(e.target.value)}
+                      data-testid="input-po-number"
+                    />
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <Label htmlFor="site-contact" className="text-sm">Site Contact / Facility Manager *</Label>
+                  {contacts.length > 0 ? (
+                    <>
+                      <Select value={siteContact} onValueChange={setSiteContact}>
+                        <SelectTrigger data-testid="select-site-contact">
+                          <SelectValue placeholder="Select contact" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {contacts.map((contact: any) => (
+                            <SelectItem key={contact.id} value={`${contact.firstName} ${contact.lastName || ''} - ${contact.phone || contact.email || ''}`}>
+                              {contact.firstName} {contact.lastName || ''} {contact.phone ? `(${contact.phone})` : ''}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="other">Other (enter manually)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {siteContact === "other" && (
+                        <Input
+                          id="custom-site-contact"
+                          placeholder="Enter contact name and phone"
+                          value={customSiteContact}
+                          onChange={(e) => setCustomSiteContact(e.target.value)}
+                          className="mt-2"
+                          data-testid="input-custom-site-contact"
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <Input
+                      id="site-contact"
+                      placeholder="Contact name and phone"
+                      value={siteContact}
+                      onChange={(e) => setSiteContact(e.target.value)}
+                      data-testid="input-site-contact"
+                    />
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="after-hours-notes" className="text-sm">Access Instructions / After-Hours Notes</Label>
+                  <Textarea
+                    id="after-hours-notes"
+                    placeholder="Security codes, after-hours access, etc."
+                    value={afterHoursNotes}
+                    onChange={(e) => setAfterHoursNotes(e.target.value)}
+                    rows={2}
+                    data-testid="textarea-after-hours-notes"
+                  />
+                </div>
               </div>
             )}
 
@@ -1105,7 +1375,7 @@ export default function CrmJobs() {
               <Label htmlFor="description">Description *</Label>
               <Textarea
                 id="description"
-                placeholder="Work order description..."
+                placeholder="Job description..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
