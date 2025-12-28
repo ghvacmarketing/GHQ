@@ -6527,7 +6527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/accounts/import-csv - Import accounts from CSV file
-  app.post("/api/crm/accounts/import-csv", requireCrmAdmin, uploadMiddleware.single("file"), async (req, res) => {
+  app.post("/api/crm/accounts/import-csv", requireCrmAdmin, upload.single("file"), async (req, res) => {
     try {
       const currentUser = await getCurrentCrmUser(req);
       const file = req.file;

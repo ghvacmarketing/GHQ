@@ -81,6 +81,8 @@ interface FormData {
   lastName: string;
   companyName: string;
   displayName: string;
+  phone: string;
+  email: string;
   parentAccountId: string;
   customerSince: Date;
   leadSource: LeadSource | "";
@@ -126,6 +128,8 @@ const initialFormData: FormData = {
   lastName: "",
   companyName: "",
   displayName: "",
+  phone: "",
+  email: "",
   parentAccountId: "",
   customerSince: new Date(),
   leadSource: "",
@@ -242,6 +246,8 @@ export default function CrmAccountCreate() {
         contacts: [{
           firstName: formData.firstName,
           lastName: formData.lastName || null,
+          phone: formData.phone || null,
+          email: formData.email || null,
           contactRole: "PRIMARY",
           isPrimary: true,
         }],
@@ -528,6 +534,31 @@ export default function CrmAccountCreate() {
                       value={formData.displayName}
                       onChange={(e) => updateField("displayName", e.target.value)}
                       data-testid="input-display-name"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="(xxx) xxx-xxxx"
+                      value={formData.phone}
+                      onChange={(e) => updateField("phone", e.target.value)}
+                      data-testid="input-phone"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="email@example.com"
+                      value={formData.email}
+                      onChange={(e) => updateField("email", e.target.value)}
+                      data-testid="input-email"
                     />
                   </div>
                 </div>
@@ -1117,6 +1148,14 @@ export default function CrmAccountCreate() {
                           <span>{formData.companyName}</span>
                         </div>
                       )}
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Phone:</span>
+                        <span>{formData.phone || "—"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Email:</span>
+                        <span>{formData.email || "—"}</span>
+                      </div>
                       <div className="flex justify-between">
                         <span className="text-slate-500">Customer Since:</span>
                         <span>{format(formData.customerSince, "MM/dd/yyyy")}</span>
