@@ -485,20 +485,23 @@ export default function CrmDispatch() {
     if (!job) return;
 
     const baseDate = selectedDate;
-    const scheduledStart = new Date(baseDate);
-    scheduledStart.setHours(Math.floor(newStart), (newStart % 1) * 60, 0, 0);
-    const scheduledEnd = new Date(baseDate);
-    scheduledEnd.setHours(Math.floor(newEnd), (newEnd % 1) * 60, 0, 0);
+    const startDate = new Date(baseDate);
+    startDate.setHours(Math.floor(newStart), (newStart % 1) * 60, 0, 0);
+    const endDate = new Date(baseDate);
+    endDate.setHours(Math.floor(newEnd), (newEnd % 1) * 60, 0, 0);
+
+    const scheduledStartISO = startDate.toISOString();
+    const scheduledEndISO = endDate.toISOString();
 
     setLocalJobs(prev => prev.map(j =>
-      j.id === jobId ? { ...j, scheduledStart, scheduledEnd } : j
+      j.id === jobId ? { ...j, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any } : j
     ));
 
     updateJobMutation.mutate({
       jobId,
       updates: {
-        scheduledStart: scheduledStart.toISOString(),
-        scheduledEnd: scheduledEnd.toISOString(),
+        scheduledStart: scheduledStartISO,
+        scheduledEnd: scheduledEndISO,
       },
     });
   }, [localJobs, selectedDate, updateJobMutation]);
@@ -535,14 +538,17 @@ export default function CrmDispatch() {
       newStartHour = Math.max(START_HOUR, Math.min(newStartHour, END_HOUR - duration));
       const newEndHour = newStartHour + duration;
 
-      const scheduledStart = new Date(selectedDate);
-      scheduledStart.setHours(Math.floor(newStartHour), (newStartHour % 1) * 60, 0, 0);
-      const scheduledEnd = new Date(selectedDate);
-      scheduledEnd.setHours(Math.floor(newEndHour), (newEndHour % 1) * 60, 0, 0);
+      const startDate = new Date(selectedDate);
+      startDate.setHours(Math.floor(newStartHour), (newStartHour % 1) * 60, 0, 0);
+      const endDate = new Date(selectedDate);
+      endDate.setHours(Math.floor(newEndHour), (newEndHour % 1) * 60, 0, 0);
+
+      const scheduledStartISO = startDate.toISOString();
+      const scheduledEndISO = endDate.toISOString();
 
       setLocalJobs(prev => prev.map(j => 
         j.id === jobId 
-          ? { ...j, assignedTechId: isUnassigned ? null : newTechId, scheduledStart, scheduledEnd } 
+          ? { ...j, assignedTechId: isUnassigned ? null : newTechId, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any } 
           : j
       ));
 
@@ -550,8 +556,8 @@ export default function CrmDispatch() {
         jobId,
         updates: {
           assignedTechId: isUnassigned ? null : newTechId,
-          scheduledStart: scheduledStart.toISOString(),
-          scheduledEnd: scheduledEnd.toISOString(),
+          scheduledStart: scheduledStartISO,
+          scheduledEnd: scheduledEndISO,
         },
       });
     }
