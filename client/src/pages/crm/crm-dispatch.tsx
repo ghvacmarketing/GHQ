@@ -33,6 +33,7 @@ import {
   UserX,
   XCircle,
   Loader2,
+  Info,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmJob } from "@shared/schema";
@@ -50,7 +51,7 @@ import {
 } from "@dnd-kit/core";
 
 type JobStatus = "new" | "scheduled" | "dispatched" | "en_route" | "on_site" | "completed" | "invoiced" | "paid" | "cancelled";
-type FilterStatus = "all" | "unassigned" | "in_progress" | "completed";
+type FilterStatus = "all" | "new" | "scheduled" | "dispatched" | "en_route" | "on_site" | "completed";
 
 interface DispatchJob extends CrmJob {
   customerName: string;
@@ -753,10 +754,8 @@ export default function CrmDispatch() {
 
   const filteredJobs = localJobs.filter((job) => {
     if (filter === "all") return true;
-    if (filter === "unassigned") return !job.assignedTechId;
-    if (filter === "in_progress") return ["dispatched", "en_route", "on_site"].includes(job.status);
     if (filter === "completed") return ["completed", "invoiced", "paid"].includes(job.status);
-    return true;
+    return job.status === filter;
   });
 
   const unassignedJobs = filteredJobs.filter(job => !job.assignedTechId);
@@ -840,21 +839,108 @@ export default function CrmDispatch() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2" data-testid="filter-buttons">
-          {(["all", "unassigned", "in_progress", "completed"] as FilterStatus[]).map((status) => (
-            <Button
-              key={status}
-              variant={filter === status ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilter(status)}
-              data-testid={`filter-${status}`}
-            >
-              {status === "all" && "All Jobs"}
-              {status === "unassigned" && `Unassigned (${unassignedJobs.length})`}
-              {status === "in_progress" && "In Progress"}
-              {status === "completed" && "Completed"}
-            </Button>
-          ))}
+        <div className="flex flex-wrap gap-2 items-center" data-testid="filter-buttons">
+          {(["all", "new", "scheduled", "dispatched", "en_route", "on_site", "completed"] as FilterStatus[]).map((status) => {
+            const count = status === "all" 
+              ? localJobs.length 
+              : status === "completed" 
+                ? localJobs.filter(j => ["completed", "invoiced", "paid"].includes(j.status)).length
+                : localJobs.filter(j => j.status === status).length;
+            const labels: Record<FilterStatus, string> = {
+              all: "All",
+              new: "New",
+              scheduled: "Scheduled",
+              dispatched: "Dispatched",
+              en_route: "En Route",
+              on_site: "On Site",
+              completed: "Completed"
+            };
+            return (
+              <Button
+                key={status}
+                variant={filter === status ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilter(status)}
+                data-testid={`filter-${status}`}
+              >
+                {labels[status]} ({count})
+              </Button>
+            );
+          })}
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="ml-2" data-testid="button-legend">
+                <Info className="h-4 w-4 mr-1" />
+                Legend
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="end">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Job Type (Background)</span>
+                  <div className="flex flex-wrap gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-4 h-4 rounded bg-sky-100 border border-sky-200" />
+                      <span className="text-xs text-slate-600">Service</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-4 h-4 rounded bg-emerald-100 border border-emerald-200" />
+                      <span className="text-xs text-slate-600">Maintenance</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-4 h-4 rounded bg-amber-100 border border-amber-200" />
+                      <span className="text-xs text-slate-600">Install</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-4 h-4 rounded bg-rose-100 border border-rose-200" />
+                      <span className="text-xs text-slate-600">Sales</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Status (Left Stripe)</span>
+                  <div className="flex flex-wrap gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-4 h-4 rounded border-l-4 border-l-slate-400 bg-slate-50" />
+                      <span className="text-xs text-slate-600">New</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-4 h-4 rounded border-l-4 border-l-blue-500 bg-blue-50" />
+                      <span className="text-xs text-slate-600">Scheduled</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-4 h-4 rounded border-l-4 border-l-purple-500 bg-purple-50" />
+                      <span className="text-xs text-slate-600">Dispatched</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-4 h-4 rounded border-l-4 border-l-amber-500 bg-amber-50" />
+                      <span className="text-xs text-slate-600">En Route</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-4 h-4 rounded border-l-4 border-l-orange-500 bg-orange-50" />
+                      <span className="text-xs text-slate-600">On Site</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-4 h-4 rounded border-l-4 border-l-green-500 bg-green-50" />
+                      <span className="text-xs text-slate-600">Completed</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Priority (Badge)</span>
+                  <div className="flex flex-wrap gap-2">
+                    <div className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500 text-white">URGENT</div>
+                    <div className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-orange-500 text-white">HIGH</div>
+                    <div className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-700">NORMAL</div>
+                    <div className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gray-100 text-gray-600">LOW</div>
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <Card className="bg-white border hidden lg:block" data-testid="card-timeline">
@@ -943,81 +1029,6 @@ export default function CrmDispatch() {
           </Card>
         </div>
 
-        <Card className="bg-white border" data-testid="card-legend">
-          <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <span className="text-sm font-semibold text-slate-700">Job Type (Background)</span>
-                <div className="flex flex-wrap gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded bg-sky-100 border border-sky-200" />
-                    <span className="text-xs text-slate-600">Service</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded bg-emerald-100 border border-emerald-200" />
-                    <span className="text-xs text-slate-600">Maintenance</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded bg-amber-100 border border-amber-200" />
-                    <span className="text-xs text-slate-600">Install</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded bg-rose-100 border border-rose-200" />
-                    <span className="text-xs text-slate-600">Sales</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <span className="text-sm font-semibold text-slate-700">Status (Left Stripe)</span>
-                <div className="flex flex-wrap gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded border-l-4 border-l-slate-400 bg-slate-50" />
-                    <span className="text-xs text-slate-600">New</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded border-l-4 border-l-blue-500 bg-blue-50" />
-                    <span className="text-xs text-slate-600">Scheduled</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded border-l-4 border-l-purple-500 bg-purple-50" />
-                    <span className="text-xs text-slate-600">Dispatched</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded border-l-4 border-l-amber-500 bg-amber-50" />
-                    <span className="text-xs text-slate-600">En Route</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded border-l-4 border-l-orange-500 bg-orange-50" />
-                    <span className="text-xs text-slate-600">On Site</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded border-l-4 border-l-green-500 bg-green-50" />
-                    <span className="text-xs text-slate-600">Completed</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <span className="text-sm font-semibold text-slate-700">Priority (Badge)</span>
-                <div className="flex flex-wrap gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <div className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500 text-white">URGENT</div>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-orange-500 text-white">HIGH</div>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-700">NORMAL</div>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gray-100 text-gray-600">LOW</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
