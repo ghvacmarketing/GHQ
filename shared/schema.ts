@@ -926,6 +926,191 @@ export const crmPayments = pgTable("crm_payments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// =============================================
+// NEW ACCOUNT + SITE + CONTACT MODEL
+// =============================================
+
+// Account Type Enum
+export const accountTypeEnum = ["RESIDENTIAL", "PROPERTY_MANAGER", "COMMERCIAL"] as const;
+export type AccountType = typeof accountTypeEnum[number];
+
+// Account Status Enum  
+export const accountStatusEnum = ["PROSPECT", "ACTIVE", "INACTIVE", "DO_NOT_SERVICE"] as const;
+export type AccountStatus = typeof accountStatusEnum[number];
+
+// Contact Role Enum
+export const contactRoleEnum = [
+  "OWNER", "PM", "TENANT", "AP", "FACILITIES", 
+  "DECISION_MAKER", "BILLING", "PRIMARY", "EMERGENCY", "OTHER"
+] as const;
+export type ContactRole = typeof contactRoleEnum[number];
+
+// Lead Source Enum
+export const leadSourceEnum = [
+  "WEBSITE", "REFERRAL", "GOOGLE", "FACEBOOK", "YELP", 
+  "HOME_ADVISOR", "ANGI", "THUMBTACK", "WALK_IN", "PHONE", 
+  "REPEAT_CUSTOMER", "FIELDEDGE", "OTHER"
+] as const;
+export type LeadSource = typeof leadSourceEnum[number];
+
+// CRM Accounts (replaces crmCustomers conceptually)
+export const crmAccounts = pgTable("crm_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  displayName: text("display_name").notNull(),
+  companyName: text("company_name"),
+  accountType: text("account_type").$type<AccountType>().notNull().default("RESIDENTIAL"),
+  accountStatus: text("account_status").$type<AccountStatus>().notNull().default("PROSPECT"),
+  leadSource: text("lead_source").$type<LeadSource>(),
+  parentAccountId: varchar("parent_account_id").references((): any => crmAccounts.id),
+  customerSince: date("customer_since"),
+  pinnedNote: text("pinned_note"),
+  noCallRecording: boolean("no_call_recording").default(false),
+  tags: json("tags").$type<string[]>().default([]),
+  sourceSystem: text("source_system"),
+  sourceId: text("source_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CRM Sites (addresses/locations linked to accounts)
+export const crmSites = pgTable("crm_sites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").notNull().references(() => crmAccounts.id, { onDelete: "cascade" }),
+  siteName: text("site_name"),
+  address1: text("address1").notNull(),
+  address2: text("address2"),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  zip: text("zip").notNull(),
+  isPrimary: boolean("is_primary").default(false),
+  accessInstructions: text("access_instructions"),
+  gateCode: text("gate_code"),
+  notes: text("notes"),
+  tenantName: text("tenant_name"),
+  tenantPhone: text("tenant_phone"),
+  tenantEmail: text("tenant_email"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CRM Contacts (people linked to accounts and/or sites)
+export const crmContacts = pgTable("crm_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").notNull().references(() => crmAccounts.id, { onDelete: "cascade" }),
+  siteId: varchar("site_id").references(() => crmSites.id, { onDelete: "set null" }),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name"),
+  email: text("email"),
+  phone: text("phone"),
+  contactRole: text("contact_role").$type<ContactRole>().notNull().default("PRIMARY"),
+  isPrimary: boolean("is_primary").default(false),
+  isPreferred: boolean("is_preferred").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Residential Profile (one-to-one with account)
+export const residentialProfiles = pgTable("residential_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").notNull().unique().references(() => crmAccounts.id, { onDelete: "cascade" }),
+  membershipPlan: text("membership_plan"),
+  membershipStartDate: date("membership_start_date"),
+  membershipEndDate: date("membership_end_date"),
+  preferredServiceDay: text("preferred_service_day"),
+  preferredTimeSlot: text("preferred_time_slot"),
+  specialInstructions: text("special_instructions"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Property Manager Profile (one-to-one with account)
+export const propertyManagerProfiles = pgTable("property_manager_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").notNull().unique().references(() => crmAccounts.id, { onDelete: "cascade" }),
+  requiresApprovalBefore: boolean("requires_approval_before").default(false),
+  approvalThreshold: decimal("approval_threshold", { precision: 10, scale: 2 }),
+  defaultBillingMethod: text("default_billing_method"),
+  netTerms: integer("net_terms").default(30),
+  managementCompanyName: text("management_company_name"),
+  portfolioSize: integer("portfolio_size"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Commercial Profile (one-to-one with account)
+export const commercialProfiles = pgTable("commercial_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").notNull().unique().references(() => crmAccounts.id, { onDelete: "cascade" }),
+  taxExempt: boolean("tax_exempt").default(false),
+  taxExemptNumber: text("tax_exempt_number"),
+  requiresPO: boolean("requires_po").default(false),
+  poPrefix: text("po_prefix"),
+  netTerms: integer("net_terms").default(30),
+  billingAddress: text("billing_address"),
+  billingCity: text("billing_city"),
+  billingState: text("billing_state"),
+  billingZip: text("billing_zip"),
+  w9OnFile: boolean("w9_on_file").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Insert schemas for new Account model
+export const insertCrmAccountSchema = createInsertSchema(crmAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCrmSiteSchema = createInsertSchema(crmSites).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCrmContactSchema = createInsertSchema(crmContacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertResidentialProfileSchema = createInsertSchema(residentialProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPropertyManagerProfileSchema = createInsertSchema(propertyManagerProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCommercialProfileSchema = createInsertSchema(commercialProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types for new Account model
+export type InsertCrmAccount = z.infer<typeof insertCrmAccountSchema>;
+export type CrmAccount = typeof crmAccounts.$inferSelect;
+export type InsertCrmSite = z.infer<typeof insertCrmSiteSchema>;
+export type CrmSite = typeof crmSites.$inferSelect;
+export type InsertCrmContact = z.infer<typeof insertCrmContactSchema>;
+export type CrmContact = typeof crmContacts.$inferSelect;
+export type InsertResidentialProfile = z.infer<typeof insertResidentialProfileSchema>;
+export type ResidentialProfile = typeof residentialProfiles.$inferSelect;
+export type InsertPropertyManagerProfile = z.infer<typeof insertPropertyManagerProfileSchema>;
+export type PropertyManagerProfile = typeof propertyManagerProfiles.$inferSelect;
+export type InsertCommercialProfile = z.infer<typeof insertCommercialProfileSchema>;
+export type CommercialProfile = typeof commercialProfiles.$inferSelect;
+
+// =============================================
+// END NEW ACCOUNT MODEL
+// =============================================
+
 // Insert schemas for CRM
 export const insertCrmUserSchema = createInsertSchema(crmUsers).omit({
   id: true,
