@@ -5187,24 +5187,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Double-booking check if assigning tech + time
-      if (assignedTechId && scheduledStart && scheduledEnd) {
-        const newStart = new Date(scheduledStart);
-        const newEnd = new Date(scheduledEnd);
+      // Double-booking check: runs if we have a tech AND scheduled times (from request or existing)
+      // Determine effective techId: from request, or look up existing assignment
+      let effectiveTechId = assignedTechId;
+      if (effectiveTechId === undefined) {
+        const existingAssignment = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.jobId, jobId));
+        effectiveTechId = existingAssignment[0]?.techUserId || null;
+      }
+
+      // Determine effective times: from request, or from existing job
+      const effectiveStart = scheduledStart !== undefined 
+        ? (scheduledStart ? new Date(scheduledStart) : null)
+        : job.scheduledStart;
+      const effectiveEnd = scheduledEnd !== undefined 
+        ? (scheduledEnd ? new Date(scheduledEnd) : null)
+        : job.scheduledEnd;
+
+      // Run overlap check if we have techId AND both times
+      if (effectiveTechId && effectiveStart && effectiveEnd) {
+        const newStart = new Date(effectiveStart);
+        const newEnd = new Date(effectiveEnd);
         
         // Get all assignments for the tech
         const techAssignments = await db.select().from(crmJobAssignments)
-          .where(eq(crmJobAssignments.techUserId, assignedTechId));
+          .where(eq(crmJobAssignments.techUserId, effectiveTechId));
         
         const techJobIds = techAssignments.map(a => a.jobId).filter(id => id !== jobId);
         
         if (techJobIds.length > 0) {
-          // Check for overlapping jobs on the same day
-          const dayStart = new Date(newStart);
-          dayStart.setHours(0, 0, 0, 0);
-          const dayEnd = new Date(newStart);
-          dayEnd.setHours(23, 59, 59, 999);
-
           const overlappingJobs = await db.select().from(crmJobs)
             .where(
               and(
@@ -5217,7 +5227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
           if (overlappingJobs.length > 0) {
-            return res.status(400).json({
+            return res.status(409).json({
               message: "Double booking detected - technician has overlapping jobs",
               conflictingJobs: overlappingJobs.map(j => ({ id: j.id, scheduledStart: j.scheduledStart, scheduledEnd: j.scheduledEnd })),
             });
@@ -5244,6 +5254,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updateData.completedAt = new Date();
         }
       }
+      
+      // Auto-set status to "scheduled" when times are set and current status is "new"
+      const finalStart = updateData.scheduledStart !== undefined ? updateData.scheduledStart : job.scheduledStart;
+      const finalEnd = updateData.scheduledEnd !== undefined ? updateData.scheduledEnd : job.scheduledEnd;
+      const currentStatus = updateData.status !== undefined ? updateData.status : job.status;
+      
+      if (finalStart && finalEnd && currentStatus === "new") {
+        updateData.status = "scheduled";
+        changes.status = { old: job.status, new: "scheduled" };
+      }
+      
       if (description !== undefined) {
         updateData.description = description;
         changes.description = { old: job.description, new: description };

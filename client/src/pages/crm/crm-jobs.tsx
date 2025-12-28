@@ -50,7 +50,21 @@ import {
   Plus,
   CalendarIcon,
   Loader2,
+  MoreVertical,
+  Clock,
+  UserCheck,
+  ExternalLink,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -163,6 +177,13 @@ export default function CrmJobs() {
   const [description, setDescription] = useState("");
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
 
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [selectedJobForSchedule, setSelectedJobForSchedule] = useState<JobWithDetails | null>(null);
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(new Date());
+  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scheduleDuration, setScheduleDuration] = useState(60);
+  const [scheduleTechId, setScheduleTechId] = useState<string>("unassigned");
+
   const debouncedSearch = useDebounce(searchInput, 300);
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
 
@@ -221,7 +242,7 @@ export default function CrmJobs() {
       if (!res.ok) throw new Error("Failed to fetch technicians");
       return res.json();
     },
-    enabled: !!currentUser && createDialogOpen,
+    enabled: !!currentUser,
   });
 
   const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
@@ -302,6 +323,100 @@ export default function CrmJobs() {
     },
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ jobId, status }: { jobId: string; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/crm/jobs/${jobId}`, { status });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to update status");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+      toast({
+        title: "Status updated",
+        description: "Job status has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const assignTechMutation = useMutation({
+    mutationFn: async ({ jobId, techId }: { jobId: string; techId: string | null }) => {
+      const res = await apiRequest("PATCH", `/api/crm/jobs/${jobId}`, { 
+        assignedTechId: techId 
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to assign technician");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+      toast({
+        title: "Technician assigned",
+        description: "Job has been assigned successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to assign technician",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const scheduleJobMutation = useMutation({
+    mutationFn: async (data: {
+      jobId: string;
+      scheduledStart: string;
+      scheduledEnd: string;
+      assignedTechId: string | null;
+    }) => {
+      const res = await apiRequest("PATCH", `/api/crm/jobs/${data.jobId}`, {
+        scheduledStart: data.scheduledStart,
+        scheduledEnd: data.scheduledEnd,
+        assignedTechId: data.assignedTechId,
+        status: "scheduled",
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        if (res.status === 409) {
+          throw new Error("This technician already has a job scheduled during this time. Please choose a different time or technician.");
+        }
+        throw new Error(errorData.message || "Failed to schedule job");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+      toast({
+        title: "Job scheduled",
+        description: "The job has been scheduled successfully.",
+      });
+      handleCloseScheduleDialog();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Scheduling conflict",
+        description: error.message || "Failed to schedule job",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCloseDialog = () => {
     setCreateDialogOpen(false);
     setCustomerSearch("");
@@ -314,6 +429,55 @@ export default function CrmJobs() {
     setDuration(60);
     setDescription("");
     setCustomerSearchOpen(false);
+  };
+
+  const handleOpenScheduleDialog = (job: JobWithDetails) => {
+    setSelectedJobForSchedule(job);
+    if (job.scheduledStart) {
+      const start = new Date(job.scheduledStart);
+      setScheduleDate(start);
+      setScheduleTime(format(start, "HH:mm"));
+    } else {
+      setScheduleDate(new Date());
+      setScheduleTime("09:00");
+    }
+    if (job.scheduledStart && job.scheduledEnd) {
+      const start = new Date(job.scheduledStart);
+      const end = new Date(job.scheduledEnd);
+      const durationMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+      setScheduleDuration(durationMinutes > 0 ? durationMinutes : 60);
+    } else {
+      setScheduleDuration(60);
+    }
+    setScheduleTechId(job.assignedTechId || "unassigned");
+    setScheduleDialogOpen(true);
+  };
+
+  const handleCloseScheduleDialog = () => {
+    setScheduleDialogOpen(false);
+    setSelectedJobForSchedule(null);
+    setScheduleDate(new Date());
+    setScheduleTime("09:00");
+    setScheduleDuration(60);
+    setScheduleTechId("unassigned");
+  };
+
+  const handleScheduleSubmit = () => {
+    if (!selectedJobForSchedule || !scheduleDate) return;
+
+    const [hours, minutes] = scheduleTime.split(":").map(Number);
+    const scheduledStart = new Date(scheduleDate);
+    scheduledStart.setHours(hours, minutes, 0, 0);
+    
+    const scheduledEnd = new Date(scheduledStart);
+    scheduledEnd.setMinutes(scheduledEnd.getMinutes() + scheduleDuration);
+
+    scheduleJobMutation.mutate({
+      jobId: selectedJobForSchedule.id,
+      scheduledStart: scheduledStart.toISOString(),
+      scheduledEnd: scheduledEnd.toISOString(),
+      assignedTechId: scheduleTechId === "unassigned" ? null : scheduleTechId,
+    });
   };
 
   const descriptionError = description.trim() === "" ? "Description is required" : null;
@@ -486,6 +650,7 @@ export default function CrmJobs() {
                         <TableHead>Assigned Tech</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Priority</TableHead>
+                        <TableHead className="w-[50px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -496,8 +661,7 @@ export default function CrmJobs() {
                         return (
                           <TableRow
                             key={job.id}
-                            className="cursor-pointer hover:bg-slate-50"
-                            onClick={() => navigate(`/crm/dispatch`)}
+                            className="hover:bg-slate-50"
                             data-testid={`row-job-${job.id}`}
                           >
                             <TableCell className="font-medium" data-testid={`text-job-date-${job.id}`}>
@@ -529,6 +693,82 @@ export default function CrmJobs() {
                               >
                                 {job.priority || "normal"}
                               </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8"
+                                    data-testid={`button-job-actions-${job.id}`}
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => handleOpenScheduleDialog(job)}
+                                    data-testid={`action-schedule-${job.id}`}
+                                  >
+                                    <Clock className="mr-2 h-4 w-4" />
+                                    Schedule
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger data-testid={`action-assign-tech-${job.id}`}>
+                                      <UserCheck className="mr-2 h-4 w-4" />
+                                      Assign Tech
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuSubContent>
+                                      <DropdownMenuItem
+                                        onClick={() => assignTechMutation.mutate({ jobId: job.id, techId: null })}
+                                        data-testid={`assign-tech-unassigned-${job.id}`}
+                                      >
+                                        Unassigned
+                                      </DropdownMenuItem>
+                                      {technicians.map((tech) => (
+                                        <DropdownMenuItem
+                                          key={tech.id}
+                                          onClick={() => assignTechMutation.mutate({ jobId: job.id, techId: tech.id })}
+                                          data-testid={`assign-tech-${tech.id}-${job.id}`}
+                                        >
+                                          {tech.name}
+                                        </DropdownMenuItem>
+                                      ))}
+                                    </DropdownMenuSubContent>
+                                  </DropdownMenuSub>
+                                  <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger data-testid={`action-change-status-${job.id}`}>
+                                      Change Status
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuSubContent>
+                                      {["new", "scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"].map((status) => (
+                                        <DropdownMenuItem
+                                          key={status}
+                                          onClick={() => updateStatusMutation.mutate({ jobId: job.id, status })}
+                                          disabled={job.status === status}
+                                          data-testid={`status-${status}-${job.id}`}
+                                        >
+                                          <Badge 
+                                            variant="outline" 
+                                            className={`${statusColors[status]?.bg} ${statusColors[status]?.text} ${statusColors[status]?.border} mr-2`}
+                                          >
+                                            {statusLabels[status]}
+                                          </Badge>
+                                        </DropdownMenuItem>
+                                      ))}
+                                    </DropdownMenuSubContent>
+                                  </DropdownMenuSub>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => navigate("/crm/dispatch")}
+                                    data-testid={`action-open-job-${job.id}`}
+                                  >
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    Open Job
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         );
@@ -806,6 +1046,120 @@ export default function CrmJobs() {
                 </>
               ) : (
                 "Create Job"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={scheduleDialogOpen} onOpenChange={(open) => !open && handleCloseScheduleDialog()}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Schedule Job</DialogTitle>
+          </DialogHeader>
+          
+          {selectedJobForSchedule && (
+            <div className="space-y-4 py-4">
+              <div className="p-3 bg-slate-50 rounded-md border">
+                <p className="text-sm text-slate-500">Customer</p>
+                <p className="font-medium" data-testid="text-schedule-customer">{selectedJobForSchedule.customerName}</p>
+                <p className="text-sm text-slate-500 mt-1">Job Type: {selectedJobForSchedule.jobType || "—"}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="schedule-tech">Technician</Label>
+                <Select value={scheduleTechId} onValueChange={setScheduleTechId}>
+                  <SelectTrigger data-testid="select-schedule-tech">
+                    <SelectValue placeholder="Select technician" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned" data-testid="schedule-tech-unassigned">
+                      Unassigned
+                    </SelectItem>
+                    {technicians.map((tech) => (
+                      <SelectItem key={tech.id} value={tech.id} data-testid={`schedule-tech-${tech.id}`}>
+                        {tech.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !scheduleDate && "text-muted-foreground"
+                        )}
+                        data-testid="button-schedule-date"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {scheduleDate ? format(scheduleDate, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={scheduleDate}
+                        onSelect={setScheduleDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="schedule-time">Time</Label>
+                  <Input
+                    id="schedule-time"
+                    type="time"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                    data-testid="input-schedule-time"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="schedule-duration">Duration (minutes)</Label>
+                <Input
+                  id="schedule-duration"
+                  type="number"
+                  min={15}
+                  step={15}
+                  value={scheduleDuration}
+                  onChange={(e) => setScheduleDuration(parseInt(e.target.value) || 60)}
+                  data-testid="input-schedule-duration"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleCloseScheduleDialog}
+              data-testid="button-cancel-schedule"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleScheduleSubmit}
+              disabled={scheduleJobMutation.isPending || !scheduleDate}
+              data-testid="button-submit-schedule"
+            >
+              {scheduleJobMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Scheduling...
+                </>
+              ) : (
+                "Schedule Job"
               )}
             </Button>
           </DialogFooter>
