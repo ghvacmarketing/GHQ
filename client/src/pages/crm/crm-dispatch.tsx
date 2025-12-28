@@ -486,14 +486,17 @@ export default function CrmDispatch() {
     const job = localJobs.find(j => j.id === jobId);
     if (!job) return;
 
-    const baseDate = selectedDate;
-    const startDate = new Date(baseDate);
-    startDate.setHours(Math.floor(newStart), (newStart % 1) * 60, 0, 0);
-    const endDate = new Date(baseDate);
-    endDate.setHours(Math.floor(newEnd), (newEnd % 1) * 60, 0, 0);
-
-    const scheduledStartISO = startDate.toISOString();
-    const scheduledEndISO = endDate.toISOString();
+    // Use the same UTC date string that the query uses
+    const baseDateStr = selectedDate.toISOString().split("T")[0];
+    
+    // Create UTC dates directly to avoid timezone issues
+    const startHourInt = Math.floor(newStart);
+    const startMinutes = Math.round((newStart % 1) * 60);
+    const endHourInt = Math.floor(newEnd);
+    const endMinutes = Math.round((newEnd % 1) * 60);
+    
+    const scheduledStartISO = `${baseDateStr}T${String(startHourInt).padStart(2, '0')}:${String(startMinutes).padStart(2, '0')}:00.000Z`;
+    const scheduledEndISO = `${baseDateStr}T${String(endHourInt).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}:00.000Z`;
 
     setLocalJobs(prev => prev.map(j =>
       j.id === jobId ? { ...j, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any } : j
@@ -540,13 +543,17 @@ export default function CrmDispatch() {
       newStartHour = Math.max(START_HOUR, Math.min(newStartHour, END_HOUR - duration));
       const newEndHour = newStartHour + duration;
 
-      const startDate = new Date(selectedDate);
-      startDate.setHours(Math.floor(newStartHour), (newStartHour % 1) * 60, 0, 0);
-      const endDate = new Date(selectedDate);
-      endDate.setHours(Math.floor(newEndHour), (newEndHour % 1) * 60, 0, 0);
-
-      const scheduledStartISO = startDate.toISOString();
-      const scheduledEndISO = endDate.toISOString();
+      // Use the same UTC date string that the query uses
+      const baseDateStr = selectedDate.toISOString().split("T")[0];
+      
+      // Create UTC dates directly to avoid timezone issues
+      const startHourInt = Math.floor(newStartHour);
+      const startMinutes = Math.round((newStartHour % 1) * 60);
+      const endHourInt = Math.floor(newEndHour);
+      const endMinutes = Math.round((newEndHour % 1) * 60);
+      
+      const scheduledStartISO = `${baseDateStr}T${String(startHourInt).padStart(2, '0')}:${String(startMinutes).padStart(2, '0')}:00.000Z`;
+      const scheduledEndISO = `${baseDateStr}T${String(endHourInt).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}:00.000Z`;
 
       setLocalJobs(prev => prev.map(j => 
         j.id === jobId 
