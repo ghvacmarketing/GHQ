@@ -29,6 +29,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
   ClipboardList,
   Calendar as CalendarIcon,
   User,
@@ -41,7 +49,9 @@ import {
   RefreshCw,
   UserCheck,
   Eye,
+  Plus,
 } from "lucide-react";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType } from "@shared/schema";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfDay, endOfDay } from "date-fns";
@@ -90,6 +100,16 @@ export default function CrmWorkOrders() {
   const [newStatus, setNewStatus] = useState<string>("");
   const [rescheduleStart, setRescheduleStart] = useState<Date | null>(null);
   const [rescheduleEnd, setRescheduleEnd] = useState<Date | null>(null);
+  
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    jobId: "",
+    visitType: "initial" as WorkOrderVisitType,
+    scheduledDate: "",
+    startTime: "08:00",
+    endTime: "17:00",
+    assignedTechId: "",
+  });
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -111,6 +131,13 @@ export default function CrmWorkOrders() {
     (techniciansData || []).filter(u => u.role === "tech"),
     [techniciansData]
   );
+
+  const { data: jobsData } = useQuery<{ jobs: CrmJob[] }>({
+    queryKey: ["/api/crm/jobs"],
+    enabled: !!currentUser && createDialogOpen,
+  });
+
+  const jobs = jobsData?.jobs || [];
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -146,6 +173,53 @@ export default function CrmWorkOrders() {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
     },
   });
+
+  const createWorkOrderMutation = useMutation({
+    mutationFn: async () => {
+      const scheduledStart = createForm.scheduledDate
+        ? new Date(`${createForm.scheduledDate}T${createForm.startTime}`)
+        : null;
+      const scheduledEnd = createForm.scheduledDate
+        ? new Date(`${createForm.scheduledDate}T${createForm.endTime}`)
+        : null;
+
+      const res = await apiRequest("POST", "/api/crm/work-orders", {
+        jobId: createForm.jobId,
+        visitType: createForm.visitType,
+        scheduledStart: scheduledStart?.toISOString(),
+        scheduledEnd: scheduledEnd?.toISOString(),
+        assignedTechId: createForm.assignedTechId || null,
+        status: "scheduled",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
+      toast({ title: "Work order created", description: "New work order has been scheduled." });
+      setCreateDialogOpen(false);
+      setCreateForm({
+        jobId: "",
+        visitType: "initial",
+        scheduledDate: "",
+        startTime: "08:00",
+        endTime: "17:00",
+        assignedTechId: "",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Creation failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const visitTypeLabels: Record<string, string> = {
+    initial: "Initial Visit",
+    return: "Return Visit",
+    follow_up: "Follow-up",
+    install_day_1: "Install Day 1",
+    install_day_2: "Install Day 2",
+    maintenance: "Maintenance",
+    inspection: "Inspection",
+  };
 
   const handleOpenDetail = async (wo: EnrichedWorkOrder) => {
     const res = await fetch(`/api/crm/work-orders/${wo.id}`, { credentials: "include" });
@@ -260,15 +334,25 @@ export default function CrmWorkOrders() {
           <h1 className="text-xl font-bold text-slate-900" data-testid="text-work-orders-title">
             Work Orders
           </h1>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            data-testid="button-refresh-work-orders"
-          >
-            <RefreshCw className="h-4 w-4 mr-1" />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setCreateDialogOpen(true)}
+              className="bg-[#711419] hover:bg-[#5a1014]"
+              data-testid="button-create-work-order"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Create Work Order
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              data-testid="button-refresh-work-orders"
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         <Card className="bg-white border shadow-sm">
@@ -749,6 +833,121 @@ export default function CrmWorkOrders() {
             )}
           </SheetContent>
         </Sheet>
+
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogContent className="max-w-md" data-testid="dialog-create-work-order">
+            <DialogHeader>
+              <DialogTitle>Create Work Order</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Job (required)</Label>
+                <Select
+                  value={createForm.jobId}
+                  onValueChange={(v) => setCreateForm({ ...createForm, jobId: v })}
+                >
+                  <SelectTrigger data-testid="select-job">
+                    <SelectValue placeholder="Select a job" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jobs.map((job) => (
+                      <SelectItem key={job.id} value={job.id}>
+                        {job.jobType} - #{job.id.slice(0, 8)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Visit Type</Label>
+                <Select
+                  value={createForm.visitType}
+                  onValueChange={(v) => setCreateForm({ ...createForm, visitType: v as WorkOrderVisitType })}
+                >
+                  <SelectTrigger data-testid="select-visit-type">
+                    <SelectValue placeholder="Select visit type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workOrderVisitTypeEnum.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {visitTypeLabels[type]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Scheduled Date (required)</Label>
+                <Input
+                  type="date"
+                  value={createForm.scheduledDate}
+                  onChange={(e) => setCreateForm({ ...createForm, scheduledDate: e.target.value })}
+                  data-testid="input-date"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Time</Label>
+                  <Input
+                    type="time"
+                    value={createForm.startTime}
+                    onChange={(e) => setCreateForm({ ...createForm, startTime: e.target.value })}
+                    data-testid="input-start-time"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Time</Label>
+                  <Input
+                    type="time"
+                    value={createForm.endTime}
+                    onChange={(e) => setCreateForm({ ...createForm, endTime: e.target.value })}
+                    data-testid="input-end-time"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Assign Technician (optional)</Label>
+                <Select
+                  value={createForm.assignedTechId}
+                  onValueChange={(v) => setCreateForm({ ...createForm, assignedTechId: v })}
+                >
+                  <SelectTrigger data-testid="select-tech">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Unassigned</SelectItem>
+                    {technicians.map((tech) => (
+                      <SelectItem key={tech.id} value={tech.id}>
+                        {tech.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setCreateDialogOpen(false)}
+                data-testid="button-cancel-create"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => createWorkOrderMutation.mutate()}
+                disabled={createWorkOrderMutation.isPending || !createForm.jobId || !createForm.scheduledDate}
+                className="bg-[#711419] hover:bg-[#5a1014]"
+                data-testid="button-submit-create"
+              >
+                {createWorkOrderMutation.isPending ? "Creating..." : "Create Work Order"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </CrmLayout>
   );
