@@ -6758,9 +6758,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)
   setTimeout(() => {
-    // Start customer auto-sync (every 10 minutes)
-    startAutoSync(10);
-    console.log('Customer auto-sync started (every 10 minutes)');
+    // Customer auto-sync disabled - using CSV import instead
+    // startAutoSync(10);
+    // console.log('Customer auto-sync started (every 10 minutes)');
 
     // Start daily weather refresh
     scheduleWeatherRefresh();
