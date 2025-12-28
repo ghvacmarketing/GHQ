@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
@@ -27,6 +29,7 @@ import {
   Trash2,
   ExternalLink,
   MoreVertical,
+  CalendarIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -37,18 +40,19 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmCustomer, CrmJob } from "@shared/schema";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
-const createJobSchema = z.object({
-  jobType: z.string().min(1, "Job type is required"),
-  description: z.string().optional(),
-  priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
-});
+const JOB_TYPES = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
+const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
-type CreateJobFormData = z.infer<typeof createJobSchema>;
+type DispatchResponse = {
+  technicians: Array<{
+    id: string;
+    name: string;
+    role: string;
+  }>;
+};
 
 interface JobWithTech extends CrmJob {
   assignedTechId: string | null;
@@ -93,14 +97,28 @@ export default function CrmCustomerDetail() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const form = useForm<CreateJobFormData>({
-    resolver: zodResolver(createJobSchema),
-    defaultValues: {
-      jobType: "",
-      description: "",
-      priority: "normal",
-    },
-  });
+  // Form state
+  const [jobType, setJobType] = useState<string>("SERVICE");
+  const [priority, setPriority] = useState<string>("normal");
+  const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
+  const [startDate, setStartDate] = useState<Date | undefined>(new Date());
+  const [startTime, setStartTime] = useState<string>("08:00");
+  const [duration, setDuration] = useState<number>(120);
+  const [description, setDescription] = useState<string>("");
+  const [durationError, setDurationError] = useState<string>("");
+  const [descriptionError, setDescriptionError] = useState<string>("");
+
+  const resetForm = () => {
+    setJobType("SERVICE");
+    setPriority("normal");
+    setAssignedTechId("unassigned");
+    setStartDate(new Date());
+    setStartTime("08:00");
+    setDuration(120);
+    setDescription("");
+    setDurationError("");
+    setDescriptionError("");
+  };
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -127,22 +145,66 @@ export default function CrmCustomerDetail() {
     enabled: !!currentUser && !!customerId,
   });
 
+  const { data: dispatchData } = useQuery<DispatchResponse>({
+    queryKey: ["/api/crm/dispatch"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/dispatch", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch technicians");
+      return res.json();
+    },
+    enabled: !!currentUser && createDialogOpen,
+  });
+
+  const technicians = dispatchData?.technicians?.filter((t) => t.role === "tech") || [];
+
+  const validateForm = (): boolean => {
+    let isValid = true;
+    setDurationError("");
+    setDescriptionError("");
+
+    if (!duration || duration < 15) {
+      setDurationError("Duration must be at least 15 minutes");
+      isValid = false;
+    }
+    if (!description.trim()) {
+      setDescriptionError("Description is required");
+      isValid = false;
+    }
+    return isValid;
+  };
+
+  const isFormValid = jobType && startDate && startTime && duration >= 15 && description.trim();
+
   const createJobMutation = useMutation({
-    mutationFn: async (data: CreateJobFormData) => {
+    mutationFn: async () => {
+      if (!startDate) throw new Error("Start date is required");
+      
+      const [hours, minutes] = startTime.split(":").map(Number);
+      const scheduledStart = new Date(startDate);
+      scheduledStart.setHours(hours, minutes, 0, 0);
+      
+      const scheduledEnd = new Date(scheduledStart);
+      scheduledEnd.setMinutes(scheduledEnd.getMinutes() + duration);
+
       const res = await apiRequest("POST", "/api/crm/jobs", {
         customerId,
-        jobType: data.jobType,
-        description: data.description || null,
-        priority: data.priority,
-        status: "new",
+        jobType,
+        description: description || null,
+        priority,
+        status: assignedTechId !== "unassigned" ? "scheduled" : "new",
+        assignedTechId: assignedTechId !== "unassigned" ? assignedTechId : null,
+        scheduledStart: scheduledStart.toISOString(),
+        scheduledEnd: scheduledEnd.toISOString(),
       });
       return res.json();
     },
     onSuccess: () => {
       toast({ title: "Job created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
       setCreateDialogOpen(false);
-      form.reset();
+      resetForm();
     },
     onError: (error: Error) => {
       toast({
@@ -153,8 +215,15 @@ export default function CrmCustomerDetail() {
     },
   });
 
-  const onSubmit = (data: CreateJobFormData) => {
-    createJobMutation.mutate(data);
+  const handleSubmit = () => {
+    if (validateForm()) {
+      createJobMutation.mutate();
+    }
+  };
+
+  const handleCloseDialog = () => {
+    setCreateDialogOpen(false);
+    resetForm();
   };
 
   const deleteJobMutation = useMutation({
@@ -224,98 +293,165 @@ export default function CrmCustomerDetail() {
             Back to Customers
           </Button>
 
-          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <Dialog open={createDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
             <DialogTrigger asChild>
               <Button data-testid="button-create-job">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Job
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
-                <DialogTitle>Create New Job</DialogTitle>
+                <DialogTitle>Create Job</DialogTitle>
                 <DialogDescription>
-                  Create a new job for {customer.name}. The job will appear in the dispatch board as unassigned.
+                  Create a new job for {customer.name}.
                 </DialogDescription>
               </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="jobType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Job Type</FormLabel>
-                        <FormControl>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger data-testid="select-job-type">
-                              <SelectValue placeholder="Select job type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="SERVICE">Service</SelectItem>
-                              <SelectItem value="INSTALL">Install</SelectItem>
-                              <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                              <SelectItem value="SALES">Sales</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+              
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="job-type">Job Type *</Label>
+                    <Select value={jobType} onValueChange={setJobType}>
+                      <SelectTrigger data-testid="select-job-type">
+                        <SelectValue placeholder="Select job type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {JOB_TYPES.map((type) => (
+                          <SelectItem key={type} value={type} data-testid={`job-type-${type}`}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Priority</FormLabel>
-                        <FormControl>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger data-testid="select-priority">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="low">Low</SelectItem>
-                              <SelectItem value="normal">Normal</SelectItem>
-                              <SelectItem value="high">High</SelectItem>
-                              <SelectItem value="urgent">Urgent</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="priority">Priority</Label>
+                    <Select value={priority} onValueChange={setPriority}>
+                      <SelectTrigger data-testid="select-priority">
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PRIORITIES.map((p) => (
+                          <SelectItem key={p} value={p} className="capitalize" data-testid={`priority-${p}`}>
+                            {p.charAt(0).toUpperCase() + p.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Describe the job or issue..."
-                            {...field}
-                            data-testid="input-description"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="space-y-2">
+                  <Label htmlFor="tech">Primary Tech</Label>
+                  <Select value={assignedTechId} onValueChange={setAssignedTechId}>
+                    <SelectTrigger data-testid="select-tech">
+                      <SelectValue placeholder="Select technician" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned" data-testid="tech-unassigned">
+                        Unassigned
+                      </SelectItem>
+                      {technicians.map((tech) => (
+                        <SelectItem key={tech.id} value={tech.id} data-testid={`tech-${tech.id}`}>
+                          {tech.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={createJobMutation.isPending} data-testid="button-submit-job">
-                      {createJobMutation.isPending ? "Creating..." : "Create Job"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Date *</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !startDate && "text-muted-foreground"
+                          )}
+                          data-testid="button-start-date"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {startDate ? format(startDate, "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={startDate}
+                          onSelect={setStartDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="start-time">Start Time *</Label>
+                    <Input
+                      id="start-time"
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      data-testid="input-start-time"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="duration">Duration (minutes) *</Label>
+                  <Input
+                    id="duration"
+                    type="number"
+                    min={15}
+                    step={15}
+                    value={duration}
+                    onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
+                    className={durationError ? "border-red-500" : ""}
+                    data-testid="input-duration"
+                  />
+                  {durationError && (
+                    <p className="text-sm text-red-500" data-testid="error-duration">{durationError}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description *</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Work order description..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                    className={descriptionError ? "border-red-500" : ""}
+                    data-testid="textarea-description"
+                  />
+                  {descriptionError && (
+                    <p className="text-sm text-red-500" data-testid="error-description">{descriptionError}</p>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={handleCloseDialog}
+                  data-testid="button-cancel-create"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={createJobMutation.isPending || !isFormValid}
+                  data-testid="button-submit-job"
+                >
+                  {createJobMutation.isPending ? "Creating..." : "Create Job"}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
