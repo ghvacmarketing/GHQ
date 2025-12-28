@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -22,28 +23,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Search,
   Users,
   ChevronLeft,
   ChevronRight,
-  CalendarIcon,
-  X,
+  Plus,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
-import type { CrmUser, CrmCustomer } from "@shared/schema";
+import { format } from "date-fns";
+import type { CrmUser, CrmAccount, CrmSite, CrmContact, AccountType, AccountStatus } from "@shared/schema";
 
-type CustomerWithAddress = CrmCustomer & { fullAddress: string | null };
+type AccountWithDetails = CrmAccount & {
+  primarySite: CrmSite | null;
+  primaryContact: CrmContact | null;
+};
 
-type CustomersResponse = {
-  customers: CustomerWithAddress[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+type AccountsResponse = {
+  accounts: AccountWithDetails[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 };
 
 const ITEMS_PER_PAGE = 50;
@@ -60,11 +63,8 @@ function useDebounce<T>(value: T, delay: number): T {
 export default function CrmCustomers() {
   const [, navigate] = useLocation();
   const [searchInput, setSearchInput] = useState("");
-  const [customerType, setCustomerType] = useState("all");
-  const [customerStatus, setCustomerStatus] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
-  const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>();
-  const [customDateTo, setCustomDateTo] = useState<Date | undefined>();
+  const [accountType, setAccountType] = useState("all");
+  const [statusTab, setStatusTab] = useState("all");
   const [page, setPage] = useState(1);
 
   const debouncedSearch = useDebounce(searchInput, 300);
@@ -80,76 +80,107 @@ export default function CrmCustomers() {
     }
   }, [authLoading, currentUser, navigate]);
 
-  const { dateFrom, dateTo } = useMemo(() => {
-    const today = startOfDay(new Date());
-    switch (dateFilter) {
-      case "today":
-        return { dateFrom: today.toISOString(), dateTo: today.toISOString() };
-      case "this_week":
-        return { dateFrom: startOfWeek(today).toISOString(), dateTo: today.toISOString() };
-      case "this_month":
-        return { dateFrom: startOfMonth(today).toISOString(), dateTo: today.toISOString() };
-      case "custom":
-        return {
-          dateFrom: customDateFrom?.toISOString() || "",
-          dateTo: customDateTo?.toISOString() || "",
-        };
-      default:
-        return { dateFrom: "", dateTo: "" };
-    }
-  }, [dateFilter, customDateFrom, customDateTo]);
-
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, customerType, customerStatus, dateFilter, customDateFrom, customDateTo]);
+  }, [debouncedSearch, accountType, statusTab]);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
-    if (customerType !== "all") params.set("customerType", customerType);
-    if (customerStatus !== "all") params.set("customerStatus", customerStatus);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
+    if (accountType !== "all") params.set("accountType", accountType);
+    if (statusTab !== "all") {
+      const statusMap: Record<string, AccountStatus> = {
+        prospects: "PROSPECT",
+        active: "ACTIVE",
+        inactive: "INACTIVE",
+      };
+      if (statusMap[statusTab]) {
+        params.set("accountStatus", statusMap[statusTab]);
+      }
+    }
     params.set("page", String(page));
     params.set("limit", String(ITEMS_PER_PAGE));
     return params.toString();
-  }, [debouncedSearch, customerType, customerStatus, dateFrom, dateTo, page]);
+  }, [debouncedSearch, accountType, statusTab, page]);
 
-  const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
-    queryKey: ["/api/crm/customers", queryParams],
+  const { data: accountsData, isLoading: accountsLoading } = useQuery<AccountsResponse>({
+    queryKey: ["/api/crm/accounts", queryParams],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/customers?${queryParams}`, {
+      const res = await fetch(`/api/crm/accounts?${queryParams}`, {
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to fetch customers");
+      if (!res.ok) throw new Error("Failed to fetch accounts");
       return res.json();
     },
     enabled: !!currentUser,
   });
 
-  const formatCustomerType = (type: string | null) => {
-    if (!type) return "—";
-    const map: Record<string, string> = {
-      residential: "Residential",
-      commercial: "Commercial",
-      property_manager: "Property Manager",
+  const formatAccountType = (type: AccountType) => {
+    const map: Record<AccountType, string> = {
+      RESIDENTIAL: "Residential",
+      PROPERTY_MANAGER: "Property Manager",
+      COMMERCIAL: "Commercial",
     };
     return map[type] || type;
   };
 
-  const formatCustomerStatus = (status: string | null) => {
-    if (!status) return "—";
-    const map: Record<string, string> = {
-      prospect: "Prospect",
-      client: "Client",
+  const getAccountTypeBadgeClass = (type: AccountType) => {
+    switch (type) {
+      case "RESIDENTIAL":
+        return "bg-blue-100 text-blue-700 border-blue-200";
+      case "PROPERTY_MANAGER":
+        return "bg-purple-100 text-purple-700 border-purple-200";
+      case "COMMERCIAL":
+        return "bg-amber-100 text-amber-700 border-amber-200";
+      default:
+        return "bg-slate-100 text-slate-600 border-slate-200";
+    }
+  };
+
+  const formatAccountStatus = (status: AccountStatus) => {
+    const map: Record<AccountStatus, string> = {
+      PROSPECT: "Prospect",
+      ACTIVE: "Active",
+      INACTIVE: "Inactive",
+      DO_NOT_SERVICE: "Do Not Service",
     };
     return map[status] || status;
   };
 
-  const getStatusBadgeClass = (status: string | null) => {
-    if (status === "client") return "bg-green-100 text-green-700 border-green-200";
-    if (status === "prospect") return "bg-amber-100 text-amber-700 border-amber-200";
-    return "bg-slate-100 text-slate-600 border-slate-200";
+  const getStatusBadgeClass = (status: AccountStatus) => {
+    switch (status) {
+      case "PROSPECT":
+        return "bg-slate-100 text-slate-700 border-slate-200";
+      case "ACTIVE":
+        return "bg-green-100 text-green-700 border-green-200";
+      case "INACTIVE":
+        return "bg-yellow-100 text-yellow-700 border-yellow-200";
+      case "DO_NOT_SERVICE":
+        return "bg-red-100 text-red-700 border-red-200";
+      default:
+        return "bg-slate-100 text-slate-600 border-slate-200";
+    }
+  };
+
+  const formatPrimarySite = (site: CrmSite | null) => {
+    if (!site) return "—";
+    const parts = [site.address1, site.city, site.state, site.zip].filter(Boolean);
+    return parts.join(", ") || "—";
+  };
+
+  const formatPrimaryContact = (contact: CrmContact | null) => {
+    if (!contact) return { name: "—", phone: "" };
+    const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "—";
+    return { name, phone: contact.phone || "" };
+  };
+
+  const formatCustomerSince = (date: string | null) => {
+    if (!date) return "—";
+    try {
+      return format(new Date(date), "MMM d, yyyy");
+    } catch {
+      return "—";
+    }
   };
 
   if (authLoading) {
@@ -168,132 +199,67 @@ export default function CrmCustomers() {
     return null;
   }
 
-  const customers = customersData?.customers || [];
-  const total = customersData?.total || 0;
-  const totalPages = customersData?.totalPages || 0;
+  const accounts = accountsData?.accounts || [];
+  const total = accountsData?.pagination?.total || 0;
+  const totalPages = accountsData?.pagination?.totalPages || 0;
 
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-customers-title">
-              Customers
+            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-accounts-title">
+              Accounts
             </h1>
             <p className="text-slate-500 text-sm mt-1">
-              <span className="font-medium text-slate-700" data-testid="text-customers-count">
-                All ({total.toLocaleString()})
+              <span className="font-medium text-slate-700" data-testid="text-accounts-count">
+                {total.toLocaleString()} accounts
               </span>
             </p>
           </div>
+          <Link href="/crm/accounts/new">
+            <Button data-testid="button-create-account">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Account
+            </Button>
+          </Link>
         </div>
 
         <Card className="bg-white border shadow-sm">
           <CardContent className="p-4">
             <div className="flex flex-col gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search by name, email, phone, or address..."
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  className="pl-10"
-                  data-testid="input-search"
-                />
-              </div>
+              <Tabs value={statusTab} onValueChange={setStatusTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="all" data-testid="tab-status-all">All</TabsTrigger>
+                  <TabsTrigger value="prospects" data-testid="tab-status-prospects">Prospects</TabsTrigger>
+                  <TabsTrigger value="active" data-testid="tab-status-active">Active</TabsTrigger>
+                  <TabsTrigger value="inactive" data-testid="tab-status-inactive">Inactive</TabsTrigger>
+                </TabsList>
+              </Tabs>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <Select value={customerType} onValueChange={setCustomerType}>
-                  <SelectTrigger data-testid="select-customer-type">
-                    <SelectValue placeholder="Customer Type" />
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search by name or company..."
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-search"
+                  />
+                </div>
+
+                <Select value={accountType} onValueChange={setAccountType}>
+                  <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-account-type">
+                    <SelectValue placeholder="Account Type" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="residential">Residential</SelectItem>
-                    <SelectItem value="commercial">Commercial</SelectItem>
-                    <SelectItem value="property_manager">Property Manager</SelectItem>
+                    <SelectItem value="RESIDENTIAL">Residential</SelectItem>
+                    <SelectItem value="PROPERTY_MANAGER">Property Manager</SelectItem>
+                    <SelectItem value="COMMERCIAL">Commercial</SelectItem>
                   </SelectContent>
                 </Select>
-
-                <Select value={customerStatus} onValueChange={setCustomerStatus}>
-                  <SelectTrigger data-testid="select-customer-status">
-                    <SelectValue placeholder="Customer Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="prospect">Prospect</SelectItem>
-                    <SelectItem value="client">Client</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={dateFilter} onValueChange={setDateFilter}>
-                  <SelectTrigger data-testid="select-date-filter">
-                    <SelectValue placeholder="Date Added" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="this_week">This Week</SelectItem>
-                    <SelectItem value="this_month">This Month</SelectItem>
-                    <SelectItem value="custom">Custom Range</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {dateFilter === "custom" && (
-                  <div className="flex gap-2 items-center col-span-1 sm:col-span-2 lg:col-span-1">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                          data-testid="button-date-from"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {customDateFrom ? format(customDateFrom, "MM/dd/yy") : "From"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={customDateFrom}
-                          onSelect={setCustomDateFrom}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                          data-testid="button-date-to"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {customDateTo ? format(customDateTo, "MM/dd/yy") : "To"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={customDateTo}
-                          onSelect={setCustomDateTo}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setCustomDateFrom(undefined);
-                        setCustomDateTo(undefined);
-                      }}
-                      data-testid="button-clear-dates"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
               </div>
             </div>
           </CardContent>
@@ -305,73 +271,88 @@ export default function CrmCustomers() {
               <TableHeader>
                 <TableRow className="bg-slate-50">
                   <TableHead className="font-semibold">Display Name</TableHead>
-                  <TableHead className="font-semibold">Type</TableHead>
-                  <TableHead className="font-semibold hidden md:table-cell">Full Address</TableHead>
-                  <TableHead className="font-semibold hidden sm:table-cell">Phone</TableHead>
-                  <TableHead className="font-semibold hidden lg:table-cell">Email</TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold">Account Type</TableHead>
+                  <TableHead className="font-semibold">Account Status</TableHead>
+                  <TableHead className="font-semibold hidden md:table-cell">Primary Site</TableHead>
+                  <TableHead className="font-semibold hidden lg:table-cell">Primary Contact</TableHead>
+                  <TableHead className="font-semibold hidden sm:table-cell">Customer Since</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customersLoading ? (
+                {accountsLoading ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-48" /></TableCell>
-                      <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-28" /></TableCell>
-                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-5 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-5 w-32" /></TableCell>
+                      <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
                     </TableRow>
                   ))
-                ) : customers.length === 0 ? (
+                ) : accounts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-12">
                       <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                      <p className="text-slate-500 font-medium">No customers found</p>
+                      <p className="text-slate-500 font-medium">No accounts found</p>
                       <p className="text-slate-400 text-sm mt-1">
                         Try adjusting your search or filters
                       </p>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  customers.map((customer) => (
-                    <TableRow
-                      key={customer.id}
-                      className="cursor-pointer hover:bg-slate-50 transition-colors"
-                      data-testid={`row-customer-${customer.id}`}
-                      onClick={() => navigate(`/crm/customers/${customer.id}`)}
-                    >
-                      <TableCell className="font-medium text-slate-900">
-                        {customer.name}
-                        {customer.companyName && (
-                          <span className="text-slate-500 text-sm block">
-                            {customer.companyName}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-slate-600">
-                        {formatCustomerType(customer.customerType)}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell text-slate-600 max-w-xs truncate">
-                        {customer.fullAddress || "—"}
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell text-slate-600">
-                        {customer.phone || "—"}
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell text-slate-600 max-w-xs truncate">
-                        {customer.email || "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={getStatusBadgeClass(customer.customerStatus)}
-                        >
-                          {formatCustomerStatus(customer.customerStatus)}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  accounts.map((account) => {
+                    const primaryContact = formatPrimaryContact(account.primaryContact);
+                    return (
+                      <TableRow
+                        key={account.id}
+                        className="cursor-pointer hover:bg-slate-50 transition-colors"
+                        data-testid={`row-account-${account.id}`}
+                        onClick={() => navigate(`/crm/accounts/${account.id}`)}
+                      >
+                        <TableCell className="font-medium text-slate-900">
+                          {account.displayName}
+                          {account.companyName && (
+                            <span className="text-slate-500 text-sm block">
+                              {account.companyName}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={getAccountTypeBadgeClass(account.accountType)}
+                          >
+                            {formatAccountType(account.accountType)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={getStatusBadgeClass(account.accountStatus)}
+                          >
+                            {formatAccountStatus(account.accountStatus)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-slate-600 max-w-xs truncate">
+                          {formatPrimarySite(account.primarySite)}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-slate-600">
+                          <div>
+                            <span>{primaryContact.name}</span>
+                            {primaryContact.phone && (
+                              <span className="text-slate-400 text-sm block">
+                                {primaryContact.phone}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell text-slate-600">
+                          {formatCustomerSince(account.customerSince)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -381,7 +362,7 @@ export default function CrmCustomers() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t bg-slate-50">
               <p className="text-sm text-slate-600">
                 Showing {((page - 1) * ITEMS_PER_PAGE) + 1} to{" "}
-                {Math.min(page * ITEMS_PER_PAGE, total)} of {total.toLocaleString()} customers
+                {Math.min(page * ITEMS_PER_PAGE, total)} of {total.toLocaleString()} accounts
               </p>
               <div className="flex items-center gap-2">
                 <Button
