@@ -817,6 +817,7 @@ function CustomerTabbedView({
                   variant="outline" 
                   size="sm"
                   className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
+                  onClick={() => setPropertyDialogOpen(true)}
                   data-testid="button-add-site-checklist"
                 >
                   <Plus className="h-4 w-4 mr-1" />
@@ -883,6 +884,7 @@ function CustomerTabbedView({
             <Button 
               size="sm"
               className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              onClick={() => setPropertyDialogOpen(true)}
               data-testid="button-add-site"
             >
               <Plus className="h-4 w-4 mr-1" />
@@ -901,6 +903,7 @@ function CustomerTabbedView({
                 <p className="text-slate-500 mb-4">No sites/properties added yet</p>
                 <Button 
                   className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                  onClick={() => setPropertyDialogOpen(true)}
                   data-testid="button-add-first-site"
                 >
                   <Plus className="h-4 w-4 mr-1" />
@@ -915,11 +918,9 @@ function CustomerTabbedView({
                     className="p-4 border rounded-lg hover:border-[#711419]/50 hover:bg-[#711419]/5 cursor-pointer transition-colors"
                     data-testid={`card-property-${property.id}`}
                   >
-                    <h4 className="font-medium">{property.name || "Unnamed Property"}</h4>
-                    <p className="text-sm text-slate-500 mt-1">{property.address || "No address"}</p>
-                    {property.city && property.state && (
-                      <p className="text-sm text-slate-500">{property.city}, {property.state} {property.zip}</p>
-                    )}
+                    <h4 className="font-medium">{property.address1}</h4>
+                    {property.address2 && <p className="text-sm text-slate-500">{property.address2}</p>}
+                    <p className="text-sm text-slate-500">{property.city}, {property.state} {property.zip}</p>
                   </div>
                 ))}
               </div>
@@ -1248,6 +1249,8 @@ export default function CrmCustomerDetail() {
   const [deleteReason, setDeleteReason] = useState("");
   const [noteBody, setNoteBody] = useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [propertyDialogOpen, setPropertyDialogOpen] = useState(false);
+  const [editingProperty, setEditingProperty] = useState<CrmProperty | null>(null);
   const { toast } = useToast();
 
   // Edit form state
@@ -1321,6 +1324,29 @@ export default function CrmCustomerDetail() {
     setProjDescription("");
     setProjPriority("normal");
     setProjPropertyId("");
+  };
+
+  // Property form state
+  const [propAddress1, setPropAddress1] = useState("");
+  const [propAddress2, setPropAddress2] = useState("");
+  const [propCity, setPropCity] = useState("");
+  const [propState, setPropState] = useState("");
+  const [propZip, setPropZip] = useState("");
+  const [propNotes, setPropNotes] = useState("");
+
+  const resetPropertyForm = () => {
+    setPropAddress1("");
+    setPropAddress2("");
+    setPropCity("");
+    setPropState("");
+    setPropZip("");
+    setPropNotes("");
+    setEditingProperty(null);
+  };
+
+  const handleClosePropertyDialog = () => {
+    setPropertyDialogOpen(false);
+    resetPropertyForm();
   };
 
   const resetVisitForm = () => {
@@ -1880,6 +1906,48 @@ export default function CrmCustomerDetail() {
       return;
     }
     updateCustomerMutation.mutate();
+  };
+
+  const createPropertyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/crm/customers/${customerId}/properties`, {
+        address1: propAddress1.trim(),
+        address2: propAddress2.trim() || null,
+        city: propCity.trim(),
+        state: propState.trim(),
+        zip: propZip.trim(),
+        notes: propNotes.trim() || null,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create property");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Site added successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "properties"] });
+      handleClosePropertyDialog();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to add site",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateProperty = () => {
+    if (!propAddress1.trim() || !propCity.trim() || !propState.trim() || !propZip.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Street address, city, state, and ZIP are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    createPropertyMutation.mutate();
   };
 
   const getAddressLabel = () => {
@@ -2688,6 +2756,99 @@ export default function CrmCustomerDetail() {
                 data-testid="button-save-edit"
               >
                 {updateCustomerMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Property Dialog */}
+        <Dialog open={propertyDialogOpen} onOpenChange={(open) => !open && handleClosePropertyDialog()}>
+          <DialogContent className="sm:max-w-[520px] p-0 gap-0 overflow-hidden">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b bg-slate-50 dark:bg-slate-900">
+              <DialogTitle className="text-xl font-semibold">Add Site</DialogTitle>
+              <DialogDescription className="text-slate-500">
+                Add a new site/property to this customer
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="px-6 py-5 space-y-5 max-h-[65vh] overflow-y-auto">
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 space-y-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Address</p>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Street Address <span className="text-red-500">*</span></Label>
+                  <Input
+                    placeholder="123 Main Street"
+                    value={propAddress1}
+                    onChange={(e) => setPropAddress1(e.target.value)}
+                    className="h-11"
+                    data-testid="input-prop-address1"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-slate-600 dark:text-slate-400">Apt, Suite, Unit <span className="text-slate-400 font-normal">(optional)</span></Label>
+                  <Input
+                    placeholder="Suite 100"
+                    value={propAddress2}
+                    onChange={(e) => setPropAddress2(e.target.value)}
+                    className="h-11"
+                    data-testid="input-prop-address2"
+                  />
+                </div>
+                <div className="grid grid-cols-5 gap-3">
+                  <div className="col-span-2 space-y-1.5">
+                    <Label className="text-sm font-medium">City <span className="text-red-500">*</span></Label>
+                    <Input
+                      value={propCity}
+                      onChange={(e) => setPropCity(e.target.value)}
+                      className="h-11"
+                      data-testid="input-prop-city"
+                    />
+                  </div>
+                  <div className="col-span-1 space-y-1.5">
+                    <Label className="text-sm font-medium">State <span className="text-red-500">*</span></Label>
+                    <Input
+                      value={propState}
+                      onChange={(e) => setPropState(e.target.value)}
+                      className="h-11"
+                      maxLength={2}
+                      data-testid="input-prop-state"
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1.5">
+                    <Label className="text-sm font-medium">ZIP <span className="text-red-500">*</span></Label>
+                    <Input
+                      value={propZip}
+                      onChange={(e) => setPropZip(e.target.value)}
+                      className="h-11"
+                      data-testid="input-prop-zip"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-600">Notes <span className="text-slate-400 font-normal">(optional)</span></Label>
+                <Textarea
+                  placeholder="Any additional notes about this site..."
+                  value={propNotes}
+                  onChange={(e) => setPropNotes(e.target.value)}
+                  className="min-h-[80px] resize-none"
+                  data-testid="input-prop-notes"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="px-6 py-4 border-t bg-slate-50 dark:bg-slate-900">
+              <Button variant="outline" onClick={handleClosePropertyDialog} className="px-6">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateProperty}
+                disabled={!propAddress1.trim() || !propCity.trim() || !propState.trim() || !propZip.trim() || createPropertyMutation.isPending}
+                className="px-6 bg-[#711419] hover:bg-[#5a1014]"
+                data-testid="button-save-property"
+              >
+                {createPropertyMutation.isPending ? "Saving..." : "Add Site"}
               </Button>
             </DialogFooter>
           </DialogContent>
