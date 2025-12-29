@@ -21,6 +21,7 @@ import {
   LogOut,
   Menu,
   ChevronRight,
+  FolderKanban,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
@@ -54,6 +55,7 @@ const navSections: NavSection[] = [
     items: [
       { label: "Customers", href: "/crm/customers", icon: Users },
       { label: "Jobs", href: "/crm/jobs", icon: Briefcase },
+      { label: "Projects", href: "/crm/projects", icon: FolderKanban },
       { label: "Quotes", href: "/crm/quotes", icon: FileText },
       { label: "Invoices", href: "/crm/invoices", icon: Receipt },
     ],

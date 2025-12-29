@@ -35,6 +35,7 @@ import CrmWorkOrders from "@/pages/crm/crm-work-orders";
 import CrmInvoices from "@/pages/crm/crm-invoices";
 import CrmQuotes from "@/pages/crm/crm-quotes";
 import CrmAgreements from "@/pages/crm/crm-agreements";
+import CrmProjects from "@/pages/crm/crm-projects";
 import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import GlobalPasswordGate from "@/components/GlobalPasswordGate";
@@ -87,6 +88,7 @@ function Router() {
       <Route path="/crm/invoices" component={CrmInvoices} />
       <Route path="/crm/quotes" component={CrmQuotes} />
       <Route path="/crm/agreements" component={CrmAgreements} />
+      <Route path="/crm/projects" component={CrmProjects} />
       <Route path="/crm" component={CrmDashboard} />
       <Route component={NotFound} />
     </Switch>

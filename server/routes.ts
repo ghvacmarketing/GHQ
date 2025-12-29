@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -7548,30 +7548,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // CRM PROPERTIES ROUTES
+  // ============================================
+
+  // GET /api/crm/properties - List properties (optionally filtered by customerId)
+  app.get("/api/crm/properties", requireCrmAuth, async (req, res) => {
+    try {
+      const { customerId } = req.query;
+      
+      let properties;
+      if (customerId) {
+        properties = await db.select().from(crmProperties).where(eq(crmProperties.customerId, customerId as string));
+      } else {
+        properties = await db.select().from(crmProperties);
+      }
+      
+      return res.json(properties);
+    } catch (error) {
+      console.error("Error fetching properties:", error);
+      return res.status(500).json({ message: "Failed to fetch properties" });
+    }
+  });
+
+  // ============================================
   // CRM WORK ORDER ROUTES
   // ============================================
 
   // GET /api/crm/work-orders - List work orders with optional filters
   app.get("/api/crm/work-orders", requireCrmAuth, async (req, res) => {
     try {
-      const { jobId, techId, date, status } = req.query;
+      const { jobId, techId, date, status, customerId, projectId, dateFrom, dateTo } = req.query;
 
       let workOrders: CrmWorkOrder[] = [];
 
-      if (jobId) {
+      if (customerId) {
+        workOrders = await storage.getWorkOrdersByCustomerId(customerId as string);
+      } else if (projectId) {
+        workOrders = await storage.getWorkOrdersByProjectId(projectId as string);
+      } else if (jobId) {
         workOrders = await storage.getWorkOrdersByJobId(jobId as string);
       } else if (techId && date) {
         const dateObj = new Date(date as string);
         workOrders = await storage.getWorkOrdersByTechId(techId as string, dateObj);
       } else if (techId) {
         workOrders = await storage.getWorkOrdersByTechId(techId as string);
-      } else if (date) {
-        const dateObj = new Date(date as string);
-        const startOfDay = new Date(dateObj);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(dateObj);
-        endOfDay.setHours(23, 59, 59, 999);
-        workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);
+      } else if (dateFrom || dateTo || date) {
+        let startDate: Date;
+        let endDate: Date;
+        if (dateFrom) {
+          startDate = new Date(dateFrom as string);
+          startDate.setHours(0, 0, 0, 0);
+        } else if (date) {
+          startDate = new Date(date as string);
+          startDate.setHours(0, 0, 0, 0);
+        } else {
+          startDate = new Date();
+          startDate.setHours(0, 0, 0, 0);
+        }
+        if (dateTo) {
+          endDate = new Date(dateTo as string);
+          endDate.setHours(23, 59, 59, 999);
+        } else if (date) {
+          endDate = new Date(date as string);
+          endDate.setHours(23, 59, 59, 999);
+        } else {
+          endDate = new Date();
+          endDate.setMonth(endDate.getMonth() + 1);
+          endDate.setHours(23, 59, 59, 999);
+        }
+        workOrders = await storage.getWorkOrdersByDateRange(startDate, endDate);
       } else {
         const today = new Date();
         const startOfDay = new Date(today);
@@ -7595,7 +7640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/work-orders/list - List enriched work orders with date range and filters
   app.get("/api/crm/work-orders/list", requireCrmSalesOrAbove, async (req, res) => {
     try {
-      const { dateFrom, dateTo, techId, status } = req.query;
+      const { dateFrom, dateTo, techId, status, customerId, projectId } = req.query;
 
       let startDate: Date;
       let endDate: Date;
@@ -7615,7 +7660,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         endDate.setHours(23, 59, 59, 999);
       }
 
-      let workOrders = await storage.getWorkOrdersByDateRange(startDate, endDate);
+      let workOrders: CrmWorkOrder[];
+      if (customerId) {
+        workOrders = await storage.getWorkOrdersByCustomerId(customerId as string);
+      } else if (projectId) {
+        workOrders = await storage.getWorkOrdersByProjectId(projectId as string);
+      } else {
+        workOrders = await storage.getWorkOrdersByDateRange(startDate, endDate);
+      }
 
       if (techId) {
         workOrders = workOrders.filter(wo => wo.assignedTechId === techId);
@@ -7627,12 +7679,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enrichedWorkOrders = await Promise.all(
         workOrders.map(async (wo) => {
-          const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, wo.jobId));
+          let job = null;
+          if (wo.jobId) {
+            const [j] = await db.select().from(crmJobs).where(eq(crmJobs.id, wo.jobId));
+            job = j || null;
+          }
 
           let customer = null;
-          if (job?.customerId) {
+          if (wo.customerId) {
+            const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, wo.customerId));
+            customer = cust || null;
+          } else if (job?.customerId) {
             const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, job.customerId));
             customer = cust || null;
+          }
+
+          let property = null;
+          if (wo.propertyId) {
+            const [prop] = await db.select().from(crmProperties).where(eq(crmProperties.id, wo.propertyId));
+            property = prop || null;
+          }
+
+          let project = null;
+          if (wo.projectId) {
+            const [proj] = await db.select().from(crmProjects).where(eq(crmProjects.id, wo.projectId));
+            project = proj || null;
           }
 
           let tech = null;
@@ -7643,8 +7714,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           return {
             ...wo,
-            job: job || null,
+            job,
             customer,
+            property,
+            project,
             tech,
           };
         })
@@ -7657,7 +7730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/work-orders/:id - Get single work order with job details
+  // GET /api/crm/work-orders/:id - Get single work order with related details
   app.get("/api/crm/work-orders/:id", requireCrmAuth, async (req, res) => {
     try {
       const workOrder = await storage.getWorkOrder(req.params.id);
@@ -7665,11 +7738,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Work order not found" });
       }
 
-      const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, workOrder.jobId));
+      let job = null;
+      if (workOrder.jobId) {
+        const [j] = await db.select().from(crmJobs).where(eq(crmJobs.id, workOrder.jobId));
+        job = j || null;
+      }
+
       let customer = null;
-      if (job?.customerId) {
+      if (workOrder.customerId) {
+        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, workOrder.customerId));
+        customer = cust || null;
+      } else if (job?.customerId) {
         const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, job.customerId));
         customer = cust || null;
+      }
+
+      let property = null;
+      if (workOrder.propertyId) {
+        const [prop] = await db.select().from(crmProperties).where(eq(crmProperties.id, workOrder.propertyId));
+        property = prop || null;
+      }
+
+      let project = null;
+      if (workOrder.projectId) {
+        const [proj] = await db.select().from(crmProjects).where(eq(crmProjects.id, workOrder.projectId));
+        project = proj || null;
       }
 
       let tech = null;
@@ -7680,8 +7773,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       return res.json({
         ...workOrder,
-        job: job || null,
+        job,
         customer,
+        property,
+        project,
         tech,
       });
     } catch (error) {
@@ -7690,12 +7785,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/crm/work-orders - Create work order
+  // POST /api/crm/work-orders - Create work order (standalone or linked to job/project)
   app.post("/api/crm/work-orders", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Validate required fields for standalone work orders
+      const { customerId, propertyId, jobId, projectId, title, description } = req.body;
+      
+      if (!customerId) {
+        return res.status(400).json({ message: "customerId is required" });
+      }
+      if (!propertyId) {
+        return res.status(400).json({ message: "propertyId is required" });
+      }
+
+      // Verify customer exists
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      // Verify property exists
+      const [property] = await db.select().from(crmProperties).where(eq(crmProperties.id, propertyId));
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      // If jobId is provided, verify it exists
+      if (jobId) {
+        const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, jobId));
+        if (!job) {
+          return res.status(404).json({ message: "Job not found" });
+        }
+      }
+
+      // If projectId is provided, verify it exists
+      if (projectId) {
+        const [project] = await db.select().from(crmProjects).where(eq(crmProjects.id, projectId));
+        if (!project) {
+          return res.status(404).json({ message: "Project not found" });
+        }
       }
 
       // Convert date strings to Date objects before validation
@@ -7712,16 +7845,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid work order data", errors: result.error.flatten() });
       }
 
-      const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, result.data.jobId));
-      if (!job) {
-        return res.status(404).json({ message: "Job not found" });
+      // Calculate work order number based on customer's existing work orders
+      let workOrderNumber = 1;
+      if (jobId) {
+        const existingWorkOrders = await storage.getWorkOrdersByJobId(jobId);
+        workOrderNumber = existingWorkOrders.length + 1;
+      } else {
+        const existingWorkOrders = await storage.getWorkOrdersByCustomerId(customerId);
+        workOrderNumber = existingWorkOrders.length + 1;
       }
-
-      const existingWorkOrders = await storage.getWorkOrdersByJobId(result.data.jobId);
-      const workOrderNumber = existingWorkOrders.length + 1;
 
       const workOrder = await storage.createWorkOrder({
         ...result.data,
+        customerId,
+        propertyId,
+        jobId: jobId || null,
+        projectId: projectId || null,
+        title: title || null,
+        description: description || null,
         workOrderNumber,
       });
 
@@ -7730,7 +7871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "work_order.created",
         "work_order",
         workOrder.id,
-        { jobId: workOrder.jobId, workOrderNumber },
+        { customerId, propertyId, jobId: workOrder.jobId, projectId: workOrder.projectId, workOrderNumber },
         req.ip
       );
 
@@ -7741,7 +7882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH /api/crm/work-orders/:id - Update work order
+  // PATCH /api/crm/work-orders/:id - Update work order (including project linking)
   app.patch("/api/crm/work-orders/:id", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -7764,6 +7905,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         techNotes: true,
         startedAt: true,
         completedAt: true,
+        projectId: true,
+        title: true,
+        description: true,
+        priority: true,
+        visitType: true,
       });
 
       const result = allowedFields.safeParse(req.body);
@@ -7774,7 +7920,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, checklist, partsUsed, startedAt, completedAt } = result.data;
+      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, checklist, partsUsed, startedAt, completedAt, projectId, title, description, priority, visitType } = result.data;
+
+      // If projectId is provided (not null), verify it exists
+      if (projectId !== undefined && projectId !== null) {
+        const [project] = await db.select().from(crmProjects).where(eq(crmProjects.id, projectId));
+        if (!project) {
+          return res.status(404).json({ message: "Project not found" });
+        }
+      }
 
       const updateData: Partial<InsertCrmWorkOrder> = {};
       if (status !== undefined) updateData.status = status;
@@ -7786,6 +7940,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (partsUsed !== undefined) updateData.partsUsed = partsUsed;
       if (startedAt !== undefined) updateData.startedAt = startedAt ? new Date(startedAt) : null;
       if (completedAt !== undefined) updateData.completedAt = completedAt ? new Date(completedAt) : null;
+      if (projectId !== undefined) updateData.projectId = projectId;
+      if (title !== undefined) updateData.title = title;
+      if (description !== undefined) updateData.description = description;
+      if (priority !== undefined) updateData.priority = priority;
+      if (visitType !== undefined) updateData.visitType = visitType;
 
       const workOrder = await storage.updateWorkOrder(req.params.id, updateData);
 
@@ -7843,6 +8002,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/crm/dispatch/work-orders", requireCrmAuth, async (req, res) => {
     try {
       const dateParam = req.query.date as string;
+      const statusParam = req.query.status as string;
       const date = dateParam ? new Date(dateParam) : new Date();
 
       const startOfDay = new Date(date);
@@ -7850,16 +8010,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);
+      let workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);
+      
+      if (statusParam) {
+        workOrders = workOrders.filter(wo => wo.status === statusParam);
+      }
 
       const enrichedWorkOrders = await Promise.all(
         workOrders.map(async (wo) => {
-          const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, wo.jobId));
+          let job = null;
+          if (wo.jobId) {
+            const [j] = await db.select().from(crmJobs).where(eq(crmJobs.id, wo.jobId));
+            job = j || null;
+          }
 
           let customer = null;
-          if (job?.customerId) {
+          if (wo.customerId) {
+            const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, wo.customerId));
+            customer = cust || null;
+          } else if (job?.customerId) {
             const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, job.customerId));
             customer = cust || null;
+          }
+
+          let property = null;
+          if (wo.propertyId) {
+            const [prop] = await db.select().from(crmProperties).where(eq(crmProperties.id, wo.propertyId));
+            property = prop || null;
+          }
+
+          let project = null;
+          if (wo.projectId) {
+            const [proj] = await db.select().from(crmProjects).where(eq(crmProjects.id, wo.projectId));
+            project = proj || null;
           }
 
           let tech = null;
@@ -7870,8 +8053,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           return {
             ...wo,
-            job: job || null,
+            job,
             customer,
+            property,
+            project,
             tech,
           };
         })
@@ -8178,6 +8363,354 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error importing agreements:", error);
       return res.status(500).json({ message: "Failed to import agreements" });
+    }
+  });
+
+  // ============================================
+  // CRM PROJECTS ROUTES
+  // ============================================
+
+  // GET /api/crm/projects - List all projects with filters
+  app.get("/api/crm/projects", requireCrmAuth, async (req, res) => {
+    try {
+      const { status, customerId, hasUpcomingWorkOrders, noWorkOrdersYet, agingApproved, page = "1", limit = "25" } = req.query;
+      const pageNum = parseInt(page as string, 10) || 1;
+      const limitNum = parseInt(limit as string, 10) || 25;
+      const offset = (pageNum - 1) * limitNum;
+
+      const conditions = [];
+
+      if (status) {
+        const statuses = (status as string).split(",");
+        if (statuses.length === 1) {
+          conditions.push(eq(crmProjects.status, statuses[0]));
+        } else {
+          conditions.push(inArray(crmProjects.status, statuses));
+        }
+      }
+
+      if (customerId) {
+        conditions.push(eq(crmProjects.customerId, customerId as string));
+      }
+
+      let query = db.select().from(crmProjects);
+      let countQuery = db.select({ count: count() }).from(crmProjects);
+
+      if (conditions.length > 0) {
+        const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+        query = query.where(whereClause!) as typeof query;
+        countQuery = countQuery.where(whereClause!) as typeof countQuery;
+      }
+
+      const [totalResult] = await countQuery;
+      const total = totalResult?.count || 0;
+
+      let projects = await query
+        .orderBy(desc(crmProjects.createdAt))
+        .limit(limitNum)
+        .offset(offset);
+
+      const enrichedProjects = await Promise.all(
+        projects.map(async (project) => {
+          let customer = null;
+          if (project.customerId) {
+            const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, project.customerId));
+            customer = cust || null;
+          }
+
+          const workOrdersForProject = await db
+            .select()
+            .from(crmWorkOrders)
+            .where(eq(crmWorkOrders.projectId, project.id));
+
+          const workOrderCount = workOrdersForProject.length;
+          const upcomingWorkOrders = workOrdersForProject.filter(
+            (wo) => wo.scheduledStart && new Date(wo.scheduledStart) > new Date()
+          );
+          const hasUpcoming = upcomingWorkOrders.length > 0;
+
+          return {
+            ...project,
+            customerName: customer?.displayName || null,
+            customer,
+            workOrderCount,
+            hasUpcomingWorkOrders: hasUpcoming,
+          };
+        })
+      );
+
+      let filteredProjects = enrichedProjects;
+
+      if (hasUpcomingWorkOrders === "true") {
+        filteredProjects = filteredProjects.filter((p) => p.hasUpcomingWorkOrders);
+      }
+
+      if (noWorkOrdersYet === "true") {
+        filteredProjects = filteredProjects.filter((p) => p.workOrderCount === 0);
+      }
+
+      if (agingApproved) {
+        const daysAgo = parseInt(agingApproved as string, 10);
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+        filteredProjects = filteredProjects.filter(
+          (p) =>
+            p.status === "approved" &&
+            p.workOrderCount === 0 &&
+            p.approvedAt &&
+            new Date(p.approvedAt) < cutoffDate
+        );
+      }
+
+      return res.json({
+        projects: filteredProjects,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(Number(total) / limitNum),
+          hasNextPage: pageNum * limitNum < Number(total),
+          hasPrevPage: pageNum > 1,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+      return res.status(500).json({ message: "Failed to fetch projects" });
+    }
+  });
+
+  // GET /api/crm/projects/:id - Get single project with related work orders
+  app.get("/api/crm/projects/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const [project] = await db
+        .select()
+        .from(crmProjects)
+        .where(eq(crmProjects.id, req.params.id));
+
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      let customer = null;
+      if (project.customerId) {
+        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, project.customerId));
+        customer = cust || null;
+      }
+
+      let property = null;
+      if (project.propertyId) {
+        const [prop] = await db.select().from(crmProperties).where(eq(crmProperties.id, project.propertyId));
+        property = prop || null;
+      }
+
+      const workOrders = await db
+        .select()
+        .from(crmWorkOrders)
+        .where(eq(crmWorkOrders.projectId, project.id))
+        .orderBy(desc(crmWorkOrders.scheduledStart));
+
+      return res.json({
+        ...project,
+        customerName: customer?.displayName || null,
+        customer,
+        property,
+        workOrders,
+        workOrderCount: workOrders.length,
+      });
+    } catch (error) {
+      console.error("Error fetching project:", error);
+      return res.status(500).json({ message: "Failed to fetch project" });
+    }
+  });
+
+  // POST /api/crm/projects - Create new project
+  app.post("/api/crm/projects", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const result = insertCrmProjectSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid project data",
+          errors: result.error.flatten(),
+        });
+      }
+
+      const [project] = await db.insert(crmProjects).values(result.data).returning();
+
+      await logCrmAudit(
+        user.id,
+        "project.created",
+        "project",
+        project.id,
+        { title: project.title, projectType: project.projectType },
+        req.ip
+      );
+
+      return res.status(201).json(project);
+    } catch (error) {
+      console.error("Error creating project:", error);
+      return res.status(500).json({ message: "Failed to create project" });
+    }
+  });
+
+  // PATCH /api/crm/projects/:id - Update project
+  app.patch("/api/crm/projects/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [existing] = await db
+        .select()
+        .from(crmProjects)
+        .where(eq(crmProjects.id, req.params.id));
+
+      if (!existing) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const allowedFields = insertCrmProjectSchema.partial();
+      const result = allowedFields.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid request body",
+          errors: result.error.flatten().fieldErrors,
+        });
+      }
+
+      const [updated] = await db
+        .update(crmProjects)
+        .set({ ...result.data, updatedAt: new Date() })
+        .where(eq(crmProjects.id, req.params.id))
+        .returning();
+
+      await logCrmAudit(
+        user.id,
+        "project.updated",
+        "project",
+        req.params.id,
+        { updates: Object.keys(result.data) },
+        req.ip
+      );
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating project:", error);
+      return res.status(500).json({ message: "Failed to update project" });
+    }
+  });
+
+  // PATCH /api/crm/projects/:id/status - Update project status (pipeline transitions)
+  app.patch("/api/crm/projects/:id/status", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { status } = req.body;
+      if (!status || !projectStatusEnum.includes(status)) {
+        return res.status(400).json({
+          message: "Invalid status",
+          validStatuses: projectStatusEnum,
+        });
+      }
+
+      const [existing] = await db
+        .select()
+        .from(crmProjects)
+        .where(eq(crmProjects.id, req.params.id));
+
+      if (!existing) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const updateData: Partial<InsertCrmProject> & { updatedAt: Date } = {
+        status,
+        updatedAt: new Date(),
+      };
+
+      if (status === "proposal_sent" && !existing.proposalSentAt) {
+        updateData.proposalSentAt = new Date();
+      } else if (status === "approved" && !existing.approvedAt) {
+        updateData.approvedAt = new Date();
+      } else if (status === "completed" && !existing.completedAt) {
+        updateData.completedAt = new Date();
+      } else if (status === "closed" && !existing.closedAt) {
+        updateData.closedAt = new Date();
+      }
+
+      const [updated] = await db
+        .update(crmProjects)
+        .set(updateData)
+        .where(eq(crmProjects.id, req.params.id))
+        .returning();
+
+      await logCrmAudit(
+        user.id,
+        "project.status_changed",
+        "project",
+        req.params.id,
+        { previousStatus: existing.status, newStatus: status },
+        req.ip
+      );
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating project status:", error);
+      return res.status(500).json({ message: "Failed to update project status" });
+    }
+  });
+
+  // DELETE /api/crm/projects/:id - Delete project
+  app.delete("/api/crm/projects/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [existing] = await db
+        .select()
+        .from(crmProjects)
+        .where(eq(crmProjects.id, req.params.id));
+
+      if (!existing) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const linkedWorkOrders = await db
+        .select()
+        .from(crmWorkOrders)
+        .where(eq(crmWorkOrders.projectId, req.params.id));
+
+      if (linkedWorkOrders.length > 0) {
+        await db
+          .update(crmWorkOrders)
+          .set({ projectId: null })
+          .where(eq(crmWorkOrders.projectId, req.params.id));
+      }
+
+      await db.delete(crmProjects).where(eq(crmProjects.id, req.params.id));
+
+      await logCrmAudit(
+        user.id,
+        "project.deleted",
+        "project",
+        req.params.id,
+        { title: existing.title, unlinkedWorkOrders: linkedWorkOrders.length },
+        req.ip
+      );
+
+      return res.json({ message: "Project deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      return res.status(500).json({ message: "Failed to delete project" });
     }
   });
 

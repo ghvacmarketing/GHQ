@@ -208,6 +208,8 @@ export interface IStorage {
   createWorkOrder(data: InsertCrmWorkOrder): Promise<CrmWorkOrder>;
   getWorkOrder(id: string): Promise<CrmWorkOrder | undefined>;
   getWorkOrdersByJobId(jobId: string): Promise<CrmWorkOrder[]>;
+  getWorkOrdersByCustomerId(customerId: string): Promise<CrmWorkOrder[]>;
+  getWorkOrdersByProjectId(projectId: string): Promise<CrmWorkOrder[]>;
   getWorkOrdersByDateRange(startDate: Date, endDate: Date): Promise<CrmWorkOrder[]>;
   getWorkOrdersByTechId(techId: string, date?: Date): Promise<CrmWorkOrder[]>;
   updateWorkOrder(id: string, data: Partial<InsertCrmWorkOrder>): Promise<CrmWorkOrder | undefined>;
@@ -1535,6 +1537,22 @@ export class DatabaseStorage implements IStorage {
       .from(crmWorkOrders)
       .where(eq(crmWorkOrders.jobId, jobId))
       .orderBy(asc(crmWorkOrders.workOrderNumber));
+  }
+
+  async getWorkOrdersByCustomerId(customerId: string): Promise<CrmWorkOrder[]> {
+    return await db
+      .select()
+      .from(crmWorkOrders)
+      .where(eq(crmWorkOrders.customerId, customerId))
+      .orderBy(desc(crmWorkOrders.scheduledStart));
+  }
+
+  async getWorkOrdersByProjectId(projectId: string): Promise<CrmWorkOrder[]> {
+    return await db
+      .select()
+      .from(crmWorkOrders)
+      .where(eq(crmWorkOrders.projectId, projectId))
+      .orderBy(asc(crmWorkOrders.scheduledStart));
   }
 
   async getWorkOrdersByDateRange(startDate: Date, endDate: Date): Promise<CrmWorkOrder[]> {

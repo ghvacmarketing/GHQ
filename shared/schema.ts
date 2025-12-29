@@ -850,11 +850,19 @@ export const crmEquipment = pgTable("crm_equipment", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Job Status Enum
+// Job Status Enum (legacy - kept for compatibility)
 export const crmJobStatusEnum = ["new", "scheduled", "dispatched", "en_route", "on_site", "completed", "invoiced", "paid", "cancelled"] as const;
 export type CrmJobStatus = typeof crmJobStatusEnum[number];
 
-// WorkOrder Status Enum  
+// Project Status Enum (pipeline-style)
+export const projectStatusEnum = ["lead", "proposal_sent", "approved", "in_progress", "completed", "closed", "archived"] as const;
+export type ProjectStatus = typeof projectStatusEnum[number];
+
+// Project Type Enum
+export const projectTypeEnum = ["INSTALL", "DUCT", "COMMERCIAL", "MAINTENANCE_AGREEMENT", "MAJOR_REPAIR"] as const;
+export type ProjectType = typeof projectTypeEnum[number];
+
+// WorkOrder Status Enum (dispatch-style)
 export const workOrderStatusEnum = ["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"] as const;
 export type WorkOrderStatus = typeof workOrderStatusEnum[number];
 
@@ -876,20 +884,46 @@ export const crmJobs = pgTable("crm_jobs", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// CRM Work Orders (scheduled visits linked to jobs)
+// CRM Projects (big-ticket scope containers - $5k+ jobs)
+export const crmProjects = pgTable("crm_projects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => crmCustomers.id),
+  propertyId: varchar("property_id").references(() => crmProperties.id),
+  projectType: text("project_type").$type<ProjectType>().notNull(),
+  status: text("status").$type<ProjectStatus>().notNull().default("lead"),
+  title: text("title").notNull(),
+  description: text("description"),
+  expectedValue: decimal("expected_value", { precision: 10, scale: 2 }),
+  actualValue: decimal("actual_value", { precision: 10, scale: 2 }),
+  priority: text("priority").$type<"low" | "normal" | "high" | "urgent">().default("normal"),
+  proposalSentAt: timestamp("proposal_sent_at"),
+  approvedAt: timestamp("approved_at"),
+  completedAt: timestamp("completed_at"),
+  closedAt: timestamp("closed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CRM Work Orders (standalone scheduled visits - can optionally link to projects)
 // Work Order Visit Types
 export const workOrderVisitTypeEnum = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
 export type WorkOrderVisitType = typeof workOrderVisitTypeEnum[number];
 
 export const crmWorkOrders = pgTable("crm_work_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  jobId: varchar("job_id").notNull().references(() => crmJobs.id, { onDelete: "cascade" }),
+  customerId: varchar("customer_id").references(() => crmCustomers.id),
+  propertyId: varchar("property_id").references(() => crmProperties.id),
+  projectId: varchar("project_id").references(() => crmProjects.id, { onDelete: "set null" }),
+  jobId: varchar("job_id").references(() => crmJobs.id, { onDelete: "set null" }),
   workOrderNumber: integer("work_order_number").notNull().default(1),
   assignedTechId: varchar("assigned_tech_id").references(() => crmUsers.id),
   visitType: text("visit_type").$type<WorkOrderVisitType>().default("SERVICE"),
+  title: text("title"),
+  description: text("description"),
   scheduledStart: timestamp("scheduled_start"),
   scheduledEnd: timestamp("scheduled_end"),
   status: text("status").$type<WorkOrderStatus>().notNull().default("scheduled"),
+  priority: text("priority").$type<"low" | "normal" | "high" | "urgent">().default("normal"),
   checklist: json("checklist").$type<{ item: string; completed: boolean }[]>(),
   partsUsed: json("parts_used").$type<{ partId: string; name: string; qty: number; price: number }[]>(),
   techNotes: text("tech_notes"),
@@ -1301,6 +1335,12 @@ export const insertCrmJobSchema = createInsertSchema(crmJobs).omit({
   updatedAt: true,
 });
 
+export const insertCrmProjectSchema = createInsertSchema(crmProjects).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertCrmInvoiceSchema = createInsertSchema(crmInvoices).omit({
   id: true,
   createdAt: true,
@@ -1342,6 +1382,8 @@ export type InsertCrmEquipment = z.infer<typeof insertCrmEquipmentSchema>;
 export type CrmEquipmentItem = typeof crmEquipment.$inferSelect;
 export type InsertCrmJob = z.infer<typeof insertCrmJobSchema>;
 export type CrmJob = typeof crmJobs.$inferSelect;
+export type InsertCrmProject = z.infer<typeof insertCrmProjectSchema>;
+export type CrmProject = typeof crmProjects.$inferSelect;
 export type CrmJobAssignment = typeof crmJobAssignments.$inferSelect;
 export type CrmJobStatusEvent = typeof crmJobStatusEvents.$inferSelect;
 export type CrmJobNote = typeof crmJobNotes.$inferSelect;

@@ -32,6 +32,11 @@ Preferred communication style: Simple, everyday language.
 - **Announcement System**: Admin-configurable modal for user notifications with Markdown support.
 - **Sales Prospects**: CRM pipeline with lead management, notes, tasks, CSV import/export, phone/email validation, Geoapify address autocomplete, and HTML5 geolocation.
 - **Installation Pipeline**: Kanban board for tracking installation jobs, integrating with sales leads. Features drag-and-drop, optimistic updates, and mobile-first design.
+- **Projects vs Work Orders Architecture**: Separated scheduling from pipeline tracking:
+  - **Projects** (`crmProjects`): Big-ticket scope containers ($5k+) with pipeline statuses (Lead → Proposal Sent → Approved → In Progress → Completed → Closed → Archived). Project types: INSTALL, DUCT, COMMERCIAL, MAINTENANCE_AGREEMENT, MAJOR_REPAIR. Can contain multiple Work Orders.
+  - **Work Orders** (`crmWorkOrders`): Scheduled visits/appointments with dispatch statuses (Scheduled → Dispatched → En Route → On Site → Completed). Visit types: SERVICE, INSTALL, MAINTENANCE, SALES. Can exist independently or be linked to Projects. Each work order belongs to a customer and property.
+  - Projects and Work Orders are independent but linkable - Work Orders have optional `projectId` foreign key.
+  - Dispatch Board shows Work Orders only. Projects page shows the pipeline view with filtering.
 - **Customer Database**: FieldEdge CSV import system with checksum-based upsert for syncing customer data. Auto-syncs from Google Sheets every 10 minutes with two-way sync (add, update, delete). Integrates customer lookup into lead forms and quote generation.
 - **AI Quote Generation**: Uses OpenAI GPT-5.2 with structured outputs (strict json_schema) for consistent, sales-ready quotes. Features conversation memory with rolling summaries (last 10 messages stored in database), and optional knowledge base integration via vector store file_search to enhance product descriptions from uploaded sales PDFs.
 - **Vector Store Knowledge Base**: Optional feature that uploads sales books and product documentation to OpenAI vector stores for enhanced quote generation. Gracefully degrades when API is not available. Admin endpoints for file management.

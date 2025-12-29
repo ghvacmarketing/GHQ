@@ -53,8 +53,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote } from "@shared/schema";
-import { workOrderVisitTypeEnum, type WorkOrderVisitType } from "@shared/schema";
+import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus } from "@shared/schema";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -571,6 +571,7 @@ export default function CrmCustomerDetail() {
   const customerId = params.id;
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [scheduleVisitDialogOpen, setScheduleVisitDialogOpen] = useState(false);
+  const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleteReason, setDeleteReason] = useState("");
@@ -599,8 +600,28 @@ export default function CrmCustomerDetail() {
   const [descriptionError, setDescriptionError] = useState<string>("");
 
   // Form state for Create Work Order dialog
+  const [woTitle, setWoTitle] = useState<string>("");
+  const [woVisitType, setWoVisitType] = useState<WorkOrderVisitType>("SERVICE");
+  const [woPropertyId, setWoPropertyId] = useState<string>("");
+  const [woProjectId, setWoProjectId] = useState<string>("");
+  const [woDate, setWoDate] = useState<Date | undefined>(new Date());
+  const [woStartTime, setWoStartTime] = useState<string>("08:00");
+  const [woEndTime, setWoEndTime] = useState<string>("10:00");
+  const [woTechId, setWoTechId] = useState<string>("unassigned");
+  const [woDescription, setWoDescription] = useState<string>("");
+  const [woPriority, setWoPriority] = useState<string>("normal");
+
+  // Form state for Create Project dialog
+  const [projTitle, setProjTitle] = useState<string>("");
+  const [projType, setProjType] = useState<ProjectType>("INSTALL");
+  const [projExpectedValue, setProjExpectedValue] = useState<string>("");
+  const [projDescription, setProjDescription] = useState<string>("");
+  const [projPriority, setProjPriority] = useState<string>("normal");
+  const [projPropertyId, setProjPropertyId] = useState<string>("");
+
+  // Legacy form state for Create Work Order dialog (backward compatible)
   const [visitJobId, setVisitJobId] = useState<string>("");
-  const [visitType, setVisitType] = useState<WorkOrderVisitType>("initial");
+  const [visitType, setVisitType] = useState<WorkOrderVisitType>("SERVICE");
   const [visitDate, setVisitDate] = useState<Date | undefined>(new Date());
   const [visitStartTime, setVisitStartTime] = useState<string>("08:00");
   const [visitEndTime, setVisitEndTime] = useState<string>("10:00");
@@ -609,9 +630,31 @@ export default function CrmCustomerDetail() {
   const [newJobTypeForVisit, setNewJobTypeForVisit] = useState<string>("SERVICE");
   const [newJobDescForVisit, setNewJobDescForVisit] = useState<string>("");
 
+  const resetWoForm = () => {
+    setWoTitle("");
+    setWoVisitType("SERVICE");
+    setWoPropertyId("");
+    setWoProjectId("");
+    setWoDate(new Date());
+    setWoStartTime("08:00");
+    setWoEndTime("10:00");
+    setWoTechId("unassigned");
+    setWoDescription("");
+    setWoPriority("normal");
+  };
+
+  const resetProjForm = () => {
+    setProjTitle("");
+    setProjType("INSTALL");
+    setProjExpectedValue("");
+    setProjDescription("");
+    setProjPriority("normal");
+    setProjPropertyId("");
+  };
+
   const resetVisitForm = () => {
     setVisitJobId("");
-    setVisitType("initial");
+    setVisitType("SERVICE");
     setVisitDate(new Date());
     setVisitStartTime("08:00");
     setVisitEndTime("10:00");
@@ -676,6 +719,52 @@ export default function CrmCustomerDetail() {
       return res.json();
     },
     enabled: !!currentUser && !!customerId,
+  });
+
+  // Fetch CRM Projects for this customer
+  interface ProjectWithDetails extends CrmProject {
+    customerName?: string;
+    propertyAddress?: string;
+    workOrderCount?: number;
+  }
+
+  const { data: crmProjects, isLoading: projectsLoading } = useQuery<ProjectWithDetails[]>({
+    queryKey: ["/api/crm/projects", { customerId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/projects?customerId=${customerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch projects");
+      return res.json();
+    },
+    enabled: !!currentUser && !!customerId,
+  });
+
+  // Fetch CRM Work Orders for this customer
+  interface WorkOrderWithDetails extends CrmWorkOrder {
+    customerName?: string;
+    propertyAddress?: string;
+    assignedTechName?: string;
+    projectTitle?: string;
+  }
+
+  const { data: crmWorkOrders, isLoading: workOrdersLoading } = useQuery<WorkOrderWithDetails[]>({
+    queryKey: ["/api/crm/work-orders/list", { customerId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/work-orders/list?customerId=${customerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch work orders");
+      return res.json();
+    },
+    enabled: !!currentUser && !!customerId,
+  });
+
+  // Fetch customer properties for dialogs
+  const { data: customerProperties } = useQuery<CrmProperty[]>({
+    queryKey: ["/api/crm/customers", customerId, "properties"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${customerId}/properties`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentUser && !!customerId && (createProjectDialogOpen || scheduleVisitDialogOpen),
   });
 
   interface CustomerImpact {
@@ -848,6 +937,125 @@ export default function CrmCustomerDetail() {
   };
 
   const isVisitFormValid = visitDate && (visitJobId || (createNewJobForVisit && newJobTypeForVisit));
+
+  // Create CRM Project mutation
+  const createProjectMutation = useMutation({
+    mutationFn: async () => {
+      if (!projTitle.trim()) throw new Error("Title is required");
+      if (!projType) throw new Error("Project type is required");
+
+      const res = await apiRequest("POST", "/api/crm/projects", {
+        customerId,
+        propertyId: projPropertyId || null,
+        title: projTitle.trim(),
+        projectType: projType,
+        description: projDescription.trim() || null,
+        expectedValue: projExpectedValue ? projExpectedValue : null,
+        priority: projPriority,
+        status: "lead",
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create project");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Project created successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", { customerId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
+      setCreateProjectDialogOpen(false);
+      resetProjForm();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create project",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmitProject = () => {
+    if (projTitle.trim() && projType) {
+      createProjectMutation.mutate();
+    }
+  };
+
+  const handleCloseProjectDialog = () => {
+    setCreateProjectDialogOpen(false);
+    resetProjForm();
+  };
+
+  const isProjFormValid = projTitle.trim() && projType;
+
+  // Create standalone Work Order mutation
+  const createWorkOrderMutation = useMutation({
+    mutationFn: async () => {
+      if (!woDate) throw new Error("Date is required");
+
+      const [hours, minutes] = woStartTime.split(":").map(Number);
+      const scheduledStart = new Date(woDate);
+      scheduledStart.setHours(hours, minutes, 0, 0);
+      
+      const [endHours, endMinutes] = woEndTime.split(":").map(Number);
+      const scheduledEnd = new Date(woDate);
+      scheduledEnd.setHours(endHours, endMinutes, 0, 0);
+
+      const res = await apiRequest("POST", "/api/crm/work-orders", {
+        customerId,
+        propertyId: woPropertyId || null,
+        projectId: woProjectId || null,
+        title: woTitle.trim() || null,
+        visitType: woVisitType,
+        description: woDescription.trim() || null,
+        scheduledStart: scheduledStart.toISOString(),
+        scheduledEnd: scheduledEnd.toISOString(),
+        assignedTechId: woTechId !== "unassigned" ? woTechId : null,
+        priority: woPriority,
+        status: "scheduled",
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create work order");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Work order created successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list", { customerId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+      setScheduleVisitDialogOpen(false);
+      resetWoForm();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create work order",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmitWorkOrder = () => {
+    if (woDate && woPropertyId) {
+      createWorkOrderMutation.mutate();
+    } else if (!woPropertyId) {
+      toast({
+        title: "Property required",
+        description: "Please select a property for the work order",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCloseWoDialog = () => {
+    setScheduleVisitDialogOpen(false);
+    resetWoForm();
+  };
+
+  const isWoFormValid = woDate && woPropertyId;
 
   const deleteJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
@@ -1062,7 +1270,7 @@ export default function CrmCustomerDetail() {
             Back to Customers
           </Button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button 
               variant="outline"
               onClick={openEditDialog}
@@ -1072,12 +1280,12 @@ export default function CrmCustomerDetail() {
               Edit Customer
             </Button>
             <Button 
-              onClick={() => setCreateDialogOpen(true)}
+              onClick={() => setCreateProjectDialogOpen(true)}
               className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              data-testid="button-new-job"
+              data-testid="button-create-project"
             >
               <Briefcase className="h-4 w-4 mr-2" />
-              New Project
+              Create Project
             </Button>
             <Button 
               onClick={() => setScheduleVisitDialogOpen(true)}
@@ -1086,6 +1294,14 @@ export default function CrmCustomerDetail() {
             >
               <CalendarPlus className="h-4 w-4 mr-2" />
               Create Work Order
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => setCreateDialogOpen(true)}
+              data-testid="button-new-job"
+            >
+              <Briefcase className="h-4 w-4 mr-2" />
+              New Job (Legacy)
             </Button>
             {canDeleteCustomer && (
               <Button 
@@ -1258,92 +1474,99 @@ export default function CrmCustomerDetail() {
             </DialogContent>
         </Dialog>
 
-        {/* Create Work Order Dialog */}
-        <Dialog open={scheduleVisitDialogOpen} onOpenChange={(open) => !open && handleCloseVisitDialog()}>
-          <DialogContent className="sm:max-w-[550px]">
+        {/* Create Work Order Dialog (Standalone) */}
+        <Dialog open={scheduleVisitDialogOpen} onOpenChange={(open) => !open && handleCloseWoDialog()}>
+          <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create Work Order</DialogTitle>
               <DialogDescription>
-                Schedule a visit for {customer.name}. Work orders must be linked to a project.
+                Schedule a work order for {customer.name}. Optionally link to a project.
               </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-4 py-4">
-              {/* Project Selection */}
+              {/* Title */}
               <div className="space-y-2">
-                <Label>Select Project *</Label>
-                <Select 
-                  value={createNewJobForVisit ? "new" : visitJobId} 
-                  onValueChange={(value) => {
-                    if (value === "new") {
-                      setCreateNewJobForVisit(true);
-                      setVisitJobId("");
-                    } else {
-                      setCreateNewJobForVisit(false);
-                      setVisitJobId(value);
-                    }
-                  }}
-                >
-                  <SelectTrigger data-testid="select-visit-job">
-                    <SelectValue placeholder="Select a project or create new" />
+                <Label>Title</Label>
+                <Input
+                  placeholder="Work order title..."
+                  value={woTitle}
+                  onChange={(e) => setWoTitle(e.target.value)}
+                  data-testid="input-wo-title"
+                />
+              </div>
+
+              {/* Property Selection */}
+              <div className="space-y-2">
+                <Label>Property *</Label>
+                <Select value={woPropertyId} onValueChange={setWoPropertyId}>
+                  <SelectTrigger data-testid="select-wo-property">
+                    <SelectValue placeholder="Select property" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="new" data-testid="visit-job-new">
-                      + Create New Project
+                    {customerProperties?.map((prop) => (
+                      <SelectItem key={prop.id} value={prop.id} data-testid={`wo-property-${prop.id}`}>
+                        {prop.name || prop.address || `Property ${prop.id.slice(-4)}`}
+                      </SelectItem>
+                    ))}
+                    {(!customerProperties || customerProperties.length === 0) && (
+                      <div className="px-2 py-1 text-sm text-slate-500">No properties found</div>
+                    )}
+                  </SelectContent>
+                </Select>
+                {(!customerProperties || customerProperties.length === 0) && (
+                  <p className="text-xs text-amber-600">⚠ Add a property to this customer first</p>
+                )}
+              </div>
+
+              {/* Link to Project (optional) */}
+              <div className="space-y-2">
+                <Label>Link to Project (optional)</Label>
+                <Select value={woProjectId} onValueChange={setWoProjectId}>
+                  <SelectTrigger data-testid="select-wo-project">
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="" data-testid="wo-project-none">
+                      No project
                     </SelectItem>
-                    {jobs?.map((job) => (
-                      <SelectItem key={job.id} value={job.id} data-testid={`visit-job-${job.id}`}>
-                        {job.jobType} - {job.description?.slice(0, 30) || "No description"}{job.description && job.description.length > 30 ? "..." : ""}
+                    {crmProjects?.filter(p => p.status !== "archived").map((proj) => (
+                      <SelectItem key={proj.id} value={proj.id} data-testid={`wo-project-${proj.id}`}>
+                        {proj.title} ({proj.projectType})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* New Project Fields (if creating new) */}
-              {createNewJobForVisit && (
-                <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
-                  <p className="text-sm font-medium text-slate-700">New Project Details</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Job Type *</Label>
-                      <Select value={newJobTypeForVisit} onValueChange={setNewJobTypeForVisit}>
-                        <SelectTrigger data-testid="select-new-visit-job-type">
-                          <SelectValue placeholder="Select job type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {JOB_TYPES.map((type) => (
-                            <SelectItem key={type} value={type} data-testid={`new-visit-job-type-${type}`}>
-                              {type}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Description</Label>
-                      <Input
-                        placeholder="Project description..."
-                        value={newJobDescForVisit}
-                        onChange={(e) => setNewJobDescForVisit(e.target.value)}
-                        data-testid="input-new-visit-job-desc"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Visit Type */}
               <div className="space-y-2">
                 <Label>Visit Type *</Label>
-                <Select value={visitType} onValueChange={(v) => setVisitType(v as WorkOrderVisitType)}>
-                  <SelectTrigger data-testid="select-visit-type">
+                <Select value={woVisitType} onValueChange={(v) => setWoVisitType(v as WorkOrderVisitType)}>
+                  <SelectTrigger data-testid="select-wo-visit-type">
                     <SelectValue placeholder="Select visit type" />
                   </SelectTrigger>
                   <SelectContent>
                     {workOrderVisitTypeEnum.map((type) => (
-                      <SelectItem key={type} value={type} data-testid={`visit-type-${type}`}>
+                      <SelectItem key={type} value={type} data-testid={`wo-visit-type-${type}`}>
                         {type.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Priority */}
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select value={woPriority} onValueChange={setWoPriority}>
+                  <SelectTrigger data-testid="select-wo-priority">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORITIES.map((p) => (
+                      <SelectItem key={p} value={p} className="capitalize" data-testid={`wo-priority-${p}`}>
+                        {p.charAt(0).toUpperCase() + p.slice(1)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1360,19 +1583,19 @@ export default function CrmCustomerDetail() {
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal",
-                          !visitDate && "text-muted-foreground"
+                          !woDate && "text-muted-foreground"
                         )}
-                        data-testid="button-visit-date"
+                        data-testid="button-wo-date"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {visitDate ? format(visitDate, "MMM d") : "Pick"}
+                        {woDate ? format(woDate, "MMM d") : "Pick"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <CalendarComponent
                         mode="single"
-                        selected={visitDate}
-                        onSelect={setVisitDate}
+                        selected={woDate}
+                        onSelect={setWoDate}
                         initialFocus
                       />
                     </PopoverContent>
@@ -1382,18 +1605,18 @@ export default function CrmCustomerDetail() {
                   <Label>Start Time</Label>
                   <Input
                     type="time"
-                    value={visitStartTime}
-                    onChange={(e) => setVisitStartTime(e.target.value)}
-                    data-testid="input-visit-start-time"
+                    value={woStartTime}
+                    onChange={(e) => setWoStartTime(e.target.value)}
+                    data-testid="input-wo-start-time"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>End Time</Label>
                   <Input
                     type="time"
-                    value={visitEndTime}
-                    onChange={(e) => setVisitEndTime(e.target.value)}
-                    data-testid="input-visit-end-time"
+                    value={woEndTime}
+                    onChange={(e) => setWoEndTime(e.target.value)}
+                    data-testid="input-wo-end-time"
                   />
                 </div>
               </div>
@@ -1401,39 +1624,174 @@ export default function CrmCustomerDetail() {
               {/* Technician */}
               <div className="space-y-2">
                 <Label>Assign Tech (optional)</Label>
-                <Select value={visitTechId} onValueChange={setVisitTechId}>
-                  <SelectTrigger data-testid="select-visit-tech">
+                <Select value={woTechId} onValueChange={setWoTechId}>
+                  <SelectTrigger data-testid="select-wo-tech">
                     <SelectValue placeholder="Select technician" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="unassigned" data-testid="visit-tech-unassigned">
+                    <SelectItem value="unassigned" data-testid="wo-tech-unassigned">
                       Unassigned
                     </SelectItem>
                     {technicians.map((tech) => (
-                      <SelectItem key={tech.id} value={tech.id} data-testid={`visit-tech-${tech.id}`}>
+                      <SelectItem key={tech.id} value={tech.id} data-testid={`wo-tech-${tech.id}`}>
                         {tech.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  placeholder="Work order description..."
+                  value={woDescription}
+                  onChange={(e) => setWoDescription(e.target.value)}
+                  rows={3}
+                  data-testid="textarea-wo-description"
+                />
+              </div>
             </div>
 
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={handleCloseVisitDialog}
-                data-testid="button-cancel-visit"
+                onClick={handleCloseWoDialog}
+                data-testid="button-cancel-wo"
               >
                 Cancel
               </Button>
               <Button
-                onClick={handleSubmitVisit}
-                disabled={scheduleVisitMutation.isPending || !isVisitFormValid}
+                onClick={handleSubmitWorkOrder}
+                disabled={createWorkOrderMutation.isPending || !isWoFormValid}
                 className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                data-testid="button-submit-visit"
+                data-testid="button-submit-wo"
               >
-                {scheduleVisitMutation.isPending ? "Creating..." : "Create Work Order"}
+                {createWorkOrderMutation.isPending ? "Creating..." : "Create Work Order"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Project Dialog */}
+        <Dialog open={createProjectDialogOpen} onOpenChange={(open) => !open && handleCloseProjectDialog()}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Create Project</DialogTitle>
+              <DialogDescription>
+                Create a new project for {customer.name}.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              {/* Title */}
+              <div className="space-y-2">
+                <Label>Title *</Label>
+                <Input
+                  placeholder="Project title..."
+                  value={projTitle}
+                  onChange={(e) => setProjTitle(e.target.value)}
+                  data-testid="input-proj-title"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Project Type */}
+                <div className="space-y-2">
+                  <Label>Project Type *</Label>
+                  <Select value={projType} onValueChange={(v) => setProjType(v as ProjectType)}>
+                    <SelectTrigger data-testid="select-proj-type">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projectTypeEnum.map((type) => (
+                        <SelectItem key={type} value={type} data-testid={`proj-type-${type}`}>
+                          {type.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Priority */}
+                <div className="space-y-2">
+                  <Label>Priority</Label>
+                  <Select value={projPriority} onValueChange={setProjPriority}>
+                    <SelectTrigger data-testid="select-proj-priority">
+                      <SelectValue placeholder="Select priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRIORITIES.map((p) => (
+                        <SelectItem key={p} value={p} className="capitalize" data-testid={`proj-priority-${p}`}>
+                          {p.charAt(0).toUpperCase() + p.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Property Selection */}
+              <div className="space-y-2">
+                <Label>Property (optional)</Label>
+                <Select value={projPropertyId} onValueChange={setProjPropertyId}>
+                  <SelectTrigger data-testid="select-proj-property">
+                    <SelectValue placeholder="Select property" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="" data-testid="proj-property-none">
+                      No property
+                    </SelectItem>
+                    {customerProperties?.map((prop) => (
+                      <SelectItem key={prop.id} value={prop.id} data-testid={`proj-property-${prop.id}`}>
+                        {prop.name || prop.address || `Property ${prop.id.slice(-4)}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Expected Value */}
+              <div className="space-y-2">
+                <Label>Expected Value ($)</Label>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={projExpectedValue}
+                  onChange={(e) => setProjExpectedValue(e.target.value)}
+                  data-testid="input-proj-expected-value"
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  placeholder="Project description..."
+                  value={projDescription}
+                  onChange={(e) => setProjDescription(e.target.value)}
+                  rows={3}
+                  data-testid="textarea-proj-description"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={handleCloseProjectDialog}
+                data-testid="button-cancel-proj"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmitProject}
+                disabled={createProjectMutation.isPending || !isProjFormValid}
+                className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                data-testid="button-submit-proj"
+              >
+                {createProjectMutation.isPending ? "Creating..." : "Create Project"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1699,11 +2057,159 @@ export default function CrmCustomerDetail() {
           addNotePending={addNoteMutation.isPending}
         />
 
+        {/* Active Projects Section (New CRM Projects) */}
+        <Card data-testid="card-crm-projects">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-blue-500" />
+              Active Projects ({crmProjects?.filter(p => p.status !== "archived").length || 0})
+            </CardTitle>
+            <Button 
+              size="sm" 
+              onClick={() => setCreateProjectDialogOpen(true)}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-create-project-inline"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Project
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {projectsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : !crmProjects || crmProjects.filter(p => p.status !== "archived").length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">No active projects</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {crmProjects.filter(p => p.status !== "archived").map((project) => (
+                  <div 
+                    key={project.id}
+                    className="p-4 border rounded-lg hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer transition-colors"
+                    onClick={() => {
+                      toast({ title: "Project Details", description: `Project: ${project.title}` });
+                    }}
+                    data-testid={`card-project-${project.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="font-medium text-sm line-clamp-1">{project.title}</h4>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {project.projectType}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                      <Badge className={`text-xs ${
+                        project.status === "lead" ? "bg-slate-100 text-slate-700" :
+                        project.status === "proposal_sent" ? "bg-amber-100 text-amber-700" :
+                        project.status === "approved" ? "bg-blue-100 text-blue-700" :
+                        project.status === "in_progress" ? "bg-green-100 text-green-700" :
+                        project.status === "completed" ? "bg-emerald-100 text-emerald-700" :
+                        "bg-slate-100 text-slate-700"
+                      }`}>
+                        {project.status.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                    {project.expectedValue && (
+                      <div className="flex items-center gap-1 text-xs text-slate-600">
+                        <DollarSign className="h-3 w-3" />
+                        ${Number(project.expectedValue).toLocaleString()}
+                      </div>
+                    )}
+                    {project.description && (
+                      <p className="text-xs text-slate-500 mt-2 line-clamp-2">{project.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Upcoming Work Orders Section */}
+        <Card data-testid="card-upcoming-work-orders">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarPlus className="h-5 w-5 text-green-500" />
+              Upcoming Work Orders ({crmWorkOrders?.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).length || 0})
+            </CardTitle>
+            <Button 
+              size="sm" 
+              onClick={() => setScheduleVisitDialogOpen(true)}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-create-wo-inline"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Work Order
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {workOrdersLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : !crmWorkOrders || crmWorkOrders.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">No upcoming work orders</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {crmWorkOrders.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).map((wo) => (
+                  <div 
+                    key={wo.id}
+                    className="p-4 border rounded-lg hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-colors"
+                    onClick={() => {
+                      toast({ title: "Work Order Details", description: `Work Order: ${wo.title || wo.visitType}` });
+                    }}
+                    data-testid={`card-wo-${wo.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="font-medium text-sm line-clamp-1">{wo.title || wo.visitType}</h4>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {wo.visitType.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                      <Badge className={`text-xs ${
+                        wo.status === "scheduled" ? "bg-blue-100 text-blue-700" :
+                        wo.status === "pending" ? "bg-amber-100 text-amber-700" :
+                        wo.status === "in_progress" ? "bg-green-100 text-green-700" :
+                        wo.status === "completed" ? "bg-emerald-100 text-emerald-700" :
+                        "bg-slate-100 text-slate-700"
+                      }`}>
+                        {wo.status}
+                      </Badge>
+                    </div>
+                    {wo.scheduledStart && (
+                      <div className="flex items-center gap-1 text-xs text-slate-600 mb-1">
+                        <CalendarIcon className="h-3 w-3" />
+                        {format(new Date(wo.scheduledStart), "MMM d, yyyy h:mm a")}
+                      </div>
+                    )}
+                    {wo.assignedTechName && (
+                      <div className="flex items-center gap-1 text-xs text-slate-600">
+                        <User className="h-3 w-3" />
+                        {wo.assignedTechName}
+                      </div>
+                    )}
+                    {wo.projectTitle && (
+                      <div className="flex items-center gap-1 text-xs text-blue-600 mt-1">
+                        <Briefcase className="h-3 w-3" />
+                        {wo.projectTitle}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card data-testid="card-active-jobs">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-amber-500" />
-              Active Projects ({activeJobs.length})
+              Jobs (Legacy) ({activeJobs.length})
             </CardTitle>
           </CardHeader>
           <CardContent>

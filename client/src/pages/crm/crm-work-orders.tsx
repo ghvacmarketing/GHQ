@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -28,14 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -58,14 +51,16 @@ import {
   UserCheck,
   Eye,
   Plus,
+  Building2,
+  FolderOpen,
+  AlertTriangle,
 } from "lucide-react";
-import { workOrderVisitTypeEnum, type WorkOrderVisitType } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkOrderStatus } from "@shared/schema";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
-import { format, addDays, startOfDay, endOfDay } from "date-fns";
-import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, WorkOrderStatus } from "@shared/schema";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, isToday, isThisWeek, addDays } from "date-fns";
+import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject } from "@shared/schema";
 
-const JOB_TYPES = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
 type CustomerWithInfo = {
@@ -97,6 +92,8 @@ function useDebounce<T>(value: T, delay: number): T {
 interface EnrichedWorkOrder extends CrmWorkOrder {
   job: CrmJob | null;
   customer: CrmCustomer | null;
+  property: CrmProperty | null;
+  project: CrmProject | null;
   tech: CrmUser | null;
 }
 
@@ -118,16 +115,44 @@ const statusLabels: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
-const allStatuses: WorkOrderStatus[] = ["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"];
+const visitTypeLabels: Record<string, string> = {
+  SERVICE: "Service",
+  INSTALL: "Install",
+  MAINTENANCE: "Maintenance",
+  SALES: "Sales",
+};
+
+const visitTypeColors: Record<string, { bg: string; text: string }> = {
+  SERVICE: { bg: "bg-blue-50", text: "text-blue-700" },
+  INSTALL: { bg: "bg-green-50", text: "text-green-700" },
+  MAINTENANCE: { bg: "bg-amber-50", text: "text-amber-700" },
+  SALES: { bg: "bg-purple-50", text: "text-purple-700" },
+};
+
+const priorityColors: Record<string, { bg: string; text: string }> = {
+  low: { bg: "bg-slate-100", text: "text-slate-600" },
+  normal: { bg: "bg-blue-100", text: "text-blue-700" },
+  high: { bg: "bg-orange-100", text: "text-orange-700" },
+  urgent: { bg: "bg-red-100", text: "text-red-700" },
+};
+
+type FilterTab = "all" | "today" | "this_week" | "scheduled" | "in_progress" | "completed";
+
+const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> = {
+  all: { label: "All Work Orders", shortLabel: "All" },
+  today: { label: "Today", shortLabel: "Today" },
+  this_week: { label: "This Week", shortLabel: "Week" },
+  scheduled: { label: "Scheduled", shortLabel: "Sched" },
+  in_progress: { label: "In Progress", shortLabel: "Active" },
+  completed: { label: "Completed", shortLabel: "Done" },
+};
 
 export default function CrmWorkOrders() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  const [dateFrom, setDateFrom] = useState<Date>(startOfDay(new Date()));
-  const [dateTo, setDateTo] = useState<Date>(endOfDay(addDays(new Date(), 30)));
+  const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [techFilter, setTechFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<EnrichedWorkOrder | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -139,27 +164,19 @@ export default function CrmWorkOrders() {
   const [rescheduleEnd, setRescheduleEnd] = useState<Date | null>(null);
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    jobId: "",
-    visitType: "initial" as WorkOrderVisitType,
-    scheduledDate: "",
-    startTime: "08:00",
-    endTime: "17:00",
-    assignedTechId: "",
-  });
-
-  const [createNewJob, setCreateNewJob] = useState(false);
-  const [newJobType, setNewJobType] = useState<string>("SERVICE");
-  const [newJobPriority, setNewJobPriority] = useState<string>("normal");
-  const [newJobDescription, setNewJobDescription] = useState<string>("");
-  const [newJobCustomerId, setNewJobCustomerId] = useState<string>("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithInfo | null>(null);
-  const [newJobStartDate, setNewJobStartDate] = useState<Date | undefined>(new Date());
-  const [newJobStartTime, setNewJobStartTime] = useState<string>("08:00");
-  const [newJobDuration, setNewJobDuration] = useState<number>(120);
-  const [newJobTechId, setNewJobTechId] = useState<string>("unassigned");
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [woTitle, setWoTitle] = useState("");
+  const [woDescription, setWoDescription] = useState("");
+  const [visitType, setVisitType] = useState<WorkOrderVisitType>("SERVICE");
+  const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
+  const [startTime, setStartTime] = useState("08:00");
+  const [endTime, setEndTime] = useState("17:00");
+  const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
+  const [priority, setPriority] = useState<string>("normal");
 
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
 
@@ -184,13 +201,6 @@ export default function CrmWorkOrders() {
     [techniciansData]
   );
 
-  const { data: jobsData } = useQuery<{ jobs: CrmJob[] }>({
-    queryKey: ["/api/crm/jobs"],
-    enabled: !!currentUser && createDialogOpen,
-  });
-
-  const jobs = jobsData?.jobs || [];
-
   const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
     queryKey: ["/api/crm/customers", debouncedCustomerSearch],
     queryFn: async () => {
@@ -203,25 +213,59 @@ export default function CrmWorkOrders() {
       if (!res.ok) throw new Error("Failed to fetch customers");
       return res.json();
     },
-    enabled: !!currentUser && createDialogOpen && createNewJob && customerSearchOpen,
+    enabled: !!currentUser && createDialogOpen && customerSearchOpen,
   });
 
   const customers = customersData?.customers || [];
 
-  useEffect(() => {
-    if (createDialogOpen && jobs.length === 0) {
-      setCreateNewJob(true);
-    }
-  }, [createDialogOpen, jobs.length]);
+  const { data: propertiesData } = useQuery<CrmProperty[]>({
+    queryKey: ["/api/crm/properties", selectedCustomer?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/properties?customerId=${selectedCustomer!.id}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch properties");
+      return res.json();
+    },
+    enabled: !!selectedCustomer?.id && createDialogOpen,
+  });
+
+  const properties = propertiesData || [];
+
+  const { data: projectsData } = useQuery<CrmProject[]>({
+    queryKey: ["/api/crm/projects", selectedCustomer?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/projects?customerId=${selectedCustomer!.id}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch projects");
+      return res.json();
+    },
+    enabled: !!selectedCustomer?.id && createDialogOpen,
+  });
+
+  const projects = projectsData || [];
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
-    params.set("dateFrom", dateFrom.toISOString());
-    params.set("dateTo", dateTo.toISOString());
+    const now = new Date();
+    
+    if (activeTab === "today") {
+      params.set("dateFrom", startOfDay(now).toISOString());
+      params.set("dateTo", endOfDay(now).toISOString());
+    } else if (activeTab === "this_week") {
+      params.set("dateFrom", startOfWeek(now, { weekStartsOn: 0 }).toISOString());
+      params.set("dateTo", endOfWeek(now, { weekStartsOn: 0 }).toISOString());
+    } else if (activeTab === "scheduled") {
+      params.set("status", "scheduled");
+    } else if (activeTab === "in_progress") {
+    } else if (activeTab === "completed") {
+      params.set("status", "completed");
+    }
+    
     if (techFilter !== "all") params.set("techId", techFilter);
-    if (statusFilter !== "all") params.set("status", statusFilter);
     return params.toString();
-  }, [dateFrom, dateTo, techFilter, statusFilter]);
+  }, [activeTab, techFilter]);
 
   const { data: workOrdersData, isLoading: workOrdersLoading, refetch } = useQuery<EnrichedWorkOrder[]>({
     queryKey: ["/api/crm/work-orders/list", queryParams],
@@ -233,7 +277,19 @@ export default function CrmWorkOrders() {
     enabled: !!currentUser,
   });
 
-  const workOrders = workOrdersData || [];
+  const filteredWorkOrders = useMemo(() => {
+    let orders = workOrdersData || [];
+    
+    if (activeTab === "in_progress") {
+      orders = orders.filter(wo => ["dispatched", "en_route", "on_site"].includes(wo.status));
+    }
+    
+    return orders.sort((a, b) => {
+      const dateA = a.scheduledStart ? new Date(a.scheduledStart).getTime() : 0;
+      const dateB = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
+      return dateA - dateB;
+    });
+  }, [workOrdersData, activeTab]);
 
   const updateWorkOrderMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<CrmWorkOrder> }) => {
@@ -250,79 +306,52 @@ export default function CrmWorkOrders() {
   });
 
   const resetCreateForm = () => {
-    setCreateForm({
-      jobId: "",
-      visitType: "initial",
-      scheduledDate: "",
-      startTime: "08:00",
-      endTime: "17:00",
-      assignedTechId: "",
-    });
-    setCreateNewJob(false);
-    setNewJobType("SERVICE");
-    setNewJobPriority("normal");
-    setNewJobDescription("");
-    setNewJobCustomerId("");
-    setCustomerSearch("");
     setSelectedCustomer(null);
+    setSelectedPropertyId("");
+    setSelectedProjectId("");
+    setWoTitle("");
+    setWoDescription("");
+    setVisitType("SERVICE");
+    setScheduledDate(new Date());
+    setStartTime("08:00");
+    setEndTime("17:00");
+    setAssignedTechId("unassigned");
+    setPriority("normal");
+    setCustomerSearch("");
     setCustomerSearchOpen(false);
-    setNewJobStartDate(new Date());
-    setNewJobStartTime("08:00");
-    setNewJobDuration(120);
-    setNewJobTechId("unassigned");
   };
 
   const createWorkOrderMutation = useMutation({
     mutationFn: async () => {
-      let jobId = createForm.jobId;
+      if (!selectedCustomer) throw new Error("Customer is required");
+      if (!scheduledDate) throw new Error("Scheduled date is required");
 
-      if (createNewJob) {
-        if (!newJobCustomerId) throw new Error("Customer is required");
-        if (!newJobDescription.trim()) throw new Error("Project description is required");
-        if (!newJobStartDate) throw new Error("Start date is required");
-        if (newJobDuration < 15) throw new Error("Duration must be at least 15 minutes");
-
-        const [hours, minutes] = newJobStartTime.split(":").map(Number);
-        const scheduledStart = new Date(newJobStartDate);
-        scheduledStart.setHours(hours, minutes, 0, 0);
-        
-        const scheduledEnd = new Date(scheduledStart);
-        scheduledEnd.setMinutes(scheduledEnd.getMinutes() + newJobDuration);
-
-        const jobRes = await apiRequest("POST", "/api/crm/jobs", {
-          customerId: newJobCustomerId,
-          jobType: newJobType,
-          priority: newJobPriority,
-          description: newJobDescription,
-          status: newJobTechId !== "unassigned" ? "scheduled" : "new",
-          assignedTechId: newJobTechId !== "unassigned" ? newJobTechId : null,
-          scheduledStart: scheduledStart.toISOString(),
-          scheduledEnd: scheduledEnd.toISOString(),
-        });
-        const newJob = await jobRes.json();
-        jobId = newJob.id;
-      }
-
-      const scheduledStart = createForm.scheduledDate
-        ? new Date(`${createForm.scheduledDate}T${createForm.startTime}`)
-        : null;
-      const scheduledEnd = createForm.scheduledDate
-        ? new Date(`${createForm.scheduledDate}T${createForm.endTime}`)
-        : null;
+      const [startHours, startMinutes] = startTime.split(":").map(Number);
+      const [endHours, endMinutes] = endTime.split(":").map(Number);
+      
+      const scheduledStart = new Date(scheduledDate);
+      scheduledStart.setHours(startHours, startMinutes, 0, 0);
+      
+      const scheduledEnd = new Date(scheduledDate);
+      scheduledEnd.setHours(endHours, endMinutes, 0, 0);
 
       const res = await apiRequest("POST", "/api/crm/work-orders", {
-        jobId,
-        visitType: createForm.visitType,
-        scheduledStart: scheduledStart?.toISOString(),
-        scheduledEnd: scheduledEnd?.toISOString(),
-        assignedTechId: createForm.assignedTechId === "unassigned" ? null : (createForm.assignedTechId || null),
+        customerId: selectedCustomer.id,
+        propertyId: selectedPropertyId || null,
+        projectId: selectedProjectId || null,
+        title: woTitle || null,
+        description: woDescription || null,
+        visitType,
+        scheduledStart: scheduledStart.toISOString(),
+        scheduledEnd: scheduledEnd.toISOString(),
+        assignedTechId: assignedTechId === "unassigned" ? null : assignedTechId,
+        priority,
         status: "scheduled",
       });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
       toast({ title: "Work order created", description: "New work order has been scheduled." });
       setCreateDialogOpen(false);
       resetCreateForm();
@@ -331,13 +360,6 @@ export default function CrmWorkOrders() {
       toast({ title: "Creation failed", description: error.message, variant: "destructive" });
     },
   });
-
-  const visitTypeLabels: Record<string, string> = {
-    SERVICE: "Service",
-    INSTALL: "Install",
-    MAINTENANCE: "Maintenance",
-    SALES: "Sales",
-  };
 
   const handleOpenDetail = async (wo: EnrichedWorkOrder) => {
     const res = await fetch(`/api/crm/work-orders/${wo.id}`, { credentials: "include" });
@@ -429,13 +451,25 @@ export default function CrmWorkOrders() {
     }
   };
 
+  const getPropertyAddress = (property: CrmProperty | null) => {
+    if (!property) return null;
+    const parts = [property.address1];
+    if (property.address2) parts.push(property.address2);
+    parts.push(`${property.city}, ${property.state} ${property.zip}`);
+    return parts.join(", ");
+  };
+
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <Skeleton className="h-12 w-64" />
-          <Skeleton className="h-16 w-full rounded-xl" />
-          <Skeleton className="h-96 w-full rounded-xl" />
+      <div className="min-h-screen bg-slate-50 p-4 md:p-6">
+        <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-12 w-full rounded-xl" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-48 w-full rounded-xl" />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -448,7 +482,7 @@ export default function CrmWorkOrders() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h1 className="text-xl font-bold text-slate-900" data-testid="text-work-orders-title">
             Work Orders
           </h1>
@@ -459,662 +493,222 @@ export default function CrmWorkOrders() {
               data-testid="button-create-work-order"
             >
               <Plus className="h-4 w-4 mr-1" />
-              Create Work Order
+              <span className="hidden sm:inline">Create Work Order</span>
+              <span className="sm:hidden">Create</span>
             </Button>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => refetch()}
               data-testid="button-refresh-work-orders"
             >
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Refresh
+              <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        <Card className="bg-white border shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500">From:</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-[140px] justify-start text-left font-normal"
-                      data-testid="button-date-from"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(dateFrom, "MMM d, yyyy")}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dateFrom}
-                      onSelect={(d) => d && setDateFrom(startOfDay(d))}
-                      data-testid="calendar-date-from"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as FilterTab)} className="w-full">
+            <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:flex sm:flex-wrap gap-1 h-auto p-1">
+              {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
+                <TabsTrigger
+                  key={tab}
+                  value={tab}
+                  className="text-xs sm:text-sm px-2 sm:px-3 py-1.5"
+                  data-testid={`tab-${tab}`}
+                >
+                  <span className="hidden sm:inline">{filterTabConfig[tab].label}</span>
+                  <span className="sm:hidden">{filterTabConfig[tab].shortLabel}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
 
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500">To:</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-[140px] justify-start text-left font-normal"
-                      data-testid="button-date-to"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(dateTo, "MMM d, yyyy")}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dateTo}
-                      onSelect={(d) => d && setDateTo(endOfDay(d))}
-                      data-testid="calendar-date-to"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+          <Select value={techFilter} onValueChange={setTechFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-tech-filter">
+              <SelectValue placeholder="All Technicians" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Technicians</SelectItem>
+              {technicians.map((tech) => (
+                <SelectItem key={tech.id} value={tech.id}>
+                  {tech.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-              <Select value={techFilter} onValueChange={setTechFilter}>
-                <SelectTrigger className="w-[160px]" data-testid="select-tech-filter">
-                  <SelectValue placeholder="All Technicians" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Technicians</SelectItem>
-                  {technicians.map((tech) => (
-                    <SelectItem key={tech.id} value={tech.id}>
-                      {tech.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  {allStatuses.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {statusLabels[status]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-50">
-                  <TableHead className="font-semibold">WO #</TableHead>
-                  <TableHead className="font-semibold">Job Type</TableHead>
-                  <TableHead className="font-semibold">Customer</TableHead>
-                  <TableHead className="font-semibold">Scheduled</TableHead>
-                  <TableHead className="font-semibold">Tech</TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
-                  <TableHead className="font-semibold">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {workOrdersLoading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-36" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : workOrders.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12">
-                      <ClipboardList className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                      <p className="text-slate-500 font-medium">No work orders found</p>
-                      <p className="text-slate-400 text-sm mt-1">
-                        Try adjusting your filters
-                      </p>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  workOrders.map((wo) => {
-                    const statusStyle = statusColors[wo.status] || statusColors.scheduled;
-                    return (
-                      <TableRow
-                        key={wo.id}
-                        className="cursor-pointer hover:bg-slate-50 transition-colors"
-                        onClick={() => handleOpenDetail(wo)}
-                        data-testid={`row-work-order-${wo.id}`}
-                      >
-                        <TableCell className="font-medium" data-testid={`text-wo-number-${wo.id}`}>
-                          WO-{wo.workOrderNumber}
-                        </TableCell>
-                        <TableCell data-testid={`text-job-type-${wo.id}`}>
-                          {wo.job?.jobType || "—"}
-                        </TableCell>
-                        <TableCell data-testid={`text-customer-${wo.id}`}>
-                          {wo.customer?.name || "—"}
-                        </TableCell>
-                        <TableCell data-testid={`text-scheduled-${wo.id}`}>
-                          {formatDateTime(wo.scheduledStart)}
-                        </TableCell>
-                        <TableCell data-testid={`text-tech-${wo.id}`}>
-                          {wo.tech?.name || "Unassigned"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            className={`${statusStyle.bg} ${statusStyle.text} ${statusStyle.border} border`}
-                            data-testid={`badge-status-${wo.id}`}
-                          >
-                            {statusLabels[wo.status]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenDetail(wo);
-                            }}
-                            data-testid={`button-view-${wo.id}`}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+        {workOrdersLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-48 w-full rounded-xl" />
+            ))}
           </div>
-        </Card>
+        ) : filteredWorkOrders.length === 0 ? (
+          <Card className="bg-white border shadow-sm">
+            <CardContent className="py-12 text-center">
+              <ClipboardList className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">No work orders found</p>
+              <p className="text-slate-400 text-sm mt-1">
+                {activeTab === "all" ? "Create your first work order to get started" : "Try adjusting your filters"}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredWorkOrders.map((wo) => {
+              const statusStyle = statusColors[wo.status] || statusColors.scheduled;
+              const visitStyle = visitTypeColors[wo.visitType || "SERVICE"] || visitTypeColors.SERVICE;
+              const prioStyle = priorityColors[wo.priority || "normal"] || priorityColors.normal;
+              
+              return (
+                <Card
+                  key={wo.id}
+                  className="bg-white border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => handleOpenDetail(wo)}
+                  data-testid={`card-work-order-${wo.id}`}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-900 truncate" data-testid={`text-wo-number-${wo.id}`}>
+                          WO-{wo.workOrderNumber}
+                        </p>
+                        {(wo.title || wo.description) && (
+                          <p className="text-sm text-slate-600 truncate mt-0.5" data-testid={`text-wo-title-${wo.id}`}>
+                            {wo.title || wo.description}
+                          </p>
+                        )}
+                      </div>
+                      <Badge 
+                        className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} shrink-0`}
+                        data-testid={`badge-status-${wo.id}`}
+                      >
+                        {statusLabels[wo.status]}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2 text-slate-600" data-testid={`text-customer-${wo.id}`}>
+                        <User className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{wo.customer?.name || "—"}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-slate-600" data-testid={`text-scheduled-${wo.id}`}>
+                        <CalendarIcon className="h-4 w-4 shrink-0" />
+                        <span>
+                          {formatDate(wo.scheduledStart)}
+                          {wo.scheduledStart && (
+                            <span className="text-slate-400 ml-1">
+                              {formatTime(wo.scheduledStart)} - {formatTime(wo.scheduledEnd)}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-slate-600" data-testid={`text-tech-${wo.id}`}>
+                        <UserCheck className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{wo.tech?.name || "Unassigned"}</span>
+                      </div>
+
+                      {wo.property && (
+                        <div className="flex items-center gap-2 text-slate-500 text-xs" data-testid={`text-address-${wo.id}`}>
+                          <MapPin className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{getPropertyAddress(wo.property)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                      <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`} data-testid={`badge-visit-type-${wo.id}`}>
+                        {visitTypeLabels[wo.visitType || "SERVICE"]}
+                      </Badge>
+                      {wo.priority && wo.priority !== "normal" && (
+                        <Badge className={`${prioStyle.bg} ${prioStyle.text} text-xs`} data-testid={`badge-priority-${wo.id}`}>
+                          {wo.priority.charAt(0).toUpperCase() + wo.priority.slice(1)}
+                        </Badge>
+                      )}
+                      {wo.project && (
+                        <Badge variant="outline" className="text-xs" data-testid={`badge-project-${wo.id}`}>
+                          <FolderOpen className="h-3 w-3 mr-1" />
+                          {wo.project.title}
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetContent className="w-full sm:max-w-lg overflow-y-auto" data-testid="sheet-work-order-detail">
+          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
             <SheetHeader>
-              <SheetTitle data-testid="text-sheet-title">
-                Work Order Details
+              <SheetTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                WO-{selectedWorkOrder?.workOrderNumber}
               </SheetTitle>
               <SheetDescription>
-                {selectedWorkOrder ? `WO-${selectedWorkOrder.workOrderNumber}` : ""}
+                {selectedWorkOrder?.title || selectedWorkOrder?.description || "Work Order Details"}
               </SheetDescription>
             </SheetHeader>
 
             {selectedWorkOrder && (
               <div className="mt-6 space-y-6">
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                    <ClipboardList className="h-4 w-4" />
-                    Work Order Info
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className="text-slate-500">Status:</span>
-                      <Badge
-                        className={`ml-2 ${statusColors[selectedWorkOrder.status]?.bg} ${statusColors[selectedWorkOrder.status]?.text}`}
-                        data-testid="badge-detail-status"
-                      >
-                        {statusLabels[selectedWorkOrder.status]}
-                      </Badge>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Tech:</span>
-                      <span className="ml-2 font-medium" data-testid="text-detail-tech">
-                        {selectedWorkOrder.tech?.name || "Unassigned"}
-                      </span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-slate-500">Scheduled:</span>
-                      <span className="ml-2" data-testid="text-detail-scheduled">
-                        {formatDateTime(selectedWorkOrder.scheduledStart)} - {formatTime(selectedWorkOrder.scheduledEnd)}
-                      </span>
-                    </div>
-                  </div>
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Customer</h4>
+                  <p className="text-slate-900">{selectedWorkOrder.customer?.name || "—"}</p>
                 </div>
 
-                <Separator />
-
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                    <Wrench className="h-4 w-4" />
-                    Job Info
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-slate-500">Type:</span>
-                      <span className="ml-2 font-medium" data-testid="text-detail-job-type">
-                        {selectedWorkOrder.job?.jobType || "—"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Priority:</span>
-                      <span className="ml-2 capitalize" data-testid="text-detail-priority">
-                        {selectedWorkOrder.job?.priority || "normal"}
-                      </span>
-                    </div>
-                    {selectedWorkOrder.job?.description && (
-                      <div>
-                        <span className="text-slate-500">Description:</span>
-                        <p className="mt-1 text-slate-700" data-testid="text-detail-description">
-                          {selectedWorkOrder.job.description}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Customer Info
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-slate-500">Name:</span>
-                      <span className="ml-2 font-medium" data-testid="text-detail-customer-name">
-                        {selectedWorkOrder.customer?.name || "—"}
-                      </span>
-                    </div>
-                    {selectedWorkOrder.customer?.phone && (
-                      <div>
-                        <span className="text-slate-500">Phone:</span>
-                        <span className="ml-2" data-testid="text-detail-customer-phone">
-                          {selectedWorkOrder.customer.phone}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                    <CheckSquare className="h-4 w-4" />
-                    Checklist
-                  </h3>
-                  {editingChecklist && editingChecklist.length > 0 ? (
-                    <div className="space-y-2">
-                      {editingChecklist.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <Checkbox
-                            id={`checklist-${idx}`}
-                            checked={item.completed}
-                            onCheckedChange={(checked) => {
-                              const updated = [...editingChecklist];
-                              updated[idx] = { ...updated[idx], completed: !!checked };
-                              setEditingChecklist(updated);
-                            }}
-                            data-testid={`checkbox-checklist-${idx}`}
-                          />
-                          <label htmlFor={`checklist-${idx}`} className="text-sm">
-                            {item.item}
-                          </label>
-                        </div>
-                      ))}
-                      <Button
-                        size="sm"
-                        onClick={handleSaveChecklist}
-                        disabled={updateWorkOrderMutation.isPending}
-                        data-testid="button-save-checklist"
-                      >
-                        Save Checklist
-                      </Button>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400">No checklist items</p>
-                  )}
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    Parts Used
-                  </h3>
-                  {selectedWorkOrder.partsUsed && selectedWorkOrder.partsUsed.length > 0 ? (
-                    <div className="space-y-2">
-                      {selectedWorkOrder.partsUsed.map((part, idx) => (
-                        <div key={idx} className="flex justify-between text-sm" data-testid={`row-part-${idx}`}>
-                          <span>{part.name} × {part.qty}</span>
-                          <span className="text-slate-500">${(part.price * part.qty).toFixed(2)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400">No parts used</p>
-                  )}
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Tech Notes
-                  </h3>
-                  <Textarea
-                    value={editingTechNotes}
-                    onChange={(e) => setEditingTechNotes(e.target.value)}
-                    placeholder="Add tech notes..."
-                    className="min-h-[80px]"
-                    data-testid="textarea-tech-notes"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleSaveTechNotes}
-                    disabled={updateWorkOrderMutation.isPending}
-                    data-testid="button-save-tech-notes"
-                  >
-                    Save Notes
-                  </Button>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-slate-900">Quick Actions</h3>
-                  
+                {selectedWorkOrder.property && (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Select value={newStatus} onValueChange={setNewStatus}>
-                        <SelectTrigger className="flex-1" data-testid="select-update-status">
-                          <SelectValue placeholder="Update Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {allStatuses.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {statusLabels[status]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        size="sm"
-                        onClick={handleUpdateStatus}
-                        disabled={updateWorkOrderMutation.isPending}
-                        data-testid="button-update-status"
-                      >
-                        Update
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Select value={reassignTechId} onValueChange={setReassignTechId}>
-                        <SelectTrigger className="flex-1" data-testid="select-reassign-tech">
-                          <SelectValue placeholder="Reassign Tech" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unassigned">Unassigned</SelectItem>
-                          {technicians.map((tech) => (
-                            <SelectItem key={tech.id} value={tech.id}>
-                              {tech.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        size="sm"
-                        onClick={handleReassignTech}
-                        disabled={updateWorkOrderMutation.isPending}
-                        data-testid="button-reassign-tech"
-                      >
-                        <UserCheck className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className="text-sm text-slate-500">Reschedule:</p>
-                      <div className="flex items-center gap-2">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="flex-1" data-testid="button-reschedule-start">
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {rescheduleStart ? format(rescheduleStart, "MMM d, h:mm a") : "Start"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={rescheduleStart || undefined}
-                              onSelect={(d) => {
-                                if (d) {
-                                  const current = rescheduleStart || new Date();
-                                  d.setHours(current.getHours(), current.getMinutes());
-                                  setRescheduleStart(d);
-                                }
-                              }}
-                              data-testid="calendar-reschedule-start"
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="flex-1" data-testid="button-reschedule-end">
-                              <Clock className="mr-2 h-4 w-4" />
-                              {rescheduleEnd ? format(rescheduleEnd, "MMM d, h:mm a") : "End"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={rescheduleEnd || undefined}
-                              onSelect={(d) => {
-                                if (d) {
-                                  const current = rescheduleEnd || new Date();
-                                  d.setHours(current.getHours(), current.getMinutes());
-                                  setRescheduleEnd(d);
-                                }
-                              }}
-                              data-testid="calendar-reschedule-end"
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                      <Button
-                        size="sm"
-                        className="w-full"
-                        onClick={handleReschedule}
-                        disabled={updateWorkOrderMutation.isPending || !rescheduleStart || !rescheduleEnd}
-                        data-testid="button-reschedule"
-                      >
-                        <Clock className="mr-2 h-4 w-4" />
-                        Reschedule
-                      </Button>
-                    </div>
+                    <h4 className="font-medium text-sm text-slate-700">Property</h4>
+                    <p className="text-slate-900 text-sm">{getPropertyAddress(selectedWorkOrder.property)}</p>
                   </div>
-                </div>
-              </div>
-            )}
-          </SheetContent>
-        </Sheet>
+                )}
 
-        <Dialog open={createDialogOpen} onOpenChange={(open) => {
-          setCreateDialogOpen(open);
-          if (!open) resetCreateForm();
-        }}>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="dialog-create-work-order">
-            <DialogHeader>
-              <DialogTitle>Create Work Order</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              {jobs.length === 0 ? (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-700">
-                  No existing projects found. Create a new project below.
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="createNewJob"
-                      checked={createNewJob}
-                      onCheckedChange={(checked) => {
-                        setCreateNewJob(!!checked);
-                        if (checked) {
-                          setCreateForm({ ...createForm, jobId: "" });
-                        }
-                      }}
-                      data-testid="checkbox-create-new-job"
-                    />
-                    <Label htmlFor="createNewJob" className="cursor-pointer">
-                      Create a new project
-                    </Label>
+                {selectedWorkOrder.project && (
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-slate-700">Linked Project</h4>
+                    <p className="text-slate-900">{selectedWorkOrder.project.title}</p>
                   </div>
+                )}
 
-                  {!createNewJob && (
-                    <div className="space-y-2">
-                      <Label>Project (required)</Label>
-                      <Select
-                        value={createForm.jobId}
-                        onValueChange={(v) => setCreateForm({ ...createForm, jobId: v })}
-                      >
-                        <SelectTrigger data-testid="select-job">
-                          <SelectValue placeholder="Select a project" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {jobs.map((job) => (
-                            <SelectItem key={job.id} value={job.id}>
-                              {job.jobType} - #{job.id.slice(0, 8)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </>
-              )}
+                <Separator />
 
-              {createNewJob && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Customer (required)</Label>
-                    <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={customerSearchOpen}
-                          className="w-full justify-between font-normal"
-                          data-testid="button-select-customer"
-                        >
-                          {selectedCustomer ? selectedCustomer.name : "Search for a customer..."}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[350px] p-0" align="start">
-                        <Command shouldFilter={false}>
-                          <CommandInput
-                            placeholder="Type to search customers..."
-                            value={customerSearch}
-                            onValueChange={setCustomerSearch}
-                            data-testid="input-customer-search"
-                          />
-                          <CommandList>
-                            {customersLoading ? (
-                              <div className="p-4 text-center text-sm text-slate-500">
-                                Loading...
-                              </div>
-                            ) : customers.length === 0 ? (
-                              <CommandEmpty>No customers found.</CommandEmpty>
-                            ) : (
-                              <CommandGroup>
-                                {customers.map((customer) => (
-                                  <CommandItem
-                                    key={customer.id}
-                                    value={customer.id}
-                                    onSelect={() => {
-                                      setSelectedCustomer(customer);
-                                      setNewJobCustomerId(customer.id);
-                                      setCustomerSearchOpen(false);
-                                      setCustomerSearch("");
-                                    }}
-                                    data-testid={`customer-option-${customer.id}`}
-                                  >
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">{customer.name}</span>
-                                      {customer.fullAddress && (
-                                        <span className="text-xs text-slate-500">{customer.fullAddress}</span>
-                                      )}
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            )}
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Job Type</Label>
-                    <Select value={newJobType} onValueChange={setNewJobType}>
-                      <SelectTrigger data-testid="select-new-job-type">
-                        <SelectValue placeholder="Select job type" />
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Status</h4>
+                  <div className="flex items-center gap-2">
+                    <Select value={newStatus} onValueChange={setNewStatus}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-status">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {JOB_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
+                        {(["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"] as WorkOrderStatus[]).map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {statusLabels[status]}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <Button
+                      size="sm"
+                      onClick={handleUpdateStatus}
+                      disabled={updateWorkOrderMutation.isPending || newStatus === selectedWorkOrder.status}
+                      data-testid="button-update-status"
+                    >
+                      Update
+                    </Button>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label>Priority</Label>
-                    <Select value={newJobPriority} onValueChange={setNewJobPriority}>
-                      <SelectTrigger data-testid="select-new-job-priority">
-                        <SelectValue placeholder="Select priority" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PRIORITIES.map((priority) => (
-                          <SelectItem key={priority} value={priority}>
-                            {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Description (required)</Label>
-                    <Textarea
-                      value={newJobDescription}
-                      onChange={(e) => setNewJobDescription(e.target.value)}
-                      placeholder="Describe the project..."
-                      className="min-h-[80px]"
-                      data-testid="textarea-new-job-description"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Primary Tech (optional)</Label>
-                    <Select value={newJobTechId} onValueChange={setNewJobTechId}>
-                      <SelectTrigger data-testid="select-new-job-tech">
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Assigned Tech</h4>
+                  <div className="flex items-center gap-2">
+                    <Select value={reassignTechId} onValueChange={setReassignTechId}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-reassign-tech">
                         <SelectValue placeholder="Unassigned" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1126,69 +720,206 @@ export default function CrmWorkOrders() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <Button
+                      size="sm"
+                      onClick={handleReassignTech}
+                      disabled={updateWorkOrderMutation.isPending}
+                      data-testid="button-reassign-tech"
+                    >
+                      Assign
+                    </Button>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label>Start Date (required)</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                          data-testid="button-new-job-start-date"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {newJobStartDate ? format(newJobStartDate, "MMM d, yyyy") : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={newJobStartDate}
-                          onSelect={setNewJobStartDate}
-                          data-testid="calendar-new-job-start-date"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Start Time (required)</Label>
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Schedule</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Start</Label>
                       <Input
-                        type="time"
-                        value={newJobStartTime}
-                        onChange={(e) => setNewJobStartTime(e.target.value)}
-                        data-testid="input-new-job-start-time"
+                        type="datetime-local"
+                        value={rescheduleStart ? format(rescheduleStart, "yyyy-MM-dd'T'HH:mm") : ""}
+                        onChange={(e) => setRescheduleStart(e.target.value ? new Date(e.target.value) : null)}
+                        data-testid="input-reschedule-start"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Duration (minutes)</Label>
+                    <div>
+                      <Label className="text-xs">End</Label>
                       <Input
-                        type="number"
-                        min={15}
-                        value={newJobDuration}
-                        onChange={(e) => setNewJobDuration(parseInt(e.target.value) || 15)}
-                        data-testid="input-new-job-duration"
+                        type="datetime-local"
+                        value={rescheduleEnd ? format(rescheduleEnd, "yyyy-MM-dd'T'HH:mm") : ""}
+                        onChange={(e) => setRescheduleEnd(e.target.value ? new Date(e.target.value) : null)}
+                        data-testid="input-reschedule-end"
                       />
-                      {newJobDuration < 15 && (
-                        <p className="text-xs text-red-500">Minimum 15 minutes</p>
-                      )}
                     </div>
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={handleReschedule}
+                    disabled={updateWorkOrderMutation.isPending || !rescheduleStart || !rescheduleEnd}
+                    data-testid="button-reschedule"
+                  >
+                    Reschedule
+                  </Button>
+                </div>
 
-                  <Separator />
-                </>
+                <Separator />
+
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Tech Notes</h4>
+                  <Textarea
+                    value={editingTechNotes}
+                    onChange={(e) => setEditingTechNotes(e.target.value)}
+                    placeholder="Add notes..."
+                    className="min-h-[80px]"
+                    data-testid="textarea-tech-notes"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSaveTechNotes}
+                    disabled={updateWorkOrderMutation.isPending}
+                    data-testid="button-save-notes"
+                  >
+                    Save Notes
+                  </Button>
+                </div>
+
+                {editingChecklist && editingChecklist.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-slate-700">Checklist</h4>
+                    <div className="space-y-2">
+                      {editingChecklist.map((item, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Checkbox
+                            checked={item.completed}
+                            onCheckedChange={(checked) => {
+                              const updated = [...editingChecklist];
+                              updated[index] = { ...item, completed: !!checked };
+                              setEditingChecklist(updated);
+                            }}
+                            data-testid={`checkbox-checklist-${index}`}
+                          />
+                          <span className={item.completed ? "line-through text-slate-400" : ""}>
+                            {item.item}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveChecklist}
+                      disabled={updateWorkOrderMutation.isPending}
+                      data-testid="button-save-checklist"
+                    >
+                      Save Checklist
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
+
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create Work Order</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Customer <span className="text-red-500">*</span></Label>
+                <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={customerSearchOpen}
+                      className="w-full justify-between font-normal"
+                      data-testid="button-select-customer"
+                    >
+                      {selectedCustomer ? selectedCustomer.name : "Search for a customer..."}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[350px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder="Type to search customers..."
+                        value={customerSearch}
+                        onValueChange={setCustomerSearch}
+                        data-testid="input-customer-search"
+                      />
+                      <CommandList>
+                        {customersLoading ? (
+                          <div className="p-4 text-center text-sm text-slate-500">
+                            Loading...
+                          </div>
+                        ) : customers.length === 0 ? (
+                          <CommandEmpty>No customers found.</CommandEmpty>
+                        ) : (
+                          <CommandGroup>
+                            {customers.map((customer) => (
+                              <CommandItem
+                                key={customer.id}
+                                value={customer.id}
+                                onSelect={() => {
+                                  setSelectedCustomer(customer);
+                                  setSelectedPropertyId("");
+                                  setSelectedProjectId("");
+                                  setCustomerSearchOpen(false);
+                                  setCustomerSearch("");
+                                }}
+                                data-testid={`customer-option-${customer.id}`}
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{customer.name}</span>
+                                  {customer.fullAddress && (
+                                    <span className="text-xs text-slate-500">{customer.fullAddress}</span>
+                                  )}
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {selectedCustomer && properties.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Property</Label>
+                  <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                    <SelectTrigger data-testid="select-property">
+                      <SelectValue placeholder="Select property (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No property selected</SelectItem>
+                      {properties.map((prop) => (
+                        <SelectItem key={prop.id} value={prop.id}>
+                          {prop.address1}, {prop.city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
 
               <div className="space-y-2">
-                <Label>Visit Type</Label>
-                <Select
-                  value={createForm.visitType}
-                  onValueChange={(v) => setCreateForm({ ...createForm, visitType: v as WorkOrderVisitType })}
-                >
+                <Label>Title</Label>
+                <Input
+                  value={woTitle}
+                  onChange={(e) => setWoTitle(e.target.value)}
+                  placeholder="Optional title for this work order"
+                  data-testid="input-wo-title"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Visit Type <span className="text-red-500">*</span></Label>
+                <Select value={visitType} onValueChange={(v) => setVisitType(v as WorkOrderVisitType)}>
                   <SelectTrigger data-testid="select-visit-type">
-                    <SelectValue placeholder="Select visit type" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {workOrderVisitTypeEnum.map((type) => (
@@ -1201,13 +932,27 @@ export default function CrmWorkOrders() {
               </div>
 
               <div className="space-y-2">
-                <Label>Scheduled Date (required)</Label>
-                <Input
-                  type="date"
-                  value={createForm.scheduledDate}
-                  onChange={(e) => setCreateForm({ ...createForm, scheduledDate: e.target.value })}
-                  data-testid="input-date"
-                />
+                <Label>Scheduled Date <span className="text-red-500">*</span></Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                      data-testid="button-scheduled-date"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {scheduledDate ? format(scheduledDate, "MMM d, yyyy") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={scheduledDate}
+                      onSelect={setScheduledDate}
+                      data-testid="calendar-scheduled-date"
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -1215,8 +960,8 @@ export default function CrmWorkOrders() {
                   <Label>Start Time</Label>
                   <Input
                     type="time"
-                    value={createForm.startTime}
-                    onChange={(e) => setCreateForm({ ...createForm, startTime: e.target.value })}
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
                     data-testid="input-start-time"
                   />
                 </div>
@@ -1224,20 +969,17 @@ export default function CrmWorkOrders() {
                   <Label>End Time</Label>
                   <Input
                     type="time"
-                    value={createForm.endTime}
-                    onChange={(e) => setCreateForm({ ...createForm, endTime: e.target.value })}
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
                     data-testid="input-end-time"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Assign Technician (optional)</Label>
-                <Select
-                  value={createForm.assignedTechId}
-                  onValueChange={(v) => setCreateForm({ ...createForm, assignedTechId: v })}
-                >
-                  <SelectTrigger data-testid="select-tech">
+                <Label>Assigned Technician</Label>
+                <Select value={assignedTechId} onValueChange={setAssignedTechId}>
+                  <SelectTrigger data-testid="select-assigned-tech">
                     <SelectValue placeholder="Unassigned" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1245,6 +987,52 @@ export default function CrmWorkOrders() {
                     {technicians.map((tech) => (
                       <SelectItem key={tech.id} value={tech.id}>
                         {tech.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedCustomer && projects.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Link to Project</Label>
+                  <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                    <SelectTrigger data-testid="select-project">
+                      <SelectValue placeholder="Select project (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No project linked</SelectItem>
+                      {projects.map((proj) => (
+                        <SelectItem key={proj.id} value={proj.id}>
+                          {proj.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  value={woDescription}
+                  onChange={(e) => setWoDescription(e.target.value)}
+                  placeholder="Optional description or notes..."
+                  className="min-h-[80px]"
+                  data-testid="textarea-description"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select value={priority} onValueChange={setPriority}>
+                  <SelectTrigger data-testid="select-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORITIES.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p.charAt(0).toUpperCase() + p.slice(1)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1264,13 +1052,7 @@ export default function CrmWorkOrders() {
               </Button>
               <Button
                 onClick={() => createWorkOrderMutation.mutate()}
-                disabled={
-                  createWorkOrderMutation.isPending ||
-                  !createForm.scheduledDate ||
-                  (createNewJob
-                    ? !newJobCustomerId || !newJobDescription.trim() || !newJobStartDate || newJobDuration < 15
-                    : !createForm.jobId)
-                }
+                disabled={createWorkOrderMutation.isPending || !selectedCustomer || !scheduledDate}
                 className="bg-[#711419] hover:bg-[#5a1014]"
                 data-testid="button-submit-create"
               >
