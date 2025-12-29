@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -2842,8 +2842,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 1. GET /api/leads - Get all leads
   app.get("/api/leads", async (req, res) => {
     try {
-      const leads = await storage.getAllLeads();
-      res.json(leads);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 25;
+      const status = req.query.status as string;
+      const search = req.query.search as string;
+      const offset = (page - 1) * limit;
+      
+      // Get total count first
+      let query = db.select({ count: sql<number>`count(*)` }).from(leads);
+      if (status && status !== 'all') {
+        query = query.where(eq(leads.status, status)) as typeof query;
+      }
+      if (search && search.length >= 2) {
+        query = query.where(sql`LOWER(${leads.name}) LIKE LOWER(${'%' + search + '%'}) OR LOWER(${leads.phone}) LIKE LOWER(${'%' + search + '%'}) OR LOWER(${leads.email}) LIKE LOWER(${'%' + search + '%'})`) as typeof query;
+      }
+      const [countResult] = await query;
+      const total = Number(countResult?.count || 0);
+      
+      // Get paginated data
+      let dataQuery = db.select().from(leads);
+      if (status && status !== 'all') {
+        dataQuery = dataQuery.where(eq(leads.status, status)) as typeof dataQuery;
+      }
+      if (search && search.length >= 2) {
+        dataQuery = dataQuery.where(sql`LOWER(${leads.name}) LIKE LOWER(${'%' + search + '%'}) OR LOWER(${leads.phone}) LIKE LOWER(${'%' + search + '%'}) OR LOWER(${leads.email}) LIKE LOWER(${'%' + search + '%'})`) as typeof dataQuery;
+      }
+      const result = await dataQuery.orderBy(desc(leads.createdAt)).limit(limit).offset(offset);
+      
+      res.json({
+        leads: result,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasNextPage: offset + limit < total,
+          hasPrevPage: page > 1
+        }
+      });
     } catch (error) {
       console.error('Error fetching leads:', error);
       res.status(500).json({ message: "Error fetching leads" });
