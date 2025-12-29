@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
@@ -530,6 +531,7 @@ export default function CrmDispatch() {
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
+  const [selectedUnassignedId, setSelectedUnassignedId] = useState<string>("");
   const { toast } = useToast();
   
   const selectedWorkOrder = selectedWorkOrderId ? localWorkOrders.find(wo => wo.id === selectedWorkOrderId) : null;
@@ -673,6 +675,51 @@ export default function CrmDispatch() {
     });
   }, [selectedWorkOrderId, newNote, localWorkOrders, updateWorkOrderMutation, toast]);
 
+  const handleAssignWorkOrder = useCallback((workOrderId: string) => {
+    if (!workOrderId) return;
+    
+    const wo = localWorkOrders.find(w => w.id === workOrderId);
+    if (!wo) return;
+
+    const startDate = new Date(selectedDate);
+    startDate.setHours(8, 0, 0, 0);
+    const endDate = new Date(selectedDate);
+    endDate.setHours(9, 0, 0, 0);
+    
+    const scheduledStartISO = startDate.toISOString();
+    const scheduledEndISO = endDate.toISOString();
+
+    const updates: any = {
+      scheduledStart: scheduledStartISO,
+      scheduledEnd: scheduledEndISO,
+    };
+    
+    if (wo.status !== "scheduled" && wo.status !== "dispatched" && wo.status !== "en_route" && wo.status !== "on_site" && wo.status !== "completed") {
+      updates.status = "scheduled";
+    }
+
+    setLocalWorkOrders(prev => prev.map(w =>
+      w.id === workOrderId 
+        ? { ...w, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any, status: updates.status || w.status } 
+        : w
+    ));
+
+    updateWorkOrderMutation.mutate({
+      workOrderId,
+      updates,
+    }, {
+      onSuccess: () => {
+        toast({ title: "Work order scheduled", description: `Work order assigned to 8am-9am slot. Drag to a technician to assign.` });
+        setSelectedUnassignedId("");
+      },
+      onError: () => {
+        setSelectedUnassignedId("");
+      }
+    });
+    
+    setSelectedUnassignedId("");
+  }, [localWorkOrders, selectedDate, updateWorkOrderMutation, toast]);
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       navigate("/crm/login");
@@ -780,6 +827,10 @@ export default function CrmDispatch() {
   });
 
   const unassignedWorkOrders = filteredWorkOrders.filter(wo => !wo.assignedTechId);
+  
+  // Split unassigned into: scheduled (have times, show on timeline) vs unscheduled (no times, show in dropdown)
+  const scheduledUnassignedWorkOrders = unassignedWorkOrders.filter(wo => wo.scheduledStart && wo.scheduledEnd);
+  const unscheduledWorkOrders = unassignedWorkOrders.filter(wo => !wo.scheduledStart || !wo.scheduledEnd);
 
   const getWorkOrdersForTechnician = useCallback((techId: string) => {
     return filteredWorkOrders.filter((wo) => wo.assignedTechId === techId);
@@ -857,6 +908,31 @@ export default function CrmDispatch() {
                 />
               </PopoverContent>
             </Popover>
+
+            <Select 
+              value={selectedUnassignedId} 
+              onValueChange={handleAssignWorkOrder}
+              disabled={unscheduledWorkOrders.length === 0}
+            >
+              <SelectTrigger className="w-[280px]" data-testid="select-unassigned-workorder">
+                <SelectValue placeholder={unscheduledWorkOrders.length > 0 
+                  ? `Assign Work Order (${unscheduledWorkOrders.length} pending)` 
+                  : "No pending work orders"} />
+              </SelectTrigger>
+              <SelectContent>
+                {unscheduledWorkOrders.map(wo => (
+                  <SelectItem key={wo.id} value={wo.id} data-testid={`option-workorder-${wo.id}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{wo.customerName}</span>
+                      <Badge variant="outline" className="text-xs">{wo.jobType}</Badge>
+                      {wo.propertyAddress && (
+                        <span className="text-xs text-slate-500 truncate max-w-[100px]">{wo.propertyAddress}</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -983,12 +1059,14 @@ export default function CrmDispatch() {
                     </div>
                   </div>
 
-                  <UnassignedRow 
-                    workOrders={unassignedWorkOrders}
-                    onResize={resizeWorkOrder}
-                    activeId={activeId}
-                    onWorkOrderClick={handleWorkOrderClick}
-                  />
+                  {scheduledUnassignedWorkOrders.length > 0 && (
+                    <UnassignedRow 
+                      workOrders={scheduledUnassignedWorkOrders}
+                      onResize={resizeWorkOrder}
+                      activeId={activeId}
+                      onWorkOrderClick={handleWorkOrderClick}
+                    />
+                  )}
 
                   {technicians.map((tech) => (
                     <DroppableTechnicianRow
