@@ -110,6 +110,8 @@ export default function CrmAgreements() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<typeof createForm | null>(null);
 
   const [sortField, setSortField] = useState<SortField>("customerName");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -201,6 +203,24 @@ export default function CrmAgreements() {
     },
     onError: () => {
       toast({ title: "Failed to delete agreement", variant: "destructive" });
+    },
+  });
+
+  const updateAgreementMutation = useMutation({
+    mutationFn: async (data: { id: string; updates: Partial<typeof createForm> }) => {
+      const res = await apiRequest("PATCH", `/api/crm/agreements/${data.id}`, data.updates);
+      return res.json();
+    },
+    onSuccess: (updatedAgreement) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
+      setIsEditing(false);
+      setEditForm(null);
+      // Update the selected agreement with the new data to reflect changes
+      setSelectedAgreement(updatedAgreement);
+      toast({ title: "Agreement updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update agreement", variant: "destructive" });
     },
   });
 
@@ -370,7 +390,42 @@ export default function CrmAgreements() {
       toast({ title: "Agreement plan is required", variant: "destructive" });
       return;
     }
+    if (!createForm.address.trim()) {
+      toast({ title: "Address is required", variant: "destructive" });
+      return;
+    }
     createAgreementMutation.mutate(createForm);
+  };
+
+  const handleStartEdit = () => {
+    if (selectedAgreement) {
+      setEditForm({
+        agreementNumber: selectedAgreement.agreementNumber || "",
+        customerName: selectedAgreement.customerName || "",
+        agreementPlan: selectedAgreement.agreementPlan || "",
+        address: selectedAgreement.address || "",
+        nextServiceDate: selectedAgreement.nextServiceDate || "",
+        nextInvoiceDate: selectedAgreement.nextInvoiceDate || "",
+        startDate: selectedAgreement.startDate || "",
+        endDate: selectedAgreement.endDate || "",
+        notes: selectedAgreement.notes || "",
+        status: selectedAgreement.status as typeof createForm.status,
+      });
+      setIsEditing(true);
+    }
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm || !selectedAgreement) return;
+    if (!editForm.address.trim()) {
+      toast({ title: "Address is required", variant: "destructive" });
+      return;
+    }
+    updateAgreementMutation.mutate({
+      id: selectedAgreement.id,
+      updates: editForm,
+    });
   };
 
   const handleImportSubmit = (e: React.FormEvent) => {
@@ -721,7 +776,7 @@ export default function CrmAgreements() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="address">Service Address</Label>
+                <Label htmlFor="address">Service Address *</Label>
                 <Input
                   id="address"
                   value={createForm.address}
@@ -867,83 +922,242 @@ export default function CrmAgreements() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!selectedAgreement} onOpenChange={(open) => !open && setSelectedAgreement(null)}>
+      <Dialog
+        open={!!selectedAgreement}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedAgreement(null);
+            setIsEditing(false);
+            setEditForm(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Agreement Details</DialogTitle>
+            <DialogTitle>{isEditing ? "Edit Agreement" : "Agreement Details"}</DialogTitle>
             <DialogDescription>
               {selectedAgreement?.agreementNumber}
             </DialogDescription>
           </DialogHeader>
           {selectedAgreement && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-slate-500 text-xs">Customer</Label>
-                  <p className="font-medium">{selectedAgreement.customerName}</p>
-                </div>
-                <div>
-                  <Label className="text-slate-500 text-xs">Status</Label>
-                  <div>
-                    <Badge className={`border ${statusColors[selectedAgreement.status] || statusColors.active}`}>
-                      {statusLabels[selectedAgreement.status] || selectedAgreement.status}
-                    </Badge>
+            <>
+              {isEditing && editForm ? (
+                <form onSubmit={handleEditSubmit}>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-agreementNumber">Agreement Number *</Label>
+                      <Input
+                        id="edit-agreementNumber"
+                        value={editForm.agreementNumber}
+                        onChange={(e) => setEditForm({ ...editForm, agreementNumber: e.target.value })}
+                        placeholder="AGR-001"
+                        data-testid="input-edit-agreement-number"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-customerName">Customer Name *</Label>
+                      <Input
+                        id="edit-customerName"
+                        value={editForm.customerName}
+                        onChange={(e) => setEditForm({ ...editForm, customerName: e.target.value })}
+                        placeholder="John Smith"
+                        data-testid="input-edit-customer-name"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-agreementPlan">Agreement Plan *</Label>
+                      <Input
+                        id="edit-agreementPlan"
+                        value={editForm.agreementPlan}
+                        onChange={(e) => setEditForm({ ...editForm, agreementPlan: e.target.value })}
+                        placeholder="1 unit, 5 units, etc."
+                        data-testid="input-edit-agreement-plan"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-address">Service Address *</Label>
+                      <Input
+                        id="edit-address"
+                        value={editForm.address}
+                        onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                        placeholder="123 Main St, City, ST 12345"
+                        data-testid="input-edit-address"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-nextServiceDate">Next Service Date</Label>
+                        <Input
+                          id="edit-nextServiceDate"
+                          type="date"
+                          value={editForm.nextServiceDate}
+                          onChange={(e) => setEditForm({ ...editForm, nextServiceDate: e.target.value })}
+                          data-testid="input-edit-next-service-date"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-nextInvoiceDate">Next Invoice Date</Label>
+                        <Input
+                          id="edit-nextInvoiceDate"
+                          type="date"
+                          value={editForm.nextInvoiceDate}
+                          onChange={(e) => setEditForm({ ...editForm, nextInvoiceDate: e.target.value })}
+                          data-testid="input-edit-next-invoice-date"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-startDate">Start Date</Label>
+                        <Input
+                          id="edit-startDate"
+                          type="date"
+                          value={editForm.startDate}
+                          onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                          data-testid="input-edit-start-date"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-endDate">End Date</Label>
+                        <Input
+                          id="edit-endDate"
+                          type="date"
+                          value={editForm.endDate}
+                          onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+                          data-testid="input-edit-end-date"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-status">Status</Label>
+                      <Select
+                        value={editForm.status}
+                        onValueChange={(value) => setEditForm({ ...editForm, status: value as typeof editForm.status })}
+                      >
+                        <SelectTrigger data-testid="select-edit-status">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="expiring">Expiring</SelectItem>
+                          <SelectItem value="expired">Expired</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-notes">Notes</Label>
+                      <Textarea
+                        id="edit-notes"
+                        value={editForm.notes}
+                        onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                        placeholder="Any additional notes..."
+                        data-testid="input-edit-notes"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsEditing(false);
+                        setEditForm(null);
+                      }}
+                      data-testid="button-cancel-edit"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="bg-[#711419] hover:bg-[#5a1014]"
+                      disabled={updateAgreementMutation.isPending}
+                      data-testid="button-save-edit"
+                    >
+                      {updateAgreementMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-slate-500 text-xs">Customer</Label>
+                      <p className="font-medium">{selectedAgreement.customerName}</p>
+                    </div>
+                    <div>
+                      <Label className="text-slate-500 text-xs">Status</Label>
+                      <div>
+                        <Badge className={`border ${statusColors[selectedAgreement.status] || statusColors.active}`}>
+                          {statusLabels[selectedAgreement.status] || selectedAgreement.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-slate-500 text-xs">Agreement Plan</Label>
+                      <p className="font-medium">{selectedAgreement.agreementPlan}</p>
+                    </div>
+                    <div>
+                      <Label className="text-slate-500 text-xs">Address</Label>
+                      <p className="font-medium">{selectedAgreement.address || "—"}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-slate-500 text-xs">Next Service Date</Label>
+                      <p className="font-medium">{formatDate(selectedAgreement.nextServiceDate)}</p>
+                    </div>
+                    <div>
+                      <Label className="text-slate-500 text-xs">Next Invoice Date</Label>
+                      <p className="font-medium">{formatDate(selectedAgreement.nextInvoiceDate)}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-slate-500 text-xs">Start Date</Label>
+                      <p className="font-medium">{formatDate(selectedAgreement.startDate)}</p>
+                    </div>
+                    <div>
+                      <Label className="text-slate-500 text-xs">End Date</Label>
+                      <p className="font-medium">{formatDate(selectedAgreement.endDate)}</p>
+                    </div>
+                  </div>
+                  {selectedAgreement.notes && (
+                    <div>
+                      <Label className="text-slate-500 text-xs">Notes</Label>
+                      <p className="text-sm">{selectedAgreement.notes}</p>
+                    </div>
+                  )}
+                  <div className="flex justify-end gap-2 pt-4 border-t">
+                    <Button
+                      size="sm"
+                      className="bg-[#711419] hover:bg-[#5a1014]"
+                      onClick={handleStartEdit}
+                      data-testid="button-edit-agreement"
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm("Are you sure you want to delete this agreement?")) {
+                          deleteAgreementMutation.mutate(selectedAgreement.id);
+                        }
+                      }}
+                      disabled={deleteAgreementMutation.isPending}
+                      data-testid="button-delete-agreement"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-slate-500 text-xs">Agreement Plan</Label>
-                  <p className="font-medium">{selectedAgreement.agreementPlan}</p>
-                </div>
-                <div>
-                  <Label className="text-slate-500 text-xs">Address</Label>
-                  <p className="font-medium">{selectedAgreement.address || "—"}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-slate-500 text-xs">Next Service Date</Label>
-                  <p className="font-medium">{formatDate(selectedAgreement.nextServiceDate)}</p>
-                </div>
-                <div>
-                  <Label className="text-slate-500 text-xs">Next Invoice Date</Label>
-                  <p className="font-medium">{formatDate(selectedAgreement.nextInvoiceDate)}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-slate-500 text-xs">Start Date</Label>
-                  <p className="font-medium">{formatDate(selectedAgreement.startDate)}</p>
-                </div>
-                <div>
-                  <Label className="text-slate-500 text-xs">End Date</Label>
-                  <p className="font-medium">{formatDate(selectedAgreement.endDate)}</p>
-                </div>
-              </div>
-              {selectedAgreement.notes && (
-                <div>
-                  <Label className="text-slate-500 text-xs">Notes</Label>
-                  <p className="text-sm">{selectedAgreement.notes}</p>
-                </div>
               )}
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    if (confirm("Are you sure you want to delete this agreement?")) {
-                      deleteAgreementMutation.mutate(selectedAgreement.id);
-                    }
-                  }}
-                  disabled={deleteAgreementMutation.isPending}
-                  data-testid="button-delete-agreement"
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
-                </Button>
-              </div>
-            </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
