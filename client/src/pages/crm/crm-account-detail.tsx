@@ -750,6 +750,7 @@ export default function CrmAccountDetail() {
                             <Button
                               size="sm"
                               variant="outline"
+                              className="min-w-[120px]"
                               onClick={item.action}
                               data-testid={`button-checklist-${item.id}`}
                             >
