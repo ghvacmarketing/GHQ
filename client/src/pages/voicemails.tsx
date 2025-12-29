@@ -33,6 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -1577,16 +1578,38 @@ const phoneScreeningSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   resumeReceived: z.enum(["yes", "no", "will_send"]),
-  currentEmployer: z.string().optional(),
-  yearsExperience: z.string().optional(),
-  hvacCertifications: z.string().optional(),
-  epaUniversal: z.enum(["yes", "no", "in_progress"]),
   validDriversLicense: z.enum(["yes", "no"]),
-  willingToTravel: z.enum(["yes", "no", "limited"]),
-  availableStart: z.string().optional(),
+  epaCertification: z.enum(["yes", "no"]),
+  epaTypeI: z.boolean().optional(),
+  epaTypeII: z.boolean().optional(),
+  epaTypeIII: z.boolean().optional(),
+  epaUniversal: z.boolean().optional(),
+  yearsExperience: z.string().optional(),
+  systemsResidential: z.boolean().optional(),
+  systemsCommercial: z.boolean().optional(),
+  brandsFamiliar: z.string().optional(),
+  experienceServiceCalls: z.boolean().optional(),
+  experienceInstallations: z.boolean().optional(),
+  experienceBoth: z.boolean().optional(),
+  ownHandTools: z.enum(["yes", "no"]),
+  toolkitDescription: z.string().optional(),
+  strongestTechnicalSkill: z.string().optional(),
+  comfortableAtticsCrawlSpaces: z.enum(["yes", "no"]),
+  canLift75lbs: z.enum(["yes", "no"]),
+  availableOnCall: z.enum(["yes", "no"]),
+  howHeardAboutUs: z.string().optional(),
+  currentlyEmployed: z.enum(["yes", "no"]),
+  noticePeriod: z.string().optional(),
+  desiredStartDate: z.string().optional(),
   salaryExpectation: z.string().optional(),
-  notes: z.string().optional(),
-  recommendation: z.enum(["proceed", "maybe", "pass"]),
+  safetyViolations: z.enum(["yes", "no"]),
+  safetyViolationsExplain: z.string().optional(),
+  reasonForLeaving: z.string().optional(),
+  phoneManner: z.enum(["professional", "okay", "concerning"]),
+  recommendMovingForward: z.enum(["yes", "no", "unsure"]),
+  redFlagsNotes: z.string().optional(),
+  actionSentToErnest: z.boolean().optional(),
+  actionDeclined: z.boolean().optional(),
 });
 
 type PhoneScreeningFormData = z.infer<typeof phoneScreeningSchema>;
@@ -1604,18 +1627,64 @@ function PhoneScreeningForm() {
       phone: "",
       email: "",
       resumeReceived: "no",
-      currentEmployer: "",
-      yearsExperience: "",
-      hvacCertifications: "",
-      epaUniversal: "no",
       validDriversLicense: "yes",
-      willingToTravel: "yes",
-      availableStart: "",
+      epaCertification: "no",
+      epaTypeI: false,
+      epaTypeII: false,
+      epaTypeIII: false,
+      epaUniversal: false,
+      yearsExperience: "",
+      systemsResidential: false,
+      systemsCommercial: false,
+      brandsFamiliar: "",
+      experienceServiceCalls: false,
+      experienceInstallations: false,
+      experienceBoth: false,
+      ownHandTools: "no",
+      toolkitDescription: "",
+      strongestTechnicalSkill: "",
+      comfortableAtticsCrawlSpaces: "yes",
+      canLift75lbs: "yes",
+      availableOnCall: "yes",
+      howHeardAboutUs: "",
+      currentlyEmployed: "no",
+      noticePeriod: "",
+      desiredStartDate: "",
       salaryExpectation: "",
-      notes: "",
-      recommendation: "maybe",
+      safetyViolations: "no",
+      safetyViolationsExplain: "",
+      reasonForLeaving: "",
+      phoneManner: "okay",
+      recommendMovingForward: "unsure",
+      redFlagsNotes: "",
+      actionSentToErnest: false,
+      actionDeclined: false,
     },
   });
+
+  const getEpaTypes = (data: PhoneScreeningFormData) => {
+    const types = [];
+    if (data.epaTypeI) types.push("Type I");
+    if (data.epaTypeII) types.push("Type II");
+    if (data.epaTypeIII) types.push("Type III");
+    if (data.epaUniversal) types.push("Universal");
+    return types.length > 0 ? types.join(", ") : "N/A";
+  };
+
+  const getSystemTypes = (data: PhoneScreeningFormData) => {
+    const types = [];
+    if (data.systemsResidential) types.push("Residential");
+    if (data.systemsCommercial) types.push("Commercial");
+    return types.length > 0 ? types.join(", ") : "N/A";
+  };
+
+  const getExperienceTypes = (data: PhoneScreeningFormData) => {
+    const types = [];
+    if (data.experienceServiceCalls) types.push("Service Calls");
+    if (data.experienceInstallations) types.push("Installations");
+    if (data.experienceBoth) types.push("Both");
+    return types.length > 0 ? types.join(", ") : "N/A";
+  };
 
   const onSubmit = async (data: PhoneScreeningFormData) => {
     setIsSubmitting(true);
@@ -1633,27 +1702,54 @@ Phone: ${data.phone || "N/A"}
 Email: ${data.email || "N/A"}
 Resume Received: ${data.resumeReceived === "yes" ? "Yes" : data.resumeReceived === "no" ? "No" : "Will Send"}
 
-EXPERIENCE & QUALIFICATIONS
-----------------------------
-Current/Previous Employer: ${data.currentEmployer || "N/A"}
-Years of HVAC Experience: ${data.yearsExperience || "N/A"}
-HVAC Certifications: ${data.hvacCertifications || "N/A"}
-EPA Universal: ${data.epaUniversal === "yes" ? "Yes" : data.epaUniversal === "no" ? "No" : "In Progress"}
-
-LOGISTICS
----------
+BASIC QUALIFICATIONS
+--------------------
 Valid Driver's License: ${data.validDriversLicense === "yes" ? "Yes" : "No"}
-Willing to Travel: ${data.willingToTravel === "yes" ? "Yes" : data.willingToTravel === "no" ? "No" : "Limited"}
-Available Start Date: ${data.availableStart || "N/A"}
-Salary Expectation: ${data.salaryExpectation || "N/A"}
+EPA Certification: ${data.epaCertification === "yes" ? "Yes" : "No"}
+EPA Type(s): ${getEpaTypes(data)}
+Years of HVAC Experience: ${data.yearsExperience || "N/A"}
 
-NOTES
------
-${data.notes || "N/A"}
+EXPERIENCE & SKILLS
+-------------------
+Types of Systems Worked On: ${getSystemTypes(data)}
+Brands Familiar With: ${data.brandsFamiliar || "N/A"}
+Experience With: ${getExperienceTypes(data)}
+Own Hand Tools: ${data.ownHandTools === "yes" ? "Yes" : "No"}
+Toolkit Description: ${data.toolkitDescription || "N/A"}
+Strongest Technical Skill: ${data.strongestTechnicalSkill || "N/A"}
 
-RECOMMENDATION
---------------
-${data.recommendation === "proceed" ? "✅ PROCEED - Schedule interview" : data.recommendation === "maybe" ? "⚠️ MAYBE - Need more info" : "❌ PASS - Not a fit"}
+PRACTICAL REQUIREMENTS
+----------------------
+Comfortable in Attics/Crawl Spaces/Roofs: ${data.comfortableAtticsCrawlSpaces === "yes" ? "Yes" : "No"}
+Can Lift/Carry 75 lbs Regularly: ${data.canLift75lbs === "yes" ? "Yes" : "No"}
+Available for Standard Hours + On-Call: ${data.availableOnCall === "yes" ? "Yes" : "No"}
+
+AVAILABILITY & BACKGROUND
+-------------------------
+How Did You Hear About Us: ${data.howHeardAboutUs || "N/A"}
+Currently Employed: ${data.currentlyEmployed === "yes" ? "Yes" : "No"}
+Notice Period Needed: ${data.noticePeriod || "N/A"}
+Desired Start Date: ${data.desiredStartDate || "N/A"}
+Salary/Hourly Expectations: ${data.salaryExpectation || "N/A"}
+Any Safety Violations/License Suspensions: ${data.safetyViolations === "yes" ? "Yes" : "No"}
+${data.safetyViolations === "yes" ? `Explanation: ${data.safetyViolationsExplain || "N/A"}` : ""}
+
+WHY THEY'RE LOOKING
+-------------------
+Reason for Leaving Current/Last Position:
+${data.reasonForLeaving || "N/A"}
+
+YOUR IMPRESSION (KYLIE)
+-----------------------
+Overall Phone Manner: ${data.phoneManner === "professional" ? "Professional" : data.phoneManner === "okay" ? "Okay" : "Concerning"}
+Would You Recommend Moving Forward: ${data.recommendMovingForward === "yes" ? "Yes" : data.recommendMovingForward === "no" ? "No" : "Unsure"}
+Red Flags or Notes:
+${data.redFlagsNotes || "None"}
+
+ACTION TAKEN
+------------
+${data.actionSentToErnest ? "✅ Sent to Ernest for Review" : ""}
+${data.actionDeclined ? "❌ Declined (Missing Requirements)" : ""}
       `.trim();
 
       const mailtoLink = `mailto:ernest@giesbrechthvac.com?subject=Phone Screening: ${encodeURIComponent(data.candidateName)}&body=${encodeURIComponent(emailBody)}`;
@@ -1675,374 +1771,428 @@ ${data.recommendation === "proceed" ? "✅ PROCEED - Schedule interview" : data.
       setIsSubmitting(false);
     }
   };
+  
+  const handlePrint = () => {
+    window.print();
+  };
+  
+  const handleClear = () => {
+    form.reset();
+    toast({
+      title: "Form cleared",
+      description: "All fields have been reset.",
+    });
+  };
+
+  const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <Card className="border shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-semibold text-slate-600 uppercase tracking-wide border-b-2 border-blue-500 pb-2">
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">{children}</CardContent>
+    </Card>
+  );
 
   return (
-    <Card className="max-w-2xl mx-auto">
-      <CardHeader className="bg-slate-700 text-white rounded-t-lg">
-        <CardTitle className="text-lg font-bold">HVAC Technician Phone Screening Form</CardTitle>
-        <p className="text-sm text-slate-200">Quick 10-minute phone interview for service technician candidates</p>
-      </CardHeader>
-      <CardContent className="p-4 sm:p-6">
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 rounded">
-          <h3 className="font-semibold text-blue-800 mb-2">Quick Steps for Kylie:</h3>
-          <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
-            <li><strong>Greet & get resume:</strong> Ask for their email and where to send resume</li>
-            <li><strong>Fill out this form:</strong> Takes 5-10 minutes during the call</li>
-            <li><strong>Send to Ernest:</strong> Email completed form + resume to Ernest (you're done!)</li>
-          </ol>
-        </div>
+    <div className="max-w-2xl mx-auto space-y-4 pb-6">
+      <Card>
+        <CardHeader className="bg-slate-700 text-white rounded-t-lg">
+          <CardTitle className="text-lg font-bold">HVAC Technician Phone Screening Form</CardTitle>
+          <p className="text-sm text-slate-200">Quick 10-minute phone interview for service technician candidates</p>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+            <h3 className="font-semibold text-blue-800 mb-2">Quick Steps for Kylie:</h3>
+            <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+              <li><strong>Greet & get resume:</strong> Ask for their email and where to send resume</li>
+              <li><strong>Fill out this form:</strong> Takes 5-10 minutes during the call</li>
+              <li><strong>Send to Ernest:</strong> Email completed form + resume to Ernest (you're done!)</li>
+            </ol>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-4">
-              <h3 className="font-semibold text-slate-700 border-b pb-2">CANDIDATE INFORMATION</h3>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="dateOfCall"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date of Call:</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} data-testid="input-date-of-call" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="screenedBy"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Screened by:</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Kylie" {...field} data-testid="input-screened-by" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="candidateName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Candidate Name:</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Full name" {...field} data-testid="input-candidate-name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone:</FormLabel>
-                      <FormControl>
-                        <Input type="tel" placeholder="(555) 123-4567" {...field} data-testid="input-phone" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email:</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="candidate@email.com" {...field} data-testid="input-email" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="resumeReceived"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Resume Received?</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-wrap gap-4"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="yes" id="resume-yes" />
-                          <Label htmlFor="resume-yes">Yes</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="no" id="resume-no" />
-                          <Label htmlFor="resume-no">No</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="will_send" id="resume-will-send" />
-                          <Label htmlFor="resume-will-send">Will Send</Label>
-                        </div>
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <SectionCard title="Candidate Information">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField control={form.control} name="dateOfCall" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date of Call:</FormLabel>
+                  <FormControl><Input type="date" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="screenedBy" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Screened by:</FormLabel>
+                  <FormControl><Input placeholder="Kylie" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
             </div>
-
-            <div className="space-y-4">
-              <h3 className="font-semibold text-slate-700 border-b pb-2">EXPERIENCE & QUALIFICATIONS</h3>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="currentEmployer"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Current/Previous Employer:</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Company name" {...field} data-testid="input-employer" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="yearsExperience"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Years of HVAC Experience:</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., 5 years" {...field} data-testid="input-experience" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="hvacCertifications"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>HVAC Certifications:</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., NATE, HVAC Excellence" {...field} data-testid="input-certifications" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="epaUniversal"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>EPA Universal Certification?</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-wrap gap-4"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="yes" id="epa-yes" />
-                          <Label htmlFor="epa-yes">Yes</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="no" id="epa-no" />
-                          <Label htmlFor="epa-no">No</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="in_progress" id="epa-in-progress" />
-                          <Label htmlFor="epa-in-progress">In Progress</Label>
-                        </div>
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <FormField control={form.control} name="candidateName" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Candidate Name:</FormLabel>
+                <FormControl><Input placeholder="Full name" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField control={form.control} name="phone" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone:</FormLabel>
+                  <FormControl><Input type="tel" placeholder="(555) 123-4567" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email:</FormLabel>
+                  <FormControl><Input type="email" placeholder="candidate@email.com" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
             </div>
+            <FormField control={form.control} name="resumeReceived" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Resume Received?</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-wrap gap-4">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="yes" id="resume-yes" /><Label htmlFor="resume-yes">Yes</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="no" id="resume-no" /><Label htmlFor="resume-no">No</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="will_send" id="resume-will-send" /><Label htmlFor="resume-will-send">Will Send</Label></div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </SectionCard>
 
-            <div className="space-y-4">
-              <h3 className="font-semibold text-slate-700 border-b pb-2">LOGISTICS</h3>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="validDriversLicense"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Valid Driver's License?</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex gap-4"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="yes" id="license-yes" />
-                            <Label htmlFor="license-yes">Yes</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="no" id="license-no" />
-                            <Label htmlFor="license-no">No</Label>
-                          </div>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="willingToTravel"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Willing to Travel?</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex gap-4"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="yes" id="travel-yes" />
-                            <Label htmlFor="travel-yes">Yes</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="no" id="travel-no" />
-                            <Label htmlFor="travel-no">No</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="limited" id="travel-limited" />
-                            <Label htmlFor="travel-limited">Limited</Label>
-                          </div>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="availableStart"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Available Start Date:</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., 2 weeks notice" {...field} data-testid="input-start-date" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="salaryExpectation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Salary Expectation:</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., $25-30/hr" {...field} data-testid="input-salary" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+          <SectionCard title="Basic Qualifications">
+            <div className="bg-amber-50 border-l-4 border-amber-400 p-3 rounded text-sm">
+              <span className="font-semibold text-amber-800">⚠️ DEAL-BREAKERS:</span>{" "}
+              <span className="text-amber-700">If they answer "No" to driver's license or EPA certification, thank them but explain these are requirements.</span>
+            </div>
+            <FormField control={form.control} name="validDriversLicense" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Valid Driver's License?</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="yes" id="license-yes" /><Label htmlFor="license-yes">Yes</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="no" id="license-no" /><Label htmlFor="license-no">No</Label></div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="epaCertification" render={({ field }) => (
+              <FormItem>
+                <FormLabel>EPA Certification?</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="yes" id="epa-cert-yes" /><Label htmlFor="epa-cert-yes">Yes</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="no" id="epa-cert-no" /><Label htmlFor="epa-cert-no">No</Label></div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <div>
+              <Label className="text-sm font-medium">If Yes, EPA Type:</Label>
+              <div className="flex flex-wrap gap-4 mt-2">
+                <FormField control={form.control} name="epaTypeI" render={({ field }) => (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} id="epa-type-1" />
+                    <Label htmlFor="epa-type-1">Type I</Label>
+                  </div>
+                )} />
+                <FormField control={form.control} name="epaTypeII" render={({ field }) => (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} id="epa-type-2" />
+                    <Label htmlFor="epa-type-2">Type II</Label>
+                  </div>
+                )} />
+                <FormField control={form.control} name="epaTypeIII" render={({ field }) => (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} id="epa-type-3" />
+                    <Label htmlFor="epa-type-3">Type III</Label>
+                  </div>
+                )} />
+                <FormField control={form.control} name="epaUniversal" render={({ field }) => (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} id="epa-universal" />
+                    <Label htmlFor="epa-universal">Universal</Label>
+                  </div>
+                )} />
               </div>
             </div>
+            <FormField control={form.control} name="yearsExperience" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Years of HVAC Experience:</FormLabel>
+                <FormControl><Input placeholder="" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </SectionCard>
 
-            <div className="space-y-4">
-              <h3 className="font-semibold text-slate-700 border-b pb-2">NOTES & RECOMMENDATION</h3>
-              
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Additional Notes:</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Any additional observations or notes from the call..."
-                        className="min-h-[100px]"
-                        {...field}
-                        data-testid="input-notes"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="recommendation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Your Recommendation:</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-wrap gap-4"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="proceed" id="rec-proceed" />
-                          <Label htmlFor="rec-proceed" className="text-green-600 font-medium">✅ Proceed</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="maybe" id="rec-maybe" />
-                          <Label htmlFor="rec-maybe" className="text-amber-600 font-medium">⚠️ Maybe</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="pass" id="rec-pass" />
-                          <Label htmlFor="rec-pass" className="text-red-600 font-medium">❌ Pass</Label>
-                        </div>
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <SectionCard title="Experience & Skills">
+            <div>
+              <Label className="text-sm font-medium">Types of Systems Worked On:</Label>
+              <div className="flex flex-wrap gap-4 mt-2">
+                <FormField control={form.control} name="systemsResidential" render={({ field }) => (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} id="sys-residential" />
+                    <Label htmlFor="sys-residential">Residential</Label>
+                  </div>
+                )} />
+                <FormField control={form.control} name="systemsCommercial" render={({ field }) => (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} id="sys-commercial" />
+                    <Label htmlFor="sys-commercial">Commercial</Label>
+                  </div>
+                )} />
+              </div>
             </div>
-
-            <div className="pt-4 border-t">
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-slate-700 hover:bg-slate-800"
-                data-testid="button-submit-screening"
-              >
-                <Send className="h-4 w-4 mr-2" />
-                {isSubmitting ? "Preparing Email..." : "Send to Ernest"}
-              </Button>
-              <p className="text-xs text-muted-foreground text-center mt-2">
-                This will open your email client with the completed form
-              </p>
+            <FormField control={form.control} name="brandsFamiliar" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Brands Familiar With:</FormLabel>
+                <FormControl><Input placeholder="e.g., Carrier, Trane, Lennox, etc." {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <div>
+              <Label className="text-sm font-medium">Experience With:</Label>
+              <div className="flex flex-wrap gap-4 mt-2">
+                <FormField control={form.control} name="experienceServiceCalls" render={({ field }) => (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} id="exp-service" />
+                    <Label htmlFor="exp-service">Service Calls</Label>
+                  </div>
+                )} />
+                <FormField control={form.control} name="experienceInstallations" render={({ field }) => (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} id="exp-install" />
+                    <Label htmlFor="exp-install">Installations</Label>
+                  </div>
+                )} />
+                <FormField control={form.control} name="experienceBoth" render={({ field }) => (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} id="exp-both" />
+                    <Label htmlFor="exp-both">Both</Label>
+                  </div>
+                )} />
+              </div>
             </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+            <FormField control={form.control} name="ownHandTools" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Own Hand Tools?</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="yes" id="tools-yes" /><Label htmlFor="tools-yes">Yes</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="no" id="tools-no" /><Label htmlFor="tools-no">No</Label></div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="toolkitDescription" render={({ field }) => (
+              <FormItem>
+                <FormLabel>If Yes, Describe Toolkit:</FormLabel>
+                <FormControl><Input placeholder="e.g., basic hand tools, multimeter, gauges, etc." {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="strongestTechnicalSkill" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Strongest Technical Skill:</FormLabel>
+                <FormControl><Input placeholder="e.g., diagnostics, refrigerant handling, electrical, etc." {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </SectionCard>
+
+          <SectionCard title="Practical Requirements">
+            <FormField control={form.control} name="comfortableAtticsCrawlSpaces" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Comfortable Working in Attics/Crawl Spaces/Roofs?</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="yes" id="attic-yes" /><Label htmlFor="attic-yes">Yes</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="no" id="attic-no" /><Label htmlFor="attic-no">No</Label></div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="canLift75lbs" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Can Lift/Carry 75 lbs Regularly?</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="yes" id="lift-yes" /><Label htmlFor="lift-yes">Yes</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="no" id="lift-no" /><Label htmlFor="lift-no">No</Label></div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="availableOnCall" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Available for Standard Hours + On-Call Rotation?</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="yes" id="oncall-yes" /><Label htmlFor="oncall-yes">Yes</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="no" id="oncall-no" /><Label htmlFor="oncall-no">No</Label></div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </SectionCard>
+
+          <SectionCard title="Availability & Background">
+            <FormField control={form.control} name="howHeardAboutUs" render={({ field }) => (
+              <FormItem>
+                <FormLabel>How Did You Hear About Us?</FormLabel>
+                <FormControl><Input placeholder="e.g., Indeed, referral, saw truck, etc." {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="currentlyEmployed" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Currently Employed?</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="yes" id="employed-yes" /><Label htmlFor="employed-yes">Yes</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="no" id="employed-no" /><Label htmlFor="employed-no">No</Label></div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="noticePeriod" render={({ field }) => (
+              <FormItem>
+                <FormLabel>If Yes, Notice Period Needed:</FormLabel>
+                <FormControl><Input placeholder="e.g., 2 weeks, immediate, etc." {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="desiredStartDate" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Desired Start Date:</FormLabel>
+                <FormControl><Input type="date" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="salaryExpectation" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Salary/Hourly Expectations:</FormLabel>
+                <FormControl><Input placeholder="e.g., $25/hour, $50k/year, negotiable" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="safetyViolations" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Any Safety Violations or License Suspensions?</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="yes" id="safety-yes" /><Label htmlFor="safety-yes">Yes</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="no" id="safety-no" /><Label htmlFor="safety-no">No</Label></div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="safetyViolationsExplain" render={({ field }) => (
+              <FormItem>
+                <FormLabel>If Yes, Explain:</FormLabel>
+                <FormControl><Textarea placeholder="" className="min-h-[80px]" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </SectionCard>
+
+          <SectionCard title="Why They're Looking">
+            <FormField control={form.control} name="reasonForLeaving" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Reason for Leaving Current/Last Position:</FormLabel>
+                <FormControl><Textarea placeholder="" className="min-h-[100px]" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </SectionCard>
+
+          <SectionCard title="Your Impression (Kylie)">
+            <FormField control={form.control} name="phoneManner" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Overall Phone Manner:</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-wrap gap-4">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="professional" id="manner-prof" /><Label htmlFor="manner-prof">Professional</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="okay" id="manner-okay" /><Label htmlFor="manner-okay">Okay</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="concerning" id="manner-concern" /><Label htmlFor="manner-concern">Concerning</Label></div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="recommendMovingForward" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Would You Recommend Moving Forward?</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-wrap gap-4">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="yes" id="rec-yes" /><Label htmlFor="rec-yes">Yes</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="no" id="rec-no" /><Label htmlFor="rec-no">No</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="unsure" id="rec-unsure" /><Label htmlFor="rec-unsure">Unsure</Label></div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="redFlagsNotes" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Any Red Flags or Notes:</FormLabel>
+                <FormControl><Textarea placeholder="" className="min-h-[100px]" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </SectionCard>
+
+          <SectionCard title="Action Taken">
+            <div className="flex flex-wrap gap-6">
+              <FormField control={form.control} name="actionSentToErnest" render={({ field }) => (
+                <div className="flex items-center space-x-2">
+                  <Checkbox checked={field.value} onCheckedChange={field.onChange} id="action-sent" />
+                  <Label htmlFor="action-sent">Sent to Ernest for Review</Label>
+                </div>
+              )} />
+              <FormField control={form.control} name="actionDeclined" render={({ field }) => (
+                <div className="flex items-center space-x-2">
+                  <Checkbox checked={field.value} onCheckedChange={field.onChange} id="action-declined" />
+                  <Label htmlFor="action-declined">Declined (Missing Requirements)</Label>
+                </div>
+              )} />
+            </div>
+          </SectionCard>
+
+          <div className="flex flex-wrap gap-3 pt-4">
+            <Button type="button" onClick={handlePrint} variant="outline" className="bg-blue-500 hover:bg-blue-600 text-white border-blue-500">
+              Print Form
+            </Button>
+            <Button type="button" onClick={handleClear} variant="outline" className="bg-slate-500 hover:bg-slate-600 text-white border-slate-500">
+              Clear Form
+            </Button>
+            <Button type="submit" disabled={isSubmitting} className="bg-green-500 hover:bg-green-600 text-white flex-1 sm:flex-none">
+              <Send className="h-4 w-4 mr-2" />
+              {isSubmitting ? "Preparing..." : "Save & Email to Ernest"}
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
   );
 }
 
