@@ -7515,6 +7515,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Work order not found" });
       }
 
+      // Convert date strings to Date objects before validation
+      const preprocessedBody = { ...req.body };
+      const dateFields = ['scheduledStart', 'scheduledEnd', 'startedAt', 'completedAt'];
+      for (const field of dateFields) {
+        if (typeof preprocessedBody[field] === 'string') {
+          preprocessedBody[field] = new Date(preprocessedBody[field]);
+        }
+      }
+
       const allowedFields = insertCrmWorkOrderSchema.partial().pick({
         status: true,
         assignedTechId: true,
@@ -7527,7 +7536,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         completedAt: true,
       });
 
-      const result = allowedFields.safeParse(req.body);
+      const result = allowedFields.safeParse(preprocessedBody);
       if (!result.success) {
         return res.status(400).json({ 
           message: "Invalid request body", 
