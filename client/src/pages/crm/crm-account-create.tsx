@@ -234,9 +234,9 @@ export default function CrmAccountCreate() {
   const createCustomerMutation = useMutation({
     mutationFn: async () => {
       const customerTypeMap: Record<AccountType, string> = {
-        "RESIDENTIAL": "residential",
-        "COMMERCIAL": "commercial",
-        "PROPERTY_MANAGER": "property_manager",
+        "RESIDENTIAL": "Residential",
+        "COMMERCIAL": "Commercial",
+        "PROPERTY_MANAGER": "Property Manager",
       };
 
       const fullAddress = `${formData.address1}${formData.address2 ? ', ' + formData.address2 : ''}, ${formData.city}, ${formData.state} ${formData.zip}`;
@@ -269,6 +269,7 @@ export default function CrmAccountCreate() {
     onSuccess: (data) => {
       toast({ title: "Customer created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers/stats"] });
       if (data?.customer?.id) {
         navigate(`/crm/customers/${data.customer.id}`);
       } else {
