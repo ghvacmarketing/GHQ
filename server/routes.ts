@@ -130,6 +130,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // ============================================
+  // HEALTH CHECK ENDPOINT (for keep-warm / monitoring)
+  // ============================================
+  app.get("/health", (req, res) => {
+    res.status(200).json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
+  });
+
+  // ============================================
   // TRELLO WEBHOOK ROUTES (must be before express.json middleware for POST)
   // ============================================
 

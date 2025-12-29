@@ -38,8 +38,69 @@ import CrmProjectDetail from "@/pages/crm/crm-project-detail";
 import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import GlobalPasswordGate from "@/components/GlobalPasswordGate";
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect, Component, type ReactNode } from "react";
 import type { Announcement } from "@shared/schema";
+import { Loader2 } from "lucide-react";
+
+// Global Error Boundary to prevent blank screens
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: { componentStack: string }) {
+    console.error("App Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background">
+          <div className="text-center max-w-md">
+            <h1 className="text-2xl font-bold text-foreground mb-4">Something went wrong</h1>
+            <p className="text-muted-foreground mb-6">
+              The application encountered an unexpected error. Please try refreshing the page.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+              data-testid="button-reload"
+            >
+              Refresh Page
+            </button>
+            {this.state.error && (
+              <details className="mt-4 text-left text-sm text-muted-foreground">
+                <summary className="cursor-pointer">Error details</summary>
+                <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto">
+                  {this.state.error.message}
+                </pre>
+              </details>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Global loading spinner for initial app load
+function GlobalLoader() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background" data-testid="global-loader">
+      <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+      <p className="text-muted-foreground">Loading GHVAC Tools...</p>
+    </div>
+  );
+}
 
 // Lazy load admin settings to reduce initial bundle size
 const AdminSettings = lazy(() => import("@/pages/admin-settings"));
@@ -132,13 +193,17 @@ function AppContent() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <GlobalPasswordGate>
-          <AppContent />
-        </GlobalPasswordGate>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <Suspense fallback={<GlobalLoader />}>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <GlobalPasswordGate>
+              <AppContent />
+            </GlobalPasswordGate>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
