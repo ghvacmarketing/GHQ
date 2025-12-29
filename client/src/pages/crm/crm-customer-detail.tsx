@@ -1296,14 +1296,6 @@ export default function CrmCustomerDetail() {
               <CalendarPlus className="h-4 w-4 mr-2" />
               Create Work Order
             </Button>
-            <Button 
-              variant="outline"
-              onClick={() => setCreateDialogOpen(true)}
-              data-testid="button-new-job"
-            >
-              <Briefcase className="h-4 w-4 mr-2" />
-              New Job (Legacy)
-            </Button>
             {canDeleteCustomer && (
               <Button 
                 variant="outline"
@@ -2206,98 +2198,6 @@ export default function CrmCustomerDetail() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-active-jobs">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-amber-500" />
-              Jobs (Legacy) ({activeJobs.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {activeJobs.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-4">No active projects</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Scheduled</TableHead>
-                    <TableHead>Technician</TableHead>
-                    <TableHead className="w-16">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activeJobs.map((job) => (
-                    <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
-                      <TableCell className="font-medium">{job.jobType}</TableCell>
-                      <TableCell>
-                        <Badge className={`${statusColors[job.status]?.bg} ${statusColors[job.status]?.text}`}>
-                          {job.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`${priorityColors[job.priority || "normal"]?.bg} ${priorityColors[job.priority || "normal"]?.text}`}>
-                          {job.priority || "normal"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatDate(job.scheduledStart)}</TableCell>
-                      <TableCell>{job.assignedTechName || "Unassigned"}</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" data-testid={`button-actions-job-${job.id}`}>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => navigate(`/crm/jobs/${job.id}`)}
-                              data-testid={`action-view-job-${job.id}`}
-                            >
-                              <ExternalLink className="h-4 w-4 mr-2" />
-                              View / Edit Project
-                            </DropdownMenuItem>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem
-                                  onSelect={(e) => e.preventDefault()}
-                                  className="text-red-600 focus:text-red-600"
-                                  data-testid={`action-delete-job-${job.id}`}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete Project
-                                </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Project?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will permanently delete this {job.jobType} project. This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => deleteJobMutation.mutate(job.id)}
-                                    className="bg-red-600 hover:bg-red-700"
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
 
         <Card data-testid="card-job-history">
           <CardHeader>
