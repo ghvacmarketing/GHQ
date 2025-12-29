@@ -43,7 +43,6 @@ import {
   ArrowDown,
   RotateCcw,
   Trash2,
-  Upload,
   Eye,
   Edit,
 } from "lucide-react";
@@ -108,8 +107,6 @@ export default function CrmAgreements() {
   const [page, setPage] = useState(1);
   const [selectedAgreement, setSelectedAgreement] = useState<CrmAgreement | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<typeof createForm | null>(null);
 
@@ -221,29 +218,6 @@ export default function CrmAgreements() {
     },
     onError: () => {
       toast({ title: "Failed to update agreement", variant: "destructive" });
-    },
-  });
-
-  const importAgreementsMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/crm/agreements/import", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to import");
-      return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
-      setShowImportDialog(false);
-      setImportFile(null);
-      toast({ title: `Imported ${data.imported} agreements` });
-    },
-    onError: () => {
-      toast({ title: "Failed to import agreements", variant: "destructive" });
     },
   });
 
@@ -428,14 +402,6 @@ export default function CrmAgreements() {
     });
   };
 
-  const handleImportSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!importFile) {
-      toast({ title: "Please select a file", variant: "destructive" });
-      return;
-    }
-    importAgreementsMutation.mutate(importFile);
-  };
 
   if (authLoading) {
     return (
@@ -475,15 +441,6 @@ export default function CrmAgreements() {
                 data-testid="input-search"
               />
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowImportDialog(true)}
-              data-testid="button-import-agreements"
-            >
-              <Upload className="h-4 w-4 mr-1" />
-              Import
-            </Button>
             <Button
               size="sm"
               className="bg-[#711419] hover:bg-[#5a1014]"
@@ -874,49 +831,6 @@ export default function CrmAgreements() {
                 data-testid="button-submit-create"
               >
                 {createAgreementMutation.isPending ? "Creating..." : "Create Agreement"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Import Agreements</DialogTitle>
-            <DialogDescription>
-              Upload a CSV file containing agreement data. Expected columns: Agreement Number, Customer Name, Agreement Plan, Address, Next Service Date, Next Invoice Date, Start Date, End Date, Status, Notes.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleImportSubmit}>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="importFile">CSV File</Label>
-                <Input
-                  id="importFile"
-                  type="file"
-                  accept=".csv"
-                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                  data-testid="input-import-file"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowImportDialog(false)}
-                data-testid="button-cancel-import"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="bg-[#711419] hover:bg-[#5a1014]"
-                disabled={importAgreementsMutation.isPending || !importFile}
-                data-testid="button-submit-import"
-              >
-                {importAgreementsMutation.isPending ? "Importing..." : "Import"}
               </Button>
             </DialogFooter>
           </form>
