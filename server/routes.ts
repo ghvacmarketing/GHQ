@@ -4553,7 +4553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
 
   // GET /api/crm/customers - List customers with search, filters, and pagination
-  // Queries BOTH `customers` table (legacy CSV imports) AND `crmAccounts` table (new Account+Site+Contact model)
+  // Only queries the customers table (CSV imports) - no Google Sheets sync
   app.get("/api/crm/customers", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -4574,106 +4574,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const offset = (pageNum - 1) * limitNum;
       const searchTerm = search?.trim().toLowerCase() || "";
 
-      // ============================================
-      // QUERY 1: Legacy customers table
-      // ============================================
-      const legacyConditions: any[] = [];
+      // Build conditions for customers table
+      const conditions: any[] = [];
 
       if (searchTerm) {
         const searchPattern = `%${searchTerm}%`;
-        legacyConditions.push(
+        conditions.push(
           sql`(LOWER(${customers.displayName}) LIKE ${searchPattern} OR LOWER(${customers.email}) LIKE ${searchPattern} OR ${customers.phone} LIKE ${searchPattern} OR LOWER(${customers.fullAddress}) LIKE ${searchPattern})`
         );
       }
 
       if (customerType && customerType !== "all") {
-        legacyConditions.push(sql`LOWER(${customers.customerType}) = LOWER(${customerType})`);
+        conditions.push(sql`LOWER(${customers.customerType}) = LOWER(${customerType})`);
       }
 
       if (customerStatus && customerStatus !== "all") {
-        legacyConditions.push(sql`LOWER(${customers.customerStatus}) = LOWER(${customerStatus})`);
+        conditions.push(sql`LOWER(${customers.customerStatus}) = LOWER(${customerStatus})`);
       }
 
-      const legacyWhereClause = legacyConditions.length > 0 ? and(...legacyConditions) : undefined;
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-      const legacyCustomers = await db
+      // Get total count
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(customers)
+        .where(whereClause);
+      
+      const total = Number(countResult?.count) || 0;
+
+      // Get paginated results
+      const customerResults = await db
         .select()
         .from(customers)
-        .where(legacyWhereClause)
-        .orderBy(desc(customers.createdAt));
+        .where(whereClause)
+        .orderBy(desc(customers.createdAt))
+        .limit(limitNum)
+        .offset(offset);
 
-      // ============================================
-      // QUERY 2: CRM Accounts with primary site and contact
-      // ============================================
-      const crmAccountsWithDetails = await db
-        .select({
-          id: crmAccounts.id,
-          displayName: crmAccounts.displayName,
-          accountType: crmAccounts.accountType,
-          accountStatus: crmAccounts.accountStatus,
-          leadSource: crmAccounts.leadSource,
-          createdAt: crmAccounts.createdAt,
-          siteAddress1: crmSites.address1,
-          siteAddress2: crmSites.address2,
-          siteCity: crmSites.city,
-          siteState: crmSites.state,
-          siteZip: crmSites.zip,
-          contactPhone: crmContacts.phone,
-          contactEmail: crmContacts.email,
-          contactFirstName: crmContacts.firstName,
-          contactLastName: crmContacts.lastName,
-        })
-        .from(crmAccounts)
-        .leftJoin(crmSites, and(eq(crmSites.accountId, crmAccounts.id), eq(crmSites.isPrimary, true)))
-        .leftJoin(crmContacts, and(eq(crmContacts.accountId, crmAccounts.id), eq(crmContacts.isPrimary, true)));
-
-      // Transform CRM accounts to unified format and apply filters in JS
-      const crmCustomersTransformed = crmAccountsWithDetails
-        .map(acc => {
-          const fullAddress = [
-            acc.siteAddress1,
-            acc.siteAddress2,
-            acc.siteCity,
-            acc.siteState,
-            acc.siteZip
-          ].filter(Boolean).join(", ");
-
-          return {
-            id: acc.id,
-            name: acc.displayName,
-            customerType: acc.accountType,
-            customerStatus: acc.accountStatus,
-            fullAddress: fullAddress || null,
-            phone: acc.contactPhone || null,
-            email: acc.contactEmail || null,
-            leadSource: acc.leadSource || null,
-            createdAt: acc.createdAt,
-            origin: 'crm' as const,
-          };
-        })
-        .filter(c => {
-          if (searchTerm) {
-            const matchesSearch = 
-              (c.name?.toLowerCase().includes(searchTerm)) ||
-              (c.email?.toLowerCase().includes(searchTerm)) ||
-              (c.phone?.includes(searchTerm)) ||
-              (c.fullAddress?.toLowerCase().includes(searchTerm));
-            if (!matchesSearch) return false;
-          }
-
-          if (customerType && customerType !== "all") {
-            if (c.customerType?.toLowerCase() !== customerType.toLowerCase()) return false;
-          }
-
-          if (customerStatus && customerStatus !== "all") {
-            if (c.customerStatus?.toLowerCase() !== customerStatus.toLowerCase()) return false;
-          }
-
-          return true;
-        });
-
-      // Transform legacy customers to unified format
-      const legacyCustomersTransformed = legacyCustomers.map(c => ({
+      // Transform to unified format
+      const transformedCustomers = customerResults.map(c => ({
         id: c.id,
         name: c.displayName,
         customerType: c.customerType,
@@ -4683,26 +4622,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: c.email,
         leadSource: c.leadSource,
         createdAt: c.createdAt,
-        origin: 'legacy' as const,
+        origin: 'crm_customers' as const,
       }));
 
-      // ============================================
-      // COMBINE and PAGINATE
-      // ============================================
-      const allCustomers = [...crmCustomersTransformed, ...legacyCustomersTransformed];
-      
-      // Sort by createdAt descending
-      allCustomers.sort((a, b) => {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return dateB - dateA;
-      });
-
-      const total = allCustomers.length;
-      const paginatedCustomers = allCustomers.slice(offset, offset + limitNum);
-
       return res.json({
-        customers: paginatedCustomers,
+        customers: transformedCustomers,
         pagination: {
           page: pageNum,
           limit: limitNum,
@@ -4716,48 +4640,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/customers/stats - Get customer counts by status (from both tables)
+  // GET /api/crm/customers/stats - Get customer counts by status (from customers table only)
   app.get("/api/crm/customers/stats", requireCrmAuth, async (req, res) => {
     try {
-      // Legacy customers table counts
-      const [legacyProspectsResult] = await db
+      const [prospectsResult] = await db
         .select({ count: sql<number>`count(*)` })
         .from(customers)
         .where(sql`LOWER(${customers.customerStatus}) = 'prospect'`);
       
-      const [legacyCustomersResult] = await db
+      const [customersResult] = await db
         .select({ count: sql<number>`count(*)` })
         .from(customers)
         .where(sql`LOWER(${customers.customerStatus}) = 'customer'`);
       
-      const [legacyTotalResult] = await db
+      const [totalResult] = await db
         .select({ count: sql<number>`count(*)` })
         .from(customers);
 
-      // CRM Accounts table counts
-      const [crmProspectsResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(crmAccounts)
-        .where(sql`LOWER(${crmAccounts.accountStatus}) = 'prospect'`);
-      
-      const [crmCustomersResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(crmAccounts)
-        .where(sql`LOWER(${crmAccounts.accountStatus}) = 'customer'`);
-      
-      const [crmTotalResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(crmAccounts);
-
-      // Combine counts
-      const prospects = Number(legacyProspectsResult?.count || 0) + Number(crmProspectsResult?.count || 0);
-      const customersCount = Number(legacyCustomersResult?.count || 0) + Number(crmCustomersResult?.count || 0);
-      const total = Number(legacyTotalResult?.count || 0) + Number(crmTotalResult?.count || 0);
-
       return res.json({
-        prospects,
-        customers: customersCount,
-        total,
+        prospects: Number(prospectsResult?.count || 0),
+        customers: Number(customersResult?.count || 0),
+        total: Number(totalResult?.count || 0),
       });
     } catch (error) {
       console.error("Error fetching customer stats:", error);

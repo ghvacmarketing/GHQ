@@ -317,7 +317,7 @@ export default function CrmCustomers() {
                       data-testid={`row-customer-${customer.id}`}
                       onClick={() => {
                         // CRM accounts go to account detail page, legacy customers to customer detail
-                        if (customer.origin === 'crm' || customer.origin === 'crm_accounts') {
+                        if (customer.origin === 'crm_accounts') {
                           navigate(`/crm/accounts/${customer.accountId || customer.id}`);
                         } else {
                           navigate(`/crm/customers/${customer.id}`);
