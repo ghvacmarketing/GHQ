@@ -1651,6 +1651,49 @@ function WeatherWidget() {
           <span className="text-[10px]">{currentPeriod.windDirection}</span>
         </div>
       </div>
+
+      {/* Weekly Forecast */}
+      <div className="mt-2 grid grid-cols-7 gap-1 py-2 px-2 bg-muted/20 dark:bg-muted/10 rounded-lg border border-border/50" data-testid="weather-weekly">
+        {(() => {
+          // Group periods by day to get high/low for each day
+          const dailyForecasts: { day: string; high: number | null; low: number | null; icon: string; isDaytime: boolean }[] = [];
+          for (let i = 0; i < periods.length; i++) {
+            const period = periods[i];
+            const dayName = period.name.replace(/ Night$/, "").replace("This ", "").replace("Tonight", "Today");
+            const existing = dailyForecasts.find(d => d.day === dayName);
+            if (existing) {
+              if (period.isDaytime) existing.high = period.temperature;
+              else existing.low = period.temperature;
+            } else {
+              dailyForecasts.push({
+                day: dayName,
+                high: period.isDaytime ? period.temperature : null,
+                low: !period.isDaytime ? period.temperature : null,
+                icon: period.shortForecast,
+                isDaytime: period.isDaytime,
+              });
+            }
+          }
+          return dailyForecasts.slice(0, 7).map((day, idx) => (
+            <div key={idx} className="flex flex-col items-center text-center py-1" data-testid={`weather-day-${idx}`}>
+              <span className="text-[10px] font-medium text-muted-foreground truncate w-full">
+                {day.day.slice(0, 3)}
+              </span>
+              <div className="my-0.5">
+                {getWeatherIcon(day.icon, true, "sm")}
+              </div>
+              <div className="flex flex-col text-[10px] leading-tight">
+                {day.high !== null && (
+                  <span className="text-red-600 dark:text-red-400 font-medium">{day.high}°</span>
+                )}
+                {day.low !== null && (
+                  <span className="text-blue-600 dark:text-blue-400">{day.low}°</span>
+                )}
+              </div>
+            </div>
+          ));
+        })()}
+      </div>
     </div>
   );
 }
