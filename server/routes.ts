@@ -7459,7 +7459,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const result = insertCrmWorkOrderSchema.safeParse(req.body);
+      // Convert date strings to Date objects before validation
+      const bodyWithDates = {
+        ...req.body,
+        scheduledStart: req.body.scheduledStart ? new Date(req.body.scheduledStart) : undefined,
+        scheduledEnd: req.body.scheduledEnd ? new Date(req.body.scheduledEnd) : undefined,
+        startedAt: req.body.startedAt ? new Date(req.body.startedAt) : undefined,
+        completedAt: req.body.completedAt ? new Date(req.body.completedAt) : undefined,
+      };
+
+      const result = insertCrmWorkOrderSchema.safeParse(bodyWithDates);
       if (!result.success) {
         return res.status(400).json({ message: "Invalid work order data", errors: result.error.flatten() });
       }

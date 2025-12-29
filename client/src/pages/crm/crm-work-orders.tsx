@@ -333,13 +333,10 @@ export default function CrmWorkOrders() {
   });
 
   const visitTypeLabels: Record<string, string> = {
-    initial: "Initial Visit",
-    return: "Return Visit",
-    follow_up: "Follow-up",
-    install_day_1: "Install Day 1",
-    install_day_2: "Install Day 2",
-    maintenance: "Maintenance",
-    inspection: "Inspection",
+    SERVICE: "Service",
+    INSTALL: "Install",
+    MAINTENANCE: "Maintenance",
+    SALES: "Sales",
   };
 
   const handleOpenDetail = async (wo: EnrichedWorkOrder) => {
