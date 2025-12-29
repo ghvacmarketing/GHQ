@@ -814,6 +814,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // MAIN API ROUTES
   // ============================================
 
+  // Dashboard stats - lightweight endpoint for home page
+  app.get("/api/dashboard/stats", async (req, res) => {
+    try {
+      // Get counts efficiently using SQL aggregates
+      const [pendingQuotesResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(quotes)
+        .where(sql`${quotes.status} IN ('draft', 'sent')`);
+      
+      const [activeLeadsResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(leads)
+        .where(sql`${leads.status} IN ('New', 'Contacted', 'Qualified') AND ${leads.won} = false AND ${leads.lost} = false`);
+      
+      // Installs this week - won leads with installation tag and installDate this week
+      const startOfWeek = new Date();
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(endOfWeek.getDate() + 7);
+      
+      const [installsThisWeekResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(leads)
+        .where(sql`${leads.status} = 'Won' AND ${leads.installDate} >= ${startOfWeek} AND ${leads.installDate} < ${endOfWeek}`);
+      
+      // Won deals last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const [wonDealsResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(leads)
+        .where(sql`${leads.status} = 'Won' AND ${leads.closedAt} >= ${thirtyDaysAgo}`);
+      
+      // Pipeline value - sum of estimated values for active leads
+      const [pipelineResult] = await db
+        .select({ total: sql<number>`COALESCE(SUM(CAST(${leads.estimatedValue} AS DECIMAL)), 0)` })
+        .from(leads)
+        .where(sql`${leads.won} = false AND ${leads.lost} = false`);
+      
+      res.json({
+        pendingQuotes: Number(pendingQuotesResult?.count || 0),
+        activeLeads: Number(activeLeadsResult?.count || 0),
+        installsThisWeek: Number(installsThisWeekResult?.count || 0),
+        wonDealsLast30Days: Number(wonDealsResult?.count || 0),
+        pipelineValue: Number(pipelineResult?.total || 0),
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      res.status(500).json({ message: "Error fetching dashboard stats" });
+    }
+  });
+
   // Get quotes with pagination support
   app.get("/api/quotes", async (req, res) => {
     try {

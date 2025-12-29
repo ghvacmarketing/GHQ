@@ -8,17 +8,20 @@ import UserMenu from "@/components/user-menu";
 import redlogo from "@assets/redlogo.webp";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
-import type { Quote, Lead, PortalUser } from "@shared/schema";
-import { useMemo } from "react";
-import { isThisWeek, subDays, isAfter } from "date-fns";
+import type { PortalUser } from "@shared/schema";
+
+type DashboardStats = {
+  pendingQuotes: number;
+  activeLeads: number;
+  installsThisWeek: number;
+  wonDealsLast30Days: number;
+  pipelineValue: number;
+};
 
 export default function Home() {
-  const { data: quotesData, isLoading: isLoadingQuotes } = useQuery<{ quotes: Quote[] }>({
-    queryKey: ['/api/quotes'],
-  });
-
-  const { data: leadsData, isLoading: isLoadingLeads } = useQuery<Lead[]>({
-    queryKey: ['/api/leads'],
+  // Use lightweight stats endpoint instead of loading all data
+  const { data: statsData, isLoading: isLoadingStats } = useQuery<DashboardStats>({
+    queryKey: ['/api/dashboard/stats'],
   });
 
   const { data: portalUser } = useQuery<PortalUser | null>({
@@ -28,45 +31,13 @@ export default function Home() {
 
   const isLoggedIntoPortal = !!portalUser?.id;
 
-  const quotes = quotesData?.quotes || [];
-  const leads = leadsData || [];
-
-  const summaryStats = useMemo(() => {
-    const pendingQuotes = quotes.filter(q => q.status === 'draft' || q.status === 'sent').length;
-    const activeLeads = leads.filter(l => l.status === 'New' || l.status === 'Contacted' || l.status === 'Qualified').length;
-    
-    const installationLeads = leads.filter(lead => {
-      if (lead.status !== "Won") return false;
-      const tags = lead.tags as string[] | null;
-      if (!tags || !Array.isArray(tags)) return false;
-      return tags.some(tag => tag.toLowerCase() === "installation");
-    });
-    
-    const installsThisWeek = installationLeads.filter(lead => {
-      if (lead.installDate) {
-        const date = new Date(lead.installDate);
-        return isThisWeek(date);
-      }
-      return false;
-    }).length;
-
-    const thirtyDaysAgo = subDays(new Date(), 30);
-    const wonDealsLast30Days = leads.filter(l => {
-      if (l.status !== 'Won') return false;
-      if (l.closedAt) {
-        const closedDate = new Date(l.closedAt);
-        return isAfter(closedDate, thirtyDaysAgo);
-      }
-      return false;
-    }).length;
-
-    const activePipelineLeads = leads.filter(l => !l.won && !l.lost);
-    const pipelineValue = activePipelineLeads.reduce((sum, l) => sum + parseFloat(l.estimatedValue || "0"), 0);
-
-    return { pendingQuotes, activeLeads, installsThisWeek, wonDealsLast30Days, pipelineValue };
-  }, [quotes, leads]);
-
-  const isLoadingStats = isLoadingQuotes || isLoadingLeads;
+  const summaryStats = statsData || {
+    pendingQuotes: 0,
+    activeLeads: 0,
+    installsThisWeek: 0,
+    wonDealsLast30Days: 0,
+    pipelineValue: 0,
+  };
 
   const sellActions = [
     {
