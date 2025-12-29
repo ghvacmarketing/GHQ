@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -54,6 +53,7 @@ import {
   Building2,
   FolderOpen,
   AlertTriangle,
+  Search,
 } from "lucide-react";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkOrderStatus } from "@shared/schema";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -136,23 +136,28 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
   urgent: { bg: "bg-red-100", text: "text-red-700" },
 };
 
-type FilterTab = "all" | "today" | "this_week" | "scheduled" | "in_progress" | "completed";
+type FilterTab = "all" | "needs_scheduling" | "scheduled" | "in_progress" | "completed" | "ready_to_invoice" | "invoiced" | "closed" | "cancelled";
 
 const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> = {
-  all: { label: "All Work Orders", shortLabel: "All" },
-  today: { label: "Today", shortLabel: "Today" },
-  this_week: { label: "This Week", shortLabel: "Week" },
-  scheduled: { label: "Scheduled", shortLabel: "Sched" },
+  all: { label: "All", shortLabel: "All" },
+  needs_scheduling: { label: "Needs Scheduling", shortLabel: "Unscheduled" },
+  scheduled: { label: "Scheduled", shortLabel: "Scheduled" },
   in_progress: { label: "In Progress", shortLabel: "Active" },
   completed: { label: "Completed", shortLabel: "Done" },
+  ready_to_invoice: { label: "Ready to Invoice", shortLabel: "Ready" },
+  invoiced: { label: "Invoiced / Awaiting Payment", shortLabel: "Invoiced" },
+  closed: { label: "Closed", shortLabel: "Closed" },
+  cancelled: { label: "Cancelled", shortLabel: "Cancelled" },
 };
 
 export default function CrmWorkOrders() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
+  const [searchInput, setSearchInput] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [techFilter, setTechFilter] = useState<string>("all");
+  const debouncedSearch = useDebounce(searchInput, 300);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<EnrichedWorkOrder | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -248,20 +253,16 @@ export default function CrmWorkOrders() {
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
-    const now = new Date();
     
-    if (activeTab === "today") {
-      params.set("dateFrom", startOfDay(now).toISOString());
-      params.set("dateTo", endOfDay(now).toISOString());
-    } else if (activeTab === "this_week") {
-      params.set("dateFrom", startOfWeek(now, { weekStartsOn: 0 }).toISOString());
-      params.set("dateTo", endOfWeek(now, { weekStartsOn: 0 }).toISOString());
-    } else if (activeTab === "scheduled") {
+    // Map tab to status filter when possible
+    if (activeTab === "scheduled") {
       params.set("status", "scheduled");
-    } else if (activeTab === "in_progress") {
     } else if (activeTab === "completed") {
       params.set("status", "completed");
+    } else if (activeTab === "cancelled") {
+      params.set("status", "cancelled");
     }
+    // Other tabs require client-side filtering
     
     if (techFilter !== "all") params.set("techId", techFilter);
     return params.toString();
@@ -280,8 +281,43 @@ export default function CrmWorkOrders() {
   const filteredWorkOrders = useMemo(() => {
     let orders = workOrdersData || [];
     
-    if (activeTab === "in_progress") {
+    // Apply search filter
+    if (debouncedSearch.trim()) {
+      const searchLower = debouncedSearch.toLowerCase();
+      orders = orders.filter(wo => {
+        const titleMatch = wo.title?.toLowerCase().includes(searchLower);
+        const descMatch = wo.description?.toLowerCase().includes(searchLower);
+        const customerMatch = wo.customer?.name?.toLowerCase().includes(searchLower);
+        const woNumber = wo.workOrderNumber?.toLowerCase().includes(searchLower);
+        return titleMatch || descMatch || customerMatch || woNumber;
+      });
+    }
+    
+    // Apply tab-based status filtering (for tabs not handled server-side)
+    if (activeTab === "needs_scheduling") {
+      // Work orders without a scheduled date
+      orders = orders.filter(wo => !wo.scheduledStart);
+    } else if (activeTab === "in_progress") {
+      // Active work - dispatched, en route, or on site
       orders = orders.filter(wo => ["dispatched", "en_route", "on_site"].includes(wo.status));
+    } else if (activeTab === "ready_to_invoice") {
+      // Completed but no invoice yet
+      orders = orders.filter(wo => 
+        wo.status === "completed" && 
+        (!wo.billingDisposition || wo.billingDisposition === "pending")
+      );
+    } else if (activeTab === "invoiced") {
+      // Has invoice created but not closed
+      orders = orders.filter(wo => 
+        wo.billingDisposition === "invoice_created"
+      );
+    } else if (activeTab === "closed") {
+      // Fully closed/paid
+      orders = orders.filter(wo => 
+        wo.billingDisposition === "billed_elsewhere" || 
+        wo.billingDisposition === "no_charge" ||
+        wo.status === "closed"
+      );
     }
     
     return orders.sort((a, b) => {
@@ -289,7 +325,7 @@ export default function CrmWorkOrders() {
       const dateB = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
       return dateA - dateB;
     });
-  }, [workOrdersData, activeTab]);
+  }, [workOrdersData, activeTab, debouncedSearch]);
 
   const updateWorkOrderMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<CrmWorkOrder> }) => {
@@ -479,22 +515,41 @@ export default function CrmWorkOrders() {
     return null;
   }
 
+  const total = workOrders?.length || 0;
+
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h1 className="text-xl font-bold text-slate-900" data-testid="text-work-orders-title">
-            Work Orders
-          </h1>
+        {/* Search bar at top - DoorLoop style */}
+        <div className="flex justify-center mb-2">
+          <div className="relative w-full max-w-xl">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search work orders..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+              data-testid="input-search-work-orders"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900" data-testid="text-work-orders-title">
+              Work Orders
+            </h1>
+            <p className="text-sm text-slate-500">Total: {total}</p>
+          </div>
           <div className="flex items-center gap-2">
             <Button
               onClick={() => setCreateDialogOpen(true)}
-              className="bg-[#711419] hover:bg-[#5a1014]"
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              size="sm"
               data-testid="button-create-work-order"
             >
               <Plus className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Create Work Order</span>
-              <span className="sm:hidden">Create</span>
+              Create Work Order
             </Button>
             <Button
               variant="outline"
@@ -507,36 +562,23 @@ export default function CrmWorkOrders() {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as FilterTab)} className="w-full">
-            <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:flex sm:flex-wrap gap-1 h-auto p-1">
-              {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
-                <TabsTrigger
-                  key={tab}
-                  value={tab}
-                  className="text-xs sm:text-sm px-2 sm:px-3 py-1.5"
-                  data-testid={`tab-${tab}`}
-                >
-                  <span className="hidden sm:inline">{filterTabConfig[tab].label}</span>
-                  <span className="sm:hidden">{filterTabConfig[tab].shortLabel}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-
-          <Select value={techFilter} onValueChange={setTechFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-tech-filter">
-              <SelectValue placeholder="All Technicians" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Technicians</SelectItem>
-              {technicians.map((tech) => (
-                <SelectItem key={tech.id} value={tech.id}>
-                  {tech.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Tabs styled like projects/customers page - underline style */}
+        <div className="flex overflow-x-auto border-b border-slate-200">
+          {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                activeTab === tab
+                  ? "border-[#711419] text-[#711419]"
+                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+              }`}
+              data-testid={`tab-${tab}`}
+            >
+              <span className="hidden sm:inline">{filterTabConfig[tab].label}</span>
+              <span className="sm:hidden">{filterTabConfig[tab].shortLabel}</span>
+            </button>
+          ))}
         </div>
 
         {workOrdersLoading ? (
