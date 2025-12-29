@@ -909,6 +909,10 @@ export const crmProjects = pgTable("crm_projects", {
 export const workOrderVisitTypeEnum = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
 export type WorkOrderVisitType = typeof workOrderVisitTypeEnum[number];
 
+// Billing Disposition - how a completed work order was billed
+export const billingDispositionEnum = ["invoice_created", "no_charge", "billed_elsewhere"] as const;
+export type BillingDisposition = typeof billingDispositionEnum[number];
+
 export const crmWorkOrders = pgTable("crm_work_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").references(() => crmCustomers.id),
@@ -927,10 +931,111 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   checklist: json("checklist").$type<{ item: string; completed: boolean }[]>(),
   partsUsed: json("parts_used").$type<{ partId: string; name: string; qty: number; price: number }[]>(),
   techNotes: text("tech_notes"),
+  billingDisposition: text("billing_disposition").$type<BillingDisposition>(),
+  billingNotes: text("billing_notes"),
+  invoiceId: varchar("invoice_id"),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
+  finalizedAt: timestamp("finalized_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CRM Quote Status and Scope
+export const crmQuoteStatusEnum = ["draft", "sent", "accepted", "declined", "expired"] as const;
+export type CrmQuoteStatus = typeof crmQuoteStatusEnum[number];
+
+export const crmQuoteScopeEnum = ["work_order", "project"] as const;
+export type CrmQuoteScope = typeof crmQuoteScopeEnum[number];
+
+// CRM Quotes (proposals attached to either a Work Order or Project)
+export const crmQuotes = pgTable("crm_quotes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteNumber: text("quote_number").notNull(),
+  customerId: varchar("customer_id"),
+  propertyId: varchar("property_id"),
+  scope: text("scope").$type<CrmQuoteScope>().notNull(),
+  workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id, { onDelete: "set null" }),
+  projectId: varchar("project_id").references(() => crmProjects.id, { onDelete: "set null" }),
+  status: text("status").$type<CrmQuoteStatus>().notNull().default("draft"),
+  title: text("title").notNull(),
+  description: text("description"),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).default("0"),
+  laborTotal: decimal("labor_total", { precision: 10, scale: 2 }).default("0"),
+  taxTotal: decimal("tax_total", { precision: 10, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).default("0"),
+  validUntil: timestamp("valid_until"),
+  sentAt: timestamp("sent_at"),
+  acceptedAt: timestamp("accepted_at"),
+  declinedAt: timestamp("declined_at"),
+  acceptedBy: text("accepted_by"),
+  declineReason: text("decline_reason"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => crmUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CRM Quote Line Items
+export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteId: varchar("quote_id").notNull().references(() => crmQuotes.id, { onDelete: "cascade" }),
+  lineType: text("line_type").$type<"part" | "labor" | "service" | "other">().notNull().default("part"),
+  description: text("description").notNull(),
+  partNumber: text("part_number"),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+  taxable: boolean("taxable").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// CRM Invoice Status
+export const crmInvoiceStatusEnum = ["draft", "sent", "paid", "void", "partial"] as const;
+export type CrmInvoiceStatus = typeof crmInvoiceStatusEnum[number];
+
+// CRM Invoices (always tied to a Work Order)
+export const crmInvoices = pgTable("crm_invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceNumber: text("invoice_number").notNull(),
+  customerId: varchar("customer_id"),
+  propertyId: varchar("property_id"),
+  workOrderId: varchar("work_order_id").notNull().references(() => crmWorkOrders.id, { onDelete: "cascade" }),
+  projectId: varchar("project_id").references(() => crmProjects.id, { onDelete: "set null" }),
+  status: text("status").$type<CrmInvoiceStatus>().notNull().default("draft"),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).default("0"),
+  laborTotal: decimal("labor_total", { precision: 10, scale: 2 }).default("0"),
+  taxTotal: decimal("tax_total", { precision: 10, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).default("0"),
+  amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).default("0"),
+  balanceDue: decimal("balance_due", { precision: 10, scale: 2 }).default("0"),
+  dueDate: timestamp("due_date"),
+  sentAt: timestamp("sent_at"),
+  paidAt: timestamp("paid_at"),
+  voidedAt: timestamp("voided_at"),
+  voidReason: text("void_reason"),
+  paymentMethod: text("payment_method"),
+  paymentReference: text("payment_reference"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => crmUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CRM Invoice Line Items
+export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => crmInvoices.id, { onDelete: "cascade" }),
+  lineType: text("line_type").$type<"part" | "labor" | "service" | "other">().notNull().default("part"),
+  description: text("description").notNull(),
+  partNumber: text("part_number"),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+  taxable: boolean("taxable").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // CRM Job Assignments (techs assigned to jobs)
@@ -1000,47 +1105,7 @@ export const insertCrmAgreementSchema = createInsertSchema(crmAgreements).omit({
   updatedAt: true,
 });
 
-// Invoice Status Enum
-export const crmInvoiceStatusEnum = ["draft", "sent", "viewed", "partial", "paid", "void"] as const;
-export type CrmInvoiceStatus = typeof crmInvoiceStatusEnum[number];
-
-// CRM Invoices
-export const crmInvoices = pgTable("crm_invoices", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  invoiceNumber: text("invoice_number").notNull().unique(),
-  jobId: varchar("job_id").references(() => crmJobs.id),
-  workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id),
-  customerId: varchar("customer_id").references(() => crmCustomers.id),
-  // Standalone customer info (when not linked to crmCustomers)
-  customerName: text("customer_name"),
-  customerEmail: text("customer_email"),
-  customerPhone: text("customer_phone"),
-  serviceAddress: text("service_address"),
-  description: text("description"),
-  status: text("status").$type<CrmInvoiceStatus>().notNull().default("draft"),
-  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
-  tax: decimal("tax", { precision: 10, scale: 2 }).notNull().default("0"),
-  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
-  balanceDue: decimal("balance_due", { precision: 10, scale: 2 }).notNull(),
-  pdfUrl: text("pdf_url"),
-  dueDate: date("due_date"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// CRM Invoice Line Items
-export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  invoiceId: varchar("invoice_id").notNull().references(() => crmInvoices.id, { onDelete: "cascade" }),
-  description: text("description").notNull(),
-  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  sortOrder: integer("sort_order").default(0),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// CRM Payments
+// CRM Payments (references crmInvoices from above)
 export const crmPayments = pgTable("crm_payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   invoiceId: varchar("invoice_id").notNull().references(() => crmInvoices.id),
@@ -1051,71 +1116,6 @@ export const crmPayments = pgTable("crm_payments", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
-
-// =============================================
-// CRM QUOTES (Separate from AI Quote Generator)
-// =============================================
-
-export const crmQuoteStatusEnum = ["draft", "sent", "viewed", "accepted", "declined", "expired"] as const;
-export type CrmQuoteStatus = typeof crmQuoteStatusEnum[number];
-
-export const crmQuotes = pgTable("crm_quotes", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  quoteNumber: text("quote_number").notNull().unique(),
-  jobId: varchar("job_id").references(() => crmJobs.id),
-  accountId: varchar("account_id").references(() => crmAccounts.id),
-  siteId: varchar("site_id").references(() => crmSites.id),
-  contactId: varchar("contact_id").references(() => crmContacts.id),
-  // Customer info (can be standalone without linked entities)
-  customerName: text("customer_name").notNull(),
-  customerEmail: text("customer_email"),
-  customerPhone: text("customer_phone"),
-  serviceAddress: text("service_address"),
-  // Quote details
-  title: text("title"),
-  description: text("description"),
-  lineItems: json("line_items").$type<CrmQuoteLineItem[]>().default([]),
-  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull().default("0"),
-  taxRate: decimal("tax_rate", { precision: 5, scale: 4 }).default("0.0825"),
-  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).notNull().default("0"),
-  laborTotal: decimal("labor_total", { precision: 10, scale: 2 }).default("0"),
-  total: decimal("total", { precision: 10, scale: 2 }).notNull().default("0"),
-  // Status and workflow
-  status: text("status").$type<CrmQuoteStatus>().notNull().default("draft"),
-  validUntil: timestamp("valid_until"),
-  sentAt: timestamp("sent_at"),
-  viewedAt: timestamp("viewed_at"),
-  acceptedAt: timestamp("accepted_at"),
-  declinedAt: timestamp("declined_at"),
-  // Assignment
-  createdById: varchar("created_by_id").references(() => crmUsers.id),
-  assignedToId: varchar("assigned_to_id").references(() => crmUsers.id),
-  // Notes
-  internalNotes: text("internal_notes"),
-  customerNotes: text("customer_notes"),
-  // Timestamps
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export type CrmQuoteLineItem = {
-  id: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  amount: number;
-  type: "part" | "labor" | "service" | "other";
-  partNumber?: string;
-};
-
-export const insertCrmQuoteSchema = createInsertSchema(crmQuotes).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertCrmQuote = z.infer<typeof insertCrmQuoteSchema>;
-export type CrmQuote = typeof crmQuotes.$inferSelect;
 
 // =============================================
 // NEW ACCOUNT + SITE + CONTACT MODEL
@@ -1368,6 +1368,17 @@ export const insertCrmInvoiceLineItemSchema = createInsertSchema(crmInvoiceLineI
   createdAt: true,
 });
 
+export const insertCrmQuoteSchema = createInsertSchema(crmQuotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCrmQuoteLineItemSchema = createInsertSchema(crmQuoteLineItems).omit({
+  id: true,
+  createdAt: true,
+});
+
 // CRM Types
 export type InsertCrmUser = z.infer<typeof insertCrmUserSchema>;
 export type CrmUser = typeof crmUsers.$inferSelect;
@@ -1397,6 +1408,10 @@ export type InsertCrmWorkOrder = z.infer<typeof insertCrmWorkOrderSchema>;
 export type CrmWorkOrder = typeof crmWorkOrders.$inferSelect;
 export type InsertCrmInvoiceLineItem = z.infer<typeof insertCrmInvoiceLineItemSchema>;
 export type CrmInvoiceLineItem = typeof crmInvoiceLineItems.$inferSelect;
+export type InsertCrmQuote = z.infer<typeof insertCrmQuoteSchema>;
+export type CrmQuote = typeof crmQuotes.$inferSelect;
+export type InsertCrmQuoteLineItem = z.infer<typeof insertCrmQuoteLineItemSchema>;
+export type CrmQuoteLineItem = typeof crmQuoteLineItems.$inferSelect;
 export type InsertCrmAgreement = z.infer<typeof insertCrmAgreementSchema>;
 export type CrmAgreement = typeof crmAgreements.$inferSelect;
 

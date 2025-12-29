@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -5293,17 +5293,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Get invoices for this job
-      const invoices = await db.select()
-        .from(crmInvoices)
-        .where(eq(crmInvoices.jobId, jobId))
-        .orderBy(crmInvoices.createdAt);
+      // Get invoices for this job via work orders
+      const woIds = workOrders.map(wo => wo.id);
+      let invoices: any[] = [];
+      if (woIds.length > 0) {
+        invoices = await db.select()
+          .from(crmInvoices)
+          .where(inArray(crmInvoices.workOrderId, woIds))
+          .orderBy(crmInvoices.createdAt);
+      }
 
-      // Get quotes for this job
-      const quotes = await db.select()
-        .from(crmQuotes)
-        .where(eq(crmQuotes.jobId, jobId))
-        .orderBy(crmQuotes.createdAt);
+      // Get quotes for this job via work orders
+      let quotes: any[] = [];
+      if (woIds.length > 0) {
+        quotes = await db.select()
+          .from(crmQuotes)
+          .where(inArray(crmQuotes.workOrderId, woIds))
+          .orderBy(crmQuotes.createdAt);
+      }
 
       // Calculate financial summary
       const totalInvoiced = invoices.reduce((sum, inv) => sum + parseFloat(inv.total || "0"), 0);
@@ -6116,11 +6123,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workOrderCount = Number(workOrdersResult?.count || 0);
       }
 
-      // Count quotes linked to this customer (via accountId)
+      // Count quotes linked to this customer (via customerId)
       const [quotesResult] = await db
         .select({ count: sql<number>`count(*)` })
         .from(crmQuotes)
-        .where(eq(crmQuotes.accountId, customerId));
+        .where(eq(crmQuotes.customerId, customerId));
 
       const quoteCount = Number(quotesResult?.count || 0);
 
@@ -6202,7 +6209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [quotesResult] = await db
         .select({ count: sql<number>`count(*)` })
         .from(crmQuotes)
-        .where(eq(crmQuotes.accountId, customerId));
+        .where(eq(crmQuotes.customerId, customerId));
       const quoteCount = Number(quotesResult?.count || 0);
 
       const [invoicesResult] = await db
@@ -8718,18 +8725,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CRM INVOICE ROUTES
   // ============================================
 
-  // GET /api/crm/invoices - List invoices with filters
+  // Helper to generate invoice number: INV-YYYYMMDD-XXX (sequential)
+  async function generateInvoiceNumber(): Promise<string> {
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+    const prefix = `INV-${dateStr}-`;
+    
+    const todayInvoices = await db.select({ invoiceNumber: crmInvoices.invoiceNumber })
+      .from(crmInvoices)
+      .where(sql`${crmInvoices.invoiceNumber} LIKE ${prefix + '%'}`)
+      .orderBy(desc(crmInvoices.invoiceNumber))
+      .limit(1);
+    
+    let seq = 1;
+    if (todayInvoices.length > 0 && todayInvoices[0].invoiceNumber) {
+      const lastSeq = parseInt(todayInvoices[0].invoiceNumber.split('-').pop() || '0', 10);
+      seq = lastSeq + 1;
+    }
+    
+    return `${prefix}${String(seq).padStart(3, '0')}`;
+  }
+
+  // GET /api/crm/invoices - List invoices with filters (status, customerId, workOrderId, projectId)
   app.get("/api/crm/invoices", requireCrmAuth, async (req, res) => {
     try {
-      const { jobId, customerId, status, workOrderId } = req.query;
+      const { customerId, status, workOrderId, projectId } = req.query;
       
-      const filters: { jobId?: string; customerId?: string; status?: string; workOrderId?: string } = {};
-      if (jobId) filters.jobId = jobId as string;
-      if (customerId) filters.customerId = customerId as string;
-      if (status) filters.status = status as string;
-      if (workOrderId) filters.workOrderId = workOrderId as string;
+      const conditions: any[] = [];
+      if (customerId) {
+        conditions.push(eq(crmInvoices.customerId, customerId as string));
+      }
+      if (status) {
+        conditions.push(eq(crmInvoices.status, status as string));
+      }
+      if (workOrderId) {
+        conditions.push(eq(crmInvoices.workOrderId, workOrderId as string));
+      }
+      if (projectId) {
+        conditions.push(eq(crmInvoices.projectId, projectId as string));
+      }
       
-      const invoices = await storage.getInvoices(Object.keys(filters).length > 0 ? filters : undefined);
+      const invoices = conditions.length > 0
+        ? await db.select().from(crmInvoices).where(and(...conditions)).orderBy(desc(crmInvoices.createdAt))
+        : await db.select().from(crmInvoices).orderBy(desc(crmInvoices.createdAt));
       
       const enrichedInvoices = await Promise.all(
         invoices.map(async (invoice) => {
@@ -8739,16 +8777,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customer = cust || null;
           }
           
-          let job = null;
-          if (invoice.jobId) {
-            const [j] = await db.select().from(crmJobs).where(eq(crmJobs.id, invoice.jobId));
-            job = j || null;
+          let workOrder = null;
+          if (invoice.workOrderId) {
+            const [wo] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, invoice.workOrderId));
+            workOrder = wo || null;
+          }
+          
+          let project = null;
+          if (invoice.projectId) {
+            const [proj] = await db.select().from(crmProjects).where(eq(crmProjects.id, invoice.projectId));
+            project = proj || null;
           }
           
           return {
             ...invoice,
             customer,
-            job,
+            workOrder,
+            project,
           };
         })
       );
@@ -8763,29 +8808,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/invoices/:id - Get invoice with line items
   app.get("/api/crm/invoices/:id", requireCrmAuth, async (req, res) => {
     try {
-      const result = await storage.getInvoiceWithLineItems(req.params.id);
+      const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, req.params.id));
       
-      if (!result) {
+      if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
       
+      const lineItems = await db.select().from(crmInvoiceLineItems)
+        .where(eq(crmInvoiceLineItems.invoiceId, req.params.id))
+        .orderBy(asc(crmInvoiceLineItems.sortOrder));
+      
       let customer = null;
-      if (result.invoice.customerId) {
-        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, result.invoice.customerId));
+      if (invoice.customerId) {
+        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, invoice.customerId));
         customer = cust || null;
       }
       
-      let job = null;
-      if (result.invoice.jobId) {
-        const [j] = await db.select().from(crmJobs).where(eq(crmJobs.id, result.invoice.jobId));
-        job = j || null;
+      let workOrder = null;
+      if (invoice.workOrderId) {
+        const [wo] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, invoice.workOrderId));
+        workOrder = wo || null;
+      }
+      
+      let project = null;
+      if (invoice.projectId) {
+        const [proj] = await db.select().from(crmProjects).where(eq(crmProjects.id, invoice.projectId));
+        project = proj || null;
       }
       
       return res.json({
-        ...result.invoice,
-        lineItems: result.lineItems,
+        ...invoice,
+        lineItems,
         customer,
-        job,
+        workOrder,
+        project,
       });
     } catch (error) {
       console.error("Error fetching invoice:", error);
@@ -8793,7 +8849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/crm/invoices - Create invoice with optional line items
+  // POST /api/crm/invoices - Create invoice (requires workOrderId)
   app.post("/api/crm/invoices", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
@@ -8803,7 +8859,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { lineItems, ...invoiceData } = req.body;
       
-      const parseResult = insertCrmInvoiceSchema.safeParse(invoiceData);
+      if (!invoiceData.workOrderId) {
+        return res.status(400).json({ message: "workOrderId is required - invoices must be tied to a work order" });
+      }
+      
+      const [workOrder] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, invoiceData.workOrderId));
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+      
+      const invoiceNumber = await generateInvoiceNumber();
+      
+      const invoiceToCreate = {
+        ...invoiceData,
+        invoiceNumber,
+        customerId: invoiceData.customerId || workOrder.customerId,
+        propertyId: invoiceData.propertyId || workOrder.propertyId,
+        projectId: invoiceData.projectId || workOrder.projectId,
+        createdBy: user.id,
+      };
+      
+      const parseResult = insertCrmInvoiceSchema.safeParse(invoiceToCreate);
       if (!parseResult.success) {
         return res.status(400).json({ 
           message: "Validation failed", 
@@ -8811,7 +8887,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const invoice = await storage.createInvoice(parseResult.data);
+      const [invoice] = await db.insert(crmInvoices).values(parseResult.data).returning();
+      
+      await db.update(crmWorkOrders)
+        .set({ 
+          billingDisposition: "invoice_created" as const,
+          invoiceId: invoice.id,
+          updatedAt: new Date()
+        })
+        .where(eq(crmWorkOrders.id, invoiceData.workOrderId));
       
       let createdLineItems: CrmInvoiceLineItem[] = [];
       if (lineItems && Array.isArray(lineItems)) {
@@ -8819,7 +8903,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const lineItemData = { ...item, invoiceId: invoice.id };
           const lineItemParseResult = insertCrmInvoiceLineItemSchema.safeParse(lineItemData);
           if (lineItemParseResult.success) {
-            const createdItem = await storage.createInvoiceLineItem(lineItemParseResult.data);
+            const [createdItem] = await db.insert(crmInvoiceLineItems).values(lineItemParseResult.data).returning();
             createdLineItems.push(createdItem);
           }
         }
@@ -8830,7 +8914,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "invoice.created",
         "invoice",
         invoice.id,
-        { invoiceNumber: invoice.invoiceNumber, customerId: invoice.customerId, total: invoice.total },
+        { invoiceNumber: invoice.invoiceNumber, workOrderId: invoice.workOrderId, customerId: invoice.customerId, total: invoice.total },
         req.ip
       );
       
@@ -8841,45 +8925,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH /api/crm/invoices/:id - Update invoice
-  app.patch("/api/crm/invoices/:id", requireCrmAuth, async (req, res) => {
+  // PATCH /api/crm/invoices/:id - Update invoice (only draft invoices can be edited)
+  app.patch("/api/crm/invoices/:id", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const existingInvoice = await storage.getInvoice(req.params.id);
+      const [existingInvoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, req.params.id));
       if (!existingInvoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
 
-      const allowedFields = insertCrmInvoiceSchema.partial().pick({
-        status: true,
-        subtotal: true,
-        tax: true,
-        total: true,
-        balanceDue: true,
-        dueDate: true,
-        pdfUrl: true,
-      });
-
-      const result = allowedFields.safeParse(req.body);
-      if (!result.success) {
-        return res.status(400).json({ 
-          message: "Invalid request body", 
-          errors: result.error.flatten().fieldErrors 
-        });
+      if (existingInvoice.status !== "draft") {
+        return res.status(400).json({ message: "Only draft invoices can be edited" });
       }
+
+      const { notes, subtotal, laborTotal, taxTotal, total, balanceDue, dueDate } = req.body;
+      const updates: Partial<CrmInvoice> = {};
       
-      const updatedInvoice = await storage.updateInvoice(req.params.id, result.data);
+      if (notes !== undefined) updates.notes = notes;
+      if (subtotal !== undefined) updates.subtotal = subtotal;
+      if (laborTotal !== undefined) updates.laborTotal = laborTotal;
+      if (taxTotal !== undefined) updates.taxTotal = taxTotal;
+      if (total !== undefined) updates.total = total;
+      if (balanceDue !== undefined) updates.balanceDue = balanceDue;
+      if (dueDate !== undefined) updates.dueDate = dueDate ? new Date(dueDate) : null;
+      updates.updatedAt = new Date();
+      
+      const [updatedInvoice] = await db.update(crmInvoices)
+        .set(updates)
+        .where(eq(crmInvoices.id, req.params.id))
+        .returning();
       
       await logCrmAudit(
         user.id,
         "invoice.updated",
         "invoice",
         req.params.id,
-        { changes: result.data },
+        { changes: updates },
         req.ip
       );
       
@@ -8890,7 +8975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/crm/invoices/:id - Delete invoice
+  // DELETE /api/crm/invoices/:id - Delete invoice (only draft invoices can be deleted)
   app.delete("/api/crm/invoices/:id", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
@@ -8898,15 +8983,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const existingInvoice = await storage.getInvoice(req.params.id);
+      const [existingInvoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, req.params.id));
       if (!existingInvoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
       
-      const deleted = await storage.deleteInvoice(req.params.id);
-      if (!deleted) {
-        return res.status(500).json({ message: "Failed to delete invoice" });
+      if (existingInvoice.status !== "draft") {
+        return res.status(400).json({ message: "Only draft invoices can be deleted" });
       }
+      
+      if (existingInvoice.workOrderId) {
+        await db.update(crmWorkOrders)
+          .set({ billingDisposition: null, invoiceId: null, updatedAt: new Date() })
+          .where(eq(crmWorkOrders.id, existingInvoice.workOrderId));
+      }
+      
+      await db.delete(crmInvoices).where(eq(crmInvoices.id, req.params.id));
       
       await logCrmAudit(
         user.id,
@@ -8924,6 +9016,216 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/work-orders/:id/invoices - Get invoices for a work order
+  app.get("/api/crm/work-orders/:id/invoices", requireCrmAuth, async (req, res) => {
+    try {
+      const [workOrder] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, req.params.id));
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+      
+      const invoices = await db.select().from(crmInvoices)
+        .where(eq(crmInvoices.workOrderId, req.params.id))
+        .orderBy(desc(crmInvoices.createdAt));
+      
+      return res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching work order invoices:", error);
+      return res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  // GET /api/crm/projects/:id/invoices - Get invoices for a project (via work orders)
+  app.get("/api/crm/projects/:id/invoices", requireCrmAuth, async (req, res) => {
+    try {
+      const [project] = await db.select().from(crmProjects).where(eq(crmProjects.id, req.params.id));
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      const invoices = await db.select().from(crmInvoices)
+        .where(eq(crmInvoices.projectId, req.params.id))
+        .orderBy(desc(crmInvoices.createdAt));
+      
+      const enrichedInvoices = await Promise.all(
+        invoices.map(async (invoice) => {
+          let workOrder = null;
+          if (invoice.workOrderId) {
+            const [wo] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, invoice.workOrderId));
+            workOrder = wo || null;
+          }
+          return { ...invoice, workOrder };
+        })
+      );
+      
+      return res.json(enrichedInvoices);
+    } catch (error) {
+      console.error("Error fetching project invoices:", error);
+      return res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  // POST /api/crm/invoices/:id/send - Mark invoice as sent
+  app.post("/api/crm/invoices/:id/send", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, req.params.id));
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      if (invoice.status !== "draft") {
+        return res.status(400).json({ message: "Only draft invoices can be sent" });
+      }
+      
+      const [updatedInvoice] = await db.update(crmInvoices)
+        .set({ 
+          status: "sent" as const,
+          sentAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(crmInvoices.id, req.params.id))
+        .returning();
+      
+      await logCrmAudit(
+        user.id,
+        "invoice.sent",
+        "invoice",
+        req.params.id,
+        { invoiceNumber: invoice.invoiceNumber },
+        req.ip
+      );
+      
+      return res.json(updatedInvoice);
+    } catch (error) {
+      console.error("Error sending invoice:", error);
+      return res.status(500).json({ message: "Failed to send invoice" });
+    }
+  });
+
+  // POST /api/crm/invoices/:id/pay - Mark invoice as paid (with payment details)
+  app.post("/api/crm/invoices/:id/pay", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, req.params.id));
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      if (invoice.status === "paid") {
+        return res.status(400).json({ message: "Invoice is already paid" });
+      }
+      
+      if (invoice.status === "void") {
+        return res.status(400).json({ message: "Cannot pay a voided invoice" });
+      }
+      
+      const { amountPaid, paymentMethod, paymentReference } = req.body;
+      
+      if (!amountPaid || parseFloat(amountPaid) <= 0) {
+        return res.status(400).json({ message: "amountPaid is required and must be positive" });
+      }
+      
+      const totalAmount = parseFloat(invoice.total || "0");
+      const paidAmount = parseFloat(amountPaid);
+      const balanceDue = Math.max(0, totalAmount - paidAmount);
+      
+      const [updatedInvoice] = await db.update(crmInvoices)
+        .set({ 
+          status: "paid" as const,
+          amountPaid: amountPaid.toString(),
+          balanceDue: balanceDue.toString(),
+          paidAt: new Date(),
+          paymentMethod: paymentMethod || null,
+          paymentReference: paymentReference || null,
+          updatedAt: new Date()
+        })
+        .where(eq(crmInvoices.id, req.params.id))
+        .returning();
+      
+      await logCrmAudit(
+        user.id,
+        "invoice.paid",
+        "invoice",
+        req.params.id,
+        { invoiceNumber: invoice.invoiceNumber, amountPaid, paymentMethod, paymentReference },
+        req.ip
+      );
+      
+      return res.json(updatedInvoice);
+    } catch (error) {
+      console.error("Error marking invoice as paid:", error);
+      return res.status(500).json({ message: "Failed to mark invoice as paid" });
+    }
+  });
+
+  // POST /api/crm/invoices/:id/void - Mark invoice as void (with reason)
+  app.post("/api/crm/invoices/:id/void", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, req.params.id));
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      if (invoice.status === "void") {
+        return res.status(400).json({ message: "Invoice is already voided" });
+      }
+      
+      if (invoice.status === "paid") {
+        return res.status(400).json({ message: "Cannot void a paid invoice" });
+      }
+      
+      const { voidReason } = req.body;
+      
+      if (!voidReason || typeof voidReason !== 'string' || voidReason.trim() === '') {
+        return res.status(400).json({ message: "voidReason is required" });
+      }
+      
+      const [updatedInvoice] = await db.update(crmInvoices)
+        .set({ 
+          status: "void" as const,
+          voidedAt: new Date(),
+          voidReason: voidReason.trim(),
+          updatedAt: new Date()
+        })
+        .where(eq(crmInvoices.id, req.params.id))
+        .returning();
+      
+      if (invoice.workOrderId) {
+        await db.update(crmWorkOrders)
+          .set({ billingDisposition: null, invoiceId: null, updatedAt: new Date() })
+          .where(eq(crmWorkOrders.id, invoice.workOrderId));
+      }
+      
+      await logCrmAudit(
+        user.id,
+        "invoice.voided",
+        "invoice",
+        req.params.id,
+        { invoiceNumber: invoice.invoiceNumber, voidReason },
+        req.ip
+      );
+      
+      return res.json(updatedInvoice);
+    } catch (error) {
+      console.error("Error voiding invoice:", error);
+      return res.status(500).json({ message: "Failed to void invoice" });
+    }
+  });
+
   // POST /api/crm/invoices/:id/line-items - Add line item to invoice
   app.post("/api/crm/invoices/:id/line-items", requireCrmSalesOrAbove, async (req, res) => {
     try {
@@ -8932,9 +9234,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const invoice = await storage.getInvoice(req.params.id);
+      const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, req.params.id));
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      if (invoice.status !== "draft") {
+        return res.status(400).json({ message: "Can only add line items to draft invoices" });
       }
       
       const lineItemData = { ...req.body, invoiceId: req.params.id };
@@ -8946,7 +9252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const lineItem = await storage.createInvoiceLineItem(parseResult.data);
+      const [lineItem] = await db.insert(crmInvoiceLineItems).values(parseResult.data).returning();
       
       await logCrmAudit(
         user.id,
@@ -8965,32 +9271,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/invoices/:id/line-items/:lineItemId - Update line item
-  app.patch("/api/crm/invoices/:id/line-items/:lineItemId", requireCrmAuth, async (req, res) => {
+  app.patch("/api/crm/invoices/:id/line-items/:lineItemId", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const invoice = await storage.getInvoice(req.params.id);
+      const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, req.params.id));
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
       
-      const lineItems = await storage.getInvoiceLineItems(req.params.id);
-      const existingLineItem = lineItems.find(li => li.id === req.params.lineItemId);
+      if (invoice.status !== "draft") {
+        return res.status(400).json({ message: "Can only update line items on draft invoices" });
+      }
+      
+      const [existingLineItem] = await db.select().from(crmInvoiceLineItems)
+        .where(and(
+          eq(crmInvoiceLineItems.id, req.params.lineItemId),
+          eq(crmInvoiceLineItems.invoiceId, req.params.id)
+        ));
+      
       if (!existingLineItem) {
         return res.status(404).json({ message: "Line item not found" });
       }
       
-      const updatedLineItem = await storage.updateInvoiceLineItem(req.params.lineItemId, req.body);
+      const { description, partNumber, quantity, unitPrice, lineTotal, taxable, sortOrder, lineType } = req.body;
+      const updates: any = {};
+      if (description !== undefined) updates.description = description;
+      if (partNumber !== undefined) updates.partNumber = partNumber;
+      if (quantity !== undefined) updates.quantity = quantity;
+      if (unitPrice !== undefined) updates.unitPrice = unitPrice;
+      if (lineTotal !== undefined) updates.lineTotal = lineTotal;
+      if (taxable !== undefined) updates.taxable = taxable;
+      if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      if (lineType !== undefined) updates.lineType = lineType;
+      
+      const [updatedLineItem] = await db.update(crmInvoiceLineItems)
+        .set(updates)
+        .where(eq(crmInvoiceLineItems.id, req.params.lineItemId))
+        .returning();
       
       await logCrmAudit(
         user.id,
         "invoice_line_item.updated",
         "invoice_line_item",
         req.params.lineItemId,
-        { invoiceId: req.params.id, changes: req.body },
+        { invoiceId: req.params.id, changes: updates },
         req.ip
       );
       
@@ -9009,21 +9337,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const invoice = await storage.getInvoice(req.params.id);
+      const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, req.params.id));
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
       
-      const lineItems = await storage.getInvoiceLineItems(req.params.id);
-      const existingLineItem = lineItems.find(li => li.id === req.params.lineItemId);
+      if (invoice.status !== "draft") {
+        return res.status(400).json({ message: "Can only delete line items from draft invoices" });
+      }
+      
+      const [existingLineItem] = await db.select().from(crmInvoiceLineItems)
+        .where(and(
+          eq(crmInvoiceLineItems.id, req.params.lineItemId),
+          eq(crmInvoiceLineItems.invoiceId, req.params.id)
+        ));
+      
       if (!existingLineItem) {
         return res.status(404).json({ message: "Line item not found" });
       }
       
-      const deleted = await storage.deleteInvoiceLineItem(req.params.lineItemId);
-      if (!deleted) {
-        return res.status(500).json({ message: "Failed to delete line item" });
-      }
+      await db.delete(crmInvoiceLineItems).where(eq(crmInvoiceLineItems.id, req.params.lineItemId));
       
       await logCrmAudit(
         user.id,
@@ -9042,76 +9375,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // =============================================
-  // CRM QUOTES ROUTES (Separate from AI Quote Generator)
+  // CRM QUOTES ROUTES
   // =============================================
 
-  // GET /api/crm/quotes - List CRM quotes with filters
+  // Helper to generate quote number: Q-YYYYMMDD-XXX (sequential)
+  async function generateQuoteNumber(): Promise<string> {
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+    const prefix = `Q-${dateStr}-`;
+    
+    const todayQuotes = await db.select({ quoteNumber: crmQuotes.quoteNumber })
+      .from(crmQuotes)
+      .where(sql`${crmQuotes.quoteNumber} LIKE ${prefix + '%'}`)
+      .orderBy(desc(crmQuotes.quoteNumber))
+      .limit(1);
+    
+    let seq = 1;
+    if (todayQuotes.length > 0 && todayQuotes[0].quoteNumber) {
+      const lastSeq = parseInt(todayQuotes[0].quoteNumber.split('-').pop() || '0', 10);
+      seq = lastSeq + 1;
+    }
+    
+    return `${prefix}${String(seq).padStart(3, '0')}`;
+  }
+
+  // GET /api/crm/quotes - List quotes with filters
   app.get("/api/crm/quotes", requireCrmAuth, async (req, res) => {
     try {
-      const { status, assignedToId, search, page = "1", limit = "25" } = req.query;
-      const pageNum = parseInt(page as string) || 1;
-      const limitNum = Math.min(parseInt(limit as string) || 25, 100);
-      const offset = (pageNum - 1) * limitNum;
-
-      let query = db.select().from(crmQuotes);
+      const { scope, status, customerId, projectId, workOrderId } = req.query;
       
       const conditions: any[] = [];
-      if (status && status !== "all") {
+      if (scope) {
+        conditions.push(eq(crmQuotes.scope, scope as string));
+      }
+      if (status) {
         conditions.push(eq(crmQuotes.status, status as string));
       }
-      if (assignedToId) {
-        conditions.push(eq(crmQuotes.assignedToId, assignedToId as string));
+      if (customerId) {
+        conditions.push(eq(crmQuotes.customerId, customerId as string));
       }
-      if (search) {
-        const searchLower = `%${(search as string).toLowerCase()}%`;
-        conditions.push(
-          sql`(LOWER(${crmQuotes.customerName}) LIKE ${searchLower} OR LOWER(${crmQuotes.quoteNumber}) LIKE ${searchLower})`
-        );
+      if (projectId) {
+        conditions.push(eq(crmQuotes.projectId, projectId as string));
+      }
+      if (workOrderId) {
+        conditions.push(eq(crmQuotes.workOrderId, workOrderId as string));
       }
 
-      const baseQuery = conditions.length > 0
-        ? db.select().from(crmQuotes).where(and(...conditions))
-        : db.select().from(crmQuotes);
+      const quotesResult = conditions.length > 0
+        ? await db.select().from(crmQuotes).where(and(...conditions)).orderBy(desc(crmQuotes.createdAt))
+        : await db.select().from(crmQuotes).orderBy(desc(crmQuotes.createdAt));
 
-      const [countResult, quotes] = await Promise.all([
-        db.select({ count: sql<number>`count(*)` }).from(crmQuotes).where(conditions.length > 0 ? and(...conditions) : undefined),
-        baseQuery.orderBy(desc(crmQuotes.createdAt)).limit(limitNum).offset(offset),
-      ]);
-
-      const total = Number(countResult[0]?.count || 0);
-
-      return res.json({
-        quotes,
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total,
-          totalPages: Math.ceil(total / limitNum),
-          hasNextPage: pageNum * limitNum < total,
-          hasPrevPage: pageNum > 1,
-        },
-      });
+      return res.json(quotesResult);
     } catch (error) {
       console.error("Error fetching CRM quotes:", error);
       return res.status(500).json({ message: "Failed to fetch quotes" });
     }
   });
 
-  // GET /api/crm/quotes/:id - Get single CRM quote
+  // GET /api/crm/quotes/:id - Get single quote with line items
   app.get("/api/crm/quotes/:id", requireCrmAuth, async (req, res) => {
     try {
-      const quote = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
-      if (!quote[0]) {
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!quote) {
         return res.status(404).json({ message: "Quote not found" });
       }
-      return res.json(quote[0]);
+      
+      const lineItems = await db.select().from(crmQuoteLineItems)
+        .where(eq(crmQuoteLineItems.quoteId, req.params.id))
+        .orderBy(asc(crmQuoteLineItems.sortOrder));
+      
+      let customer = null;
+      if (quote.customerId) {
+        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, quote.customerId));
+        customer = cust || null;
+      }
+      
+      let workOrder = null;
+      if (quote.workOrderId) {
+        const [wo] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, quote.workOrderId));
+        workOrder = wo || null;
+      }
+      
+      let project = null;
+      if (quote.projectId) {
+        const [proj] = await db.select().from(crmProjects).where(eq(crmProjects.id, quote.projectId));
+        project = proj || null;
+      }
+      
+      return res.json({
+        ...quote,
+        lineItems,
+        customer,
+        workOrder,
+        project,
+      });
     } catch (error) {
       console.error("Error fetching CRM quote:", error);
       return res.status(500).json({ message: "Failed to fetch quote" });
     }
   });
 
-  // POST /api/crm/quotes - Create CRM quote
+  // POST /api/crm/quotes - Create quote (validate scope + workOrderId/projectId)
   app.post("/api/crm/quotes", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
@@ -9119,55 +9483,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // Generate quote number: Q-YYMMDD-XXXX
-      const now = new Date();
-      const dateStr = now.toISOString().slice(2, 10).replace(/-/g, "");
-      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const quoteNumber = `Q-${dateStr}-${randomSuffix}`;
-
-      const { customerName, ...rest } = req.body;
-      if (!customerName) {
-        return res.status(400).json({ message: "Customer name is required" });
+      const { lineItems, ...quoteData } = req.body;
+      
+      // Validate scope
+      const scope = quoteData.scope;
+      if (!scope || !['work_order', 'project'].includes(scope)) {
+        return res.status(400).json({ message: "scope must be 'work_order' or 'project'" });
+      }
+      
+      // Validate scope + workOrderId/projectId relationship
+      if (scope === 'work_order') {
+        if (!quoteData.workOrderId) {
+          return res.status(400).json({ message: "workOrderId is required when scope is 'work_order'" });
+        }
+        quoteData.projectId = null;
+        
+        // Verify work order exists
+        const [wo] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, quoteData.workOrderId));
+        if (!wo) {
+          return res.status(400).json({ message: "Work order not found" });
+        }
+      } else if (scope === 'project') {
+        if (!quoteData.projectId) {
+          return res.status(400).json({ message: "projectId is required when scope is 'project'" });
+        }
+        quoteData.workOrderId = null;
+        
+        // Verify project exists
+        const [proj] = await db.select().from(crmProjects).where(eq(crmProjects.id, quoteData.projectId));
+        if (!proj) {
+          return res.status(400).json({ message: "Project not found" });
+        }
       }
 
-      const [newQuote] = await db.insert(crmQuotes).values({
-        ...rest,
-        customerName,
+      // Generate quote number
+      const quoteNumber = await generateQuoteNumber();
+
+      // Validate with schema
+      const parseResult = insertCrmQuoteSchema.safeParse({
+        ...quoteData,
         quoteNumber,
-        createdById: user.id,
-      }).returning();
+        createdBy: user.id,
+      });
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: parseResult.error.errors 
+        });
+      }
+
+      const [newQuote] = await db.insert(crmQuotes).values(parseResult.data).returning();
+
+      // Create line items if provided
+      let createdLineItems: CrmQuoteLineItem[] = [];
+      if (lineItems && Array.isArray(lineItems)) {
+        for (const item of lineItems) {
+          const lineItemData = { ...item, quoteId: newQuote.id };
+          const lineItemParseResult = insertCrmQuoteLineItemSchema.safeParse(lineItemData);
+          if (lineItemParseResult.success) {
+            const [createdItem] = await db.insert(crmQuoteLineItems).values(lineItemParseResult.data).returning();
+            createdLineItems.push(createdItem);
+          }
+        }
+      }
 
       await logCrmAudit(
         user.id,
         "quote.created",
         "crm_quote",
         newQuote.id,
-        { quoteNumber },
+        { quoteNumber: newQuote.quoteNumber, scope, customerId: newQuote.customerId },
         req.ip
       );
 
-      return res.status(201).json(newQuote);
+      return res.status(201).json({ ...newQuote, lineItems: createdLineItems });
     } catch (error) {
       console.error("Error creating CRM quote:", error);
       return res.status(500).json({ message: "Failed to create quote" });
     }
   });
 
-  // PATCH /api/crm/quotes/:id - Update CRM quote
-  app.patch("/api/crm/quotes/:id", requireCrmAuth, async (req, res) => {
+  // PATCH /api/crm/quotes/:id - Update quote (only if draft)
+  app.patch("/api/crm/quotes/:id", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const existing = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
-      if (!existing[0]) {
+      const [existing] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!existing) {
         return res.status(404).json({ message: "Quote not found" });
       }
 
+      // Only draft quotes can be edited (status changes use dedicated endpoints)
+      if (existing.status !== 'draft') {
+        return res.status(400).json({ message: "Only draft quotes can be edited. Use status endpoints for sent/accepted/declined quotes." });
+      }
+
+      // Don't allow changing scope/workOrderId/projectId after creation
+      const { scope, workOrderId, projectId, status, ...updateData } = req.body;
+      
+      if (scope || workOrderId || projectId) {
+        return res.status(400).json({ message: "Cannot change scope, workOrderId, or projectId after quote creation" });
+      }
+      
+      if (status) {
+        return res.status(400).json({ message: "Use /send, /accept, or /decline endpoints to change quote status" });
+      }
+
       const [updated] = await db.update(crmQuotes)
-        .set({ ...req.body, updatedAt: new Date() })
+        .set({ ...updateData, updatedAt: new Date() })
         .where(eq(crmQuotes.id, req.params.id))
         .returning();
 
@@ -9176,7 +9603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "quote.updated",
         "crm_quote",
         req.params.id,
-        { changes: Object.keys(req.body) },
+        { changes: Object.keys(updateData) },
         req.ip
       );
 
@@ -9187,7 +9614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/crm/quotes/:id - Delete CRM quote
+  // DELETE /api/crm/quotes/:id - Delete quote (only if draft)
   app.delete("/api/crm/quotes/:id", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
@@ -9195,11 +9622,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const existing = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
-      if (!existing[0]) {
+      const [existing] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!existing) {
         return res.status(404).json({ message: "Quote not found" });
       }
 
+      // Only draft quotes can be deleted
+      if (existing.status !== 'draft') {
+        return res.status(400).json({ message: "Only draft quotes can be deleted" });
+      }
+
+      // Line items are deleted via cascade
       await db.delete(crmQuotes).where(eq(crmQuotes.id, req.params.id));
 
       await logCrmAudit(
@@ -9207,7 +9640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "quote.deleted",
         "crm_quote",
         req.params.id,
-        { quoteNumber: existing[0].quoteNumber },
+        { quoteNumber: existing.quoteNumber },
         req.ip
       );
 
@@ -9215,6 +9648,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting CRM quote:", error);
       return res.status(500).json({ message: "Failed to delete quote" });
+    }
+  });
+
+  // GET /api/crm/projects/:id/quotes - Get quotes for a project
+  app.get("/api/crm/projects/:id/quotes", requireCrmAuth, async (req, res) => {
+    try {
+      const [project] = await db.select().from(crmProjects).where(eq(crmProjects.id, req.params.id));
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const quotesResult = await db.select().from(crmQuotes)
+        .where(eq(crmQuotes.projectId, req.params.id))
+        .orderBy(desc(crmQuotes.createdAt));
+
+      return res.json(quotesResult);
+    } catch (error) {
+      console.error("Error fetching project quotes:", error);
+      return res.status(500).json({ message: "Failed to fetch project quotes" });
+    }
+  });
+
+  // GET /api/crm/work-orders/:id/quotes - Get quotes for a work order
+  app.get("/api/crm/work-orders/:id/quotes", requireCrmAuth, async (req, res) => {
+    try {
+      const [workOrder] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, req.params.id));
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+
+      const quotesResult = await db.select().from(crmQuotes)
+        .where(eq(crmQuotes.workOrderId, req.params.id))
+        .orderBy(desc(crmQuotes.createdAt));
+
+      return res.json(quotesResult);
+    } catch (error) {
+      console.error("Error fetching work order quotes:", error);
+      return res.status(500).json({ message: "Failed to fetch work order quotes" });
+    }
+  });
+
+  // POST /api/crm/quotes/:id/send - Mark quote as sent
+  app.post("/api/crm/quotes/:id/send", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [existing] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      if (existing.status !== 'draft') {
+        return res.status(400).json({ message: "Only draft quotes can be sent" });
+      }
+
+      const [updated] = await db.update(crmQuotes)
+        .set({ 
+          status: 'sent', 
+          sentAt: new Date(),
+          updatedAt: new Date() 
+        })
+        .where(eq(crmQuotes.id, req.params.id))
+        .returning();
+
+      await logCrmAudit(
+        user.id,
+        "quote.sent",
+        "crm_quote",
+        req.params.id,
+        { quoteNumber: existing.quoteNumber },
+        req.ip
+      );
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error marking quote as sent:", error);
+      return res.status(500).json({ message: "Failed to mark quote as sent" });
+    }
+  });
+
+  // POST /api/crm/quotes/:id/accept - Mark quote as accepted
+  app.post("/api/crm/quotes/:id/accept", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [existing] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      if (existing.status !== 'sent') {
+        return res.status(400).json({ message: "Only sent quotes can be accepted" });
+      }
+
+      const { acceptedBy } = req.body;
+
+      const [updated] = await db.update(crmQuotes)
+        .set({ 
+          status: 'accepted', 
+          acceptedAt: new Date(),
+          acceptedBy: acceptedBy || null,
+          updatedAt: new Date() 
+        })
+        .where(eq(crmQuotes.id, req.params.id))
+        .returning();
+
+      await logCrmAudit(
+        user.id,
+        "quote.accepted",
+        "crm_quote",
+        req.params.id,
+        { quoteNumber: existing.quoteNumber, acceptedBy },
+        req.ip
+      );
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error marking quote as accepted:", error);
+      return res.status(500).json({ message: "Failed to mark quote as accepted" });
+    }
+  });
+
+  // POST /api/crm/quotes/:id/decline - Mark quote as declined
+  app.post("/api/crm/quotes/:id/decline", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [existing] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      if (existing.status !== 'sent') {
+        return res.status(400).json({ message: "Only sent quotes can be declined" });
+      }
+
+      const { declineReason } = req.body;
+
+      const [updated] = await db.update(crmQuotes)
+        .set({ 
+          status: 'declined', 
+          declinedAt: new Date(),
+          declineReason: declineReason || null,
+          updatedAt: new Date() 
+        })
+        .where(eq(crmQuotes.id, req.params.id))
+        .returning();
+
+      await logCrmAudit(
+        user.id,
+        "quote.declined",
+        "crm_quote",
+        req.params.id,
+        { quoteNumber: existing.quoteNumber, declineReason },
+        req.ip
+      );
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error marking quote as declined:", error);
+      return res.status(500).json({ message: "Failed to mark quote as declined" });
     }
   });
 

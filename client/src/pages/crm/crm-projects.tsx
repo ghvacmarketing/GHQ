@@ -458,12 +458,7 @@ export default function CrmProjects() {
                 <Card
                   key={project.id}
                   className="bg-white border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => {
-                    toast({
-                      title: project.title,
-                      description: `Project detail page coming soon. Customer: ${project.customerName || "—"}`,
-                    });
-                  }}
+                  onClick={() => navigate(`/crm/projects/${project.id}`)}
                   data-testid={`card-project-${project.id}`}
                 >
                   <CardContent className="p-4">

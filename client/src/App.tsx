@@ -32,10 +32,12 @@ import CrmAccountDetail from "@/pages/crm/crm-account-detail";
 import CrmJobs from "@/pages/crm/crm-jobs";
 import CrmJobDetail from "@/pages/crm/crm-job-detail";
 import CrmWorkOrders from "@/pages/crm/crm-work-orders";
+import CrmWorkOrderDetail from "@/pages/crm/crm-work-order-detail";
 import CrmInvoices from "@/pages/crm/crm-invoices";
 import CrmQuotes from "@/pages/crm/crm-quotes";
 import CrmAgreements from "@/pages/crm/crm-agreements";
 import CrmProjects from "@/pages/crm/crm-projects";
+import CrmProjectDetail from "@/pages/crm/crm-project-detail";
 import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import GlobalPasswordGate from "@/components/GlobalPasswordGate";
@@ -78,6 +80,7 @@ function Router() {
       <Route path="/crm/gate" component={CrmGate} />
       <Route path="/crm/login" component={CrmLogin} />
       <Route path="/crm/dispatch" component={CrmDispatch} />
+      <Route path="/crm/work-orders/:id" component={CrmWorkOrderDetail} />
       <Route path="/crm/work-orders" component={CrmWorkOrders} />
       <Route path="/crm/jobs/:id" component={CrmJobDetail} />
       <Route path="/crm/jobs" component={CrmJobs} />
@@ -88,6 +91,7 @@ function Router() {
       <Route path="/crm/invoices" component={CrmInvoices} />
       <Route path="/crm/quotes" component={CrmQuotes} />
       <Route path="/crm/agreements" component={CrmAgreements} />
+      <Route path="/crm/projects/:id" component={CrmProjectDetail} />
       <Route path="/crm/projects" component={CrmProjects} />
       <Route path="/crm" component={CrmDashboard} />
       <Route component={NotFound} />
