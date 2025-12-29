@@ -2764,12 +2764,16 @@ export default function CrmCustomerDetail() {
         {/* Add Property Dialog */}
         <Dialog open={propertyDialogOpen} onOpenChange={(open) => !open && handleClosePropertyDialog()}>
           <DialogContent className="sm:max-w-[520px] p-0 gap-0 overflow-hidden">
-            <DialogHeader className="px-6 pt-6 pb-4 border-b bg-slate-50 dark:bg-slate-900">
-              <DialogTitle className="text-xl font-semibold">Add Site</DialogTitle>
-              <DialogDescription className="text-slate-500">
-                Add a new site/property to this customer
-              </DialogDescription>
-            </DialogHeader>
+            <div className="p-4 pb-0">
+              <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-5">
+                <DialogHeader className="p-0">
+                  <DialogTitle className="text-xl font-semibold">Add Site</DialogTitle>
+                  <DialogDescription className="text-slate-500">
+                    Add a new site/property to this customer
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+            </div>
             
             <div className="px-6 py-5 space-y-5 max-h-[65vh] overflow-y-auto">
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 space-y-4">
