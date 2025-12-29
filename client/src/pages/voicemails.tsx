@@ -1574,8 +1574,25 @@ function WeatherWidget() {
     );
   }
 
-  const currentPeriod = weather.forecast.properties.periods[0];
+  const periods = weather.forecast.properties.periods;
+  const currentPeriod = periods[0];
   const activeAlerts = weather.alerts?.features || [];
+
+  // Find today's high and low from forecast periods
+  // NWS returns alternating day/night periods
+  let highTemp: number | null = null;
+  let lowTemp: number | null = null;
+  
+  // Look at first 2-4 periods to find today's high and tonight's low
+  for (let i = 0; i < Math.min(4, periods.length); i++) {
+    const period = periods[i];
+    if (period.isDaytime && highTemp === null) {
+      highTemp = period.temperature;
+    } else if (!period.isDaytime && lowTemp === null) {
+      lowTemp = period.temperature;
+    }
+    if (highTemp !== null && lowTemp !== null) break;
+  }
 
   return (
     <div className="mb-2" data-testid="weather-widget">
@@ -1610,7 +1627,19 @@ function WeatherWidget() {
             </span>
             <span className="text-sm text-muted-foreground">{currentPeriod.name}</span>
           </div>
-          <p className="text-sm text-muted-foreground truncate" data-testid="weather-short-forecast">
+          <div className="flex items-center gap-3 text-sm">
+            {highTemp !== null && (
+              <span className="text-red-600 dark:text-red-400 font-medium" data-testid="weather-high">
+                H: {highTemp}°
+              </span>
+            )}
+            {lowTemp !== null && (
+              <span className="text-blue-600 dark:text-blue-400 font-medium" data-testid="weather-low">
+                L: {lowTemp}°
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground truncate mt-0.5" data-testid="weather-short-forecast">
             {currentPeriod.shortForecast}
           </p>
         </div>
