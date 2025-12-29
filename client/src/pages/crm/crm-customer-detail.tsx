@@ -571,8 +571,8 @@ function NotesSection({ notes, notesLoading, noteBody, setNoteBody, handleAddNot
   );
 }
 
-// PropertyManagerTabbedView component for property_manager customers only
-interface PropertyManagerTabbedViewProps {
+// CustomerTabbedView component for ALL customer types
+interface CustomerTabbedViewProps {
   customer: CrmCustomer;
   customerProperties: CrmProperty[] | undefined;
   propertiesLoading: boolean;
@@ -589,10 +589,11 @@ interface PropertyManagerTabbedViewProps {
   addNotePending: boolean;
   onCreateProject: () => void;
   onScheduleVisit: () => void;
+  onEditCustomer: () => void;
   toast: ReturnType<typeof useToast>['toast'];
 }
 
-function PropertyManagerTabbedView({
+function CustomerTabbedView({
   customer,
   customerProperties,
   propertiesLoading,
@@ -609,18 +610,44 @@ function PropertyManagerTabbedView({
   addNotePending,
   onCreateProject,
   onScheduleVisit,
+  onEditCustomer,
   toast,
-}: PropertyManagerTabbedViewProps) {
+}: CustomerTabbedViewProps) {
   const completedJobs = jobs?.filter(j => ["completed", "invoiced", "paid"].includes(j.status)) || [];
+  const customerType = (customer.customerType || "residential").toLowerCase();
+  const isPropertyManager = customerType === "property_manager" || customerType === "property manager";
+  const isCommercial = customerType === "commercial";
+  
   const hasAtLeastOneSite = (customerProperties?.length || 0) > 0;
   const hasOpsContact = false;
   const hasAPContact = false;
   const setupComplete = hasAtLeastOneSite && hasOpsContact && hasAPContact;
   const completedSteps = [hasAtLeastOneSite, hasOpsContact, hasAPContact].filter(Boolean).length;
 
+  const upcomingWorkOrders = crmWorkOrders?.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)) || [];
+  const completedWorkOrders = crmWorkOrders?.filter(wo => ["completed", "invoiced", "paid"].includes(wo.status)) || [];
+
+  const getCustomerIcon = () => {
+    if (isPropertyManager) return <Building2 className="h-5 w-5 text-purple-600" />;
+    if (isCommercial) return <Building2 className="h-5 w-5 text-blue-600" />;
+    return <Home className="h-5 w-5 text-green-600" />;
+  };
+
+  const getCustomerTypeLabel = () => {
+    if (isPropertyManager) return "Property Manager";
+    if (isCommercial) return "Commercial";
+    return "Residential";
+  };
+
+  const getCustomerBorderColor = () => {
+    if (isPropertyManager) return "border-l-purple-500";
+    if (isCommercial) return "border-l-blue-500";
+    return "border-l-green-500";
+  };
+
   return (
-    <Tabs defaultValue="overview" className="w-full" data-testid="property-manager-tabs">
-      <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6" data-testid="tabs-list">
+    <Tabs defaultValue="overview" className="w-full" data-testid="customer-tabs">
+      <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap" data-testid="tabs-list">
         <TabsTrigger 
           value="overview" 
           className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
@@ -638,12 +665,12 @@ function PropertyManagerTabbedView({
           Sites
         </TabsTrigger>
         <TabsTrigger 
-          value="contacts" 
+          value="work-orders" 
           className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
-          data-testid="tab-contacts"
+          data-testid="tab-work-orders"
         >
-          <Users className="h-4 w-4 mr-2" />
-          Contacts
+          <Wrench className="h-4 w-4 mr-2" />
+          Work Orders
         </TabsTrigger>
         <TabsTrigger 
           value="projects" 
@@ -654,126 +681,255 @@ function PropertyManagerTabbedView({
           Projects
         </TabsTrigger>
         <TabsTrigger 
-          value="profile" 
+          value="quotes" 
           className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
-          data-testid="tab-profile"
+          data-testid="tab-quotes"
         >
-          <UserCircle className="h-4 w-4 mr-2" />
-          Profile
+          <FileText className="h-4 w-4 mr-2" />
+          Quotes
         </TabsTrigger>
         <TabsTrigger 
-          value="history" 
+          value="invoices" 
           className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
-          data-testid="tab-history"
+          data-testid="tab-invoices"
         >
-          <History className="h-4 w-4 mr-2" />
-          Customer History
+          <Receipt className="h-4 w-4 mr-2" />
+          Invoices & Payments
+        </TabsTrigger>
+        <TabsTrigger 
+          value="files" 
+          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          data-testid="tab-files"
+        >
+          <FileText className="h-4 w-4 mr-2" />
+          Files / Photos
+        </TabsTrigger>
+        <TabsTrigger 
+          value="settings" 
+          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          data-testid="tab-settings"
+        >
+          <ClipboardList className="h-4 w-4 mr-2" />
+          Settings
         </TabsTrigger>
       </TabsList>
 
       {/* Overview Tab */}
       <TabsContent value="overview" className="space-y-6" data-testid="tab-content-overview">
         {/* Customer Summary Card */}
-        <Card data-testid="card-customer-summary">
-          <CardHeader>
+        <Card className={`border-l-4 ${getCustomerBorderColor()}`} data-testid="card-customer-summary">
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-[#711419]" />
-              Customer Summary
+              {getCustomerIcon()}
+              {getCustomerTypeLabel()} Customer
             </CardTitle>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={onEditCustomer}
+                className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
+                data-testid="button-edit-customer-overview"
+              >
+                <Pencil className="h-4 w-4 mr-1" />
+                Edit Customer
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-slate-500">Company Name</p>
-                <p className="font-medium">{customer.name}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Name</p>
+                  <p className="font-medium text-slate-700 mt-1">{customer.name}</p>
+                </div>
+                {customer.companyName && customer.companyName !== customer.name && (
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Company</p>
+                    <p className="font-medium text-slate-700 mt-1">{customer.companyName}</p>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Type:</p>
+                  <Badge className="bg-[#711419]/10 text-[#711419]">{customer.customerType}</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Status:</p>
+                  <Badge variant="outline">{customer.customerStatus}</Badge>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-slate-500">HQ/Mailing Address</p>
-                <p className="font-medium">{customer.fullAddress || "Not provided"}</p>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-slate-400" />
+                  {customer.phone ? (
+                    <a href={`tel:${customer.phone}`} className="text-blue-600 hover:underline">{customer.phone}</a>
+                  ) : (
+                    <span className="text-slate-400">No phone</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-slate-400" />
+                  {customer.email ? (
+                    <a href={`mailto:${customer.email}`} className="text-blue-600 hover:underline">{customer.email}</a>
+                  ) : (
+                    <span className="text-slate-400">No email</span>
+                  )}
+                </div>
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-slate-400 mt-1" />
+                  <span className="text-slate-700">{customer.fullAddress || "No address on file"}</span>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Setup Checklist Card */}
-        <Card data-testid="card-setup-checklist">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-[#711419]" />
-                Setup Checklist
-              </span>
-              <Badge 
-                className={setupComplete ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}
-              >
-                {completedSteps}/3 Complete
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3" data-testid="checklist-step-1">
-                {hasAtLeastOneSite ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                ) : (
-                  <Circle className="h-5 w-5 text-slate-300" />
-                )}
-                <span className={hasAtLeastOneSite ? "text-slate-700" : "text-slate-500"}>
-                  Step 1: Add at least 1 Site/Property
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            onClick={onCreateProject}
+            className="bg-[#711419] hover:bg-[#5a1014] text-white"
+            data-testid="button-create-project-overview"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Create Project
+          </Button>
+          <Button 
+            onClick={onScheduleVisit}
+            variant="outline"
+            className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
+            data-testid="button-create-wo-overview"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Create Work Order
+          </Button>
+        </div>
+
+        {/* Setup Checklist Card - Only for Property Managers */}
+        {isPropertyManager && (
+          <Card data-testid="card-setup-checklist">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-[#711419]" />
+                  Setup Checklist
                 </span>
-                {hasAtLeastOneSite && (
-                  <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
-                )}
+                <Badge 
+                  className={setupComplete ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}
+                >
+                  {completedSteps}/3 Complete
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3" data-testid="checklist-step-1">
+                  {hasAtLeastOneSite ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <Circle className="h-5 w-5 text-slate-300" />
+                  )}
+                  <span className={hasAtLeastOneSite ? "text-slate-700" : "text-slate-500"}>
+                    Step 1: Add at least 1 Site/Property
+                  </span>
+                  {hasAtLeastOneSite && (
+                    <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-3" data-testid="checklist-step-2">
+                  {hasOpsContact ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <Circle className="h-5 w-5 text-slate-300" />
+                  )}
+                  <span className={hasOpsContact ? "text-slate-700" : "text-slate-500"}>
+                    Step 2: Add Ops Contact (Facilities or Primary)
+                  </span>
+                  {hasOpsContact && (
+                    <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-3" data-testid="checklist-step-3">
+                  {hasAPContact ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <Circle className="h-5 w-5 text-slate-300" />
+                  )}
+                  <span className={hasAPContact ? "text-slate-700" : "text-slate-500"}>
+                    Step 3: Add AP/Billing Contact
+                  </span>
+                  {hasAPContact && (
+                    <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-3" data-testid="checklist-step-2">
-                {hasOpsContact ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                ) : (
-                  <Circle className="h-5 w-5 text-slate-300" />
-                )}
-                <span className={hasOpsContact ? "text-slate-700" : "text-slate-500"}>
-                  Step 2: Add Ops Contact (Facilities or Primary)
-                </span>
-                {hasOpsContact && (
-                  <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
-                )}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
+                  data-testid="button-add-site-checklist"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Site
+                </Button>
               </div>
-              <div className="flex items-center gap-3" data-testid="checklist-step-3">
-                {hasAPContact ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                ) : (
-                  <Circle className="h-5 w-5 text-slate-300" />
-                )}
-                <span className={hasAPContact ? "text-slate-700" : "text-slate-500"}>
-                  Step 3: Add AP/Billing Contact
-                </span>
-                {hasAPContact && (
-                  <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-2 pt-4 border-t">
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
-                data-testid="button-add-site-overview"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Site
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
-                data-testid="button-add-contact-overview"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Contact
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Notes Section */}
+        <NotesSection 
+          notes={notes} 
+          notesLoading={notesLoading} 
+          noteBody={noteBody} 
+          setNoteBody={setNoteBody} 
+          handleAddNote={handleAddNote} 
+          addNotePending={addNotePending} 
+        />
+
+        {/* Project History (Legacy Jobs) - From old Customer History tab */}
+        {completedJobs.length > 0 && (
+          <Card data-testid="card-job-history-overview">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-5 w-5 text-slate-500" />
+                Recent Service History ({completedJobs.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Completed</TableHead>
+                    <TableHead>Technician</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {completedJobs.slice(0, 5).map((job) => (
+                    <TableRow key={job.id} data-testid={`row-history-overview-${job.id}`}>
+                      <TableCell className="font-medium">{job.jobType}</TableCell>
+                      <TableCell>
+                        <Badge className={`${statusColors[job.status]?.bg} ${statusColors[job.status]?.text}`}>
+                          {job.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(job.completedAt)}</TableCell>
+                      <TableCell>{job.assignedTechName || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {completedJobs.length > 5 && (
+                <p className="text-sm text-slate-500 text-center py-2 mt-2">
+                  +{completedJobs.length - 5} more completed jobs
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </TabsContent>
 
       {/* Sites Tab */}
@@ -832,38 +988,99 @@ function PropertyManagerTabbedView({
         </Card>
       </TabsContent>
 
-      {/* Contacts Tab */}
-      <TabsContent value="contacts" className="space-y-6" data-testid="tab-content-contacts">
-        <Card data-testid="card-contacts">
+      {/* Work Orders Tab */}
+      <TabsContent value="work-orders" className="space-y-6" data-testid="tab-content-work-orders">
+        <Card data-testid="card-upcoming-wo-tab">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-[#711419]" />
-              Contacts
+              <CalendarPlus className="h-5 w-5 text-green-500" />
+              Upcoming Work Orders ({upcomingWorkOrders.length})
             </CardTitle>
             <Button 
-              size="sm"
+              size="sm" 
+              onClick={onScheduleVisit}
               className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              data-testid="button-add-contact"
+              data-testid="button-create-wo-tab"
             >
               <Plus className="h-4 w-4 mr-1" />
-              Add Contact
+              New Work Order
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8">
-              <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 mb-4">No contacts added yet</p>
-              <p className="text-sm text-slate-400 mb-4">
-                Add operations contacts and billing contacts for this property manager.
-              </p>
-              <Button 
-                className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                data-testid="button-add-first-contact"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add First Contact
-              </Button>
-            </div>
+            {workOrdersLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : upcomingWorkOrders.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">No upcoming work orders</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {upcomingWorkOrders.map((wo) => (
+                  <div 
+                    key={wo.id}
+                    className="p-4 border rounded-lg hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-colors"
+                    data-testid={`card-wo-tab-${wo.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="font-medium text-sm line-clamp-1">{wo.title || wo.visitType}</h4>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {wo.visitType.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                    <Badge className={`text-xs ${
+                      wo.status === "scheduled" ? "bg-blue-100 text-blue-700" :
+                      wo.status === "pending" ? "bg-amber-100 text-amber-700" :
+                      "bg-slate-100 text-slate-700"
+                    }`}>
+                      {wo.status}
+                    </Badge>
+                    {wo.scheduledStart && (
+                      <div className="flex items-center gap-1 text-xs text-slate-600 mt-2">
+                        <CalendarIcon className="h-3 w-3" />
+                        {format(new Date(wo.scheduledStart), "MMM d, yyyy h:mm a")}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-completed-wo-tab">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Completed Work Orders ({completedWorkOrders.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {workOrdersLoading ? (
+              <Skeleton className="h-20 w-full" />
+            ) : completedWorkOrders.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">No completed work orders</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {completedWorkOrders.map((wo) => (
+                  <div 
+                    key={wo.id}
+                    className="p-4 border rounded-lg hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-colors"
+                    data-testid={`card-completed-wo-${wo.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="font-medium text-sm line-clamp-1">{wo.title || wo.visitType}</h4>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {wo.visitType.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                    <Badge className="text-xs bg-green-100 text-green-700">
+                      {wo.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </TabsContent>
@@ -874,7 +1091,7 @@ function PropertyManagerTabbedView({
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Briefcase className="h-5 w-5 text-blue-500" />
-              Active Projects ({crmProjects?.filter(p => p.status !== "archived").length || 0})
+              Active Projects ({crmProjects?.filter(p => p.status !== "archived" && p.status !== "completed").length || 0})
             </CardTitle>
             <Button 
               size="sm" 
@@ -892,11 +1109,11 @@ function PropertyManagerTabbedView({
                 <Skeleton className="h-20 w-full" />
                 <Skeleton className="h-20 w-full" />
               </div>
-            ) : !crmProjects || crmProjects.filter(p => p.status !== "archived").length === 0 ? (
+            ) : !crmProjects || crmProjects.filter(p => p.status !== "archived" && p.status !== "completed").length === 0 ? (
               <p className="text-sm text-slate-500 text-center py-4">No active projects</p>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {crmProjects.filter(p => p.status !== "archived").map((project) => (
+                {crmProjects.filter(p => p.status !== "archived" && p.status !== "completed").map((project) => (
                   <div 
                     key={project.id}
                     className="p-4 border rounded-lg hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer transition-colors"
@@ -968,158 +1185,110 @@ function PropertyManagerTabbedView({
         </Card>
       </TabsContent>
 
-      {/* Profile Tab */}
-      <TabsContent value="profile" className="space-y-6" data-testid="tab-content-profile">
-        <Card data-testid="card-profile">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserCircle className="h-5 w-5 text-[#711419]" />
-              Customer Profile
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-slate-500">Company Name</p>
-                  <p className="font-medium">{customer.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Customer Type</p>
-                  <Badge className="bg-[#711419]/10 text-[#711419]">{customer.customerType}</Badge>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Status</p>
-                  <Badge variant="outline">{customer.customerStatus}</Badge>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-slate-400" />
-                  <span>{customer.phone || "No phone"}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-slate-400" />
-                  <span>{customer.email || "No email"}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-4 w-4 text-slate-400 mt-1" />
-                  <span>{customer.fullAddress || "No address"}</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Notes Section in Profile */}
-        <NotesSection 
-          notes={notes} 
-          notesLoading={notesLoading} 
-          noteBody={noteBody} 
-          setNoteBody={setNoteBody} 
-          handleAddNote={handleAddNote} 
-          addNotePending={addNotePending} 
-        />
-      </TabsContent>
-
-      {/* Customer History Tab */}
-      <TabsContent value="history" className="space-y-6" data-testid="tab-content-history">
-        {/* Upcoming Work Orders */}
-        <Card data-testid="card-upcoming-wo-tab">
+      {/* Quotes Tab - Placeholder */}
+      <TabsContent value="quotes" className="space-y-6" data-testid="tab-content-quotes">
+        <Card data-testid="card-quotes">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <CalendarPlus className="h-5 w-5 text-green-500" />
-              Upcoming Work Orders ({crmWorkOrders?.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).length || 0})
+              <FileText className="h-5 w-5 text-[#711419]" />
+              Quotes
             </CardTitle>
             <Button 
-              size="sm" 
-              onClick={onScheduleVisit}
+              size="sm"
               className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              data-testid="button-create-wo-tab"
+              data-testid="button-create-quote"
             >
               <Plus className="h-4 w-4 mr-1" />
-              New Work Order
+              Create Quote
             </Button>
           </CardHeader>
           <CardContent>
-            {workOrdersLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-              </div>
-            ) : !crmWorkOrders || crmWorkOrders.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-4">No upcoming work orders</p>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {crmWorkOrders.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).map((wo) => (
-                  <div 
-                    key={wo.id}
-                    className="p-4 border rounded-lg hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-colors"
-                    data-testid={`card-wo-tab-${wo.id}`}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h4 className="font-medium text-sm line-clamp-1">{wo.title || wo.visitType}</h4>
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        {wo.visitType.replace(/_/g, " ")}
-                      </Badge>
-                    </div>
-                    <Badge className={`text-xs ${
-                      wo.status === "scheduled" ? "bg-blue-100 text-blue-700" :
-                      wo.status === "pending" ? "bg-amber-100 text-amber-700" :
-                      "bg-slate-100 text-slate-700"
-                    }`}>
-                      {wo.status}
-                    </Badge>
-                    {wo.scheduledStart && (
-                      <div className="flex items-center gap-1 text-xs text-slate-600 mt-2">
-                        <CalendarIcon className="h-3 w-3" />
-                        {format(new Date(wo.scheduledStart), "MMM d, yyyy h:mm a")}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="text-center py-8">
+              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 mb-2">No quotes yet</p>
+              <p className="text-sm text-slate-400">
+                Quotes for this customer will appear here.
+              </p>
+            </div>
           </CardContent>
         </Card>
+      </TabsContent>
 
-        {/* Project History (Legacy Jobs) */}
-        <Card data-testid="card-job-history-tab">
+      {/* Invoices & Payments Tab - Placeholder */}
+      <TabsContent value="invoices" className="space-y-6" data-testid="tab-content-invoices">
+        <Card data-testid="card-invoices">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-[#711419]" />
+              Invoices & Payments
+            </CardTitle>
+            <Button 
+              size="sm"
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-create-invoice"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Create Invoice
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <Receipt className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 mb-2">No invoices yet</p>
+              <p className="text-sm text-slate-400">
+                Invoices and payment history for this customer will appear here.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      {/* Files / Photos Tab - Placeholder */}
+      <TabsContent value="files" className="space-y-6" data-testid="tab-content-files">
+        <Card data-testid="card-files">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-[#711419]" />
+              Files & Photos
+            </CardTitle>
+            <Button 
+              size="sm"
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-upload-file"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Upload File
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 mb-2">No files or photos yet</p>
+              <p className="text-sm text-slate-400">
+                Upload documents, photos, and other files related to this customer.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      {/* Settings Tab - Placeholder */}
+      <TabsContent value="settings" className="space-y-6" data-testid="tab-content-settings">
+        <Card data-testid="card-settings">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5 text-slate-500" />
-              Project History ({completedJobs.length})
+              <ClipboardList className="h-5 w-5 text-[#711419]" />
+              Customer Settings
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {completedJobs.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-4">No completed projects</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Completed</TableHead>
-                    <TableHead>Technician</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {completedJobs.map((job) => (
-                    <TableRow key={job.id} data-testid={`row-history-tab-${job.id}`}>
-                      <TableCell className="font-medium">{job.jobType}</TableCell>
-                      <TableCell>
-                        <Badge className={`${statusColors[job.status]?.bg} ${statusColors[job.status]?.text}`}>
-                          {job.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatDate(job.completedAt)}</TableCell>
-                      <TableCell>{job.assignedTechName || "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+            <div className="text-center py-8">
+              <ClipboardList className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 mb-2">Settings coming soon</p>
+              <p className="text-sm text-slate-400">
+                Customer preferences, billing settings, and notification options will be configured here.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </TabsContent>
@@ -2600,230 +2769,27 @@ export default function CrmCustomerDetail() {
           </DialogContent>
         </Dialog>
 
-        {/* Conditionally render tabbed view for property_manager, linear for others */}
-        {customer.customerType?.toLowerCase() === "property manager" ? (
-          <PropertyManagerTabbedView
-            customer={customer}
-            customerProperties={customerProperties}
-            propertiesLoading={propertiesLoading}
-            crmProjects={crmProjects}
-            projectsLoading={projectsLoading}
-            crmWorkOrders={crmWorkOrders}
-            workOrdersLoading={workOrdersLoading}
-            jobs={jobs}
-            notes={notes || []}
-            notesLoading={notesLoading}
-            noteBody={noteBody}
-            setNoteBody={setNoteBody}
-            handleAddNote={handleAddNote}
-            addNotePending={addNoteMutation.isPending}
-            onCreateProject={() => setCreateProjectDialogOpen(true)}
-            onScheduleVisit={() => setScheduleVisitDialogOpen(true)}
-            toast={toast}
-          />
-        ) : (
-          <>
-            {/* Type-specific Customer Overview Dashboard */}
-            <CustomerOverview 
-              customer={customer} 
-              jobs={jobs || []} 
-              notes={notes || []}
-              notesLoading={notesLoading}
-              noteBody={noteBody}
-              setNoteBody={setNoteBody}
-              handleAddNote={handleAddNote}
-              addNotePending={addNoteMutation.isPending}
-            />
-
-            {/* Active Projects Section (New CRM Projects) */}
-            <Card data-testid="card-crm-projects">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Briefcase className="h-5 w-5 text-blue-500" />
-                  Active Projects ({crmProjects?.filter(p => p.status !== "archived").length || 0})
-                </CardTitle>
-                <Button 
-                  size="sm" 
-                  onClick={() => setCreateProjectDialogOpen(true)}
-                  className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                  data-testid="button-create-project-inline"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  New Project
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {projectsLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-20 w-full" />
-                    <Skeleton className="h-20 w-full" />
-                  </div>
-                ) : !crmProjects || crmProjects.filter(p => p.status !== "archived").length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-4">No active projects</p>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {crmProjects.filter(p => p.status !== "archived").map((project) => (
-                      <div 
-                        key={project.id}
-                        className="p-4 border rounded-lg hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer transition-colors"
-                        onClick={() => {
-                          toast({ title: "Project Details", description: `Project: ${project.title}` });
-                        }}
-                        data-testid={`card-project-${project.id}`}
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <h4 className="font-medium text-sm line-clamp-1">{project.title}</h4>
-                          <Badge variant="outline" className="text-xs shrink-0">
-                            {project.projectType}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
-                          <Badge className={`text-xs ${
-                            project.status === "lead" ? "bg-slate-100 text-slate-700" :
-                            project.status === "proposal_sent" ? "bg-amber-100 text-amber-700" :
-                            project.status === "approved" ? "bg-blue-100 text-blue-700" :
-                            project.status === "in_progress" ? "bg-green-100 text-green-700" :
-                            project.status === "completed" ? "bg-emerald-100 text-emerald-700" :
-                            "bg-slate-100 text-slate-700"
-                          }`}>
-                            {project.status.replace(/_/g, " ")}
-                          </Badge>
-                        </div>
-                        {project.expectedValue && (
-                          <div className="flex items-center gap-1 text-xs text-slate-600">
-                            <DollarSign className="h-3 w-3" />
-                            ${Number(project.expectedValue).toLocaleString()}
-                          </div>
-                        )}
-                        {project.description && (
-                          <p className="text-xs text-slate-500 mt-2 line-clamp-2">{project.description}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Upcoming Work Orders Section */}
-            <Card data-testid="card-upcoming-work-orders">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <CalendarPlus className="h-5 w-5 text-green-500" />
-                  Upcoming Work Orders ({crmWorkOrders?.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).length || 0})
-                </CardTitle>
-                <Button 
-                  size="sm" 
-                  onClick={() => setScheduleVisitDialogOpen(true)}
-                  className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                  data-testid="button-create-wo-inline"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  New Work Order
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {workOrdersLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-20 w-full" />
-                    <Skeleton className="h-20 w-full" />
-                  </div>
-                ) : !crmWorkOrders || crmWorkOrders.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-4">No upcoming work orders</p>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {crmWorkOrders.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).map((wo) => (
-                      <div 
-                        key={wo.id}
-                        className="p-4 border rounded-lg hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-colors"
-                        onClick={() => {
-                          toast({ title: "Work Order Details", description: `Work Order: ${wo.title || wo.visitType}` });
-                        }}
-                        data-testid={`card-wo-${wo.id}`}
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <h4 className="font-medium text-sm line-clamp-1">{wo.title || wo.visitType}</h4>
-                          <Badge variant="outline" className="text-xs shrink-0">
-                            {wo.visitType.replace(/_/g, " ")}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
-                          <Badge className={`text-xs ${
-                            wo.status === "scheduled" ? "bg-blue-100 text-blue-700" :
-                            wo.status === "pending" ? "bg-amber-100 text-amber-700" :
-                            wo.status === "in_progress" ? "bg-green-100 text-green-700" :
-                            wo.status === "completed" ? "bg-emerald-100 text-emerald-700" :
-                            "bg-slate-100 text-slate-700"
-                          }`}>
-                            {wo.status}
-                          </Badge>
-                        </div>
-                        {wo.scheduledStart && (
-                          <div className="flex items-center gap-1 text-xs text-slate-600 mb-1">
-                            <CalendarIcon className="h-3 w-3" />
-                            {format(new Date(wo.scheduledStart), "MMM d, yyyy h:mm a")}
-                          </div>
-                        )}
-                        {wo.assignedTechName && (
-                          <div className="flex items-center gap-1 text-xs text-slate-600">
-                            <User className="h-3 w-3" />
-                            {wo.assignedTechName}
-                          </div>
-                        )}
-                        {wo.projectTitle && (
-                          <div className="flex items-center gap-1 text-xs text-blue-600 mt-1">
-                            <Briefcase className="h-3 w-3" />
-                            {wo.projectTitle}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-
-            <Card data-testid="card-job-history">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  Project History ({completedJobs.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {completedJobs.length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-4">No completed projects</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Completed</TableHead>
-                        <TableHead>Technician</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {completedJobs.map((job) => (
-                        <TableRow key={job.id} data-testid={`row-history-${job.id}`}>
-                          <TableCell className="font-medium">{job.jobType}</TableCell>
-                          <TableCell>
-                            <Badge className={`${statusColors[job.status]?.bg} ${statusColors[job.status]?.text}`}>
-                              {job.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{formatDate(job.completedAt)}</TableCell>
-                          <TableCell>{job.assignedTechName || "—"}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        )}
+        {/* Tabbed view for ALL customer types */}
+        <CustomerTabbedView
+          customer={customer}
+          customerProperties={customerProperties}
+          propertiesLoading={propertiesLoading}
+          crmProjects={crmProjects}
+          projectsLoading={projectsLoading}
+          crmWorkOrders={crmWorkOrders}
+          workOrdersLoading={workOrdersLoading}
+          jobs={jobs}
+          notes={notes || []}
+          notesLoading={notesLoading}
+          noteBody={noteBody}
+          setNoteBody={setNoteBody}
+          handleAddNote={handleAddNote}
+          addNotePending={addNoteMutation.isPending}
+          onCreateProject={() => setCreateProjectDialogOpen(true)}
+          onScheduleVisit={() => setScheduleVisitDialogOpen(true)}
+          onEditCustomer={() => setEditDialogOpen(true)}
+          toast={toast}
+        />
 
       </div>
     </CrmLayout>
