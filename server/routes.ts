@@ -7700,7 +7700,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const propertyId = req.params.id;
       const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, billedTo } = req.body;
 
+      // Fetch existing property to get customer info
+      const [existingProperty] = await db.select().from(crmProperties).where(eq(crmProperties.id, propertyId));
+      if (!existingProperty) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      // Build update data with trimmed values
       const updateData: Record<string, any> = {};
+      const finalAddress1 = address1 !== undefined ? address1.trim() : existingProperty.address1;
+      const finalCity = city !== undefined ? city.trim() : existingProperty.city;
+      const finalState = state !== undefined ? state.trim() : existingProperty.state;
+      const finalZip = zip !== undefined ? zip.trim() : existingProperty.zip;
+      const finalTenantName = tenantName !== undefined ? tenantName?.trim() || null : existingProperty.tenantName;
+      const finalTenantEmail = tenantEmail !== undefined ? tenantEmail?.trim() || null : existingProperty.tenantEmail;
+      const finalBilledTo = billedTo !== undefined ? billedTo : existingProperty.billedTo;
+
+      // Validate required address fields
+      if (!finalAddress1 || !finalCity || !finalState || !finalZip) {
+        return res.status(400).json({ message: "Street address, city, state, and zip are required" });
+      }
+
+      // Fetch customer to check if Property Manager
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, existingProperty.customerId));
+      const isPropertyManager = customer?.customerType?.toLowerCase() === "property manager";
+
+      // Validate tenant requirements for Property Manager
+      if (isPropertyManager) {
+        if (!finalTenantName) {
+          return res.status(400).json({ message: "Tenant name is required for property manager sites" });
+        }
+        if (finalBilledTo === "tenant" && !finalTenantEmail) {
+          return res.status(400).json({ message: "Tenant email is required when billing to tenant" });
+        }
+      }
+
+      // Build update object
       if (address1 !== undefined) updateData.address1 = address1.trim();
       if (address2 !== undefined) updateData.address2 = address2?.trim() || null;
       if (city !== undefined) updateData.city = city.trim();
@@ -7720,10 +7755,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set(updateData)
         .where(eq(crmProperties.id, propertyId))
         .returning();
-
-      if (!updatedProperty) {
-        return res.status(404).json({ message: "Property not found" });
-      }
 
       return res.json(updatedProperty);
     } catch (error) {
