@@ -515,7 +515,7 @@ export default function CrmWorkOrders() {
     return null;
   }
 
-  const total = workOrders?.length || 0;
+  const total = workOrdersData?.length || 0;
 
   return (
     <CrmLayout currentUser={currentUser}>
