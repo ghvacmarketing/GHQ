@@ -307,7 +307,7 @@ export default function CrmAccountCreate() {
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: "Account created successfully" });
+      toast({ title: "Customer created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
       // Navigate to the account detail page for all account types
@@ -319,7 +319,7 @@ export default function CrmAccountCreate() {
     },
     onError: (error: any) => {
       toast({
-        title: "Failed to create account",
+        title: "Failed to create customer",
         description: error.message || "Please try again",
         variant: "destructive",
       });
@@ -1259,15 +1259,15 @@ export default function CrmAccountCreate() {
               <Button
                 onClick={handleSubmit}
                 disabled={!checkValidation(5).valid || createAccountMutation.isPending}
-                data-testid="button-create-account"
+                data-testid="button-create-customer"
               >
                 {createAccountMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
+                    Creating Customer...
                   </>
                 ) : (
-                  "Create Account"
+                  "Create Customer"
                 )}
               </Button>
             )}

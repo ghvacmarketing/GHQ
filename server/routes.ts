@@ -6559,6 +6559,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create account
       const [newAccount] = await db.insert(crmAccounts).values(accountResult.data).returning();
 
+      // Also create a corresponding customer record in crmCustomers table
+      const primarySite = sites && sites.length > 0 ? sites[0] : null;
+      const primaryContact = contacts && contacts.length > 0 ? contacts[0] : null;
+      const fullAddress = primarySite 
+        ? `${primarySite.address1}${primarySite.address2 ? ', ' + primarySite.address2 : ''}, ${primarySite.city}, ${primarySite.state} ${primarySite.zip}`
+        : null;
+      
+      const customerTypeMap: Record<string, "residential" | "commercial" | "property_manager"> = {
+        "RESIDENTIAL": "residential",
+        "COMMERCIAL": "commercial", 
+        "PROPERTY_MANAGER": "property_manager",
+      };
+      
+      const mappedCustomerType = customerTypeMap[newAccount.accountType] || "residential";
+      const mappedStatus: "prospect" | "client" = newAccount.accountStatus === "ACTIVE" ? "client" : "prospect";
+      
+      const [newCustomer] = await db.insert(crmCustomers).values({
+        name: newAccount.displayName,
+        companyName: newAccount.companyName,
+        email: primaryContact?.email || null,
+        phone: primaryContact?.phone || null,
+        customerType: mappedCustomerType,
+        customerStatus: mappedStatus,
+        sourceSystem: "crm_accounts",
+        sourceId: newAccount.id,
+      }).returning();
+
       // Create sites if provided
       let createdSites: any[] = [];
       if (sites && Array.isArray(sites) && sites.length > 0) {
