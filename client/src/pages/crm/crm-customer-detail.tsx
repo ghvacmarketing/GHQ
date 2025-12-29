@@ -44,6 +44,11 @@ import {
   Receipt,
   Key,
   Pencil,
+  Circle,
+  CheckCircle2,
+  History,
+  UserCircle,
+  LayoutGrid,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -52,6 +57,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty } from "@shared/schema";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus } from "@shared/schema";
@@ -565,6 +571,562 @@ function NotesSection({ notes, notesLoading, noteBody, setNoteBody, handleAddNot
   );
 }
 
+// PropertyManagerTabbedView component for property_manager customers only
+interface PropertyManagerTabbedViewProps {
+  customer: CrmCustomer;
+  customerProperties: CrmProperty[] | undefined;
+  propertiesLoading: boolean;
+  crmProjects: any[] | undefined;
+  projectsLoading: boolean;
+  crmWorkOrders: any[] | undefined;
+  workOrdersLoading: boolean;
+  jobs: JobWithTech[] | undefined;
+  notes: CustomerNoteWithUser[];
+  notesLoading: boolean;
+  noteBody: string;
+  setNoteBody: (value: string) => void;
+  handleAddNote: () => void;
+  addNotePending: boolean;
+  onCreateProject: () => void;
+  onScheduleVisit: () => void;
+  toast: ReturnType<typeof useToast>['toast'];
+}
+
+function PropertyManagerTabbedView({
+  customer,
+  customerProperties,
+  propertiesLoading,
+  crmProjects,
+  projectsLoading,
+  crmWorkOrders,
+  workOrdersLoading,
+  jobs,
+  notes,
+  notesLoading,
+  noteBody,
+  setNoteBody,
+  handleAddNote,
+  addNotePending,
+  onCreateProject,
+  onScheduleVisit,
+  toast,
+}: PropertyManagerTabbedViewProps) {
+  const completedJobs = jobs?.filter(j => ["completed", "invoiced", "paid"].includes(j.status)) || [];
+  const hasAtLeastOneSite = (customerProperties?.length || 0) > 0;
+  const hasOpsContact = false;
+  const hasAPContact = false;
+  const setupComplete = hasAtLeastOneSite && hasOpsContact && hasAPContact;
+  const completedSteps = [hasAtLeastOneSite, hasOpsContact, hasAPContact].filter(Boolean).length;
+
+  return (
+    <Tabs defaultValue="overview" className="w-full" data-testid="property-manager-tabs">
+      <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6" data-testid="tabs-list">
+        <TabsTrigger 
+          value="overview" 
+          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          data-testid="tab-overview"
+        >
+          <LayoutGrid className="h-4 w-4 mr-2" />
+          Overview
+        </TabsTrigger>
+        <TabsTrigger 
+          value="sites" 
+          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          data-testid="tab-sites"
+        >
+          <MapPin className="h-4 w-4 mr-2" />
+          Sites
+        </TabsTrigger>
+        <TabsTrigger 
+          value="contacts" 
+          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          data-testid="tab-contacts"
+        >
+          <Users className="h-4 w-4 mr-2" />
+          Contacts
+        </TabsTrigger>
+        <TabsTrigger 
+          value="projects" 
+          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          data-testid="tab-projects"
+        >
+          <Briefcase className="h-4 w-4 mr-2" />
+          Projects
+        </TabsTrigger>
+        <TabsTrigger 
+          value="profile" 
+          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          data-testid="tab-profile"
+        >
+          <UserCircle className="h-4 w-4 mr-2" />
+          Profile
+        </TabsTrigger>
+        <TabsTrigger 
+          value="history" 
+          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          data-testid="tab-history"
+        >
+          <History className="h-4 w-4 mr-2" />
+          Customer History
+        </TabsTrigger>
+      </TabsList>
+
+      {/* Overview Tab */}
+      <TabsContent value="overview" className="space-y-6" data-testid="tab-content-overview">
+        {/* Customer Summary Card */}
+        <Card data-testid="card-customer-summary">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-[#711419]" />
+              Customer Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-slate-500">Company Name</p>
+                <p className="font-medium">{customer.name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">HQ/Mailing Address</p>
+                <p className="font-medium">{customer.fullAddress || "Not provided"}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Setup Checklist Card */}
+        <Card data-testid="card-setup-checklist">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-[#711419]" />
+                Setup Checklist
+              </span>
+              <Badge 
+                className={setupComplete ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}
+              >
+                {completedSteps}/3 Complete
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3" data-testid="checklist-step-1">
+                {hasAtLeastOneSite ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                ) : (
+                  <Circle className="h-5 w-5 text-slate-300" />
+                )}
+                <span className={hasAtLeastOneSite ? "text-slate-700" : "text-slate-500"}>
+                  Step 1: Add at least 1 Site/Property
+                </span>
+                {hasAtLeastOneSite && (
+                  <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-3" data-testid="checklist-step-2">
+                {hasOpsContact ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                ) : (
+                  <Circle className="h-5 w-5 text-slate-300" />
+                )}
+                <span className={hasOpsContact ? "text-slate-700" : "text-slate-500"}>
+                  Step 2: Add Ops Contact (Facilities or Primary)
+                </span>
+                {hasOpsContact && (
+                  <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-3" data-testid="checklist-step-3">
+                {hasAPContact ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                ) : (
+                  <Circle className="h-5 w-5 text-slate-300" />
+                )}
+                <span className={hasAPContact ? "text-slate-700" : "text-slate-500"}>
+                  Step 3: Add AP/Billing Contact
+                </span>
+                {hasAPContact && (
+                  <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-4 border-t">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
+                data-testid="button-add-site-overview"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Site
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
+                data-testid="button-add-contact-overview"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Contact
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      {/* Sites Tab */}
+      <TabsContent value="sites" className="space-y-6" data-testid="tab-content-sites">
+        <Card data-testid="card-sites">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-[#711419]" />
+              Sites/Properties ({customerProperties?.length || 0})
+            </CardTitle>
+            <Button 
+              size="sm"
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-add-site"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Site
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {propertiesLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : !customerProperties || customerProperties.length === 0 ? (
+              <div className="text-center py-8">
+                <MapPin className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 mb-4">No sites/properties added yet</p>
+                <Button 
+                  className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                  data-testid="button-add-first-site"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add First Site
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {customerProperties.map((property) => (
+                  <div 
+                    key={property.id}
+                    className="p-4 border rounded-lg hover:border-[#711419]/50 hover:bg-[#711419]/5 cursor-pointer transition-colors"
+                    data-testid={`card-property-${property.id}`}
+                  >
+                    <h4 className="font-medium">{property.name || "Unnamed Property"}</h4>
+                    <p className="text-sm text-slate-500 mt-1">{property.address || "No address"}</p>
+                    {property.city && property.state && (
+                      <p className="text-sm text-slate-500">{property.city}, {property.state} {property.zip}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      {/* Contacts Tab */}
+      <TabsContent value="contacts" className="space-y-6" data-testid="tab-content-contacts">
+        <Card data-testid="card-contacts">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-[#711419]" />
+              Contacts
+            </CardTitle>
+            <Button 
+              size="sm"
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-add-contact"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Contact
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 mb-4">No contacts added yet</p>
+              <p className="text-sm text-slate-400 mb-4">
+                Add operations contacts and billing contacts for this property manager.
+              </p>
+              <Button 
+                className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                data-testid="button-add-first-contact"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add First Contact
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      {/* Projects Tab */}
+      <TabsContent value="projects" className="space-y-6" data-testid="tab-content-projects">
+        <Card data-testid="card-open-projects">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-blue-500" />
+              Active Projects ({crmProjects?.filter(p => p.status !== "archived").length || 0})
+            </CardTitle>
+            <Button 
+              size="sm" 
+              onClick={onCreateProject}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-create-project-tab"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Project
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {projectsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : !crmProjects || crmProjects.filter(p => p.status !== "archived").length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">No active projects</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {crmProjects.filter(p => p.status !== "archived").map((project) => (
+                  <div 
+                    key={project.id}
+                    className="p-4 border rounded-lg hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer transition-colors"
+                    onClick={() => {
+                      toast({ title: "Project Details", description: `Project: ${project.title}` });
+                    }}
+                    data-testid={`card-project-tab-${project.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="font-medium text-sm line-clamp-1">{project.title}</h4>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {project.projectType}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                      <Badge className={`text-xs ${
+                        project.status === "lead" ? "bg-slate-100 text-slate-700" :
+                        project.status === "proposal_sent" ? "bg-amber-100 text-amber-700" :
+                        project.status === "approved" ? "bg-blue-100 text-blue-700" :
+                        project.status === "in_progress" ? "bg-green-100 text-green-700" :
+                        project.status === "completed" ? "bg-emerald-100 text-emerald-700" :
+                        "bg-slate-100 text-slate-700"
+                      }`}>
+                        {project.status.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                    {project.expectedValue && (
+                      <div className="flex items-center gap-1 text-xs text-slate-600">
+                        <DollarSign className="h-3 w-3" />
+                        ${Number(project.expectedValue).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-completed-projects-tab">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Completed Projects ({crmProjects?.filter(p => p.status === "completed").length || 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {projectsLoading ? (
+              <Skeleton className="h-20 w-full" />
+            ) : !crmProjects || crmProjects.filter(p => p.status === "completed").length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">No completed projects</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {crmProjects.filter(p => p.status === "completed").map((project) => (
+                  <div 
+                    key={project.id}
+                    className="p-4 border rounded-lg hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-colors"
+                    data-testid={`card-completed-project-${project.id}`}
+                  >
+                    <h4 className="font-medium text-sm">{project.title}</h4>
+                    <Badge variant="outline" className="text-xs mt-1">
+                      {project.projectType}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      {/* Profile Tab */}
+      <TabsContent value="profile" className="space-y-6" data-testid="tab-content-profile">
+        <Card data-testid="card-profile">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserCircle className="h-5 w-5 text-[#711419]" />
+              Customer Profile
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-slate-500">Company Name</p>
+                  <p className="font-medium">{customer.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Customer Type</p>
+                  <Badge className="bg-[#711419]/10 text-[#711419]">{customer.customerType}</Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Status</p>
+                  <Badge variant="outline">{customer.customerStatus}</Badge>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-slate-400" />
+                  <span>{customer.phone || "No phone"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-slate-400" />
+                  <span>{customer.email || "No email"}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-slate-400 mt-1" />
+                  <span>{customer.fullAddress || "No address"}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Notes Section in Profile */}
+        <NotesSection 
+          notes={notes} 
+          notesLoading={notesLoading} 
+          noteBody={noteBody} 
+          setNoteBody={setNoteBody} 
+          handleAddNote={handleAddNote} 
+          addNotePending={addNotePending} 
+        />
+      </TabsContent>
+
+      {/* Customer History Tab */}
+      <TabsContent value="history" className="space-y-6" data-testid="tab-content-history">
+        {/* Upcoming Work Orders */}
+        <Card data-testid="card-upcoming-wo-tab">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarPlus className="h-5 w-5 text-green-500" />
+              Upcoming Work Orders ({crmWorkOrders?.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).length || 0})
+            </CardTitle>
+            <Button 
+              size="sm" 
+              onClick={onScheduleVisit}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-create-wo-tab"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Work Order
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {workOrdersLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : !crmWorkOrders || crmWorkOrders.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">No upcoming work orders</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {crmWorkOrders.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).map((wo) => (
+                  <div 
+                    key={wo.id}
+                    className="p-4 border rounded-lg hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-colors"
+                    data-testid={`card-wo-tab-${wo.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="font-medium text-sm line-clamp-1">{wo.title || wo.visitType}</h4>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {wo.visitType.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                    <Badge className={`text-xs ${
+                      wo.status === "scheduled" ? "bg-blue-100 text-blue-700" :
+                      wo.status === "pending" ? "bg-amber-100 text-amber-700" :
+                      "bg-slate-100 text-slate-700"
+                    }`}>
+                      {wo.status}
+                    </Badge>
+                    {wo.scheduledStart && (
+                      <div className="flex items-center gap-1 text-xs text-slate-600 mt-2">
+                        <CalendarIcon className="h-3 w-3" />
+                        {format(new Date(wo.scheduledStart), "MMM d, yyyy h:mm a")}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Project History (Legacy Jobs) */}
+        <Card data-testid="card-job-history-tab">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-slate-500" />
+              Project History ({completedJobs.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {completedJobs.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">No completed projects</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Completed</TableHead>
+                    <TableHead>Technician</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {completedJobs.map((job) => (
+                    <TableRow key={job.id} data-testid={`row-history-tab-${job.id}`}>
+                      <TableCell className="font-medium">{job.jobType}</TableCell>
+                      <TableCell>
+                        <Badge className={`${statusColors[job.status]?.bg} ${statusColors[job.status]?.text}`}>
+                          {job.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(job.completedAt)}</TableCell>
+                      <TableCell>{job.assignedTechName || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
+  );
+}
+
 export default function CrmCustomerDetail() {
   const [, navigate] = useLocation();
   const params = useParams<{ id: string }>();
@@ -757,15 +1319,15 @@ export default function CrmCustomerDetail() {
     enabled: !!currentUser && !!customerId,
   });
 
-  // Fetch customer properties for dialogs
-  const { data: customerProperties } = useQuery<CrmProperty[]>({
+  // Fetch customer properties for all views (needed for property_manager tabs)
+  const { data: customerProperties, isLoading: propertiesLoading } = useQuery<CrmProperty[]>({
     queryKey: ["/api/crm/customers", customerId, "properties"],
     queryFn: async () => {
       const res = await fetch(`/api/crm/customers/${customerId}/properties`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!currentUser && !!customerId && (createProjectDialogOpen || scheduleVisitDialogOpen),
+    enabled: !!currentUser && !!customerId,
   });
 
   interface CustomerImpact {
@@ -2038,205 +2600,230 @@ export default function CrmCustomerDetail() {
           </DialogContent>
         </Dialog>
 
-        {/* Type-specific Customer Overview Dashboard */}
-        <CustomerOverview 
-          customer={customer} 
-          jobs={jobs || []} 
-          notes={notes || []}
-          notesLoading={notesLoading}
-          noteBody={noteBody}
-          setNoteBody={setNoteBody}
-          handleAddNote={handleAddNote}
-          addNotePending={addNoteMutation.isPending}
-        />
+        {/* Conditionally render tabbed view for property_manager, linear for others */}
+        {customer.customerType?.toLowerCase() === "property manager" ? (
+          <PropertyManagerTabbedView
+            customer={customer}
+            customerProperties={customerProperties}
+            propertiesLoading={propertiesLoading}
+            crmProjects={crmProjects}
+            projectsLoading={projectsLoading}
+            crmWorkOrders={crmWorkOrders}
+            workOrdersLoading={workOrdersLoading}
+            jobs={jobs}
+            notes={notes || []}
+            notesLoading={notesLoading}
+            noteBody={noteBody}
+            setNoteBody={setNoteBody}
+            handleAddNote={handleAddNote}
+            addNotePending={addNoteMutation.isPending}
+            onCreateProject={() => setCreateProjectDialogOpen(true)}
+            onScheduleVisit={() => setScheduleVisitDialogOpen(true)}
+            toast={toast}
+          />
+        ) : (
+          <>
+            {/* Type-specific Customer Overview Dashboard */}
+            <CustomerOverview 
+              customer={customer} 
+              jobs={jobs || []} 
+              notes={notes || []}
+              notesLoading={notesLoading}
+              noteBody={noteBody}
+              setNoteBody={setNoteBody}
+              handleAddNote={handleAddNote}
+              addNotePending={addNoteMutation.isPending}
+            />
 
-        {/* Active Projects Section (New CRM Projects) */}
-        <Card data-testid="card-crm-projects">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-blue-500" />
-              Active Projects ({crmProjects?.filter(p => p.status !== "archived").length || 0})
-            </CardTitle>
-            <Button 
-              size="sm" 
-              onClick={() => setCreateProjectDialogOpen(true)}
-              className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              data-testid="button-create-project-inline"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              New Project
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {projectsLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-              </div>
-            ) : !crmProjects || crmProjects.filter(p => p.status !== "archived").length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-4">No active projects</p>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {crmProjects.filter(p => p.status !== "archived").map((project) => (
-                  <div 
-                    key={project.id}
-                    className="p-4 border rounded-lg hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer transition-colors"
-                    onClick={() => {
-                      toast({ title: "Project Details", description: `Project: ${project.title}` });
-                    }}
-                    data-testid={`card-project-${project.id}`}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h4 className="font-medium text-sm line-clamp-1">{project.title}</h4>
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        {project.projectType}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
-                      <Badge className={`text-xs ${
-                        project.status === "lead" ? "bg-slate-100 text-slate-700" :
-                        project.status === "proposal_sent" ? "bg-amber-100 text-amber-700" :
-                        project.status === "approved" ? "bg-blue-100 text-blue-700" :
-                        project.status === "in_progress" ? "bg-green-100 text-green-700" :
-                        project.status === "completed" ? "bg-emerald-100 text-emerald-700" :
-                        "bg-slate-100 text-slate-700"
-                      }`}>
-                        {project.status.replace(/_/g, " ")}
-                      </Badge>
-                    </div>
-                    {project.expectedValue && (
-                      <div className="flex items-center gap-1 text-xs text-slate-600">
-                        <DollarSign className="h-3 w-3" />
-                        ${Number(project.expectedValue).toLocaleString()}
-                      </div>
-                    )}
-                    {project.description && (
-                      <p className="text-xs text-slate-500 mt-2 line-clamp-2">{project.description}</p>
-                    )}
+            {/* Active Projects Section (New CRM Projects) */}
+            <Card data-testid="card-crm-projects">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-blue-500" />
+                  Active Projects ({crmProjects?.filter(p => p.status !== "archived").length || 0})
+                </CardTitle>
+                <Button 
+                  size="sm" 
+                  onClick={() => setCreateProjectDialogOpen(true)}
+                  className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                  data-testid="button-create-project-inline"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  New Project
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {projectsLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Upcoming Work Orders Section */}
-        <Card data-testid="card-upcoming-work-orders">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <CalendarPlus className="h-5 w-5 text-green-500" />
-              Upcoming Work Orders ({crmWorkOrders?.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).length || 0})
-            </CardTitle>
-            <Button 
-              size="sm" 
-              onClick={() => setScheduleVisitDialogOpen(true)}
-              className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              data-testid="button-create-wo-inline"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              New Work Order
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {workOrdersLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-              </div>
-            ) : !crmWorkOrders || crmWorkOrders.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-4">No upcoming work orders</p>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {crmWorkOrders.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).map((wo) => (
-                  <div 
-                    key={wo.id}
-                    className="p-4 border rounded-lg hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-colors"
-                    onClick={() => {
-                      toast({ title: "Work Order Details", description: `Work Order: ${wo.title || wo.visitType}` });
-                    }}
-                    data-testid={`card-wo-${wo.id}`}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h4 className="font-medium text-sm line-clamp-1">{wo.title || wo.visitType}</h4>
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        {wo.visitType.replace(/_/g, " ")}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
-                      <Badge className={`text-xs ${
-                        wo.status === "scheduled" ? "bg-blue-100 text-blue-700" :
-                        wo.status === "pending" ? "bg-amber-100 text-amber-700" :
-                        wo.status === "in_progress" ? "bg-green-100 text-green-700" :
-                        wo.status === "completed" ? "bg-emerald-100 text-emerald-700" :
-                        "bg-slate-100 text-slate-700"
-                      }`}>
-                        {wo.status}
-                      </Badge>
-                    </div>
-                    {wo.scheduledStart && (
-                      <div className="flex items-center gap-1 text-xs text-slate-600 mb-1">
-                        <CalendarIcon className="h-3 w-3" />
-                        {format(new Date(wo.scheduledStart), "MMM d, yyyy h:mm a")}
+                ) : !crmProjects || crmProjects.filter(p => p.status !== "archived").length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-4">No active projects</p>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {crmProjects.filter(p => p.status !== "archived").map((project) => (
+                      <div 
+                        key={project.id}
+                        className="p-4 border rounded-lg hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer transition-colors"
+                        onClick={() => {
+                          toast({ title: "Project Details", description: `Project: ${project.title}` });
+                        }}
+                        data-testid={`card-project-${project.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h4 className="font-medium text-sm line-clamp-1">{project.title}</h4>
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            {project.projectType}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                          <Badge className={`text-xs ${
+                            project.status === "lead" ? "bg-slate-100 text-slate-700" :
+                            project.status === "proposal_sent" ? "bg-amber-100 text-amber-700" :
+                            project.status === "approved" ? "bg-blue-100 text-blue-700" :
+                            project.status === "in_progress" ? "bg-green-100 text-green-700" :
+                            project.status === "completed" ? "bg-emerald-100 text-emerald-700" :
+                            "bg-slate-100 text-slate-700"
+                          }`}>
+                            {project.status.replace(/_/g, " ")}
+                          </Badge>
+                        </div>
+                        {project.expectedValue && (
+                          <div className="flex items-center gap-1 text-xs text-slate-600">
+                            <DollarSign className="h-3 w-3" />
+                            ${Number(project.expectedValue).toLocaleString()}
+                          </div>
+                        )}
+                        {project.description && (
+                          <p className="text-xs text-slate-500 mt-2 line-clamp-2">{project.description}</p>
+                        )}
                       </div>
-                    )}
-                    {wo.assignedTechName && (
-                      <div className="flex items-center gap-1 text-xs text-slate-600">
-                        <User className="h-3 w-3" />
-                        {wo.assignedTechName}
-                      </div>
-                    )}
-                    {wo.projectTitle && (
-                      <div className="flex items-center gap-1 text-xs text-blue-600 mt-1">
-                        <Briefcase className="h-3 w-3" />
-                        {wo.projectTitle}
-                      </div>
-                    )}
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Upcoming Work Orders Section */}
+            <Card data-testid="card-upcoming-work-orders">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarPlus className="h-5 w-5 text-green-500" />
+                  Upcoming Work Orders ({crmWorkOrders?.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).length || 0})
+                </CardTitle>
+                <Button 
+                  size="sm" 
+                  onClick={() => setScheduleVisitDialogOpen(true)}
+                  className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                  data-testid="button-create-wo-inline"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  New Work Order
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {workOrdersLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                ) : !crmWorkOrders || crmWorkOrders.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-4">No upcoming work orders</p>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {crmWorkOrders.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)).map((wo) => (
+                      <div 
+                        key={wo.id}
+                        className="p-4 border rounded-lg hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-colors"
+                        onClick={() => {
+                          toast({ title: "Work Order Details", description: `Work Order: ${wo.title || wo.visitType}` });
+                        }}
+                        data-testid={`card-wo-${wo.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h4 className="font-medium text-sm line-clamp-1">{wo.title || wo.visitType}</h4>
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            {wo.visitType.replace(/_/g, " ")}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                          <Badge className={`text-xs ${
+                            wo.status === "scheduled" ? "bg-blue-100 text-blue-700" :
+                            wo.status === "pending" ? "bg-amber-100 text-amber-700" :
+                            wo.status === "in_progress" ? "bg-green-100 text-green-700" :
+                            wo.status === "completed" ? "bg-emerald-100 text-emerald-700" :
+                            "bg-slate-100 text-slate-700"
+                          }`}>
+                            {wo.status}
+                          </Badge>
+                        </div>
+                        {wo.scheduledStart && (
+                          <div className="flex items-center gap-1 text-xs text-slate-600 mb-1">
+                            <CalendarIcon className="h-3 w-3" />
+                            {format(new Date(wo.scheduledStart), "MMM d, yyyy h:mm a")}
+                          </div>
+                        )}
+                        {wo.assignedTechName && (
+                          <div className="flex items-center gap-1 text-xs text-slate-600">
+                            <User className="h-3 w-3" />
+                            {wo.assignedTechName}
+                          </div>
+                        )}
+                        {wo.projectTitle && (
+                          <div className="flex items-center gap-1 text-xs text-blue-600 mt-1">
+                            <Briefcase className="h-3 w-3" />
+                            {wo.projectTitle}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
 
-        <Card data-testid="card-job-history">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              Project History ({completedJobs.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {completedJobs.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-4">No completed projects</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Completed</TableHead>
-                    <TableHead>Technician</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {completedJobs.map((job) => (
-                    <TableRow key={job.id} data-testid={`row-history-${job.id}`}>
-                      <TableCell className="font-medium">{job.jobType}</TableCell>
-                      <TableCell>
-                        <Badge className={`${statusColors[job.status]?.bg} ${statusColors[job.status]?.text}`}>
-                          {job.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatDate(job.completedAt)}</TableCell>
-                      <TableCell>{job.assignedTechName || "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+            <Card data-testid="card-job-history">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  Project History ({completedJobs.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {completedJobs.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-4">No completed projects</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Completed</TableHead>
+                        <TableHead>Technician</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {completedJobs.map((job) => (
+                        <TableRow key={job.id} data-testid={`row-history-${job.id}`}>
+                          <TableCell className="font-medium">{job.jobType}</TableCell>
+                          <TableCell>
+                            <Badge className={`${statusColors[job.status]?.bg} ${statusColors[job.status]?.text}`}>
+                              {job.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{formatDate(job.completedAt)}</TableCell>
+                          <TableCell>{job.assignedTechName || "—"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
 
       </div>
     </CrmLayout>
