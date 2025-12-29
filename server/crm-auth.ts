@@ -58,6 +58,9 @@ export async function createCrmSession(
   return session;
 }
 
+const lastSeenCache = new Map<string, number>();
+const LAST_SEEN_THROTTLE_MS = 60000; // Only update lastSeenAt once per minute
+
 export async function validateCrmSession(sessionToken: string): Promise<CrmSession | null> {
   const [session] = await db
     .select()
@@ -71,10 +74,17 @@ export async function validateCrmSession(sessionToken: string): Promise<CrmSessi
 
   if (!session) return null;
 
-  await db
-    .update(crmSessions)
-    .set({ lastSeenAt: new Date() })
-    .where(eq(crmSessions.id, session.id));
+  // Throttle lastSeenAt updates to reduce DB writes
+  const now = Date.now();
+  const lastUpdate = lastSeenCache.get(session.id) || 0;
+  if (now - lastUpdate > LAST_SEEN_THROTTLE_MS) {
+    lastSeenCache.set(session.id, now);
+    db.update(crmSessions)
+      .set({ lastSeenAt: new Date() })
+      .where(eq(crmSessions.id, session.id))
+      .then(() => {})
+      .catch((err) => console.error("lastSeenAt update failed:", err));
+  }
 
   return session;
 }

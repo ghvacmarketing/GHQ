@@ -59,6 +59,10 @@ export function isTechOrAbove(role: CrmUserRole): boolean {
   return TECH_ROLES.includes(role);
 }
 
+// Throttle lastSeenAt updates to reduce DB writes
+const lastSeenCache = new Map<string, number>();
+const LAST_SEEN_THROTTLE_MS = 60000; // Only update lastSeenAt once per minute
+
 export async function requireCrmAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   const sessionToken = authHeader?.replace("Bearer ", "") || req.cookies?.crm_session;
@@ -68,35 +72,39 @@ export async function requireCrmAuth(req: Request, res: Response, next: NextFunc
   }
 
   try {
-    const [session] = await db
-      .select()
+    // Single JOIN query for session + user validation
+    const result = await db
+      .select({
+        session: crmSessions,
+        user: crmUsers,
+      })
       .from(crmSessions)
+      .innerJoin(crmUsers, eq(crmSessions.userId, crmUsers.id))
       .where(
         and(
           eq(crmSessions.sessionToken, sessionToken),
-          gt(crmSessions.expiresAt, new Date())
+          gt(crmSessions.expiresAt, new Date()),
+          eq(crmUsers.isActive, true)
         )
       )
       .limit(1);
 
-    if (!session) {
+    if (result.length === 0) {
       return res.status(401).json({ message: "Unauthorized - Invalid or expired session" });
     }
 
-    const [user] = await db
-      .select()
-      .from(crmUsers)
-      .where(eq(crmUsers.id, session.userId))
-      .limit(1);
+    const { session, user } = result[0];
 
-    if (!user || !user.isActive) {
-      return res.status(401).json({ message: "Unauthorized - User not found or inactive" });
+    // Throttle lastSeenAt updates - fire and forget
+    const now = Date.now();
+    const lastUpdate = lastSeenCache.get(session.id) || 0;
+    if (now - lastUpdate > LAST_SEEN_THROTTLE_MS) {
+      lastSeenCache.set(session.id, now);
+      db.update(crmSessions)
+        .set({ lastSeenAt: new Date() })
+        .where(eq(crmSessions.id, session.id))
+        .catch((err) => console.error("lastSeenAt update failed:", err));
     }
-
-    await db
-      .update(crmSessions)
-      .set({ lastSeenAt: new Date() })
-      .where(eq(crmSessions.id, session.id));
 
     req.crmUser = user;
     req.crmSessionId = session.id;
