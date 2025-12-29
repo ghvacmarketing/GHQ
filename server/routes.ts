@@ -4799,8 +4799,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/customers/:id - Get single customer
-  // Checks crmAccounts first (new model), then crmCustomers, then legacy customers table
+  // POST /api/crm/customers/create-with-property - Create customer with property in one call
+  app.post("/api/crm/customers/create-with-property", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { customer: customerData, property: propertyData } = req.body;
+
+      if (!customerData?.name) {
+        return res.status(400).json({ message: "Customer name is required" });
+      }
+
+      // Create customer
+      const [newCustomer] = await db.insert(crmCustomers).values({
+        name: customerData.name,
+        companyName: customerData.companyName || null,
+        email: customerData.email || null,
+        phone: customerData.phone || null,
+        customerType: customerData.customerType || "residential",
+        customerStatus: customerData.customerStatus || "prospect",
+        fullAddress: customerData.fullAddress || null,
+        leadSource: customerData.leadSource || null,
+        notes: customerData.notes || null,
+      }).returning();
+
+      // Create property if provided
+      let newProperty = null;
+      if (propertyData?.address1 && propertyData?.city && propertyData?.state && propertyData?.zip) {
+        const [property] = await db.insert(crmProperties).values({
+          customerId: newCustomer.id,
+          address1: propertyData.address1,
+          address2: propertyData.address2 || null,
+          city: propertyData.city,
+          state: propertyData.state,
+          zip: propertyData.zip,
+          notes: propertyData.notes || null,
+        }).returning();
+        newProperty = property;
+      }
+
+      await logCrmAudit(
+        user.id,
+        "customer.created",
+        "customer",
+        newCustomer.id,
+        { name: newCustomer.name, hasProperty: !!newProperty },
+        req.ip
+      );
+
+      return res.status(201).json({
+        customer: newCustomer,
+        property: newProperty,
+      });
+    } catch (error) {
+      console.error("Error creating customer with property:", error);
+      return res.status(500).json({ message: "Failed to create customer" });
+    }
+  });
+
+  // GET /api/crm/customers/:id - Get single customer from crmCustomers table
   app.get("/api/crm/customers/:id", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -4810,70 +4870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const customerId = req.params.id;
 
-      // Try crmAccounts first (new Account+Site+Contact model)
-      const accountWithDetails = await db
-        .select({
-          id: crmAccounts.id,
-          displayName: crmAccounts.displayName,
-          companyName: crmAccounts.companyName,
-          accountType: crmAccounts.accountType,
-          accountStatus: crmAccounts.accountStatus,
-          leadSource: crmAccounts.leadSource,
-          pinnedNote: crmAccounts.pinnedNote,
-          createdAt: crmAccounts.createdAt,
-          siteAddress1: crmSites.address1,
-          siteAddress2: crmSites.address2,
-          siteCity: crmSites.city,
-          siteState: crmSites.state,
-          siteZip: crmSites.zip,
-          contactPhone: crmContacts.phone,
-          contactEmail: crmContacts.email,
-          contactFirstName: crmContacts.firstName,
-          contactLastName: crmContacts.lastName,
-        })
-        .from(crmAccounts)
-        .leftJoin(crmSites, and(eq(crmSites.accountId, crmAccounts.id), eq(crmSites.isPrimary, true)))
-        .leftJoin(crmContacts, and(eq(crmContacts.accountId, crmAccounts.id), eq(crmContacts.isPrimary, true)))
-        .where(eq(crmAccounts.id, customerId))
-        .limit(1);
-
-      if (accountWithDetails.length > 0) {
-        // Apply same authorization as crmCustomers - sales+ can see all, techs only assigned jobs
-        if (!isSalesOrAbove(user.role)) {
-          // For techs, check if they have any job assignments linked to this account
-          const assignments = await db.select().from(crmJobAssignments).where(eq(crmJobAssignments.techUserId, user.id));
-          const jobIds = assignments.map(a => a.jobId);
-          if (jobIds.length === 0) {
-            return res.status(403).json({ message: "Access denied" });
-          }
-          const jobs = await db.select().from(crmJobs).where(inArray(crmJobs.id, jobIds));
-          const hasAccess = jobs.some(j => j.customerId === customerId);
-          if (!hasAccess) {
-            return res.status(403).json({ message: "Access denied" });
-          }
-        }
-
-        const acc = accountWithDetails[0];
-        const fullAddress = [acc.siteAddress1, acc.siteAddress2, acc.siteCity, acc.siteState, acc.siteZip]
-          .filter(Boolean).join(", ");
-        
-        const customer = {
-          id: acc.id,
-          name: acc.displayName,
-          companyName: acc.companyName,
-          customerType: acc.accountType?.toLowerCase() || "residential",
-          customerStatus: acc.accountStatus?.toLowerCase() || "prospect",
-          phone: acc.contactPhone,
-          email: acc.contactEmail,
-          notes: acc.pinnedNote,
-          fullAddress: fullAddress || null,
-          createdAt: acc.createdAt,
-          origin: 'crm_accounts' as const,
-        };
-        return res.json(customer);
-      }
-
-      // Fall back to crmCustomers table
+      // Check crmCustomers table first (primary source)
       const [crmCustomer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
       if (crmCustomer) {
         if (isSalesOrAbove(user.role)) {
@@ -4892,7 +4889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ ...crmCustomer, origin: 'crm_customers' });
       }
 
-      // Fall back to legacy customers table
+      // Fall back to legacy customers table for older records
       const [legacyCustomer] = await db.select().from(customers).where(eq(customers.id, customerId));
       if (legacyCustomer) {
         return res.json({
@@ -4936,55 +4933,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user can change customerType (only admin/owner)
       const canChangeType = ["admin", "owner"].includes(user.role);
 
-      // Try crmAccounts first (new Account+Site+Contact model)
-      const [existingAccount] = await db.select().from(crmAccounts).where(eq(crmAccounts.id, customerId));
-      if (existingAccount) {
-        const updateData: any = {
-          displayName: name.trim(),
-          accountStatus: customerStatus || existingAccount.accountStatus,
-          leadSource: leadSource !== undefined ? leadSource : existingAccount.leadSource,
-        };
-        
-        if (canChangeType && customerType) {
-          updateData.accountType = customerType;
-        }
-
-        await db.update(crmAccounts)
-          .set(updateData)
-          .where(eq(crmAccounts.id, customerId));
-
-        // Update primary contact phone/email if provided
-        if (phone !== undefined || email !== undefined) {
-          const [primaryContact] = await db.select().from(crmContacts)
-            .where(and(eq(crmContacts.accountId, customerId), eq(crmContacts.isPrimary, true)));
-          
-          if (primaryContact) {
-            const contactUpdate: any = {};
-            if (phone !== undefined) contactUpdate.phone = phone;
-            if (email !== undefined) contactUpdate.email = email;
-            await db.update(crmContacts)
-              .set(contactUpdate)
-              .where(eq(crmContacts.id, primaryContact.id));
-          }
-        }
-
-        // Update primary site address if provided
-        if (fullAddress !== undefined) {
-          const [primarySite] = await db.select().from(crmSites)
-            .where(and(eq(crmSites.accountId, customerId), eq(crmSites.isPrimary, true)));
-          
-          if (primarySite) {
-            await db.update(crmSites)
-              .set({ address1: fullAddress || "" })
-              .where(eq(crmSites.id, primarySite.id));
-          }
-        }
-
-        await logCrmAudit(user.id, "customer.updated", "customer", customerId, { name: name.trim() }, req.ip);
-        return res.json({ success: true, origin: 'crm_accounts' });
-      }
-
-      // Try crmCustomers table
+      // Check crmCustomers table first (primary source)
       const [existingCrmCustomer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
       if (existingCrmCustomer) {
         const updateData: any = {
@@ -4992,7 +4941,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phone: phone !== undefined ? phone : existingCrmCustomer.phone,
           email: email !== undefined ? email : existingCrmCustomer.email,
           customerStatus: customerStatus || existingCrmCustomer.customerStatus,
-          notes: fullAddress !== undefined ? fullAddress : existingCrmCustomer.notes,
+          fullAddress: fullAddress !== undefined ? fullAddress : existingCrmCustomer.fullAddress,
+          leadSource: leadSource !== undefined ? leadSource : existingCrmCustomer.leadSource,
         };
         
         if (canChangeType && customerType) {
@@ -5007,7 +4957,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ success: true, origin: 'crm_customers' });
       }
 
-      // Try legacy customers table
+      // Fall back to legacy customers table
       const [existingLegacy] = await db.select().from(customers).where(eq(customers.id, customerId));
       if (existingLegacy) {
         const updateData: any = {

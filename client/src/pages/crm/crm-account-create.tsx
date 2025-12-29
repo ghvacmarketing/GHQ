@@ -231,90 +231,48 @@ export default function CrmAccountCreate() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const createAccountMutation = useMutation({
+  const createCustomerMutation = useMutation({
     mutationFn: async () => {
-      const payload: any = {
-        account: {
-          displayName: formData.displayName,
+      const customerTypeMap: Record<AccountType, string> = {
+        "RESIDENTIAL": "residential",
+        "COMMERCIAL": "commercial",
+        "PROPERTY_MANAGER": "property_manager",
+      };
+
+      const fullAddress = `${formData.address1}${formData.address2 ? ', ' + formData.address2 : ''}, ${formData.city}, ${formData.state} ${formData.zip}`;
+
+      const payload = {
+        customer: {
+          name: formData.displayName,
           companyName: formData.companyName || null,
-          accountType: formData.accountType,
+          email: formData.accountType === "PROPERTY_MANAGER" ? formData.pmMainOfficeEmail : formData.email || null,
+          phone: formData.accountType === "PROPERTY_MANAGER" ? formData.pmMainOfficePhone : formData.phone || null,
+          customerType: customerTypeMap[formData.accountType],
+          customerStatus: "prospect",
+          fullAddress: fullAddress,
           leadSource: formData.leadSource || null,
-          parentAccountId: formData.parentAccountId || null,
-          customerSince: formData.customerSince.toISOString().split("T")[0],
-          pinnedNote: formData.pinnedNote || null,
+          notes: formData.pinnedNote || null,
         },
-        sites: [{
+        property: {
           address1: formData.address1,
           address2: formData.address2 || null,
           city: formData.city,
           state: formData.state,
           zip: formData.zip,
-          isPrimary: true,
-          accessInstructions: formData.accessInstructions || null,
-          gateCode: formData.gateCode || null,
-          // For PM accounts, this is HQ address - no tenant info here
-          // Tenant info will be per-property (added when creating sites later)
-        }],
-        contacts: [],
+          notes: formData.accessInstructions || formData.gateCode ? `Access: ${formData.accessInstructions || ''} Gate: ${formData.gateCode || ''}`.trim() : null,
+        },
       };
 
-      // For PM accounts: don't create a contact from person fields (they don't have first/last name)
-      // For Residential/Commercial: create contact from the person info
-      if (formData.accountType !== "PROPERTY_MANAGER") {
-        payload.contacts = [{
-          firstName: formData.firstName,
-          lastName: formData.lastName || null,
-          phone: formData.phone || null,
-          email: formData.email || null,
-          contactRole: "PRIMARY",
-          isPrimary: true,
-        }];
-      }
-
-      if (formData.accountType === "RESIDENTIAL") {
-        payload.profile = {
-          specialInstructions: formData.specialInstructions || null,
-        };
-      } else if (formData.accountType === "PROPERTY_MANAGER") {
-        payload.profile = {
-          managementCompanyName: formData.companyName || null, // Use company name from step 2
-          portfolioSize: formData.portfolioSize ? parseInt(formData.portfolioSize) : null,
-          requiresApprovalBefore: formData.requiresApprovalBefore,
-          approvalThreshold: formData.requiresApprovalBefore && formData.approvalThreshold ? formData.approvalThreshold : null,
-          defaultBillingMethod: formData.defaultBillingMethod || null,
-          billingTerms: formData.pmBillingTerms || "NET_30",
-          defaultBillTo: formData.pmDefaultBillTo || "PM",
-          mainOfficePhone: formData.pmMainOfficePhone || null,
-          mainOfficeEmail: formData.pmMainOfficeEmail || null,
-          billingApEmail: formData.pmBillingApEmail || null,
-        };
-      } else if (formData.accountType === "COMMERCIAL") {
-        payload.profile = {
-          taxExempt: formData.taxExempt,
-          taxExemptNumber: formData.taxExempt ? formData.taxExemptNumber : null,
-          requiresPO: formData.requiresPO,
-          poPrefix: formData.requiresPO ? formData.poPrefix : null,
-          netTerms: parseInt(formData.commercialNetTerms) || 30,
-          billingAddress: formData.billingAddressDifferent ? formData.billingAddress : null,
-          billingCity: formData.billingAddressDifferent ? formData.billingCity : null,
-          billingState: formData.billingAddressDifferent ? formData.billingState : null,
-          billingZip: formData.billingAddressDifferent ? formData.billingZip : null,
-          w9OnFile: formData.w9OnFile,
-        };
-      }
-
-      const res = await apiRequest("POST", "/api/crm/accounts", payload);
+      const res = await apiRequest("POST", "/api/crm/customers/create-with-property", payload);
       return res.json();
     },
     onSuccess: (data) => {
       toast({ title: "Customer created successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
-      // Navigate to the account detail page for all account types
-      if (data?.account?.id) {
-        navigate(`/crm/accounts/${data.account.id}`);
+      if (data?.customer?.id) {
+        navigate(`/crm/customers/${data.customer.id}`);
       } else {
-        navigate(`/crm/dashboard`);
+        navigate(`/crm/customers`);
       }
     },
     onError: (error: any) => {
@@ -400,7 +358,7 @@ export default function CrmAccountCreate() {
   const handleSubmit = () => {
     const validation = validateStep(5);
     if (validation.valid) {
-      createAccountMutation.mutate();
+      createCustomerMutation.mutate();
     } else {
       toast({
         title: "Please fix validation errors",
@@ -1258,10 +1216,10 @@ export default function CrmAccountCreate() {
             ) : (
               <Button
                 onClick={handleSubmit}
-                disabled={!checkValidation(5).valid || createAccountMutation.isPending}
+                disabled={!checkValidation(5).valid || createCustomerMutation.isPending}
                 data-testid="button-create-customer"
               >
-                {createAccountMutation.isPending ? (
+                {createCustomerMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Creating Customer...

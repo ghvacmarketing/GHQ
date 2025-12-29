@@ -335,12 +335,7 @@ export default function CrmCustomers() {
                       className="cursor-pointer hover:bg-slate-50 transition-colors"
                       data-testid={`row-customer-${customer.id}`}
                       onClick={() => {
-                        // CRM accounts go to account detail page, legacy customers to customer detail
-                        if (customer.origin === 'crm_accounts') {
-                          navigate(`/crm/accounts/${customer.accountId || customer.id}`);
-                        } else {
-                          navigate(`/crm/customers/${customer.id}`);
-                        }
+                        navigate(`/crm/customers/${customer.id}`);
                       }}
                     >
                       <TableCell className="font-medium text-slate-900">

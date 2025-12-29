@@ -816,6 +816,8 @@ export const crmCustomers = pgTable("crm_customers", {
   phone: text("phone"),
   customerType: text("customer_type").$type<CrmCustomerType>().default("residential"),
   customerStatus: text("customer_status").$type<CrmCustomerStatus>().default("client"),
+  fullAddress: text("full_address"),
+  leadSource: text("lead_source"),
   tags: json("tags").$type<string[]>().default([]),
   notes: text("notes"),
   sourceSystem: text("source_system"),
