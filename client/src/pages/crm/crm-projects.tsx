@@ -170,7 +170,7 @@ export default function CrmProjects() {
   
   const [hasUpcomingWorkOrders, setHasUpcomingWorkOrders] = useState<string>("all");
   const [noWorkOrdersYet, setNoWorkOrdersYet] = useState<string>("all");
-  const [agingApproved, setAgingApproved] = useState<string>("");
+  const [agingApproved, setAgingApproved] = useState<string>("all");
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
@@ -216,7 +216,7 @@ export default function CrmProjects() {
       params.set("noWorkOrdersYet", "true");
     }
     
-    if (agingApproved) {
+    if (agingApproved && agingApproved !== "all") {
       params.set("agingApproved", agingApproved);
     }
     
@@ -423,7 +423,7 @@ export default function CrmProjects() {
               <SelectValue placeholder="Aging Approved" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All</SelectItem>
+              <SelectItem value="all">All</SelectItem>
               <SelectItem value="7">Approved 7+ days</SelectItem>
               <SelectItem value="14">Approved 14+ days</SelectItem>
               <SelectItem value="30">Approved 30+ days</SelectItem>
