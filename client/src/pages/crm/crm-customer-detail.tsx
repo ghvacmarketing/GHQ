@@ -919,12 +919,27 @@ function CustomerTabbedView({
                 {customerProperties.map((property) => (
                   <div 
                     key={property.id}
-                    className="p-4 border rounded-lg hover:border-[#711419]/50 hover:bg-[#711419]/5 cursor-pointer transition-colors"
+                    className="p-4 border rounded-lg hover:border-[#711419]/50 hover:bg-[#711419]/5 transition-colors group relative"
                     data-testid={`card-property-${property.id}`}
                   >
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="absolute top-2 right-2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleEditProperty(property)}
+                      data-testid={`button-edit-property-${property.id}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     <h4 className="font-medium">{property.address1}</h4>
                     {property.address2 && <p className="text-sm text-slate-500">{property.address2}</p>}
                     <p className="text-sm text-slate-500">{property.city}, {property.state} {property.zip}</p>
+                    {property.tenantName && (
+                      <p className="text-xs text-purple-600 mt-1 flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {property.tenantName}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1956,6 +1971,88 @@ export default function CrmCustomerDetail() {
 
   const isPropertyManager = customer?.customerType?.toLowerCase() === "property manager";
 
+  const updatePropertyMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingProperty) throw new Error("No property selected");
+      const res = await apiRequest("PATCH", `/api/crm/properties/${editingProperty.id}`, {
+        address1: propAddress1.trim(),
+        address2: propAddress2.trim() || null,
+        city: propCity.trim(),
+        state: propState.trim(),
+        zip: propZip.trim(),
+        notes: propNotes.trim() || null,
+        tenantName: propTenantName.trim() || null,
+        tenantPhone: propTenantPhone.trim() || null,
+        tenantEmail: propTenantEmail.trim() || null,
+        billedTo: propBilledTo,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update property");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Site updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "properties"] });
+      handleClosePropertyDialog();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update site",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditProperty = (property: CrmProperty) => {
+    setEditingProperty(property);
+    setPropAddress1(property.address1 || "");
+    setPropAddress2(property.address2 || "");
+    setPropCity(property.city || "");
+    setPropState(property.state || "");
+    setPropZip(property.zip || "");
+    setPropNotes(property.notes || "");
+    setPropTenantName(property.tenantName || "");
+    setPropTenantPhone(property.tenantPhone || "");
+    setPropTenantEmail(property.tenantEmail || "");
+    setPropBilledTo((property.billedTo as "property_manager" | "tenant") || "property_manager");
+    setPropertyDialogOpen(true);
+  };
+
+  const handleSaveProperty = () => {
+    if (!propAddress1.trim() || !propCity.trim() || !propState.trim() || !propZip.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Street address, city, state, and ZIP are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isPropertyManager && !propTenantName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Tenant name is required for property manager sites",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isPropertyManager && propBilledTo === "tenant" && !propTenantEmail.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Tenant email is required when billing to tenant",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (editingProperty) {
+      updatePropertyMutation.mutate();
+    } else {
+      createPropertyMutation.mutate();
+    }
+  };
+
   const handleCreateProperty = () => {
     if (!propAddress1.trim() || !propCity.trim() || !propState.trim() || !propZip.trim()) {
       toast({
@@ -2795,21 +2892,21 @@ export default function CrmCustomerDetail() {
           </DialogContent>
         </Dialog>
 
-        {/* Add Property Dialog */}
+        {/* Add/Edit Property Dialog */}
         <Dialog open={propertyDialogOpen} onOpenChange={(open) => !open && handleClosePropertyDialog()}>
-          <DialogContent className="sm:max-w-[520px] p-0 gap-0 overflow-hidden">
-            <div className="p-4 pb-0">
+          <DialogContent className="sm:max-w-[520px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-4 pb-0 shrink-0">
               <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-5">
                 <DialogHeader className="p-0">
-                  <DialogTitle className="text-xl font-semibold">Add Site</DialogTitle>
+                  <DialogTitle className="text-xl font-semibold">{editingProperty ? "Edit Site" : "Add Site"}</DialogTitle>
                   <DialogDescription className="text-slate-500">
-                    Add a new site/property to this customer
+                    {editingProperty ? "Update site/property details" : "Add a new site/property to this customer"}
                   </DialogDescription>
                 </DialogHeader>
               </div>
             </div>
             
-            <div className="px-6 py-5 space-y-5 max-h-[65vh] overflow-y-auto">
+            <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 space-y-4">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Address</p>
                 <div className="space-y-1.5">
@@ -2936,17 +3033,17 @@ export default function CrmCustomerDetail() {
               )}
             </div>
 
-            <DialogFooter className="px-6 py-4 border-t bg-slate-50 dark:bg-slate-900">
+            <DialogFooter className="px-6 py-4 border-t bg-slate-50 dark:bg-slate-900 shrink-0">
               <Button variant="outline" onClick={handleClosePropertyDialog} className="px-6">
                 Cancel
               </Button>
               <Button
-                onClick={handleCreateProperty}
-                disabled={!propAddress1.trim() || !propCity.trim() || !propState.trim() || !propZip.trim() || (isPropertyManager && !propTenantName.trim()) || (isPropertyManager && propBilledTo === "tenant" && !propTenantEmail.trim()) || createPropertyMutation.isPending}
+                onClick={handleSaveProperty}
+                disabled={!propAddress1.trim() || !propCity.trim() || !propState.trim() || !propZip.trim() || (isPropertyManager && !propTenantName.trim()) || (isPropertyManager && propBilledTo === "tenant" && !propTenantEmail.trim()) || createPropertyMutation.isPending || updatePropertyMutation.isPending}
                 className="px-6 bg-[#711419] hover:bg-[#5a1014]"
                 data-testid="button-save-property"
               >
-                {createPropertyMutation.isPending ? "Saving..." : "Add Site"}
+                {(createPropertyMutation.isPending || updatePropertyMutation.isPending) ? "Saving..." : (editingProperty ? "Save Changes" : "Add Site")}
               </Button>
             </DialogFooter>
           </DialogContent>

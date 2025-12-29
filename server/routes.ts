@@ -7694,6 +7694,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH /api/crm/properties/:id - Update a property
+  app.patch("/api/crm/properties/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const propertyId = req.params.id;
+      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, billedTo } = req.body;
+
+      const updateData: Record<string, any> = {};
+      if (address1 !== undefined) updateData.address1 = address1.trim();
+      if (address2 !== undefined) updateData.address2 = address2?.trim() || null;
+      if (city !== undefined) updateData.city = city.trim();
+      if (state !== undefined) updateData.state = state.trim();
+      if (zip !== undefined) updateData.zip = zip.trim();
+      if (notes !== undefined) updateData.notes = notes?.trim() || null;
+      if (tenantName !== undefined) updateData.tenantName = tenantName?.trim() || null;
+      if (tenantPhone !== undefined) updateData.tenantPhone = tenantPhone?.trim() || null;
+      if (tenantEmail !== undefined) updateData.tenantEmail = tenantEmail?.trim() || null;
+      if (billedTo !== undefined) updateData.billedTo = billedTo;
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: "No fields to update" });
+      }
+
+      const [updatedProperty] = await db.update(crmProperties)
+        .set(updateData)
+        .where(eq(crmProperties.id, propertyId))
+        .returning();
+
+      if (!updatedProperty) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      return res.json(updatedProperty);
+    } catch (error) {
+      console.error("Error updating property:", error);
+      return res.status(500).json({ message: "Failed to update property" });
+    }
+  });
+
   // ============================================
   // CRM WORK ORDER ROUTES
   // ============================================

@@ -241,6 +241,9 @@ export default function CrmAccountCreate() {
 
       const fullAddress = `${formData.address1}${formData.address2 ? ', ' + formData.address2 : ''}, ${formData.city}, ${formData.state} ${formData.zip}`;
 
+      // Property Managers: address is HQ/Mailing, NOT a site - don't auto-create property
+      const shouldCreateProperty = formData.accountType !== "PROPERTY_MANAGER";
+
       const payload = {
         customer: {
           name: formData.displayName,
@@ -253,14 +256,14 @@ export default function CrmAccountCreate() {
           leadSource: formData.leadSource || null,
           notes: formData.pinnedNote || null,
         },
-        property: {
+        property: shouldCreateProperty ? {
           address1: formData.address1,
           address2: formData.address2 || null,
           city: formData.city,
           state: formData.state,
           zip: formData.zip,
           notes: formData.accessInstructions || formData.gateCode ? `Access: ${formData.accessInstructions || ''} Gate: ${formData.gateCode || ''}`.trim() : null,
-        },
+        } : null,
       };
 
       const res = await apiRequest("POST", "/api/crm/customers/create-with-property", payload);
