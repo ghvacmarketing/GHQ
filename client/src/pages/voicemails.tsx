@@ -396,14 +396,14 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
     Service: "border-l-blue-500",
     Install: "border-l-green-500",
     Sales: "border-l-purple-500",
-    Other: "border-l-gray-400",
+    Maintenance: "border-l-amber-500",
   };
 
   const tagBadgeColors: Record<string, string> = {
     Service: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
     Install: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
     Sales: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-    Other: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
+    Maintenance: "bg-amber-100 text-amber-800 dark:bg-amber-700 dark:text-amber-200",
   };
 
   const borderColor = log.tag ? tagBorderColors[log.tag] || "border-l-gray-300" : "border-l-gray-300";
@@ -620,7 +620,7 @@ function CallLogForm({ date, editingLog, onCancel, onSuccess }: CallLogFormProps
                     <SelectItem value="Service">Service</SelectItem>
                     <SelectItem value="Install">Install</SelectItem>
                     <SelectItem value="Sales">Sales</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
+                    <SelectItem value="Maintenance">Maintenance</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
