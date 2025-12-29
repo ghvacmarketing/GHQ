@@ -1174,158 +1174,184 @@ export default function CrmAccountDetail() {
         </Tabs>
 
         <Dialog open={siteDialogOpen} onOpenChange={(open) => { if (!open) { setSiteDialogOpen(false); resetSiteForm(); } else setSiteDialogOpen(true); }}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>{editingSite ? "Edit Site" : "Add Site"}</DialogTitle>
-              <DialogDescription>
+          <DialogContent className="sm:max-w-[520px] p-0 gap-0 overflow-hidden">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b bg-slate-50 dark:bg-slate-900">
+              <DialogTitle className="text-xl font-semibold">{editingSite ? "Edit Site" : "Add Site"}</DialogTitle>
+              <DialogDescription className="text-slate-500">
                 {editingSite ? "Update the site information" : "Add a new site to this account"}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-              <div className="space-y-2">
-                <Label>Site Name (optional)</Label>
+            
+            <div className="px-6 py-5 space-y-5 max-h-[65vh] overflow-y-auto">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Site Name <span className="text-slate-400 font-normal">(optional)</span></Label>
                 <Input
                   placeholder="e.g., Main Office, Unit A"
                   value={siteForm.siteName}
                   onChange={(e) => setSiteForm({ ...siteForm, siteName: e.target.value })}
+                  className="h-11"
                   data-testid="input-site-name"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Address Line 1 *</Label>
-                <Input
-                  placeholder="Street address"
-                  value={siteForm.address1}
-                  onChange={(e) => setSiteForm({ ...siteForm, address1: e.target.value })}
-                  data-testid="input-address1"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Address Line 2</Label>
-                <Input
-                  placeholder="Apt, Suite, Unit, etc."
-                  value={siteForm.address2}
-                  onChange={(e) => setSiteForm({ ...siteForm, address2: e.target.value })}
-                  data-testid="input-address2"
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>City *</Label>
+
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 space-y-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Address</p>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Street Address <span className="text-red-500">*</span></Label>
                   <Input
-                    value={siteForm.city}
-                    onChange={(e) => setSiteForm({ ...siteForm, city: e.target.value })}
-                    data-testid="input-city"
+                    placeholder="123 Main Street"
+                    value={siteForm.address1}
+                    onChange={(e) => setSiteForm({ ...siteForm, address1: e.target.value })}
+                    className="h-11"
+                    data-testid="input-address1"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>State *</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-slate-600 dark:text-slate-400">Apt, Suite, Unit <span className="text-slate-400 font-normal">(optional)</span></Label>
                   <Input
-                    value={siteForm.state}
-                    onChange={(e) => setSiteForm({ ...siteForm, state: e.target.value })}
-                    data-testid="input-state"
+                    placeholder="Suite 100"
+                    value={siteForm.address2}
+                    onChange={(e) => setSiteForm({ ...siteForm, address2: e.target.value })}
+                    className="h-11"
+                    data-testid="input-address2"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>ZIP *</Label>
-                  <Input
-                    value={siteForm.zip}
-                    onChange={(e) => setSiteForm({ ...siteForm, zip: e.target.value })}
-                    data-testid="input-zip"
-                  />
+                <div className="grid grid-cols-5 gap-3">
+                  <div className="col-span-2 space-y-1.5">
+                    <Label className="text-sm font-medium">City <span className="text-red-500">*</span></Label>
+                    <Input
+                      value={siteForm.city}
+                      onChange={(e) => setSiteForm({ ...siteForm, city: e.target.value })}
+                      className="h-11"
+                      data-testid="input-city"
+                    />
+                  </div>
+                  <div className="col-span-1 space-y-1.5">
+                    <Label className="text-sm font-medium">State <span className="text-red-500">*</span></Label>
+                    <Input
+                      value={siteForm.state}
+                      onChange={(e) => setSiteForm({ ...siteForm, state: e.target.value })}
+                      className="h-11"
+                      maxLength={2}
+                      data-testid="input-state"
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1.5">
+                    <Label className="text-sm font-medium">ZIP <span className="text-red-500">*</span></Label>
+                    <Input
+                      value={siteForm.zip}
+                      onChange={(e) => setSiteForm({ ...siteForm, zip: e.target.value })}
+                      className="h-11"
+                      data-testid="input-zip"
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
+
+              <div className="flex items-center gap-3 py-2">
                 <Checkbox
                   id="isPrimary"
                   checked={siteForm.isPrimary}
                   onCheckedChange={(checked) => setSiteForm({ ...siteForm, isPrimary: checked as boolean })}
+                  className="h-5 w-5"
                   data-testid="checkbox-is-primary"
                 />
-                <Label htmlFor="isPrimary">Primary Site</Label>
+                <Label htmlFor="isPrimary" className="text-sm font-medium cursor-pointer">Set as Primary Site</Label>
               </div>
-              <Separator />
-              <div className="space-y-2">
-                <Label>Access Instructions</Label>
-                <Textarea
-                  placeholder="Gate code, parking instructions, etc."
-                  value={siteForm.accessInstructions}
-                  onChange={(e) => setSiteForm({ ...siteForm, accessInstructions: e.target.value })}
-                  data-testid="input-access-instructions"
-                />
+
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 space-y-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Access Details</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-1 space-y-1.5">
+                    <Label className="text-sm font-medium text-slate-600">Gate Code</Label>
+                    <Input
+                      placeholder="#1234"
+                      value={siteForm.gateCode}
+                      onChange={(e) => setSiteForm({ ...siteForm, gateCode: e.target.value })}
+                      className="h-11"
+                      data-testid="input-gate-code"
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1.5">
+                    <Label className="text-sm font-medium text-slate-600">Access Instructions</Label>
+                    <Input
+                      placeholder="Parking, entry notes..."
+                      value={siteForm.accessInstructions}
+                      onChange={(e) => setSiteForm({ ...siteForm, accessInstructions: e.target.value })}
+                      className="h-11"
+                      data-testid="input-access-instructions"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Gate Code</Label>
-                <Input
-                  placeholder="e.g., #1234"
-                  value={siteForm.gateCode}
-                  onChange={(e) => setSiteForm({ ...siteForm, gateCode: e.target.value })}
-                  data-testid="input-gate-code"
-                />
-              </div>
+
               {account.accountType === "PROPERTY_MANAGER" && (
-                <>
-                  <Separator />
-                  <p className="text-sm font-medium text-slate-700">Tenant Information</p>
-                  <div className="space-y-2">
-                    <Label>Tenant Name</Label>
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 space-y-4 border border-blue-100 dark:border-blue-800">
+                  <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Tenant Information</p>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">Tenant Name</Label>
                     <Input
                       value={siteForm.tenantName}
                       onChange={(e) => setSiteForm({ ...siteForm, tenantName: e.target.value })}
+                      className="h-11 bg-white dark:bg-slate-800"
                       data-testid="input-tenant-name"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Tenant Phone</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium">Tenant Phone</Label>
                       <Input
                         value={siteForm.tenantPhone}
                         onChange={(e) => {
                           const formatted = formatPhoneNumber(e.target.value);
                           setSiteForm({ ...siteForm, tenantPhone: formatted });
                           if (formatted && !validatePhone(formatted)) {
-                            setTenantPhoneError("Please enter a valid phone number");
+                            setTenantPhoneError("Invalid phone");
                           } else {
                             setTenantPhoneError("");
                           }
                         }}
                         placeholder="(555) 555-5555"
-                        className={tenantPhoneError ? "border-red-500" : ""}
+                        className={cn("h-11 bg-white dark:bg-slate-800", tenantPhoneError && "border-red-500 focus-visible:ring-red-500")}
                         data-testid="input-tenant-phone"
                       />
-                      {tenantPhoneError && <p className="text-sm text-red-500 mt-1">{tenantPhoneError}</p>}
+                      {tenantPhoneError && <p className="text-xs text-red-500">{tenantPhoneError}</p>}
                     </div>
-                    <div className="space-y-2">
-                      <Label>Tenant Email</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium">Tenant Email</Label>
                       <Input
                         value={siteForm.tenantEmail}
                         onChange={(e) => setSiteForm({ ...siteForm, tenantEmail: e.target.value })}
                         onBlur={() => {
                           if (siteForm.tenantEmail && !validateEmail(siteForm.tenantEmail)) {
-                            setTenantEmailError("Please enter a valid email (e.g., name@example.com)");
+                            setTenantEmailError("Invalid email");
                           } else {
                             setTenantEmailError("");
                           }
                         }}
-                        className={tenantEmailError ? "border-red-500" : ""}
+                        className={cn("h-11 bg-white dark:bg-slate-800", tenantEmailError && "border-red-500 focus-visible:ring-red-500")}
                         data-testid="input-tenant-email"
                       />
-                      {tenantEmailError && <p className="text-sm text-red-500 mt-1">{tenantEmailError}</p>}
+                      {tenantEmailError && <p className="text-xs text-red-500">{tenantEmailError}</p>}
                     </div>
                   </div>
-                </>
+                </div>
               )}
-              <div className="space-y-2">
-                <Label>Notes</Label>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-600">Notes <span className="text-slate-400 font-normal">(optional)</span></Label>
                 <Textarea
+                  placeholder="Any additional notes about this site..."
                   value={siteForm.notes}
                   onChange={(e) => setSiteForm({ ...siteForm, notes: e.target.value })}
+                  className="min-h-[80px] resize-none"
                   data-testid="input-site-notes"
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setSiteDialogOpen(false); resetSiteForm(); }}>
+
+            <DialogFooter className="px-6 py-4 border-t bg-slate-50 dark:bg-slate-900">
+              <Button variant="outline" onClick={() => { setSiteDialogOpen(false); resetSiteForm(); }} className="px-6">
                 Cancel
               </Button>
               <Button
@@ -1343,6 +1369,7 @@ export default function CrmAccountDetail() {
                   editingSite ? updateSiteMutation.mutate() : createSiteMutation.mutate();
                 }}
                 disabled={!siteForm.address1 || !siteForm.city || !siteForm.state || !siteForm.zip || createSiteMutation.isPending || updateSiteMutation.isPending || !!tenantEmailError || !!tenantPhoneError}
+                className="px-6 bg-[#711419] hover:bg-[#5a1014]"
                 data-testid="button-save-site"
               >
                 {createSiteMutation.isPending || updateSiteMutation.isPending ? "Saving..." : editingSite ? "Update Site" : "Add Site"}
