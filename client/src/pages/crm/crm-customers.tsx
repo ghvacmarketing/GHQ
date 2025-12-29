@@ -8,13 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -200,78 +193,104 @@ export default function CrmCustomers() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
+        {/* Search bar at top - DoorLoop style */}
+        <div className="flex justify-center mb-2">
+          <div className="relative w-full max-w-xl">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search by name, phone, email, or address..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+              data-testid="input-search"
+            />
+          </div>
+        </div>
+
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-slate-900" data-testid="text-customers-title">
-            Customers
-          </h1>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900" data-testid="text-customers-title">
+              Customers
+            </h1>
+            <p className="text-sm text-slate-500">Total: {total}</p>
+          </div>
           <Link href="/crm/accounts/new">
-            <Button size="sm" data-testid="button-create-customer">
+            <Button size="sm" className="bg-[#711419] hover:bg-[#5a1014] text-white" data-testid="button-create-customer">
               <Plus className="h-4 w-4 mr-1" />
-              New
+              New Customer
             </Button>
           </Link>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
-          <Input
-            placeholder="Search by name, phone, email, or address..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-12 h-12 text-base bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419]"
-            data-testid="input-search"
-            autoFocus
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Tabs styled like projects page - underline style */}
+        <div className="flex overflow-x-auto border-b border-slate-200">
           <button
-            onClick={() => setStatusTab("all")}
-            className={`px-3 py-1 rounded-full text-xs border transition-colors ${
-              statusTab === "all"
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+            onClick={() => { setStatusTab("all"); setCustomerType("all"); }}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+              statusTab === "all" && customerType === "all"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
             data-testid="tab-status-all"
           >
             All ({statsData?.total?.toLocaleString() || 0})
           </button>
           <button
-            onClick={() => setStatusTab("prospects")}
-            className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+            onClick={() => { setStatusTab("prospects"); setCustomerType("all"); }}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
               statusTab === "prospects"
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
             data-testid="tab-status-prospects"
           >
             Prospects ({statsData?.prospects?.toLocaleString() || 0})
           </button>
           <button
-            onClick={() => setStatusTab("customers")}
-            className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+            onClick={() => { setStatusTab("customers"); setCustomerType("all"); }}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
               statusTab === "customers"
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
             data-testid="tab-status-customers"
           >
             Customers ({statsData?.customers?.toLocaleString() || 0})
           </button>
-
-          <div className="flex-1" />
-
-          <Select value={customerType} onValueChange={setCustomerType}>
-            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-customer-type">
-              <SelectValue placeholder="All Types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="Residential">Residential</SelectItem>
-              <SelectItem value="Property Manager">Property Manager</SelectItem>
-              <SelectItem value="Commercial">Commercial</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="border-l border-slate-200 mx-2" />
+          <button
+            onClick={() => { setCustomerType("Residential"); setStatusTab("all"); }}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+              customerType === "Residential"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+            }`}
+            data-testid="tab-type-residential"
+          >
+            Residential
+          </button>
+          <button
+            onClick={() => { setCustomerType("Commercial"); setStatusTab("all"); }}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+              customerType === "Commercial"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+            }`}
+            data-testid="tab-type-commercial"
+          >
+            Commercial
+          </button>
+          <button
+            onClick={() => { setCustomerType("Property Manager"); setStatusTab("all"); }}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+              customerType === "Property Manager"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+            }`}
+            data-testid="tab-type-property-manager"
+          >
+            Property Manager
+          </button>
         </div>
 
         <Card className="bg-white border shadow-sm overflow-hidden">
