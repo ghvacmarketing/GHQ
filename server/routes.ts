@@ -7671,63 +7671,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CRM WORK ORDER ROUTES
   // ============================================
 
-  // GET /api/crm/work-orders - List work orders with optional filters
+  // GET /api/crm/work-orders - List work orders with optional filters and pagination (OPTIMIZED)
   app.get("/api/crm/work-orders", requireCrmAuth, async (req, res) => {
     try {
-      const { jobId, techId, date, status, customerId, projectId, dateFrom, dateTo } = req.query;
+      const { jobId, techId, date, status, customerId, projectId, dateFrom, dateTo, page = "1", limit = "25" } = req.query;
+      const pageNum = parseInt(page as string, 10) || 1;
+      const limitNum = Math.min(50, parseInt(limit as string, 10) || 25);
+      const offset = (pageNum - 1) * limitNum;
 
-      let workOrders: CrmWorkOrder[] = [];
-
+      // Build query conditions
+      const conditions: any[] = [];
+      
       if (customerId) {
-        workOrders = await storage.getWorkOrdersByCustomerId(customerId as string);
-      } else if (projectId) {
-        workOrders = await storage.getWorkOrdersByProjectId(projectId as string);
-      } else if (jobId) {
-        workOrders = await storage.getWorkOrdersByJobId(jobId as string);
-      } else if (techId && date) {
-        const dateObj = new Date(date as string);
-        workOrders = await storage.getWorkOrdersByTechId(techId as string, dateObj);
-      } else if (techId) {
-        workOrders = await storage.getWorkOrdersByTechId(techId as string);
-      } else if (dateFrom || dateTo || date) {
-        let startDate: Date;
-        let endDate: Date;
-        if (dateFrom) {
-          startDate = new Date(dateFrom as string);
-          startDate.setHours(0, 0, 0, 0);
-        } else if (date) {
-          startDate = new Date(date as string);
-          startDate.setHours(0, 0, 0, 0);
-        } else {
-          startDate = new Date();
-          startDate.setHours(0, 0, 0, 0);
-        }
-        if (dateTo) {
-          endDate = new Date(dateTo as string);
-          endDate.setHours(23, 59, 59, 999);
-        } else if (date) {
-          endDate = new Date(date as string);
-          endDate.setHours(23, 59, 59, 999);
-        } else {
-          endDate = new Date();
-          endDate.setMonth(endDate.getMonth() + 1);
-          endDate.setHours(23, 59, 59, 999);
-        }
-        workOrders = await storage.getWorkOrdersByDateRange(startDate, endDate);
-      } else {
-        const today = new Date();
-        const startOfDay = new Date(today);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfMonth = new Date(today);
-        endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-        workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfMonth);
+        conditions.push(eq(crmWorkOrders.customerId, customerId as string));
       }
-
+      if (projectId) {
+        conditions.push(eq(crmWorkOrders.projectId, projectId as string));
+      }
+      if (jobId) {
+        conditions.push(eq(crmWorkOrders.jobId, jobId as string));
+      }
+      if (techId) {
+        conditions.push(eq(crmWorkOrders.assignedTechId, techId as string));
+      }
       if (status) {
-        workOrders = workOrders.filter(wo => wo.status === status);
+        conditions.push(eq(crmWorkOrders.status, status as string));
       }
 
-      return res.json(workOrders);
+      // Date range filtering
+      let startDate: Date;
+      let endDate: Date;
+      if (dateFrom) {
+        startDate = new Date(dateFrom as string);
+        startDate.setHours(0, 0, 0, 0);
+      } else if (date) {
+        startDate = new Date(date as string);
+        startDate.setHours(0, 0, 0, 0);
+      } else {
+        startDate = new Date();
+        startDate.setHours(0, 0, 0, 0);
+      }
+      if (dateTo) {
+        endDate = new Date(dateTo as string);
+        endDate.setHours(23, 59, 59, 999);
+      } else if (date) {
+        endDate = new Date(date as string);
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + 1);
+        endDate.setHours(23, 59, 59, 999);
+      }
+      
+      conditions.push(sql`${crmWorkOrders.scheduledStart} >= ${startDate}`);
+      conditions.push(sql`${crmWorkOrders.scheduledStart} <= ${endDate}`);
+
+      const whereClause = and(...conditions);
+
+      // Get total count
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(crmWorkOrders)
+        .where(whereClause);
+      const total = Number(countResult?.count) || 0;
+
+      // Get paginated work orders
+      const workOrders = await db
+        .select()
+        .from(crmWorkOrders)
+        .where(whereClause)
+        .orderBy(desc(crmWorkOrders.scheduledStart))
+        .limit(limitNum)
+        .offset(offset);
+
+      return res.json({
+        workOrders,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      });
     } catch (error) {
       console.error("Error fetching work orders:", error);
       return res.status(500).json({ message: "Failed to fetch work orders" });
@@ -8467,12 +8492,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CRM PROJECTS ROUTES
   // ============================================
 
-  // GET /api/crm/projects - List all projects with filters
+  // GET /api/crm/projects - List all projects with filters (OPTIMIZED - batch loading)
   app.get("/api/crm/projects", requireCrmAuth, async (req, res) => {
     try {
       const { status, customerId, hasUpcomingWorkOrders, noWorkOrdersYet, agingApproved, page = "1", limit = "25" } = req.query;
       const pageNum = parseInt(page as string, 10) || 1;
-      const limitNum = parseInt(limit as string, 10) || 25;
+      const limitNum = Math.min(50, parseInt(limit as string, 10) || 25);
       const offset = (pageNum - 1) * limitNum;
 
       const conditions = [];
@@ -8507,34 +8532,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(limitNum)
         .offset(offset);
 
-      const enrichedProjects = await Promise.all(
-        projects.map(async (project) => {
-          let customer = null;
-          if (project.customerId) {
-            const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, project.customerId));
-            customer = cust || null;
-          }
+      // BATCH LOAD: Get all customer IDs and project IDs, then load in one query each
+      const customerIds = [...new Set(projects.map(p => p.customerId).filter(Boolean))] as string[];
+      const projectIds = projects.map(p => p.id);
 
-          const workOrdersForProject = await db
-            .select()
-            .from(crmWorkOrders)
-            .where(eq(crmWorkOrders.projectId, project.id));
+      // Batch load customers
+      const customersMap = new Map<string, typeof crmCustomers.$inferSelect>();
+      if (customerIds.length > 0) {
+        const customersList = await db.select().from(crmCustomers).where(inArray(crmCustomers.id, customerIds));
+        customersList.forEach(c => customersMap.set(c.id, c));
+      }
 
-          const workOrderCount = workOrdersForProject.length;
-          const upcomingWorkOrders = workOrdersForProject.filter(
-            (wo) => wo.scheduledStart && new Date(wo.scheduledStart) > new Date()
-          );
-          const hasUpcoming = upcomingWorkOrders.length > 0;
-
-          return {
-            ...project,
-            customerName: customer?.displayName || null,
-            customer,
-            workOrderCount,
-            hasUpcomingWorkOrders: hasUpcoming,
-          };
+      // Batch load work order counts and upcoming status per project
+      const workOrderStats = await db
+        .select({
+          projectId: crmWorkOrders.projectId,
+          count: sql<number>`count(*)`,
+          upcomingCount: sql<number>`count(*) FILTER (WHERE ${crmWorkOrders.scheduledStart} > NOW())`,
         })
-      );
+        .from(crmWorkOrders)
+        .where(inArray(crmWorkOrders.projectId, projectIds))
+        .groupBy(crmWorkOrders.projectId);
+
+      const woStatsMap = new Map<string, { count: number; upcomingCount: number }>();
+      workOrderStats.forEach(s => {
+        if (s.projectId) {
+          woStatsMap.set(s.projectId, { count: Number(s.count), upcomingCount: Number(s.upcomingCount) });
+        }
+      });
+
+      // Enrich projects without N+1
+      const enrichedProjects = projects.map((project) => {
+        const customer = project.customerId ? customersMap.get(project.customerId) || null : null;
+        const stats = woStatsMap.get(project.id) || { count: 0, upcomingCount: 0 };
+
+        return {
+          ...project,
+          customerName: customer?.displayName || null,
+          customer,
+          workOrderCount: stats.count,
+          hasUpcomingWorkOrders: stats.upcomingCount > 0,
+        };
+      });
 
       let filteredProjects = enrichedProjects;
 
@@ -8836,10 +8875,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return `${prefix}${String(seq).padStart(3, '0')}`;
   }
 
-  // GET /api/crm/invoices - List invoices with filters (status, customerId, workOrderId, projectId)
+  // GET /api/crm/invoices - List invoices with filters and pagination (OPTIMIZED)
   app.get("/api/crm/invoices", requireCrmAuth, async (req, res) => {
     try {
-      const { customerId, status, workOrderId, projectId } = req.query;
+      const { customerId, status, workOrderId, projectId, page = "1", limit = "25" } = req.query;
+      const pageNum = parseInt(page as string, 10) || 1;
+      const limitNum = Math.min(50, parseInt(limit as string, 10) || 25);
+      const offset = (pageNum - 1) * limitNum;
       
       const conditions: any[] = [];
       if (customerId) {
@@ -8855,40 +8897,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(eq(crmInvoices.projectId, projectId as string));
       }
       
-      const invoices = conditions.length > 0
-        ? await db.select().from(crmInvoices).where(and(...conditions)).orderBy(desc(crmInvoices.createdAt))
-        : await db.select().from(crmInvoices).orderBy(desc(crmInvoices.createdAt));
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
       
-      const enrichedInvoices = await Promise.all(
-        invoices.map(async (invoice) => {
-          let customer = null;
-          if (invoice.customerId) {
-            const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, invoice.customerId));
-            customer = cust || null;
-          }
-          
-          let workOrder = null;
-          if (invoice.workOrderId) {
-            const [wo] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, invoice.workOrderId));
-            workOrder = wo || null;
-          }
-          
-          let project = null;
-          if (invoice.projectId) {
-            const [proj] = await db.select().from(crmProjects).where(eq(crmProjects.id, invoice.projectId));
-            project = proj || null;
-          }
-          
-          return {
-            ...invoice,
-            customer,
-            workOrder,
-            project,
-          };
-        })
-      );
+      // Get total count
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(crmInvoices)
+        .where(whereClause);
+      const total = Number(countResult?.count) || 0;
       
-      return res.json(enrichedInvoices);
+      // Get paginated invoices
+      const invoices = await db
+        .select()
+        .from(crmInvoices)
+        .where(whereClause)
+        .orderBy(desc(crmInvoices.createdAt))
+        .limit(limitNum)
+        .offset(offset);
+      
+      // BATCH LOAD: Get unique IDs for customers only (minimal data for list view)
+      const customerIds = [...new Set(invoices.map(i => i.customerId).filter(Boolean))] as string[];
+      
+      const customersMap = new Map<string, { id: string; displayName: string | null }>();
+      if (customerIds.length > 0) {
+        const customersList = await db
+          .select({ id: crmCustomers.id, displayName: crmCustomers.displayName })
+          .from(crmCustomers)
+          .where(inArray(crmCustomers.id, customerIds));
+        customersList.forEach(c => customersMap.set(c.id, c));
+      }
+      
+      // Enrich with minimal customer data for list view
+      const enrichedInvoices = invoices.map((invoice) => ({
+        ...invoice,
+        customerName: invoice.customerId ? customersMap.get(invoice.customerId)?.displayName || null : null,
+      }));
+      
+      return res.json({
+        invoices: enrichedInvoices,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      });
     } catch (error) {
       console.error("Error fetching invoices:", error);
       return res.status(500).json({ message: "Failed to fetch invoices" });
@@ -9489,10 +9542,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return `${prefix}${String(seq).padStart(3, '0')}`;
   }
 
-  // GET /api/crm/quotes - List quotes with filters
+  // GET /api/crm/quotes - List quotes with filters and pagination (OPTIMIZED)
   app.get("/api/crm/quotes", requireCrmAuth, async (req, res) => {
     try {
-      const { scope, status, customerId, projectId, workOrderId } = req.query;
+      const { scope, status, customerId, projectId, workOrderId, page = "1", limit = "25" } = req.query;
+      const pageNum = parseInt(page as string, 10) || 1;
+      const limitNum = Math.min(50, parseInt(limit as string, 10) || 25);
+      const offset = (pageNum - 1) * limitNum;
       
       const conditions: any[] = [];
       if (scope) {
@@ -9511,11 +9567,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(eq(crmQuotes.workOrderId, workOrderId as string));
       }
 
-      const quotesResult = conditions.length > 0
-        ? await db.select().from(crmQuotes).where(and(...conditions)).orderBy(desc(crmQuotes.createdAt))
-        : await db.select().from(crmQuotes).orderBy(desc(crmQuotes.createdAt));
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      
+      // Get total count
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(crmQuotes)
+        .where(whereClause);
+      const total = Number(countResult?.count) || 0;
 
-      return res.json(quotesResult);
+      // Get paginated quotes
+      const quotesResult = await db
+        .select()
+        .from(crmQuotes)
+        .where(whereClause)
+        .orderBy(desc(crmQuotes.createdAt))
+        .limit(limitNum)
+        .offset(offset);
+
+      // BATCH LOAD: Get customer names for list view
+      const customerIds = [...new Set(quotesResult.map(q => q.customerId).filter(Boolean))] as string[];
+      
+      const customersMap = new Map<string, string>();
+      if (customerIds.length > 0) {
+        const customersList = await db
+          .select({ id: crmCustomers.id, displayName: crmCustomers.displayName })
+          .from(crmCustomers)
+          .where(inArray(crmCustomers.id, customerIds));
+        customersList.forEach(c => customersMap.set(c.id, c.displayName || ''));
+      }
+      
+      const enrichedQuotes = quotesResult.map((quote) => ({
+        ...quote,
+        customerName: quote.customerId ? customersMap.get(quote.customerId) || null : null,
+      }));
+
+      return res.json({
+        quotes: enrichedQuotes,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      });
     } catch (error) {
       console.error("Error fetching CRM quotes:", error);
       return res.status(500).json({ message: "Failed to fetch quotes" });
