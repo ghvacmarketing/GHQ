@@ -169,10 +169,6 @@ export default function CrmProjects() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [page, setPage] = useState(1);
   
-  const [hasUpcomingWorkOrders, setHasUpcomingWorkOrders] = useState<string>("all");
-  const [noWorkOrdersYet, setNoWorkOrdersYet] = useState<string>("all");
-  const [agingApproved, setAgingApproved] = useState<string>("all");
-  
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithInfo | null>(null);
@@ -199,7 +195,7 @@ export default function CrmProjects() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, activeTab, hasUpcomingWorkOrders, noWorkOrdersYet, agingApproved]);
+  }, [debouncedSearch, activeTab]);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -209,22 +205,10 @@ export default function CrmProjects() {
       params.set("status", activeTab);
     }
     
-    if (hasUpcomingWorkOrders === "yes") {
-      params.set("hasUpcomingWorkOrders", "true");
-    }
-    
-    if (noWorkOrdersYet === "yes") {
-      params.set("noWorkOrdersYet", "true");
-    }
-    
-    if (agingApproved && agingApproved !== "all") {
-      params.set("agingApproved", agingApproved);
-    }
-    
     params.set("page", String(page));
     params.set("limit", String(ITEMS_PER_PAGE));
     return params.toString();
-  }, [debouncedSearch, activeTab, hasUpcomingWorkOrders, noWorkOrdersYet, agingApproved, page]);
+  }, [debouncedSearch, activeTab, page]);
 
   const { data: projectsData, isLoading: projectsLoading } = useQuery<ProjectsResponse>({
     queryKey: ["/api/crm/projects", queryParams],
@@ -356,6 +340,20 @@ export default function CrmProjects() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
+        {/* Search bar at top - DoorLoop style */}
+        <div className="flex justify-center mb-2">
+          <div className="relative w-full max-w-xl">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search projects..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+              data-testid="input-search-projects"
+            />
+          </div>
+        </div>
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-slate-900" data-testid="text-projects-title">
@@ -374,66 +372,22 @@ export default function CrmProjects() {
           </Button>
         </div>
 
+        {/* Tabs styled like customer page - underline style */}
         <div className="flex overflow-x-auto border-b border-slate-200">
           {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
                 activeTab === tab
-                  ? "bg-[#711419] text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "border-[#711419] text-[#711419]"
+                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
               }`}
               data-testid={`tab-status-${tab}`}
             >
               {filterTabConfig[tab].label}
             </button>
           ))}
-        </div>
-
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
-          <Input
-            placeholder="Search projects..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-12 h-12 text-base bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419]"
-            data-testid="input-search-projects"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <Select value={hasUpcomingWorkOrders} onValueChange={setHasUpcomingWorkOrders}>
-            <SelectTrigger className="w-[180px] h-8 text-xs" data-testid="select-has-upcoming-wo">
-              <SelectValue placeholder="Upcoming WOs" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All (Work Orders)</SelectItem>
-              <SelectItem value="yes">Has Upcoming WOs</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={noWorkOrdersYet} onValueChange={setNoWorkOrdersYet}>
-            <SelectTrigger className="w-[180px] h-8 text-xs" data-testid="select-no-wo">
-              <SelectValue placeholder="No WOs Yet" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All (Work Orders)</SelectItem>
-              <SelectItem value="yes">No Work Orders Yet</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={agingApproved} onValueChange={setAgingApproved}>
-            <SelectTrigger className="w-[180px] h-8 text-xs" data-testid="select-aging-approved">
-              <SelectValue placeholder="Aging Approved" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="7">Approved 7+ days</SelectItem>
-              <SelectItem value="14">Approved 14+ days</SelectItem>
-              <SelectItem value="30">Approved 30+ days</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {projectsLoading ? (
