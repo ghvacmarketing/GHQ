@@ -498,7 +498,8 @@ export default function CrmAgreements() {
 
         <div className="flex items-center gap-4 border-b border-slate-200 overflow-x-auto pb-0">
           {tabFilters.map((tab) => {
-            const count = tab.key === "active" ? statusCounts.active
+            const count = tab.key === "all" ? agreementsData?.pagination?.total
+              : tab.key === "active" ? statusCounts.active
               : tab.key === "expiring" ? statusCounts.expiring
               : tab.key === "expired" ? statusCounts.expired
               : null;
