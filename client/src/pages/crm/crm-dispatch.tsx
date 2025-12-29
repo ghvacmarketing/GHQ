@@ -37,7 +37,18 @@ import {
   FileText,
   CheckSquare,
   Package,
+  Search,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, WorkOrderStatus } from "@shared/schema";
 import {
@@ -524,6 +535,8 @@ export default function CrmDispatch() {
   const [, navigate] = useLocation();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [filter, setFilter] = useState<FilterStatus>("all");
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebounce(searchInput, 300);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [localWorkOrders, setLocalWorkOrders] = useState<DispatchWorkOrder[]>([]);
@@ -774,6 +787,20 @@ export default function CrmDispatch() {
   }, [localWorkOrders, selectedDate, updateWorkOrderMutation, technicians]);
 
   const filteredWorkOrders = localWorkOrders.filter((wo) => {
+    // Apply search filter
+    if (debouncedSearch.trim()) {
+      const searchLower = debouncedSearch.toLowerCase();
+      const woNumber = wo.workOrderNumber ? String(wo.workOrderNumber).toLowerCase() : "";
+      const matchesSearch = 
+        wo.customerName?.toLowerCase().includes(searchLower) ||
+        woNumber.includes(searchLower) ||
+        wo.description?.toLowerCase().includes(searchLower) ||
+        wo.techName?.toLowerCase().includes(searchLower) ||
+        wo.propertyAddress?.toLowerCase().includes(searchLower);
+      if (!matchesSearch) return false;
+    }
+    
+    // Apply status filter
     if (filter === "all") return true;
     if (filter === "completed") return wo.status === "completed";
     return wo.status === filter;
@@ -821,26 +848,47 @@ export default function CrmDispatch() {
     return null;
   }
 
+  const filterLabels: Record<FilterStatus, string> = {
+    all: "All",
+    scheduled: "Scheduled",
+    dispatched: "Dispatched",
+    en_route: "En Route",
+    on_site: "On Site",
+    completed: "Completed"
+  };
+
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="space-y-4">
+        {/* Search bar at top - DoorLoop style */}
+        <div className="flex justify-center mb-2">
+          <div className="relative w-full max-w-xl">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search work orders..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+              data-testid="input-search-dispatch"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-dispatch-title">
+            <h1 className="text-xl font-bold text-slate-900" data-testid="text-dispatch-title">
               Dispatch Board
             </h1>
-            <p className="text-slate-500 text-sm flex items-center gap-2 mt-1">
-              <CalendarDays className="h-4 w-4" />
-              Schedule and manage work orders
-            </p>
+            <p className="text-slate-500 text-sm">Daily Schedule - {filteredWorkOrders.length} work orders</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button 
                   variant="outline" 
-                  className="text-slate-600 py-1.5 px-3 h-auto"
+                  size="sm"
+                  className="text-slate-600"
                   data-testid="button-date-picker"
                 >
                   <CalendarDays className="h-4 w-4 mr-2" />
@@ -857,42 +905,14 @@ export default function CrmDispatch() {
                 />
               </PopoverContent>
             </Popover>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 items-center" data-testid="filter-buttons">
-          {(["all", "scheduled", "dispatched", "en_route", "on_site", "completed"] as FilterStatus[]).map((status) => {
-            const count = status === "all" 
-              ? localWorkOrders.length 
-              : localWorkOrders.filter(wo => wo.status === status).length;
-            const labels: Record<FilterStatus, string> = {
-              all: "All",
-              scheduled: "Scheduled",
-              dispatched: "Dispatched",
-              en_route: "En Route",
-              on_site: "On Site",
-              completed: "Completed"
-            };
-            return (
-              <Button
-                key={status}
-                variant={filter === status ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter(status)}
-                data-testid={`filter-${status}`}
-              >
-                {labels[status]} ({count})
-              </Button>
-            );
-          })}
-          
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="ml-2 text-slate-600" data-testid="button-legend">
-                <Info className="h-4 w-4 mr-1.5" />
-                Legend
-              </Button>
-            </PopoverTrigger>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="text-slate-600" data-testid="button-legend">
+                  <Info className="h-4 w-4 mr-1.5" />
+                  Legend
+                </Button>
+              </PopoverTrigger>
             <PopoverContent className="w-[340px] p-0" align="end">
               <div className="p-4 space-y-4">
                 <div>
@@ -948,7 +968,31 @@ export default function CrmDispatch() {
                 </div>
               </div>
             </PopoverContent>
-          </Popover>
+            </Popover>
+          </div>
+        </div>
+
+        {/* Tabs styled like projects/customers page - underline style */}
+        <div className="flex overflow-x-auto border-b border-slate-200" data-testid="filter-tabs">
+          {(["all", "scheduled", "dispatched", "en_route", "on_site", "completed"] as FilterStatus[]).map((status) => {
+            const count = status === "all" 
+              ? localWorkOrders.length 
+              : localWorkOrders.filter(wo => wo.status === status).length;
+            return (
+              <button
+                key={status}
+                onClick={() => setFilter(status)}
+                className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                  filter === status
+                    ? "border-[#711419] text-[#711419]"
+                    : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                }`}
+                data-testid={`tab-${status}`}
+              >
+                {filterLabels[status]} ({count})
+              </button>
+            );
+          })}
         </div>
 
         <Card className="bg-white border hidden lg:block" data-testid="card-timeline">
