@@ -733,7 +733,8 @@ export default function CrmCustomerDetail() {
     queryFn: async () => {
       const res = await fetch(`/api/crm/projects?customerId=${customerId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch projects");
-      return res.json();
+      const data = await res.json();
+      return data.projects || [];
     },
     enabled: !!currentUser && !!customerId,
   });
