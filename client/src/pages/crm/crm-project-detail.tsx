@@ -375,18 +375,7 @@ export default function CrmProjectDetail() {
               Back
             </Button>
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold" data-testid="text-project-title">{project.title}</h1>
-                <Badge className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border}`}>
-                  {projectStatusLabels[project.status] || project.status}
-                </Badge>
-                <Badge className={`${typeStyle.bg} ${typeStyle.text} border ${typeStyle.border}`}>
-                  {projectTypeLabels[project.projectType] || project.projectType}
-                </Badge>
-                <Badge className={`${priorityStyle.bg} ${priorityStyle.text}`}>
-                  {(project.priority || "normal").charAt(0).toUpperCase() + (project.priority || "normal").slice(1)} Priority
-                </Badge>
-              </div>
+              <h1 className="text-2xl font-bold" data-testid="text-project-title">{project.title}</h1>
               {project.customer && (
                 <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                   <button
@@ -421,143 +410,160 @@ export default function CrmProjectDetail() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card data-testid="card-total-quoted">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Quoted</p>
-                  <p className="text-xl font-semibold">{formatCurrency(totalQuoted)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-total-invoiced">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Receipt className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Invoiced</p>
-                  <p className="text-xl font-semibold">{formatCurrency(totalInvoiced)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-balance-due">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${balanceDue > 0 ? "bg-orange-100" : "bg-green-100"}`}>
-                  <DollarSign className={`w-5 h-5 ${balanceDue > 0 ? "text-orange-600" : "text-green-600"}`} />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Balance Due</p>
-                  <p className={`text-xl font-semibold ${balanceDue > 0 ? "text-orange-600" : ""}`}>
-                    {formatCurrency(balanceDue)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-work-orders-count">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <ClipboardList className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Work Orders</p>
-                  <p className="text-xl font-semibold">{workOrderCount}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Expected Value</span>
-              </div>
-              <p className="text-lg font-semibold">{formatCurrency(project.expectedValue)}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Actual Value</span>
-              </div>
-              <p className="text-lg font-semibold">{formatCurrency(project.actualValue)}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Created</span>
-              </div>
-              <p className="text-lg font-semibold">{formatDate(project.createdAt)}</p>
-            </CardContent>
-          </Card>
-        </div>
-
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
-            <TabsTrigger value="work-orders" data-testid="tab-work-orders">
+          <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
+            <TabsTrigger 
+              value="overview" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              data-testid="tab-overview"
+            >
+              Overview
+            </TabsTrigger>
+            <TabsTrigger 
+              value="work-orders" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              data-testid="tab-work-orders"
+            >
               Work Orders ({workOrderCount})
             </TabsTrigger>
-            <TabsTrigger value="quotes" data-testid="tab-quotes">
+            <TabsTrigger 
+              value="quotes" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              data-testid="tab-quotes"
+            >
               Quotes ({quotes?.length || 0})
             </TabsTrigger>
-            <TabsTrigger value="invoices" data-testid="tab-invoices">
+            <TabsTrigger 
+              value="invoices" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              data-testid="tab-invoices"
+            >
               Invoices ({invoices?.length || 0})
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Details</CardTitle>
+          <TabsContent value="overview" className="mt-0 space-y-6">
+            <Card className="border shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-semibold">Project Details</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
                 {project.description && (
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
-                    <p className="text-sm whitespace-pre-wrap">{project.description}</p>
+                  <div className="mb-4">
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Description</p>
+                    <p className="text-sm text-slate-700">{project.description}</p>
                   </div>
                 )}
-
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Proposal Sent</h4>
-                    <p className="text-sm">{formatDate(project.proposalSentAt)}</p>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Proposal Sent</p>
+                    <p className="text-sm text-slate-700">{formatDate(project.proposalSentAt)}</p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Approved</h4>
-                    <p className="text-sm">{formatDate(project.approvedAt)}</p>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Approved</p>
+                    <p className="text-sm text-slate-700">{formatDate(project.approvedAt)}</p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Completed</h4>
-                    <p className="text-sm">{formatDate(project.completedAt)}</p>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Completed</p>
+                    <p className="text-sm text-slate-700">{formatDate(project.completedAt)}</p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Closed</h4>
-                    <p className="text-sm">{formatDate(project.closedAt)}</p>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Closed</p>
+                    <p className="text-sm text-slate-700">{formatDate(project.closedAt)}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card data-testid="card-total-quoted">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <FileText className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Quoted</p>
+                      <p className="text-xl font-semibold">{formatCurrency(totalQuoted)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-total-invoiced">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Receipt className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Invoiced</p>
+                      <p className="text-xl font-semibold">{formatCurrency(totalInvoiced)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-balance-due">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${balanceDue > 0 ? "bg-orange-100" : "bg-green-100"}`}>
+                      <DollarSign className={`w-5 h-5 ${balanceDue > 0 ? "text-orange-600" : "text-green-600"}`} />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Balance Due</p>
+                      <p className={`text-xl font-semibold ${balanceDue > 0 ? "text-orange-600" : ""}`}>
+                        {formatCurrency(balanceDue)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-work-orders-count">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <ClipboardList className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Work Orders</p>
+                      <p className="text-xl font-semibold">{workOrderCount}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Expected Value</span>
+                  </div>
+                  <p className="text-lg font-semibold">{formatCurrency(project.expectedValue)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Actual Value</span>
+                  </div>
+                  <p className="text-lg font-semibold">{formatCurrency(project.actualValue)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Created</span>
+                  </div>
+                  <p className="text-lg font-semibold">{formatDate(project.createdAt)}</p>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="work-orders" className="mt-4">
