@@ -2030,22 +2030,50 @@ export default function CrmCustomerDetail() {
       });
       return;
     }
-    if (isPropertyManager && !propTenantName.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Tenant name is required for property manager sites",
-        variant: "destructive",
-      });
-      return;
+    
+    // For Property Managers:
+    // - Billing to tenant always requires tenant name and email
+    // - New sites require tenant name
+    // - Existing sites that had tenant data can't clear it
+    if (isPropertyManager) {
+      if (propBilledTo === "tenant") {
+        if (!propTenantName.trim()) {
+          toast({
+            title: "Validation Error",
+            description: "Tenant name is required when billing to tenant",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (!propTenantEmail.trim()) {
+          toast({
+            title: "Validation Error",
+            description: "Tenant email is required when billing to tenant",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      // For new sites, require tenant name
+      if (!editingProperty && !propTenantName.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Tenant name is required for property manager sites",
+          variant: "destructive",
+        });
+        return;
+      }
+      // For existing sites with tenant data, don't allow clearing
+      if (editingProperty?.tenantName && !propTenantName.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Tenant name cannot be removed from existing site",
+          variant: "destructive",
+        });
+        return;
+      }
     }
-    if (isPropertyManager && propBilledTo === "tenant" && !propTenantEmail.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Tenant email is required when billing to tenant",
-        variant: "destructive",
-      });
-      return;
-    }
+    
     if (editingProperty) {
       updatePropertyMutation.mutate();
     } else {
@@ -3033,13 +3061,23 @@ export default function CrmCustomerDetail() {
               )}
             </div>
 
-            <DialogFooter className="px-6 py-4 border-t bg-slate-50 dark:bg-slate-900 shrink-0">
+            <DialogFooter className="px-6 py-4 border-t bg-slate-50 dark:bg-slate-900 shrink-0 rounded-b-xl">
               <Button variant="outline" onClick={handleClosePropertyDialog} className="px-6">
                 Cancel
               </Button>
               <Button
                 onClick={handleSaveProperty}
-                disabled={!propAddress1.trim() || !propCity.trim() || !propState.trim() || !propZip.trim() || (isPropertyManager && !propTenantName.trim()) || (isPropertyManager && propBilledTo === "tenant" && !propTenantEmail.trim()) || createPropertyMutation.isPending || updatePropertyMutation.isPending}
+                disabled={
+                  !propAddress1.trim() || 
+                  !propCity.trim() || 
+                  !propState.trim() || 
+                  !propZip.trim() || 
+                  (isPropertyManager && !editingProperty && !propTenantName.trim()) || 
+                  (isPropertyManager && editingProperty?.tenantName && !propTenantName.trim()) ||
+                  (isPropertyManager && propBilledTo === "tenant" && (!propTenantName.trim() || !propTenantEmail.trim())) || 
+                  createPropertyMutation.isPending || 
+                  updatePropertyMutation.isPending
+                }
                 className="px-6 bg-[#711419] hover:bg-[#5a1014]"
                 data-testid="button-save-property"
               >

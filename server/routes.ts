@@ -7726,12 +7726,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isPropertyManager = customer?.customerType?.toLowerCase() === "property manager";
 
       // Validate tenant requirements for Property Manager
+      // Grandfathers existing sites without tenant data, but enforces rules when:
+      // - Billing to tenant (always requires tenant name and email)
+      // - Site already had tenant data (preserve existing requirements)
+      // - User is explicitly adding tenant data
       if (isPropertyManager) {
-        if (!finalTenantName) {
-          return res.status(400).json({ message: "Tenant name is required for property manager sites" });
+        // If billing to tenant, tenant name and email are always required
+        if (finalBilledTo === "tenant") {
+          if (!finalTenantName) {
+            return res.status(400).json({ message: "Tenant name is required when billing to tenant" });
+          }
+          if (!finalTenantEmail) {
+            return res.status(400).json({ message: "Tenant email is required when billing to tenant" });
+          }
         }
-        if (finalBilledTo === "tenant" && !finalTenantEmail) {
-          return res.status(400).json({ message: "Tenant email is required when billing to tenant" });
+        // If site already had tenant data, don't allow clearing the tenant name
+        if (existingProperty.tenantName && !finalTenantName) {
+          return res.status(400).json({ message: "Tenant name cannot be removed from existing site" });
         }
       }
 
