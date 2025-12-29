@@ -73,7 +73,7 @@ export default function CrmDashboard() {
       trend: null,
     },
     {
-      title: "Jobs Completed",
+      title: "Projects Completed",
       value: "—",
       subtitle: "This month",
       icon: CheckCircle2,
@@ -82,7 +82,7 @@ export default function CrmDashboard() {
       trend: null,
     },
     {
-      title: "Open Jobs",
+      title: "Open Projects",
       value: "—",
       subtitle: "Active",
       icon: Briefcase,
@@ -184,7 +184,7 @@ export default function CrmDashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
                 <Briefcase className="h-5 w-5 text-indigo-600" />
-                Recent Jobs
+                Recent Projects
               </CardTitle>
             </CardHeader>
             <CardContent>

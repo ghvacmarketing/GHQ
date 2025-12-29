@@ -440,14 +440,14 @@ export default function CrmAccountDetail() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Job created successfully" });
+      toast({ title: "Project created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/accounts", accountId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
       setJobDialogOpen(false);
       resetJobForm();
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to create job", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to create project", description: error.message, variant: "destructive" });
     },
   });
 
@@ -586,7 +586,7 @@ export default function CrmAccountDetail() {
             </TabsTrigger>
             <TabsTrigger value="jobs" data-testid="tab-jobs">
               <Briefcase className="h-4 w-4 mr-2" />
-              Jobs ({jobs.length})
+              Projects ({jobs.length})
             </TabsTrigger>
             <TabsTrigger value="profile" data-testid="tab-profile">
               <FileText className="h-4 w-4 mr-2" />
@@ -717,13 +717,13 @@ export default function CrmAccountDetail() {
                         },
                         {
                           id: "job",
-                          label: "Create first Job",
+                          label: "Create first Project",
                           completed: hasJob,
                           action: () => {
                             resetJobForm();
                             setJobDialogOpen(true);
                           },
-                          buttonLabel: "Create Job",
+                          buttonLabel: "Create Project",
                         },
                       ];
 
@@ -972,7 +972,7 @@ export default function CrmAccountDetail() {
           <TabsContent value="jobs" className="space-y-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-4">
-                <CardTitle className="text-lg">Jobs</CardTitle>
+                <CardTitle className="text-lg">Projects</CardTitle>
                 <Button
                   size="sm"
                   onClick={() => {
@@ -982,14 +982,14 @@ export default function CrmAccountDetail() {
                   data-testid="button-add-job"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Job
+                  Add Project
                 </Button>
               </CardHeader>
               <CardContent>
                 {jobs.length === 0 ? (
                   <div className="text-center py-8 text-slate-500">
                     <Briefcase className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>No jobs yet</p>
+                    <p>No projects yet</p>
                   </div>
                 ) : (
                   <Table>
@@ -1508,9 +1508,9 @@ export default function CrmAccountDetail() {
         <Dialog open={jobDialogOpen} onOpenChange={(open) => { if (!open) { setJobDialogOpen(false); resetJobForm(); } else setJobDialogOpen(true); }}>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
-              <DialogTitle>Create Job</DialogTitle>
+              <DialogTitle>Create Project</DialogTitle>
               <DialogDescription>
-                Create a new job for {account.displayName}
+                Create a new project for {account.displayName}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -1597,7 +1597,7 @@ export default function CrmAccountDetail() {
               <div className="space-y-2">
                 <Label>Description</Label>
                 <Textarea
-                  placeholder="Job description..."
+                  placeholder="Project description..."
                   value={jobForm.description}
                   onChange={(e) => setJobForm({ ...jobForm, description: e.target.value })}
                   data-testid="input-job-description"
@@ -1613,7 +1613,7 @@ export default function CrmAccountDetail() {
                 disabled={createJobMutation.isPending}
                 data-testid="button-create-job"
               >
-                {createJobMutation.isPending ? "Creating..." : "Create Job"}
+                {createJobMutation.isPending ? "Creating..." : "Create Project"}
               </Button>
             </DialogFooter>
           </DialogContent>

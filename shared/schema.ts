@@ -392,6 +392,11 @@ export const customers = pgTable("customers", {
   importBatchId: varchar("import_batch_id"),
   lastSyncedAt: timestamp("last_synced_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
+  // Archive support (soft delete)
+  archived: boolean("archived").default(false),
+  archivedAt: timestamp("archived_at"),
+  archivedBy: varchar("archived_by"),
+  archiveReason: text("archive_reason"),
 });
 
 export const customerImportBatches = pgTable("customer_import_batches", {

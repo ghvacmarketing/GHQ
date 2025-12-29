@@ -278,7 +278,7 @@ export default function CrmWorkOrders() {
 
       if (createNewJob) {
         if (!newJobCustomerId) throw new Error("Customer is required");
-        if (!newJobDescription.trim()) throw new Error("Job description is required");
+        if (!newJobDescription.trim()) throw new Error("Project description is required");
         if (!newJobStartDate) throw new Error("Start date is required");
         if (newJobDuration < 15) throw new Error("Duration must be at least 15 minutes");
 
@@ -963,7 +963,7 @@ export default function CrmWorkOrders() {
             <div className="space-y-4 py-4">
               {jobs.length === 0 ? (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-700">
-                  No existing jobs found. Create a new job below.
+                  No existing projects found. Create a new project below.
                 </div>
               ) : (
                 <>
@@ -980,19 +980,19 @@ export default function CrmWorkOrders() {
                       data-testid="checkbox-create-new-job"
                     />
                     <Label htmlFor="createNewJob" className="cursor-pointer">
-                      Create a new job
+                      Create a new project
                     </Label>
                   </div>
 
                   {!createNewJob && (
                     <div className="space-y-2">
-                      <Label>Job (required)</Label>
+                      <Label>Project (required)</Label>
                       <Select
                         value={createForm.jobId}
                         onValueChange={(v) => setCreateForm({ ...createForm, jobId: v })}
                       >
                         <SelectTrigger data-testid="select-job">
-                          <SelectValue placeholder="Select a job" />
+                          <SelectValue placeholder="Select a project" />
                         </SelectTrigger>
                         <SelectContent>
                           {jobs.map((job) => (
@@ -1105,7 +1105,7 @@ export default function CrmWorkOrders() {
                     <Textarea
                       value={newJobDescription}
                       onChange={(e) => setNewJobDescription(e.target.value)}
-                      placeholder="Describe the job..."
+                      placeholder="Describe the project..."
                       className="min-h-[80px]"
                       data-testid="textarea-new-job-description"
                     />

@@ -1,0 +1,130 @@
+CUSTOMER PAGE UPDATES + TERMINOLOGY CHANGE + TYPE-SPECIFIC DASHBOARDS
+
+Goal:
+1) Add “Delete Customer” capability (with safeguards).
+2) Replace top customer page action buttons with:
+   - Create Project (formerly Job)
+   - Create Work Order (Schedule Visit)
+3) Rename all CRM references from “Job(s)” to “Project(s)” across UI, routes, labels, components, and database naming where feasible.
+4) Build type-specific Customer dashboards (Residential vs Property Manager vs Commercial) similar to a Property Manager dashboard style, but with fields relevant to each customer type.
+5) Ensure “Edit Customer” is comprehensive and can edit EVERYTHING originally captured for that customer type.
+
+--------------------------------------------
+A) DELETE CUSTOMER BUTTON (Admin-only)
+--------------------------------------------
+Add a “Delete Customer” button on the Customer detail page.
+
+Requirements:
+- Only Admin role can see/use it.
+- Confirmation modal requires typing something like DELETE to confirm.
+- Before deleting, show impact summary:
+  - number of Projects linked
+  - number of Work Orders linked
+  - number of Quotes/Invoices linked
+- Safety rule: If customer has ANY linked Projects/Work Orders/Quotes/Invoices:
+  - do NOT hard-delete
+  - instead implement “Archive Customer” (soft delete): archived=true, inactive, hidden from searches by default
+- Only allow hard-delete if customer has zero linked records.
+- Log this action in an audit log: who, when, what, why (optional reason field).
+
+--------------------------------------------
+B) REPLACE CUSTOMER PAGE ACTION BUTTONS
+--------------------------------------------
+On the customer detail page header area:
+- Replace “New Job” with “Create Project”
+- Replace “Schedule Visit” with “Create Work Order”
+Behavior:
+- Create Project opens modal or page with the customer pre-selected.
+- Create Work Order opens modal or page with the customer pre-selected, then asks:
+  - which Project to attach it to OR “Create new Project” inline if none exist.
+
+--------------------------------------------
+C) RENAME “JOBS” TO “PROJECTS” THROUGHOUT CRM
+--------------------------------------------
+We are changing terminology:
+- Job = Project
+- Jobs tab = Projects tab
+- Everywhere in UI that says “Job(s)” becomes “Project(s)”
+- “Create Job” becomes “Create Project”
+- Routing should change from /jobs to /projects (if feasible); if not, keep old routes as backwards-compatible redirects but display “Projects” in UI.
+
+Data model expectation:
+- If DB currently has Job table/model, we can either:
+  1) keep it as Job internally but map label to Project everywhere (fastest), OR
+  2) rename to Project in schema and migrate (cleaner but more work).
+Choose the safest path without breaking existing data.
+
+--------------------------------------------
+D) CUSTOMER DETAIL PAGE: TYPE-SPECIFIC DASHBOARD
+--------------------------------------------
+Customer types: Residential, Property Manager, Commercial
+When viewing a customer, show a dashboard layout tailored to the selected customer type.
+Keep the tab bar approach (Overview, Sites, Contacts, Projects, Profile), but make Overview content dynamic per type.
+
+1) Residential Customer Overview (what to show)
+- Primary Address / Service Address
+- Primary Contact info (phone/email)
+- Equipment summary (count, last service date, key systems)
+- Membership/Agreement status (active? plan type? renewal date?)
+- Quick stats: open Projects, upcoming Work Orders, unpaid invoices
+- Notes / pinned note
+- “Preferred communication method” and “do-not-contact flags”
+- Optional: household preferences (pets, gate code, parking notes)
+
+2) Property Manager Overview (what to show)
+- Company / Portfolio summary
+- Billing rules: bill-to account, payment terms, “require approval” toggle
+- Approval contacts + dispatch contacts
+- Portfolio Sites/Properties count + quick link
+- Quick stats: open Projects across portfolio, upcoming visits, outstanding balances
+- Preferred scheduling windows + access rules
+- “Unit/tenant workflow” notes (how we receive tenant info, access instructions)
+
+3) Commercial Overview (what to show)
+- Company HQ + Service locations count
+- Main AP contact (billing) + main site contact(s)
+- Contract terms / PO required (yes/no), tax-exempt settings
+- Maintenance plan(s) / service level agreement notes
+- Quick stats: open Projects, upcoming Work Orders, outstanding invoices
+- Site access requirements (badges, escort required, after-hours allowed)
+
+--------------------------------------------
+E) EDIT CUSTOMER MUST EDIT EVERYTHING (TYPE-SPECIFIC)
+--------------------------------------------
+Update the Edit Customer flow so it can edit ALL fields that were originally set at creation, and also any new fields we add.
+
+Requirements:
+- Edit form should be dynamic based on customer type (Residential vs PM vs Commercial).
+- Switching customer type should be restricted:
+  - Only Admin can change customer type once created
+  - If changed, require confirmation and show impact (sites/contacts/billing rules)
+- Must support editing:
+  - name/display name/company name
+  - customer type
+  - lead source
+  - parent account (if used)
+  - addresses (HQ/billing/service)
+  - contacts (primary, billing, dispatch, approval)
+  - notes/pinned note
+  - billing/tax settings where applicable
+  - preferences/access instructions
+
+Validation:
+- Residential requires at least one service address + primary contact.
+- PM requires company name + billing contact + at least one site (or allow empty but prompt).
+- Commercial requires company name + billing info (AP contact) OR require later but show warning.
+
+--------------------------------------------
+F) CUSTOMER PAGE TABS UPDATE
+--------------------------------------------
+Rename “Jobs (0)” tab to “Projects (0)”.
+Ensure counts reflect projects and work orders correctly.
+
+--------------------------------------------
+Acceptance tests / checkpoints:
+1) Admin sees Delete Customer; non-admin does not.
+2) Customer with linked records cannot be hard-deleted, only archived.
+3) “Create Project” and “Create Work Order” buttons work and prefill customer.
+4) CRM uses “Project(s)” wording everywhere users see it.
+5) Residential/PM/Commercial Overview differs and shows the right fields.
+6) Edit Customer allows editing every originally-created field for that type.

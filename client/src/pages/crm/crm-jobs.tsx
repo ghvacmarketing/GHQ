@@ -164,7 +164,7 @@ const ITEMS_PER_PAGE = 50;
 type FilterTab = "all" | "needs_scheduling" | "scheduled" | "in_progress" | "completed" | "closed" | "cancelled";
 
 const filterTabConfig: Record<FilterTab, { label: string }> = {
-  all: { label: "All Jobs" },
+  all: { label: "All Projects" },
   needs_scheduling: { label: "New / Needs Scheduling" },
   scheduled: { label: "Scheduled" },
   in_progress: { label: "In Progress" },
@@ -399,14 +399,14 @@ export default function CrmJobs() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
       if (result.assignmentFailed) {
         toast({
-          title: "Job created",
-          description: "The job was created but technician assignment failed. Please assign manually.",
+          title: "Project created",
+          description: "The project was created but technician assignment failed. Please assign manually.",
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Job created",
-          description: "The job has been created successfully.",
+          title: "Project created",
+          description: "The project has been created successfully.",
         });
       }
       handleCloseDialog();
@@ -414,7 +414,7 @@ export default function CrmJobs() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create job",
+        description: error.message || "Failed to create project",
         variant: "destructive",
       });
     },
@@ -434,7 +434,7 @@ export default function CrmJobs() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
       toast({
         title: "Status updated",
-        description: "Job status has been updated successfully.",
+        description: "Project status has been updated successfully.",
       });
     },
     onError: (error: Error) => {
@@ -462,7 +462,7 @@ export default function CrmJobs() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
       toast({
         title: "Technician assigned",
-        description: "Job has been assigned successfully.",
+        description: "Project has been assigned successfully.",
       });
     },
     onError: (error: Error) => {
@@ -490,9 +490,9 @@ export default function CrmJobs() {
       if (!res.ok) {
         const errorData = await res.json();
         if (res.status === 409) {
-          throw new Error("This technician already has a job scheduled during this time. Please choose a different time or technician.");
+          throw new Error("This technician already has a project scheduled during this time. Please choose a different time or technician.");
         }
-        throw new Error(errorData.message || "Failed to schedule job");
+        throw new Error(errorData.message || "Failed to schedule project");
       }
       return res.json();
     },
@@ -500,15 +500,15 @@ export default function CrmJobs() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
       toast({
-        title: "Job scheduled",
-        description: "The job has been scheduled successfully.",
+        title: "Project scheduled",
+        description: "The project has been scheduled successfully.",
       });
       handleCloseScheduleDialog();
     },
     onError: (error: Error) => {
       toast({
         title: "Scheduling conflict",
-        description: error.message || "Failed to schedule job",
+        description: error.message || "Failed to schedule project",
         variant: "destructive",
       });
     },
@@ -519,7 +519,7 @@ export default function CrmJobs() {
       const res = await apiRequest("DELETE", `/api/crm/jobs/${jobId}`);
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to delete job");
+        throw new Error(errorData.message || "Failed to delete project");
       }
       return res.json();
     },
@@ -527,8 +527,8 @@ export default function CrmJobs() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
       toast({
-        title: "Job deleted",
-        description: "The job has been deleted successfully.",
+        title: "Project deleted",
+        description: "The project has been deleted successfully.",
       });
       setDeleteConfirmOpen(false);
       setJobToDelete(null);
@@ -536,7 +536,7 @@ export default function CrmJobs() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete job",
+        description: error.message || "Failed to delete project",
         variant: "destructive",
       });
     },
@@ -980,7 +980,7 @@ export default function CrmJobs() {
       <Dialog open={createDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
         <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create Job</DialogTitle>
+            <DialogTitle>Create Project</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
@@ -1375,7 +1375,7 @@ export default function CrmJobs() {
               <Label htmlFor="description">Description *</Label>
               <Textarea
                 id="description"
-                placeholder="Job description..."
+                placeholder="Project description..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
@@ -1407,7 +1407,7 @@ export default function CrmJobs() {
                   Creating...
                 </>
               ) : (
-                "Create Job"
+                "Create Project"
               )}
             </Button>
           </DialogFooter>
@@ -1417,7 +1417,7 @@ export default function CrmJobs() {
       <Dialog open={scheduleDialogOpen} onOpenChange={(open) => !open && handleCloseScheduleDialog()}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Schedule Job</DialogTitle>
+            <DialogTitle>Schedule Project</DialogTitle>
           </DialogHeader>
           
           {selectedJobForSchedule && (
@@ -1524,7 +1524,7 @@ export default function CrmJobs() {
                   Scheduling...
                 </>
               ) : (
-                "Schedule Job"
+                "Schedule Project"
               )}
             </Button>
           </DialogFooter>
@@ -1534,9 +1534,9 @@ export default function CrmJobs() {
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent data-testid="dialog-delete-job">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Job</AlertDialogTitle>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this job? This action cannot be undone.
+              Are you sure you want to delete this project? This action cannot be undone.
               All associated work orders, invoices, and quotes will also be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1552,7 +1552,7 @@ export default function CrmJobs() {
               className="bg-red-600 hover:bg-red-700"
               data-testid="button-confirm-delete"
             >
-              {deleteJobMutation.isPending ? "Deleting..." : "Delete Job"}
+              {deleteJobMutation.isPending ? "Deleting..." : "Delete Project"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

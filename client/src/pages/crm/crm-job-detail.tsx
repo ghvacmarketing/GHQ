@@ -267,8 +267,8 @@ export default function CrmJobDetail() {
     queryFn: async () => {
       const res = await fetch(`/api/crm/jobs/${jobId}`, { credentials: "include" });
       if (!res.ok) {
-        if (res.status === 404) throw new Error("Job not found");
-        throw new Error("Failed to fetch job");
+        if (res.status === 404) throw new Error("Project not found");
+        throw new Error("Failed to fetch project");
       }
       return res.json();
     },
@@ -360,13 +360,13 @@ export default function CrmJobDetail() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Job deleted successfully" });
+      toast({ title: "Project deleted successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/jobs"] });
       navigate("/crm/jobs");
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to delete job",
+        title: "Failed to delete project",
         description: error.message,
         variant: "destructive",
       });
@@ -438,12 +438,12 @@ export default function CrmJobDetail() {
             data-testid="button-back"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            All Jobs
+            All Projects
           </Button>
           <Card>
             <CardContent className="p-8 text-center">
               <XCircle className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-600">Job not found</p>
+              <p className="text-slate-600">Project not found</p>
             </CardContent>
           </Card>
         </div>
@@ -473,7 +473,7 @@ export default function CrmJobDetail() {
                     data-testid="button-back"
                   >
                     <ArrowLeft className="h-4 w-4 mr-1" />
-                    Jobs
+                    Projects
                   </Button>
                 </div>
                 <h1
@@ -1143,9 +1143,9 @@ export default function CrmJobDetail() {
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent data-testid="dialog-delete-job">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Job</AlertDialogTitle>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this job? This action cannot be undone.
+              Are you sure you want to delete this project? This action cannot be undone.
               All associated work orders, invoices, and quotes will also be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1156,7 +1156,7 @@ export default function CrmJobDetail() {
               className="bg-red-600 hover:bg-red-700"
               data-testid="button-confirm-delete"
             >
-              {deleteJobMutation.isPending ? "Deleting..." : "Delete Job"}
+              {deleteJobMutation.isPending ? "Deleting..." : "Delete Project"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

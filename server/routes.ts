@@ -4577,6 +4577,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Build conditions for customers table
       const conditions: any[] = [];
 
+      // Exclude archived customers by default
+      conditions.push(sql`(${customers.archived} = false OR ${customers.archived} IS NULL)`);
+
       if (searchTerm) {
         const searchPattern = `%${searchTerm}%`;
         conditions.push(
@@ -4810,6 +4813,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching CRM customer:", error);
       return res.status(500).json({ message: "Failed to fetch customer" });
+    }
+  });
+
+  // PATCH /api/crm/customers/:id - Update customer
+  app.patch("/api/crm/customers/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const customerId = req.params.id;
+      const { name, customerType, customerStatus, phone, email, fullAddress, leadSource } = req.body;
+
+      // Validate required fields
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ message: "Display name is required" });
+      }
+
+      // Check if user can change customerType (only admin/owner)
+      const canChangeType = ["admin", "owner"].includes(user.role);
+
+      // Try crmAccounts first (new Account+Site+Contact model)
+      const [existingAccount] = await db.select().from(crmAccounts).where(eq(crmAccounts.id, customerId));
+      if (existingAccount) {
+        const updateData: any = {
+          displayName: name.trim(),
+          accountStatus: customerStatus || existingAccount.accountStatus,
+          leadSource: leadSource !== undefined ? leadSource : existingAccount.leadSource,
+        };
+        
+        if (canChangeType && customerType) {
+          updateData.accountType = customerType;
+        }
+
+        await db.update(crmAccounts)
+          .set(updateData)
+          .where(eq(crmAccounts.id, customerId));
+
+        // Update primary contact phone/email if provided
+        if (phone !== undefined || email !== undefined) {
+          const [primaryContact] = await db.select().from(crmContacts)
+            .where(and(eq(crmContacts.accountId, customerId), eq(crmContacts.isPrimary, true)));
+          
+          if (primaryContact) {
+            const contactUpdate: any = {};
+            if (phone !== undefined) contactUpdate.phone = phone;
+            if (email !== undefined) contactUpdate.email = email;
+            await db.update(crmContacts)
+              .set(contactUpdate)
+              .where(eq(crmContacts.id, primaryContact.id));
+          }
+        }
+
+        // Update primary site address if provided
+        if (fullAddress !== undefined) {
+          const [primarySite] = await db.select().from(crmSites)
+            .where(and(eq(crmSites.accountId, customerId), eq(crmSites.isPrimary, true)));
+          
+          if (primarySite) {
+            await db.update(crmSites)
+              .set({ address1: fullAddress || "" })
+              .where(eq(crmSites.id, primarySite.id));
+          }
+        }
+
+        await logCrmAudit(user.id, "customer.updated", "customer", customerId, { name: name.trim() }, req.ip);
+        return res.json({ success: true, origin: 'crm_accounts' });
+      }
+
+      // Try crmCustomers table
+      const [existingCrmCustomer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      if (existingCrmCustomer) {
+        const updateData: any = {
+          name: name.trim(),
+          phone: phone !== undefined ? phone : existingCrmCustomer.phone,
+          email: email !== undefined ? email : existingCrmCustomer.email,
+          customerStatus: customerStatus || existingCrmCustomer.customerStatus,
+          notes: fullAddress !== undefined ? fullAddress : existingCrmCustomer.notes,
+        };
+        
+        if (canChangeType && customerType) {
+          updateData.customerType = customerType;
+        }
+
+        await db.update(crmCustomers)
+          .set(updateData)
+          .where(eq(crmCustomers.id, customerId));
+
+        await logCrmAudit(user.id, "customer.updated", "customer", customerId, { name: name.trim() }, req.ip);
+        return res.json({ success: true, origin: 'crm_customers' });
+      }
+
+      // Try legacy customers table
+      const [existingLegacy] = await db.select().from(customers).where(eq(customers.id, customerId));
+      if (existingLegacy) {
+        const updateData: any = {
+          displayName: name.trim(),
+          phone: phone !== undefined ? phone : existingLegacy.phone,
+          email: email !== undefined ? email : existingLegacy.email,
+          customerStatus: customerStatus || existingLegacy.customerStatus,
+          fullAddress: fullAddress !== undefined ? fullAddress : existingLegacy.fullAddress,
+          leadSource: leadSource !== undefined ? leadSource : existingLegacy.leadSource,
+        };
+        
+        if (canChangeType && customerType) {
+          updateData.customerType = customerType;
+        }
+
+        await db.update(customers)
+          .set(updateData)
+          .where(eq(customers.id, customerId));
+
+        await logCrmAudit(user.id, "customer.updated", "customer", customerId, { name: name.trim() }, req.ip);
+        return res.json({ success: true, origin: 'customers' });
+      }
+
+      return res.status(404).json({ message: "Customer not found" });
+    } catch (error) {
+      console.error("Error updating CRM customer:", error);
+      return res.status(500).json({ message: "Failed to update customer" });
     }
   });
 
@@ -5941,6 +6065,218 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating customer note:", error);
       return res.status(500).json({ message: "Failed to create customer note" });
+    }
+  });
+
+  // GET /api/crm/customers/:id/impact - Get counts of linked records for a customer
+  app.get("/api/crm/customers/:id/impact", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const customerId = req.params.id;
+
+      // Verify customer exists in any of the three tables
+      const [crmAccount] = await db.select({ id: crmAccounts.id }).from(crmAccounts).where(eq(crmAccounts.id, customerId));
+      const [crmCustomer] = await db.select({ id: crmCustomers.id }).from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      const [legacyCustomer] = await db.select({ id: customers.id }).from(customers).where(eq(customers.id, customerId));
+
+      if (!crmAccount && !crmCustomer && !legacyCustomer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      // Count projects (crmJobs) linked to this customer
+      const [jobsResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(crmJobs)
+        .where(or(
+          eq(crmJobs.customerId, customerId),
+          eq(crmJobs.accountId, customerId)
+        ));
+
+      const projectCount = Number(jobsResult?.count || 0);
+
+      // Get job IDs to count work orders
+      const jobIds = await db
+        .select({ id: crmJobs.id })
+        .from(crmJobs)
+        .where(or(
+          eq(crmJobs.customerId, customerId),
+          eq(crmJobs.accountId, customerId)
+        ));
+
+      let workOrderCount = 0;
+      if (jobIds.length > 0) {
+        const [workOrdersResult] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(crmWorkOrders)
+          .where(inArray(crmWorkOrders.jobId, jobIds.map(j => j.id)));
+        workOrderCount = Number(workOrdersResult?.count || 0);
+      }
+
+      // Count quotes linked to this customer (via accountId)
+      const [quotesResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(crmQuotes)
+        .where(eq(crmQuotes.accountId, customerId));
+
+      const quoteCount = Number(quotesResult?.count || 0);
+
+      // Count invoices linked to this customer
+      const [invoicesResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(crmInvoices)
+        .where(eq(crmInvoices.customerId, customerId));
+
+      const invoiceCount = Number(invoicesResult?.count || 0);
+
+      return res.json({
+        projects: projectCount,
+        workOrders: workOrderCount,
+        quotes: quoteCount,
+        invoices: invoiceCount,
+        hasLinkedRecords: projectCount > 0 || workOrderCount > 0 || quoteCount > 0 || invoiceCount > 0,
+      });
+    } catch (error) {
+      console.error("Error fetching customer impact:", error);
+      return res.status(500).json({ message: "Failed to fetch customer impact" });
+    }
+  });
+
+  // DELETE /api/crm/customers/:id - Delete or archive a customer (admin/owner/manager only)
+  app.delete("/api/crm/customers/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Check if user has admin/owner/manager role
+      if (!["admin", "owner", "manager"].includes(user.role)) {
+        return res.status(403).json({ message: "Forbidden - Admin, owner, or manager role required" });
+      }
+
+      const customerId = req.params.id;
+      const { reason } = req.body || {};
+
+      // Check which table the customer exists in
+      const [crmAccount] = await db.select({ id: crmAccounts.id }).from(crmAccounts).where(eq(crmAccounts.id, customerId));
+      const [crmCustomer] = await db.select({ id: crmCustomers.id }).from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      const [legacyCustomer] = await db.select({ id: customers.id }).from(customers).where(eq(customers.id, customerId));
+
+      if (!crmAccount && !crmCustomer && !legacyCustomer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      // Check for linked records
+      const [jobsResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(crmJobs)
+        .where(or(
+          eq(crmJobs.customerId, customerId),
+          eq(crmJobs.accountId, customerId)
+        ));
+
+      const projectCount = Number(jobsResult?.count || 0);
+
+      // Get job IDs to count work orders
+      const jobIds = await db
+        .select({ id: crmJobs.id })
+        .from(crmJobs)
+        .where(or(
+          eq(crmJobs.customerId, customerId),
+          eq(crmJobs.accountId, customerId)
+        ));
+
+      let workOrderCount = 0;
+      if (jobIds.length > 0) {
+        const [workOrdersResult] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(crmWorkOrders)
+          .where(inArray(crmWorkOrders.jobId, jobIds.map(j => j.id)));
+        workOrderCount = Number(workOrdersResult?.count || 0);
+      }
+
+      const [quotesResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(crmQuotes)
+        .where(eq(crmQuotes.accountId, customerId));
+      const quoteCount = Number(quotesResult?.count || 0);
+
+      const [invoicesResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(crmInvoices)
+        .where(eq(crmInvoices.customerId, customerId));
+      const invoiceCount = Number(invoicesResult?.count || 0);
+
+      const hasLinkedRecords = projectCount > 0 || workOrderCount > 0 || quoteCount > 0 || invoiceCount > 0;
+
+      if (hasLinkedRecords) {
+        // Archive the customer instead of deleting
+        // Only the legacy customers table supports archiving
+        if (legacyCustomer) {
+          await db.update(customers)
+            .set({
+              archived: true,
+              archivedAt: new Date(),
+              archivedBy: user.id,
+              archiveReason: reason || null,
+            })
+            .where(eq(customers.id, customerId));
+
+          // Log the archive action
+          await logCrmAudit(db, {
+            userId: user.id,
+            action: "archive_customer",
+            entityType: "customer",
+            entityId: customerId,
+            details: { reason, linkedRecords: { projectCount, workOrderCount, quoteCount, invoiceCount } },
+          });
+
+          return res.json({
+            message: "Customer archived successfully",
+            action: "archived",
+            reason: reason || null,
+          });
+        } else {
+          // For crmAccounts or crmCustomers, we can't archive (no archive columns), return error
+          return res.status(400).json({
+            message: "Cannot delete customer with linked records. Customer is from a table that does not support archiving.",
+            linkedRecords: { projectCount, workOrderCount, quoteCount, invoiceCount },
+          });
+        }
+      } else {
+        // No linked records - hard delete
+        if (legacyCustomer) {
+          await db.delete(customers).where(eq(customers.id, customerId));
+        } else if (crmCustomer) {
+          await db.delete(crmCustomers).where(eq(crmCustomers.id, customerId));
+        } else if (crmAccount) {
+          // Delete related sites and contacts first (cascade should handle this, but being explicit)
+          await db.delete(crmContacts).where(eq(crmContacts.accountId, customerId));
+          await db.delete(crmSites).where(eq(crmSites.accountId, customerId));
+          await db.delete(crmAccounts).where(eq(crmAccounts.id, customerId));
+        }
+
+        // Log the delete action
+        await logCrmAudit(db, {
+          userId: user.id,
+          action: "delete_customer",
+          entityType: "customer",
+          entityId: customerId,
+          details: { reason },
+        });
+
+        return res.json({
+          message: "Customer deleted permanently",
+          action: "deleted",
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      return res.status(500).json({ message: "Failed to delete customer" });
     }
   });
 
