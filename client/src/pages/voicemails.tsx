@@ -650,9 +650,10 @@ interface DateCardProps {
   highlightedLogId: string | null;
   entryRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
   cardRef?: React.Ref<HTMLDivElement>;
+  hideHeader?: boolean;
 }
 
-function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRefs, cardRef }: DateCardProps) {
+function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRefs, cardRef, hideHeader = false }: DateCardProps) {
   const { toast } = useToast();
   const [editingLog, setEditingLog] = useState<CallLog | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -697,20 +698,22 @@ function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRe
   return (
     <div ref={cardRef} data-testid={`date-card-${date}`}>
       <Collapsible open={isExpanded} onOpenChange={onToggle}>
-        <div className="border-b border-border/50 dark:border-border/30">
-          <CollapsibleTrigger asChild>
-            <button className="w-full flex items-center justify-between py-2 px-1 hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors text-left">
-              <div className="flex items-center gap-2">
-                {isExpanded ? (
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                )}
-                <span className="text-sm font-medium">{formattedDate}</span>
-              </div>
-              <Badge variant="outline" className="text-xs h-5 px-1.5">{count}</Badge>
-            </button>
-          </CollapsibleTrigger>
+        <div className={hideHeader ? "" : "border-b border-border/50 dark:border-border/30"}>
+          {!hideHeader && (
+            <CollapsibleTrigger asChild>
+              <button className="w-full flex items-center justify-between py-2 px-1 hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors text-left">
+                <div className="flex items-center gap-2">
+                  {isExpanded ? (
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  )}
+                  <span className="text-sm font-medium">{formattedDate}</span>
+                </div>
+                <Badge variant="outline" className="text-xs h-5 px-1.5">{count}</Badge>
+              </button>
+            </CollapsibleTrigger>
+          )}
           <CollapsibleContent>
             <div className="py-2 px-1 space-y-2">
               {!showForm && !editingLog && (
@@ -821,15 +824,20 @@ function DailyCallLog() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   const [highlightedLogId, setHighlightedLogId] = useState<string | null>(null);
+  const [selectedPastDate, setSelectedPastDate] = useState<string | null>(null);
+  const [pendingScrollTarget, setPendingScrollTarget] = useState<{ date: string; logId: string } | null>(null);
   const entryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  const todayDate = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   const { data: days = [], isLoading: isDaysLoading } = useQuery<{ id: string; date: string; count: number }[]>({
     queryKey: ["/api/call-logs/days"],
   });
+  
+  const hasTodayCard = days.some((d) => d.date === todayDate);
 
   const { data: searchResults = [], isLoading: isSearching } = useQuery<SearchResult[]>({
     queryKey: ["/api/call-logs/search", searchQuery],
@@ -842,57 +850,72 @@ function DailyCallLog() {
     enabled: searchQuery.length >= 2,
   });
 
+  // Effect to scroll to search result after card has rendered
   useEffect(() => {
-    if (days.length > 0 && expandedDays.size === 0) {
-      setExpandedDays(new Set([days[0].date]));
-    }
-  }, [days]);
-
-  const toggleDay = useCallback((date: string) => {
-    setExpandedDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(date)) {
-        next.delete(date);
-      } else {
-        next.add(date);
+    if (!pendingScrollTarget) return;
+    
+    const { date, logId } = pendingScrollTarget;
+    let scrolledToCard = false;
+    let scrolledToEntry = false;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    
+    // Try to scroll - first to card, then to entry (may load async)
+    const attemptScroll = (attempts: number) => {
+      if (attempts <= 0 || scrolledToEntry) {
+        // If this was a past day, keep it selected after clearing pendingScrollTarget
+        if (date !== todayDate) {
+          setSelectedPastDate(date);
+        }
+        setPendingScrollTarget(null);
+        if (!scrolledToEntry) {
+          setTimeout(() => setHighlightedLogId(null), 3000);
+        }
+        return;
       }
-      return next;
-    });
-  }, []);
+      
+      const cardEl = cardRefs.current[date];
+      const entryEl = entryRefs.current[logId];
+      
+      // Scroll to card once it's available
+      if (cardEl && !scrolledToCard) {
+        cardEl.scrollIntoView({ behavior: "smooth", block: "start" });
+        scrolledToCard = true;
+      }
+      
+      // Scroll to entry once it's available
+      if (entryEl && !scrolledToEntry) {
+        setTimeout(() => {
+          entryEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, scrolledToCard ? 200 : 0);
+        scrolledToEntry = true;
+        // Keep the past day selected so the card stays visible
+        if (date !== todayDate) {
+          setSelectedPastDate(date);
+        }
+        setTimeout(() => setHighlightedLogId(null), 3000);
+        setPendingScrollTarget(null);
+        return;
+      }
+      
+      // Retry after a short delay
+      timeoutId = setTimeout(() => attemptScroll(attempts - 1), 200);
+    };
+    
+    attemptScroll(20); // Try up to 20 times (4 seconds total)
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [pendingScrollTarget, selectedPastDate, todayDate]);
 
   const handleSearchResultClick = useCallback((result: SearchResult) => {
     setShowSearchResults(false);
     setSearchQuery("");
-
-    setExpandedDays((prev) => {
-      const next = new Set(prev);
-      next.add(result.date);
-      return next;
-    });
-
     setHighlightedLogId(result.id);
-
-    setTimeout(() => {
-      const cardEl = cardRefs.current[result.date];
-      if (cardEl) {
-        cardEl.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-
-      setTimeout(() => {
-        const entryEl = entryRefs.current[result.id];
-        if (entryEl) {
-          entryEl.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }, 300);
-
-      setTimeout(() => {
-        setHighlightedLogId(null);
-      }, 3000);
-    }, 100);
+    
+    // pendingScrollTarget drives both the rendering of past-day cards and the scroll behavior
+    setPendingScrollTarget({ date: result.date, logId: result.id });
   }, []);
-
-  const todayDate = new Date().toISOString().split("T")[0];
-  const hasTodayCard = days.some((d) => d.date === todayDate);
 
   const createTodayMutation = useMutation({
     mutationFn: async () => {
@@ -905,7 +928,6 @@ function DailyCallLog() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days"] });
-      setExpandedDays((prev) => new Set([...prev, todayDate]));
     },
   });
 
@@ -980,49 +1002,158 @@ function DailyCallLog() {
         )}
       </div>
 
-      {!hasTodayCard && (
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => {
-            setExpandedDays((prev) => new Set([...prev, todayDate]));
-            if (!hasTodayCard) {
-              createTodayMutation.mutate();
-            }
-          }}
-          disabled={createTodayMutation.isPending}
-          data-testid="button-create-today"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          {createTodayMutation.isPending ? "Creating..." : "Start Today's Log"}
-        </Button>
-      )}
-
       {isDaysLoading ? (
         <div className="text-center text-muted-foreground py-8">Loading call logs...</div>
       ) : days.length === 0 ? (
         <div className="text-center text-muted-foreground py-8">
           <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
           <p>No call logs yet</p>
-          <p className="text-sm">Start by creating today's log</p>
+          <Button
+            variant="default"
+            className="mt-3"
+            onClick={() => createTodayMutation.mutate()}
+            disabled={createTodayMutation.isPending}
+            data-testid="button-create-today"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {createTodayMutation.isPending ? "Creating..." : "Start Today's Log"}
+          </Button>
         </div>
       ) : (
-        <ScrollArea className="h-[calc(100vh-220px)]">
-          <div className="space-y-0 pr-4">
-            {days.map((day) => (
-              <DateCard
-                key={day.date}
-                date={day.date}
-                count={day.count}
-                isExpanded={expandedDays.has(day.date)}
-                onToggle={() => toggleDay(day.date)}
-                highlightedLogId={highlightedLogId}
-                entryRefs={entryRefs}
-                cardRef={(el) => { cardRefs.current[day.date] = el; }}
-              />
-            ))}
-          </div>
-        </ScrollArea>
+        <div className="space-y-4">
+          {/* Today's Log - Prominent Section */}
+          {(() => {
+            const todayData = days.find(d => d.date === todayDate);
+            if (todayData) {
+              return (
+                <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-background shadow-sm" data-testid="today-card">
+                  <CardHeader className="pb-2 pt-3 px-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Calendar className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base font-semibold">Today</CardTitle>
+                          <p className="text-xs text-muted-foreground">{format(new Date(), "EEEE, MMMM d")}</p>
+                        </div>
+                      </div>
+                      <Badge className="bg-primary/10 text-primary border-primary/20 text-sm">
+                        {todayData.count} {todayData.count === 1 ? "call" : "calls"}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="px-4 pb-3">
+                    <DateCard
+                      date={todayDate}
+                      count={todayData.count}
+                      isExpanded={true}
+                      onToggle={() => {}}
+                      highlightedLogId={highlightedLogId}
+                      entryRefs={entryRefs}
+                      cardRef={(el) => { cardRefs.current[todayDate] = el; }}
+                      hideHeader={true}
+                    />
+                  </CardContent>
+                </Card>
+              );
+            } else {
+              return (
+                <Card className="border-dashed border-2 border-primary/30" data-testid="today-card-empty">
+                  <CardContent className="py-6 text-center">
+                    <Calendar className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground mb-3">No calls logged today</p>
+                    <Button
+                      onClick={() => createTodayMutation.mutate()}
+                      disabled={createTodayMutation.isPending}
+                      data-testid="button-create-today"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      {createTodayMutation.isPending ? "Creating..." : "Start Today's Log"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            }
+          })()}
+
+          {/* Previous Days Dropdown */}
+          {(() => {
+            const pastDays = days.filter(d => d.date !== todayDate);
+            if (pastDays.length === 0) return null;
+            
+            // Active past date - pending search scroll takes priority over user-selected
+            const pendingPastDate = pendingScrollTarget?.date && pendingScrollTarget.date !== todayDate ? pendingScrollTarget.date : null;
+            const activePastDate = pendingPastDate || selectedPastDate;
+            
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Select 
+                    value={selectedPastDate || "none"} 
+                    onValueChange={(val) => setSelectedPastDate(val === "none" ? null : val)}
+                  >
+                    <SelectTrigger className="w-full" data-testid="select-past-date">
+                      <SelectValue placeholder="View previous days..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Select a previous day...</SelectItem>
+                      {pastDays.map((day) => (
+                        <SelectItem key={day.date} value={day.date}>
+                          <div className="flex items-center justify-between w-full gap-4">
+                            <span>{format(parseISO(day.date), "EEE, MMM d, yyyy")}</span>
+                            <Badge variant="secondary" className="text-xs">{day.count}</Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {activePastDate && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setSelectedPastDate(null);
+                        setPendingScrollTarget(null);
+                      }}
+                      className="flex-shrink-0"
+                      data-testid="button-clear-selection"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+
+                {activePastDate && (
+                  <Card className="bg-muted/20" data-testid={`past-day-card-${activePastDate}`}>
+                    <CardHeader className="pb-2 pt-3 px-4">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium">
+                          {format(parseISO(activePastDate), "EEEE, MMMM d, yyyy")}
+                        </CardTitle>
+                        <Badge variant="outline" className="text-xs">
+                          {days.find(d => d.date === activePastDate)?.count || 0} calls
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-3">
+                      <DateCard
+                        date={activePastDate}
+                        count={days.find(d => d.date === activePastDate)?.count || 0}
+                        isExpanded={true}
+                        onToggle={() => {}}
+                        highlightedLogId={highlightedLogId}
+                        entryRefs={entryRefs}
+                        cardRef={(el) => { cardRefs.current[activePastDate] = el; }}
+                        hideHeader={true}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            );
+          })()}
+        </div>
       )}
     </div>
   );
