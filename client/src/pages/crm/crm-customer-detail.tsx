@@ -114,19 +114,15 @@ function formatDate(date: Date | string | null): string {
 interface CustomerOverviewProps {
   customer: CrmCustomer;
   jobs: JobWithTech[];
-  notes: CustomerNoteWithUser[];
-  notesLoading: boolean;
-  noteBody: string;
-  setNoteBody: (value: string) => void;
-  handleAddNote: () => void;
-  addNotePending: boolean;
+  onCreateProject: () => void;
+  onCreateWorkOrder: () => void;
 }
 
 interface CustomerNoteWithUser extends CrmCustomerNote {
   userName: string | null;
 }
 
-function CustomerOverview({ customer, jobs, notes, notesLoading, noteBody, setNoteBody, handleAddNote, addNotePending }: CustomerOverviewProps) {
+function CustomerOverview({ customer, jobs, onCreateProject, onCreateWorkOrder }: CustomerOverviewProps) {
   const customerType = (customer.customerType || "residential").toLowerCase();
   
   const openProjects = jobs?.filter(j => !["completed", "invoiced", "paid", "cancelled"].includes(j.status)).length || 0;
@@ -138,14 +134,14 @@ function CustomerOverview({ customer, jobs, notes, notesLoading, noteBody, setNo
   const completedProjects = jobs?.filter(j => ["completed", "invoiced", "paid"].includes(j.status)).length || 0;
   
   if (customerType === "property_manager" || customerType === "property manager") {
-    return <PropertyManagerOverview customer={customer} openProjects={openProjects} upcomingVisits={upcomingVisits} completedProjects={completedProjects} notes={notes} notesLoading={notesLoading} noteBody={noteBody} setNoteBody={setNoteBody} handleAddNote={handleAddNote} addNotePending={addNotePending} />;
+    return <PropertyManagerOverview customer={customer} openProjects={openProjects} upcomingVisits={upcomingVisits} completedProjects={completedProjects} onCreateProject={onCreateProject} onCreateWorkOrder={onCreateWorkOrder} />;
   }
   
   if (customerType === "commercial") {
-    return <CommercialOverview customer={customer} openProjects={openProjects} upcomingVisits={upcomingVisits} completedProjects={completedProjects} notes={notes} notesLoading={notesLoading} noteBody={noteBody} setNoteBody={setNoteBody} handleAddNote={handleAddNote} addNotePending={addNotePending} />;
+    return <CommercialOverview customer={customer} openProjects={openProjects} upcomingVisits={upcomingVisits} completedProjects={completedProjects} onCreateProject={onCreateProject} onCreateWorkOrder={onCreateWorkOrder} />;
   }
   
-  return <ResidentialOverview customer={customer} openProjects={openProjects} upcomingVisits={upcomingVisits} completedProjects={completedProjects} notes={notes} notesLoading={notesLoading} noteBody={noteBody} setNoteBody={setNoteBody} handleAddNote={handleAddNote} addNotePending={addNotePending} />;
+  return <ResidentialOverview customer={customer} openProjects={openProjects} upcomingVisits={upcomingVisits} completedProjects={completedProjects} onCreateProject={onCreateProject} onCreateWorkOrder={onCreateWorkOrder} />;
 }
 
 interface OverviewLayoutProps {
@@ -153,334 +149,273 @@ interface OverviewLayoutProps {
   openProjects: number;
   upcomingVisits: number;
   completedProjects: number;
-  notes: CustomerNoteWithUser[];
-  notesLoading: boolean;
-  noteBody: string;
-  setNoteBody: (value: string) => void;
-  handleAddNote: () => void;
-  addNotePending: boolean;
+  onCreateProject: () => void;
+  onCreateWorkOrder: () => void;
 }
 
-function ResidentialOverview({ customer, openProjects, upcomingVisits, completedProjects, notes, notesLoading, noteBody, setNoteBody, handleAddNote, addNotePending }: OverviewLayoutProps) {
+function ResidentialOverview({ customer, openProjects, upcomingVisits, completedProjects, onCreateProject, onCreateWorkOrder }: OverviewLayoutProps) {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 border-l-4 border-l-green-500" data-testid="card-residential-info">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Home className="h-5 w-5 text-green-600" />
-              Residential Customer
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
-                  <MapPin className="h-5 w-5 text-green-600 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Service Address</p>
-                    <p className="text-sm text-slate-700 mt-1">{customer.fullAddress || "No address on file"}</p>
-                  </div>
-                </div>
+      <Card className="border shadow-sm" data-testid="card-residential-info">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-4 mb-6">
+            <div className="p-3 bg-green-100 rounded-full">
+              <Home className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-slate-900">Residential Customer</h2>
+              <p className="text-sm text-slate-500 mt-0.5">{customer.name}</p>
+            </div>
+            <Badge className="bg-green-100 text-green-700 border-green-200">Residential</Badge>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Name</p>
+                <p className="text-sm font-medium text-slate-900">{customer.name}</p>
               </div>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                  <User className="h-5 w-5 text-slate-600 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Primary Contact</p>
-                    <p className="text-sm font-medium text-slate-700 mt-1">{customer.name}</p>
-                    {customer.phone && (
-                      <a href={`tel:${customer.phone}`} className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline mt-1">
-                        <Phone className="h-3.5 w-3.5" />
-                        {customer.phone}
-                      </a>
-                    )}
-                    {customer.email && (
-                      <a href={`mailto:${customer.email}`} className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline mt-1">
-                        <Mail className="h-3.5 w-3.5" />
-                        {customer.email}
-                      </a>
-                    )}
-                  </div>
-                </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Service Address</p>
+                <p className="text-sm text-slate-700">{customer.fullAddress || "No address on file"}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</p>
+                <Badge variant="outline" className="text-xs">{customer.status || "Active"}</Badge>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200" data-testid="stat-open-projects">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Open Projects</p>
-                  <p className="text-3xl font-bold text-amber-900 mt-1">{openProjects}</p>
-                </div>
-                <div className="p-3 bg-amber-100 rounded-full">
-                  <Briefcase className="h-6 w-6 text-amber-600" />
-                </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Phone</p>
+                {customer.phone ? (
+                  <a href={`tel:${customer.phone}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                    <Phone className="h-3.5 w-3.5" />
+                    {customer.phone}
+                  </a>
+                ) : (
+                  <p className="text-sm text-slate-400">No phone</p>
+                )}
               </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200" data-testid="stat-upcoming-visits">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Upcoming Visits</p>
-                  <p className="text-3xl font-bold text-blue-900 mt-1">{upcomingVisits}</p>
-                </div>
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <Calendar className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-slate-50 to-gray-50 border-slate-200" data-testid="stat-total-jobs">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Completed Projects</p>
-                  <p className="text-3xl font-bold text-slate-800 mt-1">{completedProjects}</p>
-                </div>
-                <div className="p-3 bg-slate-100 rounded-full">
-                  <ClipboardList className="h-6 w-6 text-slate-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <NotesSection notes={notes} notesLoading={notesLoading} noteBody={noteBody} setNoteBody={setNoteBody} handleAddNote={handleAddNote} addNotePending={addNotePending} />
-    </div>
-  );
-}
-
-function PropertyManagerOverview({ customer, openProjects, upcomingVisits, completedProjects, notes, notesLoading, noteBody, setNoteBody, handleAddNote, addNotePending }: OverviewLayoutProps) {
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 border-l-4 border-l-purple-500" data-testid="card-property-manager-info">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Building2 className="h-5 w-5 text-purple-600" />
-              Property Manager Account
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-lg">
-                  <Users className="h-5 w-5 text-purple-600 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">Company / Portfolio</p>
-                    <p className="text-sm font-medium text-slate-700 mt-1">{customer.companyName || customer.name}</p>
-                    <p className="text-xs text-slate-500 mt-1">Completed {completedProjects} projects</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 bg-purple-50/50 rounded-lg">
-                  <MapPin className="h-5 w-5 text-purple-600 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">HQ / Mailing Address</p>
-                    <p className="text-sm text-slate-700 mt-1">{customer.fullAddress || "No address on file"}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                  <Receipt className="h-5 w-5 text-slate-600 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Billing Rules</p>
-                    <p className="text-sm text-slate-600 mt-1">Standard NET-30 terms</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Contact for custom arrangements</p>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                  <User className="h-5 w-5 text-slate-600 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Primary Contact</p>
-                    <p className="text-sm font-medium text-slate-700 mt-1">{customer.name}</p>
-                    {customer.phone && (
-                      <a href={`tel:${customer.phone}`} className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline mt-1">
-                        <Phone className="h-3.5 w-3.5" />
-                        {customer.phone}
-                      </a>
-                    )}
-                    {customer.email && (
-                      <a href={`mailto:${customer.email}`} className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline mt-1">
-                        <Mail className="h-3.5 w-3.5" />
-                        {customer.email}
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          <Card className="bg-gradient-to-br from-purple-50 to-fuchsia-50 border-purple-200" data-testid="stat-portfolio-sites">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">Completed Projects</p>
-                  <p className="text-3xl font-bold text-purple-900 mt-1">{completedProjects}</p>
-                </div>
-                <div className="p-3 bg-purple-100 rounded-full">
-                  <Building2 className="h-6 w-6 text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200" data-testid="stat-open-projects-pm">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Open Projects</p>
-                  <p className="text-3xl font-bold text-amber-900 mt-1">{openProjects}</p>
-                </div>
-                <div className="p-3 bg-amber-100 rounded-full">
-                  <Briefcase className="h-6 w-6 text-amber-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-teal-50 to-emerald-50 border-teal-200" data-testid="stat-upcoming-visits-pm">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-teal-700 uppercase tracking-wide">Upcoming Visits</p>
-                  <p className="text-3xl font-bold text-teal-900 mt-1">{upcomingVisits}</p>
-                </div>
-                <div className="p-3 bg-teal-100 rounded-full">
-                  <Calendar className="h-6 w-6 text-teal-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <NotesSection notes={notes} notesLoading={notesLoading} noteBody={noteBody} setNoteBody={setNoteBody} handleAddNote={handleAddNote} addNotePending={addNotePending} />
-    </div>
-  );
-}
-
-function CommercialOverview({ customer, openProjects, upcomingVisits, completedProjects, notes, notesLoading, noteBody, setNoteBody, handleAddNote, addNotePending }: OverviewLayoutProps) {
-  const hasAccessNotes = customer.notes && customer.notes.toLowerCase().includes("access");
-  
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 border-l-4 border-l-blue-500" data-testid="card-commercial-info">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Building2 className="h-5 w-5 text-blue-600" />
-              Commercial Account
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
-                  <Building2 className="h-5 w-5 text-blue-600 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Company Info</p>
-                    <p className="text-sm font-medium text-slate-700 mt-1">{customer.companyName || customer.name}</p>
-                    <p className="text-xs text-slate-500 mt-1">{customer.fullAddress || "No address on file"}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                  <FileText className="h-5 w-5 text-slate-600 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Contract Terms</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">PO Required</Badge>
-                      <Badge variant="outline" className="text-xs">NET-30</Badge>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1">Contact for service agreements</p>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                  <User className="h-5 w-5 text-slate-600 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Primary Contact</p>
-                    <p className="text-sm font-medium text-slate-700 mt-1">{customer.name}</p>
-                    {customer.phone && (
-                      <a href={`tel:${customer.phone}`} className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline mt-1">
-                        <Phone className="h-3.5 w-3.5" />
-                        {customer.phone}
-                      </a>
-                    )}
-                    {customer.email && (
-                      <a href={`mailto:${customer.email}`} className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline mt-1">
-                        <Mail className="h-3.5 w-3.5" />
-                        {customer.email}
-                      </a>
-                    )}
-                  </div>
-                </div>
-                {(hasAccessNotes || customer.notes) && (
-                  <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg">
-                    <Key className="h-5 w-5 text-amber-600 mt-0.5" />
-                    <div>
-                      <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Site Access Notes</p>
-                      <p className="text-sm text-slate-600 mt-1">{customer.notes || "No special access requirements"}</p>
-                    </div>
-                  </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Email</p>
+                {customer.email ? (
+                  <a href={`mailto:${customer.email}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                    <Mail className="h-3.5 w-3.5" />
+                    {customer.email}
+                  </a>
+                ) : (
+                  <p className="text-sm text-slate-400">No email</p>
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        <div className="space-y-4">
-          <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200" data-testid="stat-open-projects-commercial">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Open Projects</p>
-                  <p className="text-3xl font-bold text-blue-900 mt-1">{openProjects}</p>
-                </div>
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <Briefcase className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200" data-testid="stat-upcoming-visits-commercial">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Work Orders</p>
-                  <p className="text-3xl font-bold text-amber-900 mt-1">{upcomingVisits}</p>
-                </div>
-                <div className="p-3 bg-amber-100 rounded-full">
-                  <Wrench className="h-6 w-6 text-amber-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200" data-testid="stat-invoices-commercial">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Completed Projects</p>
-                  <p className="text-3xl font-bold text-green-900 mt-1">{completedProjects}</p>
-                </div>
-                <div className="p-3 bg-green-100 rounded-full">
-                  <ClipboardList className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <Card className="border shadow-sm" data-testid="card-quick-actions">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium text-slate-800">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex flex-wrap gap-3">
+            <Button 
+              onClick={onCreateProject}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-quick-create-project"
+            >
+              <Briefcase className="h-4 w-4 mr-2" />
+              Create Project
+            </Button>
+            <Button 
+              onClick={onCreateWorkOrder}
+              variant="outline"
+              className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
+              data-testid="button-quick-create-work-order"
+            >
+              <CalendarPlus className="h-4 w-4 mr-2" />
+              Create Work Order
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
-      <NotesSection notes={notes} notesLoading={notesLoading} noteBody={noteBody} setNoteBody={setNoteBody} handleAddNote={handleAddNote} addNotePending={addNotePending} />
+function PropertyManagerOverview({ customer, openProjects, upcomingVisits, completedProjects, onCreateProject, onCreateWorkOrder }: OverviewLayoutProps) {
+  return (
+    <div className="space-y-6">
+      <Card className="border shadow-sm" data-testid="card-property-manager-info">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-4 mb-6">
+            <div className="p-3 bg-purple-100 rounded-full">
+              <Users className="h-6 w-6 text-purple-600" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-slate-900">Property Manager</h2>
+              <p className="text-sm text-slate-500 mt-0.5">{customer.companyName || customer.name}</p>
+            </div>
+            <Badge className="bg-purple-100 text-purple-700 border-purple-200">Property Manager</Badge>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Name</p>
+                <p className="text-sm font-medium text-slate-900">{customer.name}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Address</p>
+                <p className="text-sm text-slate-700">{customer.fullAddress || "No address on file"}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</p>
+                <Badge variant="outline" className="text-xs">{customer.status || "Active"}</Badge>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Phone</p>
+                {customer.phone ? (
+                  <a href={`tel:${customer.phone}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                    <Phone className="h-3.5 w-3.5" />
+                    {customer.phone}
+                  </a>
+                ) : (
+                  <p className="text-sm text-slate-400">No phone</p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Email</p>
+                {customer.email ? (
+                  <a href={`mailto:${customer.email}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                    <Mail className="h-3.5 w-3.5" />
+                    {customer.email}
+                  </a>
+                ) : (
+                  <p className="text-sm text-slate-400">No email</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border shadow-sm" data-testid="card-quick-actions">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium text-slate-800">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex flex-wrap gap-3">
+            <Button 
+              onClick={onCreateProject}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-quick-create-project"
+            >
+              <Briefcase className="h-4 w-4 mr-2" />
+              Create Project
+            </Button>
+            <Button 
+              onClick={onCreateWorkOrder}
+              variant="outline"
+              className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
+              data-testid="button-quick-create-work-order"
+            >
+              <CalendarPlus className="h-4 w-4 mr-2" />
+              Create Work Order
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function CommercialOverview({ customer, openProjects, upcomingVisits, completedProjects, onCreateProject, onCreateWorkOrder }: OverviewLayoutProps) {
+  return (
+    <div className="space-y-6">
+      <Card className="border shadow-sm" data-testid="card-commercial-info">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-4 mb-6">
+            <div className="p-3 bg-blue-100 rounded-full">
+              <Building2 className="h-6 w-6 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-slate-900">Commercial Customer</h2>
+              <p className="text-sm text-slate-500 mt-0.5">{customer.companyName || customer.name}</p>
+            </div>
+            <Badge className="bg-blue-100 text-blue-700 border-blue-200">Commercial</Badge>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Name</p>
+                <p className="text-sm font-medium text-slate-900">{customer.name}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Address</p>
+                <p className="text-sm text-slate-700">{customer.fullAddress || "No address on file"}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</p>
+                <Badge variant="outline" className="text-xs">{customer.status || "Active"}</Badge>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Phone</p>
+                {customer.phone ? (
+                  <a href={`tel:${customer.phone}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                    <Phone className="h-3.5 w-3.5" />
+                    {customer.phone}
+                  </a>
+                ) : (
+                  <p className="text-sm text-slate-400">No phone</p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Email</p>
+                {customer.email ? (
+                  <a href={`mailto:${customer.email}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                    <Mail className="h-3.5 w-3.5" />
+                    {customer.email}
+                  </a>
+                ) : (
+                  <p className="text-sm text-slate-400">No email</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border shadow-sm" data-testid="card-quick-actions">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium text-slate-800">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex flex-wrap gap-3">
+            <Button 
+              onClick={onCreateProject}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-quick-create-project"
+            >
+              <Briefcase className="h-4 w-4 mr-2" />
+              Create Project
+            </Button>
+            <Button 
+              onClick={onCreateWorkOrder}
+              variant="outline"
+              className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
+              data-testid="button-quick-create-work-order"
+            >
+              <CalendarPlus className="h-4 w-4 mr-2" />
+              Create Work Order
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -645,6 +580,18 @@ function CustomerTabbedView({
     return "border-l-green-500";
   };
 
+  const getCustomerBgColor = () => {
+    if (isPropertyManager) return "bg-purple-100";
+    if (isCommercial) return "bg-blue-100";
+    return "bg-green-100";
+  };
+
+  const getCustomerBadgeColor = () => {
+    if (isPropertyManager) return "bg-purple-100 text-purple-700 border-purple-200";
+    if (isCommercial) return "bg-blue-100 text-blue-700 border-blue-200";
+    return "bg-green-100 text-green-700 border-green-200";
+  };
+
   return (
     <Tabs defaultValue="overview" className="w-full" data-testid="customer-tabs">
       <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap" data-testid="tabs-list">
@@ -717,93 +664,95 @@ function CustomerTabbedView({
       {/* Overview Tab */}
       <TabsContent value="overview" className="space-y-6" data-testid="tab-content-overview">
         {/* Customer Summary Card */}
-        <Card className={`border-l-4 ${getCustomerBorderColor()}`} data-testid="card-customer-summary">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              {getCustomerIcon()}
-              {getCustomerTypeLabel()} Customer
-            </CardTitle>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={onEditCustomer}
-                className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
-                data-testid="button-edit-customer-overview"
-              >
-                <Pencil className="h-4 w-4 mr-1" />
-                Edit Customer
-              </Button>
+        <Card className="border shadow-sm" data-testid="card-customer-summary">
+          <CardContent className="p-6">
+            <div className="flex items-start gap-4 mb-6">
+              <div className={`p-3 rounded-full ${getCustomerBgColor()}`}>
+                {getCustomerIcon()}
+              </div>
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold text-slate-900">{getCustomerTypeLabel()} Customer</h2>
+                <p className="text-sm text-slate-500 mt-0.5">{customer.name}</p>
+              </div>
+              <Badge className={getCustomerBadgeColor()}>{customer.customerType}</Badge>
             </div>
-          </CardHeader>
-          <CardContent>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Name</p>
-                  <p className="font-medium text-slate-700 mt-1">{customer.name}</p>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Name</p>
+                  <p className="text-sm font-medium text-slate-900">{customer.name}</p>
                 </div>
                 {customer.companyName && customer.companyName !== customer.name && (
                   <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Company</p>
-                    <p className="font-medium text-slate-700 mt-1">{customer.companyName}</p>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Company</p>
+                    <p className="text-sm font-medium text-slate-900">{customer.companyName}</p>
                   </div>
                 )}
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Type:</p>
-                  <Badge className="bg-[#711419]/10 text-[#711419]">{customer.customerType}</Badge>
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Address</p>
+                  <p className="text-sm text-slate-700">{customer.fullAddress || "No address on file"}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Status:</p>
-                  <Badge variant="outline">{customer.customerStatus}</Badge>
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</p>
+                  <Badge variant="outline" className="text-xs">{customer.customerStatus || "Active"}</Badge>
                 </div>
               </div>
               <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-slate-400" />
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Phone</p>
                   {customer.phone ? (
-                    <a href={`tel:${customer.phone}`} className="text-blue-600 hover:underline">{customer.phone}</a>
+                    <a href={`tel:${customer.phone}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                      <Phone className="h-3.5 w-3.5" />
+                      {customer.phone}
+                    </a>
                   ) : (
-                    <span className="text-slate-400">No phone</span>
+                    <p className="text-sm text-slate-400">No phone</p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-slate-400" />
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Email</p>
                   {customer.email ? (
-                    <a href={`mailto:${customer.email}`} className="text-blue-600 hover:underline">{customer.email}</a>
+                    <a href={`mailto:${customer.email}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                      <Mail className="h-3.5 w-3.5" />
+                      {customer.email}
+                    </a>
                   ) : (
-                    <span className="text-slate-400">No email</span>
+                    <p className="text-sm text-slate-400">No email</p>
                   )}
-                </div>
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-4 w-4 text-slate-400 mt-1" />
-                  <span className="text-slate-700">{customer.fullAddress || "No address on file"}</span>
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-2">
-          <Button 
-            onClick={onCreateProject}
-            className="bg-[#711419] hover:bg-[#5a1014] text-white"
-            data-testid="button-create-project-overview"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Create Project
-          </Button>
-          <Button 
-            onClick={onScheduleVisit}
-            variant="outline"
-            className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
-            data-testid="button-create-wo-overview"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Create Work Order
-          </Button>
-        </div>
+        {/* Quick Actions */}
+        <Card className="border shadow-sm" data-testid="card-quick-actions">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium text-slate-800">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap gap-3">
+              <Button 
+                onClick={onCreateProject}
+                className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                data-testid="button-quick-create-project"
+              >
+                <Briefcase className="h-4 w-4 mr-2" />
+                Create Project
+              </Button>
+              <Button 
+                onClick={onScheduleVisit}
+                variant="outline"
+                className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
+                data-testid="button-quick-create-work-order"
+              >
+                <CalendarPlus className="h-4 w-4 mr-2" />
+                Create Work Order
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Setup Checklist Card - Only for Property Managers */}
         {isPropertyManager && (
@@ -878,15 +827,6 @@ function CustomerTabbedView({
           </Card>
         )}
 
-        {/* Notes Section */}
-        <NotesSection 
-          notes={notes} 
-          notesLoading={notesLoading} 
-          noteBody={noteBody} 
-          setNoteBody={setNoteBody} 
-          handleAddNote={handleAddNote} 
-          addNotePending={addNotePending} 
-        />
 
         {/* Project History (Legacy Jobs) - From old Customer History tab */}
         {completedJobs.length > 0 && (
@@ -2010,22 +1950,6 @@ export default function CrmCustomerDetail() {
             >
               <Pencil className="h-4 w-4 mr-2" />
               Edit Customer
-            </Button>
-            <Button 
-              onClick={() => setCreateProjectDialogOpen(true)}
-              className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              data-testid="button-create-project"
-            >
-              <Briefcase className="h-4 w-4 mr-2" />
-              Create Project
-            </Button>
-            <Button 
-              onClick={() => setScheduleVisitDialogOpen(true)}
-              className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              data-testid="button-schedule-visit"
-            >
-              <CalendarPlus className="h-4 w-4 mr-2" />
-              Create Work Order
             </Button>
             {canDeleteCustomer && (
               <Button 
