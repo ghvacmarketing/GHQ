@@ -21,21 +21,23 @@ import ProposalHistory from "@/pages/proposal-history";
 import EmployeePortal from "@/pages/employee-portal";
 import EmployeePortalLogin from "@/pages/employee-portal-login";
 import EmployeePortalAdmin from "@/pages/employee-portal-admin";
-import CrmLogin from "@/pages/crm/crm-login";
-import CrmDashboard from "@/pages/crm/crm-dashboard";
-import CrmDispatch from "@/pages/crm/crm-dispatch";
-import CrmCustomers from "@/pages/crm/crm-customers";
-import CrmCustomerDetail from "@/pages/crm/crm-customer-detail";
-import CrmAccountCreate from "@/pages/crm/crm-account-create";
-import CrmAccountDetail from "@/pages/crm/crm-account-detail";
-import CrmWorkOrders from "@/pages/crm/crm-work-orders";
-import CrmWorkOrderDetail from "@/pages/crm/crm-work-order-detail";
-import CrmInvoices from "@/pages/crm/crm-invoices";
-import CrmQuotes from "@/pages/crm/crm-quotes";
-import CrmAgreements from "@/pages/crm/crm-agreements";
-import CrmProjects from "@/pages/crm/crm-projects";
-import CrmProjectDetail from "@/pages/crm/crm-project-detail";
 import NotFound from "@/pages/not-found";
+
+// Lazy-load CRM pages to reduce initial bundle size
+const CrmLogin = lazy(() => import("@/pages/crm/crm-login"));
+const CrmDashboard = lazy(() => import("@/pages/crm/crm-dashboard"));
+const CrmDispatch = lazy(() => import("@/pages/crm/crm-dispatch"));
+const CrmCustomers = lazy(() => import("@/pages/crm/crm-customers"));
+const CrmCustomerDetail = lazy(() => import("@/pages/crm/crm-customer-detail"));
+const CrmAccountCreate = lazy(() => import("@/pages/crm/crm-account-create"));
+const CrmAccountDetail = lazy(() => import("@/pages/crm/crm-account-detail"));
+const CrmWorkOrders = lazy(() => import("@/pages/crm/crm-work-orders"));
+const CrmWorkOrderDetail = lazy(() => import("@/pages/crm/crm-work-order-detail"));
+const CrmInvoices = lazy(() => import("@/pages/crm/crm-invoices"));
+const CrmQuotes = lazy(() => import("@/pages/crm/crm-quotes"));
+const CrmAgreements = lazy(() => import("@/pages/crm/crm-agreements"));
+const CrmProjects = lazy(() => import("@/pages/crm/crm-projects"));
+const CrmProjectDetail = lazy(() => import("@/pages/crm/crm-project-detail"));
 import AnnouncementModal from "@/components/AnnouncementModal";
 import GlobalPasswordGate from "@/components/GlobalPasswordGate";
 import { lazy, Suspense, useState, useEffect, Component, type ReactNode } from "react";
@@ -102,6 +104,21 @@ function GlobalLoader() {
   );
 }
 
+// CRM-specific loading placeholder
+function CrmLoader() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background" data-testid="crm-loader">
+      <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+      <p className="text-muted-foreground">Loading GHQ CRM...</p>
+    </div>
+  );
+}
+
+// Wrapper for lazy-loaded CRM pages
+function CrmWrapper({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<CrmLoader />}>{children}</Suspense>;
+}
+
 // Lazy load admin settings to reduce initial bundle size
 const AdminSettings = lazy(() => import("@/pages/admin-settings"));
 
@@ -135,20 +152,20 @@ function Router() {
       <Route path="/employee-portal/login" component={EmployeePortalLogin} />
       <Route path="/employee-portal/admin" component={EmployeePortalAdmin} />
       <Route path="/employee-portal" component={EmployeePortal} />
-      <Route path="/crm/login" component={CrmLogin} />
-      <Route path="/crm/dispatch" component={CrmDispatch} />
-      <Route path="/crm/work-orders/:id" component={CrmWorkOrderDetail} />
-      <Route path="/crm/work-orders" component={CrmWorkOrders} />
-      <Route path="/crm/accounts/new" component={CrmAccountCreate} />
-      <Route path="/crm/accounts/:id" component={CrmAccountDetail} />
-      <Route path="/crm/customers/:id" component={CrmCustomerDetail} />
-      <Route path="/crm/customers" component={CrmCustomers} />
-      <Route path="/crm/invoices" component={CrmInvoices} />
-      <Route path="/crm/quotes" component={CrmQuotes} />
-      <Route path="/crm/agreements" component={CrmAgreements} />
-      <Route path="/crm/projects/:id" component={CrmProjectDetail} />
-      <Route path="/crm/projects" component={CrmProjects} />
-      <Route path="/crm" component={CrmDashboard} />
+      <Route path="/crm/login">{() => <CrmWrapper><CrmLogin /></CrmWrapper>}</Route>
+      <Route path="/crm/dispatch">{() => <CrmWrapper><CrmDispatch /></CrmWrapper>}</Route>
+      <Route path="/crm/work-orders/:id">{() => <CrmWrapper><CrmWorkOrderDetail /></CrmWrapper>}</Route>
+      <Route path="/crm/work-orders">{() => <CrmWrapper><CrmWorkOrders /></CrmWrapper>}</Route>
+      <Route path="/crm/accounts/new">{() => <CrmWrapper><CrmAccountCreate /></CrmWrapper>}</Route>
+      <Route path="/crm/accounts/:id">{() => <CrmWrapper><CrmAccountDetail /></CrmWrapper>}</Route>
+      <Route path="/crm/customers/:id">{() => <CrmWrapper><CrmCustomerDetail /></CrmWrapper>}</Route>
+      <Route path="/crm/customers">{() => <CrmWrapper><CrmCustomers /></CrmWrapper>}</Route>
+      <Route path="/crm/invoices">{() => <CrmWrapper><CrmInvoices /></CrmWrapper>}</Route>
+      <Route path="/crm/quotes">{() => <CrmWrapper><CrmQuotes /></CrmWrapper>}</Route>
+      <Route path="/crm/agreements">{() => <CrmWrapper><CrmAgreements /></CrmWrapper>}</Route>
+      <Route path="/crm/projects/:id">{() => <CrmWrapper><CrmProjectDetail /></CrmWrapper>}</Route>
+      <Route path="/crm/projects">{() => <CrmWrapper><CrmProjects /></CrmWrapper>}</Route>
+      <Route path="/crm">{() => <CrmWrapper><CrmDashboard /></CrmWrapper>}</Route>
       <Route component={NotFound} />
     </Switch>
   );
