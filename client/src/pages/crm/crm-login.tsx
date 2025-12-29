@@ -25,13 +25,6 @@ export default function CrmLogin() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  useEffect(() => {
-    const gatePassed = sessionStorage.getItem("crm_gate_passed");
-    if (!gatePassed) {
-      navigate("/crm/gate");
-    }
-  }, [navigate]);
-
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
@@ -74,9 +67,8 @@ export default function CrmLogin() {
     loginMutation.mutate(data);
   };
 
-  const handleBackToGate = () => {
-    sessionStorage.removeItem("crm_gate_passed");
-    navigate("/crm/gate");
+  const handleBackToHome = () => {
+    navigate("/");
   };
 
   if (authLoading) {
@@ -111,7 +103,7 @@ export default function CrmLogin() {
           variant="ghost"
           size="sm"
           className="mb-6 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-          onClick={handleBackToGate}
+          onClick={handleBackToHome}
           data-testid="button-back-gate"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />

@@ -172,7 +172,7 @@ export default function Home() {
             <span className="text-sm sm:text-base font-semibold truncate">Home</span>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-            <Link href="/crm/gate">
+            <Link href="/crm/login">
               <Button 
                 variant="ghost" 
                 size="icon"

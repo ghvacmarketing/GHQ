@@ -37,7 +37,7 @@ const navSections = [
       { label: "Phone", href: "/voicemails", icon: Phone },
       { label: "Settings", href: "/admin", icon: Settings },
       { label: "Employee Portal", href: "/employee-portal/login", icon: Users },
-      { label: "CRM", href: "/crm/gate", icon: Briefcase },
+      { label: "CRM", href: "/crm/login", icon: Briefcase },
     ],
   },
 ];
