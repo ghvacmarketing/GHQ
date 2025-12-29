@@ -526,6 +526,8 @@ interface CustomerTabbedViewProps {
   onScheduleVisit: () => void;
   onEditCustomer: () => void;
   toast: ReturnType<typeof useToast>['toast'];
+  propertyDialogOpen: boolean;
+  setPropertyDialogOpen: (open: boolean) => void;
 }
 
 function CustomerTabbedView({
@@ -547,6 +549,8 @@ function CustomerTabbedView({
   onScheduleVisit,
   onEditCustomer,
   toast,
+  propertyDialogOpen,
+  setPropertyDialogOpen,
 }: CustomerTabbedViewProps) {
   const completedJobs = jobs?.filter(j => ["completed", "invoiced", "paid"].includes(j.status)) || [];
   const customerType = (customer.customerType || "residential").toLowerCase();
@@ -2878,6 +2882,8 @@ export default function CrmCustomerDetail() {
           onScheduleVisit={() => setScheduleVisitDialogOpen(true)}
           onEditCustomer={() => setEditDialogOpen(true)}
           toast={toast}
+          propertyDialogOpen={propertyDialogOpen}
+          setPropertyDialogOpen={setPropertyDialogOpen}
         />
 
       </div>
