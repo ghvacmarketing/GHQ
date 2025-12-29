@@ -9,12 +9,16 @@ import {
   crmJobStatusEvents,
   crmJobNotes,
   crmProperties,
+  crmProjects,
+  crmWorkOrders,
+  crmInvoices,
+  crmQuotes,
   insertCrmCustomerSchema,
   insertCrmJobSchema,
   CrmJobStatus,
   CrmUser,
 } from "@shared/schema";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, sql, gte, lte, count, sum, isNull } from "drizzle-orm";
 import {
   requireCrmAuth,
   requireCrmRole,
@@ -517,6 +521,96 @@ router.patch("/users/:id/deactivate", requireCrmAuth, requireCrmAdmin, async (re
   } catch (error) {
     console.error("Deactivate user error:", error);
     return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Dashboard summary cache
+let dashboardSummaryCache: { data: any; timestamp: number } | null = null;
+const DASHBOARD_CACHE_TTL_MS = 30000; // 30 seconds
+
+router.get("/dashboard/summary", requireCrmAuth, async (req: Request, res: Response) => {
+  try {
+    const now = Date.now();
+    if (dashboardSummaryCache && (now - dashboardSummaryCache.timestamp) < DASHBOARD_CACHE_TTL_MS) {
+      return res.json(dashboardSummaryCache.data);
+    }
+
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    // Run all queries in parallel for speed
+    const [
+      openProjectsResult,
+      completedThisMonthResult,
+      pendingInvoicesResult,
+      revenueThisMonthResult,
+      recentWorkOrders,
+      recentInvoices,
+      recentQuotes
+    ] = await Promise.all([
+      // Open projects count
+      db.select({ count: count() })
+        .from(crmProjects)
+        .where(and(
+          inArray(crmProjects.status, ["lead", "proposal_sent", "approved", "in_progress"])
+        )),
+      // Completed projects this month
+      db.select({ count: count() })
+        .from(crmProjects)
+        .where(and(
+          eq(crmProjects.status, "completed"),
+          gte(crmProjects.updatedAt, startOfMonth),
+          lte(crmProjects.updatedAt, endOfMonth)
+        )),
+      // Pending invoices (sent but not paid)
+      db.select({ count: count() })
+        .from(crmInvoices)
+        .where(eq(crmInvoices.status, "sent")),
+      // Revenue this month (paid invoices)
+      db.select({ total: sum(crmInvoices.amountPaid) })
+        .from(crmInvoices)
+        .where(and(
+          eq(crmInvoices.status, "paid"),
+          gte(crmInvoices.paidAt, startOfMonth),
+          lte(crmInvoices.paidAt, endOfMonth)
+        )),
+      // Next 10 work orders (scheduled)
+      db.select()
+        .from(crmWorkOrders)
+        .where(inArray(crmWorkOrders.status, ["scheduled", "dispatched"]))
+        .orderBy(crmWorkOrders.scheduledStart)
+        .limit(10),
+      // Last 10 invoices
+      db.select()
+        .from(crmInvoices)
+        .orderBy(desc(crmInvoices.createdAt))
+        .limit(10),
+      // Last 10 quotes
+      db.select()
+        .from(crmQuotes)
+        .orderBy(desc(crmQuotes.createdAt))
+        .limit(10),
+    ]);
+
+    const summary = {
+      stats: {
+        openProjects: openProjectsResult[0]?.count ?? 0,
+        completedThisMonth: completedThisMonthResult[0]?.count ?? 0,
+        pendingInvoices: pendingInvoicesResult[0]?.count ?? 0,
+        revenueThisMonth: Number(revenueThisMonthResult[0]?.total ?? 0),
+      },
+      recentWorkOrders,
+      recentInvoices,
+      recentQuotes,
+      cachedAt: new Date().toISOString(),
+    };
+
+    dashboardSummaryCache = { data: summary, timestamp: now };
+    return res.json(summary);
+  } catch (error) {
+    console.error("Dashboard summary error:", error);
+    return res.status(500).json({ message: "Failed to load dashboard summary" });
   }
 });
 
