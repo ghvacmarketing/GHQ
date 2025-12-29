@@ -887,8 +887,8 @@ export const crmJobs = pgTable("crm_jobs", {
 // CRM Projects (big-ticket scope containers - $5k+ jobs)
 export const crmProjects = pgTable("crm_projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  customerId: varchar("customer_id").references(() => crmCustomers.id),
-  propertyId: varchar("property_id").references(() => crmProperties.id),
+  customerId: varchar("customer_id"),
+  propertyId: varchar("property_id"),
   projectType: text("project_type").$type<ProjectType>().notNull(),
   status: text("status").$type<ProjectStatus>().notNull().default("lead"),
   title: text("title").notNull(),
