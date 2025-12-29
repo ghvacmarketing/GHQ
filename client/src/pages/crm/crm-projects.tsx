@@ -359,7 +359,7 @@ export default function CrmProjects() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-slate-900" data-testid="text-projects-title">
-              Jobs
+              Projects
             </h1>
             <p className="text-sm text-slate-500">Total: {total}</p>
           </div>
@@ -370,7 +370,7 @@ export default function CrmProjects() {
             data-testid="button-create-project"
           >
             <Plus className="h-4 w-4 mr-1" />
-            Create Job
+            Create Project
           </Button>
         </div>
 
@@ -394,7 +394,7 @@ export default function CrmProjects() {
         <div className="relative">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
           <Input
-            placeholder="Search jobs..."
+            placeholder="Search projects..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="pl-12 h-12 text-base bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419]"

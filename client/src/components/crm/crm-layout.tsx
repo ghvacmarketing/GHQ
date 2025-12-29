@@ -53,7 +53,7 @@ const navSections: NavSection[] = [
     title: "Sales",
     items: [
       { label: "Customers", href: "/crm/customers", icon: Users },
-      { label: "Jobs", href: "/crm/projects", icon: FolderKanban },
+      { label: "Projects", href: "/crm/projects", icon: FolderKanban },
       { label: "Quotes", href: "/crm/quotes", icon: FileText },
       { label: "Invoices", href: "/crm/invoices", icon: Receipt },
     ],
