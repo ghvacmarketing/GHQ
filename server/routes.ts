@@ -4566,11 +4566,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerType,
         customerStatus,
         page = "1",
-        limit = "50",
+        limit = "25",
       } = req.query as Record<string, string | undefined>;
 
       const pageNum = Math.max(1, parseInt(page) || 1);
-      const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 50));
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 25));
       const offset = (pageNum - 1) * limitNum;
       const searchTerm = search?.trim().toLowerCase() || "";
 
@@ -4605,12 +4605,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const total = Number(countResult?.count) || 0;
 
-      // Get paginated results
+      // Get paginated results - sorted by lastSyncedAt desc (most recently updated first)
       const customerResults = await db
         .select()
         .from(customers)
         .where(whereClause)
-        .orderBy(desc(customers.createdAt))
+        .orderBy(desc(customers.lastSyncedAt), desc(customers.createdAt))
         .limit(limitNum)
         .offset(offset);
 
