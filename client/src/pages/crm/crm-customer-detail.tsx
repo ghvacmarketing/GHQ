@@ -1337,6 +1337,10 @@ export default function CrmCustomerDetail() {
   const [propState, setPropState] = useState("");
   const [propZip, setPropZip] = useState("");
   const [propNotes, setPropNotes] = useState("");
+  const [propTenantName, setPropTenantName] = useState("");
+  const [propTenantPhone, setPropTenantPhone] = useState("");
+  const [propTenantEmail, setPropTenantEmail] = useState("");
+  const [propBilledTo, setPropBilledTo] = useState<"property_manager" | "tenant">("property_manager");
 
   const resetPropertyForm = () => {
     setPropAddress1("");
@@ -1345,6 +1349,10 @@ export default function CrmCustomerDetail() {
     setPropState("");
     setPropZip("");
     setPropNotes("");
+    setPropTenantName("");
+    setPropTenantPhone("");
+    setPropTenantEmail("");
+    setPropBilledTo("property_manager");
     setEditingProperty(null);
   };
 
@@ -1921,6 +1929,10 @@ export default function CrmCustomerDetail() {
         state: propState.trim(),
         zip: propZip.trim(),
         notes: propNotes.trim() || null,
+        tenantName: propTenantName.trim() || null,
+        tenantPhone: propTenantPhone.trim() || null,
+        tenantEmail: propTenantEmail.trim() || null,
+        billedTo: propBilledTo,
       });
       if (!res.ok) {
         const error = await res.json();
@@ -1942,11 +1954,29 @@ export default function CrmCustomerDetail() {
     },
   });
 
+  const isPropertyManager = customer?.customerType?.toLowerCase() === "property manager";
+
   const handleCreateProperty = () => {
     if (!propAddress1.trim() || !propCity.trim() || !propState.trim() || !propZip.trim()) {
       toast({
         title: "Validation Error",
         description: "Street address, city, state, and ZIP are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isPropertyManager && !propTenantName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Tenant name is required for property manager sites",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isPropertyManager && propBilledTo === "tenant" && !propTenantEmail.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Tenant email is required when billing to tenant",
         variant: "destructive",
       });
       return;
@@ -2844,6 +2874,66 @@ export default function CrmCustomerDetail() {
                   data-testid="input-prop-notes"
                 />
               </div>
+
+              {/* Tenant Information - Only for Property Manager customers */}
+              {isPropertyManager && (
+                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 space-y-4 border border-purple-200 dark:border-purple-800">
+                  <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">Tenant Information</p>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">Tenant Name <span className="text-red-500">*</span></Label>
+                    <Input
+                      placeholder="John Doe"
+                      value={propTenantName}
+                      onChange={(e) => setPropTenantName(e.target.value)}
+                      className="h-11"
+                      data-testid="input-prop-tenant-name"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium text-slate-600">Tenant Phone <span className="text-slate-400 font-normal">(optional)</span></Label>
+                      <Input
+                        placeholder="(706) 555-1234"
+                        value={propTenantPhone}
+                        onChange={(e) => setPropTenantPhone(e.target.value)}
+                        className="h-11"
+                        data-testid="input-prop-tenant-phone"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium">
+                        Tenant Email {propBilledTo === "tenant" ? <span className="text-red-500">*</span> : <span className="text-slate-400 font-normal">(optional)</span>}
+                      </Label>
+                      <Input
+                        placeholder="tenant@email.com"
+                        type="email"
+                        value={propTenantEmail}
+                        onChange={(e) => setPropTenantEmail(e.target.value)}
+                        className="h-11"
+                        data-testid="input-prop-tenant-email"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">Billed To</Label>
+                    <Select value={propBilledTo} onValueChange={(v) => setPropBilledTo(v as "property_manager" | "tenant")}>
+                      <SelectTrigger className="h-11" data-testid="select-prop-billed-to">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="property_manager">Property Manager</SelectItem>
+                        <SelectItem value="tenant">Tenant</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {propBilledTo === "tenant" && (
+                    <div className="flex items-center gap-2 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-md text-amber-700 dark:text-amber-300 text-sm">
+                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                      <span>Invoices will be sent to the tenant email address</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <DialogFooter className="px-6 py-4 border-t bg-slate-50 dark:bg-slate-900">
@@ -2852,7 +2942,7 @@ export default function CrmCustomerDetail() {
               </Button>
               <Button
                 onClick={handleCreateProperty}
-                disabled={!propAddress1.trim() || !propCity.trim() || !propState.trim() || !propZip.trim() || createPropertyMutation.isPending}
+                disabled={!propAddress1.trim() || !propCity.trim() || !propState.trim() || !propZip.trim() || (isPropertyManager && !propTenantName.trim()) || (isPropertyManager && propBilledTo === "tenant" && !propTenantEmail.trim()) || createPropertyMutation.isPending}
                 className="px-6 bg-[#711419] hover:bg-[#5a1014]"
                 data-testid="button-save-property"
               >

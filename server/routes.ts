@@ -7651,6 +7651,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/customers/:id/properties - List properties for a customer
+  app.get("/api/crm/customers/:id/properties", requireCrmAuth, async (req, res) => {
+    try {
+      const customerId = req.params.id;
+      const properties = await db.select().from(crmProperties).where(eq(crmProperties.customerId, customerId));
+      return res.json(properties);
+    } catch (error) {
+      console.error("Error fetching customer properties:", error);
+      return res.status(500).json({ message: "Failed to fetch properties" });
+    }
+  });
+
+  // POST /api/crm/customers/:id/properties - Create a property for a customer
+  app.post("/api/crm/customers/:id/properties", requireCrmAuth, async (req, res) => {
+    try {
+      const customerId = req.params.id;
+      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, billedTo } = req.body;
+
+      if (!address1?.trim() || !city?.trim() || !state?.trim() || !zip?.trim()) {
+        return res.status(400).json({ message: "Street address, city, state, and zip are required" });
+      }
+
+      const [newProperty] = await db.insert(crmProperties).values({
+        customerId,
+        address1: address1.trim(),
+        address2: address2?.trim() || null,
+        city: city.trim(),
+        state: state.trim(),
+        zip: zip.trim(),
+        notes: notes?.trim() || null,
+        tenantName: tenantName?.trim() || null,
+        tenantPhone: tenantPhone?.trim() || null,
+        tenantEmail: tenantEmail?.trim() || null,
+        billedTo: billedTo || "property_manager",
+      }).returning();
+
+      return res.status(201).json(newProperty);
+    } catch (error) {
+      console.error("Error creating property:", error);
+      return res.status(500).json({ message: "Failed to create property" });
+    }
+  });
+
   // ============================================
   // CRM WORK ORDER ROUTES
   // ============================================

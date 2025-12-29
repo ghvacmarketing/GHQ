@@ -836,6 +836,10 @@ export const crmProperties = pgTable("crm_properties", {
   state: text("state").notNull(),
   zip: text("zip").notNull(),
   notes: text("notes"),
+  tenantName: text("tenant_name"),
+  tenantPhone: text("tenant_phone"),
+  tenantEmail: text("tenant_email"),
+  billedTo: text("billed_to").$type<"property_manager" | "tenant">().default("property_manager"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
