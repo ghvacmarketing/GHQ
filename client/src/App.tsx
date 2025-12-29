@@ -29,8 +29,6 @@ import CrmCustomers from "@/pages/crm/crm-customers";
 import CrmCustomerDetail from "@/pages/crm/crm-customer-detail";
 import CrmAccountCreate from "@/pages/crm/crm-account-create";
 import CrmAccountDetail from "@/pages/crm/crm-account-detail";
-import CrmJobs from "@/pages/crm/crm-jobs";
-import CrmJobDetail from "@/pages/crm/crm-job-detail";
 import CrmWorkOrders from "@/pages/crm/crm-work-orders";
 import CrmWorkOrderDetail from "@/pages/crm/crm-work-order-detail";
 import CrmInvoices from "@/pages/crm/crm-invoices";
@@ -82,8 +80,6 @@ function Router() {
       <Route path="/crm/dispatch" component={CrmDispatch} />
       <Route path="/crm/work-orders/:id" component={CrmWorkOrderDetail} />
       <Route path="/crm/work-orders" component={CrmWorkOrders} />
-      <Route path="/crm/jobs/:id" component={CrmJobDetail} />
-      <Route path="/crm/jobs" component={CrmJobs} />
       <Route path="/crm/accounts/new" component={CrmAccountCreate} />
       <Route path="/crm/accounts/:id" component={CrmAccountDetail} />
       <Route path="/crm/customers/:id" component={CrmCustomerDetail} />

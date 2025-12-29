@@ -93,17 +93,16 @@ type CustomersResponse = {
 
 const ITEMS_PER_PAGE = 25;
 
-type FilterTab = "all" | "lead" | "proposal_sent" | "approved" | "in_progress" | "completed" | "closed" | "archived";
+type FilterTab = "all" | "lead" | "approved" | "in_progress" | "completed" | "closed" | "cancelled";
 
 const filterTabConfig: Record<FilterTab, { label: string }> = {
   all: { label: "All Projects" },
-  lead: { label: "Lead/New" },
-  proposal_sent: { label: "Proposal Sent" },
-  approved: { label: "Approved" },
+  lead: { label: "New / Needs Scheduling" },
+  approved: { label: "Scheduled" },
   in_progress: { label: "In Progress" },
   completed: { label: "Completed" },
   closed: { label: "Closed" },
-  archived: { label: "Archived" },
+  cancelled: { label: "Cancelled" },
 };
 
 const statusColors: Record<string, { bg: string; text: string; border: string }> = {
@@ -113,16 +112,18 @@ const statusColors: Record<string, { bg: string; text: string; border: string }>
   in_progress: { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
   completed: { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-200" },
   closed: { bg: "bg-teal-100", text: "text-teal-700", border: "border-teal-200" },
+  cancelled: { bg: "bg-red-100", text: "text-red-500", border: "border-red-200" },
   archived: { bg: "bg-gray-100", text: "text-gray-500", border: "border-gray-200" },
 };
 
 const statusLabels: Record<string, string> = {
-  lead: "Lead",
+  lead: "New",
   proposal_sent: "Proposal Sent",
-  approved: "Approved",
+  approved: "Scheduled",
   in_progress: "In Progress",
   completed: "Completed",
   closed: "Closed",
+  cancelled: "Cancelled",
   archived: "Archived",
 };
 
@@ -356,45 +357,49 @@ export default function CrmProjects() {
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-slate-900" data-testid="text-projects-title">
-            Projects
-          </h1>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900" data-testid="text-projects-title">
+              Jobs
+            </h1>
+            <p className="text-sm text-slate-500">Total: {total}</p>
+          </div>
           <Button
             size="sm"
+            className="bg-[#711419] hover:bg-[#5a1014] text-white"
             onClick={() => setCreateDialogOpen(true)}
             data-testid="button-create-project"
           >
             <Plus className="h-4 w-4 mr-1" />
-            Create Project
+            Create Job
           </Button>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
-          <Input
-            placeholder="Search projects..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-12 h-12 text-base bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419]"
-            data-testid="input-search-projects"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex overflow-x-auto border-b border-slate-200">
           {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
                 activeTab === tab
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                  ? "bg-[#711419] text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
               data-testid={`tab-status-${tab}`}
             >
               {filterTabConfig[tab].label}
             </button>
           ))}
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+          <Input
+            placeholder="Search jobs..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="pl-12 h-12 text-base bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419]"
+            data-testid="input-search-projects"
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

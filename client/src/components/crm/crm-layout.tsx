@@ -11,7 +11,6 @@ import {
   LayoutDashboard,
   CalendarClock,
   Users,
-  Briefcase,
   FileText,
   Receipt,
   ClipboardList,
@@ -54,8 +53,7 @@ const navSections: NavSection[] = [
     title: "Sales",
     items: [
       { label: "Customers", href: "/crm/customers", icon: Users },
-      { label: "Jobs", href: "/crm/jobs", icon: Briefcase },
-      { label: "Projects", href: "/crm/projects", icon: FolderKanban },
+      { label: "Jobs", href: "/crm/projects", icon: FolderKanban },
       { label: "Quotes", href: "/crm/quotes", icon: FileText },
       { label: "Invoices", href: "/crm/invoices", icon: Receipt },
     ],
