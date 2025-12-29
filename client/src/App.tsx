@@ -3,6 +3,9 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { lazy, Suspense, useState, useEffect, Component, type ReactNode } from "react";
+import type { Announcement } from "@shared/schema";
+import { Loader2 } from "lucide-react";
 import Home from "@/pages/home";
 import QuoteGenerator from "@/pages/quote-generator";
 import QuoteEdit from "@/pages/quote-edit";
@@ -22,6 +25,8 @@ import EmployeePortal from "@/pages/employee-portal";
 import EmployeePortalLogin from "@/pages/employee-portal-login";
 import EmployeePortalAdmin from "@/pages/employee-portal-admin";
 import NotFound from "@/pages/not-found";
+import AnnouncementModal from "@/components/AnnouncementModal";
+import GlobalPasswordGate from "@/components/GlobalPasswordGate";
 
 // Lazy-load CRM pages to reduce initial bundle size
 const CrmLogin = lazy(() => import("@/pages/crm/crm-login"));
@@ -38,11 +43,6 @@ const CrmQuotes = lazy(() => import("@/pages/crm/crm-quotes"));
 const CrmAgreements = lazy(() => import("@/pages/crm/crm-agreements"));
 const CrmProjects = lazy(() => import("@/pages/crm/crm-projects"));
 const CrmProjectDetail = lazy(() => import("@/pages/crm/crm-project-detail"));
-import AnnouncementModal from "@/components/AnnouncementModal";
-import GlobalPasswordGate from "@/components/GlobalPasswordGate";
-import { lazy, Suspense, useState, useEffect, Component, type ReactNode } from "react";
-import type { Announcement } from "@shared/schema";
-import { Loader2 } from "lucide-react";
 
 // Global Error Boundary to prevent blank screens
 class ErrorBoundary extends Component<
