@@ -826,11 +826,11 @@ export default function CrmDispatch() {
     return wo.status === filter;
   });
 
+  // Unassigned = no technician assigned (regardless of whether times are set)
   const unassignedWorkOrders = filteredWorkOrders.filter(wo => !wo.assignedTechId);
   
-  // Split unassigned into: scheduled (have times, show on timeline) vs unscheduled (no times, show in dropdown)
+  // Unassigned work orders with times appear in the timeline row
   const scheduledUnassignedWorkOrders = unassignedWorkOrders.filter(wo => wo.scheduledStart && wo.scheduledEnd);
-  const unscheduledWorkOrders = unassignedWorkOrders.filter(wo => !wo.scheduledStart || !wo.scheduledEnd);
 
   const getWorkOrdersForTechnician = useCallback((techId: string) => {
     return filteredWorkOrders.filter((wo) => wo.assignedTechId === techId);
@@ -912,15 +912,15 @@ export default function CrmDispatch() {
             <Select 
               value={selectedUnassignedId} 
               onValueChange={handleAssignWorkOrder}
-              disabled={unscheduledWorkOrders.length === 0}
+              disabled={unassignedWorkOrders.length === 0}
             >
               <SelectTrigger className="w-[280px]" data-testid="select-unassigned-workorder">
-                <SelectValue placeholder={unscheduledWorkOrders.length > 0 
-                  ? `Assign Work Order (${unscheduledWorkOrders.length} pending)` 
-                  : "No pending work orders"} />
+                <SelectValue placeholder={unassignedWorkOrders.length > 0 
+                  ? `Unassigned Work Orders (${unassignedWorkOrders.length})` 
+                  : "No unassigned work orders"} />
               </SelectTrigger>
               <SelectContent>
-                {unscheduledWorkOrders.map(wo => (
+                {unassignedWorkOrders.map(wo => (
                   <SelectItem key={wo.id} value={wo.id} data-testid={`option-workorder-${wo.id}`}>
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{wo.customerName}</span>

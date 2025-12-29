@@ -14,7 +14,7 @@ import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
-import { eq, inArray, desc, sql, and, or, ilike, asc, count } from "drizzle-orm";
+import { eq, inArray, notInArray, desc, sql, and, or, ilike, asc, count, isNull } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -7620,7 +7620,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);
+      // Get work orders scheduled for this date
+      const scheduledWorkOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);
+      
+      // Also get ALL unassigned work orders (no tech) that are not cancelled/completed
+      const allWorkOrders = await db.select().from(crmWorkOrders)
+        .where(
+          and(
+            isNull(crmWorkOrders.assignedTechId),
+            notInArray(crmWorkOrders.status, ['completed', 'cancelled'])
+          )
+        );
+      
+      // Merge, removing duplicates (work orders already in scheduledWorkOrders)
+      const scheduledIds = new Set(scheduledWorkOrders.map(wo => wo.id));
+      const unassignedNotScheduled = allWorkOrders.filter(wo => !scheduledIds.has(wo.id));
+      const workOrders = [...scheduledWorkOrders, ...unassignedNotScheduled];
 
       const enrichedWorkOrders = await Promise.all(
         workOrders.map(async (wo) => {
