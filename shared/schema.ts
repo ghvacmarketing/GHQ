@@ -932,6 +932,35 @@ export const crmCustomerNotes = pgTable("crm_customer_notes", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// CRM Agreements Status Enum
+export const crmAgreementStatusEnum = ["active", "expiring", "expired", "cancelled"] as const;
+export type CrmAgreementStatus = typeof crmAgreementStatusEnum[number];
+
+// CRM Agreements (service/maintenance agreements with customers)
+export const crmAgreements = pgTable("crm_agreements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agreementNumber: text("agreement_number").notNull(),
+  customerId: varchar("customer_id").references(() => crmCustomers.id),
+  customerName: text("customer_name").notNull(),
+  agreementPlan: text("agreement_plan").notNull(),
+  nextServiceDate: date("next_service_date"),
+  nextInvoiceDate: date("next_invoice_date"),
+  address: text("address"),
+  status: text("status").$type<CrmAgreementStatus>().notNull().default("active"),
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCrmAgreementSchema = createInsertSchema(crmAgreements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Invoice Status Enum
 export const crmInvoiceStatusEnum = ["draft", "sent", "viewed", "partial", "paid", "void"] as const;
 export type CrmInvoiceStatus = typeof crmInvoiceStatusEnum[number];
@@ -1321,6 +1350,8 @@ export type InsertCrmWorkOrder = z.infer<typeof insertCrmWorkOrderSchema>;
 export type CrmWorkOrder = typeof crmWorkOrders.$inferSelect;
 export type InsertCrmInvoiceLineItem = z.infer<typeof insertCrmInvoiceLineItemSchema>;
 export type CrmInvoiceLineItem = typeof crmInvoiceLineItems.$inferSelect;
+export type InsertCrmAgreement = z.infer<typeof insertCrmAgreementSchema>;
+export type CrmAgreement = typeof crmAgreements.$inferSelect;
 
 // Weather Cache table for storing weather.gov API data
 export const weatherCache = pgTable("weather_cache", {

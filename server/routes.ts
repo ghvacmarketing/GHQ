@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -7642,6 +7642,303 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching dispatch work orders:", error);
       return res.status(500).json({ message: "Failed to fetch dispatch work orders" });
+    }
+  });
+
+  // ============================================
+  // CRM AGREEMENTS ROUTES
+  // ============================================
+
+  // GET /api/crm/agreements - List all agreements with search/filter
+  app.get("/api/crm/agreements", requireCrmAuth, async (req, res) => {
+    try {
+      const { search, status, page = "1", limit = "25" } = req.query;
+      const pageNum = parseInt(page as string, 10) || 1;
+      const limitNum = parseInt(limit as string, 10) || 25;
+      const offset = (pageNum - 1) * limitNum;
+
+      let query = db.select().from(crmAgreements);
+      let countQuery = db.select({ count: count() }).from(crmAgreements);
+
+      const conditions = [];
+
+      if (status && status !== "all") {
+        conditions.push(eq(crmAgreements.status, status as string));
+      }
+
+      if (search) {
+        const searchTerm = `%${search}%`;
+        conditions.push(
+          or(
+            ilike(crmAgreements.customerName, searchTerm),
+            ilike(crmAgreements.agreementNumber, searchTerm),
+            ilike(crmAgreements.address, searchTerm)
+          )
+        );
+      }
+
+      if (conditions.length > 0) {
+        const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+        query = query.where(whereClause!) as typeof query;
+        countQuery = countQuery.where(whereClause!) as typeof countQuery;
+      }
+
+      const [totalResult] = await countQuery;
+      const total = totalResult?.count || 0;
+
+      const agreements = await query
+        .orderBy(desc(crmAgreements.createdAt))
+        .limit(limitNum)
+        .offset(offset);
+
+      return res.json({
+        agreements,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(Number(total) / limitNum),
+          hasNextPage: pageNum * limitNum < Number(total),
+          hasPrevPage: pageNum > 1,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching agreements:", error);
+      return res.status(500).json({ message: "Failed to fetch agreements" });
+    }
+  });
+
+  // GET /api/crm/agreements/:id - Get single agreement
+  app.get("/api/crm/agreements/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const [agreement] = await db
+        .select()
+        .from(crmAgreements)
+        .where(eq(crmAgreements.id, req.params.id));
+
+      if (!agreement) {
+        return res.status(404).json({ message: "Agreement not found" });
+      }
+
+      let customer = null;
+      if (agreement.customerId) {
+        const [cust] = await db
+          .select()
+          .from(crmCustomers)
+          .where(eq(crmCustomers.id, agreement.customerId));
+        customer = cust || null;
+      }
+
+      return res.json({ ...agreement, customer });
+    } catch (error) {
+      console.error("Error fetching agreement:", error);
+      return res.status(500).json({ message: "Failed to fetch agreement" });
+    }
+  });
+
+  // POST /api/crm/agreements - Create agreement
+  app.post("/api/crm/agreements", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Convert empty strings to undefined for optional date fields (drizzle-zod expects undefined, not null)
+      const normalizedBody = { ...req.body };
+      if (!normalizedBody.nextServiceDate) delete normalizedBody.nextServiceDate;
+      if (!normalizedBody.nextInvoiceDate) delete normalizedBody.nextInvoiceDate;
+      if (!normalizedBody.startDate) delete normalizedBody.startDate;
+      if (!normalizedBody.endDate) delete normalizedBody.endDate;
+
+      const result = insertCrmAgreementSchema.safeParse(normalizedBody);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid agreement data", 
+          errors: result.error.flatten() 
+        });
+      }
+
+      const [agreement] = await db
+        .insert(crmAgreements)
+        .values(result.data)
+        .returning();
+
+      await logCrmAudit(
+        user.id,
+        "agreement.created",
+        "agreement",
+        agreement.id,
+        { agreementNumber: agreement.agreementNumber },
+        req.ip
+      );
+
+      return res.status(201).json(agreement);
+    } catch (error) {
+      console.error("Error creating agreement:", error);
+      return res.status(500).json({ message: "Failed to create agreement" });
+    }
+  });
+
+  // PATCH /api/crm/agreements/:id - Update agreement
+  app.patch("/api/crm/agreements/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [existing] = await db
+        .select()
+        .from(crmAgreements)
+        .where(eq(crmAgreements.id, req.params.id));
+
+      if (!existing) {
+        return res.status(404).json({ message: "Agreement not found" });
+      }
+
+      // Convert empty strings to undefined for optional date fields (drizzle-zod expects undefined, not null)
+      const normalizedBody = { ...req.body };
+      if (normalizedBody.nextServiceDate === "") delete normalizedBody.nextServiceDate;
+      if (normalizedBody.nextInvoiceDate === "") delete normalizedBody.nextInvoiceDate;
+      if (normalizedBody.startDate === "") delete normalizedBody.startDate;
+      if (normalizedBody.endDate === "") delete normalizedBody.endDate;
+
+      const allowedFields = insertCrmAgreementSchema.partial();
+      const result = allowedFields.safeParse(normalizedBody);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid request body", 
+          errors: result.error.flatten().fieldErrors 
+        });
+      }
+
+      const [updated] = await db
+        .update(crmAgreements)
+        .set({ ...result.data, updatedAt: new Date() })
+        .where(eq(crmAgreements.id, req.params.id))
+        .returning();
+
+      await logCrmAudit(
+        user.id,
+        "agreement.updated",
+        "agreement",
+        req.params.id,
+        { updates: Object.keys(result.data) },
+        req.ip
+      );
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating agreement:", error);
+      return res.status(500).json({ message: "Failed to update agreement" });
+    }
+  });
+
+  // DELETE /api/crm/agreements/:id - Delete agreement
+  app.delete("/api/crm/agreements/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [existing] = await db
+        .select()
+        .from(crmAgreements)
+        .where(eq(crmAgreements.id, req.params.id));
+
+      if (!existing) {
+        return res.status(404).json({ message: "Agreement not found" });
+      }
+
+      await db.delete(crmAgreements).where(eq(crmAgreements.id, req.params.id));
+
+      await logCrmAudit(
+        user.id,
+        "agreement.deleted",
+        "agreement",
+        req.params.id,
+        { agreementNumber: existing.agreementNumber },
+        req.ip
+      );
+
+      return res.json({ message: "Agreement deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting agreement:", error);
+      return res.status(500).json({ message: "Failed to delete agreement" });
+    }
+  });
+
+  // POST /api/crm/agreements/import - Import agreements from CSV
+  app.post("/api/crm/agreements/import", requireCrmSalesOrAbove, upload.single("file"), async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const csvContent = req.file.buffer.toString("utf-8");
+      const lines = csvContent.split("\n").filter((line) => line.trim());
+
+      if (lines.length < 2) {
+        return res.status(400).json({ message: "CSV file is empty or has no data rows" });
+      }
+
+      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
+      const imported: CrmAgreement[] = [];
+      const errors: string[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        try {
+          const values = lines[i].split(",").map((v) => v.trim().replace(/['"]/g, ""));
+          const row: Record<string, string> = {};
+          headers.forEach((header, index) => {
+            row[header] = values[index] || "";
+          });
+
+          const agreementData: InsertCrmAgreement = {
+            agreementNumber: row["agreement number"] || row["agreementnumber"] || row["agreement_number"] || `AGR-${Date.now()}-${i}`,
+            customerName: row["customer name"] || row["customername"] || row["customer_name"] || row["customer"] || "Unknown",
+            agreementPlan: row["agreement plan"] || row["agreementplan"] || row["agreement_plan"] || row["plan"] || "Standard",
+            address: row["address"] || row["service address"] || row["serviceaddress"] || null,
+            nextServiceDate: row["next service date"] || row["nextservicedate"] || row["next_service_date"] || null,
+            nextInvoiceDate: row["next invoice date"] || row["nextinvoicedate"] || row["next_invoice_date"] || null,
+            status: (row["status"] as any) || "active",
+            isActive: row["is active"]?.toLowerCase() !== "false" && row["isactive"]?.toLowerCase() !== "false",
+            notes: row["notes"] || null,
+            startDate: row["start date"] || row["startdate"] || row["start_date"] || null,
+            endDate: row["end date"] || row["enddate"] || row["end_date"] || null,
+          };
+
+          const [agreement] = await db.insert(crmAgreements).values(agreementData).returning();
+          imported.push(agreement);
+        } catch (rowError: any) {
+          errors.push(`Row ${i + 1}: ${rowError.message}`);
+        }
+      }
+
+      await logCrmAudit(
+        user.id,
+        "agreement.import",
+        "agreement",
+        null,
+        { importedCount: imported.length, errorCount: errors.length },
+        req.ip
+      );
+
+      return res.json({
+        message: `Imported ${imported.length} agreements`,
+        imported: imported.length,
+        errors,
+      });
+    } catch (error) {
+      console.error("Error importing agreements:", error);
+      return res.status(500).json({ message: "Failed to import agreements" });
     }
   });
 
