@@ -21,6 +21,8 @@ import {
   Menu,
   ChevronRight,
   FolderKanban,
+  Target,
+  Megaphone,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
@@ -66,9 +68,16 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: "Sales",
+    items: [
+      { label: "Leads", href: "/crm/leads", icon: Target },
+    ],
+  },
+  {
     title: "Other",
     items: [
       { label: "Reports", href: "/crm/reports", icon: BarChart3 },
+      { label: "Marketing", href: "/crm/marketing", icon: Megaphone },
       { label: "Settings", href: "/crm/settings", icon: Settings },
     ],
   },

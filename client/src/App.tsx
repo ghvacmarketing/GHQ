@@ -43,6 +43,8 @@ const CrmQuotes = lazy(() => import("@/pages/crm/crm-quotes"));
 const CrmAgreements = lazy(() => import("@/pages/crm/crm-agreements"));
 const CrmProjects = lazy(() => import("@/pages/crm/crm-projects"));
 const CrmProjectDetail = lazy(() => import("@/pages/crm/crm-project-detail"));
+const CrmLeads = lazy(() => import("@/pages/crm/crm-leads"));
+const CrmMarketing = lazy(() => import("@/pages/crm/crm-marketing"));
 
 // Global Error Boundary to prevent blank screens
 class ErrorBoundary extends Component<
@@ -165,6 +167,8 @@ function Router() {
       <Route path="/crm/agreements">{() => <CrmWrapper><CrmAgreements /></CrmWrapper>}</Route>
       <Route path="/crm/projects/:id">{() => <CrmWrapper><CrmProjectDetail /></CrmWrapper>}</Route>
       <Route path="/crm/projects">{() => <CrmWrapper><CrmProjects /></CrmWrapper>}</Route>
+      <Route path="/crm/leads">{() => <CrmWrapper><CrmLeads /></CrmWrapper>}</Route>
+      <Route path="/crm/marketing">{() => <CrmWrapper><CrmMarketing /></CrmWrapper>}</Route>
       <Route path="/crm">{() => <CrmWrapper><CrmDashboard /></CrmWrapper>}</Route>
       <Route component={NotFound} />
     </Switch>
