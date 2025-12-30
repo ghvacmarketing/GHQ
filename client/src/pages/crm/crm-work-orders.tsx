@@ -138,15 +138,10 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
   urgent: { bg: "bg-red-100", text: "text-red-700" },
 };
 
-type FilterTab = "all" | "needs_scheduling" | "ready_to_dispatch" | "waiting_on_parts" | "needs_approval" | "on_hold" | "scheduled" | "in_progress" | "completed" | "ready_to_invoice" | "invoiced" | "closed" | "cancelled" | "unassigned";
+type FilterTab = "all" | "scheduled" | "in_progress" | "completed" | "ready_to_invoice" | "invoiced" | "closed" | "cancelled" | "unassigned";
 
 const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> = {
   all: { label: "All", shortLabel: "All" },
-  needs_scheduling: { label: "Needs Scheduling", shortLabel: "Unscheduled" },
-  ready_to_dispatch: { label: "Ready to Dispatch", shortLabel: "Ready" },
-  waiting_on_parts: { label: "Waiting on Parts", shortLabel: "Parts" },
-  needs_approval: { label: "Needs Approval", shortLabel: "Approval" },
-  on_hold: { label: "On Hold", shortLabel: "Hold" },
   scheduled: { label: "Scheduled", shortLabel: "Scheduled" },
   in_progress: { label: "In Progress", shortLabel: "Active" },
   completed: { label: "Completed", shortLabel: "Done" },
@@ -155,6 +150,16 @@ const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> 
   closed: { label: "Closed", shortLabel: "Closed" },
   cancelled: { label: "Cancelled", shortLabel: "Cancelled" },
   unassigned: { label: "Unassigned", shortLabel: "Unassigned" },
+};
+
+type UnassignedCategory = "needs_scheduling" | "ready_to_dispatch" | "waiting_on_parts" | "needs_approval" | "on_hold";
+
+const unassignedCategoryConfig: Record<UnassignedCategory, { label: string; description: string }> = {
+  needs_scheduling: { label: "Needs Scheduling", description: "No time set" },
+  ready_to_dispatch: { label: "Ready to Dispatch", description: "Time set but no tech" },
+  waiting_on_parts: { label: "Waiting on Parts", description: "" },
+  needs_approval: { label: "Needs Approval", description: "" },
+  on_hold: { label: "On Hold", description: "" },
 };
 
 export default function CrmWorkOrders() {
@@ -417,21 +422,6 @@ export default function CrmWorkOrders() {
         !wo.assignedTechId || 
         (wo.dispatchQueueStage && unassignedStages.includes(wo.dispatchQueueStage))
       );
-    } else if (activeTab === "needs_scheduling") {
-      // Work orders without a scheduled date (no time set)
-      orders = orders.filter(wo => !wo.scheduledStart);
-    } else if (activeTab === "ready_to_dispatch") {
-      // Time set but no tech assigned
-      orders = orders.filter(wo => wo.scheduledStart && !wo.assignedTechId);
-    } else if (activeTab === "waiting_on_parts") {
-      // Explicitly marked as waiting on parts
-      orders = orders.filter(wo => wo.dispatchQueueStage === "WaitingOnParts");
-    } else if (activeTab === "needs_approval") {
-      // Explicitly marked as needs approval
-      orders = orders.filter(wo => wo.dispatchQueueStage === "NeedsApproval");
-    } else if (activeTab === "on_hold") {
-      // Explicitly marked as on hold
-      orders = orders.filter(wo => wo.dispatchQueueStage === "OnHold");
     } else if (activeTab === "scheduled") {
       // Scheduled with tech and time set
       orders = orders.filter(wo => wo.scheduledStart && wo.assignedTechId && wo.status === "scheduled");
@@ -464,6 +454,35 @@ export default function CrmWorkOrders() {
       return dateA - dateB;
     });
   }, [workOrdersData, activeTab, debouncedSearch, categoryFilter]);
+
+  // Categorize unassigned work orders for the unassigned tab
+  const categorizedUnassigned = useMemo(() => {
+    if (activeTab !== "unassigned") return null;
+    
+    const categories: Record<UnassignedCategory, EnrichedWorkOrder[]> = {
+      needs_scheduling: [],
+      ready_to_dispatch: [],
+      waiting_on_parts: [],
+      needs_approval: [],
+      on_hold: [],
+    };
+    
+    filteredWorkOrders.forEach(wo => {
+      if (wo.dispatchQueueStage === "WaitingOnParts") {
+        categories.waiting_on_parts.push(wo);
+      } else if (wo.dispatchQueueStage === "NeedsApproval") {
+        categories.needs_approval.push(wo);
+      } else if (wo.dispatchQueueStage === "OnHold") {
+        categories.on_hold.push(wo);
+      } else if (!wo.scheduledStart) {
+        categories.needs_scheduling.push(wo);
+      } else if (!wo.assignedTechId) {
+        categories.ready_to_dispatch.push(wo);
+      }
+    });
+    
+    return categories;
+  }, [filteredWorkOrders, activeTab]);
 
   const updateWorkOrderMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<CrmWorkOrder> & { updateProjectCustomer?: boolean } }) => {
@@ -832,6 +851,103 @@ export default function CrmWorkOrders() {
               </p>
             </CardContent>
           </Card>
+        ) : activeTab === "unassigned" && categorizedUnassigned ? (
+          <div className="space-y-6">
+            {(Object.keys(unassignedCategoryConfig) as UnassignedCategory[]).map((category) => {
+              const config = unassignedCategoryConfig[category];
+              const categoryOrders = categorizedUnassigned[category];
+              
+              return (
+                <div key={category}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="text-lg font-semibold text-slate-800">{config.label}</h3>
+                    {config.description && (
+                      <span className="text-sm text-slate-500">({config.description})</span>
+                    )}
+                    <Badge variant="secondary" className="ml-auto">{categoryOrders.length}</Badge>
+                  </div>
+                  
+                  {categoryOrders.length === 0 ? (
+                    <Card className="bg-slate-50 border border-dashed">
+                      <CardContent className="py-6 text-center">
+                        <p className="text-slate-400 text-sm">No work orders in this category</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {categoryOrders.map((wo) => {
+                        const statusStyle = statusColors[wo.status] || statusColors.scheduled;
+                        const visitStyle = visitTypeColors[wo.visitType || "SERVICE"] || visitTypeColors.SERVICE;
+                        const prioStyle = priorityColors[wo.priority || "normal"] || priorityColors.normal;
+                        
+                        return (
+                          <Card
+                            key={wo.id}
+                            className="bg-white border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                            onClick={() => handleOpenDetail(wo)}
+                            data-testid={`card-work-order-${wo.id}`}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between gap-2 mb-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-slate-900 truncate">
+                                    WO-{wo.workOrderNumber}
+                                  </p>
+                                  {(wo.title || wo.description) && (
+                                    <p className="text-sm text-slate-600 truncate mt-0.5">
+                                      {wo.title || wo.description}
+                                    </p>
+                                  )}
+                                </div>
+                                <Badge className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} shrink-0`}>
+                                  {statusLabels[wo.status]}
+                                </Badge>
+                              </div>
+
+                              <div className="space-y-2 text-sm">
+                                <div className="flex items-center gap-2 text-slate-600">
+                                  <User className="h-4 w-4 shrink-0" />
+                                  <span className="truncate">{wo.customer?.name || "—"}</span>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-slate-600">
+                                  <CalendarIcon className="h-4 w-4 shrink-0" />
+                                  <span>
+                                    {wo.scheduledStart ? formatDate(wo.scheduledStart) : "Not scheduled"}
+                                    {wo.scheduledStart && (
+                                      <span className="text-slate-400 ml-1">
+                                        {formatTime(wo.scheduledStart)} - {formatTime(wo.scheduledEnd)}
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-slate-600">
+                                  <UserCheck className="h-4 w-4 shrink-0" />
+                                  <span className="truncate">{wo.tech?.name || "Unassigned"}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                                <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`}>
+                                  {visitTypeLabels[wo.visitType || "SERVICE"]}
+                                </Badge>
+                                {wo.priority && wo.priority !== "normal" && (
+                                  <Badge className={`${prioStyle.bg} ${prioStyle.text} text-xs`}>
+                                    {wo.priority.charAt(0).toUpperCase() + wo.priority.slice(1)}
+                                  </Badge>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredWorkOrders.map((wo) => {
