@@ -2051,6 +2051,74 @@ export default function CrmDispatch() {
           </div>
         </div>
 
+        <div className="flex justify-center mb-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const newDate = new Date(selectedDate);
+                newDate.setDate(newDate.getDate() - (viewMode === "week" ? 7 : 1));
+                setSelectedDate(newDate);
+              }}
+              data-testid="button-prev-date"
+            >
+              ←
+            </Button>
+            
+            {viewMode === "day" ? (
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="text-slate-700 font-medium min-w-[160px]"
+                    data-testid="button-date-picker"
+                  >
+                    {dateDisplay}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="center">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    initialFocus
+                    data-testid="calendar-picker"
+                  />
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <span className="text-sm font-medium text-slate-700 px-2 min-w-[160px] text-center">
+                {formatWeekRange(weekDates)}
+              </span>
+            )}
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const newDate = new Date(selectedDate);
+                newDate.setDate(newDate.getDate() + (viewMode === "week" ? 7 : 1));
+                setSelectedDate(newDate);
+              }}
+              data-testid="button-next-date"
+            >
+              →
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedDate(new Date())}
+              className="ml-2"
+              data-testid="button-today"
+            >
+              Today
+            </Button>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div>
@@ -2085,71 +2153,6 @@ export default function CrmDispatch() {
           </div>
           
           <div className="flex items-center gap-2">
-            {viewMode === "week" && (
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const newDate = new Date(selectedDate);
-                    newDate.setDate(newDate.getDate() - 7);
-                    setSelectedDate(newDate);
-                  }}
-                  data-testid="button-prev-week"
-                >
-                  ←
-                </Button>
-                <span className="text-sm font-medium text-slate-700 px-2">
-                  {formatWeekRange(weekDates)}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const newDate = new Date(selectedDate);
-                    newDate.setDate(newDate.getDate() + 7);
-                    setSelectedDate(newDate);
-                  }}
-                  data-testid="button-next-week"
-                >
-                  →
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedDate(new Date())}
-                  className="ml-2"
-                  data-testid="button-today"
-                >
-                  Today
-                </Button>
-              </div>
-            )}
-            
-            {viewMode === "day" && (
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="text-slate-600"
-                    data-testid="button-date-picker"
-                  >
-                    <CalendarDays className="h-4 w-4 mr-2" />
-                    {dateDisplay}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelect}
-                    initialFocus
-                    data-testid="calendar-picker"
-                  />
-                </PopoverContent>
-              </Popover>
-            )}
             
             <Popover>
               <PopoverTrigger asChild>
