@@ -929,7 +929,7 @@ function DraggableScheduleCard({
       const parentWidth = containerRef.current.parentElement?.offsetWidth || SCHEDULE_TIMELINE_WIDTH;
       const deltaX = moveEvent.clientX - startXRef.current;
       const deltaPercent = (deltaX / parentWidth) * 100;
-      const deltaMinutes = Math.round((deltaPercent / 100) * SCHEDULE_TOTAL_MINUTES / 15) * 15;
+      const deltaMinutes = Math.round((deltaPercent / 100) * SCHEDULE_TOTAL_MINUTES / 30) * 30;
       const deltaPercentSnapped = (deltaMinutes / SCHEDULE_TOTAL_MINUTES) * 100;
       
       if (edge === 'start') {
