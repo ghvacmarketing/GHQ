@@ -185,13 +185,18 @@ const START_HOUR = 8;
 const END_HOUR = 20;
 const STEP_MINUTES = 30;
 const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / STEP_MINUTES;
-const SLOT_WIDTH = 60;
 
 function formatHour(hour: number): string {
   if (hour === 12) return "12pm";
   if (hour > 12) return `${hour - 12}pm`;
   return `${hour}am`;
 }
+
+// Create hour labels for 8am through 8pm (13 labels total)
+const hourLabels = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => ({
+  hour: START_HOUR + i,
+  label: formatHour(START_HOUR + i),
+}));
 
 const timeSlots = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
   const totalMinutes = START_HOUR * 60 + i * STEP_MINUTES;
@@ -206,6 +211,7 @@ const timeSlots = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
   };
 });
 
+const SLOT_WIDTH = 60;
 const TIMELINE_WIDTH = TOTAL_SLOTS * SLOT_WIDTH;
 
 const statusColors: Record<string, { bg: string; border: string; text: string }> = {
@@ -1817,17 +1823,17 @@ export default function CrmDispatch() {
                           Technicians
                         </div>
                         <div ref={timelineRef} className="flex" style={{ width: `${TIMELINE_WIDTH}px` }}>
-                          {timeSlots.map((slot, idx) => (
+                          {hourLabels.map((hourItem, idx) => (
                             <div
                               key={idx}
-                              className={`text-center py-2 text-xs border-r last:border-r-0 ${
-                                slot.isHourMark 
-                                  ? "text-slate-600 font-medium border-slate-300" 
-                                  : "text-slate-400 border-slate-200"
-                              }`}
-                              style={{ width: `${SLOT_WIDTH}px` }}
+                              className="text-center py-2 text-xs text-slate-600 font-medium"
+                              style={{ 
+                                width: idx === hourLabels.length - 1 ? '0' : `${(TIMELINE_WIDTH) / (hourLabels.length - 1)}px`,
+                                marginLeft: idx === hourLabels.length - 1 ? '-12px' : '0',
+                                textAlign: idx === 0 ? 'left' : idx === hourLabels.length - 1 ? 'right' : 'center'
+                              }}
                             >
-                              {slot.label || ""}
+                              {hourItem.label}
                             </div>
                           ))}
                         </div>
