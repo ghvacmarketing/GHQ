@@ -948,6 +948,17 @@ export type WorkSubtype =
 export const billingDispositionEnum = ["invoice_created", "no_charge", "billed_elsewhere"] as const;
 export type BillingDisposition = typeof billingDispositionEnum[number];
 
+// Dispatch Queue Stage - for organizing unassigned work orders
+export const dispatchQueueStageEnum = [
+  "NeedsScheduling",
+  "ReadyToDispatch", 
+  "WaitingOnParts",
+  "NeedsApproval",
+  "OnHold",
+  "CallbackPriority"
+] as const;
+export type DispatchQueueStage = typeof dispatchQueueStageEnum[number];
+
 export const crmWorkOrders = pgTable("crm_work_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").references(() => crmCustomers.id),
@@ -965,6 +976,7 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   scheduledEnd: timestamp("scheduled_end"),
   status: text("status").$type<WorkOrderStatus>().notNull().default("scheduled"),
   priority: text("priority").$type<"low" | "normal" | "high" | "urgent">().default("normal"),
+  dispatchQueueStage: text("dispatch_queue_stage").$type<DispatchQueueStage>(),
   checklist: json("checklist").$type<{ item: string; completed: boolean }[]>(),
   partsUsed: json("parts_used").$type<{ partId: string; name: string; qty: number; price: number }[]>(),
   techNotes: text("tech_notes"),
