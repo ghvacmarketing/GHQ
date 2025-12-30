@@ -50,19 +50,19 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: "Operations",
-    items: [
-      { label: "Work Orders", href: "/crm/work-orders", icon: ClipboardList },
-      { label: "Projects", href: "/crm/projects", icon: FolderKanban },
-      { label: "Quotes", href: "/crm/quotes", icon: FileText },
-    ],
-  },
-  {
     title: "Admin",
     items: [
       { label: "Customers", href: "/crm/customers", icon: Users },
       { label: "Invoices", href: "/crm/invoices", icon: Receipt },
       { label: "Agreements", href: "/crm/agreements", icon: FileCheck },
+    ],
+  },
+  {
+    title: "Operations",
+    items: [
+      { label: "Work Orders", href: "/crm/work-orders", icon: ClipboardList },
+      { label: "Projects", href: "/crm/projects", icon: FolderKanban },
+      { label: "Quotes", href: "/crm/quotes", icon: FileText },
     ],
   },
   {
