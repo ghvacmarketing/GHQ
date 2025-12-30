@@ -1083,12 +1083,12 @@ export default function Installation() {
         </div>
 
         <Tabs value={activeView} onValueChange={(v) => setActiveView(v as "kanban" | "calendar")} className="mb-4">
-          <TabsList className="grid w-full max-w-sm grid-cols-2 h-12 py-0 px-[3px] mx-auto" data-testid="tabs-view-switcher">
-            <TabsTrigger value="kanban" className="min-h-[44px] pt-0 pb-0" data-testid="tab-kanban">
+          <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap" data-testid="tabs-view-switcher">
+            <TabsTrigger value="kanban" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="tab-kanban">
               <LayoutGrid className="h-4 w-4 mr-2" />
               Kanban
             </TabsTrigger>
-            <TabsTrigger value="calendar" className="min-h-[44px] pt-0 pb-0" data-testid="tab-calendar">
+            <TabsTrigger value="calendar" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="tab-calendar">
               <CalendarDays className="h-4 w-4 mr-2" />
               Calendar
             </TabsTrigger>

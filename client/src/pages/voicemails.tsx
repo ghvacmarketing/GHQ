@@ -2504,20 +2504,20 @@ export default function Voicemails() {
       <main className="p-2 sm:p-3">
         <WeatherWidget />
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-lg grid-cols-4 mb-2 h-8">
-            <TabsTrigger value="call-logs" className="text-xs" data-testid="tab-call-logs">
+          <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
+            <TabsTrigger value="call-logs" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="tab-call-logs">
               <Calendar className="h-3.5 w-3.5 mr-1.5" />
               Call Logs
             </TabsTrigger>
-            <TabsTrigger value="voicemails" className="text-xs" data-testid="tab-voicemails">
+            <TabsTrigger value="voicemails" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="tab-voicemails">
               <Phone className="h-3.5 w-3.5 mr-1.5" />
               Voicemails
             </TabsTrigger>
-            <TabsTrigger value="screening" className="text-xs" data-testid="tab-screening">
+            <TabsTrigger value="screening" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="tab-screening">
               <ClipboardList className="h-3.5 w-3.5 mr-1.5" />
               Screening
             </TabsTrigger>
-            <TabsTrigger value="weather" className="text-xs" data-testid="tab-weather">
+            <TabsTrigger value="weather" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="tab-weather">
               <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
               Weather
             </TabsTrigger>

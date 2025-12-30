@@ -1709,9 +1709,9 @@ function ActivityTimelineSheet({
         <div className="flex-1 flex flex-col overflow-hidden mt-4">
           {/* Quick Action Forms */}
           <Tabs defaultValue="note" className="w-full mb-4">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="note">Add Note</TabsTrigger>
-              <TabsTrigger value="callback">Log Callback</TabsTrigger>
+            <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
+              <TabsTrigger value="note" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">Add Note</TabsTrigger>
+              <TabsTrigger value="callback" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">Log Callback</TabsTrigger>
             </TabsList>
 
             <TabsContent value="note">
@@ -2141,9 +2141,9 @@ function LeadCard({
 
           <ScrollArea className="flex-1 px-4 py-3">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="w-full mb-4 grid grid-cols-2">
-                <TabsTrigger value="details" className="text-xs">Details</TabsTrigger>
-                <TabsTrigger value="activity" className="text-xs">
+              <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
+                <TabsTrigger value="details" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">Details</TabsTrigger>
+                <TabsTrigger value="activity" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
                   <MessageSquare className="h-3 w-3 mr-1" />
                   Log
                 </TabsTrigger>

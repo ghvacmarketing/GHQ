@@ -3173,10 +3173,10 @@ export default function ProposalBuilder() {
 
       <main className="p-3 sm:p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-2xl grid-cols-3 h-14 p-1 mx-auto mb-6 bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl shadow-md" data-testid="tabs-view-switcher">
+          <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap" data-testid="tabs-view-switcher">
             <TabsTrigger 
               value="preset" 
-              className="min-h-[48px] rounded-lg font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-lg dark:data-[state=active]:bg-slate-900" 
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" 
               data-testid="tab-preset-packages"
             >
               <Package className="h-5 w-5 sm:mr-2" />
@@ -3184,7 +3184,7 @@ export default function ProposalBuilder() {
             </TabsTrigger>
             <TabsTrigger 
               value="custom" 
-              className="min-h-[48px] rounded-lg font-semibold transition-all data-[state=active]:bg-[#d3b07d] data-[state=active]:text-white data-[state=active]:shadow-lg" 
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" 
               data-testid="tab-build-your-own"
             >
               <Wrench className="h-5 w-5 sm:mr-2" />
@@ -3192,7 +3192,7 @@ export default function ProposalBuilder() {
             </TabsTrigger>
             <TabsTrigger 
               value="crawlspace" 
-              className="min-h-[48px] rounded-lg font-semibold transition-all data-[state=active]:bg-teal-500 data-[state=active]:text-white data-[state=active]:shadow-lg" 
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" 
               data-testid="tab-crawlspace"
             >
               <Droplets className="h-5 w-5 sm:mr-2" />

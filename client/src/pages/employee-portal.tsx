@@ -195,10 +195,10 @@ export default function EmployeePortal() {
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="inline-flex h-11 items-center justify-center rounded-full bg-slate-100 p-1 text-slate-500" data-testid="tabs-navigation">
+          <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap" data-testid="tabs-navigation">
             <TabsTrigger 
               value="overview" 
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
               data-testid="tab-overview"
             >
               <User className="h-4 w-4 mr-2" />
@@ -206,7 +206,7 @@ export default function EmployeePortal() {
             </TabsTrigger>
             <TabsTrigger 
               value="pay-history" 
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
               data-testid="tab-pay-history"
             >
               <DollarSign className="h-4 w-4 mr-2" />
@@ -214,7 +214,7 @@ export default function EmployeePortal() {
             </TabsTrigger>
             <TabsTrigger 
               value="documents" 
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
               data-testid="tab-documents"
             >
               <FileText className="h-4 w-4 mr-2" />
