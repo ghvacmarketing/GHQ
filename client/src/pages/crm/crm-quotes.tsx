@@ -56,7 +56,7 @@ import {
   Send,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { format, subDays, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
+import { format, subDays, isAfter } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
 import type { CrmUser, CrmQuote, CrmQuoteLineItem } from "@shared/schema";
@@ -139,8 +139,6 @@ export default function CrmQuotes() {
   
   // Additional filters
   const [amountFilter, setAmountFilter] = useState("all");
-  const [dateFromFilter, setDateFromFilter] = useState("");
-  const [dateToFilter, setDateToFilter] = useState("");
 
   // Create form state
   const [createForm, setCreateForm] = useState({
@@ -167,7 +165,7 @@ export default function CrmQuotes() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, activeTab, amountFilter, dateFromFilter, dateToFilter]);
+  }, [debouncedSearch, activeTab, amountFilter]);
 
   const { data: quotesData, isLoading: quotesLoading } = useQuery<QuotesResponse>({
     queryKey: ["/api/crm/quotes", page],
@@ -287,20 +285,6 @@ export default function CrmQuotes() {
       });
     }
 
-    // Date range filter
-    if (dateFromFilter) {
-      const fromDate = startOfDay(new Date(dateFromFilter));
-      filtered = filtered.filter((quote) => 
-        quote.createdAt && isAfter(new Date(quote.createdAt), fromDate)
-      );
-    }
-    if (dateToFilter) {
-      const toDate = endOfDay(new Date(dateToFilter));
-      filtered = filtered.filter((quote) => 
-        quote.createdAt && isBefore(new Date(quote.createdAt), toDate)
-      );
-    }
-
     // Sorting
     filtered.sort((a, b) => {
       let aVal: string | number | Date = "";
@@ -342,7 +326,7 @@ export default function CrmQuotes() {
     });
 
     return filtered;
-  }, [quotesData?.quotes, debouncedSearch, activeTab, amountFilter, dateFromFilter, dateToFilter, sortField, sortDirection]);
+  }, [quotesData?.quotes, debouncedSearch, activeTab, amountFilter, sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -365,14 +349,12 @@ export default function CrmQuotes() {
   const resetFilters = () => {
     setActiveTab("all");
     setAmountFilter("all");
-    setDateFromFilter("");
-    setDateToFilter("");
     setSearchInput("");
     setSortField("createdAt");
     setSortDirection("desc");
   };
 
-  const hasActiveFilters = activeTab !== "all" || amountFilter !== "all" || dateFromFilter || dateToFilter || debouncedSearch;
+  const hasActiveFilters = activeTab !== "all" || amountFilter !== "all" || debouncedSearch;
 
   const formatCurrency = (value: string | number | null) => {
     if (value === null || value === undefined) return "$0.00";
@@ -428,24 +410,43 @@ export default function CrmQuotes() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
+        {/* Search bar at top - DoorLoop style */}
+        <div className="flex justify-center mb-2">
+          <div className="relative w-full max-w-xl">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search by customer, quote #..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+              data-testid="input-search"
+            />
+          </div>
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div>
             <h1 className="text-xl font-bold text-slate-900" data-testid="text-quotes-title">
               CRM Quotes
             </h1>
+            <p className="text-sm text-slate-500">
+              {filteredAndSortedQuotes.length} quote{filteredAndSortedQuotes.length !== 1 ? "s" : ""}
+            </p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search by customer, quote #..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-9 h-9 w-64 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419]"
-                data-testid="input-search"
-              />
-            </div>
+            {hasActiveFilters && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={resetFilters}
+                className="h-8 text-xs text-slate-600"
+                data-testid="button-reset-filters"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Reset
+              </Button>
+            )}
             <Button 
               size="sm" 
               className="bg-[#711419] hover:bg-[#5a1014]" 
@@ -458,91 +459,50 @@ export default function CrmQuotes() {
           </div>
         </div>
 
-        {/* Tab Filters */}
-        <div className="flex items-center gap-4 border-b border-slate-200 overflow-x-auto pb-0">
-          {tabFilters.map((tab) => {
-            const count = tab.key === "accepted" ? statusCounts.accepted 
-              : tab.key === "sent" ? statusCounts.sent 
-              : tab.key === "draft" ? statusCounts.draft 
-              : null;
-            
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                  activeTab === tab.key
-                    ? "border-[#711419] text-[#711419]"
-                    : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-                }`}
-                data-testid={`tab-${tab.key}`}
-              >
-                {tab.label}
-                {count !== null && count > 0 && (
-                  <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded ${
-                    activeTab === tab.key ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"
-                  }`}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Filter Row */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={amountFilter} onValueChange={setAmountFilter}>
-            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-amount-filter">
-              <SelectValue placeholder="Amount" />
-            </SelectTrigger>
-            <SelectContent>
-              {amountRanges.map((range) => (
-                <SelectItem key={range.key} value={range.key}>{range.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-slate-500">From:</span>
-            <Input
-              type="date"
-              value={dateFromFilter}
-              onChange={(e) => setDateFromFilter(e.target.value)}
-              className="w-[130px] h-8 text-xs"
-              data-testid="input-date-from"
-            />
+        {/* Tab Filters with Amount dropdown on right */}
+        <div className="flex items-center justify-between border-b border-slate-200">
+          <div className="flex overflow-x-auto">
+            {tabFilters.map((tab) => {
+              const count = tab.key === "accepted" ? statusCounts.accepted 
+                : tab.key === "sent" ? statusCounts.sent 
+                : tab.key === "draft" ? statusCounts.draft 
+                : null;
+              
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                    activeTab === tab.key
+                      ? "border-[#711419] text-[#711419]"
+                      : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                  }`}
+                  data-testid={`tab-${tab.key}`}
+                >
+                  {tab.label}
+                  {count !== null && count > 0 && (
+                    <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded ${
+                      activeTab === tab.key ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-slate-500">To:</span>
-            <Input
-              type="date"
-              value={dateToFilter}
-              onChange={(e) => setDateToFilter(e.target.value)}
-              className="w-[130px] h-8 text-xs"
-              data-testid="input-date-to"
-            />
+          <div className="shrink-0 pb-1">
+            <Select value={amountFilter} onValueChange={setAmountFilter}>
+              <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-amount-filter">
+                <SelectValue placeholder="Amount" />
+              </SelectTrigger>
+              <SelectContent>
+                {amountRanges.map((range) => (
+                  <SelectItem key={range.key} value={range.key}>{range.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-
-          <div className="flex-1" />
-
-          {hasActiveFilters && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={resetFilters}
-              className="h-8 text-xs text-slate-600"
-              data-testid="button-reset-filters"
-            >
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Reset
-            </Button>
-          )}
-
-          <span className="text-sm text-slate-500" data-testid="text-quote-count">
-            {filteredAndSortedQuotes.length} quote{filteredAndSortedQuotes.length !== 1 ? "s" : ""}
-          </span>
         </div>
 
         {/* Table */}
