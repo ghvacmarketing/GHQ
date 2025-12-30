@@ -327,31 +327,31 @@ export default function DispatchBoardV2() {
                       >
                         Technicians
                       </div>
-                      <div className="flex">
-                        {Array.from({ length: 12 }, (_, i) => {
+                      <div className="flex" style={{ width: TIMELINE_WIDTH }}>
+                        {Array.from({ length: 13 }, (_, i) => {
                           const hour = 8 + i;
                           const label = hour === 12 ? "12pm" : hour > 12 ? `${hour - 12}pm` : `${hour}am`;
+                          const isLast = i === 12;
                           return (
                             <div
                               key={i}
-                              className="text-center py-2 text-xs font-medium text-slate-600 border-r border-slate-300"
-                              style={{ width: SLOT_WIDTH * 2 }}
+                              className="py-2 text-xs font-medium text-slate-600"
+                              style={{ 
+                                width: isLast ? 0 : TIMELINE_WIDTH / 12,
+                                textAlign: i === 0 ? 'left' : isLast ? 'right' : 'center',
+                                marginLeft: isLast ? -20 : 0,
+                                paddingLeft: i === 0 ? 4 : 0,
+                              }}
                             >
                               {label}
                             </div>
                           );
                         })}
-                        <div
-                          className="text-center py-2 text-xs text-slate-600 font-medium"
-                          style={{ width: 30 }}
-                        >
-                          8pm
-                        </div>
                       </div>
                     </div>
 
                     {technicians.map((tech) => (
-                      <TechnicianRowComponent
+                      <TechnicianRowV2
                         key={tech.id}
                         tech={tech}
                         workOrders={assignedWorkOrders.filter(wo => wo.assignedTechId === tech.id)}
@@ -446,7 +446,7 @@ function QueueCard({ workOrder }: { workOrder: EnrichedWorkOrder }) {
   );
 }
 
-function TechnicianRowComponent({
+function TechnicianRowV2({
   tech,
   workOrders,
   selectedDate,
@@ -470,13 +470,20 @@ function TechnicianRowComponent({
         </div>
       </div>
 
-      <div className="relative" style={{ width: TIMELINE_WIDTH + 30 }}>
+      <div className="relative" style={{ width: TIMELINE_WIDTH }}>
+        {Array.from({ length: 12 }, (_, i) => (
+          <div
+            key={i}
+            className="absolute top-0 bottom-0 border-r border-slate-100"
+            style={{ left: (i + 1) * (TIMELINE_WIDTH / 12) - 1 }}
+          />
+        ))}
+
         {timeSlots.map((slot, idx) => (
-          <TimeSlotDropZone
+          <DropZoneV2
             key={idx}
             techId={tech.id}
             slotIndex={idx}
-            isHourMark={slot.minute === 0}
           />
         ))}
 
@@ -506,7 +513,7 @@ function TechnicianRowComponent({
   );
 }
 
-function TimeSlotDropZone({ techId, slotIndex, isHourMark }: { techId: string; slotIndex: number; isHourMark: boolean }) {
+function DropZoneV2({ techId, slotIndex }: { techId: string; slotIndex: number }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `tech-slot::${techId}::${slotIndex}`,
   });
@@ -514,7 +521,7 @@ function TimeSlotDropZone({ techId, slotIndex, isHourMark }: { techId: string; s
   return (
     <div
       ref={setNodeRef}
-      className={`absolute top-0 bottom-0 ${isHourMark ? "border-r border-slate-200" : ""} ${isOver ? "bg-blue-100" : ""}`}
+      className={`absolute top-0 bottom-0 ${isOver ? "bg-blue-50" : ""}`}
       style={{
         left: slotIndex * SLOT_WIDTH,
         width: SLOT_WIDTH,
