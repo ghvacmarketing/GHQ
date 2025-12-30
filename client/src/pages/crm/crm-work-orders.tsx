@@ -420,7 +420,7 @@ export default function CrmWorkOrders() {
   }, [workOrdersData, activeTab, debouncedSearch]);
 
   const updateWorkOrderMutation = useMutation({
-    mutationFn: async (data: { id: string; updates: Partial<CrmWorkOrder> }) => {
+    mutationFn: async (data: { id: string; updates: Partial<CrmWorkOrder> & { updateProjectCustomer?: boolean } }) => {
       const res = await apiRequest("PATCH", `/api/crm/work-orders/${data.id}`, data.updates);
       return res.json();
     },
