@@ -12,6 +12,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,9 +65,15 @@ import {
   Search,
   Plus,
   Calendar as CalendarIcon,
+  ChevronDown,
+  ChevronRight,
+  AlertCircle,
+  Timer,
+  Wrench,
+  Phone,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -77,7 +85,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject, WorkOrderStatus } from "@shared/schema";
-import { workOrderVisitTypeEnum, type WorkOrderVisitType, workCategoryEnum, workSubtypeByCategory, type WorkCategory, type WorkSubtype } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType, workCategoryEnum, workSubtypeByCategory, type WorkCategory, type WorkSubtype, dispatchQueueStageEnum, type DispatchQueueStage } from "@shared/schema";
 
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
@@ -104,6 +112,25 @@ const visitTypeLabels: Record<string, string> = {
   MAINTENANCE: "Maintenance",
   SALES: "Sales",
 };
+
+const queueStageLabels: Record<DispatchQueueStage, string> = {
+  NeedsScheduling: "Needs Scheduling",
+  ReadyToDispatch: "Ready to Dispatch",
+  WaitingOnParts: "Waiting on Parts",
+  NeedsApproval: "Needs Approval",
+  OnHold: "On Hold",
+  CallbackPriority: "Callback/Priority",
+};
+
+const queueStageColors: Record<DispatchQueueStage, { bg: string; border: string; text: string; badge: string }> = {
+  NeedsScheduling: { bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-700", badge: "bg-slate-500" },
+  ReadyToDispatch: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", badge: "bg-blue-500" },
+  WaitingOnParts: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", badge: "bg-amber-500" },
+  NeedsApproval: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700", badge: "bg-purple-500" },
+  OnHold: { bg: "bg-gray-50", border: "border-gray-300", text: "text-gray-700", badge: "bg-gray-500" },
+  CallbackPriority: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", badge: "bg-red-500" },
+};
+
 import {
   DndContext,
   closestCenter,
@@ -157,8 +184,8 @@ function getInitials(name: string): string {
 const START_HOUR = 8;
 const END_HOUR = 20;
 const STEP_MINUTES = 30;
-const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / STEP_MINUTES; // 24 slots
-const SLOT_WIDTH = 48; // Width of each 30-min slot
+const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / STEP_MINUTES;
+const SLOT_WIDTH = 48;
 
 function formatHour(hour: number): string {
   if (hour === 12) return "12pm";
@@ -166,7 +193,6 @@ function formatHour(hour: number): string {
   return `${hour}am`;
 }
 
-// Generate timeSlots array: 8:00, 8:30, 9:00, ... 19:30
 const timeSlots = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
   const totalMinutes = START_HOUR * 60 + i * STEP_MINUTES;
   const hour = Math.floor(totalMinutes / 60);
@@ -174,9 +200,9 @@ const timeSlots = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
   return {
     hour,
     minute,
-    label: minute === 0 ? formatHour(hour) : null, // Only show label on hour marks
+    label: minute === 0 ? formatHour(hour) : null,
     isHourMark: minute === 0,
-    timeValue: hour + minute / 60, // Decimal hour for positioning (e.g., 8.5 = 8:30)
+    timeValue: hour + minute / 60,
   };
 });
 
@@ -233,13 +259,11 @@ const statusLabels: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
-// Convert decimal hours to slot index (e.g., 8.5 = slot 1)
 function timeToSlotIndex(decimalHour: number): number {
   const clampedHour = Math.max(START_HOUR, Math.min(END_HOUR, decimalHour));
   return Math.round((clampedHour - START_HOUR) * (60 / STEP_MINUTES));
 }
 
-// Convert slot index to decimal hours (e.g., slot 1 = 8.5)
 function slotIndexToTime(slotIndex: number): number {
   return START_HOUR + (slotIndex * STEP_MINUTES) / 60;
 }
@@ -260,6 +284,540 @@ function getWorkOrderDisplayTimes(workOrder: DispatchWorkOrder): { startHour: nu
     startSlot, 
     endSlot: endSlot > startSlot ? endSlot : startSlot + 1 
   };
+}
+
+function getEffectiveQueueStage(workOrder: DispatchWorkOrder): DispatchQueueStage {
+  if (workOrder.dispatchQueueStage) {
+    return workOrder.dispatchQueueStage as DispatchQueueStage;
+  }
+  if (!workOrder.scheduledStart) {
+    return "NeedsScheduling";
+  }
+  if (!workOrder.assignedTechId) {
+    return "ReadyToDispatch";
+  }
+  return "NeedsScheduling";
+}
+
+interface DraggableQueueCardProps {
+  workOrder: DispatchWorkOrder;
+  onClick?: (workOrderId: string) => void;
+  technicians?: Technician[];
+  onQuickAssign?: (workOrderId: string, techId: string) => void;
+  onQuickSchedule?: (workOrderId: string, date: Date, startTime: string, endTime: string) => void;
+  onQuickStageChange?: (workOrderId: string, stage: DispatchQueueStage) => void;
+  onQuickNote?: (workOrderId: string, note: string) => void;
+  selectedDate?: Date;
+}
+
+function DraggableQueueCard({ 
+  workOrder, 
+  onClick, 
+  technicians = [],
+  onQuickAssign,
+  onQuickSchedule,
+  onQuickStageChange,
+  onQuickNote,
+  selectedDate = new Date(),
+}: DraggableQueueCardProps) {
+  const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
+  const visitTypeColor = getJobTypeColor(workOrder.visitType || workOrder.jobType);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [quickNote, setQuickNote] = useState("");
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(selectedDate);
+  const [scheduleStart, setScheduleStart] = useState("08:00");
+  const [scheduleEnd, setScheduleEnd] = useState("09:00");
+  
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `queue-${workOrder.id}`,
+    data: { workOrder, fromQueue: true },
+  });
+
+  const age = workOrder.createdAt ? formatDistanceToNow(new Date(workOrder.createdAt), { addSuffix: false }) : null;
+  
+  const scheduledWindow = workOrder.scheduledStart && workOrder.scheduledEnd
+    ? `${format(new Date(workOrder.scheduledStart), "h:mm a")} - ${format(new Date(workOrder.scheduledEnd), "h:mm a")}`
+    : null;
+
+  const style: React.CSSProperties = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  
+  const handleScheduleSubmit = () => {
+    if (scheduleDate && onQuickSchedule) {
+      onQuickSchedule(workOrder.id, scheduleDate, scheduleStart, scheduleEnd);
+      setScheduleOpen(false);
+    }
+  };
+  
+  const handleNoteSubmit = () => {
+    if (quickNote.trim() && onQuickNote) {
+      onQuickNote(workOrder.id, quickNote.trim());
+      setQuickNote("");
+      setNoteOpen(false);
+    }
+  };
+  
+  const quickTimeOptions = [
+    { value: "08:00", label: "8:00 AM" },
+    { value: "09:00", label: "9:00 AM" },
+    { value: "10:00", label: "10:00 AM" },
+    { value: "11:00", label: "11:00 AM" },
+    { value: "12:00", label: "12:00 PM" },
+    { value: "13:00", label: "1:00 PM" },
+    { value: "14:00", label: "2:00 PM" },
+    { value: "15:00", label: "3:00 PM" },
+    { value: "16:00", label: "4:00 PM" },
+    { value: "17:00", label: "5:00 PM" },
+  ];
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow ${isDragging ? 'z-50 shadow-lg cursor-grabbing' : ''}`}
+      data-testid={`queue-card-${workOrder.id}`}
+    >
+      <div 
+        className="cursor-grab"
+        {...attributes}
+        {...listeners}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.(workOrder.id);
+        }}
+      >
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</p>
+            {workOrder.propertyAddress && (
+              <p className="text-xs text-slate-500 truncate flex items-center gap-1">
+                <MapPin className="h-3 w-3 flex-shrink-0" />
+                {workOrder.propertyAddress}
+              </p>
+            )}
+          </div>
+          {workOrder.priority && workOrder.priority !== "normal" && (
+            <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}>
+              {workOrder.priority.toUpperCase()}
+            </span>
+          )}
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px]`}>
+            {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
+          </Badge>
+          
+          {workOrder.workCategory && (
+            <span className="text-slate-600">{workOrder.workCategory}</span>
+          )}
+          {workOrder.workSubtype && workOrder.workSubtype !== "Other" && (
+            <span className="text-slate-400">• {workOrder.workSubtype}</span>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-500">
+          {age && (
+            <span className="flex items-center gap-1">
+              <Timer className="h-3 w-3" />
+              {age} old
+            </span>
+          )}
+          {scheduledWindow && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {scheduledWindow}
+            </span>
+          )}
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-1 mt-2 pt-2 border-t border-slate-100">
+        <Select onValueChange={(techId) => onQuickAssign?.(workOrder.id, techId)}>
+          <SelectTrigger className="h-6 text-[10px] px-2 flex-1 min-w-0" data-testid={`quick-assign-${workOrder.id}`}>
+            <User className="h-3 w-3 mr-1" />
+            <span className="truncate">Assign</span>
+          </SelectTrigger>
+          <SelectContent>
+            {technicians.map((tech) => (
+              <SelectItem key={tech.id} value={tech.id} className="text-xs">{tech.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        <Popover open={scheduleOpen} onOpenChange={setScheduleOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" data-testid={`quick-schedule-${workOrder.id}`}>
+              <CalendarIcon className="h-3 w-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-3" align="start">
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Date</Label>
+                <Calendar
+                  mode="single"
+                  selected={scheduleDate}
+                  onSelect={setScheduleDate}
+                  className="rounded-md border"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Start</Label>
+                  <Select value={scheduleStart} onValueChange={setScheduleStart}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {quickTimeOptions.map((t) => (
+                        <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">End</Label>
+                  <Select value={scheduleEnd} onValueChange={setScheduleEnd}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {quickTimeOptions.map((t) => (
+                        <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button size="sm" className="w-full h-7 text-xs" onClick={handleScheduleSubmit}>
+                Schedule
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+        
+        <Select onValueChange={(stage) => onQuickStageChange?.(workOrder.id, stage as DispatchQueueStage)}>
+          <SelectTrigger className="h-6 text-[10px] px-2 w-auto" data-testid={`quick-status-${workOrder.id}`}>
+            <AlertCircle className="h-3 w-3" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="WaitingOnParts" className="text-xs">Waiting on Parts</SelectItem>
+            <SelectItem value="NeedsApproval" className="text-xs">Needs Approval</SelectItem>
+            <SelectItem value="OnHold" className="text-xs">On Hold</SelectItem>
+            <SelectItem value="CallbackPriority" className="text-xs">Callback/Priority</SelectItem>
+            <SelectItem value="ReadyToDispatch" className="text-xs">Ready to Dispatch</SelectItem>
+          </SelectContent>
+        </Select>
+        
+        <Popover open={noteOpen} onOpenChange={setNoteOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" data-testid={`quick-note-${workOrder.id}`}>
+              <FileText className="h-3 w-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-3" align="end">
+            <div className="space-y-2">
+              <Label className="text-xs">Quick Note</Label>
+              <Textarea
+                value={quickNote}
+                onChange={(e) => setQuickNote(e.target.value)}
+                placeholder="Add a note..."
+                className="min-h-[60px] text-xs"
+              />
+              <Button size="sm" className="w-full h-7 text-xs" onClick={handleNoteSubmit} disabled={!quickNote.trim()}>
+                Add Note
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
+  );
+}
+
+function QueueCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
+  const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
+  const visitTypeColor = getJobTypeColor(workOrder.visitType || workOrder.jobType);
+  
+  return (
+    <div className="p-3 bg-white border rounded-lg shadow-lg cursor-grabbing w-64">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</p>
+        </div>
+        {workOrder.priority && workOrder.priority !== "normal" && (
+          <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}>
+            {workOrder.priority.toUpperCase()}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px]`}>
+          {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
+        </Badge>
+      </div>
+    </div>
+  );
+}
+
+interface QueueStageBoxProps {
+  stage: DispatchQueueStage;
+  workOrders: DispatchWorkOrder[];
+  onWorkOrderClick?: (workOrderId: string) => void;
+  technicians?: Technician[];
+  onQuickAssign?: (workOrderId: string, techId: string) => void;
+  onQuickSchedule?: (workOrderId: string, date: Date, startTime: string, endTime: string) => void;
+  onQuickStageChange?: (workOrderId: string, stage: DispatchQueueStage) => void;
+  onQuickNote?: (workOrderId: string, note: string) => void;
+  selectedDate?: Date;
+}
+
+function QueueStageBox({ 
+  stage, 
+  workOrders, 
+  onWorkOrderClick,
+  technicians,
+  onQuickAssign,
+  onQuickSchedule,
+  onQuickStageChange,
+  onQuickNote,
+  selectedDate,
+}: QueueStageBoxProps) {
+  const [isOpen, setIsOpen] = useState(true);
+  const colors = queueStageColors[stage];
+  const label = queueStageLabels[stage];
+  
+  if (workOrders.length === 0) return null;
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className={`${colors.bg} ${colors.border} border`} data-testid={`queue-box-${stage}`}>
+        <CollapsibleTrigger asChild>
+          <CardHeader className="py-2 px-3 cursor-pointer hover:bg-black/5 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <CardTitle className={`text-sm font-medium ${colors.text}`}>{label}</CardTitle>
+              </div>
+              <Badge className={`${colors.badge} text-white text-xs`}>{workOrders.length}</Badge>
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-0 pb-3 px-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+              {workOrders.map((wo) => (
+                <DraggableQueueCard 
+                  key={wo.id} 
+                  workOrder={wo}
+                  onClick={onWorkOrderClick}
+                  technicians={technicians}
+                  onQuickAssign={onQuickAssign}
+                  onQuickSchedule={onQuickSchedule}
+                  onQuickStageChange={onQuickStageChange}
+                  onQuickNote={onQuickNote}
+                  selectedDate={selectedDate}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
+
+type DateScope = "today" | "tomorrow" | "thisWeek" | "all";
+
+interface UnassignedQueueSectionProps {
+  workOrders: DispatchWorkOrder[];
+  queueCategoryFilter: WorkCategory | "all";
+  setQueueCategoryFilter: (v: WorkCategory | "all") => void;
+  queuePriorityFilter: string;
+  setQueuePriorityFilter: (v: string) => void;
+  callbacksOnly: boolean;
+  setCallbacksOnly: (v: boolean) => void;
+  pmOnly: boolean;
+  setPmOnly: (v: boolean) => void;
+  dateScope: DateScope;
+  setDateScope: (v: DateScope) => void;
+  onWorkOrderClick?: (workOrderId: string) => void;
+  technicians?: Technician[];
+  onQuickAssign?: (workOrderId: string, techId: string) => void;
+  onQuickSchedule?: (workOrderId: string, date: Date, startTime: string, endTime: string) => void;
+  onQuickStageChange?: (workOrderId: string, stage: DispatchQueueStage) => void;
+  onQuickNote?: (workOrderId: string, note: string) => void;
+  selectedDate?: Date;
+}
+
+function UnassignedQueueSection({
+  workOrders,
+  queueCategoryFilter,
+  setQueueCategoryFilter,
+  queuePriorityFilter,
+  setQueuePriorityFilter,
+  callbacksOnly,
+  setCallbacksOnly,
+  pmOnly,
+  setPmOnly,
+  dateScope,
+  setDateScope,
+  onWorkOrderClick,
+  technicians,
+  onQuickAssign,
+  onQuickSchedule,
+  onQuickStageChange,
+  onQuickNote,
+  selectedDate,
+}: UnassignedQueueSectionProps) {
+  const filteredWorkOrders = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const endOfWeek = new Date(today);
+    endOfWeek.setDate(endOfWeek.getDate() + (7 - endOfWeek.getDay()));
+    
+    return workOrders.filter(wo => {
+      if (queueCategoryFilter !== "all" && wo.workCategory !== queueCategoryFilter) return false;
+      if (queuePriorityFilter !== "all" && wo.priority !== queuePriorityFilter) return false;
+      if (callbacksOnly) {
+        const stage = getEffectiveQueueStage(wo);
+        if (stage !== "CallbackPriority") return false;
+      }
+      if (pmOnly && wo.workCategory !== "Maintenance") return false;
+      if (dateScope !== "all" && wo.scheduledStart) {
+        const woDate = new Date(wo.scheduledStart);
+        woDate.setHours(0, 0, 0, 0);
+        if (dateScope === "today" && woDate.getTime() !== today.getTime()) return false;
+        if (dateScope === "tomorrow" && woDate.getTime() !== tomorrow.getTime()) return false;
+        if (dateScope === "thisWeek" && (woDate < today || woDate > endOfWeek)) return false;
+      }
+      return true;
+    });
+  }, [workOrders, queueCategoryFilter, queuePriorityFilter, callbacksOnly, pmOnly, dateScope]);
+
+  const groupedByStage = useMemo(() => {
+    const groups: Record<DispatchQueueStage, DispatchWorkOrder[]> = {
+      NeedsScheduling: [],
+      ReadyToDispatch: [],
+      WaitingOnParts: [],
+      NeedsApproval: [],
+      OnHold: [],
+      CallbackPriority: [],
+    };
+    
+    filteredWorkOrders.forEach(wo => {
+      const stage = getEffectiveQueueStage(wo);
+      groups[stage].push(wo);
+    });
+    
+    return groups;
+  }, [filteredWorkOrders]);
+
+  const stageOrder: DispatchQueueStage[] = [
+    "CallbackPriority",
+    "ReadyToDispatch",
+    "NeedsScheduling",
+    "WaitingOnParts",
+    "NeedsApproval",
+    "OnHold",
+  ];
+
+  return (
+    <div className="space-y-3" data-testid="unassigned-queue-section">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-slate-800">Unassigned Queue ({workOrders.length})</h2>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Select value={dateScope} onValueChange={(v) => setDateScope(v as DateScope)}>
+            <SelectTrigger className="w-[120px] h-8 text-xs" data-testid="select-date-scope">
+              <SelectValue placeholder="Date Scope" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Dates</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="tomorrow">Tomorrow</SelectItem>
+              <SelectItem value="thisWeek">This Week</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Select value={queueCategoryFilter} onValueChange={(v) => setQueueCategoryFilter(v as WorkCategory | "all")}>
+            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-queue-category">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {workCategoryEnum.map((cat) => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Select value={queuePriorityFilter} onValueChange={setQueuePriorityFilter}>
+            <SelectTrigger className="w-[120px] h-8 text-xs" data-testid="select-queue-priority">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Priorities</SelectItem>
+              {PRIORITIES.map((p) => (
+                <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <div className="flex items-center gap-2">
+            <Switch 
+              checked={pmOnly} 
+              onCheckedChange={setPmOnly}
+              id="pm-only"
+              data-testid="switch-pm-only"
+            />
+            <Label htmlFor="pm-only" className="text-xs text-slate-600 cursor-pointer">PM Only</Label>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Switch 
+              checked={callbacksOnly} 
+              onCheckedChange={setCallbacksOnly}
+              id="callbacks-only"
+              data-testid="switch-callbacks-only"
+            />
+            <Label htmlFor="callbacks-only" className="text-xs text-slate-600 cursor-pointer">Callbacks Only</Label>
+          </div>
+        </div>
+      </div>
+      
+      {filteredWorkOrders.length === 0 ? (
+        <Card className="bg-slate-50 border-dashed">
+          <CardContent className="py-8 text-center text-slate-500">
+            <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No unassigned work orders match your filters</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {stageOrder.map(stage => (
+            <QueueStageBox 
+              key={stage}
+              stage={stage}
+              workOrders={groupedByStage[stage]}
+              onWorkOrderClick={onWorkOrderClick}
+              technicians={technicians}
+              onQuickAssign={onQuickAssign}
+              onQuickSchedule={onQuickSchedule}
+              onQuickStageChange={onQuickStageChange}
+              onQuickNote={onQuickNote}
+              selectedDate={selectedDate}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface DraggableWorkOrderCardProps {
@@ -296,7 +854,7 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
   
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: workOrder.id,
-    data: { workOrder },
+    data: { workOrder, fromQueue: false },
     disabled: isResizing,
   });
 
@@ -356,7 +914,6 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
 
   const displayStart = isResizing ? visualStart : startHour;
   const displayEnd = isResizing ? visualEnd : endHour;
-  // Convert decimal hours to slot-based pixels
   const startSlotIdx = (displayStart - START_HOUR) * (60 / STEP_MINUTES);
   const endSlotIdx = (displayEnd - START_HOUR) * (60 / STEP_MINUTES);
   const leftPx = startSlotIdx * SLOT_WIDTH;
@@ -505,53 +1062,6 @@ function DroppableTechnicianRow({ tech, workOrders, onResize, activeId, onWorkOr
   );
 }
 
-function UnassignedRow({ workOrders, onResize, activeId, onWorkOrderClick }: { workOrders: DispatchWorkOrder[]; onResize: (workOrderId: string, newStart: number, newEnd: number) => void; activeId: string | null; onWorkOrderClick?: (workOrderId: string) => void }) {
-  const { isOver, setNodeRef } = useDroppable({
-    id: `technician-unassigned`,
-    data: { technicianId: null },
-  });
-
-  return (
-    <div
-      className={`flex border-b-2 border-slate-200 ${isOver ? 'bg-amber-50' : 'bg-amber-50/30'}`}
-      data-testid="unassigned-row"
-    >
-      <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 flex items-center sticky left-0 bg-inherit z-10">
-        <div className={`w-1 h-10 rounded-full mr-2 ${workOrders.length > 0 ? 'bg-amber-500' : 'bg-slate-300'}`} />
-        <div className="w-10 h-10 rounded bg-slate-300 flex items-center justify-center mr-2 flex-shrink-0">
-          <svg className="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-          </svg>
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-800">Unassigned</p>
-          <p className="text-xs text-amber-600">{workOrders.length} pending</p>
-        </div>
-      </div>
-      <div ref={setNodeRef} className={`relative h-14 ${isOver ? 'bg-amber-50' : ''}`} style={{ width: `${TIMELINE_WIDTH}px` }}>
-        <div className="absolute inset-0 flex">
-          {timeSlots.map((slot, idx) => (
-            <div
-              key={idx}
-              className={`border-r last:border-r-0 ${slot.isHourMark ? 'border-slate-300' : 'border-slate-200'}`}
-              style={{ width: `${SLOT_WIDTH}px` }}
-            />
-          ))}
-        </div>
-        {workOrders.map((wo) => (
-          <DraggableWorkOrderCard 
-            key={wo.id} 
-            workOrder={wo} 
-            onResize={onResize}
-            isDragging={activeId === wo.id}
-            onClick={onWorkOrderClick}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function MobileWorkOrderCard({ workOrder, technician, onClick }: { workOrder: DispatchWorkOrder; technician?: Technician; onClick?: (workOrderId: string) => void }) {
   const jobColors = getJobTypeColor(workOrder.jobType);
   const statusStripe = statusStripeColors[workOrder.status] || statusStripeColors.scheduled;
@@ -633,6 +1143,12 @@ export default function CrmDispatch() {
   const [newNote, setNewNote] = useState("");
   const { toast } = useToast();
   
+  const [queueCategoryFilter, setQueueCategoryFilter] = useState<WorkCategory | "all">("all");
+  const [queuePriorityFilter, setQueuePriorityFilter] = useState<string>("all");
+  const [callbacksOnly, setCallbacksOnly] = useState(false);
+  const [pmOnly, setPmOnly] = useState(false);
+  const [dateScope, setDateScope] = useState<DateScope>("all");
+  
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
@@ -649,12 +1165,11 @@ export default function CrmDispatch() {
   const [endTime, setEndTime] = useState("10:00");
   const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
   
-  // Generate 30-minute interval time options from 8:00 AM to 8:00 PM
   const timeOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [];
     for (let hour = 8; hour <= 20; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
-        if (hour === 20 && minute > 0) break; // Stop at 8:00 PM
+        if (hour === 20 && minute > 0) break;
         const hourStr = hour.toString().padStart(2, "0");
         const minuteStr = minute.toString().padStart(2, "0");
         const value = `${hourStr}:${minuteStr}`;
@@ -817,7 +1332,6 @@ export default function CrmDispatch() {
       if (!selectedCustomer) throw new Error("Customer is required");
       if (!scheduledDate) throw new Error("Scheduled date is required");
 
-      // Parse start and end times
       const [startHours, startMinutes] = startTime.split(":").map(Number);
       const [endHours, endMinutes] = endTime.split(":").map(Number);
       
@@ -923,6 +1437,98 @@ export default function CrmDispatch() {
     });
   }, [selectedWorkOrderId, newNote, localWorkOrders, updateWorkOrderMutation, toast]);
 
+  const handleQuickAssign = useCallback((workOrderId: string, techId: string) => {
+    const newTech = technicians.find(t => t.id === techId);
+    const startDate = new Date(selectedDate);
+    startDate.setHours(8, 0, 0, 0);
+    const endDate = new Date(selectedDate);
+    endDate.setHours(9, 0, 0, 0);
+    
+    setLocalWorkOrders(prev => prev.map(wo => 
+      wo.id === workOrderId 
+        ? { ...wo, assignedTechId: techId, techName: newTech?.name || null, scheduledStart: startDate.toISOString() as any, scheduledEnd: endDate.toISOString() as any } 
+        : wo
+    ));
+    
+    updateWorkOrderMutation.mutate({
+      workOrderId,
+      updates: { 
+        assignedTechId: techId,
+        scheduledStart: startDate.toISOString(),
+        scheduledEnd: endDate.toISOString(),
+      },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Technician assigned", description: `Assigned to ${newTech?.name || 'technician'}` });
+      }
+    });
+  }, [technicians, selectedDate, updateWorkOrderMutation, toast]);
+
+  const handleQuickSchedule = useCallback((workOrderId: string, date: Date, startTime: string, endTime: string) => {
+    const [startHours, startMinutes] = startTime.split(":").map(Number);
+    const [endHours, endMinutes] = endTime.split(":").map(Number);
+    
+    const startDate = new Date(date);
+    startDate.setHours(startHours, startMinutes, 0, 0);
+    const endDate = new Date(date);
+    endDate.setHours(endHours, endMinutes, 0, 0);
+    
+    setLocalWorkOrders(prev => prev.map(wo => 
+      wo.id === workOrderId 
+        ? { ...wo, scheduledStart: startDate.toISOString() as any, scheduledEnd: endDate.toISOString() as any } 
+        : wo
+    ));
+    
+    updateWorkOrderMutation.mutate({
+      workOrderId,
+      updates: { 
+        scheduledStart: startDate.toISOString(),
+        scheduledEnd: endDate.toISOString(),
+      },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Scheduled", description: `Work order scheduled for ${format(startDate, "PPp")}` });
+      }
+    });
+  }, [updateWorkOrderMutation, toast]);
+
+  const handleQuickStageChange = useCallback((workOrderId: string, stage: DispatchQueueStage) => {
+    setLocalWorkOrders(prev => prev.map(wo => 
+      wo.id === workOrderId 
+        ? { ...wo, dispatchQueueStage: stage } as DispatchWorkOrder
+        : wo
+    ));
+    
+    updateWorkOrderMutation.mutate({
+      workOrderId,
+      updates: { dispatchQueueStage: stage },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Status updated", description: `Changed to ${queueStageLabels[stage]}` });
+      }
+    });
+  }, [updateWorkOrderMutation, toast]);
+
+  const handleQuickNote = useCallback((workOrderId: string, note: string) => {
+    const currentWO = localWorkOrders.find(wo => wo.id === workOrderId);
+    const updatedNotes = currentWO?.techNotes 
+      ? `${currentWO.techNotes}\n\n---\n${new Date().toLocaleDateString()}: ${note}`
+      : note;
+    
+    setLocalWorkOrders(prev => prev.map(wo => 
+      wo.id === workOrderId ? { ...wo, techNotes: updatedNotes } : wo
+    ));
+    
+    updateWorkOrderMutation.mutate({
+      workOrderId,
+      updates: { techNotes: updatedNotes },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Note added", description: "Quick note has been saved" });
+      }
+    });
+  }, [localWorkOrders, updateWorkOrderMutation, toast]);
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       navigate("/crm/login");
@@ -960,7 +1566,8 @@ export default function CrmDispatch() {
   }, [localWorkOrders, selectedDate, updateWorkOrderMutation]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
+    const id = event.active.id as string;
+    setActiveId(id.startsWith('queue-') ? id.replace('queue-', '') : id);
   }, []);
 
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -972,88 +1579,142 @@ export default function CrmDispatch() {
     if (!over) return;
     
     const overId = over.id as string;
-    const workOrderId = active.id as string;
+    const activeIdStr = active.id as string;
+    const isFromQueue = activeIdStr.startsWith('queue-');
+    const workOrderId = isFromQueue ? activeIdStr.replace('queue-', '') : activeIdStr;
     const wo = localWorkOrders.find(w => w.id === workOrderId);
     
     if (!wo) return;
     
     if (overId.startsWith('technician-')) {
       const newTechId = overId.replace('technician-', '');
-      const isUnassigned = newTechId === 'unassigned';
-      const { startHour, endHour } = getWorkOrderDisplayTimes(wo);
-      const duration = endHour - startHour;
       
-      const hoursPerPixel = (END_HOUR - START_HOUR) / TIMELINE_WIDTH;
-      const deltaHours = Math.round((delta.x * hoursPerPixel) * 2) / 2;
-      
-      let newStartHour = startHour + deltaHours;
-      newStartHour = Math.round(newStartHour * 2) / 2;
-      newStartHour = Math.max(START_HOUR, Math.min(newStartHour, END_HOUR - duration));
-      const newEndHour = newStartHour + duration;
+      if (isFromQueue) {
+        const defaultDuration = 1;
+        
+        let newStartHour = START_HOUR;
+        
+        const pointerEvent = event.activatorEvent as PointerEvent | MouseEvent | null;
+        const overRect = over.rect;
+        
+        if (pointerEvent && overRect) {
+          const dropX = pointerEvent.clientX - overRect.left + (delta?.x || 0);
+          const rawHour = START_HOUR + (dropX / SLOT_WIDTH) * (STEP_MINUTES / 60);
+          newStartHour = Math.round(rawHour * 2) / 2;
+          newStartHour = Math.max(START_HOUR, Math.min(newStartHour, END_HOUR - defaultDuration));
+        }
+        
+        const newEndHour = Math.min(newStartHour + defaultDuration, END_HOUR);
+        
+        const startHourInt = Math.floor(newStartHour);
+        const startMinutes = Math.round((newStartHour % 1) * 60);
+        const endHourInt = Math.floor(newEndHour);
+        const endMinutes = Math.round((newEndHour % 1) * 60);
+        
+        const startDate = new Date(selectedDate);
+        startDate.setHours(startHourInt, startMinutes, 0, 0);
+        const endDate = new Date(selectedDate);
+        endDate.setHours(endHourInt, endMinutes, 0, 0);
+        
+        const scheduledStartISO = startDate.toISOString();
+        const scheduledEndISO = endDate.toISOString();
 
-      const startHourInt = Math.floor(newStartHour);
-      const startMinutes = Math.round((newStartHour % 1) * 60);
-      const endHourInt = Math.floor(newEndHour);
-      const endMinutes = Math.round((newEndHour % 1) * 60);
-      
-      const startDate = new Date(selectedDate);
-      startDate.setHours(startHourInt, startMinutes, 0, 0);
-      const endDate = new Date(selectedDate);
-      endDate.setHours(endHourInt, endMinutes, 0, 0);
-      
-      const scheduledStartISO = startDate.toISOString();
-      const scheduledEndISO = endDate.toISOString();
+        const newTech = technicians.find(t => t.id === newTechId);
 
-      const newTech = isUnassigned ? null : technicians.find(t => t.id === newTechId);
+        setLocalWorkOrders(prev => prev.map(w => 
+          w.id === workOrderId 
+            ? { ...w, assignedTechId: newTechId, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any, techName: newTech?.name || null } 
+            : w
+        ));
 
-      setLocalWorkOrders(prev => prev.map(w => 
-        w.id === workOrderId 
-          ? { ...w, assignedTechId: isUnassigned ? null : newTechId, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any, techName: newTech?.name || null } 
-          : w
-      ));
+        updateWorkOrderMutation.mutate({
+          workOrderId,
+          updates: {
+            assignedTechId: newTechId,
+            scheduledStart: scheduledStartISO,
+            scheduledEnd: scheduledEndISO,
+          },
+        });
 
-      updateWorkOrderMutation.mutate({
-        workOrderId,
-        updates: {
-          assignedTechId: isUnassigned ? null : newTechId,
-          scheduledStart: scheduledStartISO,
-          scheduledEnd: scheduledEndISO,
-        },
-      });
+        toast({
+          title: "Work order assigned",
+          description: `Assigned to ${newTech?.name || 'technician'} at ${formatHour(Math.floor(newStartHour))}`,
+        });
+      } else {
+        const { startHour, endHour } = getWorkOrderDisplayTimes(wo);
+        const duration = endHour - startHour;
+        
+        const hoursPerPixel = (END_HOUR - START_HOUR) / TIMELINE_WIDTH;
+        const deltaHours = Math.round((delta.x * hoursPerPixel) * 2) / 2;
+        
+        let newStartHour = startHour + deltaHours;
+        newStartHour = Math.round(newStartHour * 2) / 2;
+        newStartHour = Math.max(START_HOUR, Math.min(newStartHour, END_HOUR - duration));
+        const newEndHour = newStartHour + duration;
+
+        const startHourInt = Math.floor(newStartHour);
+        const startMinutes = Math.round((newStartHour % 1) * 60);
+        const endHourInt = Math.floor(newEndHour);
+        const endMinutes = Math.round((newEndHour % 1) * 60);
+        
+        const startDate = new Date(selectedDate);
+        startDate.setHours(startHourInt, startMinutes, 0, 0);
+        const endDate = new Date(selectedDate);
+        endDate.setHours(endHourInt, endMinutes, 0, 0);
+        
+        const scheduledStartISO = startDate.toISOString();
+        const scheduledEndISO = endDate.toISOString();
+
+        const newTech = technicians.find(t => t.id === newTechId);
+
+        setLocalWorkOrders(prev => prev.map(w => 
+          w.id === workOrderId 
+            ? { ...w, assignedTechId: newTechId, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any, techName: newTech?.name || null } 
+            : w
+        ));
+
+        updateWorkOrderMutation.mutate({
+          workOrderId,
+          updates: {
+            assignedTechId: newTechId,
+            scheduledStart: scheduledStartISO,
+            scheduledEnd: scheduledEndISO,
+          },
+        });
+      }
     }
-  }, [localWorkOrders, selectedDate, updateWorkOrderMutation, technicians]);
+  }, [localWorkOrders, selectedDate, updateWorkOrderMutation, technicians, toast]);
 
-  const filteredWorkOrders = localWorkOrders.filter((wo) => {
-    // Apply search filter
-    if (debouncedSearch.trim()) {
-      const searchLower = debouncedSearch.toLowerCase();
-      const woNumber = wo.workOrderNumber ? String(wo.workOrderNumber).toLowerCase() : "";
-      const matchesSearch = 
-        wo.customerName?.toLowerCase().includes(searchLower) ||
-        woNumber.includes(searchLower) ||
-        wo.description?.toLowerCase().includes(searchLower) ||
-        wo.techName?.toLowerCase().includes(searchLower) ||
-        wo.propertyAddress?.toLowerCase().includes(searchLower);
-      if (!matchesSearch) return false;
-    }
-    
-    // Apply category filter
-    if (categoryFilter !== "all" && wo.workCategory !== categoryFilter) return false;
-    
-    // Apply subtype filter
-    if (subtypeFilter !== "all" && wo.workSubtype !== subtypeFilter) return false;
-    
-    // Apply status filter
-    if (filter === "all") return true;
-    if (filter === "completed") return wo.status === "completed";
-    return wo.status === filter;
-  });
+  const unassignedWorkOrders = localWorkOrders.filter(wo => !wo.assignedTechId);
 
-  const unassignedWorkOrders = filteredWorkOrders.filter(wo => !wo.assignedTechId);
+  const assignedWorkOrders = useMemo(() => {
+    return localWorkOrders.filter((wo) => {
+      if (!wo.assignedTechId) return false;
+      
+      if (debouncedSearch.trim()) {
+        const searchLower = debouncedSearch.toLowerCase();
+        const woNumber = wo.workOrderNumber ? String(wo.workOrderNumber).toLowerCase() : "";
+        const matchesSearch = 
+          wo.customerName?.toLowerCase().includes(searchLower) ||
+          woNumber.includes(searchLower) ||
+          wo.description?.toLowerCase().includes(searchLower) ||
+          wo.techName?.toLowerCase().includes(searchLower) ||
+          wo.propertyAddress?.toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
+      
+      if (categoryFilter !== "all" && wo.workCategory !== categoryFilter) return false;
+      if (subtypeFilter !== "all" && wo.workSubtype !== subtypeFilter) return false;
+      
+      if (filter === "all") return true;
+      if (filter === "completed") return wo.status === "completed";
+      return wo.status === filter;
+    });
+  }, [localWorkOrders, debouncedSearch, categoryFilter, subtypeFilter, filter]);
 
   const getWorkOrdersForTechnician = useCallback((techId: string) => {
-    return filteredWorkOrders.filter((wo) => wo.assignedTechId === techId);
-  }, [filteredWorkOrders]);
+    return assignedWorkOrders.filter((wo) => wo.assignedTechId === techId);
+  }, [assignedWorkOrders]);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
@@ -1103,7 +1764,6 @@ export default function CrmDispatch() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        {/* Search bar at top - DoorLoop style centered */}
         <div className="flex justify-center mb-2">
           <div className="relative w-full max-w-xl">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -1117,13 +1777,12 @@ export default function CrmDispatch() {
           </div>
         </div>
 
-        {/* Title + action buttons row */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-slate-900" data-testid="text-dispatch-title">
               Dispatch Board
             </h1>
-            <p className="text-sm text-slate-500">Daily Schedule - {filteredWorkOrders.length} work orders</p>
+            <p className="text-sm text-slate-500">Daily Schedule - {localWorkOrders.length} work orders</p>
           </div>
           <div className="flex items-center gap-2">
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
@@ -1228,158 +1887,182 @@ export default function CrmDispatch() {
           </div>
         </div>
 
-        {/* Tabs styled like projects/customers page - underline style */}
-        <div className="flex overflow-x-auto border-b border-slate-200" data-testid="filter-tabs">
-          {(["all", "scheduled", "dispatched", "en_route", "on_site", "completed"] as FilterStatus[]).map((status) => {
-            const count = status === "all" 
-              ? localWorkOrders.length 
-              : localWorkOrders.filter(wo => wo.status === status).length;
-            return (
-              <button
-                key={status}
-                onClick={() => setFilter(status)}
-                className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                  filter === status
-                    ? "border-[#711419] text-[#711419]"
-                    : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-                }`}
-                data-testid={`tab-${status}`}
-              >
-                {filterLabels[status]} ({count})
-              </button>
-            );
-          })}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="hidden lg:block space-y-6">
+            <UnassignedQueueSection
+              workOrders={unassignedWorkOrders}
+              queueCategoryFilter={queueCategoryFilter}
+              setQueueCategoryFilter={setQueueCategoryFilter}
+              queuePriorityFilter={queuePriorityFilter}
+              setQueuePriorityFilter={setQueuePriorityFilter}
+              callbacksOnly={callbacksOnly}
+              setCallbacksOnly={setCallbacksOnly}
+              pmOnly={pmOnly}
+              setPmOnly={setPmOnly}
+              dateScope={dateScope}
+              setDateScope={setDateScope}
+              onWorkOrderClick={handleWorkOrderClick}
+              technicians={technicians}
+              onQuickAssign={handleQuickAssign}
+              onQuickSchedule={handleQuickSchedule}
+              onQuickStageChange={handleQuickStageChange}
+              onQuickNote={handleQuickNote}
+              selectedDate={selectedDate}
+            />
 
-        {/* Category and Subtype filters */}
-        <div className="flex gap-3 flex-wrap">
-          <Select 
-            value={categoryFilter} 
-            onValueChange={(v) => {
-              setCategoryFilter(v as WorkCategory | "all");
-              setSubtypeFilter("all");
-            }}
-          >
-            <SelectTrigger className="w-[160px]" data-testid="select-category-filter">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {workCategoryEnum.map((cat) => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Select 
-            value={subtypeFilter} 
-            onValueChange={setSubtypeFilter}
-            disabled={categoryFilter === "all"}
-          >
-            <SelectTrigger className="w-[200px]" data-testid="select-subtype-filter">
-              <SelectValue placeholder="All Subtypes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Subtypes</SelectItem>
-              {categoryFilter !== "all" && workSubtypeByCategory[categoryFilter].map((sub) => (
-                <SelectItem key={sub} value={sub}>{sub}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          {(categoryFilter !== "all" || subtypeFilter !== "all") && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => {
-                setCategoryFilter("all");
-                setSubtypeFilter("all");
-              }}
-              className="text-slate-500"
-              data-testid="button-clear-filters"
-            >
-              Clear Filters
-            </Button>
-          )}
-        </div>
-
-        <Card className="bg-white border hidden lg:block" data-testid="card-timeline">
-          <CardContent className="p-0">
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <ScrollArea className="w-full" style={{ maxWidth: '100%' }}>
-                <div style={{ width: `${TIMELINE_WIDTH + 176}px` }}>
-                  <div className="flex border-b border-slate-100 sticky top-0 bg-white z-20">
-                    <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 text-sm font-medium text-slate-700 sticky left-0 bg-white z-30">
-                      Technicians
-                    </div>
-                    <div ref={timelineRef} className="flex" style={{ width: `${TIMELINE_WIDTH}px` }}>
-                      {timeSlots.map((slot, idx) => (
-                        <div
-                          key={idx}
-                          className={`text-center py-2 text-xs border-r last:border-r-0 ${
-                            slot.isHourMark 
-                              ? "text-slate-600 font-medium border-slate-300" 
-                              : "text-slate-400 border-slate-200"
-                          }`}
-                          style={{ width: `${SLOT_WIDTH}px` }}
-                        >
-                          {slot.label || ""}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <UnassignedRow 
-                    workOrders={unassignedWorkOrders}
-                    onResize={resizeWorkOrder}
-                    activeId={activeId}
-                    onWorkOrderClick={handleWorkOrderClick}
-                  />
-
-                  {technicians.map((tech) => (
-                    <DroppableTechnicianRow
-                      key={tech.id}
-                      tech={tech}
-                      workOrders={getWorkOrdersForTechnician(tech.id)}
-                      onResize={resizeWorkOrder}
-                      activeId={activeId}
-                      onWorkOrderClick={handleWorkOrderClick}
-                    />
-                  ))}
-
-                  {localWorkOrders.length === 0 && (
-                    <div className="p-8 text-center text-slate-500">
-                      No work orders scheduled for this date
-                    </div>
-                  )}
-                </div>
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-slate-800">Technician Schedule ({assignedWorkOrders.length})</h2>
+              </div>
               
-              <DragOverlay>
-                {activeWorkOrder ? <WorkOrderCardOverlay workOrder={activeWorkOrder} /> : null}
-              </DragOverlay>
-            </DndContext>
-          </CardContent>
-        </Card>
+              <div className="flex overflow-x-auto border-b border-slate-200" data-testid="filter-tabs">
+                {(["all", "scheduled", "dispatched", "en_route", "on_site", "completed"] as FilterStatus[]).map((status) => {
+                  const count = status === "all" 
+                    ? localWorkOrders.filter(wo => wo.assignedTechId).length 
+                    : localWorkOrders.filter(wo => wo.assignedTechId && wo.status === status).length;
+                  return (
+                    <button
+                      key={status}
+                      onClick={() => setFilter(status)}
+                      className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                        filter === status
+                          ? "border-[#711419] text-[#711419]"
+                          : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                      }`}
+                      data-testid={`tab-${status}`}
+                    >
+                      {filterLabels[status]} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3 flex-wrap">
+                <Select 
+                  value={categoryFilter} 
+                  onValueChange={(v) => {
+                    setCategoryFilter(v as WorkCategory | "all");
+                    setSubtypeFilter("all");
+                  }}
+                >
+                  <SelectTrigger className="w-[160px]" data-testid="select-category-filter">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {workCategoryEnum.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select 
+                  value={subtypeFilter} 
+                  onValueChange={setSubtypeFilter}
+                  disabled={categoryFilter === "all"}
+                >
+                  <SelectTrigger className="w-[200px]" data-testid="select-subtype-filter">
+                    <SelectValue placeholder="All Subtypes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Subtypes</SelectItem>
+                    {categoryFilter !== "all" && workSubtypeByCategory[categoryFilter].map((sub) => (
+                      <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                {(categoryFilter !== "all" || subtypeFilter !== "all") && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      setCategoryFilter("all");
+                      setSubtypeFilter("all");
+                    }}
+                    className="text-slate-500"
+                    data-testid="button-clear-filters"
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+
+              <Card className="bg-white border" data-testid="card-timeline">
+                <CardContent className="p-0">
+                  <ScrollArea className="w-full" style={{ maxWidth: '100%' }}>
+                    <div style={{ width: `${TIMELINE_WIDTH + 176}px` }}>
+                      <div className="flex border-b border-slate-100 sticky top-0 bg-white z-20">
+                        <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 text-sm font-medium text-slate-700 sticky left-0 bg-white z-30">
+                          Technicians
+                        </div>
+                        <div ref={timelineRef} className="flex" style={{ width: `${TIMELINE_WIDTH}px` }}>
+                          {timeSlots.map((slot, idx) => (
+                            <div
+                              key={idx}
+                              className={`text-center py-2 text-xs border-r last:border-r-0 ${
+                                slot.isHourMark 
+                                  ? "text-slate-600 font-medium border-slate-300" 
+                                  : "text-slate-400 border-slate-200"
+                              }`}
+                              style={{ width: `${SLOT_WIDTH}px` }}
+                            >
+                              {slot.label || ""}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {technicians.map((tech) => (
+                        <DroppableTechnicianRow
+                          key={tech.id}
+                          tech={tech}
+                          workOrders={getWorkOrdersForTechnician(tech.id)}
+                          onResize={resizeWorkOrder}
+                          activeId={activeId}
+                          onWorkOrderClick={handleWorkOrderClick}
+                        />
+                      ))}
+
+                      {technicians.length === 0 && (
+                        <div className="p-8 text-center text-slate-500">
+                          No technicians available
+                        </div>
+                      )}
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+          
+          <DragOverlay>
+            {activeWorkOrder ? (
+              activeId && localWorkOrders.find(wo => wo.id === activeId)?.assignedTechId 
+                ? <WorkOrderCardOverlay workOrder={activeWorkOrder} />
+                : <QueueCardOverlay workOrder={activeWorkOrder} />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
 
         <div className="lg:hidden space-y-4" data-testid="mobile-workorder-list">
           <Card className="bg-white border">
             <CardHeader className="py-3 px-4">
               <CardTitle className="text-base font-medium text-slate-800">
-                Today's Work Orders ({filteredWorkOrders.length})
+                Today's Work Orders ({localWorkOrders.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {filteredWorkOrders.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-4">No work orders match the current filter</p>
+              {localWorkOrders.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">No work orders for this date</p>
               ) : (
-                filteredWorkOrders.map((wo) => {
+                localWorkOrders.map((wo) => {
                   const tech = technicians.find((t) => t.id === wo.assignedTechId);
                   return <MobileWorkOrderCard key={wo.id} workOrder={wo} technician={tech} onClick={handleWorkOrderClick} />;
                 })
@@ -1438,10 +2121,12 @@ export default function CrmDispatch() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Scheduled</span>
                       <span className="text-sm font-medium text-slate-900" data-testid="text-scheduled-time">
-                        {(() => {
-                          const { startHour, endHour } = getWorkOrderDisplayTimes(selectedWorkOrder);
-                          return `${formatHour(Math.floor(startHour))} - ${formatHour(Math.floor(endHour))}`;
-                        })()}
+                        {selectedWorkOrder.scheduledStart && selectedWorkOrder.scheduledEnd ? (
+                          (() => {
+                            const { startHour, endHour } = getWorkOrderDisplayTimes(selectedWorkOrder);
+                            return `${formatHour(Math.floor(startHour))} - ${formatHour(Math.floor(endHour))}`;
+                          })()
+                        ) : "Not scheduled"}
                       </span>
                     </div>
                     
@@ -1496,60 +2181,15 @@ export default function CrmDispatch() {
 
                 <Separator />
 
-                {selectedWorkOrder.checklist && selectedWorkOrder.checklist.length > 0 && (
-                  <>
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                        <CheckSquare className="h-4 w-4" />
-                        Checklist
-                      </h3>
-                      <div className="space-y-2">
-                        {selectedWorkOrder.checklist.map((item, idx) => (
-                          <div key={idx} className="flex items-center gap-2 text-sm">
-                            <span className={`w-4 h-4 rounded border flex items-center justify-center ${item.completed ? 'bg-green-500 border-green-500 text-white' : 'border-slate-300'}`}>
-                              {item.completed && '✓'}
-                            </span>
-                            <span className={item.completed ? 'text-slate-500 line-through' : 'text-slate-700'}>{item.item}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <Separator />
-                  </>
-                )}
-
-                {selectedWorkOrder.partsUsed && selectedWorkOrder.partsUsed.length > 0 && (
-                  <>
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        Parts Used
-                      </h3>
-                      <div className="space-y-2">
-                        {selectedWorkOrder.partsUsed.map((part, idx) => (
-                          <div key={idx} className="flex items-center justify-between text-sm">
-                            <span className="text-slate-700">{part.name} x{part.qty}</span>
-                            <span className="text-slate-500">${(part.price * part.qty).toFixed(2)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <Separator />
-                  </>
-                )}
-
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Tech Notes
-                  </h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Tech Notes</h3>
                   {selectedWorkOrder.techNotes && (
-                    <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 whitespace-pre-wrap">
+                    <div className="bg-slate-50 rounded p-3 text-sm whitespace-pre-wrap">
                       {selectedWorkOrder.techNotes}
                     </div>
                   )}
                   <Textarea
-                    placeholder="Add notes about this work order..."
+                    placeholder="Add notes..."
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
                     className="min-h-[80px]"
@@ -1561,47 +2201,34 @@ export default function CrmDispatch() {
                     disabled={!newNote.trim() || updateWorkOrderMutation.isPending}
                     data-testid="button-save-notes"
                   >
-                    {updateWorkOrderMutation.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
                     Save Notes
                   </Button>
                 </div>
-
-                {selectedWorkOrder.description && (
-                  <>
-                    <Separator />
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-slate-900">Job Description</h3>
-                      <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 whitespace-pre-wrap">
-                        {selectedWorkOrder.description}
-                      </div>
-                    </div>
-                  </>
-                )}
 
                 <Separator />
 
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-slate-900">Actions</h3>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleUnassign}
-                      disabled={updateWorkOrderMutation.isPending || !selectedWorkOrder.assignedTechId}
-                      data-testid="button-unassign"
-                    >
-                      <UserX className="h-4 w-4 mr-1" />
-                      Unassign
-                    </Button>
-                    
+                    {selectedWorkOrder.assignedTechId && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleUnassign}
+                        disabled={updateWorkOrderMutation.isPending}
+                        data-testid="button-unassign"
+                      >
+                        <UserX className="h-4 w-4 mr-1" />
+                        Unassign Tech
+                      </Button>
+                    )}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
-                          variant="outline"
                           size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          disabled={updateWorkOrderMutation.isPending}
-                          data-testid="button-cancel-workorder"
+                          variant="destructive"
+                          disabled={updateWorkOrderMutation.isPending || selectedWorkOrder.status === "cancelled"}
+                          data-testid="button-cancel-wo"
                         >
                           <XCircle className="h-4 w-4 mr-1" />
                           Cancel Work Order
@@ -1611,33 +2238,19 @@ export default function CrmDispatch() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Cancel Work Order?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to cancel this work order? This action cannot be easily undone.
+                            This will cancel the work order. This action can be undone by changing the status later.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Keep Work Order</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleCancelWorkOrder} className="bg-red-600 hover:bg-red-700">
-                            Cancel Work Order
+                          <AlertDialogAction onClick={handleCancelWorkOrder}>
+                            Yes, Cancel It
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
                 </div>
-
-                {selectedWorkOrder.jobId && (
-                  <>
-                    <Separator />
-                    <div className="pt-2">
-                      <Link href={`/crm/jobs/${selectedWorkOrder.jobId}`}>
-                        <Button variant="outline" size="sm" className="w-full" data-testid="link-view-job">
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          View Parent Job
-                        </Button>
-                      </Link>
-                    </div>
-                  </>
-                )}
               </div>
             </>
           )}
@@ -1645,65 +2258,56 @@ export default function CrmDispatch() {
       </Sheet>
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create Work Order</DialogTitle>
+            <DialogTitle>Create New Work Order</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Customer <span className="text-red-500">*</span></Label>
+              <Label>Customer *</Label>
               <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
                     aria-expanded={customerSearchOpen}
-                    className="w-full justify-between font-normal"
+                    className="w-full justify-between"
                     data-testid="button-select-customer"
                   >
-                    {selectedCustomer ? selectedCustomer.name : "Search for a customer..."}
+                    {selectedCustomer ? selectedCustomer.name : "Select customer..."}
+                    <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[350px] p-0" align="start">
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder="Type to search customers..."
+                <PopoverContent className="w-[400px] p-0">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search customers..." 
                       value={customerSearch}
                       onValueChange={setCustomerSearch}
-                      data-testid="input-customer-search"
                     />
                     <CommandList>
-                      {customersLoading ? (
-                        <div className="p-4 text-center text-sm text-slate-500">
-                          Loading...
-                        </div>
-                      ) : customers.length === 0 ? (
-                        <CommandEmpty>No customers found.</CommandEmpty>
-                      ) : (
-                        <CommandGroup>
-                          {customers.map((customer) => (
-                            <CommandItem
-                              key={customer.id}
-                              value={customer.id}
-                              onSelect={() => {
-                                setSelectedCustomer(customer);
-                                setSelectedPropertyId("");
-                                setSelectedProjectId("");
-                                setCustomerSearchOpen(false);
-                                setCustomerSearch("");
-                              }}
-                              data-testid={`customer-option-${customer.id}`}
-                            >
-                              <div className="flex flex-col">
-                                <span className="font-medium">{customer.name}</span>
-                                {customer.fullAddress && (
-                                  <span className="text-xs text-slate-500">{customer.fullAddress}</span>
-                                )}
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      )}
+                      <CommandEmpty>
+                        {customersLoading ? "Searching..." : "No customers found."}
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {customers.map((c) => (
+                          <CommandItem
+                            key={c.id}
+                            value={c.id}
+                            onSelect={() => {
+                              setSelectedCustomer(c);
+                              setCustomerSearchOpen(false);
+                              setSelectedPropertyId("");
+                              setSelectedProjectId("");
+                            }}
+                          >
+                            <div>
+                              <p className="font-medium">{c.name}</p>
+                              <p className="text-xs text-slate-500">{c.fullAddress || c.customerType}</p>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
                     </CommandList>
                   </Command>
                 </PopoverContent>
@@ -1712,16 +2316,16 @@ export default function CrmDispatch() {
 
             {selectedCustomer && properties.length > 0 && (
               <div className="space-y-2">
-                <Label>Property</Label>
-                <Select value={selectedPropertyId || "none"} onValueChange={(v) => setSelectedPropertyId(v === "none" ? "" : v)}>
-                  <SelectTrigger data-testid="select-property">
-                    <SelectValue placeholder="Select property (optional)" />
+                <Label>Property (Optional)</Label>
+                <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select property..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No property selected</SelectItem>
-                    {properties.map((prop) => (
-                      <SelectItem key={prop.id} value={prop.id}>
-                        {prop.address1}, {prop.city}
+                    <SelectItem value="">No specific property</SelectItem>
+                    {properties.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.address1} {p.city && `, ${p.city}`}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1729,66 +2333,82 @@ export default function CrmDispatch() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label>Title</Label>
-              <Input
-                value={woTitle}
-                onChange={(e) => setWoTitle(e.target.value)}
-                placeholder="Optional title for this work order"
-                data-testid="input-wo-title"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Visit Type <span className="text-red-500">*</span></Label>
-              <Select value={visitType} onValueChange={(v) => setVisitType(v as WorkOrderVisitType)}>
-                <SelectTrigger data-testid="select-visit-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {workOrderVisitTypeEnum.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {visitTypeLabels[type]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+            {selectedCustomer && projects.length > 0 && (
               <div className="space-y-2">
-                <Label>Work Category <span className="text-red-500">*</span></Label>
-                <Select 
-                  value={workCategory} 
-                  onValueChange={(v) => {
-                    const cat = v as WorkCategory;
-                    setWorkCategory(cat);
-                    setWorkSubtype(workSubtypeByCategory[cat][0]);
-                  }}
-                >
-                  <SelectTrigger data-testid="select-work-category">
-                    <SelectValue />
+                <Label>Project (Optional)</Label>
+                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select project..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {workCategoryEnum.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
+                    <SelectItem value="">No specific project</SelectItem>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Work Subtype <span className="text-red-500">*</span></Label>
+                <Label>Visit Type</Label>
+                <Select value={visitType} onValueChange={(v) => setVisitType(v as WorkOrderVisitType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workOrderVisitTypeEnum.map((t) => (
+                      <SelectItem key={t} value={t}>{visitTypeLabels[t] || t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select value={priority} onValueChange={setPriority}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORITIES.map((p) => (
+                      <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Work Category</Label>
+                <Select value={workCategory} onValueChange={(v) => {
+                  setWorkCategory(v as WorkCategory);
+                  setWorkSubtype("Other");
+                }}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workCategoryEnum.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Work Subtype</Label>
                 <Select value={workSubtype} onValueChange={(v) => setWorkSubtype(v as WorkSubtype)}>
-                  <SelectTrigger data-testid="select-work-subtype">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {workSubtypeByCategory[workCategory].map((sub) => (
-                      <SelectItem key={sub} value={sub}>
-                        {sub}
-                      </SelectItem>
+                    {workSubtypeByCategory[workCategory].map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1796,56 +2416,49 @@ export default function CrmDispatch() {
             </div>
 
             <div className="space-y-2">
-              <Label>Scheduled Date <span className="text-red-500">*</span></Label>
+              <Label>Scheduled Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                    data-testid="button-scheduled-date"
-                  >
+                  <Button variant="outline" className="w-full justify-start text-left">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {scheduledDate ? format(scheduledDate, "MMM d, yyyy") : "Pick a date"}
+                    {scheduledDate ? format(scheduledDate, "PPP") : "Pick a date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
                     selected={scheduledDate}
                     onSelect={setScheduledDate}
-                    data-testid="calendar-scheduled-date"
+                    initialFocus
                   />
                 </PopoverContent>
               </Popover>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start Time</Label>
                 <Select value={startTime} onValueChange={setStartTime}>
-                  <SelectTrigger data-testid="select-start-time">
-                    <SelectValue placeholder="Start" />
+                  <SelectTrigger>
+                    <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {timeOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
+                  <SelectContent>
+                    {timeOptions.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-2">
                 <Label>End Time</Label>
                 <Select value={endTime} onValueChange={setEndTime}>
-                  <SelectTrigger data-testid="select-end-time">
-                    <SelectValue placeholder="End" />
+                  <SelectTrigger>
+                    <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {timeOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
+                  <SelectContent>
+                    {timeOptions.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1853,86 +2466,55 @@ export default function CrmDispatch() {
             </div>
 
             <div className="space-y-2">
-              <Label>Assigned Technician</Label>
+              <Label>Assign Technician</Label>
               <Select value={assignedTechId} onValueChange={setAssignedTechId}>
-                <SelectTrigger data-testid="select-assigned-tech">
-                  <SelectValue placeholder="Unassigned" />
+                <SelectTrigger>
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {techniciansList.map((tech) => (
-                    <SelectItem key={tech.id} value={tech.id}>
-                      {tech.name}
-                    </SelectItem>
+                  {techniciansList.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {selectedCustomer && projects.length > 0 && (
-              <div className="space-y-2">
-                <Label>Link to Project</Label>
-                <Select value={selectedProjectId || "none"} onValueChange={(v) => setSelectedProjectId(v === "none" ? "" : v)}>
-                  <SelectTrigger data-testid="select-project">
-                    <SelectValue placeholder="Select project (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No project linked</SelectItem>
-                    {projects.map((proj) => (
-                      <SelectItem key={proj.id} value={proj.id}>
-                        {proj.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea
-                value={woDescription}
-                onChange={(e) => setWoDescription(e.target.value)}
-                placeholder="Optional description or notes..."
-                className="min-h-[80px]"
-                data-testid="textarea-description"
+              <Label>Title (Optional)</Label>
+              <Input 
+                value={woTitle}
+                onChange={(e) => setWoTitle(e.target.value)}
+                placeholder="Brief title for the work order"
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Priority</Label>
-              <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger data-testid="select-priority">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRIORITIES.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Description (Optional)</Label>
+              <Textarea 
+                value={woDescription}
+                onChange={(e) => setWoDescription(e.target.value)}
+                placeholder="Describe the work to be done..."
+                className="min-h-[80px]"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setCreateDialogOpen(false);
-                resetCreateForm();
-              }}
-              data-testid="button-cancel-create"
-            >
+            <Button variant="outline" onClick={() => {
+              setCreateDialogOpen(false);
+              resetCreateForm();
+            }}>
               Cancel
             </Button>
-            <Button
+            <Button 
               onClick={() => createWorkOrderMutation.mutate()}
-              disabled={createWorkOrderMutation.isPending || !selectedCustomer || !scheduledDate}
+              disabled={!selectedCustomer || createWorkOrderMutation.isPending}
               className="bg-[#711419] hover:bg-[#5a1014]"
-              data-testid="button-submit-create"
             >
-              {createWorkOrderMutation.isPending ? "Creating..." : "Create Work Order"}
+              {createWorkOrderMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Create Work Order
             </Button>
           </DialogFooter>
         </DialogContent>
