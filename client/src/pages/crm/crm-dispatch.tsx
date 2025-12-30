@@ -967,6 +967,8 @@ function DraggableScheduleCard({
     zIndex: isDragging || isResizing ? 50 : 1,
   };
 
+  const dragListeners = isResizing ? {} : listeners;
+
   return (
     <div
       ref={(node) => {
@@ -977,7 +979,7 @@ function DraggableScheduleCard({
       className={`absolute top-2 bottom-2 ${bgColor} ${statusStripe} text-slate-800 rounded-md px-2 py-1 cursor-grab hover:shadow-md transition-all overflow-hidden shadow-sm group ${isResizing ? 'cursor-ew-resize' : ''}`}
       data-testid={`schedule-card-${workOrder.id}`}
       {...attributes}
-      {...listeners}
+      {...dragListeners}
       onClick={(e) => {
         if (!isResizing) {
           e.stopPropagation();
@@ -986,13 +988,15 @@ function DraggableScheduleCard({
       }}
     >
       <div 
-        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-slate-400/30 hover:bg-slate-400/50 transition-opacity"
+        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-slate-400/30 hover:bg-slate-400/50 transition-opacity z-10"
         onMouseDown={(e) => handleMouseDown(e, 'start')}
+        onPointerDown={(e) => e.stopPropagation()}
         data-testid={`resize-start-${workOrder.id}`}
       />
       <div 
-        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-slate-400/30 hover:bg-slate-400/50 transition-opacity"
+        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-slate-400/30 hover:bg-slate-400/50 transition-opacity z-10"
         onMouseDown={(e) => handleMouseDown(e, 'end')}
+        onPointerDown={(e) => e.stopPropagation()}
         data-testid={`resize-end-${workOrder.id}`}
       />
       
