@@ -148,12 +148,25 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
   urgent: { bg: "bg-red-100", text: "text-red-700" },
 };
 
-const timeSlots = [
-  { value: "08:00-10:00", label: "8:00 AM - 10:00 AM" },
-  { value: "10:00-12:00", label: "10:00 AM - 12:00 PM" },
-  { value: "13:00-15:00", label: "1:00 PM - 3:00 PM" },
-  { value: "15:00-17:00", label: "3:00 PM - 5:00 PM" },
-];
+// Generate 15-minute interval time options from 6:00 AM to 8:00 PM
+const generateTimeOptions = () => {
+  const options: { value: string; label: string }[] = [];
+  for (let hour = 6; hour <= 20; hour++) {
+    for (let minute = 0; minute < 60; minute += 15) {
+      if (hour === 20 && minute > 0) break; // Stop at 8:00 PM
+      const hourStr = hour.toString().padStart(2, "0");
+      const minuteStr = minute.toString().padStart(2, "0");
+      const value = `${hourStr}:${minuteStr}`;
+      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+      const ampm = hour >= 12 ? "PM" : "AM";
+      const label = `${displayHour}:${minuteStr} ${ampm}`;
+      options.push({ value, label });
+    }
+  }
+  return options;
+};
+
+const timeOptions = generateTimeOptions();
 
 function formatShortDate(date: Date | string | null): string {
   if (!date) return "—";
@@ -199,15 +212,12 @@ function formatCurrency(amount: number | string | null | undefined): string {
   }).format(num);
 }
 
-function getTimeSlotFromSchedule(start: Date | string | null): string {
-  if (!start) return "08:00-10:00";
-  const startDate = new Date(start);
-  const hours = startDate.getHours();
-  if (hours >= 8 && hours < 10) return "08:00-10:00";
-  if (hours >= 10 && hours < 13) return "10:00-12:00";
-  if (hours >= 13 && hours < 15) return "13:00-15:00";
-  if (hours >= 15 && hours < 17) return "15:00-17:00";
-  return "08:00-10:00";
+function getTimeFromSchedule(date: Date | string | null): string {
+  if (!date) return "08:00";
+  const d = new Date(date);
+  const hours = d.getHours().toString().padStart(2, "0");
+  const minutes = (Math.floor(d.getMinutes() / 15) * 15).toString().padStart(2, "0");
+  return `${hours}:${minutes}`;
 }
 
 function getPropertyAddress(property: CrmProperty | null): string {
@@ -232,7 +242,8 @@ export default function CrmWorkOrderDetail() {
   const [newStatus, setNewStatus] = useState<string>("");
   const [reassignTechId, setReassignTechId] = useState<string>("unassigned");
   const [rescheduleDate, setRescheduleDate] = useState<Date | undefined>(undefined);
-  const [rescheduleTimeSlot, setRescheduleTimeSlot] = useState<string>("");
+  const [rescheduleStartTime, setRescheduleStartTime] = useState<string>("08:00");
+  const [rescheduleEndTime, setRescheduleEndTime] = useState<string>("10:00");
   const [editingTechNotes, setEditingTechNotes] = useState<string>("");
   const [editingChecklist, setEditingChecklist] = useState<{ item: string; completed: boolean }[]>([]);
   const [billingDisposition, setBillingDisposition] = useState<string>("not_set");
@@ -280,7 +291,8 @@ export default function CrmWorkOrderDetail() {
       setBillingNotes(workOrder.billingNotes || "");
       if (workOrder.scheduledStart) {
         setRescheduleDate(new Date(workOrder.scheduledStart));
-        setRescheduleTimeSlot(getTimeSlotFromSchedule(workOrder.scheduledStart));
+        setRescheduleStartTime(getTimeFromSchedule(workOrder.scheduledStart));
+        setRescheduleEndTime(getTimeFromSchedule(workOrder.scheduledEnd));
       }
     }
   }, [workOrder]);
@@ -448,10 +460,9 @@ export default function CrmWorkOrderDetail() {
   };
 
   const handleReschedule = () => {
-    if (rescheduleDate && rescheduleTimeSlot) {
-      const [startTimeStr, endTimeStr] = rescheduleTimeSlot.split("-");
-      const [startHours, startMinutes] = startTimeStr.split(":").map(Number);
-      const [endHours, endMinutes] = endTimeStr.split(":").map(Number);
+    if (rescheduleDate && rescheduleStartTime && rescheduleEndTime) {
+      const [startHours, startMinutes] = rescheduleStartTime.split(":").map(Number);
+      const [endHours, endMinutes] = rescheduleEndTime.split(":").map(Number);
       
       const scheduledStart = new Date(rescheduleDate);
       scheduledStart.setHours(startHours, startMinutes, 0, 0);
@@ -461,8 +472,8 @@ export default function CrmWorkOrderDetail() {
       
       updateWorkOrderMutation.mutate({
         updates: {
-          scheduledStart,
-          scheduledEnd,
+          scheduledStart: scheduledStart.toISOString(),
+          scheduledEnd: scheduledEnd.toISOString(),
         },
       });
     }
@@ -1294,7 +1305,7 @@ export default function CrmWorkOrderDetail() {
 
                 <div className="space-y-3">
                   <h4 className="font-medium text-sm text-slate-700">Schedule</h4>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs">Date</Label>
                       <Popover>
@@ -1322,15 +1333,30 @@ export default function CrmWorkOrderDetail() {
                       </Popover>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Time Slot</Label>
-                      <Select value={rescheduleTimeSlot} onValueChange={setRescheduleTimeSlot}>
-                        <SelectTrigger data-testid="select-edit-time-slot">
-                          <SelectValue placeholder="Select time" />
+                      <Label className="text-xs">Start Time</Label>
+                      <Select value={rescheduleStartTime} onValueChange={setRescheduleStartTime}>
+                        <SelectTrigger data-testid="select-edit-start-time">
+                          <SelectValue placeholder="Start" />
                         </SelectTrigger>
-                        <SelectContent>
-                          {timeSlots.map((slot) => (
-                            <SelectItem key={slot.value} value={slot.value}>
-                              {slot.label}
+                        <SelectContent className="max-h-[200px]">
+                          {timeOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">End Time</Label>
+                      <Select value={rescheduleEndTime} onValueChange={setRescheduleEndTime}>
+                        <SelectTrigger data-testid="select-edit-end-time">
+                          <SelectValue placeholder="End" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[200px]">
+                          {timeOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1340,7 +1366,7 @@ export default function CrmWorkOrderDetail() {
                   <Button
                     size="sm"
                     onClick={handleReschedule}
-                    disabled={updateWorkOrderMutation.isPending || !rescheduleDate || !rescheduleTimeSlot}
+                    disabled={updateWorkOrderMutation.isPending || !rescheduleDate || !rescheduleStartTime || !rescheduleEndTime}
                     data-testid="button-reschedule"
                   >
                     Reschedule

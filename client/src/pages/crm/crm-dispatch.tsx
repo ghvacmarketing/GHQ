@@ -608,16 +608,27 @@ export default function CrmDispatch() {
   const [woDescription, setWoDescription] = useState("");
   const [visitType, setVisitType] = useState<WorkOrderVisitType>("SERVICE");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
-  const [timeSlot, setTimeSlot] = useState("08:00-10:00");
+  const [startTime, setStartTime] = useState("08:00");
+  const [endTime, setEndTime] = useState("10:00");
   const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
   
-  // Time slot options (2-hour blocks from 8am to 5pm)
-  const timeSlots = [
-    { value: "08:00-10:00", label: "8:00 AM - 10:00 AM" },
-    { value: "10:00-12:00", label: "10:00 AM - 12:00 PM" },
-    { value: "13:00-15:00", label: "1:00 PM - 3:00 PM" },
-    { value: "15:00-17:00", label: "3:00 PM - 5:00 PM" },
-  ];
+  // Generate 15-minute interval time options from 6:00 AM to 8:00 PM
+  const timeOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = [];
+    for (let hour = 6; hour <= 20; hour++) {
+      for (let minute = 0; minute < 60; minute += 15) {
+        if (hour === 20 && minute > 0) break; // Stop at 8:00 PM
+        const hourStr = hour.toString().padStart(2, "0");
+        const minuteStr = minute.toString().padStart(2, "0");
+        const value = `${hourStr}:${minuteStr}`;
+        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+        const ampm = hour >= 12 ? "PM" : "AM";
+        const label = `${displayHour}:${minuteStr} ${ampm}`;
+        options.push({ value, label });
+      }
+    }
+    return options;
+  }, []);
   const [priority, setPriority] = useState<string>("normal");
 
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
@@ -767,10 +778,9 @@ export default function CrmDispatch() {
       if (!selectedCustomer) throw new Error("Customer is required");
       if (!scheduledDate) throw new Error("Scheduled date is required");
 
-      // Parse time slot to get start and end times
-      const [startTimeStr, endTimeStr] = timeSlot.split("-");
-      const [startHours, startMinutes] = startTimeStr.split(":").map(Number);
-      const [endHours, endMinutes] = endTimeStr.split(":").map(Number);
+      // Parse start and end times
+      const [startHours, startMinutes] = startTime.split(":").map(Number);
+      const [endHours, endMinutes] = endTime.split(":").map(Number);
       
       const scheduledStart = new Date(scheduledDate);
       scheduledStart.setHours(startHours, startMinutes, 0, 0);
@@ -1670,20 +1680,37 @@ export default function CrmDispatch() {
               </Popover>
             </div>
 
-            <div className="space-y-2">
-              <Label>Time Slot</Label>
-              <Select value={timeSlot} onValueChange={setTimeSlot}>
-                <SelectTrigger data-testid="select-time-slot">
-                  <SelectValue placeholder="Select time slot" />
-                </SelectTrigger>
-                <SelectContent>
-                  {timeSlots.map((slot) => (
-                    <SelectItem key={slot.value} value={slot.value}>
-                      {slot.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Start Time</Label>
+                <Select value={startTime} onValueChange={setStartTime}>
+                  <SelectTrigger data-testid="select-start-time">
+                    <SelectValue placeholder="Start" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    {timeOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>End Time</Label>
+                <Select value={endTime} onValueChange={setEndTime}>
+                  <SelectTrigger data-testid="select-end-time">
+                    <SelectValue placeholder="End" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    {timeOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-2">
