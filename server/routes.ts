@@ -8232,6 +8232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = allowedFields.safeParse(req.body);
       if (!result.success) {
+        console.error("Work order PATCH validation error:", JSON.stringify(result.error.flatten().fieldErrors), "Body:", JSON.stringify(req.body));
         return res.status(400).json({ 
           message: "Invalid request body", 
           errors: result.error.flatten().fieldErrors 
