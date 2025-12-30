@@ -146,7 +146,7 @@ export default function CrmInvoices() {
     return params.toString();
   }, [statusFilter]);
 
-  const { data: invoicesData, isLoading: invoicesLoading } = useQuery<InvoiceWithRelations[]>({
+  const { data: invoicesResponse, isLoading: invoicesLoading } = useQuery<{ invoices: InvoiceWithRelations[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>({
     queryKey: ["/api/crm/invoices", queryParams],
     queryFn: async () => {
       const res = await fetch(`/api/crm/invoices${queryParams ? `?${queryParams}` : ""}`, {
@@ -157,6 +157,8 @@ export default function CrmInvoices() {
     },
     enabled: !!currentUser,
   });
+
+  const invoicesData = invoicesResponse?.invoices;
 
   const { data: invoiceDetail, isLoading: detailLoading } = useQuery<InvoiceDetailWithItems>({
     queryKey: ["/api/crm/invoices", selectedInvoiceId],
