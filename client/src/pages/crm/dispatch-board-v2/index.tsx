@@ -495,15 +495,7 @@ function TechnicianRowV2({
         </div>
       </div>
 
-      <div className="relative" style={{ width: TIMELINE_WIDTH }}>
-        {Array.from({ length: 12 }, (_, i) => (
-          <div
-            key={i}
-            className="absolute top-0 bottom-0 border-r border-slate-100"
-            style={{ left: `${((i + 1) / 12) * 100}%` }}
-          />
-        ))}
-
+      <div className="relative bg-slate-50/30" style={{ width: TIMELINE_WIDTH }}>
         {Array.from({ length: TOTAL_SLOTS }, (_, idx) => (
           <DropZonePercent
             key={idx}
