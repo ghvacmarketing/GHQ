@@ -6,7 +6,8 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, statusChangeMetadataSchema, type ActivityAttachment } from "@shared/schema";
+import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -79,7 +80,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static assets from attached_assets directory (for SGA images, etc.)
   app.use('/assets', express.static('attached_assets'));
   
-  // Serve uploads folder for voicemail MP3 files
+  // Block direct access to /uploads/activities/* - these must go through the protected API endpoint
+  app.use('/uploads/activities', (req, res) => {
+    res.status(403).json({ message: "Access denied. Use the protected API endpoint." });
+  });
+  
+  // Serve uploads folder for voicemail MP3 files (activities blocked above)
   app.use('/uploads', express.static('uploads'));
 
   // Setup session middleware with PostgreSQL store
@@ -128,6 +134,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
+
+  // Ensure uploads/activities directory exists for activity attachments
+  const activitiesUploadsDir = path.join(uploadsDir, 'activities');
+  if (!fs.existsSync(activitiesUploadsDir)) {
+    fs.mkdirSync(activitiesUploadsDir, { recursive: true });
+  }
+
+  // Allowed MIME types for activity attachments
+  const allowedMimeTypes = [
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'application/pdf',
+    'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  ];
+
+  // Configure multer for activity file uploads with disk storage
+  const activityUpload = multer({
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => {
+        cb(null, activitiesUploadsDir);
+      },
+      filename: (req, file, cb) => {
+        const uuid = randomUUID();
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+        cb(null, `${uuid}_${safeName}`);
+      }
+    }),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB per file
+      files: 10 // max 10 files
+    },
+    fileFilter: (req, file, cb) => {
+      if (allowedMimeTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error(`File type ${file.mimetype} not allowed. Allowed types: jpg, png, gif, webp, pdf, doc, docx, xlsx`));
+      }
+    }
+  });
 
   // ============================================
   // HEALTH CHECK ENDPOINT (for keep-warm / monitoring)
@@ -8966,6 +9011,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // ACTIVITY FILE UPLOAD ENDPOINT
+  // ============================================
+
+  // POST /api/activities/upload - Upload files for activity attachments
+  app.post("/api/activities/upload", requireCrmAuth, activityUpload.array('files', 10), async (req, res) => {
+    try {
+      const files = req.files as Express.Multer.File[];
+      
+      if (!files || files.length === 0) {
+        return res.status(400).json({ message: "No files uploaded" });
+      }
+
+      const attachments: ActivityAttachment[] = files.map(file => ({
+        id: nanoid(),
+        filename: file.filename,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        url: `/api/activities/files/${file.filename}`
+      }));
+
+      return res.json(attachments);
+    } catch (error: any) {
+      console.error("Error uploading activity files:", error);
+      if (error.message?.includes('File type')) {
+        return res.status(400).json({ message: error.message });
+      }
+      return res.status(500).json({ message: "Failed to upload files" });
+    }
+  });
+
+  // GET /api/activities/files/:filename - Protected endpoint to serve activity files
+  app.get("/api/activities/files/:filename", requireCrmAuth, async (req, res) => {
+    try {
+      const { filename } = req.params;
+      
+      // Validate filename to prevent path traversal
+      if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+        return res.status(400).json({ message: "Invalid filename" });
+      }
+      
+      const filePath = path.join(activitiesUploadsDir, filename);
+      
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "File not found" });
+      }
+      
+      // Determine content type based on file extension
+      const ext = path.extname(filename).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.pdf': 'application/pdf',
+        '.doc': 'application/msword',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      };
+      
+      const contentType = mimeTypes[ext] || 'application/octet-stream';
+      
+      // Set headers for download
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      
+      // Stream the file
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error("Error serving activity file:", error);
+      return res.status(500).json({ message: "Failed to serve file" });
+    }
+  });
+
+  // ============================================
   // PROJECT ACTIVITY (TIMELINE) ROUTES
   // ============================================
 
@@ -9053,8 +9176,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
+      const { activityType, metadata } = req.body;
+
+      // Validate metadata based on activityType
+      if (metadata) {
+        let metadataValidation;
+        switch (activityType) {
+          case "note":
+            metadataValidation = noteMetadataSchema.safeParse(metadata);
+            break;
+          case "photo":
+            metadataValidation = photoMetadataSchema.safeParse(metadata);
+            break;
+          case "file":
+            metadataValidation = fileMetadataSchema.safeParse(metadata);
+            break;
+          case "financial_update":
+            metadataValidation = financialMetadataSchema.safeParse(metadata);
+            break;
+          case "approval":
+            metadataValidation = approvalMetadataSchema.safeParse(metadata);
+            break;
+          case "status_change":
+            metadataValidation = statusChangeMetadataSchema.safeParse(metadata);
+            break;
+          default:
+            metadataValidation = { success: true, data: metadata };
+        }
+
+        if (metadataValidation && !metadataValidation.success) {
+          return res.status(400).json({ 
+            message: `Invalid ${activityType} metadata`, 
+            errors: metadataValidation.error?.errors 
+          });
+        }
+      }
+
       const activityData = {
         ...req.body,
+        activityType,
         projectId,
         userId: user.id,
       };
@@ -9062,6 +9222,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = insertProjectActivitySchema.safeParse(activityData);
       if (!result.success) {
         return res.status(400).json({ message: "Invalid activity data", errors: result.error.errors });
+      }
+
+      // Handle status_change side effects
+      if (activityType === "status_change" && metadata) {
+        const statusData = statusChangeMetadataSchema.parse(metadata);
+        
+        if (statusData.entityType === "project") {
+          await db
+            .update(crmProjects)
+            .set({ status: statusData.toStatus as any, updatedAt: new Date() })
+            .where(eq(crmProjects.id, statusData.entityId));
+        } else if (statusData.entityType === "work_order") {
+          await db
+            .update(crmWorkOrders)
+            .set({ status: statusData.toStatus as any, updatedAt: new Date() })
+            .where(eq(crmWorkOrders.id, statusData.entityId));
+        }
       }
 
       const [activity] = await db.insert(projectActivities).values(result.data).returning();

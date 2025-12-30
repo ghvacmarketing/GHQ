@@ -54,10 +54,25 @@ import {
   Filter,
   X,
   History,
+  Upload,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Eye,
+  ArrowRight,
+  XCircle,
+  Loader2,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
-import type { CrmUser, CrmProject, CrmWorkOrder, CrmInvoice, CrmQuote, CrmCustomer, CrmProperty } from "@shared/schema";
+import type { 
+  CrmUser, CrmProject, CrmWorkOrder, CrmInvoice, CrmQuote, CrmCustomer, CrmProperty,
+  ActivityAttachment, NoteMetadata, PhotoMetadata, FileMetadata, FinancialMetadata, 
+  ApprovalMetadata, StatusChangeMetadata, FinancialSubtype, ApprovalStatus
+} from "@shared/schema";
+import { 
+  projectActivityTypeEnum, financialSubtypeEnum, approvalStatusEnum 
+} from "@shared/schema";
 
 type ProjectDetail = CrmProject & {
   customerName: string | null;
@@ -990,6 +1005,24 @@ const filterOptions = [
   { value: "status_change", label: "Status Changes" },
 ];
 
+type UploadedFile = {
+  file: globalThis.File;
+  tag?: string;
+  preview?: string;
+};
+
+type UploadedAttachment = ActivityAttachment;
+
+const PHOTO_TAGS = ["before", "after", "indoor", "outdoor"] as const;
+const FILE_CATEGORIES = ["proposal", "invoice", "permit", "manual", "other"] as const;
+const FINANCIAL_SUBTYPES = ["estimate", "invoice", "payment", "credit", "change_order"] as const;
+const FINANCIAL_STATUSES = ["pending", "approved", "paid", "cancelled"] as const;
+const APPROVAL_STATUSES = ["requested", "approved", "denied"] as const;
+const APPROVER_TYPES = ["pm", "tenant", "owner", "other"] as const;
+
+const PROJECT_STATUSES = ["lead", "proposal_sent", "approved", "in_progress", "completed", "closed", "archived"];
+const WORK_ORDER_STATUSES = ["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"];
+
 function ProjectTimelineTab({ projectId }: { projectId: string }) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -999,9 +1032,31 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newActivityType, setNewActivityType] = useState("note");
-  const [newActivityTitle, setNewActivityTitle] = useState("");
-  const [newActivityDescription, setNewActivityDescription] = useState("");
   const [newActivityWorkOrderId, setNewActivityWorkOrderId] = useState("");
+
+  const [noteContent, setNoteContent] = useState("");
+  const [photoFiles, setPhotoFiles] = useState<UploadedFile[]>([]);
+  const [photoCaption, setPhotoCaption] = useState("");
+  const [fileUploads, setFileUploads] = useState<UploadedFile[]>([]);
+  const [fileCategory, setFileCategory] = useState<string>("other");
+  const [fileNote, setFileNote] = useState("");
+  const [financialSubtype, setFinancialSubtype] = useState<string>("estimate");
+  const [financialAmount, setFinancialAmount] = useState("");
+  const [financialStatus, setFinancialStatus] = useState<string>("pending");
+  const [financialDate, setFinancialDate] = useState<Date | undefined>();
+  const [financialNote, setFinancialNote] = useState("");
+  const [financialAttachments, setFinancialAttachments] = useState<UploadedFile[]>([]);
+  const [approvalTitle, setApprovalTitle] = useState("");
+  const [approverType, setApproverType] = useState<string>("pm");
+  const [approverName, setApproverName] = useState("");
+  const [approvalStatus, setApprovalStatus] = useState<string>("requested");
+  const [approvalAmount, setApprovalAmount] = useState("");
+  const [approvalNote, setApprovalNote] = useState("");
+  const [approvalAttachments, setApprovalAttachments] = useState<UploadedFile[]>([]);
+  const [statusEntityType, setStatusEntityType] = useState<string>("project");
+  const [statusWorkOrderId, setStatusWorkOrderId] = useState("");
+  const [statusNewStatus, setStatusNewStatus] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
 
   const queryParams = new URLSearchParams();
   if (typeFilter !== "all") queryParams.set("type", typeFilter);
@@ -1015,23 +1070,77 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
   });
   const activities = Array.isArray(activitiesData) ? activitiesData : [];
 
-  const { data: workOrdersData } = useQuery<{ id: string; workOrderNumber: number; title: string | null }[]>({
+  const { data: projectData } = useQuery<ProjectDetail>({
+    queryKey: ["/api/crm/projects", projectId],
+    queryFn: () => fetch(`/api/crm/projects/${projectId}`).then(r => r.json()),
+  });
+
+  const { data: workOrdersData } = useQuery<{ id: string; workOrderNumber: number; title: string | null; status: string }[]>({
     queryKey: ["/api/crm/work-orders", { projectId }],
     queryFn: () => fetch(`/api/crm/work-orders?projectId=${projectId}`).then(r => r.json()).then(d => d.workOrders || []),
   });
   const workOrders = Array.isArray(workOrdersData) ? workOrdersData : [];
 
+  const resetFormState = () => {
+    setNoteContent("");
+    setPhotoFiles([]);
+    setPhotoCaption("");
+    setFileUploads([]);
+    setFileCategory("other");
+    setFileNote("");
+    setFinancialSubtype("estimate");
+    setFinancialAmount("");
+    setFinancialStatus("pending");
+    setFinancialDate(undefined);
+    setFinancialNote("");
+    setFinancialAttachments([]);
+    setApprovalTitle("");
+    setApproverType("pm");
+    setApproverName("");
+    setApprovalStatus("requested");
+    setApprovalAmount("");
+    setApprovalNote("");
+    setApprovalAttachments([]);
+    setStatusEntityType("project");
+    setStatusWorkOrderId("");
+    setStatusNewStatus("");
+    setNewActivityWorkOrderId("");
+  };
+
+  const uploadFiles = async (files: UploadedFile[]): Promise<UploadedAttachment[]> => {
+    if (files.length === 0) return [];
+    
+    const formData = new FormData();
+    files.forEach((f) => {
+      formData.append('files', f.file);
+    });
+
+    const response = await fetch('/api/activities/upload', {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload files');
+    }
+
+    const attachments: UploadedAttachment[] = await response.json();
+    return attachments.map((att, idx) => ({
+      ...att,
+      tag: files[idx]?.tag,
+    }));
+  };
+
   const createActivityMutation = useMutation({
-    mutationFn: async (data: { activityType: string; title: string; description?: string; workOrderId?: string }) => {
+    mutationFn: async (data: { activityType: string; title: string; description?: string; workOrderId?: string; metadata?: Record<string, any> }) => {
       return apiRequest("POST", `/api/crm/projects/${projectId}/activities`, data);
     },
     onSuccess: () => {
       toast({ title: "Activity added" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "activities"], exact: false });
       setShowAddDialog(false);
-      setNewActivityTitle("");
-      setNewActivityDescription("");
-      setNewActivityWorkOrderId("");
+      resetFormState();
     },
     onError: () => {
       toast({ title: "Failed to add activity", variant: "destructive" });
@@ -1046,6 +1155,168 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "activities"], exact: false });
     },
   });
+
+  const handleSubmitActivity = async () => {
+    setIsUploading(true);
+    try {
+      let title = "";
+      let description: string | undefined;
+      let metadata: Record<string, any> = {};
+
+      switch (newActivityType) {
+        case "note": {
+          if (noteContent.length < 10) {
+            toast({ title: "Note must be at least 10 characters", variant: "destructive" });
+            setIsUploading(false);
+            return;
+          }
+          title = noteContent.substring(0, 50) + (noteContent.length > 50 ? "..." : "");
+          metadata = { content: noteContent };
+          break;
+        }
+        case "photo": {
+          if (photoFiles.length === 0) {
+            toast({ title: "Please select at least one photo", variant: "destructive" });
+            setIsUploading(false);
+            return;
+          }
+          const uploadedPhotos = await uploadFiles(photoFiles);
+          title = `${photoFiles.length} photo${photoFiles.length > 1 ? "s" : ""} uploaded`;
+          metadata = { photos: uploadedPhotos, caption: photoCaption || undefined };
+          break;
+        }
+        case "file": {
+          if (fileUploads.length === 0) {
+            toast({ title: "Please select at least one file", variant: "destructive" });
+            setIsUploading(false);
+            return;
+          }
+          const uploadedFiles = await uploadFiles(fileUploads);
+          uploadedFiles.forEach(f => f.category = fileCategory);
+          title = `${fileUploads.length} file${fileUploads.length > 1 ? "s" : ""} uploaded`;
+          metadata = { files: uploadedFiles, category: fileCategory, note: fileNote || undefined };
+          break;
+        }
+        case "financial": {
+          const amount = parseFloat(financialAmount);
+          if (isNaN(amount) || amount <= 0) {
+            toast({ title: "Please enter a valid amount", variant: "destructive" });
+            setIsUploading(false);
+            return;
+          }
+          const subtypeLabel = financialSubtype.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+          title = `${subtypeLabel}: ${formatCurrency(amount)}`;
+          let uploadedAttachments: UploadedAttachment[] = [];
+          if (financialAttachments.length > 0) {
+            uploadedAttachments = await uploadFiles(financialAttachments);
+          }
+          metadata = {
+            subtype: financialSubtype,
+            amount,
+            status: financialStatus,
+            date: financialDate ? format(financialDate, "yyyy-MM-dd") : undefined,
+            attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
+            note: financialNote || undefined,
+          };
+          break;
+        }
+        case "approval": {
+          if (!approvalTitle.trim()) {
+            toast({ title: "Please enter a title", variant: "destructive" });
+            setIsUploading(false);
+            return;
+          }
+          title = approvalTitle;
+          let uploadedAttachments: UploadedAttachment[] = [];
+          if (approvalAttachments.length > 0) {
+            uploadedAttachments = await uploadFiles(approvalAttachments);
+          }
+          metadata = {
+            approverType,
+            approverName: approverName || undefined,
+            status: approvalStatus,
+            amount: approvalAmount ? parseFloat(approvalAmount) : undefined,
+            attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
+            note: approvalNote || undefined,
+          };
+          break;
+        }
+        case "status_change": {
+          if (!statusNewStatus) {
+            toast({ title: "Please select a new status", variant: "destructive" });
+            setIsUploading(false);
+            return;
+          }
+          let fromStatus = "";
+          let entityId = "";
+          if (statusEntityType === "project") {
+            fromStatus = projectData?.status || "unknown";
+            entityId = projectId;
+          } else {
+            const selectedWO = workOrders.find(wo => wo.id === statusWorkOrderId);
+            if (!selectedWO) {
+              toast({ title: "Please select a work order", variant: "destructive" });
+              setIsUploading(false);
+              return;
+            }
+            fromStatus = selectedWO.status || "unknown";
+            entityId = statusWorkOrderId;
+          }
+          title = `Status: ${fromStatus} → ${statusNewStatus}`;
+          metadata = {
+            entityType: statusEntityType,
+            entityId,
+            fromStatus,
+            toStatus: statusNewStatus,
+          };
+          break;
+        }
+      }
+
+      await createActivityMutation.mutateAsync({
+        activityType: newActivityType,
+        title,
+        description,
+        workOrderId: newActivityWorkOrderId || undefined,
+        metadata,
+      });
+    } catch (error) {
+      toast({ title: "Failed to create activity", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<UploadedFile[]>>, isPhoto = false) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    const newFiles: UploadedFile[] = Array.from(files).map(file => ({
+      file,
+      tag: isPhoto ? "before" : undefined,
+      preview: isPhoto ? URL.createObjectURL(file) : undefined,
+    }));
+    setter(prev => [...prev, ...newFiles]);
+  };
+
+  const removeFile = (index: number, setter: React.Dispatch<React.SetStateAction<UploadedFile[]>>) => {
+    setter(prev => {
+      const updated = [...prev];
+      if (updated[index].preview) {
+        URL.revokeObjectURL(updated[index].preview!);
+      }
+      updated.splice(index, 1);
+      return updated;
+    });
+  };
+
+  const updateFileTag = (index: number, tag: string, setter: React.Dispatch<React.SetStateAction<UploadedFile[]>>) => {
+    setter(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], tag };
+      return updated;
+    });
+  };
 
   const groupedByDay = activities.reduce((acc, activity) => {
     const date = activity.createdAt ? format(new Date(activity.createdAt), "yyyy-MM-dd") : "Unknown";
@@ -1064,6 +1335,453 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
     setStartDate("");
     setEndDate("");
     setPinnedOnly(false);
+  };
+
+  const renderDynamicForm = () => {
+    switch (newActivityType) {
+      case "note":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Note Content <span className="text-red-500">*</span></Label>
+              <Textarea
+                value={noteContent}
+                onChange={(e) => setNoteContent(e.target.value)}
+                placeholder="Enter your note (minimum 10 characters)..."
+                rows={4}
+                data-testid="input-note-content"
+              />
+              <p className="text-xs text-muted-foreground">
+                {noteContent.length}/10 characters minimum. Title auto-generates from first 50 characters.
+              </p>
+            </div>
+          </div>
+        );
+
+      case "photo":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Photos <span className="text-red-500">*</span></Label>
+              <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handleFileSelect(e, setPhotoFiles, true)}
+                  className="hidden"
+                  id="photo-upload"
+                  data-testid="input-photo-files"
+                />
+                <label htmlFor="photo-upload" className="cursor-pointer">
+                  <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Click to upload images</p>
+                </label>
+              </div>
+            </div>
+            {photoFiles.length > 0 && (
+              <div className="space-y-2">
+                <Label>Uploaded Photos ({photoFiles.length})</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {photoFiles.map((f, idx) => (
+                    <div key={idx} className="relative border rounded-lg p-2">
+                      {f.preview && (
+                        <img src={f.preview} alt="" className="w-full h-20 object-cover rounded mb-2" />
+                      )}
+                      <div className="flex items-center gap-2">
+                        <Select value={f.tag || "before"} onValueChange={(v) => updateFileTag(idx, v, setPhotoFiles)}>
+                          <SelectTrigger className="h-8 text-xs" data-testid={`select-photo-tag-${idx}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PHOTO_TAGS.map(tag => (
+                              <SelectItem key={tag} value={tag}>{tag.charAt(0).toUpperCase() + tag.slice(1)}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => removeFile(idx, setPhotoFiles)}
+                          data-testid={`button-remove-photo-${idx}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Caption (optional)</Label>
+              <Textarea
+                value={photoCaption}
+                onChange={(e) => setPhotoCaption(e.target.value)}
+                placeholder="Add a caption..."
+                rows={2}
+                data-testid="input-photo-caption"
+              />
+            </div>
+          </div>
+        );
+
+      case "file":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Files <span className="text-red-500">*</span></Label>
+              <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xlsx"
+                  multiple
+                  onChange={(e) => handleFileSelect(e, setFileUploads)}
+                  className="hidden"
+                  id="file-upload"
+                  data-testid="input-file-files"
+                />
+                <label htmlFor="file-upload" className="cursor-pointer">
+                  <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Click to upload (PDF, DOC, DOCX, XLSX)</p>
+                </label>
+              </div>
+            </div>
+            {fileUploads.length > 0 && (
+              <div className="space-y-2">
+                <Label>Uploaded Files ({fileUploads.length})</Label>
+                <div className="space-y-1">
+                  {fileUploads.map((f, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 border rounded">
+                      <span className="text-sm truncate flex-1">{f.file.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => removeFile(idx, setFileUploads)}
+                        data-testid={`button-remove-file-${idx}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={fileCategory} onValueChange={setFileCategory}>
+                <SelectTrigger data-testid="select-file-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FILE_CATEGORIES.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Note (optional)</Label>
+              <Textarea
+                value={fileNote}
+                onChange={(e) => setFileNote(e.target.value)}
+                placeholder="Add a note about these files..."
+                rows={2}
+                data-testid="input-file-note"
+              />
+            </div>
+          </div>
+        );
+
+      case "financial":
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Subtype <span className="text-red-500">*</span></Label>
+                <Select value={financialSubtype} onValueChange={setFinancialSubtype}>
+                  <SelectTrigger data-testid="select-financial-subtype">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FINANCIAL_SUBTYPES.map(sub => (
+                      <SelectItem key={sub} value={sub}>
+                        {sub.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Amount <span className="text-red-500">*</span></Label>
+                <Input
+                  type="number"
+                  value={financialAmount}
+                  onChange={(e) => setFinancialAmount(e.target.value)}
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                  data-testid="input-financial-amount"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={financialStatus} onValueChange={setFinancialStatus}>
+                  <SelectTrigger data-testid="select-financial-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FINANCIAL_STATUSES.map(status => (
+                      <SelectItem key={status} value={status}>
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Date (optional)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start" data-testid="button-financial-date">
+                      <CalendarIcon className="w-4 h-4 mr-2" />
+                      {financialDate ? format(financialDate, "MMM d, yyyy") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarPicker
+                      mode="single"
+                      selected={financialDate}
+                      onSelect={setFinancialDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Note (optional)</Label>
+              <Textarea
+                value={financialNote}
+                onChange={(e) => setFinancialNote(e.target.value)}
+                placeholder="Add a note..."
+                rows={2}
+                data-testid="input-financial-note"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Attachments (optional)</Label>
+              <div className="border-2 border-dashed rounded-lg p-3 text-center">
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => handleFileSelect(e, setFinancialAttachments)}
+                  className="hidden"
+                  id="financial-attachments"
+                  data-testid="input-financial-attachments"
+                />
+                <label htmlFor="financial-attachments" className="cursor-pointer text-sm text-muted-foreground">
+                  <Upload className="w-6 h-6 mx-auto mb-1" />
+                  Click to upload
+                </label>
+              </div>
+              {financialAttachments.length > 0 && (
+                <div className="text-sm text-muted-foreground">
+                  {financialAttachments.length} file(s) selected
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      case "approval":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Title <span className="text-red-500">*</span></Label>
+              <Input
+                value={approvalTitle}
+                onChange={(e) => setApprovalTitle(e.target.value)}
+                placeholder="e.g., AC Unit Replacement Approval"
+                data-testid="input-approval-title"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Approver Type</Label>
+                <Select value={approverType} onValueChange={setApproverType}>
+                  <SelectTrigger data-testid="select-approver-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {APPROVER_TYPES.map(type => (
+                      <SelectItem key={type} value={type}>
+                        {type.toUpperCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Approver Name (optional)</Label>
+                <Input
+                  value={approverName}
+                  onChange={(e) => setApproverName(e.target.value)}
+                  placeholder="Name"
+                  data-testid="input-approver-name"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={approvalStatus} onValueChange={setApprovalStatus}>
+                  <SelectTrigger data-testid="select-approval-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {APPROVAL_STATUSES.map(status => (
+                      <SelectItem key={status} value={status}>
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Amount (optional)</Label>
+                <Input
+                  type="number"
+                  value={approvalAmount}
+                  onChange={(e) => setApprovalAmount(e.target.value)}
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                  data-testid="input-approval-amount"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Note (optional)</Label>
+              <Textarea
+                value={approvalNote}
+                onChange={(e) => setApprovalNote(e.target.value)}
+                placeholder="Add a note..."
+                rows={2}
+                data-testid="input-approval-note"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Attachments (optional)</Label>
+              <div className="border-2 border-dashed rounded-lg p-3 text-center">
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => handleFileSelect(e, setApprovalAttachments)}
+                  className="hidden"
+                  id="approval-attachments"
+                  data-testid="input-approval-attachments"
+                />
+                <label htmlFor="approval-attachments" className="cursor-pointer text-sm text-muted-foreground">
+                  <Upload className="w-6 h-6 mx-auto mb-1" />
+                  Click to upload
+                </label>
+              </div>
+              {approvalAttachments.length > 0 && (
+                <div className="text-sm text-muted-foreground">
+                  {approvalAttachments.length} file(s) selected
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      case "status_change":
+        const selectedWO = workOrders.find(wo => wo.id === statusWorkOrderId);
+        const currentStatus = statusEntityType === "project" 
+          ? projectData?.status || "unknown"
+          : selectedWO?.status || "unknown";
+        const availableStatuses = statusEntityType === "project" ? PROJECT_STATUSES : WORK_ORDER_STATUSES;
+
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Entity Type</Label>
+              <Select value={statusEntityType} onValueChange={(v) => {
+                setStatusEntityType(v);
+                setStatusWorkOrderId("");
+                setStatusNewStatus("");
+              }}>
+                <SelectTrigger data-testid="select-status-entity-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="project">Project</SelectItem>
+                  <SelectItem value="work_order">Work Order</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {statusEntityType === "work_order" && (
+              <div className="space-y-2">
+                <Label>Work Order <span className="text-red-500">*</span></Label>
+                <Select value={statusWorkOrderId} onValueChange={setStatusWorkOrderId}>
+                  <SelectTrigger data-testid="select-status-work-order">
+                    <SelectValue placeholder="Select a work order" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workOrders.map(wo => (
+                      <SelectItem key={wo.id} value={wo.id}>
+                        WO #{wo.workOrderNumber} - {wo.title || "Untitled"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Current Status</Label>
+              <div className="p-2 bg-muted rounded text-sm">{currentStatus}</div>
+            </div>
+            <div className="space-y-2">
+              <Label>New Status <span className="text-red-500">*</span></Label>
+              <Select value={statusNewStatus} onValueChange={setStatusNewStatus}>
+                <SelectTrigger data-testid="select-status-new-status">
+                  <SelectValue placeholder="Select new status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableStatuses.filter(s => s !== currentStatus).map(status => (
+                    <SelectItem key={status} value={status}>
+                      {status.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const isFormValid = () => {
+    switch (newActivityType) {
+      case "note": return noteContent.length >= 10;
+      case "photo": return photoFiles.length > 0;
+      case "file": return fileUploads.length > 0;
+      case "financial": return financialAmount && parseFloat(financialAmount) > 0;
+      case "approval": return approvalTitle.trim().length > 0;
+      case "status_change": {
+        if (statusEntityType === "work_order" && !statusWorkOrderId) return false;
+        return statusNewStatus.length > 0;
+      }
+      default: return false;
+    }
   };
 
   return (
@@ -1258,15 +1976,21 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
         </CardContent>
       </Card>
 
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
+      <Dialog open={showAddDialog} onOpenChange={(open) => {
+        setShowAddDialog(open);
+        if (!open) resetFormState();
+      }}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Activity</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Activity Type</Label>
-              <Select value={newActivityType} onValueChange={setNewActivityType}>
+              <Select value={newActivityType} onValueChange={(v) => {
+                setNewActivityType(v);
+                resetFormState();
+              }}>
                 <SelectTrigger data-testid="select-new-activity-type">
                   <SelectValue />
                 </SelectTrigger>
@@ -1280,57 +2004,47 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Title</Label>
-              <Input
-                value={newActivityTitle}
-                onChange={(e) => setNewActivityTitle(e.target.value)}
-                placeholder="Activity title"
-                data-testid="input-activity-title"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Description (optional)</Label>
-              <Textarea
-                value={newActivityDescription}
-                onChange={(e) => setNewActivityDescription(e.target.value)}
-                placeholder="Add more details..."
-                rows={3}
-                data-testid="input-activity-description"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Link to Work Order (optional)</Label>
-              <Select value={newActivityWorkOrderId || "none"} onValueChange={(v) => setNewActivityWorkOrderId(v === "none" ? "" : v)}>
-                <SelectTrigger data-testid="select-link-work-order">
-                  <SelectValue placeholder="Select a work order" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {workOrders.map(wo => (
-                    <SelectItem key={wo.id} value={wo.id}>
-                      WO #{wo.workOrderNumber} - {wo.title || "Untitled"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
+            {renderDynamicForm()}
+
+            {newActivityType !== "status_change" && (
+              <div className="space-y-2">
+                <Label>Link to Work Order (optional)</Label>
+                <Select value={newActivityWorkOrderId || "none"} onValueChange={(v) => setNewActivityWorkOrderId(v === "none" ? "" : v)}>
+                  <SelectTrigger data-testid="select-link-work-order">
+                    <SelectValue placeholder="Select a work order" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {workOrders.map(wo => (
+                      <SelectItem key={wo.id} value={wo.id}>
+                        WO #{wo.workOrderNumber} - {wo.title || "Untitled"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>
               Cancel
             </Button>
             <Button
-              onClick={() => createActivityMutation.mutate({
-                activityType: newActivityType,
-                title: newActivityTitle,
-                description: newActivityDescription || undefined,
-                workOrderId: newActivityWorkOrderId || undefined,
-              })}
-              disabled={!newActivityTitle || createActivityMutation.isPending}
+              onClick={handleSubmitActivity}
+              disabled={!isFormValid() || isUploading || createActivityMutation.isPending}
               data-testid="button-submit-activity"
             >
-              {createActivityMutation.isPending ? "Adding..." : "Add Activity"}
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : createActivityMutation.isPending ? (
+                "Adding..."
+              ) : (
+                "Add Activity"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1348,9 +2062,295 @@ function ActivityCard({
   onTogglePin: (isPinned: boolean) => void;
   onNavigateToWorkOrder: (woId: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  
   const IconComponent = activityTypeIcons[activity.activityType] || Activity;
   const colors = activityTypeColors[activity.activityType] || activityTypeColors.note;
   const label = activityTypeLabels[activity.activityType] || activity.activityType;
+  const metadata = activity.metadata || {};
+
+  const renderTypeSpecificContent = () => {
+    switch (activity.activityType) {
+      case "note": {
+        const content = metadata.content || activity.description || "";
+        const isLong = content.length > 150;
+        const displayContent = expanded || !isLong ? content : content.substring(0, 150) + "...";
+        
+        return (
+          <div className="mt-2">
+            <p className="text-sm text-slate-700 whitespace-pre-wrap">{displayContent}</p>
+            {isLong && (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="text-xs text-blue-600 hover:underline mt-1 flex items-center gap-1"
+                data-testid={`button-expand-note-${activity.id}`}
+              >
+                {expanded ? (
+                  <>
+                    <ChevronUp className="w-3 h-3" />
+                    Show less
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="w-3 h-3" />
+                    Show more
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        );
+      }
+
+      case "photo": {
+        const photos = (metadata.photos || []) as ActivityAttachment[];
+        const caption = metadata.caption;
+        const visiblePhotos = photos.slice(0, 4);
+        const remainingCount = photos.length - 4;
+
+        return (
+          <div className="mt-2">
+            <div className="grid grid-cols-4 gap-2">
+              {visiblePhotos.map((photo, idx) => (
+                <div
+                  key={photo.id || idx}
+                  className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => {
+                    setLightboxIndex(idx);
+                    setLightboxOpen(true);
+                  }}
+                  data-testid={`photo-thumbnail-${idx}`}
+                >
+                  <img
+                    src={photo.url}
+                    alt={photo.originalName || "Photo"}
+                    className="w-full h-full object-cover"
+                  />
+                  {photo.tag && (
+                    <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded">
+                      {photo.tag}
+                    </span>
+                  )}
+                  {idx === 3 && remainingCount > 0 && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <span className="text-white font-semibold">+{remainingCount}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {caption && (
+              <p className="text-sm text-muted-foreground mt-2 italic">{caption}</p>
+            )}
+            
+            <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+              <DialogContent className="max-w-4xl p-2">
+                <div className="relative">
+                  {photos[lightboxIndex] && (
+                    <img
+                      src={photos[lightboxIndex].url}
+                      alt={photos[lightboxIndex].originalName || "Photo"}
+                      className="w-full max-h-[70vh] object-contain"
+                    />
+                  )}
+                  <div className="flex justify-between items-center mt-2 px-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setLightboxIndex(prev => Math.max(0, prev - 1))}
+                      disabled={lightboxIndex === 0}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {lightboxIndex + 1} / {photos.length}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setLightboxIndex(prev => Math.min(photos.length - 1, prev + 1))}
+                      disabled={lightboxIndex === photos.length - 1}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        );
+      }
+
+      case "file": {
+        const files = (metadata.files || []) as ActivityAttachment[];
+        const note = metadata.note;
+
+        const getFileIcon = (mimeType: string) => {
+          if (mimeType.includes("pdf")) return <FileText className="w-4 h-4 text-red-600" />;
+          if (mimeType.includes("word") || mimeType.includes("doc")) return <FileText className="w-4 h-4 text-blue-600" />;
+          if (mimeType.includes("sheet") || mimeType.includes("xlsx")) return <FileText className="w-4 h-4 text-green-600" />;
+          return <File className="w-4 h-4 text-slate-600" />;
+        };
+
+        return (
+          <div className="mt-2 space-y-2">
+            {files.map((file, idx) => (
+              <div
+                key={file.id || idx}
+                className="flex items-center justify-between p-2 bg-white rounded border"
+                data-testid={`file-item-${idx}`}
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  {getFileIcon(file.mimeType)}
+                  <span className="text-sm truncate">{file.originalName || file.filename}</span>
+                  {file.category && (
+                    <Badge variant="outline" className="text-xs">{file.category}</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <a
+                    href={file.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1 hover:bg-slate-100 rounded"
+                    data-testid={`button-view-file-${idx}`}
+                  >
+                    <Eye className="w-4 h-4 text-slate-600" />
+                  </a>
+                  <a
+                    href={file.url}
+                    download={file.originalName || file.filename}
+                    className="p-1 hover:bg-slate-100 rounded"
+                    data-testid={`button-download-file-${idx}`}
+                  >
+                    <Download className="w-4 h-4 text-slate-600" />
+                  </a>
+                </div>
+              </div>
+            ))}
+            {note && (
+              <p className="text-sm text-muted-foreground italic">{note}</p>
+            )}
+          </div>
+        );
+      }
+
+      case "financial": {
+        const subtype = metadata.subtype;
+        const amount = metadata.amount;
+        const status = metadata.status;
+        const note = metadata.note;
+
+        const subtypeLabel = subtype?.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()) || "Unknown";
+        
+        const getStatusColor = (s: string) => {
+          switch (s) {
+            case "approved": return "bg-green-100 text-green-700 border-green-200";
+            case "paid": return "bg-emerald-100 text-emerald-700 border-emerald-200";
+            case "pending": return "bg-yellow-100 text-yellow-700 border-yellow-200";
+            case "cancelled": return "bg-red-100 text-red-600 border-red-200";
+            default: return "bg-slate-100 text-slate-600 border-slate-200";
+          }
+        };
+
+        return (
+          <div className="mt-2 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                {subtypeLabel}
+              </Badge>
+              {amount !== undefined && (
+                <span className="text-lg font-semibold text-green-700">
+                  {formatCurrency(amount)}
+                </span>
+              )}
+              {status && (
+                <Badge variant="outline" className={getStatusColor(status)}>
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </Badge>
+              )}
+            </div>
+            {note && (
+              <p className="text-sm text-muted-foreground">{note}</p>
+            )}
+          </div>
+        );
+      }
+
+      case "approval": {
+        const approverType = metadata.approverType;
+        const approverName = metadata.approverName;
+        const status = metadata.status;
+        const amount = metadata.amount;
+        const note = metadata.note;
+
+        const getStatusColor = (s: string) => {
+          switch (s) {
+            case "approved": return "bg-green-100 text-green-700 border-green-200";
+            case "denied": return "bg-red-100 text-red-600 border-red-200";
+            case "requested": return "bg-yellow-100 text-yellow-700 border-yellow-200";
+            default: return "bg-slate-100 text-slate-600 border-slate-200";
+          }
+        };
+
+        return (
+          <div className="mt-2 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {status && (
+                <Badge variant="outline" className={getStatusColor(status)}>
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </Badge>
+              )}
+              {approverType && (
+                <span className="text-sm text-muted-foreground">
+                  Approver: {approverType.toUpperCase()}
+                  {approverName && ` (${approverName})`}
+                </span>
+              )}
+              {amount !== undefined && (
+                <span className="text-sm font-medium text-slate-700">
+                  {formatCurrency(amount)}
+                </span>
+              )}
+            </div>
+            {note && (
+              <p className="text-sm text-muted-foreground">{note}</p>
+            )}
+          </div>
+        );
+      }
+
+      case "status_change": {
+        const fromStatus = metadata.fromStatus;
+        const toStatus = metadata.toStatus;
+        const entityType = metadata.entityType;
+
+        return (
+          <div className="mt-2">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">
+                {entityType === "work_order" ? "Work Order" : "Project"}:
+              </span>
+              <Badge variant="outline" className="bg-slate-100 text-slate-600">
+                {fromStatus?.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}
+              </Badge>
+              <ArrowRight className="w-4 h-4 text-muted-foreground" />
+              <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                {toStatus?.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}
+              </Badge>
+            </div>
+          </div>
+        );
+      }
+
+      default:
+        return activity.description ? (
+          <p className="text-sm text-muted-foreground mt-2">{activity.description}</p>
+        ) : null;
+    }
+  };
 
   return (
     <div
@@ -1398,9 +2398,7 @@ function ActivityCard({
             {activity.isPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
           </Button>
         </div>
-        {activity.description && (
-          <p className="text-sm text-muted-foreground mt-2">{activity.description}</p>
-        )}
+        {renderTypeSpecificContent()}
       </div>
     </div>
   );

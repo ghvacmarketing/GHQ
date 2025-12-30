@@ -1094,7 +1094,7 @@ export const crmCustomerNotes = pgTable("crm_customer_notes", {
 });
 
 // Project Activity Types for Timeline
-export const projectActivityTypeEnum = ["note", "photo", "file", "status_change", "financial", "approval", "work_order_created", "work_order_completed", "quote_sent", "quote_accepted", "invoice_sent", "invoice_paid"] as const;
+export const projectActivityTypeEnum = ["note", "photo", "file", "status_change", "financial_update", "approval", "work_order_created", "work_order_completed", "quote_sent", "quote_accepted", "invoice_sent", "invoice_paid"] as const;
 export type ProjectActivityType = typeof projectActivityTypeEnum[number];
 
 // Project Activities (Timeline entries aggregating work order activities)
