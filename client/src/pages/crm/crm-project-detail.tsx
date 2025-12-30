@@ -794,7 +794,7 @@ export default function CrmProjectDetail() {
           </TabsContent>
 
           <TabsContent value="timeline" className="mt-4">
-            <ProjectTimelineTab projectId={id!} />
+            <ProjectTimelineTab projectId={projectId!} />
           </TabsContent>
         </Tabs>
 
