@@ -185,7 +185,7 @@ const START_HOUR = 8;
 const END_HOUR = 20;
 const STEP_MINUTES = 30;
 const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / STEP_MINUTES;
-const SLOT_WIDTH = 48;
+const SLOT_WIDTH = 60;
 
 function formatHour(hour: number): string {
   if (hour === 12) return "12pm";
