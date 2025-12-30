@@ -839,6 +839,10 @@ export const crmProperties = pgTable("crm_properties", {
   tenantName: text("tenant_name"),
   tenantPhone: text("tenant_phone"),
   tenantEmail: text("tenant_email"),
+  // Owner contact fields (for billing to owner)
+  ownerName: text("owner_name"),
+  ownerPhone: text("owner_phone"),
+  ownerEmail: text("owner_email"),
   // Quick toggle for preferred payment method (visible without billing override)
   preferredPaymentMethod: text("preferred_payment_method"), // e.g., "check", "cash", "credit_card"
   // Billing fields - if billingOverride is false, use PM defaults

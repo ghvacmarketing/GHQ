@@ -1356,8 +1356,10 @@ export default function CrmCustomerDetail() {
   const [propTenantName, setPropTenantName] = useState("");
   const [propTenantPhone, setPropTenantPhone] = useState("");
   const [propTenantEmail, setPropTenantEmail] = useState("");
-  // Preferred payment method (always visible for PM sites)
-  const [propPreferredPaymentMethod, setPropPreferredPaymentMethod] = useState("");
+  // Owner contact fields
+  const [propOwnerName, setPropOwnerName] = useState("");
+  const [propOwnerPhone, setPropOwnerPhone] = useState("");
+  const [propOwnerEmail, setPropOwnerEmail] = useState("");
   // Billing override fields
   const [propBillingOverride, setPropBillingOverride] = useState(false);
   const [propBilledTo, setPropBilledTo] = useState<"property_manager" | "tenant" | "owner">("tenant");
@@ -1375,7 +1377,9 @@ export default function CrmCustomerDetail() {
     setPropTenantName("");
     setPropTenantPhone("");
     setPropTenantEmail("");
-    setPropPreferredPaymentMethod("");
+    setPropOwnerName("");
+    setPropOwnerPhone("");
+    setPropOwnerEmail("");
     setPropBillingOverride(false);
     setPropBilledTo("tenant");
     setPropPaymentTerms("");
@@ -1960,7 +1964,9 @@ export default function CrmCustomerDetail() {
         tenantName: propTenantName.trim() || null,
         tenantPhone: propTenantPhone.trim() || null,
         tenantEmail: propTenantEmail.trim() || null,
-        preferredPaymentMethod: propPreferredPaymentMethod || null,
+        ownerName: propOwnerName.trim() || null,
+        ownerPhone: propOwnerPhone.trim() || null,
+        ownerEmail: propOwnerEmail.trim() || null,
         billingOverride: propBillingOverride,
         billedTo: propBillingOverride ? propBilledTo : "property_manager",
         paymentTerms: propBillingOverride ? (propPaymentTerms || null) : null,
@@ -2002,7 +2008,9 @@ export default function CrmCustomerDetail() {
         tenantName: propTenantName.trim() || null,
         tenantPhone: propTenantPhone.trim() || null,
         tenantEmail: propTenantEmail.trim() || null,
-        preferredPaymentMethod: propPreferredPaymentMethod || null,
+        ownerName: propOwnerName.trim() || null,
+        ownerPhone: propOwnerPhone.trim() || null,
+        ownerEmail: propOwnerEmail.trim() || null,
         billingOverride: propBillingOverride,
         billedTo: propBillingOverride ? propBilledTo : "property_manager",
         paymentTerms: propBillingOverride ? (propPaymentTerms || null) : null,
@@ -2040,9 +2048,11 @@ export default function CrmCustomerDetail() {
     setPropTenantName(property.tenantName || "");
     setPropTenantPhone(property.tenantPhone || "");
     setPropTenantEmail(property.tenantEmail || "");
-    setPropPreferredPaymentMethod((property as any).preferredPaymentMethod || "");
-    // If property is billed to tenant, assume billing override was on (backwards compatibility)
-    const hasBillingOverride = (property as any).billingOverride || property.billedTo === "tenant";
+    setPropOwnerName((property as any).ownerName || "");
+    setPropOwnerPhone((property as any).ownerPhone || "");
+    setPropOwnerEmail((property as any).ownerEmail || "");
+    // If property is billed to tenant or owner, assume billing override was on (backwards compatibility)
+    const hasBillingOverride = (property as any).billingOverride || property.billedTo === "tenant" || property.billedTo === "owner";
     setPropBillingOverride(hasBillingOverride);
     setPropBilledTo((property.billedTo as "property_manager" | "tenant" | "owner") || "tenant");
     setPropPaymentTerms((property as any).paymentTerms || "");
@@ -3038,27 +3048,25 @@ export default function CrmCustomerDetail() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-medium text-slate-600">Tenant Phone</Label>
-                      <Input
-                        placeholder="(706) 555-1234"
-                        value={propTenantPhone}
-                        onChange={(e) => setPropTenantPhone(e.target.value)}
-                        className="h-10 bg-white/80 dark:bg-slate-800/50"
-                        data-testid="input-prop-tenant-phone"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-medium text-slate-600">Site Notes</Label>
-                      <Input
-                        placeholder="Gate code, access notes..."
-                        value={propNotes}
-                        onChange={(e) => setPropNotes(e.target.value)}
-                        className="h-10 bg-white/80 dark:bg-slate-800/50"
-                        data-testid="input-prop-notes-inline"
-                      />
-                    </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium text-slate-600">Tenant Phone</Label>
+                    <Input
+                      placeholder="(706) 555-1234"
+                      value={propTenantPhone}
+                      onChange={(e) => setPropTenantPhone(e.target.value)}
+                      className="h-10 bg-white/80 dark:bg-slate-800/50"
+                      data-testid="input-prop-tenant-phone"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium text-slate-600">Site Notes</Label>
+                    <Textarea
+                      placeholder="Gate code, access notes, special instructions..."
+                      value={propNotes}
+                      onChange={(e) => setPropNotes(e.target.value)}
+                      className="min-h-[60px] resize-none bg-white/80 dark:bg-slate-800/50"
+                      data-testid="input-prop-notes-inline"
+                    />
                   </div>
                 </div>
               )}
@@ -3094,10 +3102,10 @@ export default function CrmCustomerDetail() {
                       </div>
                       
                       <div className="space-y-1.5">
-                        <Label className="text-sm font-medium text-slate-600">Payment Terms <span className="text-slate-400 font-normal">(optional)</span></Label>
+                        <Label className="text-sm font-medium">Payment Terms <span className="text-red-500">*</span></Label>
                         <Select value={propPaymentTerms} onValueChange={setPropPaymentTerms}>
                           <SelectTrigger className="h-11" data-testid="select-prop-payment-terms">
-                            <SelectValue placeholder="Use PM default" />
+                            <SelectValue placeholder="Select payment terms" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="due_on_receipt">Due on Receipt</SelectItem>
@@ -3110,10 +3118,10 @@ export default function CrmCustomerDetail() {
                       </div>
                       
                       <div className="space-y-1.5">
-                        <Label className="text-sm font-medium text-slate-600">Payment Method <span className="text-slate-400 font-normal">(optional)</span></Label>
+                        <Label className="text-sm font-medium">Payment Method <span className="text-red-500">*</span></Label>
                         <Select value={propPaymentMethod} onValueChange={setPropPaymentMethod}>
                           <SelectTrigger className="h-11" data-testid="select-prop-payment-method">
-                            <SelectValue placeholder="Use PM default" />
+                            <SelectValue placeholder="Select payment method" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="invoice">Invoice</SelectItem>
@@ -3125,10 +3133,10 @@ export default function CrmCustomerDetail() {
                       </div>
                       
                       <div className="space-y-1.5">
-                        <Label className="text-sm font-medium text-slate-600">Approval Rule <span className="text-slate-400 font-normal">(optional)</span></Label>
+                        <Label className="text-sm font-medium">Approval Rule <span className="text-red-500">*</span></Label>
                         <Select value={propApprovalRule} onValueChange={setPropApprovalRule}>
                           <SelectTrigger className="h-11" data-testid="select-prop-approval-rule">
-                            <SelectValue placeholder="Use PM default" />
+                            <SelectValue placeholder="Select approval rule" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="pm_approval_required">PM Approval Required</SelectItem>
@@ -3137,17 +3145,66 @@ export default function CrmCustomerDetail() {
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {/* Owner Contact - when billing to owner */}
+                      {propBilledTo === "owner" && (
+                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl p-4 space-y-4 border border-emerald-200/60 dark:border-emerald-700/40">
+                          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            Owner Contact <span className="text-red-500">*</span>
+                          </p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-sm font-medium text-slate-600">Owner Name <span className="text-red-500">*</span></Label>
+                              <Input
+                                placeholder="Property Owner Name"
+                                value={propOwnerName}
+                                onChange={(e) => setPropOwnerName(e.target.value)}
+                                className="h-10 bg-white/80 dark:bg-slate-800/50"
+                                data-testid="input-prop-owner-name"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-sm font-medium text-slate-600">Owner Email <span className="text-red-500">*</span></Label>
+                              <Input
+                                placeholder="owner@email.com"
+                                type="email"
+                                value={propOwnerEmail}
+                                onChange={(e) => setPropOwnerEmail(e.target.value)}
+                                className="h-10 bg-white/80 dark:bg-slate-800/50"
+                                data-testid="input-prop-owner-email"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-sm font-medium text-slate-600">Owner Phone</Label>
+                              <Input
+                                placeholder="(706) 555-1234"
+                                value={propOwnerPhone}
+                                onChange={(e) => setPropOwnerPhone(e.target.value)}
+                                className="h-10 bg-white/80 dark:bg-slate-800/50"
+                                data-testid="input-prop-owner-phone"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-sm font-medium text-slate-600">Notes</Label>
+                              <Input
+                                placeholder="Billing notes..."
+                                value={propNotes}
+                                onChange={(e) => setPropNotes(e.target.value)}
+                                className="h-10 bg-white/80 dark:bg-slate-800/50"
+                                data-testid="input-prop-owner-notes"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       
                       {propBilledTo === "tenant" && (
                         <div className="flex items-center gap-2 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-md text-amber-700 dark:text-amber-300 text-sm">
                           <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                          <span>Invoices will be sent to the tenant email address</span>
-                        </div>
-                      )}
-                      {propBilledTo === "owner" && (
-                        <div className="flex items-center gap-2 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-md text-amber-700 dark:text-amber-300 text-sm">
-                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                          <span>Invoices will be sent to the property owner</span>
+                          <span>Invoices will be sent to the tenant email address above</span>
                         </div>
                       )}
                     </div>
@@ -3167,7 +3224,9 @@ export default function CrmCustomerDetail() {
                   !propCity.trim() || 
                   !propState.trim() || 
                   !propZip.trim() || 
+                  (isPropertyManager && propBillingOverride && (!propPaymentTerms || !propPaymentMethod || !propApprovalRule)) ||
                   (isPropertyManager && propBillingOverride && propBilledTo === "tenant" && (!propTenantName.trim() || !propTenantEmail.trim())) || 
+                  (isPropertyManager && propBillingOverride && propBilledTo === "owner" && (!propOwnerName.trim() || !propOwnerEmail.trim())) || 
                   createPropertyMutation.isPending || 
                   updatePropertyMutation.isPending
                 }
