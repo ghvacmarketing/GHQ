@@ -1037,28 +1037,29 @@ export default function CrmDispatch() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        {/* Header with search bar and Create Work Order button */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-2">
-          {/* Left side: Search bar */}
-          <div className="relative flex-1 max-w-xl">
+        {/* Header: Grid layout with centered search and right-aligned controls */}
+        <div className="grid grid-cols-[1fr_auto] items-center gap-x-6 mb-2">
+          {/* Centered search bar */}
+          <div className="relative w-full max-w-xl justify-self-center">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search work orders..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+              className="pl-10 h-9 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
               data-testid="input-search-dispatch"
             />
           </div>
 
-          {/* Right side: Create button above date/legend */}
-          <div className="flex flex-col gap-2 items-end">
+          {/* Right side: Create button stacked above date/legend */}
+          <div className="flex flex-col gap-1.5 items-end">
             <Button
+              size="sm"
               onClick={() => {
                 setScheduledDate(selectedDate);
                 setCreateDialogOpen(true);
               }}
-              className="bg-[#711419] hover:bg-[#5a1014] text-white h-10 w-full sm:w-auto"
+              className="bg-[#711419] hover:bg-[#5a1014] text-white w-full"
               data-testid="button-create-work-order"
             >
               <Plus className="h-4 w-4 mr-1.5" />
