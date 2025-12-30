@@ -810,7 +810,7 @@ export default function CrmProjectDetail() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="timeline" className="mt-4">
+          <TabsContent value="timeline" className="mt-4 data-[state=inactive]:hidden" forceMount>
             <ProjectTimelineTab projectId={projectId!} />
           </TabsContent>
         </Tabs>
