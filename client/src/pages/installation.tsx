@@ -777,9 +777,11 @@ export default function Installation() {
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   );
 
-  const { data: allLeads = [], isLoading: isLoadingLeads } = useQuery<Lead[]>({
+  const { data: leadsResponse, isLoading: isLoadingLeads } = useQuery<{ leads: Lead[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>({
     queryKey: ["/api/leads"],
   });
+
+  const allLeads = leadsResponse?.leads || [];
 
   const { data: technicians = [] } = useQuery<Technician[]>({
     queryKey: ["/api/technicians"],
