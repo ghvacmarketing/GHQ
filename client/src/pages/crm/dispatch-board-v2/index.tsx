@@ -328,15 +328,19 @@ export default function DispatchBoardV2() {
                         Technicians
                       </div>
                       <div className="flex">
-                        {timeSlots.map((slot, idx) => (
-                          <div
-                            key={idx}
-                            className={`text-center py-2 text-xs font-medium border-r ${slot.label ? "text-slate-600 border-slate-300" : "text-slate-400 border-slate-100"}`}
-                            style={{ width: 60 }}
-                          >
-                            {slot.label || ""}
-                          </div>
-                        ))}
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const hour = 8 + i;
+                          const label = hour === 12 ? "12pm" : hour > 12 ? `${hour - 12}pm` : `${hour}am`;
+                          return (
+                            <div
+                              key={i}
+                              className="text-center py-2 text-xs font-medium text-slate-600 border-r border-slate-300"
+                              style={{ width: SLOT_WIDTH * 2 }}
+                            >
+                              {label}
+                            </div>
+                          );
+                        })}
                         <div
                           className="text-center py-2 text-xs text-slate-600 font-medium"
                           style={{ width: 30 }}
@@ -510,7 +514,7 @@ function TimeSlotDropZone({ techId, slotIndex, isHourMark }: { techId: string; s
   return (
     <div
       ref={setNodeRef}
-      className={`absolute top-0 bottom-0 border-r ${isHourMark ? "border-slate-300" : "border-slate-100"} ${isOver ? "bg-blue-100" : ""}`}
+      className={`absolute top-0 bottom-0 ${isHourMark ? "border-r border-slate-200" : ""} ${isOver ? "bg-blue-100" : ""}`}
       style={{
         left: slotIndex * SLOT_WIDTH,
         width: SLOT_WIDTH,
