@@ -1037,9 +1037,10 @@ export default function CrmDispatch() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        {/* Search bar at top - DoorLoop style */}
-        <div className="flex justify-center mb-2">
-          <div className="relative w-full max-w-xl">
+        {/* Header with search bar and Create Work Order button */}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-2">
+          {/* Left side: Search bar */}
+          <div className="relative flex-1 max-w-xl">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search work orders..."
@@ -1049,6 +1050,109 @@ export default function CrmDispatch() {
               data-testid="input-search-dispatch"
             />
           </div>
+
+          {/* Right side: Create button above date/legend */}
+          <div className="flex flex-col gap-2 items-end">
+            <Button
+              onClick={() => {
+                setScheduledDate(selectedDate);
+                setCreateDialogOpen(true);
+              }}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white h-10 w-full sm:w-auto"
+              data-testid="button-create-work-order"
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              Create Work Order
+            </Button>
+            <div className="flex items-center gap-2">
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="text-slate-600"
+                    data-testid="button-date-picker"
+                  >
+                    <CalendarDays className="h-4 w-4 mr-2" />
+                    {dateDisplay}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    initialFocus
+                    data-testid="calendar-picker"
+                  />
+                </PopoverContent>
+              </Popover>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-slate-600" data-testid="button-legend">
+                    <Info className="h-4 w-4 mr-1.5" />
+                    Legend
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[340px] p-0" align="end">
+                  <div className="p-4 space-y-4">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Job Type (Background)</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded bg-sky-100 border border-sky-200" />
+                          <span className="text-sm text-slate-700">Service</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded bg-emerald-100 border border-emerald-200" />
+                          <span className="text-sm text-slate-700">Maintenance</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded bg-amber-100 border border-amber-200" />
+                          <span className="text-sm text-slate-700">Install</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded bg-rose-100 border border-rose-200" />
+                          <span className="text-sm text-slate-700">Sales</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="border-t border-slate-100 pt-4">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Visit Type (Left Stripe)</p>
+                      <div className="grid grid-cols-3 gap-x-3 gap-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                          <span className="text-sm text-slate-700">Scheduled</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0" />
+                          <span className="text-sm text-slate-700">Dispatched</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+                          <span className="text-sm text-slate-700">En Route</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+                          <span className="text-sm text-slate-700">On Site</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                          <span className="text-sm text-slate-700">Completed</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                          <span className="text-sm text-slate-700">Cancelled</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1057,109 +1161,6 @@ export default function CrmDispatch() {
               Dispatch Board
             </h1>
             <p className="text-slate-500 text-sm">Daily Schedule - {filteredWorkOrders.length} work orders</p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="text-slate-600"
-                  data-testid="button-date-picker"
-                >
-                  <CalendarDays className="h-4 w-4 mr-2" />
-                  {dateDisplay}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={handleDateSelect}
-                  initialFocus
-                  data-testid="calendar-picker"
-                />
-              </PopoverContent>
-            </Popover>
-            
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="text-slate-600" data-testid="button-legend">
-                  <Info className="h-4 w-4 mr-1.5" />
-                  Legend
-                </Button>
-              </PopoverTrigger>
-            <PopoverContent className="w-[340px] p-0" align="end">
-              <div className="p-4 space-y-4">
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Job Type (Background)</p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-sky-100 border border-sky-200" />
-                      <span className="text-sm text-slate-700">Service</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-emerald-100 border border-emerald-200" />
-                      <span className="text-sm text-slate-700">Maintenance</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-amber-100 border border-amber-200" />
-                      <span className="text-sm text-slate-700">Install</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-rose-100 border border-rose-200" />
-                      <span className="text-sm text-slate-700">Sales</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="border-t border-slate-100 pt-4">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Visit Type (Left Stripe)</p>
-                  <div className="grid grid-cols-3 gap-x-3 gap-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                      <span className="text-sm text-slate-700">Scheduled</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0" />
-                      <span className="text-sm text-slate-700">Dispatched</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
-                      <span className="text-sm text-slate-700">En Route</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
-                      <span className="text-sm text-slate-700">On Site</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-                      <span className="text-sm text-slate-700">Completed</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
-                      <span className="text-sm text-slate-700">Cancelled</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </PopoverContent>
-            </Popover>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-slate-600"
-              onClick={() => {
-                setScheduledDate(selectedDate);
-                setCreateDialogOpen(true);
-              }}
-              data-testid="button-create-work-order"
-            >
-              <Plus className="h-4 w-4 mr-1.5" />
-              Create Work Order
-            </Button>
           </div>
         </div>
 
