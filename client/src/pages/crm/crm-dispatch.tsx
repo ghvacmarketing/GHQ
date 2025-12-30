@@ -156,11 +156,31 @@ function getInitials(name: string): string {
 
 const START_HOUR = 8;
 const END_HOUR = 20;
-const TOTAL_HOURS = END_HOUR - START_HOUR;
-const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i + START_HOUR);
-const SLOT_WIDTH = 48;
-const HOUR_WIDTH = SLOT_WIDTH * 2;
-const TIMELINE_WIDTH = TOTAL_HOURS * HOUR_WIDTH;
+const STEP_MINUTES = 30;
+const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / STEP_MINUTES; // 24 slots
+const SLOT_WIDTH = 48; // Width of each 30-min slot
+
+function formatHour(hour: number): string {
+  if (hour === 12) return "12pm";
+  if (hour > 12) return `${hour - 12}pm`;
+  return `${hour}am`;
+}
+
+// Generate timeSlots array: 8:00, 8:30, 9:00, ... 19:30
+const timeSlots = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
+  const totalMinutes = START_HOUR * 60 + i * STEP_MINUTES;
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  return {
+    hour,
+    minute,
+    label: minute === 0 ? formatHour(hour) : null, // Only show label on hour marks
+    isHourMark: minute === 0,
+    timeValue: hour + minute / 60, // Decimal hour for positioning (e.g., 8.5 = 8:30)
+  };
+});
+
+const TIMELINE_WIDTH = TOTAL_SLOTS * SLOT_WIDTH;
 
 const statusColors: Record<string, { bg: string; border: string; text: string }> = {
   scheduled: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
@@ -213,21 +233,33 @@ const statusLabels: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
-function formatHour(hour: number): string {
-  if (hour === 12) return "12pm";
-  if (hour > 12) return `${hour - 12}pm`;
-  return `${hour}am`;
+// Convert decimal hours to slot index (e.g., 8.5 = slot 1)
+function timeToSlotIndex(decimalHour: number): number {
+  const clampedHour = Math.max(START_HOUR, Math.min(END_HOUR, decimalHour));
+  return Math.round((clampedHour - START_HOUR) * (60 / STEP_MINUTES));
 }
 
-function getWorkOrderDisplayTimes(workOrder: DispatchWorkOrder): { startHour: number; endHour: number } {
+// Convert slot index to decimal hours (e.g., slot 1 = 8.5)
+function slotIndexToTime(slotIndex: number): number {
+  return START_HOUR + (slotIndex * STEP_MINUTES) / 60;
+}
+
+function getWorkOrderDisplayTimes(workOrder: DispatchWorkOrder): { startHour: number; endHour: number; startSlot: number; endSlot: number } {
   if (!workOrder.scheduledStart || !workOrder.scheduledEnd) {
-    return { startHour: START_HOUR, endHour: START_HOUR + 1 };
+    return { startHour: START_HOUR, endHour: START_HOUR + 1, startSlot: 0, endSlot: 2 };
   }
   const start = new Date(workOrder.scheduledStart);
   const end = new Date(workOrder.scheduledEnd);
   const startHour = Math.max(START_HOUR, Math.min(END_HOUR, start.getHours() + start.getMinutes() / 60));
   const endHour = Math.max(START_HOUR, Math.min(END_HOUR, end.getHours() + end.getMinutes() / 60));
-  return { startHour, endHour: endHour > startHour ? endHour : startHour + 1 };
+  const startSlot = timeToSlotIndex(startHour);
+  const endSlot = timeToSlotIndex(endHour);
+  return { 
+    startHour, 
+    endHour: endHour > startHour ? endHour : startHour + 0.5, 
+    startSlot, 
+    endSlot: endSlot > startSlot ? endSlot : startSlot + 1 
+  };
 }
 
 interface DraggableWorkOrderCardProps {
@@ -288,7 +320,7 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
     if (!isResizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const hoursPerPixel = TOTAL_HOURS / TIMELINE_WIDTH;
+      const hoursPerPixel = (END_HOUR - START_HOUR) / TIMELINE_WIDTH;
       const deltaX = e.clientX - resizeStartX.current;
       const deltaHours = deltaX * hoursPerPixel;
       
@@ -324,8 +356,11 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
 
   const displayStart = isResizing ? visualStart : startHour;
   const displayEnd = isResizing ? visualEnd : endHour;
-  const leftPx = (displayStart - START_HOUR) * HOUR_WIDTH;
-  const widthPx = (displayEnd - displayStart) * HOUR_WIDTH;
+  // Convert decimal hours to slot-based pixels
+  const startSlotIdx = (displayStart - START_HOUR) * (60 / STEP_MINUTES);
+  const endSlotIdx = (displayEnd - START_HOUR) * (60 / STEP_MINUTES);
+  const leftPx = startSlotIdx * SLOT_WIDTH;
+  const widthPx = (endSlotIdx - startSlotIdx) * SLOT_WIDTH;
 
   const style: React.CSSProperties = {
     left: `${leftPx}px`,
@@ -393,8 +428,8 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
   const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
   const isCompletedStatus = ["completed", "cancelled"].includes(workOrder.status);
   const { startHour, endHour } = getWorkOrderDisplayTimes(workOrder);
-  const duration = endHour - startHour;
-  const widthPx = Math.max(48, duration * HOUR_WIDTH);
+  const durationSlots = (endHour - startHour) * (60 / STEP_MINUTES);
+  const widthPx = Math.max(48, durationSlots * SLOT_WIDTH);
   
   return (
     <div
@@ -448,16 +483,12 @@ function DroppableTechnicianRow({ tech, workOrders, onResize, activeId, onWorkOr
       </div>
       <div ref={setNodeRef} className={`relative h-14 ${isOver ? 'bg-slate-50' : ''}`} style={{ width: `${TIMELINE_WIDTH}px` }}>
         <div className="absolute inset-0 flex">
-          {hours.map((hour) => (
+          {timeSlots.map((slot, idx) => (
             <div
-              key={hour}
-              className="border-r border-slate-200 last:border-r-0 flex"
-              style={{ width: `${HOUR_WIDTH}px` }}
-            >
-              {[0, 1, 2, 3].map((q) => (
-                <div key={q} className="flex-1 border-r border-slate-100 last:border-r-0" />
-              ))}
-            </div>
+              key={idx}
+              className={`border-r last:border-r-0 ${slot.isHourMark ? 'border-slate-300' : 'border-slate-200'}`}
+              style={{ width: `${SLOT_WIDTH}px` }}
+            />
           ))}
         </div>
         {workOrders.map((wo) => (
@@ -499,16 +530,12 @@ function UnassignedRow({ workOrders, onResize, activeId, onWorkOrderClick }: { w
       </div>
       <div ref={setNodeRef} className={`relative h-14 ${isOver ? 'bg-amber-50' : ''}`} style={{ width: `${TIMELINE_WIDTH}px` }}>
         <div className="absolute inset-0 flex">
-          {hours.map((hour) => (
+          {timeSlots.map((slot, idx) => (
             <div
-              key={hour}
-              className="border-r border-slate-200 last:border-r-0 flex"
-              style={{ width: `${HOUR_WIDTH}px` }}
-            >
-              {[0, 1, 2, 3].map((q) => (
-                <div key={q} className="flex-1 border-r border-slate-100 last:border-r-0" />
-              ))}
-            </div>
+              key={idx}
+              className={`border-r last:border-r-0 ${slot.isHourMark ? 'border-slate-300' : 'border-slate-200'}`}
+              style={{ width: `${SLOT_WIDTH}px` }}
+            />
           ))}
         </div>
         {workOrders.map((wo) => (
@@ -948,7 +975,7 @@ export default function CrmDispatch() {
       const { startHour, endHour } = getWorkOrderDisplayTimes(wo);
       const duration = endHour - startHour;
       
-      const hoursPerPixel = TOTAL_HOURS / TIMELINE_WIDTH;
+      const hoursPerPixel = (END_HOUR - START_HOUR) / TIMELINE_WIDTH;
       const deltaHours = Math.round((delta.x * hoursPerPixel) * 2) / 2;
       
       let newStartHour = startHour + deltaHours;
@@ -1225,13 +1252,17 @@ export default function CrmDispatch() {
                       Technicians
                     </div>
                     <div ref={timelineRef} className="flex" style={{ width: `${TIMELINE_WIDTH}px` }}>
-                      {hours.map((hour) => (
+                      {timeSlots.map((slot, idx) => (
                         <div
-                          key={hour}
-                          className="text-center py-2 text-xs text-slate-500 border-r border-slate-200 last:border-r-0"
-                          style={{ width: `${HOUR_WIDTH}px` }}
+                          key={idx}
+                          className={`text-center py-2 text-xs border-r last:border-r-0 ${
+                            slot.isHourMark 
+                              ? "text-slate-600 font-medium border-slate-300" 
+                              : "text-slate-400 border-slate-200"
+                          }`}
+                          style={{ width: `${SLOT_WIDTH}px` }}
                         >
-                          {formatHour(hour)}
+                          {slot.label || ""}
                         </div>
                       ))}
                     </div>
