@@ -843,7 +843,7 @@ export const crmProperties = pgTable("crm_properties", {
   preferredPaymentMethod: text("preferred_payment_method"), // e.g., "check", "cash", "credit_card"
   // Billing fields - if billingOverride is false, use PM defaults
   billingOverride: boolean("billing_override").default(false),
-  billedTo: text("billed_to").$type<"property_manager" | "tenant">().default("property_manager"),
+  billedTo: text("billed_to").$type<"property_manager" | "tenant" | "owner">().default("property_manager"),
   paymentTerms: text("payment_terms"), // e.g., "net_30", "due_on_receipt", "net_15"
   paymentMethod: text("payment_method"), // e.g., "invoice", "credit_card", "check"
   approvalRule: text("approval_rule"), // e.g., "pm_approval_required", "tenant_direct", "auto_approve"

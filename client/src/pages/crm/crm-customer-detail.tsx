@@ -1360,7 +1360,7 @@ export default function CrmCustomerDetail() {
   const [propPreferredPaymentMethod, setPropPreferredPaymentMethod] = useState("");
   // Billing override fields
   const [propBillingOverride, setPropBillingOverride] = useState(false);
-  const [propBilledTo, setPropBilledTo] = useState<"property_manager" | "tenant">("property_manager");
+  const [propBilledTo, setPropBilledTo] = useState<"property_manager" | "tenant" | "owner">("tenant");
   const [propPaymentTerms, setPropPaymentTerms] = useState("");
   const [propPaymentMethod, setPropPaymentMethod] = useState("");
   const [propApprovalRule, setPropApprovalRule] = useState("");
@@ -1377,7 +1377,7 @@ export default function CrmCustomerDetail() {
     setPropTenantEmail("");
     setPropPreferredPaymentMethod("");
     setPropBillingOverride(false);
-    setPropBilledTo("property_manager");
+    setPropBilledTo("tenant");
     setPropPaymentTerms("");
     setPropPaymentMethod("");
     setPropApprovalRule("");
@@ -2044,7 +2044,7 @@ export default function CrmCustomerDetail() {
     // If property is billed to tenant, assume billing override was on (backwards compatibility)
     const hasBillingOverride = (property as any).billingOverride || property.billedTo === "tenant";
     setPropBillingOverride(hasBillingOverride);
-    setPropBilledTo((property.billedTo as "property_manager" | "tenant") || "property_manager");
+    setPropBilledTo((property.billedTo as "property_manager" | "tenant" | "owner") || "tenant");
     setPropPaymentTerms((property as any).paymentTerms || "");
     setPropPaymentMethod((property as any).paymentMethod || "");
     setPropApprovalRule((property as any).approvalRule || "");
@@ -2990,77 +2990,76 @@ export default function CrmCustomerDetail() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-slate-600">Notes <span className="text-slate-400 font-normal">(optional)</span></Label>
-                <Textarea
-                  placeholder="Any additional notes about this site..."
-                  value={propNotes}
-                  onChange={(e) => setPropNotes(e.target.value)}
-                  className="min-h-[80px] resize-none"
-                  data-testid="input-prop-notes"
-                />
-              </div>
+              {/* Notes - Only for non-PM customers */}
+              {!isPropertyManager && (
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-slate-600">Notes <span className="text-slate-400 font-normal">(optional)</span></Label>
+                  <Textarea
+                    placeholder="Any additional notes about this site..."
+                    value={propNotes}
+                    onChange={(e) => setPropNotes(e.target.value)}
+                    className="min-h-[80px] resize-none"
+                    data-testid="input-prop-notes"
+                  />
+                </div>
+              )}
 
-              {/* Tenant Contact Information - Only for Property Manager customers */}
+              {/* Tenant Contact & Site Details - Only for Property Manager customers */}
               {isPropertyManager && (
-                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 space-y-4 border border-purple-200 dark:border-purple-800">
-                  <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">Tenant Contact <span className="text-purple-400 font-normal">(optional)</span></p>
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium text-slate-600">
-                      Tenant Name {propBillingOverride && propBilledTo === "tenant" ? <span className="text-red-500">*</span> : <span className="text-slate-400 font-normal">(optional)</span>}
-                    </Label>
-                    <Input
-                      placeholder="John Doe"
-                      value={propTenantName}
-                      onChange={(e) => setPropTenantName(e.target.value)}
-                      className="h-11"
-                      data-testid="input-prop-tenant-name"
-                    />
-                  </div>
+                <div className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-xl p-4 space-y-4 border border-violet-200/60 dark:border-violet-700/40 shadow-sm">
+                  <p className="text-xs font-semibold text-violet-600 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-violet-400"></span>
+                    Tenant Contact <span className="text-violet-400 font-normal">(optional)</span>
+                  </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <Label className="text-sm font-medium text-slate-600">Tenant Phone <span className="text-slate-400 font-normal">(optional)</span></Label>
+                      <Label className="text-sm font-medium text-slate-600">
+                        Tenant Name {propBillingOverride && propBilledTo === "tenant" ? <span className="text-red-500">*</span> : ""}
+                      </Label>
                       <Input
-                        placeholder="(706) 555-1234"
-                        value={propTenantPhone}
-                        onChange={(e) => setPropTenantPhone(e.target.value)}
-                        className="h-11"
-                        data-testid="input-prop-tenant-phone"
+                        placeholder="John Doe"
+                        value={propTenantName}
+                        onChange={(e) => setPropTenantName(e.target.value)}
+                        className="h-10 bg-white/80 dark:bg-slate-800/50"
+                        data-testid="input-prop-tenant-name"
                       />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-sm font-medium text-slate-600">
-                        Tenant Email {propBillingOverride && propBilledTo === "tenant" ? <span className="text-red-500">*</span> : <span className="text-slate-400 font-normal">(optional)</span>}
+                        Tenant Email {propBillingOverride && propBilledTo === "tenant" ? <span className="text-red-500">*</span> : ""}
                       </Label>
                       <Input
                         placeholder="tenant@email.com"
                         type="email"
                         value={propTenantEmail}
                         onChange={(e) => setPropTenantEmail(e.target.value)}
-                        className="h-11"
+                        className="h-10 bg-white/80 dark:bg-slate-800/50"
                         data-testid="input-prop-tenant-email"
                       />
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* Preferred Payment Method - Visible for Property Manager customers */}
-              {isPropertyManager && (
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-slate-600">Preferred Payment Method <span className="text-slate-400 font-normal">(optional)</span></Label>
-                  <Select value={propPreferredPaymentMethod || "none"} onValueChange={(v) => setPropPreferredPaymentMethod(v === "none" ? "" : v)}>
-                    <SelectTrigger className="h-11" data-testid="select-preferred-payment-method">
-                      <SelectValue placeholder="No preference" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No preference</SelectItem>
-                      <SelectItem value="check">Check</SelectItem>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="credit_card">Credit Card</SelectItem>
-                      <SelectItem value="ach">ACH</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium text-slate-600">Tenant Phone</Label>
+                      <Input
+                        placeholder="(706) 555-1234"
+                        value={propTenantPhone}
+                        onChange={(e) => setPropTenantPhone(e.target.value)}
+                        className="h-10 bg-white/80 dark:bg-slate-800/50"
+                        data-testid="input-prop-tenant-phone"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium text-slate-600">Site Notes</Label>
+                      <Input
+                        placeholder="Gate code, access notes..."
+                        value={propNotes}
+                        onChange={(e) => setPropNotes(e.target.value)}
+                        className="h-10 bg-white/80 dark:bg-slate-800/50"
+                        data-testid="input-prop-notes-inline"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -3083,13 +3082,13 @@ export default function CrmCustomerDetail() {
                     <div className="space-y-4 pt-2 border-t border-blue-200 dark:border-blue-700">
                       <div className="space-y-1.5">
                         <Label className="text-sm font-medium">Bill To</Label>
-                        <Select value={propBilledTo} onValueChange={(v) => setPropBilledTo(v as "property_manager" | "tenant")}>
+                        <Select value={propBilledTo} onValueChange={(v) => setPropBilledTo(v as "property_manager" | "tenant" | "owner")}>
                           <SelectTrigger className="h-11" data-testid="select-prop-billed-to">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="property_manager">Property Manager</SelectItem>
                             <SelectItem value="tenant">Tenant</SelectItem>
+                            <SelectItem value="owner">Owner</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -3143,6 +3142,12 @@ export default function CrmCustomerDetail() {
                         <div className="flex items-center gap-2 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-md text-amber-700 dark:text-amber-300 text-sm">
                           <AlertCircle className="h-4 w-4 flex-shrink-0" />
                           <span>Invoices will be sent to the tenant email address</span>
+                        </div>
+                      )}
+                      {propBilledTo === "owner" && (
+                        <div className="flex items-center gap-2 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-md text-amber-700 dark:text-amber-300 text-sm">
+                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                          <span>Invoices will be sent to the property owner</span>
                         </div>
                       )}
                     </div>
