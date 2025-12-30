@@ -30,23 +30,21 @@ import {
   END_HOUR,
   INTERVAL_MINUTES,
   TOTAL_SLOTS,
+  TOTAL_MINUTES,
   QUEUE_STAGES,
   QUEUE_STAGE_CONFIG,
   TECH_COLORS,
-  buildTimeSlots,
-  dateToSlotIndex,
   slotIndexToTime,
-  calculateDurationSlots,
+  minutesFromDayStart,
+  minutesToPercent,
+  getDurationMinutes,
   type QueueStage,
 } from "./constants";
 import type { EnrichedWorkOrder, Technician, DragPayload } from "./types";
 
-const timeSlots = buildTimeSlots();
-const SLOT_WIDTH = 60;
-const TIMELINE_WIDTH = TOTAL_SLOTS * SLOT_WIDTH;
-
 const TECH_ROW_HEIGHT = 56;
 const TECH_LABEL_WIDTH = 176;
+const TIMELINE_WIDTH = 900;
 
 function getInitials(name: string): string {
   return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
@@ -73,6 +71,7 @@ export default function DispatchBoardV2() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
+  const [dragTooltip, setDragTooltip] = useState<{ start: string; end: string } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -167,9 +166,27 @@ export default function DispatchBoardV2() {
     setActiveId(event.active.id as string);
   };
 
+  const handleDragMove = useCallback((event: any) => {
+    const overId = event.over?.id as string;
+    if (overId?.startsWith("tech-slot::")) {
+      const parts = overId.replace("tech-slot::", "").split("::");
+      const slotIndex = parseInt(parts[1], 10);
+      const startTime = slotIndexToTime(slotIndex, selectedDate);
+      const endTime = new Date(startTime);
+      endTime.setHours(endTime.getHours() + 1);
+      setDragTooltip({
+        start: format(startTime, "h:mm a"),
+        end: format(endTime, "h:mm a"),
+      });
+    } else {
+      setDragTooltip(null);
+    }
+  }, [selectedDate]);
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setDragTooltip(null);
 
     if (!over) return;
 
@@ -282,6 +299,7 @@ export default function DispatchBoardV2() {
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
         >
           <div className="flex-1 overflow-hidden flex flex-col">
@@ -327,20 +345,18 @@ export default function DispatchBoardV2() {
                       >
                         Technicians
                       </div>
-                      <div className="flex" style={{ width: TIMELINE_WIDTH }}>
+                      <div className="relative" style={{ width: TIMELINE_WIDTH }}>
                         {Array.from({ length: 13 }, (_, i) => {
-                          const hour = 8 + i;
+                          const hour = START_HOUR + i;
                           const label = hour === 12 ? "12pm" : hour > 12 ? `${hour - 12}pm` : `${hour}am`;
-                          const isLast = i === 12;
+                          const leftPercent = (i / 12) * 100;
                           return (
                             <div
                               key={i}
-                              className="py-2 text-xs font-medium text-slate-600"
+                              className="absolute py-2 text-xs font-medium text-slate-600"
                               style={{ 
-                                width: isLast ? 0 : TIMELINE_WIDTH / 12,
-                                textAlign: i === 0 ? 'left' : isLast ? 'right' : 'center',
-                                marginLeft: isLast ? -20 : 0,
-                                paddingLeft: i === 0 ? 4 : 0,
+                                left: `${leftPercent}%`,
+                                transform: i === 0 ? 'none' : i === 12 ? 'translateX(-100%)' : 'translateX(-50%)',
                               }}
                             >
                               {label}
@@ -372,7 +388,16 @@ export default function DispatchBoardV2() {
           </div>
 
           <DragOverlay>
-            {activeWorkOrder && <WorkOrderCardOverlay workOrder={activeWorkOrder} />}
+            {activeWorkOrder && (
+              <div>
+                <WorkOrderCardOverlay workOrder={activeWorkOrder} />
+                {dragTooltip && (
+                  <div className="mt-2 bg-slate-900 text-white text-xs px-3 py-1.5 rounded-md shadow-lg">
+                    Starts {dragTooltip.start} – Ends {dragTooltip.end}
+                  </div>
+                )}
+              </div>
+            )}
           </DragOverlay>
         </DndContext>
       </div>
@@ -408,7 +433,7 @@ function QueueColumnComponent({ stage, workOrders }: { stage: QueueStage; workOr
   );
 }
 
-import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { useDraggable, useDroppable, DragMoveEvent } from "@dnd-kit/core";
 
 function QueueCard({ workOrder }: { workOrder: EnrichedWorkOrder }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -475,12 +500,12 @@ function TechnicianRowV2({
           <div
             key={i}
             className="absolute top-0 bottom-0 border-r border-slate-100"
-            style={{ left: (i + 1) * (TIMELINE_WIDTH / 12) - 1 }}
+            style={{ left: `${((i + 1) / 12) * 100}%` }}
           />
         ))}
 
-        {timeSlots.map((slot, idx) => (
-          <DropZoneV2
+        {Array.from({ length: TOTAL_SLOTS }, (_, idx) => (
+          <DropZonePercent
             key={idx}
             techId={tech.id}
             slotIndex={idx}
@@ -491,20 +516,21 @@ function TechnicianRowV2({
           if (!wo.scheduledStart) return null;
           const startDate = new Date(wo.scheduledStart);
           const endDate = wo.scheduledEnd ? new Date(wo.scheduledEnd) : null;
-          const slotIndex = dateToSlotIndex(startDate);
-          const durationSlots = calculateDurationSlots(startDate, endDate);
+          
+          const minutesFrom8am = minutesFromDayStart(startDate);
+          const durationMins = getDurationMinutes(startDate, endDate);
 
-          if (slotIndex < 0 || slotIndex >= TOTAL_SLOTS) return null;
+          if (minutesFrom8am < 0 || minutesFrom8am >= TOTAL_MINUTES) return null;
 
-          const leftPx = slotIndex * SLOT_WIDTH;
-          const widthPx = durationSlots * SLOT_WIDTH;
+          const leftPercent = minutesToPercent(minutesFrom8am);
+          const widthPercent = minutesToPercent(durationMins);
 
           return (
             <ScheduledWorkOrderCard
               key={wo.id}
               workOrder={wo}
-              leftPx={leftPx}
-              widthPx={widthPx}
+              leftPercent={leftPercent}
+              widthPercent={widthPercent}
             />
           );
         })}
@@ -513,18 +539,21 @@ function TechnicianRowV2({
   );
 }
 
-function DropZoneV2({ techId, slotIndex }: { techId: string; slotIndex: number }) {
+function DropZonePercent({ techId, slotIndex }: { techId: string; slotIndex: number }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `tech-slot::${techId}::${slotIndex}`,
   });
+
+  const leftPercent = (slotIndex / TOTAL_SLOTS) * 100;
+  const widthPercent = (1 / TOTAL_SLOTS) * 100;
 
   return (
     <div
       ref={setNodeRef}
       className={`absolute top-0 bottom-0 ${isOver ? "bg-blue-50" : ""}`}
       style={{
-        left: slotIndex * SLOT_WIDTH,
-        width: SLOT_WIDTH,
+        left: `${leftPercent}%`,
+        width: `${widthPercent}%`,
       }}
     />
   );
@@ -532,12 +561,12 @@ function DropZoneV2({ techId, slotIndex }: { techId: string; slotIndex: number }
 
 function ScheduledWorkOrderCard({
   workOrder,
-  leftPx,
-  widthPx,
+  leftPercent,
+  widthPercent,
 }: {
   workOrder: EnrichedWorkOrder;
-  leftPx: number;
-  widthPx: number;
+  leftPercent: number;
+  widthPercent: number;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: workOrder.id,
@@ -550,8 +579,8 @@ function ScheduledWorkOrderCard({
     position: "absolute",
     top: 4,
     bottom: 4,
-    left: leftPx,
-    width: widthPx,
+    left: `${leftPercent}%`,
+    width: `${widthPercent}%`,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
     opacity: isDragging ? 0.7 : 1,
     zIndex: isDragging ? 50 : 10,

@@ -1,7 +1,28 @@
 export const START_HOUR = 8;
 export const END_HOUR = 20;
 export const INTERVAL_MINUTES = 30;
-export const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / INTERVAL_MINUTES;
+export const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
+export const TOTAL_SLOTS = TOTAL_MINUTES / INTERVAL_MINUTES;
+
+export function minutesFromDayStart(date: Date): number {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  return (hours - START_HOUR) * 60 + minutes;
+}
+
+export function minutesToPercent(minutes: number): number {
+  return (minutes / TOTAL_MINUTES) * 100;
+}
+
+export function snapMinutes(minutes: number): number {
+  return Math.round(minutes / INTERVAL_MINUTES) * INTERVAL_MINUTES;
+}
+
+export function getDurationMinutes(startDate: Date | null, endDate: Date | null): number {
+  if (!startDate || !endDate) return 60;
+  const diff = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+  return Math.max(INTERVAL_MINUTES, Math.round(diff / INTERVAL_MINUTES) * INTERVAL_MINUTES);
+}
 
 export const QUEUE_STAGES = [
   "NeedsScheduling",
