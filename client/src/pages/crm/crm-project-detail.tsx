@@ -1007,15 +1007,17 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
   if (endDate) queryParams.set("endDate", endDate);
   if (pinnedOnly) queryParams.set("pinnedOnly", "true");
 
-  const { data: activities = [], isLoading, refetch } = useQuery<ProjectActivityWithMeta[]>({
+  const { data: activitiesData, isLoading, refetch } = useQuery<ProjectActivityWithMeta[]>({
     queryKey: ["/api/crm/projects", projectId, "activities", queryParams.toString()],
     queryFn: () => fetch(`/api/crm/projects/${projectId}/activities?${queryParams.toString()}`).then(r => r.json()),
   });
+  const activities = Array.isArray(activitiesData) ? activitiesData : [];
 
-  const { data: workOrders = [] } = useQuery<{ id: string; workOrderNumber: number; title: string | null }[]>({
+  const { data: workOrdersData } = useQuery<{ id: string; workOrderNumber: number; title: string | null }[]>({
     queryKey: ["/api/crm/work-orders", { projectId }],
     queryFn: () => fetch(`/api/crm/work-orders?projectId=${projectId}`).then(r => r.json()).then(d => d.workOrders || []),
   });
+  const workOrders = Array.isArray(workOrdersData) ? workOrdersData : [];
 
   const createActivityMutation = useMutation({
     mutationFn: async (data: { activityType: string; title: string; description?: string; workOrderId?: string }) => {
