@@ -39,7 +39,6 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import {
   Search,
@@ -50,7 +49,6 @@ import {
   DollarSign,
   XCircle,
   Printer,
-  Calendar as CalendarIcon,
   X,
   Loader2,
   Plus,
@@ -108,8 +106,6 @@ export default function CrmInvoices() {
   const { toast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [endDate, setEndDate] = useState<Date | undefined>();
   const [page, setPage] = useState(1);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -142,7 +138,7 @@ export default function CrmInvoices() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, startDate, endDate]);
+  }, [debouncedSearch, statusFilter]);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -246,24 +242,8 @@ export default function CrmInvoices() {
       });
     }
 
-    if (startDate) {
-      filtered = filtered.filter((inv) => {
-        if (!inv.createdAt) return false;
-        return new Date(inv.createdAt) >= startDate;
-      });
-    }
-
-    if (endDate) {
-      const endOfDay = new Date(endDate);
-      endOfDay.setHours(23, 59, 59, 999);
-      filtered = filtered.filter((inv) => {
-        if (!inv.createdAt) return false;
-        return new Date(inv.createdAt) <= endOfDay;
-      });
-    }
-
     return filtered;
-  }, [invoicesData, debouncedSearch, startDate, endDate]);
+  }, [invoicesData, debouncedSearch]);
 
   const paginatedInvoices = useMemo(() => {
     const start = (page - 1) * ITEMS_PER_PAGE;
@@ -340,11 +320,6 @@ export default function CrmInvoices() {
     if (invoiceDetail) {
       window.print();
     }
-  };
-
-  const clearDateFilters = () => {
-    setStartDate(undefined);
-    setEndDate(undefined);
   };
 
   const handleCreateSubmit = (e: React.FormEvent) => {
@@ -439,56 +414,6 @@ export default function CrmInvoices() {
               {tab.label}
             </button>
           ))}
-        </div>
-
-        {/* Date filters row */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 text-xs" data-testid="button-start-date">
-                <CalendarIcon className="h-3 w-3 mr-1" />
-                {startDate ? format(startDate, "MMM d, yyyy") : "Start Date"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={startDate}
-                onSelect={setStartDate}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 text-xs" data-testid="button-end-date">
-                <CalendarIcon className="h-3 w-3 mr-1" />
-                {endDate ? format(endDate, "MMM d, yyyy") : "End Date"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={endDate}
-                onSelect={setEndDate}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-
-          {(startDate || endDate) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearDateFilters}
-              className="h-8 text-xs text-slate-500"
-              data-testid="button-clear-dates"
-            >
-              <X className="h-3 w-3 mr-1" />
-              Clear Dates
-            </Button>
-          )}
         </div>
 
         <Card className="bg-white border shadow-sm overflow-hidden">
