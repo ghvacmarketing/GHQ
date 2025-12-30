@@ -9119,19 +9119,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+      // Use simple select() to avoid column reference issues
       const activities = await db
-        .select({
-          id: projectActivities.id,
-          projectId: projectActivities.projectId,
-          workOrderId: projectActivities.workOrderId,
-          userId: projectActivities.userId,
-          activityType: projectActivities.activityType,
-          title: projectActivities.title,
-          description: projectActivities.description,
-          metadata: projectActivities.metadata,
-          isPinned: projectActivities.isPinned,
-          createdAt: projectActivities.createdAt,
-        })
+        .select()
         .from(projectActivities)
         .where(whereClause)
         .orderBy(desc(projectActivities.createdAt));
