@@ -63,9 +63,14 @@ type ProjectWithDetails = CrmProject & {
 
 type ProjectsResponse = {
   projects: ProjectWithDetails[];
-  total: number;
-  page: number;
-  limit: number;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
 };
 
 type CustomerWithInfo = {
@@ -334,8 +339,8 @@ export default function CrmProjects() {
   }
 
   const projects = projectsData?.projects || [];
-  const total = projectsData?.total || 0;
-  const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+  const total = projectsData?.pagination?.total || 0;
+  const totalPages = projectsData?.pagination?.totalPages || Math.ceil(total / ITEMS_PER_PAGE);
 
   return (
     <CrmLayout currentUser={currentUser}>
