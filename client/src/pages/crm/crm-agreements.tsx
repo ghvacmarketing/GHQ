@@ -424,23 +424,43 @@ export default function CrmAgreements() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
+        {/* Search bar at top - DoorLoop style */}
+        <div className="flex justify-center mb-2">
+          <div className="relative w-full max-w-xl">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search by customer, agreement #, address..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+              data-testid="input-search"
+            />
+          </div>
+        </div>
+
+        {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div>
             <h1 className="text-xl font-bold text-slate-900" data-testid="text-agreements-title">
               Service Agreements
             </h1>
+            <p className="text-sm text-slate-500">
+              {filteredAndSortedAgreements.length} agreement{filteredAndSortedAgreements.length !== 1 ? "s" : ""}
+            </p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search by customer, agreement #, address..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-9 h-9 w-64 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419]"
-                data-testid="input-search"
-              />
-            </div>
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+                className="h-8 text-xs text-slate-600"
+                data-testid="button-reset-filters"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Reset
+              </Button>
+            )}
             <Button
               size="sm"
               className="bg-[#711419] hover:bg-[#5a1014]"
@@ -453,25 +473,27 @@ export default function CrmAgreements() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 border-b border-slate-200 overflow-x-auto pb-0">
-          {tabFilters.map((tab) => {
-            const count = tab.key === "all" ? agreementsData?.pagination?.total
-              : tab.key === "active" ? statusCounts.active
-              : tab.key === "expiring" ? statusCounts.expiring
-              : tab.key === "expired" ? statusCounts.expired
-              : null;
+        {/* Tab Filters */}
+        <div className="flex items-center justify-between border-b border-slate-200">
+          <div className="flex overflow-x-auto">
+            {tabFilters.map((tab) => {
+              const count = tab.key === "all" ? agreementsData?.pagination?.total
+                : tab.key === "active" ? statusCounts.active
+                : tab.key === "expiring" ? statusCounts.expiring
+                : tab.key === "expired" ? statusCounts.expired
+                : null;
 
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                  activeTab === tab.key
-                    ? "border-[#711419] text-[#711419]"
-                    : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-                }`}
-                data-testid={`tab-${tab.key}`}
-              >
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                    activeTab === tab.key
+                      ? "border-[#711419] text-[#711419]"
+                      : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                  }`}
+                  data-testid={`tab-${tab.key}`}
+                >
                 {tab.label}
                 {count !== null && count > 0 && (
                   <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded ${
@@ -483,25 +505,7 @@ export default function CrmAgreements() {
               </button>
             );
           })}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex-1" />
-          {hasActiveFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={resetFilters}
-              className="h-8 text-xs text-slate-600"
-              data-testid="button-reset-filters"
-            >
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Reset
-            </Button>
-          )}
-          <span className="text-sm text-slate-500" data-testid="text-agreement-count">
-            {filteredAndSortedAgreements.length} agreement{filteredAndSortedAgreements.length !== 1 ? "s" : ""}
-          </span>
+          </div>
         </div>
 
         <Card className="bg-white border shadow-sm overflow-hidden">
