@@ -863,14 +863,125 @@ function DroppableScheduleRow({ techId, children }: DroppableScheduleRowProps) {
   );
 }
 
+interface DraggableScheduleCardProps {
+  workOrder: DispatchWorkOrder;
+  leftPercent: number;
+  widthPercent: number;
+  bgColor: string;
+  onWorkOrderClick?: (id: string) => void;
+  onResize?: (workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => void;
+  isDragging?: boolean;
+}
+
+function DraggableScheduleCard({ 
+  workOrder, 
+  leftPercent, 
+  widthPercent, 
+  bgColor, 
+  onWorkOrderClick,
+  onResize,
+  isDragging = false,
+}: DraggableScheduleCardProps) {
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeEdge, setResizeEdge] = useState<'start' | 'end' | null>(null);
+  const [startX, setStartX] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: `schedule-${workOrder.id}`,
+    data: { workOrder, fromSchedule: true },
+    disabled: isResizing,
+  });
+
+  const handleMouseDown = (e: React.MouseEvent, edge: 'start' | 'end') => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsResizing(true);
+    setResizeEdge(edge);
+    setStartX(e.clientX);
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!containerRef.current) return;
+      const parentWidth = containerRef.current.parentElement?.offsetWidth || SCHEDULE_TIMELINE_WIDTH;
+      const deltaX = moveEvent.clientX - startX;
+      const deltaPercent = (deltaX / parentWidth) * 100;
+      const deltaMinutes = Math.round((deltaPercent / 100) * SCHEDULE_TOTAL_MINUTES / 15) * 15;
+      
+      if (Math.abs(deltaMinutes) >= 15 && onResize) {
+        onResize(workOrder.id, edge, deltaMinutes);
+        setStartX(moveEvent.clientX);
+      }
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      setResizeEdge(null);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const style: React.CSSProperties = {
+    left: `${leftPercent}%`,
+    width: `${Math.max(widthPercent, 4)}%`,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    opacity: isDragging ? 0.3 : 1,
+    zIndex: isDragging || isResizing ? 50 : 1,
+  };
+
+  return (
+    <div
+      ref={(node) => {
+        setNodeRef(node);
+        (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+      }}
+      style={style}
+      className={`absolute top-2 bottom-2 ${bgColor} text-white rounded-md px-2 py-1 cursor-grab hover:opacity-90 transition-opacity overflow-hidden shadow-sm group ${isResizing ? 'cursor-ew-resize' : ''}`}
+      data-testid={`schedule-card-${workOrder.id}`}
+      {...attributes}
+      {...listeners}
+      onClick={(e) => {
+        if (!isResizing) {
+          e.stopPropagation();
+          onWorkOrderClick?.(workOrder.id);
+        }
+      }}
+    >
+      <div 
+        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-white/30 hover:bg-white/50 transition-opacity"
+        onMouseDown={(e) => handleMouseDown(e, 'start')}
+        data-testid={`resize-start-${workOrder.id}`}
+      />
+      <div 
+        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-white/30 hover:bg-white/50 transition-opacity"
+        onMouseDown={(e) => handleMouseDown(e, 'end')}
+        data-testid={`resize-end-${workOrder.id}`}
+      />
+      
+      <div className="flex items-center gap-1.5">
+        {workOrder.status === "completed" && <CheckSquare className="h-3 w-3 flex-shrink-0" />}
+        <p className="text-xs font-medium truncate">{workOrder.customerName}</p>
+      </div>
+      {workOrder.propertyAddress && (
+        <p className="text-[10px] opacity-90 truncate">{workOrder.propertyAddress}</p>
+      )}
+    </div>
+  );
+}
+
 interface TechnicianScheduleBoardProps {
   technicians: Technician[];
   workOrders: DispatchWorkOrder[];
   onWorkOrderClick?: (workOrderId: string) => void;
   selectedDate: Date;
+  onResize?: (workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => void;
+  activeId?: string | null;
 }
 
-function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate }: TechnicianScheduleBoardProps) {
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResize, activeId }: TechnicianScheduleBoardProps) {
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
     for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
@@ -941,24 +1052,16 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                     if (startMinutesFrom8 < 0 || startMinutesFrom8 >= SCHEDULE_TOTAL_MINUTES) return null;
 
                     return (
-                      <div
+                      <DraggableScheduleCard
                         key={wo.id}
-                        onClick={() => onWorkOrderClick?.(wo.id)}
-                        className={`absolute top-2 bottom-2 ${bgColor} text-white rounded-md px-2 py-1 cursor-pointer hover:opacity-90 transition-opacity overflow-hidden shadow-sm`}
-                        style={{
-                          left: `${leftPercent}%`,
-                          width: `${Math.max(widthPercent, 4)}%`,
-                        }}
-                        data-testid={`schedule-card-${wo.id}`}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          {wo.status === "completed" && <CheckSquare className="h-3 w-3 flex-shrink-0" />}
-                          <p className="text-xs font-medium truncate">{wo.customerName}</p>
-                        </div>
-                        {wo.propertyAddress && (
-                          <p className="text-[10px] opacity-90 truncate">{wo.propertyAddress}</p>
-                        )}
-                      </div>
+                        workOrder={wo}
+                        leftPercent={leftPercent}
+                        widthPercent={widthPercent}
+                        bgColor={bgColor}
+                        onWorkOrderClick={onWorkOrderClick}
+                        onResize={onResize}
+                        isDragging={activeId === `schedule-${wo.id}`}
+                      />
                     );
                   })}
                 </div>
@@ -1829,9 +1932,55 @@ export default function CrmDispatch() {
     });
   }, [localWorkOrders, selectedDate, updateWorkOrderMutation]);
 
+  const handleScheduleResize = useCallback((workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => {
+    const wo = localWorkOrders.find(w => w.id === workOrderId);
+    if (!wo || !wo.scheduledStart) return;
+
+    const currentStart = new Date(wo.scheduledStart);
+    const currentEnd = wo.scheduledEnd ? new Date(wo.scheduledEnd) : new Date(currentStart.getTime() + 60 * 60 * 1000);
+    
+    let newStart = new Date(currentStart);
+    let newEnd = new Date(currentEnd);
+    
+    if (edge === 'start') {
+      newStart = new Date(currentStart.getTime() + deltaMinutes * 60 * 1000);
+      if (newStart >= newEnd) return;
+      if (newStart.getHours() < SCHEDULE_START_HOUR) {
+        newStart.setHours(SCHEDULE_START_HOUR, 0, 0, 0);
+      }
+    } else {
+      newEnd = new Date(currentEnd.getTime() + deltaMinutes * 60 * 1000);
+      if (newEnd <= newStart) return;
+      if (newEnd.getHours() > SCHEDULE_END_HOUR || (newEnd.getHours() === SCHEDULE_END_HOUR && newEnd.getMinutes() > 0)) {
+        newEnd.setHours(SCHEDULE_END_HOUR, 0, 0, 0);
+      }
+    }
+    
+    const scheduledStartISO = newStart.toISOString();
+    const scheduledEndISO = newEnd.toISOString();
+
+    setLocalWorkOrders(prev => prev.map(w =>
+      w.id === workOrderId ? { ...w, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any } : w
+    ));
+
+    updateWorkOrderMutation.mutate({
+      workOrderId,
+      updates: {
+        scheduledStart: scheduledStartISO,
+        scheduledEnd: scheduledEndISO,
+      },
+    });
+  }, [localWorkOrders, updateWorkOrderMutation]);
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const id = event.active.id as string;
-    setActiveId(id.startsWith('queue-') ? id.replace('queue-', '') : id);
+    if (id.startsWith('queue-')) {
+      setActiveId(id.replace('queue-', ''));
+    } else if (id.startsWith('schedule-')) {
+      setActiveId(id.replace('schedule-', ''));
+    } else {
+      setActiveId(id);
+    }
   }, []);
 
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -1845,7 +1994,13 @@ export default function CrmDispatch() {
     const overId = over.id as string;
     const activeIdStr = active.id as string;
     const isFromQueue = activeIdStr.startsWith('queue-');
-    const workOrderId = isFromQueue ? activeIdStr.replace('queue-', '') : activeIdStr;
+    const isFromSchedule = activeIdStr.startsWith('schedule-');
+    let workOrderId = activeIdStr;
+    if (isFromQueue) {
+      workOrderId = activeIdStr.replace('queue-', '');
+    } else if (isFromSchedule) {
+      workOrderId = activeIdStr.replace('schedule-', '');
+    }
     const wo = localWorkOrders.find(w => w.id === workOrderId);
     
     if (!wo) return;
@@ -1853,7 +2008,7 @@ export default function CrmDispatch() {
     if (overId.startsWith('technician-')) {
       const newTechId = overId.replace('technician-', '');
       
-      if (isFromQueue) {
+      if (isFromQueue && !isFromSchedule) {
         const defaultDuration = 1;
         
         let newStartHour = START_HOUR;
@@ -2268,6 +2423,8 @@ export default function CrmDispatch() {
                 workOrders={localWorkOrders.filter(wo => wo.assignedTechId)}
                 onWorkOrderClick={handleWorkOrderClick}
                 selectedDate={selectedDate}
+                onResize={handleScheduleResize}
+                activeId={activeId}
               />
               
               <UnassignedQueueSection
