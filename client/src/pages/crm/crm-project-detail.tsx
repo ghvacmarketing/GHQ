@@ -1366,7 +1366,12 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
       acc["Unknown"].activities.push(activity);
       return acc;
     }
-    const localDate = new Date(activity.createdAt);
+    // Parse the timestamp - ensure it's treated as UTC if no timezone specified
+    let timestamp = activity.createdAt;
+    if (!timestamp.endsWith('Z') && !timestamp.includes('+') && !timestamp.includes('-', 10)) {
+      timestamp = timestamp + 'Z';
+    }
+    const localDate = new Date(timestamp);
     const dateKey = format(localDate, "yyyy-MM-dd");
     const dateLabel = format(localDate, "EEEE, MMMM d, yyyy");
     if (!acc[dateKey]) acc[dateKey] = { label: dateLabel, activities: [] };
@@ -2326,7 +2331,7 @@ function ActivityCard({
                 {label}
               </Badge>
               {activity.createdAt && (
-                <span>{format(new Date(activity.createdAt), "h:mm a")}</span>
+                <span>{format(new Date(activity.createdAt.endsWith('Z') || activity.createdAt.includes('+') ? activity.createdAt : activity.createdAt + 'Z'), "h:mm a")}</span>
               )}
               {activity.userName && (
                 <span className="flex items-center gap-1">
