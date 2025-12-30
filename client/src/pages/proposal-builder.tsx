@@ -3916,12 +3916,11 @@ export default function ProposalBuilder() {
                             >
                               <CardHeader className="pb-2">
                                 <div className="flex items-center justify-between">
-                                  <RadioGroupItem
-                                    value={option.id}
-                                    checked={isSelected}
-                                    className="mr-2"
-                                    onClick={e => e.stopPropagation()}
-                                  />
+                                  <div className={`w-4 h-4 rounded-full border-2 mr-2 flex items-center justify-center ${
+                                    isSelected ? 'border-orange-500 bg-orange-500' : 'border-gray-400'
+                                  }`}>
+                                    {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                                  </div>
                                   <CardTitle className="text-base flex-1">{option.name}</CardTitle>
                                   <Badge className="bg-orange-500 text-white">
                                     {formatPrice(option.price)}
