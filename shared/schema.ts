@@ -1094,7 +1094,7 @@ export const crmCustomerNotes = pgTable("crm_customer_notes", {
 });
 
 // Project Activity Types for Timeline
-export const projectActivityTypeEnum = ["note", "photo", "file", "status_change", "financial_update", "approval", "work_order_created", "work_order_completed", "quote_sent", "quote_accepted", "invoice_sent", "invoice_paid"] as const;
+export const projectActivityTypeEnum = ["note", "photo", "file", "financial_update", "approval", "work_order_created", "work_order_completed", "quote_sent", "quote_accepted", "invoice_sent", "invoice_paid"] as const;
 export type ProjectActivityType = typeof projectActivityTypeEnum[number];
 
 // Project Activities (Timeline entries aggregating work order activities)
@@ -1177,14 +1177,6 @@ export const approvalMetadataSchema = z.object({
 });
 export type ApprovalMetadata = z.infer<typeof approvalMetadataSchema>;
 
-export const statusChangeMetadataSchema = z.object({
-  entityType: z.enum(["project", "work_order"]),
-  entityId: z.string(),
-  fromStatus: z.string(),
-  toStatus: z.string(),
-  changedBy: z.string().optional(),
-});
-export type StatusChangeMetadata = z.infer<typeof statusChangeMetadataSchema>;
 
 // CRM Agreements Status Enum
 export const crmAgreementStatusEnum = ["active", "expiring", "expired", "cancelled"] as const;

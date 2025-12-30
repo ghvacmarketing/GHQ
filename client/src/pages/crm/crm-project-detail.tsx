@@ -954,7 +954,6 @@ const activityTypeIcons: Record<string, any> = {
   note: MessageSquare,
   photo: Image,
   file: File,
-  status_change: Activity,
   financial: DollarSign,
   approval: CheckCircle,
   work_order_created: ClipboardList,
@@ -969,7 +968,6 @@ const activityTypeColors: Record<string, { bg: string; text: string; border: str
   note: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
   photo: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200" },
   file: { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200" },
-  status_change: { bg: "bg-yellow-50", text: "text-yellow-700", border: "border-yellow-200" },
   financial: { bg: "bg-green-50", text: "text-green-700", border: "border-green-200" },
   approval: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
   work_order_created: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" },
@@ -984,7 +982,6 @@ const activityTypeLabels: Record<string, string> = {
   note: "Note",
   photo: "Photo",
   file: "File",
-  status_change: "Status Change",
   financial: "Financial",
   approval: "Approval",
   work_order_created: "Work Order Created",
@@ -1002,7 +999,6 @@ const filterOptions = [
   { value: "file", label: "Files" },
   { value: "financial", label: "Financial" },
   { value: "approval", label: "Approvals" },
-  { value: "status_change", label: "Status Changes" },
 ];
 
 type UploadedFile = {
@@ -1020,8 +1016,6 @@ const FINANCIAL_STATUSES = ["pending", "approved", "paid", "cancelled"] as const
 const APPROVAL_STATUSES = ["requested", "approved", "denied"] as const;
 const APPROVER_TYPES = ["pm", "tenant", "owner", "other"] as const;
 
-const PROJECT_STATUSES = ["lead", "proposal_sent", "approved", "in_progress", "completed", "closed", "archived"];
-const WORK_ORDER_STATUSES = ["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"];
 
 function ProjectTimelineTab({ projectId }: { projectId: string }) {
   const [, navigate] = useLocation();
@@ -1053,9 +1047,6 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
   const [approvalAmount, setApprovalAmount] = useState("");
   const [approvalNote, setApprovalNote] = useState("");
   const [approvalAttachments, setApprovalAttachments] = useState<UploadedFile[]>([]);
-  const [statusEntityType, setStatusEntityType] = useState<string>("project");
-  const [statusWorkOrderId, setStatusWorkOrderId] = useState("");
-  const [statusNewStatus, setStatusNewStatus] = useState("");
   const [isUploading, setIsUploading] = useState(false);
 
   const queryParams = new URLSearchParams();
@@ -1101,9 +1092,6 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
     setApprovalAmount("");
     setApprovalNote("");
     setApprovalAttachments([]);
-    setStatusEntityType("project");
-    setStatusWorkOrderId("");
-    setStatusNewStatus("");
     setNewActivityWorkOrderId("");
   };
 
@@ -1238,36 +1226,6 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
             amount: approvalAmount ? parseFloat(approvalAmount) : undefined,
             attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
             note: approvalNote || undefined,
-          };
-          break;
-        }
-        case "status_change": {
-          if (!statusNewStatus) {
-            toast({ title: "Please select a new status", variant: "destructive" });
-            setIsUploading(false);
-            return;
-          }
-          let fromStatus = "";
-          let entityId = "";
-          if (statusEntityType === "project") {
-            fromStatus = projectData?.status || "unknown";
-            entityId = projectId;
-          } else {
-            const selectedWO = workOrders.find(wo => wo.id === statusWorkOrderId);
-            if (!selectedWO) {
-              toast({ title: "Please select a work order", variant: "destructive" });
-              setIsUploading(false);
-              return;
-            }
-            fromStatus = selectedWO.status || "unknown";
-            entityId = statusWorkOrderId;
-          }
-          title = `Status: ${fromStatus} → ${statusNewStatus}`;
-          metadata = {
-            entityType: statusEntityType,
-            entityId,
-            fromStatus,
-            toStatus: statusNewStatus,
           };
           break;
         }
@@ -1700,70 +1658,6 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
           </div>
         );
 
-      case "status_change":
-        const selectedWO = workOrders.find(wo => wo.id === statusWorkOrderId);
-        const currentStatus = statusEntityType === "project" 
-          ? projectData?.status || "unknown"
-          : selectedWO?.status || "unknown";
-        const availableStatuses = statusEntityType === "project" ? PROJECT_STATUSES : WORK_ORDER_STATUSES;
-
-        return (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Entity Type</Label>
-              <Select value={statusEntityType} onValueChange={(v) => {
-                setStatusEntityType(v);
-                setStatusWorkOrderId("");
-                setStatusNewStatus("");
-              }}>
-                <SelectTrigger data-testid="select-status-entity-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="project">Project</SelectItem>
-                  <SelectItem value="work_order">Work Order</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {statusEntityType === "work_order" && (
-              <div className="space-y-2">
-                <Label>Work Order <span className="text-red-500">*</span></Label>
-                <Select value={statusWorkOrderId} onValueChange={setStatusWorkOrderId}>
-                  <SelectTrigger data-testid="select-status-work-order">
-                    <SelectValue placeholder="Select a work order" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {workOrders.map(wo => (
-                      <SelectItem key={wo.id} value={wo.id}>
-                        WO #{wo.workOrderNumber} - {wo.title || "Untitled"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label>Current Status</Label>
-              <div className="p-2 bg-muted rounded text-sm">{currentStatus}</div>
-            </div>
-            <div className="space-y-2">
-              <Label>New Status <span className="text-red-500">*</span></Label>
-              <Select value={statusNewStatus} onValueChange={setStatusNewStatus}>
-                <SelectTrigger data-testid="select-status-new-status">
-                  <SelectValue placeholder="Select new status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableStatuses.filter(s => s !== currentStatus).map(status => (
-                    <SelectItem key={status} value={status}>
-                      {status.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        );
-
       default:
         return null;
     }
@@ -1776,10 +1670,6 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
       case "file": return fileUploads.length > 0;
       case "financial": return financialAmount && parseFloat(financialAmount) > 0;
       case "approval": return approvalTitle.trim().length > 0;
-      case "status_change": {
-        if (statusEntityType === "work_order" && !statusWorkOrderId) return false;
-        return statusNewStatus.length > 0;
-      }
       default: return false;
     }
   };
@@ -2000,7 +1890,6 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
                   <SelectItem value="file">File</SelectItem>
                   <SelectItem value="financial">Financial Update</SelectItem>
                   <SelectItem value="approval">Approval</SelectItem>
-                  <SelectItem value="status_change">Status Change</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2318,29 +2207,6 @@ function ActivityCard({
             {note && (
               <p className="text-sm text-muted-foreground">{note}</p>
             )}
-          </div>
-        );
-      }
-
-      case "status_change": {
-        const fromStatus = metadata.fromStatus;
-        const toStatus = metadata.toStatus;
-        const entityType = metadata.entityType;
-
-        return (
-          <div className="mt-2">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">
-                {entityType === "work_order" ? "Work Order" : "Project"}:
-              </span>
-              <Badge variant="outline" className="bg-slate-100 text-slate-600">
-                {fromStatus?.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}
-              </Badge>
-              <ArrowRight className="w-4 h-4 text-muted-foreground" />
-              <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
-                {toStatus?.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}
-              </Badge>
-            </div>
           </div>
         );
       }
