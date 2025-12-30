@@ -6249,17 +6249,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workOrderCount = Number(workOrdersResult?.count || 0);
       }
 
-      const [quotesResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(crmQuotes)
-        .where(eq(crmQuotes.customerId, customerId));
-      const quoteCount = Number(quotesResult?.count || 0);
+      // Count quotes using raw SQL (database uses account_id, not customerId)
+      const quotesResult = await db.execute(
+        sql`SELECT count(*) as count FROM crm_quotes WHERE account_id = ${customerId}`
+      );
+      const quoteCount = Number(quotesResult.rows?.[0]?.count || 0);
 
-      const [invoicesResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(crmInvoices)
-        .where(eq(crmInvoices.customerId, customerId));
-      const invoiceCount = Number(invoicesResult?.count || 0);
+      // Count invoices using raw SQL (database uses account_id, not customer_id)  
+      const invoicesResult = await db.execute(
+        sql`SELECT count(*) as count FROM crm_invoices WHERE account_id = ${customerId}`
+      );
+      const invoiceCount = Number(invoicesResult.rows?.[0]?.count || 0);
 
       const hasLinkedRecords = projectCount > 0 || workOrderCount > 0 || quoteCount > 0 || invoiceCount > 0;
 
@@ -6302,6 +6302,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (legacyCustomer) {
           await db.delete(customers).where(eq(customers.id, customerId));
         } else if (crmCustomer) {
+          // Delete related properties first (foreign key constraint)
+          await db.delete(crmProperties).where(eq(crmProperties.customerId, customerId));
           await db.delete(crmCustomers).where(eq(crmCustomers.id, customerId));
         } else if (crmAccount) {
           // Delete related sites and contacts first (cascade should handle this, but being explicit)
