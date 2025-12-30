@@ -1356,6 +1356,8 @@ export default function CrmCustomerDetail() {
   const [propTenantName, setPropTenantName] = useState("");
   const [propTenantPhone, setPropTenantPhone] = useState("");
   const [propTenantEmail, setPropTenantEmail] = useState("");
+  // Preferred payment method (always visible for PM sites)
+  const [propPreferredPaymentMethod, setPropPreferredPaymentMethod] = useState("");
   // Billing override fields
   const [propBillingOverride, setPropBillingOverride] = useState(false);
   const [propBilledTo, setPropBilledTo] = useState<"property_manager" | "tenant">("property_manager");
@@ -1373,6 +1375,7 @@ export default function CrmCustomerDetail() {
     setPropTenantName("");
     setPropTenantPhone("");
     setPropTenantEmail("");
+    setPropPreferredPaymentMethod("");
     setPropBillingOverride(false);
     setPropBilledTo("property_manager");
     setPropPaymentTerms("");
@@ -1957,6 +1960,7 @@ export default function CrmCustomerDetail() {
         tenantName: propTenantName.trim() || null,
         tenantPhone: propTenantPhone.trim() || null,
         tenantEmail: propTenantEmail.trim() || null,
+        preferredPaymentMethod: propPreferredPaymentMethod || null,
         billingOverride: propBillingOverride,
         billedTo: propBillingOverride ? propBilledTo : "property_manager",
         paymentTerms: propBillingOverride ? (propPaymentTerms || null) : null,
@@ -1998,6 +2002,7 @@ export default function CrmCustomerDetail() {
         tenantName: propTenantName.trim() || null,
         tenantPhone: propTenantPhone.trim() || null,
         tenantEmail: propTenantEmail.trim() || null,
+        preferredPaymentMethod: propPreferredPaymentMethod || null,
         billingOverride: propBillingOverride,
         billedTo: propBillingOverride ? propBilledTo : "property_manager",
         paymentTerms: propBillingOverride ? (propPaymentTerms || null) : null,
@@ -2035,6 +2040,7 @@ export default function CrmCustomerDetail() {
     setPropTenantName(property.tenantName || "");
     setPropTenantPhone(property.tenantPhone || "");
     setPropTenantEmail(property.tenantEmail || "");
+    setPropPreferredPaymentMethod((property as any).preferredPaymentMethod || "");
     // If property is billed to tenant, assume billing override was on (backwards compatibility)
     const hasBillingOverride = (property as any).billingOverride || property.billedTo === "tenant";
     setPropBillingOverride(hasBillingOverride);
@@ -3036,6 +3042,25 @@ export default function CrmCustomerDetail() {
                       />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Preferred Payment Method - Visible for Property Manager customers */}
+              {isPropertyManager && (
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-slate-600">Preferred Payment Method <span className="text-slate-400 font-normal">(optional)</span></Label>
+                  <Select value={propPreferredPaymentMethod} onValueChange={setPropPreferredPaymentMethod}>
+                    <SelectTrigger className="h-11" data-testid="select-preferred-payment-method">
+                      <SelectValue placeholder="No preference" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No preference</SelectItem>
+                      <SelectItem value="check">Check</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="credit_card">Credit Card</SelectItem>
+                      <SelectItem value="ach">ACH</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 

@@ -22,6 +22,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Separator } from "@/components/ui/separator";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   ArrowLeft,
   ArrowRight,
   Building2,
@@ -32,6 +37,8 @@ import {
   Search,
   AlertCircle,
   Loader2,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
@@ -826,7 +833,7 @@ export default function CrmAccountCreate() {
                 {formData.accountType === "PROPERTY_MANAGER" && (
                   <div className="space-y-4">
                     <h4 className="font-medium text-slate-900">Billing & Payment Terms</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Billing Terms</Label>
                         <Select
@@ -842,22 +849,6 @@ export default function CrmAccountCreate() {
                             <SelectItem value="NET_30">Net 30</SelectItem>
                             <SelectItem value="NET_45">Net 45</SelectItem>
                             <SelectItem value="NET_60">Net 60</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Default Bill-To</Label>
-                        <Select
-                          value={formData.pmDefaultBillTo}
-                          onValueChange={(val) => updateField("pmDefaultBillTo", val)}
-                        >
-                          <SelectTrigger data-testid="select-default-bill-to">
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
-                          <SelectContent position="popper" sideOffset={4}>
-                            <SelectItem value="PM">Property Manager</SelectItem>
-                            <SelectItem value="OWNER">Owner</SelectItem>
-                            <SelectItem value="TENANT">Tenant</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -878,6 +869,33 @@ export default function CrmAccountCreate() {
                         </Select>
                       </div>
                     </div>
+
+                    {/* Advanced Settings - collapsed by default */}
+                    <Collapsible>
+                      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 py-2">
+                        <ChevronRight className="h-4 w-4 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
+                        Advanced Settings
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pt-2">
+                        <div className="space-y-2 pl-6 border-l-2 border-slate-200">
+                          <Label>Default Bill-To</Label>
+                          <Select
+                            value={formData.pmDefaultBillTo}
+                            onValueChange={(val) => updateField("pmDefaultBillTo", val)}
+                          >
+                            <SelectTrigger data-testid="select-default-bill-to" className="w-48">
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent position="popper" sideOffset={4}>
+                              <SelectItem value="PM">Property Manager</SelectItem>
+                              <SelectItem value="OWNER">Owner</SelectItem>
+                              <SelectItem value="TENANT">Tenant</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-slate-500">Default is Property Manager (90% of cases)</p>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
 
                     <Separator />
                     <h4 className="font-medium text-slate-900">Approval Settings</h4>

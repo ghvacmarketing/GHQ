@@ -7665,7 +7665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/crm/customers/:id/properties", requireCrmAuth, async (req, res) => {
     try {
       const customerId = req.params.id;
-      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, billingOverride, billedTo, paymentTerms, paymentMethod, approvalRule } = req.body;
+      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, preferredPaymentMethod, billingOverride, billedTo, paymentTerms, paymentMethod, approvalRule } = req.body;
 
       if (!address1?.trim() || !city?.trim() || !state?.trim() || !zip?.trim()) {
         return res.status(400).json({ message: "Street address, city, state, and zip are required" });
@@ -7692,6 +7692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tenantName: tenantName?.trim() || null,
         tenantPhone: tenantPhone?.trim() || null,
         tenantEmail: tenantEmail?.trim() || null,
+        preferredPaymentMethod: preferredPaymentMethod || null,
         billingOverride: billingOverride || false,
         billedTo: billedTo || "property_manager",
         paymentTerms: paymentTerms || null,
@@ -7710,7 +7711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/crm/properties/:id", requireCrmAuth, async (req, res) => {
     try {
       const propertyId = req.params.id;
-      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, billingOverride, billedTo, paymentTerms, paymentMethod, approvalRule } = req.body;
+      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, preferredPaymentMethod, billingOverride, billedTo, paymentTerms, paymentMethod, approvalRule } = req.body;
 
       // Fetch existing property to get customer info
       const [existingProperty] = await db.select().from(crmProperties).where(eq(crmProperties.id, propertyId));
@@ -7758,6 +7759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (tenantName !== undefined) updateData.tenantName = tenantName?.trim() || null;
       if (tenantPhone !== undefined) updateData.tenantPhone = tenantPhone?.trim() || null;
       if (tenantEmail !== undefined) updateData.tenantEmail = tenantEmail?.trim() || null;
+      if (preferredPaymentMethod !== undefined) updateData.preferredPaymentMethod = preferredPaymentMethod || null;
       if (billingOverride !== undefined) updateData.billingOverride = billingOverride;
       if (billedTo !== undefined) updateData.billedTo = billedTo;
       if (paymentTerms !== undefined) updateData.paymentTerms = paymentTerms || null;
