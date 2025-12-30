@@ -3049,12 +3049,12 @@ export default function CrmCustomerDetail() {
               {isPropertyManager && (
                 <div className="space-y-1.5">
                   <Label className="text-sm font-medium text-slate-600">Preferred Payment Method <span className="text-slate-400 font-normal">(optional)</span></Label>
-                  <Select value={propPreferredPaymentMethod} onValueChange={setPropPreferredPaymentMethod}>
+                  <Select value={propPreferredPaymentMethod || "none"} onValueChange={(v) => setPropPreferredPaymentMethod(v === "none" ? "" : v)}>
                     <SelectTrigger className="h-11" data-testid="select-preferred-payment-method">
                       <SelectValue placeholder="No preference" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No preference</SelectItem>
+                      <SelectItem value="none">No preference</SelectItem>
                       <SelectItem value="check">Check</SelectItem>
                       <SelectItem value="cash">Cash</SelectItem>
                       <SelectItem value="credit_card">Credit Card</SelectItem>
