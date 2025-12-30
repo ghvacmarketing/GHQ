@@ -1521,19 +1521,9 @@ export default function CrmWorkOrders() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label>Title</Label>
-                <Input
-                  value={woTitle}
-                  onChange={(e) => setWoTitle(e.target.value)}
-                  placeholder="Optional title for this work order"
-                  data-testid="input-wo-title"
-                />
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Visit Type <span className="text-red-500">*</span></Label>
+                  <Label>Visit Type</Label>
                   <Select 
                     value={visitType} 
                     onValueChange={(v) => {
@@ -1555,20 +1545,36 @@ export default function CrmWorkOrders() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Work Subtype <span className="text-red-500">*</span></Label>
-                  <Select value={workSubtype} onValueChange={(v) => setWorkSubtype(v as WorkSubtype)}>
-                    <SelectTrigger data-testid="select-work-subtype">
+                  <Label>Priority</Label>
+                  <Select value={priority} onValueChange={setPriority}>
+                    <SelectTrigger data-testid="select-priority">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {workSubtypeByVisitType[visitType].map((sub) => (
-                        <SelectItem key={sub} value={sub}>
-                          {sub}
+                      {PRIORITIES.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p.charAt(0).toUpperCase() + p.slice(1)}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Work Subtype</Label>
+                <Select value={workSubtype} onValueChange={(v) => setWorkSubtype(v as WorkSubtype)}>
+                  <SelectTrigger data-testid="select-work-subtype">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workSubtypeByVisitType[visitType].map((sub) => (
+                      <SelectItem key={sub} value={sub}>
+                        {sub}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
@@ -1629,7 +1635,7 @@ export default function CrmWorkOrders() {
               </div>
 
               <div className="space-y-2">
-                <Label>Assigned Technician</Label>
+                <Label>Assign Technician</Label>
                 <Select value={assignedTechId} onValueChange={setAssignedTechId}>
                   <SelectTrigger data-testid="select-assigned-tech">
                     <SelectValue placeholder="Unassigned" />
@@ -1643,6 +1649,27 @@ export default function CrmWorkOrders() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Title (Optional)</Label>
+                <Input
+                  value={woTitle}
+                  onChange={(e) => setWoTitle(e.target.value)}
+                  placeholder="Brief title for the work order"
+                  data-testid="input-wo-title"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Description (Optional)</Label>
+                <Textarea
+                  value={woDescription}
+                  onChange={(e) => setWoDescription(e.target.value)}
+                  placeholder="Describe the work to be done..."
+                  className="min-h-[80px]"
+                  data-testid="textarea-description"
+                />
               </div>
 
               {selectedCustomer && projects.length > 0 && (
@@ -1663,33 +1690,6 @@ export default function CrmWorkOrders() {
                   </Select>
                 </div>
               )}
-
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Textarea
-                  value={woDescription}
-                  onChange={(e) => setWoDescription(e.target.value)}
-                  placeholder="Optional description or notes..."
-                  className="min-h-[80px]"
-                  data-testid="textarea-description"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Priority</Label>
-                <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger data-testid="select-priority">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRIORITIES.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p.charAt(0).toUpperCase() + p.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
             <DialogFooter>
               <Button
