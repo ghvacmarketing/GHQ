@@ -52,7 +52,7 @@ import {
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import type { CrmUser, CrmProject } from "@shared/schema";
+import type { CrmUser, CrmProject, CrmProperty } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
 type ProjectWithDetails = CrmProject & {
@@ -178,6 +178,7 @@ export default function CrmProjects() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithInfo | null>(null);
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [selectedSite, setSelectedSite] = useState<CrmProperty | null>(null);
   const [title, setTitle] = useState("");
   const [projectType, setProjectType] = useState<string>("INSTALL");
   const [expectedValue, setExpectedValue] = useState("");
@@ -242,9 +243,25 @@ export default function CrmProjects() {
     enabled: !!currentUser && createDialogOpen,
   });
 
+  // Fetch sites for the selected customer
+  const { data: sitesData, isLoading: sitesLoading } = useQuery<CrmProperty[]>({
+    queryKey: ["/api/crm/properties", selectedCustomer?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/properties?customerId=${selectedCustomer?.id}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch sites");
+      return res.json();
+    },
+    enabled: !!currentUser && !!selectedCustomer,
+  });
+
+  const sites = sitesData || [];
+
   const createProjectMutation = useMutation({
     mutationFn: async (data: {
       customerId: string;
+      propertyId?: string;
       title: string;
       projectType: string;
       expectedValue?: string;
@@ -274,6 +291,7 @@ export default function CrmProjects() {
   const resetCreateForm = () => {
     setCustomerSearch("");
     setSelectedCustomer(null);
+    setSelectedSite(null);
     setTitle("");
     setProjectType("INSTALL");
     setExpectedValue("");
@@ -291,8 +309,19 @@ export default function CrmProjects() {
       return;
     }
 
+    // If customer has sites, require site selection
+    if (sites.length > 0 && !selectedSite) {
+      toast({
+        title: "Site required",
+        description: "Please select a site for this customer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     createProjectMutation.mutate({
       customerId: selectedCustomer.id,
+      propertyId: selectedSite?.id || undefined,
       title,
       projectType,
       expectedValue: expectedValue || undefined,
@@ -577,6 +606,7 @@ export default function CrmProjects() {
                                 value={customer.name}
                                 onSelect={() => {
                                   setSelectedCustomer(customer);
+                                  setSelectedSite(null); // Reset site when customer changes
                                   setCustomerSearchOpen(false);
                                 }}
                                 data-testid={`customer-option-${customer.id}`}
@@ -607,6 +637,47 @@ export default function CrmProjects() {
                 </PopoverContent>
               </Popover>
             </div>
+
+            {/* Site selection - shown only when customer is selected */}
+            {selectedCustomer && (
+              <div className="space-y-2">
+                <Label htmlFor="site">
+                  Site {sites.length > 0 && <span className="text-red-500">*</span>}
+                </Label>
+                {sitesLoading ? (
+                  <div className="flex items-center gap-2 p-3 border rounded-md bg-slate-50">
+                    <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                    <span className="text-sm text-slate-500">Loading sites...</span>
+                  </div>
+                ) : sites.length > 0 ? (
+                  <Select 
+                    value={selectedSite?.id || ""} 
+                    onValueChange={(value) => {
+                      const site = sites.find(s => s.id === value);
+                      setSelectedSite(site || null);
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-site">
+                      <SelectValue placeholder="Select a site">
+                        {selectedSite 
+                          ? `${selectedSite.address1}${selectedSite.city ? `, ${selectedSite.city}` : ""}`
+                          : "Select a site"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sites.map((site) => (
+                        <SelectItem key={site.id} value={site.id}>
+                          {site.siteName || site.address1}
+                          {site.city && `, ${site.city}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-slate-500 p-2">No sites for this customer</p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="title">Title *</Label>
@@ -692,7 +763,7 @@ export default function CrmProjects() {
             </Button>
             <Button
               onClick={handleCreateProject}
-              disabled={createProjectMutation.isPending || !selectedCustomer || !title || !projectType}
+              disabled={createProjectMutation.isPending || !selectedCustomer || !title || !projectType || (sites.length > 0 && !selectedSite)}
               data-testid="button-submit-create"
             >
               {createProjectMutation.isPending ? (
