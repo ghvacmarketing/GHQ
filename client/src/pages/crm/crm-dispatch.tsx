@@ -841,6 +841,28 @@ function DroppableWeekCell({ techId, date, children, onQuickAssign }: DroppableW
   );
 }
 
+interface DroppableScheduleRowProps {
+  techId: string;
+  children: React.ReactNode;
+}
+
+function DroppableScheduleRow({ techId, children }: DroppableScheduleRowProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `technician-${techId}`,
+    data: { technicianId: techId },
+  });
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      className={`flex border-b border-slate-100 hover:bg-slate-50/50 transition-colors ${isOver ? "bg-[#711419]/10 ring-2 ring-inset ring-[#711419]/30" : ""}`} 
+      style={{ minHeight: 64 }}
+    >
+      {children}
+    </div>
+  );
+}
+
 interface TechnicianScheduleBoardProps {
   technicians: Technician[];
   workOrders: DispatchWorkOrder[];
@@ -894,7 +916,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
           {technicians.map((tech) => {
             const techWorkOrders = getWorkOrdersForTech(tech.id);
             return (
-              <div key={tech.id} className="flex border-b border-slate-100 hover:bg-slate-50/50" style={{ minHeight: 64 }}>
+              <DroppableScheduleRow key={tech.id} techId={tech.id}>
                 <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-100 flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-full ${tech.color} text-white flex items-center justify-center text-xs font-medium`}>
                     {tech.initials}
@@ -940,7 +962,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                     );
                   })}
                 </div>
-              </div>
+              </DroppableScheduleRow>
             );
           })}
         </div>
