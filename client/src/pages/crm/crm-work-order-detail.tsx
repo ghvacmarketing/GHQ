@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,24 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -18,9 +36,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
-  Calendar,
+  Calendar as CalendarIcon,
   Clock,
   User,
   Phone,
@@ -38,10 +57,13 @@ import {
   MapPin,
   Package,
   AlertTriangle,
+  Pencil,
+  FolderOpen,
+  Edit,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
-import type { CrmUser, CrmJob, CrmProperty, CrmWorkOrder, CrmInvoice, CrmQuote, CrmCustomer, CrmProject } from "@shared/schema";
+import type { CrmUser, CrmJob, CrmProperty, CrmWorkOrder, CrmInvoice, CrmQuote, CrmCustomer, CrmProject, WorkOrderStatus } from "@shared/schema";
 
 type WorkOrderDetail = CrmWorkOrder & {
   job: CrmJob | null;
@@ -50,6 +72,32 @@ type WorkOrderDetail = CrmWorkOrder & {
   project: CrmProject | null;
   tech: CrmUser | null;
 };
+
+type CustomerWithInfo = {
+  id: string;
+  name: string;
+  customerType: string;
+  fullAddress: string | null;
+};
+
+type CustomersResponse = {
+  customers: CustomerWithInfo[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
 
 const workOrderStatusColors: Record<string, { bg: string; text: string; border: string }> = {
   scheduled: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
@@ -100,6 +148,13 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
   urgent: { bg: "bg-red-100", text: "text-red-700" },
 };
 
+const timeSlots = [
+  { value: "08:00-10:00", label: "8:00 AM - 10:00 AM" },
+  { value: "10:00-12:00", label: "10:00 AM - 12:00 PM" },
+  { value: "13:00-15:00", label: "1:00 PM - 3:00 PM" },
+  { value: "15:00-17:00", label: "3:00 PM - 5:00 PM" },
+];
+
 function formatShortDate(date: Date | string | null): string {
   if (!date) return "—";
   const d = new Date(date);
@@ -144,6 +199,25 @@ function formatCurrency(amount: number | string | null | undefined): string {
   }).format(num);
 }
 
+function getTimeSlotFromSchedule(start: Date | string | null): string {
+  if (!start) return "08:00-10:00";
+  const startDate = new Date(start);
+  const hours = startDate.getHours();
+  if (hours >= 8 && hours < 10) return "08:00-10:00";
+  if (hours >= 10 && hours < 13) return "10:00-12:00";
+  if (hours >= 13 && hours < 15) return "13:00-15:00";
+  if (hours >= 15 && hours < 17) return "15:00-17:00";
+  return "08:00-10:00";
+}
+
+function getPropertyAddress(property: CrmProperty | null): string {
+  if (!property) return "";
+  const parts = [property.address1];
+  if (property.address2) parts.push(property.address2);
+  parts.push(`${property.city}, ${property.state} ${property.zip}`);
+  return parts.join(", ");
+}
+
 export default function CrmWorkOrderDetail() {
   const [, navigate] = useLocation();
   const params = useParams<{ id: string }>();
@@ -154,6 +228,23 @@ export default function CrmWorkOrderDetail() {
   const [createQuoteDialogOpen, setCreateQuoteDialogOpen] = useState(false);
   const [quoteTitle, setQuoteTitle] = useState("");
   const [quoteDescription, setQuoteDescription] = useState("");
+
+  const [newStatus, setNewStatus] = useState<string>("");
+  const [reassignTechId, setReassignTechId] = useState<string>("unassigned");
+  const [rescheduleDate, setRescheduleDate] = useState<Date | undefined>(undefined);
+  const [rescheduleTimeSlot, setRescheduleTimeSlot] = useState<string>("");
+  const [editingTechNotes, setEditingTechNotes] = useState<string>("");
+  const [editingChecklist, setEditingChecklist] = useState<{ item: string; completed: boolean }[]>([]);
+  const [billingDisposition, setBillingDisposition] = useState<string>("not_set");
+  const [billingNotes, setBillingNotes] = useState<string>("");
+
+  const [projectSearch, setProjectSearch] = useState("");
+  const [projectSearchOpen, setProjectSearchOpen] = useState(false);
+
+  const [reassignCustomerSearch, setReassignCustomerSearch] = useState("");
+  const [reassignCustomerSearchOpen, setReassignCustomerSearchOpen] = useState(false);
+  const debouncedReassignCustomerSearch = useDebounce(reassignCustomerSearch, 300);
+  const debouncedProjectSearch = useDebounce(projectSearch, 300);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -179,6 +270,21 @@ export default function CrmWorkOrderDetail() {
     enabled: !!currentUser && !!workOrderId,
   });
 
+  useEffect(() => {
+    if (workOrder) {
+      setNewStatus(workOrder.status);
+      setReassignTechId(workOrder.assignedTechId || "unassigned");
+      setEditingTechNotes(workOrder.techNotes || "");
+      setEditingChecklist(workOrder.checklist || []);
+      setBillingDisposition(workOrder.billingDisposition || "not_set");
+      setBillingNotes(workOrder.billingNotes || "");
+      if (workOrder.scheduledStart) {
+        setRescheduleDate(new Date(workOrder.scheduledStart));
+        setRescheduleTimeSlot(getTimeSlotFromSchedule(workOrder.scheduledStart));
+      }
+    }
+  }, [workOrder]);
+
   const { data: quotes, isLoading: quotesLoading } = useQuery<CrmQuote[]>({
     queryKey: ["/api/crm/work-orders", workOrderId, "quotes"],
     queryFn: async () => {
@@ -198,6 +304,60 @@ export default function CrmWorkOrderDetail() {
     },
     enabled: !!currentUser && !!workOrderId,
   });
+
+  const { data: techniciansData } = useQuery<CrmUser[]>({
+    queryKey: ["/api/crm/users"],
+    enabled: !!currentUser,
+  });
+
+  const technicians = (techniciansData || []).filter(u => u.role === "tech");
+
+  const { data: propertiesData } = useQuery<CrmProperty[]>({
+    queryKey: ["/api/crm/properties", workOrder?.customerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/properties?customerId=${workOrder?.customerId}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch properties");
+      return res.json();
+    },
+    enabled: !!currentUser && !!workOrder?.customerId,
+  });
+
+  const properties = propertiesData || [];
+
+  const { data: projectsResponse, isLoading: projectsLoading } = useQuery<{ projects: CrmProject[]; pagination: any }>({
+    queryKey: ["/api/crm/projects", workOrder?.customerId, debouncedProjectSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (workOrder?.customerId) params.set("customerId", workOrder.customerId);
+      if (debouncedProjectSearch) params.set("search", debouncedProjectSearch);
+      const res = await fetch(`/api/crm/projects?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch projects");
+      return res.json();
+    },
+    enabled: !!currentUser && !!workOrder?.customerId,
+  });
+
+  const linkableProjects = projectsResponse?.projects || [];
+
+  const { data: reassignCustomersData, isLoading: reassignCustomersLoading } = useQuery<CustomersResponse>({
+    queryKey: ["/api/crm/customers", debouncedReassignCustomerSearch, "reassign"],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: "1", limit: "10" });
+      if (debouncedReassignCustomerSearch) params.set("search", debouncedReassignCustomerSearch);
+      const res = await fetch(`/api/crm/customers?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch customers");
+      return res.json();
+    },
+    enabled: !!currentUser && reassignCustomerSearchOpen,
+  });
+
+  const reassignCustomers = reassignCustomersData?.customers || [];
 
   const createQuoteMutation = useMutation({
     mutationFn: async () => {
@@ -249,10 +409,123 @@ export default function CrmWorkOrderDetail() {
     },
   });
 
+  const updateWorkOrderMutation = useMutation({
+    mutationFn: async (data: { updates: Partial<CrmWorkOrder> & { updateProjectCustomer?: boolean } }) => {
+      const res = await apiRequest("PATCH", `/api/crm/work-orders/${workOrderId}`, data.updates);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", workOrderId] });
+      toast({ title: "Work order updated", description: "Changes have been saved." });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update work order",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateQuote = () => {
     if (quoteTitle.trim()) {
       createQuoteMutation.mutate();
     }
+  };
+
+  const handleUpdateStatus = () => {
+    if (newStatus) {
+      updateWorkOrderMutation.mutate({
+        updates: { status: newStatus as WorkOrderStatus },
+      });
+    }
+  };
+
+  const handleReassignTech = () => {
+    updateWorkOrderMutation.mutate({
+      updates: { assignedTechId: reassignTechId === "unassigned" ? null : (reassignTechId || null) },
+    });
+  };
+
+  const handleReschedule = () => {
+    if (rescheduleDate && rescheduleTimeSlot) {
+      const [startTimeStr, endTimeStr] = rescheduleTimeSlot.split("-");
+      const [startHours, startMinutes] = startTimeStr.split(":").map(Number);
+      const [endHours, endMinutes] = endTimeStr.split(":").map(Number);
+      
+      const scheduledStart = new Date(rescheduleDate);
+      scheduledStart.setHours(startHours, startMinutes, 0, 0);
+      
+      const scheduledEnd = new Date(rescheduleDate);
+      scheduledEnd.setHours(endHours, endMinutes, 0, 0);
+      
+      updateWorkOrderMutation.mutate({
+        updates: {
+          scheduledStart,
+          scheduledEnd,
+        },
+      });
+    }
+  };
+
+  const handleSaveTechNotes = () => {
+    updateWorkOrderMutation.mutate({
+      updates: { techNotes: editingTechNotes },
+    });
+  };
+
+  const handleSaveChecklist = () => {
+    updateWorkOrderMutation.mutate({
+      updates: { checklist: editingChecklist },
+    });
+  };
+
+  const handleSaveBilling = () => {
+    updateWorkOrderMutation.mutate({
+      updates: { 
+        billingDisposition: billingDisposition as any,
+        billingNotes: billingNotes,
+      },
+    });
+  };
+
+  const handleLinkProject = (projectId: string | null) => {
+    updateWorkOrderMutation.mutate({
+      updates: { projectId },
+    });
+    setProjectSearchOpen(false);
+    setProjectSearch("");
+  };
+
+  const handleUpdateProperty = (propertyId: string) => {
+    updateWorkOrderMutation.mutate({
+      updates: { propertyId },
+    });
+  };
+
+  const handleReassignCustomer = (newCustomer: CustomerWithInfo) => {
+    if (!workOrder) return;
+    
+    const hasLinkedProject = !!workOrder.projectId;
+    
+    updateWorkOrderMutation.mutate({
+      updates: { 
+        customerId: newCustomer.id, 
+        propertyId: null,
+        projectId: null,
+        updateProjectCustomer: hasLinkedProject,
+      },
+    });
+    
+    setReassignCustomerSearchOpen(false);
+    setReassignCustomerSearch("");
+    
+    toast({
+      title: "Customer reassigned",
+      description: hasLinkedProject 
+        ? "Customer updated. Please select a new property and project for this customer."
+        : "Customer updated. Please select a property for this customer.",
+    });
   };
 
   if (authLoading || workOrderLoading) {
@@ -360,7 +633,7 @@ export default function CrmWorkOrderDetail() {
               <div className="flex items-center gap-2 text-sm text-slate-600">
                 {workOrder.scheduledStart && (
                   <div className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg">
-                    <Calendar className="h-4 w-4 text-slate-500" />
+                    <CalendarIcon className="h-4 w-4 text-slate-500" />
                     <span>{formatShortDate(workOrder.scheduledStart)}</span>
                     <Clock className="h-4 w-4 text-slate-500 ml-2" />
                     <span>{formatTimeRange(workOrder.scheduledStart, workOrder.scheduledEnd)}</span>
@@ -528,6 +801,14 @@ export default function CrmWorkOrderDetail() {
             >
               <DollarSign className="h-4 w-4 md:mr-2" />
               <span className="hidden md:inline">Invoices</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="edit"
+              data-testid="tab-edit"
+              className="data-[state=active]:bg-[#711419] data-[state=active]:text-white px-3 py-2"
+            >
+              <Pencil className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Edit</span>
             </TabsTrigger>
           </TabsList>
 
@@ -759,6 +1040,431 @@ export default function CrmWorkOrderDetail() {
                     </Button>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="edit" className="mt-6">
+            <Card className="shadow-sm">
+              <CardHeader className="pb-3 border-b bg-slate-50/50">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <Pencil className="h-4 w-4 text-[#711419]" />
+                  Edit Work Order
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Customer</h4>
+                  <div className="flex items-center justify-between">
+                    <p className="text-slate-900">{workOrder.customer?.name || "—"}</p>
+                    <Popover open={reassignCustomerSearchOpen} onOpenChange={setReassignCustomerSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-[#711419] hover:bg-[#711419]/10"
+                          data-testid="button-change-customer"
+                        >
+                          <Edit className="h-3.5 w-3.5 mr-1" />
+                          Change
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[350px] p-0" align="end">
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            placeholder="Search customers..."
+                            value={reassignCustomerSearch}
+                            onValueChange={setReassignCustomerSearch}
+                            data-testid="input-customer-search"
+                          />
+                          <CommandList>
+                            {reassignCustomersLoading ? (
+                              <div className="p-4 text-center text-sm text-slate-500">
+                                Loading...
+                              </div>
+                            ) : reassignCustomers.length === 0 ? (
+                              <CommandEmpty>No customers found.</CommandEmpty>
+                            ) : (
+                              <CommandGroup>
+                                {reassignCustomers.map((customer) => (
+                                  <CommandItem
+                                    key={customer.id}
+                                    value={customer.id}
+                                    onSelect={() => handleReassignCustomer(customer)}
+                                    data-testid={`reassign-customer-${customer.id}`}
+                                  >
+                                    <User className="h-4 w-4 mr-2 text-slate-500" />
+                                    <div>
+                                      <p className="font-medium">{customer.name}</p>
+                                      <p className="text-xs text-slate-500">{customer.fullAddress || customer.customerType}</p>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Site <span className="text-red-500">*</span></h4>
+                  {properties.length > 0 ? (
+                    <Select 
+                      value={workOrder.propertyId || ""} 
+                      onValueChange={handleUpdateProperty}
+                    >
+                      <SelectTrigger className="w-full" data-testid="select-edit-site">
+                        <SelectValue placeholder="Select a site">
+                          {workOrder.property 
+                            ? getPropertyAddress(workOrder.property) 
+                            : "Select a site"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {properties.map((property) => (
+                          <SelectItem key={property.id} value={property.id}>
+                            {getPropertyAddress(property)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm text-slate-500">No sites for this customer</p>
+                      {workOrder.customerId && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/crm/customers/${workOrder.customerId}`)}
+                          className="w-full"
+                          data-testid="button-add-site"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Site
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Linked Project</h4>
+                  {workOrder.project ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FolderOpen className="h-4 w-4 text-slate-500" />
+                        <Link 
+                          to={`/crm/projects/${workOrder.projectId}`}
+                          className="text-[#711419] hover:underline font-medium"
+                        >
+                          {workOrder.project.title}
+                        </Link>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleLinkProject(null)}
+                        className="text-slate-500 hover:text-red-600"
+                        data-testid="button-unlink-project"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ) : projectsLoading ? (
+                    <p className="text-sm text-slate-500">Loading...</p>
+                  ) : (
+                    <Popover open={projectSearchOpen} onOpenChange={setProjectSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start"
+                          data-testid="button-link-project"
+                        >
+                          <FolderOpen className="h-4 w-4 mr-2" />
+                          {linkableProjects.length === 0 ? "No projects - Create one" : "Add to Project"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0" align="start">
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            placeholder="Search projects..."
+                            value={projectSearch}
+                            onValueChange={setProjectSearch}
+                            data-testid="input-project-search"
+                          />
+                          <CommandList>
+                            {linkableProjects.length === 0 ? (
+                              <div className="p-4 text-center">
+                                <p className="text-sm text-slate-500 mb-3">No projects for this customer</p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setProjectSearchOpen(false);
+                                    navigate(`/crm/customers/${workOrder.customerId}`);
+                                  }}
+                                  data-testid="button-create-project"
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Create Project
+                                </Button>
+                              </div>
+                            ) : (
+                              <CommandGroup>
+                                {linkableProjects.map((project) => (
+                                  <CommandItem
+                                    key={project.id}
+                                    value={project.id}
+                                    onSelect={() => handleLinkProject(project.id)}
+                                    data-testid={`project-option-${project.id}`}
+                                  >
+                                    <FolderOpen className="h-4 w-4 mr-2 text-slate-500" />
+                                    <div>
+                                      <p className="font-medium">{project.title}</p>
+                                      <p className="text-xs text-slate-500">{project.projectType}</p>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Status</h4>
+                  <div className="flex items-center gap-2">
+                    <Select value={newStatus} onValueChange={setNewStatus}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-edit-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"] as WorkOrderStatus[]).map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {statusLabels[status]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      onClick={handleUpdateStatus}
+                      disabled={updateWorkOrderMutation.isPending || newStatus === workOrder.status}
+                      data-testid="button-update-status"
+                    >
+                      Update
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Assigned Tech</h4>
+                  <div className="flex items-center gap-2">
+                    <Select value={reassignTechId} onValueChange={setReassignTechId}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-edit-tech">
+                        <SelectValue placeholder="Unassigned" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {technicians.map((tech) => (
+                          <SelectItem key={tech.id} value={tech.id}>
+                            {tech.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      onClick={handleReassignTech}
+                      disabled={updateWorkOrderMutation.isPending}
+                      data-testid="button-assign-tech"
+                    >
+                      Assign
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Schedule</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !rescheduleDate && "text-muted-foreground"
+                            )}
+                            data-testid="calendar-reschedule"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {rescheduleDate ? format(rescheduleDate, "MMM d, yyyy") : "Pick date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={rescheduleDate}
+                            onSelect={setRescheduleDate}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Time Slot</Label>
+                      <Select value={rescheduleTimeSlot} onValueChange={setRescheduleTimeSlot}>
+                        <SelectTrigger data-testid="select-edit-time-slot">
+                          <SelectValue placeholder="Select time" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {timeSlots.map((slot) => (
+                            <SelectItem key={slot.value} value={slot.value}>
+                              {slot.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleReschedule}
+                    disabled={updateWorkOrderMutation.isPending || !rescheduleDate || !rescheduleTimeSlot}
+                    data-testid="button-reschedule"
+                  >
+                    Reschedule
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Checklist</h4>
+                  <div className="space-y-2">
+                    {editingChecklist.map((item, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`checklist-item-${index}`}
+                          checked={item.completed}
+                          onCheckedChange={(checked) => {
+                            const newList = [...editingChecklist];
+                            newList[index] = { ...item, completed: !!checked };
+                            setEditingChecklist(newList);
+                          }}
+                        />
+                        <Input
+                          value={item.item}
+                          onChange={(e) => {
+                            const newList = [...editingChecklist];
+                            newList[index] = { ...item, item: e.target.value };
+                            setEditingChecklist(newList);
+                          }}
+                          className="h-8 text-sm"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-400 hover:text-red-500"
+                          onClick={() => {
+                            setEditingChecklist(editingChecklist.filter((_, i) => i !== index));
+                          }}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() => setEditingChecklist([...editingChecklist, { item: "", completed: false }])}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Item
+                    </Button>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveChecklist}
+                    disabled={updateWorkOrderMutation.isPending}
+                    data-testid="button-save-checklist"
+                  >
+                    Save Checklist
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Billing Disposition</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Disposition</Label>
+                      <Select value={billingDisposition} onValueChange={setBillingDisposition}>
+                        <SelectTrigger data-testid="select-billing-disposition">
+                          <SelectValue placeholder="Select disposition" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="not_set">Not Set</SelectItem>
+                          <SelectItem value="invoice_created">Invoice Created</SelectItem>
+                          <SelectItem value="no_charge">No Charge</SelectItem>
+                          <SelectItem value="billed_elsewhere">Billed Elsewhere</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Billing Notes</Label>
+                      <Textarea
+                        value={billingNotes}
+                        onChange={(e) => setBillingNotes(e.target.value)}
+                        placeholder="Billing specific notes..."
+                        className="min-h-[80px]"
+                        data-testid="textarea-billing-notes"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveBilling}
+                    disabled={updateWorkOrderMutation.isPending}
+                    data-testid="button-save-billing"
+                  >
+                    Save Billing Info
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Tech Notes</h4>
+                  <Textarea
+                    value={editingTechNotes}
+                    onChange={(e) => setEditingTechNotes(e.target.value)}
+                    placeholder="Add notes..."
+                    className="min-h-[80px]"
+                    data-testid="textarea-edit-tech-notes"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSaveTechNotes}
+                    disabled={updateWorkOrderMutation.isPending}
+                    data-testid="button-save-notes"
+                  >
+                    Save Notes
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

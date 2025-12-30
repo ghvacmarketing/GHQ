@@ -491,25 +491,9 @@ export default function CrmWorkOrders() {
     },
   });
 
-  const handleOpenDetail = async (wo: EnrichedWorkOrder) => {
-    const res = await fetch(`/api/crm/work-orders/${wo.id}`, { credentials: "include" });
-    if (res.ok) {
-      const data = await res.json();
-      setSelectedWorkOrder(data);
-      setEditingChecklist(data.checklist || []);
-      setEditingTechNotes(data.techNotes || "");
-      setReassignTechId(data.assignedTechId || "unassigned");
-      setNewStatus(data.status);
-      setRescheduleDate(data.scheduledStart ? new Date(data.scheduledStart) : new Date());
-      setRescheduleTimeSlot(getTimeSlotFromSchedule(data.scheduledStart));
-      setProjectSearch("");
-      setProjectSearchOpen(false);
-      // Reset customer reassignment state
-      setReassignCustomerSearch("");
-      setReassignCustomerSearchOpen(false);
-      setReassignPropertyId(data.propertyId || "");
-      setSheetOpen(true);
-    }
+  const handleOpenDetail = (wo: EnrichedWorkOrder) => {
+    // Navigate to the work order detail page
+    navigate(`/crm/work-orders/${wo.id}`);
   };
 
   const handleSaveChecklist = () => {
