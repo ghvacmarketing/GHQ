@@ -62,7 +62,19 @@ import {
   ArrowRight,
   XCircle,
   Loader2,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
 import type { 
@@ -307,6 +319,24 @@ export default function CrmProjectDetail() {
     },
   });
 
+  const deleteProjectMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/crm/projects/${projectId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Project deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
+      navigate("/crm/projects");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete project",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const totalQuoted = (quotes || [])
     .filter((q) => q.status === "accepted")
     .reduce((sum, q) => sum + parseFloat(q.total?.toString() || "0"), 0);
@@ -434,6 +464,40 @@ export default function CrmProjectDetail() {
               )}
             </div>
           </div>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                data-testid="button-delete-project"
+              >
+                <Trash2 className="w-4 h-4 mr-1.5" />
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete "{project.title}" and all associated timeline activities. 
+                  Work orders linked to this project will remain but will no longer be associated with it.
+                  This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteProjectMutation.mutate()}
+                  className="bg-red-600 hover:bg-red-700"
+                  disabled={deleteProjectMutation.isPending}
+                  data-testid="button-confirm-delete-project"
+                >
+                  {deleteProjectMutation.isPending ? "Deleting..." : "Delete Project"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>

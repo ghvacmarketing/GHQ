@@ -9164,11 +9164,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workOrder: activity.workOrderId ? workOrdersMap.get(activity.workOrderId) : null,
       }));
 
-      console.log(`[Activities API] Returning ${enrichedActivities.length} activities for project ${projectId}`);
-      if (enrichedActivities.length > 0) {
-        console.log(`[Activities API] First activity:`, JSON.stringify(enrichedActivities[0], null, 2));
-      }
-
       return res.json(enrichedActivities);
     } catch (error) {
       console.error("Error fetching project activities:", error);
