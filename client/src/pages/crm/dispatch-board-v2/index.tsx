@@ -345,19 +345,14 @@ export default function DispatchBoardV2() {
                       >
                         Technicians
                       </div>
-                      <div className="relative" style={{ width: TIMELINE_WIDTH }}>
+                      <div className="flex justify-between" style={{ width: TIMELINE_WIDTH }}>
                         {Array.from({ length: 13 }, (_, i) => {
                           const hour = START_HOUR + i;
                           const label = hour === 12 ? "12pm" : hour > 12 ? `${hour - 12}pm` : `${hour}am`;
-                          const leftPercent = (i / 12) * 100;
                           return (
                             <div
                               key={i}
-                              className="absolute py-2 text-xs font-medium text-slate-600"
-                              style={{ 
-                                left: `${leftPercent}%`,
-                                transform: i === 0 ? 'none' : i === 12 ? 'translateX(-100%)' : 'translateX(-50%)',
-                              }}
+                              className="py-2 text-xs font-medium text-slate-600"
                             >
                               {label}
                             </div>
