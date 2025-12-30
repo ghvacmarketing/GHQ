@@ -154,10 +154,13 @@ function getInitials(name: string): string {
   return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
-const START_HOUR = 8;
+const START_HOUR = 6;
 const END_HOUR = 20;
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i + START_HOUR);
+const SLOT_WIDTH = 48;
+const HOUR_WIDTH = SLOT_WIDTH * 4;
+const TIMELINE_WIDTH = TOTAL_HOURS * HOUR_WIDTH;
 
 const statusColors: Record<string, { bg: string; border: string; text: string }> = {
   scheduled: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
@@ -285,21 +288,17 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
     if (!isResizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const parent = cardRef.current?.parentElement;
-      if (!parent) return;
-      
-      const parentWidth = parent.offsetWidth;
-      const hoursPerPixel = TOTAL_HOURS / parentWidth;
+      const hoursPerPixel = TOTAL_HOURS / TIMELINE_WIDTH;
       const deltaX = e.clientX - resizeStartX.current;
       const deltaHours = deltaX * hoursPerPixel;
       
       if (isResizingLeft) {
-        let newStart = Math.round(originalStart.current + deltaHours);
-        newStart = Math.max(START_HOUR, Math.min(newStart, originalEnd.current - 1));
+        let newStart = Math.round((originalStart.current + deltaHours) * 4) / 4;
+        newStart = Math.max(START_HOUR, Math.min(newStart, originalEnd.current - 0.25));
         setVisualStart(newStart);
       } else if (isResizingRight) {
-        let newEnd = Math.round(originalEnd.current + deltaHours);
-        newEnd = Math.max(originalStart.current + 1, Math.min(newEnd, END_HOUR));
+        let newEnd = Math.round((originalEnd.current + deltaHours) * 4) / 4;
+        newEnd = Math.max(originalStart.current + 0.25, Math.min(newEnd, END_HOUR));
         setVisualEnd(newEnd);
       }
     };
@@ -325,13 +324,12 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
 
   const displayStart = isResizing ? visualStart : startHour;
   const displayEnd = isResizing ? visualEnd : endHour;
-  const widthPercent = ((displayEnd - displayStart) / TOTAL_HOURS) * 100;
-  const leftPercent = ((displayStart - START_HOUR) / TOTAL_HOURS) * 100;
+  const leftPx = (displayStart - START_HOUR) * HOUR_WIDTH;
+  const widthPx = (displayEnd - displayStart) * HOUR_WIDTH;
 
   const style: React.CSSProperties = {
-    left: `${leftPercent}%`,
-    width: `${widthPercent}%`,
-    minWidth: "60px",
+    left: `${leftPx}px`,
+    width: `${Math.max(widthPx, 48)}px`,
     transform: isDragging && transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.5 : 1,
   };
@@ -389,14 +387,14 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
   );
 }
 
-function WorkOrderCardOverlay({ workOrder, timelineWidth }: { workOrder: DispatchWorkOrder; timelineWidth: number }) {
+function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
   const jobColors = getJobTypeColor(workOrder.jobType);
   const statusStripe = statusStripeColors[workOrder.status] || statusStripeColors.scheduled;
   const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
   const isCompletedStatus = ["completed", "cancelled"].includes(workOrder.status);
   const { startHour, endHour } = getWorkOrderDisplayTimes(workOrder);
   const duration = endHour - startHour;
-  const widthPx = Math.max(60, (duration / TOTAL_HOURS) * timelineWidth);
+  const widthPx = Math.max(48, duration * HOUR_WIDTH);
   
   return (
     <div
@@ -436,7 +434,7 @@ function DroppableTechnicianRow({ tech, workOrders, onResize, activeId, onWorkOr
       className={`flex border-b border-slate-100 last:border-b-0 ${isOver ? 'bg-slate-50' : ''}`}
       data-testid={`technician-row-${tech.id}`}
     >
-      <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 flex items-center">
+      <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 flex items-center sticky left-0 bg-white z-10">
         <div className={`w-1 h-10 rounded-full mr-2 ${workOrders.length > 0 ? 'bg-green-500' : 'bg-slate-300'}`} />
         <div className="w-10 h-10 rounded bg-slate-200 flex items-center justify-center mr-2 flex-shrink-0">
           <svg className="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
@@ -448,14 +446,18 @@ function DroppableTechnicianRow({ tech, workOrders, onResize, activeId, onWorkOr
           <p className="text-xs text-slate-400">{workOrders.length} work orders</p>
         </div>
       </div>
-      <div ref={setNodeRef} className={`flex-1 relative h-14 ${isOver ? 'bg-slate-50' : ''}`}>
+      <div ref={setNodeRef} className={`relative h-14 ${isOver ? 'bg-slate-50' : ''}`} style={{ width: `${TIMELINE_WIDTH}px` }}>
         <div className="absolute inset-0 flex">
           {hours.map((hour) => (
             <div
               key={hour}
-              className="flex-1 border-r border-slate-200 last:border-r-0"
-              style={{ minWidth: "50px" }}
-            />
+              className="border-r border-slate-200 last:border-r-0 flex"
+              style={{ width: `${HOUR_WIDTH}px` }}
+            >
+              {[0, 1, 2, 3].map((q) => (
+                <div key={q} className="flex-1 border-r border-slate-100 last:border-r-0" />
+              ))}
+            </div>
           ))}
         </div>
         {workOrders.map((wo) => (
@@ -483,7 +485,7 @@ function UnassignedRow({ workOrders, onResize, activeId, onWorkOrderClick }: { w
       className={`flex border-b-2 border-slate-200 ${isOver ? 'bg-amber-50' : 'bg-amber-50/30'}`}
       data-testid="unassigned-row"
     >
-      <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 flex items-center">
+      <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 flex items-center sticky left-0 bg-inherit z-10">
         <div className={`w-1 h-10 rounded-full mr-2 ${workOrders.length > 0 ? 'bg-amber-500' : 'bg-slate-300'}`} />
         <div className="w-10 h-10 rounded bg-slate-300 flex items-center justify-center mr-2 flex-shrink-0">
           <svg className="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
@@ -495,14 +497,18 @@ function UnassignedRow({ workOrders, onResize, activeId, onWorkOrderClick }: { w
           <p className="text-xs text-amber-600">{workOrders.length} pending</p>
         </div>
       </div>
-      <div ref={setNodeRef} className={`flex-1 relative h-14 ${isOver ? 'bg-amber-50' : ''}`}>
+      <div ref={setNodeRef} className={`relative h-14 ${isOver ? 'bg-amber-50' : ''}`} style={{ width: `${TIMELINE_WIDTH}px` }}>
         <div className="absolute inset-0 flex">
           {hours.map((hour) => (
             <div
               key={hour}
-              className="flex-1 border-r border-slate-200 last:border-r-0"
-              style={{ minWidth: "50px" }}
-            />
+              className="border-r border-slate-200 last:border-r-0 flex"
+              style={{ width: `${HOUR_WIDTH}px` }}
+            >
+              {[0, 1, 2, 3].map((q) => (
+                <div key={q} className="flex-1 border-r border-slate-100 last:border-r-0" />
+              ))}
+            </div>
           ))}
         </div>
         {workOrders.map((wo) => (
@@ -942,11 +948,11 @@ export default function CrmDispatch() {
       const { startHour, endHour } = getWorkOrderDisplayTimes(wo);
       const duration = endHour - startHour;
       
-      const timelineWidth = timelineRef.current?.offsetWidth || 780;
-      const hoursPerPixel = TOTAL_HOURS / timelineWidth;
-      const deltaHours = Math.round(delta.x * hoursPerPixel);
+      const hoursPerPixel = TOTAL_HOURS / TIMELINE_WIDTH;
+      const deltaHours = Math.round((delta.x * hoursPerPixel) * 4) / 4;
       
       let newStartHour = startHour + deltaHours;
+      newStartHour = Math.round(newStartHour * 4) / 4;
       newStartHour = Math.max(START_HOUR, Math.min(newStartHour, END_HOUR - duration));
       const newEndHour = newStartHour + duration;
 
@@ -1216,18 +1222,18 @@ export default function CrmDispatch() {
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
             >
-              <ScrollArea className="w-full">
-                <div className="min-w-[800px]">
-                  <div className="flex border-b border-slate-100">
-                    <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 text-sm font-medium text-slate-700">
+              <ScrollArea className="w-full" style={{ maxWidth: '100%' }}>
+                <div style={{ width: `${TIMELINE_WIDTH + 176}px` }}>
+                  <div className="flex border-b border-slate-100 sticky top-0 bg-white z-20">
+                    <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 text-sm font-medium text-slate-700 sticky left-0 bg-white z-30">
                       Technicians
                     </div>
-                    <div ref={timelineRef} className="flex-1 flex">
+                    <div ref={timelineRef} className="flex" style={{ width: `${TIMELINE_WIDTH}px` }}>
                       {hours.map((hour) => (
                         <div
                           key={hour}
-                          className="flex-1 text-center py-2 text-xs text-slate-500 border-r border-slate-200 last:border-r-0"
-                          style={{ minWidth: "50px" }}
+                          className="text-center py-2 text-xs text-slate-500 border-r border-slate-200 last:border-r-0"
+                          style={{ width: `${HOUR_WIDTH}px` }}
                         >
                           {formatHour(hour)}
                         </div>
@@ -1263,7 +1269,7 @@ export default function CrmDispatch() {
               </ScrollArea>
               
               <DragOverlay>
-                {activeWorkOrder ? <WorkOrderCardOverlay workOrder={activeWorkOrder} timelineWidth={timelineRef.current?.offsetWidth || 780} /> : null}
+                {activeWorkOrder ? <WorkOrderCardOverlay workOrder={activeWorkOrder} /> : null}
               </DragOverlay>
             </DndContext>
           </CardContent>
