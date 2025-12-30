@@ -34,7 +34,18 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -60,6 +71,7 @@ import {
   Pencil,
   FolderOpen,
   Edit,
+  Trash2,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
@@ -238,6 +250,7 @@ export default function CrmWorkOrderDetail() {
   const [createQuoteDialogOpen, setCreateQuoteDialogOpen] = useState(false);
   const [quoteTitle, setQuoteTitle] = useState("");
   const [quoteDescription, setQuoteDescription] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const [newStatus, setNewStatus] = useState<string>("");
   const [reassignTechId, setReassignTechId] = useState<string>("unassigned");
@@ -438,6 +451,28 @@ export default function CrmWorkOrderDetail() {
       });
     },
   });
+
+  const deleteWorkOrderMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/crm/work-orders/${workOrderId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Work order deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      navigate("/crm/work-orders");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete work order",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteWorkOrder = () => {
+    deleteWorkOrderMutation.mutate();
+  };
 
   const handleCreateQuote = () => {
     if (quoteTitle.trim()) {
@@ -1490,6 +1525,25 @@ export default function CrmWorkOrderDetail() {
                     Save Notes
                   </Button>
                 </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-red-600">Danger Zone</h4>
+                  <p className="text-sm text-slate-500">
+                    Once you delete a work order, there is no going back. Please be certain.
+                  </p>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setDeleteDialogOpen(true)}
+                    disabled={deleteWorkOrderMutation.isPending}
+                    data-testid="button-delete-work-order"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Work Order
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1541,6 +1595,28 @@ export default function CrmWorkOrderDetail() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this work order? This action cannot be undone
+                and will permanently remove the work order and all associated data.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteWorkOrder}
+                className="bg-red-600 hover:bg-red-700"
+                data-testid="button-confirm-delete"
+              >
+                {deleteWorkOrderMutation.isPending ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </CrmLayout>
   );
