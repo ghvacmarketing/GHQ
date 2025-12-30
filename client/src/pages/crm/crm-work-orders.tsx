@@ -57,7 +57,7 @@ import {
   Search,
   Edit,
 } from "lucide-react";
-import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkOrderStatus, workCategoryEnum, workSubtypeByCategory, type WorkCategory, type WorkSubtype } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkOrderStatus, workSubtypeByVisitType, type WorkSubtype } from "@shared/schema";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, isToday, isThisWeek, addDays } from "date-fns";
@@ -169,7 +169,7 @@ export default function CrmWorkOrders() {
   const [searchInput, setSearchInput] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [techFilter, setTechFilter] = useState<string>("all");
-  const [categoryFilter, setCategoryFilter] = useState<WorkCategory | "all">("all");
+  const [visitTypeFilter, setVisitTypeFilter] = useState<WorkOrderVisitType | "all">("all");
   const debouncedSearch = useDebounce(searchInput, 300);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<EnrichedWorkOrder | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -201,7 +201,6 @@ export default function CrmWorkOrders() {
   const [woTitle, setWoTitle] = useState("");
   const [woDescription, setWoDescription] = useState("");
   const [visitType, setVisitType] = useState<WorkOrderVisitType>("SERVICE");
-  const [workCategory, setWorkCategory] = useState<WorkCategory>("Service");
   const [workSubtype, setWorkSubtype] = useState<WorkSubtype>("Other");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState("08:00");
@@ -409,8 +408,8 @@ export default function CrmWorkOrders() {
     }
     
     // Apply category filter
-    if (categoryFilter !== "all") {
-      orders = orders.filter(wo => wo.workCategory === categoryFilter);
+    if (visitTypeFilter !== "all") {
+      orders = orders.filter(wo => wo.visitType === visitTypeFilter);
     }
     
     
@@ -453,7 +452,7 @@ export default function CrmWorkOrders() {
       const dateB = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
       return dateA - dateB;
     });
-  }, [workOrdersData, activeTab, debouncedSearch, categoryFilter]);
+  }, [workOrdersData, activeTab, debouncedSearch, visitTypeFilter]);
 
   // Categorize unassigned work orders for the unassigned tab
   const categorizedUnassigned = useMemo(() => {
@@ -505,7 +504,6 @@ export default function CrmWorkOrders() {
     setWoTitle("");
     setWoDescription("");
     setVisitType("SERVICE");
-    setWorkCategory("Service");
     setWorkSubtype("Other");
     setScheduledDate(new Date());
     setStartTime("08:00");
@@ -538,7 +536,6 @@ export default function CrmWorkOrders() {
         title: woTitle || null,
         description: woDescription || null,
         visitType,
-        workCategory,
         workSubtype,
         scheduledStart: scheduledStart.toISOString(),
         scheduledEnd: scheduledEnd.toISOString(),
@@ -791,16 +788,16 @@ export default function CrmWorkOrders() {
           </div>
           <div className="flex items-center gap-2">
             <Select 
-              value={categoryFilter} 
-              onValueChange={(v) => setCategoryFilter(v as WorkCategory | "all")}
+              value={visitTypeFilter} 
+              onValueChange={(v) => setVisitTypeFilter(v as WorkOrderVisitType | "all")}
             >
-              <SelectTrigger className="w-[140px]" data-testid="select-category-filter">
-                <SelectValue placeholder="All Categories" />
+              <SelectTrigger className="w-[140px]" data-testid="select-visit-type-filter">
+                <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {workCategoryEnum.map((cat) => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
+                {workOrderVisitTypeEnum.map((type) => (
+                  <SelectItem key={type} value={type}>{visitTypeLabels[type]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -1534,40 +1531,24 @@ export default function CrmWorkOrders() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>Visit Type <span className="text-red-500">*</span></Label>
-                <Select value={visitType} onValueChange={(v) => setVisitType(v as WorkOrderVisitType)}>
-                  <SelectTrigger data-testid="select-visit-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {workOrderVisitTypeEnum.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {visitTypeLabels[type]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Work Category <span className="text-red-500">*</span></Label>
+                  <Label>Visit Type <span className="text-red-500">*</span></Label>
                   <Select 
-                    value={workCategory} 
+                    value={visitType} 
                     onValueChange={(v) => {
-                      const cat = v as WorkCategory;
-                      setWorkCategory(cat);
-                      setWorkSubtype(workSubtypeByCategory[cat][0]);
+                      const vt = v as WorkOrderVisitType;
+                      setVisitType(vt);
+                      setWorkSubtype(workSubtypeByVisitType[vt][0]);
                     }}
                   >
-                    <SelectTrigger data-testid="select-work-category">
+                    <SelectTrigger data-testid="select-visit-type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {workCategoryEnum.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
+                      {workOrderVisitTypeEnum.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {visitTypeLabels[type]}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1580,7 +1561,7 @@ export default function CrmWorkOrders() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {workSubtypeByCategory[workCategory].map((sub) => (
+                      {workSubtypeByVisitType[visitType].map((sub) => (
                         <SelectItem key={sub} value={sub}>
                           {sub}
                         </SelectItem>
