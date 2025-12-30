@@ -34,7 +34,6 @@ import {
   QUEUE_STAGE_CONFIG,
   TECH_COLORS,
   buildTimeSlots,
-  getHourLabels,
   dateToSlotIndex,
   slotIndexToTime,
   calculateDurationSlots,
@@ -43,7 +42,8 @@ import {
 import type { EnrichedWorkOrder, Technician, DragPayload } from "./types";
 
 const timeSlots = buildTimeSlots();
-const hourLabels = getHourLabels();
+const SLOT_WIDTH = 60;
+const TIMELINE_WIDTH = TOTAL_SLOTS * SLOT_WIDTH;
 
 const TECH_ROW_HEIGHT = 56;
 const TECH_LABEL_WIDTH = 176;
@@ -176,8 +176,8 @@ export default function DispatchBoardV2() {
     const workOrderId = active.id as string;
     const overId = over.id as string;
 
-    if (overId.startsWith("tech-slot-")) {
-      const parts = overId.replace("tech-slot-", "").split("-");
+    if (overId.startsWith("tech-slot::")) {
+      const parts = overId.replace("tech-slot::", "").split("::");
       const techId = parts[0];
       const slotIndex = parseInt(parts[1], 10);
 
@@ -327,16 +327,22 @@ export default function DispatchBoardV2() {
                       >
                         Technicians
                       </div>
-                      <div className="flex flex-1">
-                        {hourLabels.map((item, idx) => (
+                      <div className="flex">
+                        {timeSlots.map((slot, idx) => (
                           <div
                             key={idx}
-                            className="text-center py-2 text-xs text-slate-600 font-medium border-r border-slate-200"
-                            style={{ flex: idx === hourLabels.length - 1 ? "0 0 0" : "1 1 0" }}
+                            className={`text-center py-2 text-xs font-medium border-r ${slot.label ? "text-slate-600 border-slate-300" : "text-slate-400 border-slate-100"}`}
+                            style={{ width: 60 }}
                           >
-                            {item.label}
+                            {slot.label || ""}
                           </div>
                         ))}
+                        <div
+                          className="text-center py-2 text-xs text-slate-600 font-medium"
+                          style={{ width: 30 }}
+                        >
+                          8pm
+                        </div>
                       </div>
                     </div>
 
@@ -460,7 +466,7 @@ function TechnicianRowComponent({
         </div>
       </div>
 
-      <div className="flex-1 relative">
+      <div className="relative" style={{ width: TIMELINE_WIDTH + 30 }}>
         {timeSlots.map((slot, idx) => (
           <TimeSlotDropZone
             key={idx}
@@ -479,15 +485,15 @@ function TechnicianRowComponent({
 
           if (slotIndex < 0 || slotIndex >= TOTAL_SLOTS) return null;
 
-          const leftPercent = (slotIndex / TOTAL_SLOTS) * 100;
-          const widthPercent = (durationSlots / TOTAL_SLOTS) * 100;
+          const leftPx = slotIndex * SLOT_WIDTH;
+          const widthPx = durationSlots * SLOT_WIDTH;
 
           return (
             <ScheduledWorkOrderCard
               key={wo.id}
               workOrder={wo}
-              leftPercent={leftPercent}
-              widthPercent={widthPercent}
+              leftPx={leftPx}
+              widthPx={widthPx}
             />
           );
         })}
@@ -498,7 +504,7 @@ function TechnicianRowComponent({
 
 function TimeSlotDropZone({ techId, slotIndex, isHourMark }: { techId: string; slotIndex: number; isHourMark: boolean }) {
   const { setNodeRef, isOver } = useDroppable({
-    id: `tech-slot-${techId}-${slotIndex}`,
+    id: `tech-slot::${techId}::${slotIndex}`,
   });
 
   return (
@@ -506,8 +512,8 @@ function TimeSlotDropZone({ techId, slotIndex, isHourMark }: { techId: string; s
       ref={setNodeRef}
       className={`absolute top-0 bottom-0 border-r ${isHourMark ? "border-slate-300" : "border-slate-100"} ${isOver ? "bg-blue-100" : ""}`}
       style={{
-        left: `${(slotIndex / TOTAL_SLOTS) * 100}%`,
-        width: `${(1 / TOTAL_SLOTS) * 100}%`,
+        left: slotIndex * SLOT_WIDTH,
+        width: SLOT_WIDTH,
       }}
     />
   );
@@ -515,12 +521,12 @@ function TimeSlotDropZone({ techId, slotIndex, isHourMark }: { techId: string; s
 
 function ScheduledWorkOrderCard({
   workOrder,
-  leftPercent,
-  widthPercent,
+  leftPx,
+  widthPx,
 }: {
   workOrder: EnrichedWorkOrder;
-  leftPercent: number;
-  widthPercent: number;
+  leftPx: number;
+  widthPx: number;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: workOrder.id,
@@ -533,8 +539,8 @@ function ScheduledWorkOrderCard({
     position: "absolute",
     top: 4,
     bottom: 4,
-    left: `${leftPercent}%`,
-    width: `${widthPercent}%`,
+    left: leftPx,
+    width: widthPx,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
     opacity: isDragging ? 0.7 : 1,
     zIndex: isDragging ? 50 : 10,
