@@ -32,7 +32,6 @@ import GlobalPasswordGate from "@/components/GlobalPasswordGate";
 const CrmLogin = lazy(() => import("@/pages/crm/crm-login"));
 const CrmDashboard = lazy(() => import("@/pages/crm/crm-dashboard"));
 const CrmDispatch = lazy(() => import("@/pages/crm/crm-dispatch"));
-const CrmDispatchV2 = lazy(() => import("@/pages/crm/dispatch-board-v2"));
 const CrmCustomers = lazy(() => import("@/pages/crm/crm-customers"));
 const CrmCustomerDetail = lazy(() => import("@/pages/crm/crm-customer-detail"));
 const CrmAccountCreate = lazy(() => import("@/pages/crm/crm-account-create"));
@@ -157,7 +156,6 @@ function Router() {
       <Route path="/employee-portal" component={EmployeePortal} />
       <Route path="/crm/login">{() => <CrmWrapper><CrmLogin /></CrmWrapper>}</Route>
       <Route path="/crm/dispatch">{() => <CrmWrapper><CrmDispatch /></CrmWrapper>}</Route>
-      <Route path="/crm/dispatch-v2">{() => <CrmWrapper><CrmDispatchV2 /></CrmWrapper>}</Route>
       <Route path="/crm/work-orders/:id">{() => <CrmWrapper><CrmWorkOrderDetail /></CrmWrapper>}</Route>
       <Route path="/crm/work-orders">{() => <CrmWrapper><CrmWorkOrders /></CrmWrapper>}</Route>
       <Route path="/crm/accounts/new">{() => <CrmWrapper><CrmAccountCreate /></CrmWrapper>}</Route>
