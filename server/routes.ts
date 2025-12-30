@@ -9105,7 +9105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pa.user_id as "userId", pa.activity_type as "activityType", 
           pa.title, pa.description, pa.metadata, pa.is_pinned as "isPinned",
           pa.created_at as "createdAt",
-          u.display_name as "userName",
+          u.name as "userName",
           wo.work_order_number as "workOrderNumber", wo.title as "workOrderTitle"
         FROM project_activities pa
         LEFT JOIN crm_users u ON pa.user_id = u.id
