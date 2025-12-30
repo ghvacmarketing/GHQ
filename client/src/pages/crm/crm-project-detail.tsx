@@ -1057,18 +1057,18 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
 
   const { data: activitiesData, isLoading, refetch } = useQuery<ProjectActivityWithMeta[]>({
     queryKey: ["/api/crm/projects", projectId, "activities", queryParams.toString()],
-    queryFn: () => fetch(`/api/crm/projects/${projectId}/activities?${queryParams.toString()}`).then(r => r.json()),
+    queryFn: () => fetch(`/api/crm/projects/${projectId}/activities?${queryParams.toString()}`, { credentials: 'include' }).then(r => r.json()),
   });
   const activities = Array.isArray(activitiesData) ? activitiesData : [];
 
   const { data: projectData } = useQuery<ProjectDetail>({
     queryKey: ["/api/crm/projects", projectId],
-    queryFn: () => fetch(`/api/crm/projects/${projectId}`).then(r => r.json()),
+    queryFn: () => fetch(`/api/crm/projects/${projectId}`, { credentials: 'include' }).then(r => r.json()),
   });
 
   const { data: workOrdersData } = useQuery<{ id: string; workOrderNumber: number; title: string | null; status: string }[]>({
     queryKey: ["/api/crm/work-orders", { projectId }],
-    queryFn: () => fetch(`/api/crm/work-orders?projectId=${projectId}`).then(r => r.json()).then(d => d.workOrders || []),
+    queryFn: () => fetch(`/api/crm/work-orders?projectId=${projectId}`, { credentials: 'include' }).then(r => r.json()).then(d => d.workOrders || []),
   });
   const workOrders = Array.isArray(workOrdersData) ? workOrdersData : [];
 
