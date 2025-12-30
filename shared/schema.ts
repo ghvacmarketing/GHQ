@@ -1093,6 +1093,32 @@ export const crmCustomerNotes = pgTable("crm_customer_notes", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Project Activity Types for Timeline
+export const projectActivityTypeEnum = ["note", "photo", "file", "status_change", "financial", "approval", "work_order_created", "work_order_completed", "quote_sent", "quote_accepted", "invoice_sent", "invoice_paid"] as const;
+export type ProjectActivityType = typeof projectActivityTypeEnum[number];
+
+// Project Activities (Timeline entries aggregating work order activities)
+export const projectActivities = pgTable("project_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => crmProjects.id, { onDelete: "cascade" }),
+  workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id, { onDelete: "set null" }),
+  userId: varchar("user_id").references(() => crmUsers.id),
+  activityType: text("activity_type").$type<ProjectActivityType>().notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  metadata: json("metadata").$type<Record<string, any>>(), // For storing additional context like file URLs, old/new status, amounts, etc.
+  isPinned: boolean("is_pinned").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertProjectActivitySchema = createInsertSchema(projectActivities).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertProjectActivity = z.infer<typeof insertProjectActivitySchema>;
+export type ProjectActivity = typeof projectActivities.$inferSelect;
+
 // CRM Agreements Status Enum
 export const crmAgreementStatusEnum = ["active", "expiring", "expired", "cancelled"] as const;
 export type CrmAgreementStatus = typeof crmAgreementStatusEnum[number];
