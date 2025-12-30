@@ -60,3 +60,4 @@ Preferred communication style: Simple, everyday language.
 - **Geoapify API**: Address autocomplete and reverse geocoding.
 - **react-pdf**: PDF viewing.
 - **jsPDF**: PDF export generation.
+- **Replit App Storage**: Cloud file storage with presigned URL uploads via `@google-cloud/storage`. Attachments table tracks file metadata with references to projects, activities, and work orders.

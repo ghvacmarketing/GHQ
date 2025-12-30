@@ -28,6 +28,7 @@ import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureDefaultAdminExists, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, logCrmAudit, hashPassword as hashCrmPassword } from "./crm-auth";
 import cookieParser from "cookie-parser";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -118,6 +119,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup employee portal authentication (passport strategies, login/logout routes)
   setupEmployeeAuth(app);
+
+  // Register object storage routes for App Storage file uploads
+  registerObjectStorageRoutes(app);
 
   // Ensure default CRM admin user exists
   ensureDefaultAdminExists().catch(console.error);

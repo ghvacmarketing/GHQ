@@ -1605,3 +1605,27 @@ export type InsertCrmJobAssignment = z.infer<typeof insertCrmJobAssignmentSchema
 export type InsertCrmJobNote = z.infer<typeof insertCrmJobNoteSchema>;
 export type InsertCrmJobStatusEvent = z.infer<typeof insertCrmJobStatusEventSchema>;
 export type InsertCrmSession = z.infer<typeof insertCrmSessionSchema>;
+
+// Attachments table for App Storage files (replaces filesystem storage)
+export const attachments = pgTable("attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  projectId: varchar("project_id").references(() => crmProjects.id, { onDelete: "cascade" }),
+  activityId: varchar("activity_id").references(() => projectActivities.id, { onDelete: "cascade" }),
+  workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id, { onDelete: "cascade" }),
+  storageKey: text("storage_key").notNull(),
+  originalName: text("original_name").notNull(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => crmUsers.id),
+  thumbnailKey: text("thumbnail_key"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAttachmentSchema = createInsertSchema(attachments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
+export type Attachment = typeof attachments.$inferSelect;
