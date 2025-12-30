@@ -58,6 +58,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty } from "@shared/schema";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus } from "@shared/schema";
@@ -1355,7 +1356,12 @@ export default function CrmCustomerDetail() {
   const [propTenantName, setPropTenantName] = useState("");
   const [propTenantPhone, setPropTenantPhone] = useState("");
   const [propTenantEmail, setPropTenantEmail] = useState("");
+  // Billing override fields
+  const [propBillingOverride, setPropBillingOverride] = useState(false);
   const [propBilledTo, setPropBilledTo] = useState<"property_manager" | "tenant">("property_manager");
+  const [propPaymentTerms, setPropPaymentTerms] = useState("");
+  const [propPaymentMethod, setPropPaymentMethod] = useState("");
+  const [propApprovalRule, setPropApprovalRule] = useState("");
 
   const resetPropertyForm = () => {
     setPropAddress1("");
@@ -1367,7 +1373,11 @@ export default function CrmCustomerDetail() {
     setPropTenantName("");
     setPropTenantPhone("");
     setPropTenantEmail("");
+    setPropBillingOverride(false);
     setPropBilledTo("property_manager");
+    setPropPaymentTerms("");
+    setPropPaymentMethod("");
+    setPropApprovalRule("");
     setEditingProperty(null);
   };
 
@@ -1947,7 +1957,11 @@ export default function CrmCustomerDetail() {
         tenantName: propTenantName.trim() || null,
         tenantPhone: propTenantPhone.trim() || null,
         tenantEmail: propTenantEmail.trim() || null,
-        billedTo: propBilledTo,
+        billingOverride: propBillingOverride,
+        billedTo: propBillingOverride ? propBilledTo : "property_manager",
+        paymentTerms: propBillingOverride ? (propPaymentTerms || null) : null,
+        paymentMethod: propBillingOverride ? (propPaymentMethod || null) : null,
+        approvalRule: propBillingOverride ? (propApprovalRule || null) : null,
       });
       if (!res.ok) {
         const error = await res.json();
@@ -1984,7 +1998,11 @@ export default function CrmCustomerDetail() {
         tenantName: propTenantName.trim() || null,
         tenantPhone: propTenantPhone.trim() || null,
         tenantEmail: propTenantEmail.trim() || null,
-        billedTo: propBilledTo,
+        billingOverride: propBillingOverride,
+        billedTo: propBillingOverride ? propBilledTo : "property_manager",
+        paymentTerms: propBillingOverride ? (propPaymentTerms || null) : null,
+        paymentMethod: propBillingOverride ? (propPaymentMethod || null) : null,
+        approvalRule: propBillingOverride ? (propApprovalRule || null) : null,
       });
       if (!res.ok) {
         const error = await res.json();
@@ -2017,7 +2035,13 @@ export default function CrmCustomerDetail() {
     setPropTenantName(property.tenantName || "");
     setPropTenantPhone(property.tenantPhone || "");
     setPropTenantEmail(property.tenantEmail || "");
+    // If property is billed to tenant, assume billing override was on (backwards compatibility)
+    const hasBillingOverride = (property as any).billingOverride || property.billedTo === "tenant";
+    setPropBillingOverride(hasBillingOverride);
     setPropBilledTo((property.billedTo as "property_manager" | "tenant") || "property_manager");
+    setPropPaymentTerms((property as any).paymentTerms || "");
+    setPropPaymentMethod((property as any).paymentMethod || "");
+    setPropApprovalRule((property as any).approvalRule || "");
     setPropertyDialogOpen(true);
   };
 
@@ -2031,43 +2055,21 @@ export default function CrmCustomerDetail() {
       return;
     }
     
-    // For Property Managers:
-    // - Billing to tenant always requires tenant name and email
-    // - New sites require tenant name
-    // - Existing sites that had tenant data can't clear it
-    if (isPropertyManager) {
-      if (propBilledTo === "tenant") {
-        if (!propTenantName.trim()) {
-          toast({
-            title: "Validation Error",
-            description: "Tenant name is required when billing to tenant",
-            variant: "destructive",
-          });
-          return;
-        }
-        if (!propTenantEmail.trim()) {
-          toast({
-            title: "Validation Error",
-            description: "Tenant email is required when billing to tenant",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-      // For new sites, require tenant name
-      if (!editingProperty && !propTenantName.trim()) {
+    // For Property Managers with billing override ON and billing to tenant:
+    // Require tenant name and email
+    if (isPropertyManager && propBillingOverride && propBilledTo === "tenant") {
+      if (!propTenantName.trim()) {
         toast({
           title: "Validation Error",
-          description: "Tenant name is required for property manager sites",
+          description: "Tenant name is required when billing to tenant",
           variant: "destructive",
         });
         return;
       }
-      // For existing sites with tenant data, don't allow clearing
-      if (editingProperty?.tenantName && !propTenantName.trim()) {
+      if (!propTenantEmail.trim()) {
         toast({
           title: "Validation Error",
-          description: "Tenant name cannot be removed from existing site",
+          description: "Tenant email is required when billing to tenant",
           variant: "destructive",
         });
         return;
@@ -2090,15 +2092,8 @@ export default function CrmCustomerDetail() {
       });
       return;
     }
-    if (isPropertyManager && !propTenantName.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Tenant name is required for property manager sites",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (isPropertyManager && propBilledTo === "tenant" && !propTenantEmail.trim()) {
+    // Only require tenant info when billing override is ON and billing to tenant
+    if (isPropertyManager && propBillingOverride && propBilledTo === "tenant" && !propTenantEmail.trim()) {
       toast({
         title: "Validation Error",
         description: "Tenant email is required when billing to tenant",
@@ -3000,12 +2995,14 @@ export default function CrmCustomerDetail() {
                 />
               </div>
 
-              {/* Tenant Information - Only for Property Manager customers */}
+              {/* Tenant Contact Information - Only for Property Manager customers */}
               {isPropertyManager && (
                 <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 space-y-4 border border-purple-200 dark:border-purple-800">
-                  <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">Tenant Information</p>
+                  <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">Tenant Contact <span className="text-purple-400 font-normal">(optional)</span></p>
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Tenant Name <span className="text-red-500">*</span></Label>
+                    <Label className="text-sm font-medium text-slate-600">
+                      Tenant Name {propBillingOverride && propBilledTo === "tenant" ? <span className="text-red-500">*</span> : <span className="text-slate-400 font-normal">(optional)</span>}
+                    </Label>
                     <Input
                       placeholder="John Doe"
                       value={propTenantName}
@@ -3026,8 +3023,8 @@ export default function CrmCustomerDetail() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-sm font-medium">
-                        Tenant Email {propBilledTo === "tenant" ? <span className="text-red-500">*</span> : <span className="text-slate-400 font-normal">(optional)</span>}
+                      <Label className="text-sm font-medium text-slate-600">
+                        Tenant Email {propBillingOverride && propBilledTo === "tenant" ? <span className="text-red-500">*</span> : <span className="text-slate-400 font-normal">(optional)</span>}
                       </Label>
                       <Input
                         placeholder="tenant@email.com"
@@ -3039,22 +3036,90 @@ export default function CrmCustomerDetail() {
                       />
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Billed To</Label>
-                    <Select value={propBilledTo} onValueChange={(v) => setPropBilledTo(v as "property_manager" | "tenant")}>
-                      <SelectTrigger className="h-11" data-testid="select-prop-billed-to">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="property_manager">Property Manager</SelectItem>
-                        <SelectItem value="tenant">Tenant</SelectItem>
-                      </SelectContent>
-                    </Select>
+                </div>
+              )}
+
+              {/* Billing Override - Only for Property Manager customers */}
+              {isPropertyManager && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 space-y-4 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Billing Override</p>
+                      <p className="text-xs text-slate-500 mt-1">Enable to set custom billing for this site</p>
+                    </div>
+                    <Switch
+                      checked={propBillingOverride}
+                      onCheckedChange={setPropBillingOverride}
+                      data-testid="switch-billing-override"
+                    />
                   </div>
-                  {propBilledTo === "tenant" && (
-                    <div className="flex items-center gap-2 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-md text-amber-700 dark:text-amber-300 text-sm">
-                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                      <span>Invoices will be sent to the tenant email address</span>
+                  
+                  {propBillingOverride && (
+                    <div className="space-y-4 pt-2 border-t border-blue-200 dark:border-blue-700">
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">Bill To</Label>
+                        <Select value={propBilledTo} onValueChange={(v) => setPropBilledTo(v as "property_manager" | "tenant")}>
+                          <SelectTrigger className="h-11" data-testid="select-prop-billed-to">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="property_manager">Property Manager</SelectItem>
+                            <SelectItem value="tenant">Tenant</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium text-slate-600">Payment Terms <span className="text-slate-400 font-normal">(optional)</span></Label>
+                        <Select value={propPaymentTerms} onValueChange={setPropPaymentTerms}>
+                          <SelectTrigger className="h-11" data-testid="select-prop-payment-terms">
+                            <SelectValue placeholder="Use PM default" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="due_on_receipt">Due on Receipt</SelectItem>
+                            <SelectItem value="net_15">Net 15</SelectItem>
+                            <SelectItem value="net_30">Net 30</SelectItem>
+                            <SelectItem value="net_45">Net 45</SelectItem>
+                            <SelectItem value="net_60">Net 60</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium text-slate-600">Payment Method <span className="text-slate-400 font-normal">(optional)</span></Label>
+                        <Select value={propPaymentMethod} onValueChange={setPropPaymentMethod}>
+                          <SelectTrigger className="h-11" data-testid="select-prop-payment-method">
+                            <SelectValue placeholder="Use PM default" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="invoice">Invoice</SelectItem>
+                            <SelectItem value="credit_card">Credit Card</SelectItem>
+                            <SelectItem value="check">Check</SelectItem>
+                            <SelectItem value="ach">ACH</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium text-slate-600">Approval Rule <span className="text-slate-400 font-normal">(optional)</span></Label>
+                        <Select value={propApprovalRule} onValueChange={setPropApprovalRule}>
+                          <SelectTrigger className="h-11" data-testid="select-prop-approval-rule">
+                            <SelectValue placeholder="Use PM default" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pm_approval_required">PM Approval Required</SelectItem>
+                            <SelectItem value="tenant_direct">Tenant Can Approve</SelectItem>
+                            <SelectItem value="auto_approve">Auto-Approve</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {propBilledTo === "tenant" && (
+                        <div className="flex items-center gap-2 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-md text-amber-700 dark:text-amber-300 text-sm">
+                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                          <span>Invoices will be sent to the tenant email address</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -3072,9 +3137,7 @@ export default function CrmCustomerDetail() {
                   !propCity.trim() || 
                   !propState.trim() || 
                   !propZip.trim() || 
-                  (isPropertyManager && !editingProperty && !propTenantName.trim()) || 
-                  (isPropertyManager && editingProperty?.tenantName && !propTenantName.trim()) ||
-                  (isPropertyManager && propBilledTo === "tenant" && (!propTenantName.trim() || !propTenantEmail.trim())) || 
+                  (isPropertyManager && propBillingOverride && propBilledTo === "tenant" && (!propTenantName.trim() || !propTenantEmail.trim())) || 
                   createPropertyMutation.isPending || 
                   updatePropertyMutation.isPending
                 }

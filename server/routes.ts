@@ -7663,10 +7663,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/crm/customers/:id/properties", requireCrmAuth, async (req, res) => {
     try {
       const customerId = req.params.id;
-      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, billedTo } = req.body;
+      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, billingOverride, billedTo, paymentTerms, paymentMethod, approvalRule } = req.body;
 
       if (!address1?.trim() || !city?.trim() || !state?.trim() || !zip?.trim()) {
         return res.status(400).json({ message: "Street address, city, state, and zip are required" });
+      }
+
+      // Validate tenant requirements when billing override is ON and billing to tenant
+      if (billingOverride && billedTo === "tenant") {
+        if (!tenantName?.trim()) {
+          return res.status(400).json({ message: "Tenant name is required when billing to tenant" });
+        }
+        if (!tenantEmail?.trim()) {
+          return res.status(400).json({ message: "Tenant email is required when billing to tenant" });
+        }
       }
 
       const [newProperty] = await db.insert(crmProperties).values({
@@ -7680,7 +7690,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tenantName: tenantName?.trim() || null,
         tenantPhone: tenantPhone?.trim() || null,
         tenantEmail: tenantEmail?.trim() || null,
+        billingOverride: billingOverride || false,
         billedTo: billedTo || "property_manager",
+        paymentTerms: paymentTerms || null,
+        paymentMethod: paymentMethod || null,
+        approvalRule: approvalRule || null,
       }).returning();
 
       return res.status(201).json(newProperty);
@@ -7694,7 +7708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/crm/properties/:id", requireCrmAuth, async (req, res) => {
     try {
       const propertyId = req.params.id;
-      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, billedTo } = req.body;
+      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, billingOverride, billedTo, paymentTerms, paymentMethod, approvalRule } = req.body;
 
       // Fetch existing property to get customer info
       const [existingProperty] = await db.select().from(crmProperties).where(eq(crmProperties.id, propertyId));
@@ -7710,6 +7724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const finalZip = zip !== undefined ? zip.trim() : existingProperty.zip;
       const finalTenantName = tenantName !== undefined ? tenantName?.trim() || null : existingProperty.tenantName;
       const finalTenantEmail = tenantEmail !== undefined ? tenantEmail?.trim() || null : existingProperty.tenantEmail;
+      const finalBillingOverride = billingOverride !== undefined ? billingOverride : existingProperty.billingOverride;
       const finalBilledTo = billedTo !== undefined ? billedTo : existingProperty.billedTo;
 
       // Validate required address fields
@@ -7721,24 +7736,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, existingProperty.customerId));
       const isPropertyManager = customer?.customerType?.toLowerCase() === "property manager";
 
-      // Validate tenant requirements for Property Manager
-      // Grandfathers existing sites without tenant data, but enforces rules when:
-      // - Billing to tenant (always requires tenant name and email)
-      // - Site already had tenant data (preserve existing requirements)
-      // - User is explicitly adding tenant data
-      if (isPropertyManager) {
-        // If billing to tenant, tenant name and email are always required
-        if (finalBilledTo === "tenant") {
-          if (!finalTenantName) {
-            return res.status(400).json({ message: "Tenant name is required when billing to tenant" });
-          }
-          if (!finalTenantEmail) {
-            return res.status(400).json({ message: "Tenant email is required when billing to tenant" });
-          }
+      // Validate tenant requirements for Property Manager when billing override is ON and billing to tenant
+      if (isPropertyManager && finalBillingOverride && finalBilledTo === "tenant") {
+        if (!finalTenantName) {
+          return res.status(400).json({ message: "Tenant name is required when billing to tenant" });
         }
-        // If site already had tenant data, don't allow clearing the tenant name
-        if (existingProperty.tenantName && !finalTenantName) {
-          return res.status(400).json({ message: "Tenant name cannot be removed from existing site" });
+        if (!finalTenantEmail) {
+          return res.status(400).json({ message: "Tenant email is required when billing to tenant" });
         }
       }
 
@@ -7752,7 +7756,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (tenantName !== undefined) updateData.tenantName = tenantName?.trim() || null;
       if (tenantPhone !== undefined) updateData.tenantPhone = tenantPhone?.trim() || null;
       if (tenantEmail !== undefined) updateData.tenantEmail = tenantEmail?.trim() || null;
+      if (billingOverride !== undefined) updateData.billingOverride = billingOverride;
       if (billedTo !== undefined) updateData.billedTo = billedTo;
+      if (paymentTerms !== undefined) updateData.paymentTerms = paymentTerms || null;
+      if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod || null;
+      if (approvalRule !== undefined) updateData.approvalRule = approvalRule || null;
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ message: "No fields to update" });
