@@ -680,139 +680,138 @@ export default function CrmWorkOrderDetail() {
             </TabsTrigger>
           </TabsList>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="shadow-sm">
-            <CardHeader className="pb-3 border-b bg-slate-50/50">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <User className="h-4 w-4 text-[#711419]" />
-                Customer & Site
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-3">
-              {workOrder.customer && (
-                <div>
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-base font-semibold text-slate-900 hover:text-[#711419]"
-                    onClick={() => navigate(`/crm/customers/${workOrder.customer!.id}`)}
-                    data-testid="link-customer"
-                  >
-                    {workOrder.customer.name}
-                    <ExternalLink className="h-3 w-3 ml-1" />
-                  </Button>
-                </div>
-              )}
-              {workOrder.customer?.phone && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <Phone className="h-4 w-4 text-slate-400" />
-                  <a href={`tel:${workOrder.customer.phone}`} className="hover:text-[#711419]" data-testid="link-phone">
-                    {workOrder.customer.phone}
-                  </a>
-                </div>
-              )}
-              {workOrder.customer?.email && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <Mail className="h-4 w-4 text-slate-400" />
-                  <a href={`mailto:${workOrder.customer.email}`} className="hover:text-[#711419] truncate" data-testid="link-email">
-                    {workOrder.customer.email}
-                  </a>
-                </div>
-              )}
-              {workOrder.property && (
-                <div className="pt-3 border-t">
-                  <div className="flex items-start justify-between">
+          <TabsContent value="details" className="mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3 border-b bg-slate-50/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <User className="h-4 w-4 text-[#711419]" />
+                    Customer & Site
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-3">
+                  {workOrder.customer && (
                     <div>
-                      <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Property</p>
-                      <p className="font-medium text-sm text-slate-900" data-testid="text-address-line1">
-                        {workOrder.property.address1}
-                      </p>
-                      <p className="text-slate-600 text-sm" data-testid="text-address-city">
-                        {workOrder.property.city}, {workOrder.property.state} {workOrder.property.zip}
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto text-base font-semibold text-slate-900 hover:text-[#711419]"
+                        onClick={() => navigate(`/crm/customers/${workOrder.customer!.id}`)}
+                        data-testid="link-customer"
+                      >
+                        {workOrder.customer.name}
+                        <ExternalLink className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                  )}
+                  {workOrder.customer?.phone && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <Phone className="h-4 w-4 text-slate-400" />
+                      <a href={`tel:${workOrder.customer.phone}`} className="hover:text-[#711419]" data-testid="link-phone">
+                        {workOrder.customer.phone}
+                      </a>
+                    </div>
+                  )}
+                  {workOrder.customer?.email && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <Mail className="h-4 w-4 text-slate-400" />
+                      <a href={`mailto:${workOrder.customer.email}`} className="hover:text-[#711419] truncate" data-testid="link-email">
+                        {workOrder.customer.email}
+                      </a>
+                    </div>
+                  )}
+                  {workOrder.property && (
+                    <div className="pt-3 border-t">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Property</p>
+                          <p className="font-medium text-sm text-slate-900" data-testid="text-address-line1">
+                            {workOrder.property.address1}
+                          </p>
+                          <p className="text-slate-600 text-sm" data-testid="text-address-city">
+                            {workOrder.property.city}, {workOrder.property.state} {workOrder.property.zip}
+                          </p>
+                        </div>
+                        <Button variant="ghost" size="sm" asChild data-testid="button-directions">
+                          <a href={getGoogleMapsUrl(workOrder.property)} target="_blank" rel="noopener noreferrer">
+                            <Navigation className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3 border-b bg-slate-50/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <Wrench className="h-4 w-4 text-[#711419]" />
+                    Assignment
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-3">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Technician</p>
+                    <p className="font-medium text-sm text-slate-900" data-testid="text-tech-name">
+                      {workOrder.tech?.name || "Unassigned"}
+                    </p>
+                  </div>
+                  {workOrder.job && (
+                    <div className="pt-3 border-t">
+                      <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Linked Job</p>
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto text-sm font-medium text-slate-900 hover:text-[#711419]"
+                        onClick={() => navigate(`/crm/jobs/${workOrder.job!.id}`)}
+                        data-testid="link-job"
+                      >
+                        {workOrder.job.jobType} - #{workOrder.job.id.slice(-6)}
+                        <ExternalLink className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                  )}
+                  {workOrder.project && (
+                    <div className="pt-3 border-t">
+                      <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Linked Project</p>
+                      <p className="font-medium text-sm text-slate-900" data-testid="text-project-name">
+                        {workOrder.project.title || workOrder.project.projectType}
                       </p>
                     </div>
-                    <Button variant="ghost" size="sm" asChild data-testid="button-directions">
-                      <a href={getGoogleMapsUrl(workOrder.property)} target="_blank" rel="noopener noreferrer">
-                        <Navigation className="h-4 w-4" />
-                      </a>
-                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3 border-b bg-slate-50/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <DollarSign className="h-4 w-4 text-[#711419]" />
+                    Billing
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-3">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Disposition</p>
+                    <p className="font-medium text-sm text-slate-900" data-testid="text-billing-disposition">
+                      {workOrder.billingDisposition || "Not set"}
+                    </p>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm">
-            <CardHeader className="pb-3 border-b bg-slate-50/50">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <Wrench className="h-4 w-4 text-[#711419]" />
-                Assignment
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-3">
-              <div>
-                <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Technician</p>
-                <p className="font-medium text-sm text-slate-900" data-testid="text-tech-name">
-                  {workOrder.tech?.name || "Unassigned"}
-                </p>
-              </div>
-              {workOrder.job && (
-                <div className="pt-3 border-t">
-                  <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Linked Job</p>
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-sm font-medium text-slate-900 hover:text-[#711419]"
-                    onClick={() => navigate(`/crm/jobs/${workOrder.job!.id}`)}
-                    data-testid="link-job"
-                  >
-                    {workOrder.job.jobType} - #{workOrder.job.id.slice(-6)}
-                    <ExternalLink className="h-3 w-3 ml-1" />
-                  </Button>
-                </div>
-              )}
-              {workOrder.project && (
-                <div className="pt-3 border-t">
-                  <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Linked Project</p>
-                  <p className="font-medium text-sm text-slate-900" data-testid="text-project-name">
-                    {workOrder.project.title || workOrder.project.projectType}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm">
-            <CardHeader className="pb-3 border-b bg-slate-50/50">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <DollarSign className="h-4 w-4 text-[#711419]" />
-                Billing
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-3">
-              <div>
-                <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Disposition</p>
-                <p className="font-medium text-sm text-slate-900" data-testid="text-billing-disposition">
-                  {workOrder.billingDisposition || "Not set"}
-                </p>
-              </div>
-              {workOrder.billingNotes && (
-                <div>
-                  <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Notes</p>
-                  <p className="text-sm text-slate-600">{workOrder.billingNotes}</p>
-                </div>
-              )}
-              <div className="pt-3 border-t">
-                <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Quotes</p>
-                <p className="font-medium text-sm text-slate-900">{quotes?.length || 0} quote(s)</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Invoices</p>
-                <p className="font-medium text-sm text-slate-900">{invoices?.length || 0} invoice(s)</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-          <TabsContent value="details" className="mt-6">
+                  {workOrder.billingNotes && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Notes</p>
+                      <p className="text-sm text-slate-600">{workOrder.billingNotes}</p>
+                    </div>
+                  )}
+                  <div className="pt-3 border-t">
+                    <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Quotes</p>
+                    <p className="font-medium text-sm text-slate-900">{quotes?.length || 0} quote(s)</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Invoices</p>
+                    <p className="font-medium text-sm text-slate-900">{invoices?.length || 0} invoice(s)</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="shadow-sm">
                 <CardHeader className="pb-3 border-b bg-slate-50/50">
