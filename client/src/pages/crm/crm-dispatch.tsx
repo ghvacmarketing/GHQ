@@ -663,6 +663,184 @@ const scheduleCardColors: Record<string, string> = {
   cancelled: "bg-red-400",
 };
 
+const weekCardColors: Record<string, { bg: string; border: string }> = {
+  scheduled: { bg: "bg-blue-100", border: "border-l-blue-500" },
+  dispatched: { bg: "bg-purple-100", border: "border-l-purple-500" },
+  en_route: { bg: "bg-amber-100", border: "border-l-amber-500" },
+  on_site: { bg: "bg-orange-100", border: "border-l-orange-500" },
+  completed: { bg: "bg-green-100", border: "border-l-green-500" },
+  cancelled: { bg: "bg-red-100", border: "border-l-red-400" },
+};
+
+interface WeekDispatchBoardProps {
+  technicians: Technician[];
+  workOrders: DispatchWorkOrder[];
+  weekDates: Date[];
+  onWorkOrderClick?: (workOrderId: string) => void;
+  onQuickAssign?: (workOrderId: string, techId: string) => void;
+  onDayClick?: (date: Date) => void;
+}
+
+function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClick, onQuickAssign, onDayClick }: WeekDispatchBoardProps) {
+  const { setNodeRef } = useDroppable({ id: "week-board" });
+  
+  const getWorkOrdersForTechAndDay = (techId: string, date: Date) => {
+    const dateStr = date.toISOString().split("T")[0];
+    return workOrders.filter(wo => {
+      if (wo.assignedTechId !== techId) return false;
+      if (!wo.scheduledStart) return false;
+      const woDate = new Date(wo.scheduledStart).toISOString().split("T")[0];
+      return woDate === dateStr;
+    });
+  };
+  
+  const getUnassignedForDay = (date: Date) => {
+    const dateStr = date.toISOString().split("T")[0];
+    return workOrders.filter(wo => {
+      if (wo.assignedTechId) return false;
+      if (!wo.scheduledStart) return false;
+      const woDate = new Date(wo.scheduledStart).toISOString().split("T")[0];
+      return woDate === dateStr;
+    });
+  };
+  
+  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const today = new Date().toISOString().split("T")[0];
+  
+  return (
+    <Card className="bg-white border overflow-hidden" ref={setNodeRef}>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] border-collapse">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="w-40 px-3 py-2 text-left text-xs font-semibold text-slate-600 border-r border-slate-200">
+                Technicians
+              </th>
+              {weekDates.map((date, i) => {
+                const dateStr = date.toISOString().split("T")[0];
+                const isToday = dateStr === today;
+                return (
+                  <th 
+                    key={i} 
+                    className={`px-2 py-2 text-center text-xs font-semibold border-r border-slate-200 cursor-pointer hover:bg-slate-100 ${isToday ? "bg-[#711419]/10 text-[#711419]" : "text-slate-600"}`}
+                    onClick={() => onDayClick?.(date)}
+                  >
+                    <div>{dayNames[i]}</div>
+                    <div className={`text-sm font-bold ${isToday ? "text-[#711419]" : "text-slate-800"}`}>
+                      {date.getDate()}
+                    </div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {technicians.map((tech) => (
+              <tr key={tech.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                <td className="px-3 py-2 border-r border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-7 h-7 rounded-full ${tech.color} text-white flex items-center justify-center text-[10px] font-medium`}>
+                      {tech.initials}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-slate-800 truncate">{tech.name}</p>
+                    </div>
+                  </div>
+                </td>
+                {weekDates.map((date, dayIdx) => {
+                  const dayWOs = getWorkOrdersForTechAndDay(tech.id, date);
+                  const dateStr = date.toISOString().split("T")[0];
+                  const isToday = dateStr === today;
+                  const totalHours = dayWOs.reduce((sum, wo) => {
+                    if (!wo.scheduledStart || !wo.scheduledEnd) return sum;
+                    const start = new Date(wo.scheduledStart);
+                    const end = new Date(wo.scheduledEnd);
+                    return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+                  }, 0);
+                  
+                  return (
+                    <td 
+                      key={dayIdx} 
+                      className={`px-1 py-1 border-r border-slate-100 align-top min-h-[80px] ${isToday ? "bg-[#711419]/5" : ""}`}
+                      style={{ minHeight: 80, height: 80 }}
+                    >
+                      <DroppableWeekCell 
+                        techId={tech.id} 
+                        date={date}
+                        onQuickAssign={onQuickAssign}
+                      >
+                        {dayWOs.length > 0 ? (
+                          <div className="space-y-1">
+                            {dayWOs.slice(0, 3).map((wo) => {
+                              const colors = weekCardColors[wo.status] || weekCardColors.scheduled;
+                              const startTime = wo.scheduledStart ? format(new Date(wo.scheduledStart), "h:mma").toLowerCase() : "";
+                              return (
+                                <div
+                                  key={wo.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onWorkOrderClick?.(wo.id);
+                                  }}
+                                  className={`${colors.bg} ${colors.border} border-l-2 rounded-r px-1.5 py-0.5 cursor-pointer hover:opacity-80 text-[10px]`}
+                                  data-testid={`week-card-${wo.id}`}
+                                >
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-medium text-slate-600">{startTime}</span>
+                                    <span className="truncate text-slate-700">{wo.customerName}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {dayWOs.length > 3 && (
+                              <div className="text-[10px] text-slate-500 px-1">
+                                +{dayWOs.length - 3} more
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="h-full min-h-[60px] flex items-center justify-center">
+                            <span className="text-[10px] text-slate-300">—</span>
+                          </div>
+                        )}
+                        {totalHours > 0 && (
+                          <div className="text-[9px] text-slate-400 mt-1 text-right">
+                            {totalHours.toFixed(1)}h
+                          </div>
+                        )}
+                      </DroppableWeekCell>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+interface DroppableWeekCellProps {
+  techId: string;
+  date: Date;
+  children: React.ReactNode;
+  onQuickAssign?: (workOrderId: string, techId: string) => void;
+}
+
+function DroppableWeekCell({ techId, date, children, onQuickAssign }: DroppableWeekCellProps) {
+  const id = `week-${techId}-${date.toISOString().split("T")[0]}`;
+  const { setNodeRef, isOver } = useDroppable({ id });
+  
+  return (
+    <div 
+      ref={setNodeRef} 
+      className={`min-h-[60px] rounded transition-colors ${isOver ? "bg-[#711419]/10 ring-2 ring-[#711419]/30" : ""}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 interface TechnicianScheduleBoardProps {
   technicians: Technician[];
   workOrders: DispatchWorkOrder[];
@@ -1166,9 +1344,42 @@ function enrichWorkOrder(wo: any): DispatchWorkOrder {
   };
 }
 
+type ViewMode = "day" | "week";
+
+function getWeekDates(date: Date): Date[] {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d.setDate(diff));
+  monday.setHours(0, 0, 0, 0);
+  
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    return date;
+  });
+}
+
+function formatWeekRange(dates: Date[]): string {
+  if (dates.length < 7) return "";
+  const start = dates[0];
+  const end = dates[6];
+  const startMonth = start.toLocaleDateString("en-US", { month: "short" });
+  const endMonth = end.toLocaleDateString("en-US", { month: "short" });
+  const startDay = start.getDate();
+  const endDay = end.getDate();
+  const year = end.getFullYear();
+  
+  if (startMonth === endMonth) {
+    return `${startMonth} ${startDay} - ${endDay}, ${year}`;
+  }
+  return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
+}
+
 export default function CrmDispatch() {
   const [, navigate] = useLocation();
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebounce(searchInput, 300);
@@ -1179,6 +1390,8 @@ export default function CrmDispatch() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
   const { toast } = useToast();
+  
+  const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
@@ -1711,6 +1924,41 @@ export default function CrmDispatch() {
           },
         });
       }
+    } else if (overId.startsWith('week-')) {
+      const parts = overId.replace('week-', '').split('-');
+      const techId = parts[0];
+      const dateStr = parts.slice(1).join('-');
+      const dropDate = new Date(dateStr + 'T08:00:00');
+      
+      const startDate = new Date(dropDate);
+      startDate.setHours(8, 0, 0, 0);
+      const endDate = new Date(dropDate);
+      endDate.setHours(10, 0, 0, 0);
+      
+      const scheduledStartISO = startDate.toISOString();
+      const scheduledEndISO = endDate.toISOString();
+      
+      const newTech = technicians.find(t => t.id === techId);
+      
+      setLocalWorkOrders(prev => prev.map(w => 
+        w.id === workOrderId 
+          ? { ...w, assignedTechId: techId, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any, techName: newTech?.name || null } 
+          : w
+      ));
+      
+      updateWorkOrderMutation.mutate({
+        workOrderId,
+        updates: {
+          assignedTechId: techId,
+          scheduledStart: scheduledStartISO,
+          scheduledEnd: scheduledEndISO,
+        },
+      });
+      
+      toast({
+        title: "Work order scheduled",
+        description: `Assigned to ${newTech?.name || 'technician'} on ${format(dropDate, "MMM d")}`,
+      });
     }
   }, [localWorkOrders, selectedDate, updateWorkOrderMutation, technicians, toast]);
 
@@ -1804,35 +2052,104 @@ export default function CrmDispatch() {
         </div>
 
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900" data-testid="text-dispatch-title">
-              Dispatch Board
-            </h1>
-            <p className="text-sm text-slate-500">Daily Schedule - {localWorkOrders.length} work orders</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-xl font-bold text-slate-900" data-testid="text-dispatch-title">
+                Dispatch Board
+              </h1>
+              <p className="text-sm text-slate-500">
+                {viewMode === "day" ? "Daily Schedule" : "Weekly Schedule"} - {localWorkOrders.length} work orders
+              </p>
+            </div>
+            
+            <div className="flex items-center bg-slate-100 rounded-lg p-1">
+              <Button
+                variant={viewMode === "day" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("day")}
+                className={viewMode === "day" ? "bg-white shadow-sm" : ""}
+                data-testid="button-view-day"
+              >
+                Day
+              </Button>
+              <Button
+                variant={viewMode === "week" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("week")}
+                className={viewMode === "week" ? "bg-white shadow-sm" : ""}
+                data-testid="button-view-week"
+              >
+                Week
+              </Button>
+            </div>
           </div>
+          
           <div className="flex items-center gap-2">
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button 
-                  variant="outline" 
+            {viewMode === "week" && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
                   size="sm"
-                  className="text-slate-600"
-                  data-testid="button-date-picker"
+                  onClick={() => {
+                    const newDate = new Date(selectedDate);
+                    newDate.setDate(newDate.getDate() - 7);
+                    setSelectedDate(newDate);
+                  }}
+                  data-testid="button-prev-week"
                 >
-                  <CalendarDays className="h-4 w-4 mr-2" />
-                  {dateDisplay}
+                  ←
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={handleDateSelect}
-                  initialFocus
-                  data-testid="calendar-picker"
-                />
-              </PopoverContent>
-            </Popover>
+                <span className="text-sm font-medium text-slate-700 px-2">
+                  {formatWeekRange(weekDates)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newDate = new Date(selectedDate);
+                    newDate.setDate(newDate.getDate() + 7);
+                    setSelectedDate(newDate);
+                  }}
+                  data-testid="button-next-week"
+                >
+                  →
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedDate(new Date())}
+                  className="ml-2"
+                  data-testid="button-today"
+                >
+                  Today
+                </Button>
+              </div>
+            )}
+            
+            {viewMode === "day" && (
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="text-slate-600"
+                    data-testid="button-date-picker"
+                  >
+                    <CalendarDays className="h-4 w-4 mr-2" />
+                    {dateDisplay}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    initialFocus
+                    data-testid="calendar-picker"
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
             
             <Popover>
               <PopoverTrigger asChild>
@@ -1919,25 +2236,52 @@ export default function CrmDispatch() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="hidden lg:block space-y-6">
-            <TechnicianScheduleBoard
-              technicians={technicians}
-              workOrders={localWorkOrders.filter(wo => wo.assignedTechId)}
-              onWorkOrderClick={handleWorkOrderClick}
-              selectedDate={selectedDate}
-            />
-            
-            <UnassignedQueueSection
-              workOrders={unassignedWorkOrders}
-              onWorkOrderClick={handleWorkOrderClick}
-              technicians={technicians}
-              onQuickAssign={handleQuickAssign}
-              onQuickSchedule={handleQuickSchedule}
-              onQuickStageChange={handleQuickStageChange}
-              onQuickNote={handleQuickNote}
-              selectedDate={selectedDate}
-            />
-          </div>
+          {viewMode === "day" ? (
+            <div className="hidden lg:block space-y-6">
+              <TechnicianScheduleBoard
+                technicians={technicians}
+                workOrders={localWorkOrders.filter(wo => wo.assignedTechId)}
+                onWorkOrderClick={handleWorkOrderClick}
+                selectedDate={selectedDate}
+              />
+              
+              <UnassignedQueueSection
+                workOrders={unassignedWorkOrders}
+                onWorkOrderClick={handleWorkOrderClick}
+                technicians={technicians}
+                onQuickAssign={handleQuickAssign}
+                onQuickSchedule={handleQuickSchedule}
+                onQuickStageChange={handleQuickStageChange}
+                onQuickNote={handleQuickNote}
+                selectedDate={selectedDate}
+              />
+            </div>
+          ) : (
+            <div className="hidden lg:block space-y-6">
+              <WeekDispatchBoard
+                technicians={technicians}
+                workOrders={localWorkOrders}
+                weekDates={weekDates}
+                onWorkOrderClick={handleWorkOrderClick}
+                onQuickAssign={handleQuickAssign}
+                onDayClick={(date) => {
+                  setSelectedDate(date);
+                  setViewMode("day");
+                }}
+              />
+              
+              <UnassignedQueueSection
+                workOrders={unassignedWorkOrders}
+                onWorkOrderClick={handleWorkOrderClick}
+                technicians={technicians}
+                onQuickAssign={handleQuickAssign}
+                onQuickSchedule={handleQuickSchedule}
+                onQuickStageChange={handleQuickStageChange}
+                onQuickNote={handleQuickNote}
+                selectedDate={selectedDate}
+              />
+            </div>
+          )}
           
           <DragOverlay>
             {activeWorkOrder ? (
