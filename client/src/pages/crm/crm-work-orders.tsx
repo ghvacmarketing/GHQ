@@ -952,19 +952,19 @@ export default function CrmWorkOrders() {
                   </div>
                 </div>
 
-                {/* Property Section with Selector */}
+                {/* Site Section with Selector */}
                 <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Property</h4>
+                  <h4 className="font-medium text-sm text-slate-700">Site</h4>
                   {woProperties.length > 0 ? (
                     <Select 
                       value={selectedWorkOrder.propertyId || ""} 
                       onValueChange={handleUpdateProperty}
                     >
-                      <SelectTrigger className="w-full" data-testid="select-property">
-                        <SelectValue placeholder="Select a property">
+                      <SelectTrigger className="w-full" data-testid="select-site">
+                        <SelectValue placeholder="Select a site">
                           {selectedWorkOrder.property 
                             ? getPropertyAddress(selectedWorkOrder.property) 
-                            : "Select a property"}
+                            : "Select a site"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -976,7 +976,7 @@ export default function CrmWorkOrders() {
                       </SelectContent>
                     </Select>
                   ) : (
-                    <p className="text-sm text-slate-500">No properties for this customer</p>
+                    <p className="text-sm text-slate-500">No sites for this customer</p>
                   )}
                 </div>
 
@@ -1288,13 +1288,13 @@ export default function CrmWorkOrders() {
 
               {selectedCustomer && properties.length > 0 && (
                 <div className="space-y-2">
-                  <Label>Property</Label>
+                  <Label>Site</Label>
                   <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
-                    <SelectTrigger data-testid="select-property">
-                      <SelectValue placeholder="Select property (optional)" />
+                    <SelectTrigger data-testid="select-site">
+                      <SelectValue placeholder="Select site (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No property selected</SelectItem>
+                      <SelectItem value="">No site selected</SelectItem>
                       {properties.map((prop) => (
                         <SelectItem key={prop.id} value={prop.id}>
                           {prop.address1}, {prop.city}
