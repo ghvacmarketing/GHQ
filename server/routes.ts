@@ -8192,6 +8192,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: true,
         priority: true,
         visitType: true,
+        customerId: true,
+        propertyId: true,
+      }).extend({
+        updateProjectCustomer: z.boolean().optional(),
       });
 
       const result = allowedFields.safeParse(req.body);
@@ -8202,13 +8206,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, checklist, partsUsed, startedAt, completedAt, projectId, title, description, priority, visitType } = result.data;
+      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, checklist, partsUsed, startedAt, completedAt, projectId, title, description, priority, visitType, customerId, propertyId, updateProjectCustomer } = result.data;
 
       // If projectId is provided (not null), verify it exists
       if (projectId !== undefined && projectId !== null) {
         const [project] = await db.select().from(crmProjects).where(eq(crmProjects.id, projectId));
         if (!project) {
           return res.status(404).json({ message: "Project not found" });
+        }
+      }
+
+      // If customerId is being changed, validate the new customer exists
+      if (customerId !== undefined && customerId !== null) {
+        const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+        if (!customer) {
+          return res.status(404).json({ message: "Customer not found" });
+        }
+      }
+
+      // If propertyId is being changed, validate it belongs to the customer
+      if (propertyId !== undefined && propertyId !== null) {
+        const targetCustomerId = customerId || existingWorkOrder.customerId;
+        if (targetCustomerId) {
+          const [property] = await db.select().from(crmProperties).where(
+            and(eq(crmProperties.id, propertyId), eq(crmProperties.customerId, targetCustomerId))
+          );
+          if (!property) {
+            return res.status(400).json({ message: "Property does not belong to the selected customer" });
+          }
         }
       }
 
@@ -8227,6 +8252,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (description !== undefined) updateData.description = description;
       if (priority !== undefined) updateData.priority = priority;
       if (visitType !== undefined) updateData.visitType = visitType;
+      if (customerId !== undefined) updateData.customerId = customerId;
+      if (propertyId !== undefined) updateData.propertyId = propertyId;
+
+      // If customer is being changed and there's a linked project, update project too
+      if (customerId !== undefined && customerId !== existingWorkOrder.customerId && updateProjectCustomer) {
+        const linkedProjectId = projectId !== undefined ? projectId : existingWorkOrder.projectId;
+        if (linkedProjectId) {
+          await db.update(crmProjects)
+            .set({ customerId: customerId })
+            .where(eq(crmProjects.id, linkedProjectId));
+        }
+      }
 
       const workOrder = await storage.updateWorkOrder(req.params.id, updateData);
 
