@@ -637,6 +637,144 @@ function QueueStageBox({
   );
 }
 
+const SCHEDULE_START_HOUR = 8;
+const SCHEDULE_END_HOUR = 20;
+const SCHEDULE_TOTAL_MINUTES = (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) * 60;
+const SCHEDULE_INTERVAL = 30;
+const SCHEDULE_TIMELINE_WIDTH = 1200;
+
+function getScheduleLeftPercent(date: Date): number {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const totalMinutes = (hours - SCHEDULE_START_HOUR) * 60 + minutes;
+  return Math.max(0, Math.min(100, (totalMinutes / SCHEDULE_TOTAL_MINUTES) * 100));
+}
+
+function getScheduleWidthPercent(startDate: Date, endDate: Date | null): number {
+  if (!endDate) return (60 / SCHEDULE_TOTAL_MINUTES) * 100;
+  const durationMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+  const snappedDuration = Math.max(SCHEDULE_INTERVAL, Math.round(durationMinutes / SCHEDULE_INTERVAL) * SCHEDULE_INTERVAL);
+  return (snappedDuration / SCHEDULE_TOTAL_MINUTES) * 100;
+}
+
+const scheduleCardColors: Record<string, string> = {
+  scheduled: "bg-blue-500",
+  dispatched: "bg-purple-500",
+  en_route: "bg-amber-500",
+  on_site: "bg-orange-500",
+  completed: "bg-green-500",
+  cancelled: "bg-red-400",
+};
+
+interface TechnicianScheduleBoardProps {
+  technicians: Technician[];
+  workOrders: DispatchWorkOrder[];
+  onWorkOrderClick?: (workOrderId: string) => void;
+  selectedDate: Date;
+}
+
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate }: TechnicianScheduleBoardProps) {
+  const hourLabels = useMemo(() => {
+    const labels: string[] = [];
+    for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
+      const label = h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`;
+      labels.push(label);
+    }
+    return labels;
+  }, []);
+
+  const getWorkOrdersForTech = (techId: string) => {
+    return workOrders.filter(wo => wo.assignedTechId === techId && wo.scheduledStart);
+  };
+
+  if (technicians.length === 0) {
+    return (
+      <Card className="bg-white border">
+        <CardContent className="p-8 text-center text-slate-500">
+          No technicians available
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-white border overflow-hidden">
+      <ScrollArea className="w-full">
+        <div style={{ minWidth: SCHEDULE_TIMELINE_WIDTH + 200 }}>
+          <div className="flex border-b border-slate-200 sticky top-0 bg-white z-10">
+            <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-200 text-sm font-semibold text-slate-700">
+              Technicians
+            </div>
+            <div className="flex-1 relative" style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}>
+              <div className="flex justify-between px-2 py-3">
+                {hourLabels.map((label, i) => (
+                  <div key={i} className="text-xs font-medium text-slate-500" style={{ width: i === hourLabels.length - 1 ? 'auto' : `${100 / (hourLabels.length - 1)}%` }}>
+                    {label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {technicians.map((tech) => {
+            const techWorkOrders = getWorkOrdersForTech(tech.id);
+            return (
+              <div key={tech.id} className="flex border-b border-slate-100 hover:bg-slate-50/50" style={{ minHeight: 64 }}>
+                <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-100 flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full ${tech.color} text-white flex items-center justify-center text-xs font-medium`}>
+                    {tech.initials}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{tech.name}</p>
+                    <p className="text-xs text-slate-400">{techWorkOrders.length} work orders</p>
+                  </div>
+                </div>
+                
+                <div className="flex-1 relative py-2" style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}>
+                  {techWorkOrders.map((wo) => {
+                    if (!wo.scheduledStart) return null;
+                    const startDate = new Date(wo.scheduledStart);
+                    const endDate = wo.scheduledEnd ? new Date(wo.scheduledEnd) : null;
+                    
+                    const leftPercent = getScheduleLeftPercent(startDate);
+                    const widthPercent = getScheduleWidthPercent(startDate, endDate);
+                    const bgColor = scheduleCardColors[wo.status] || scheduleCardColors.scheduled;
+                    
+                    const startMinutesFrom8 = (startDate.getHours() - SCHEDULE_START_HOUR) * 60 + startDate.getMinutes();
+                    if (startMinutesFrom8 < 0 || startMinutesFrom8 >= SCHEDULE_TOTAL_MINUTES) return null;
+
+                    return (
+                      <div
+                        key={wo.id}
+                        onClick={() => onWorkOrderClick?.(wo.id)}
+                        className={`absolute top-2 bottom-2 ${bgColor} text-white rounded-md px-2 py-1 cursor-pointer hover:opacity-90 transition-opacity overflow-hidden shadow-sm`}
+                        style={{
+                          left: `${leftPercent}%`,
+                          width: `${Math.max(widthPercent, 4)}%`,
+                        }}
+                        data-testid={`schedule-card-${wo.id}`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {wo.status === "completed" && <CheckSquare className="h-3 w-3 flex-shrink-0" />}
+                          <p className="text-xs font-medium truncate">{wo.customerName}</p>
+                        </div>
+                        {wo.propertyAddress && (
+                          <p className="text-[10px] opacity-90 truncate">{wo.propertyAddress}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+    </Card>
+  );
+}
+
 interface UnassignedQueueSectionProps {
   workOrders: DispatchWorkOrder[];
   onWorkOrderClick?: (workOrderId: string) => void;
@@ -1787,6 +1925,13 @@ export default function CrmDispatch() {
           onDragEnd={handleDragEnd}
         >
           <div className="hidden lg:block space-y-6">
+            <TechnicianScheduleBoard
+              technicians={technicians}
+              workOrders={localWorkOrders.filter(wo => wo.assignedTechId)}
+              onWorkOrderClick={handleWorkOrderClick}
+              selectedDate={selectedDate}
+            />
+            
             <UnassignedQueueSection
               workOrders={unassignedWorkOrders}
               onWorkOrderClick={handleWorkOrderClick}
