@@ -1037,8 +1037,8 @@ export default function CrmDispatch() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        {/* Row 1: Search bar + Create Work Order button */}
-        <div className="flex items-center gap-3 mb-3">
+        {/* Row 1: Search bar + Create Work Order button - aligned right so button sits above Date/Legend */}
+        <div className="flex items-center justify-end gap-3 mb-3">
           <div className="relative flex-1 max-w-xl">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input

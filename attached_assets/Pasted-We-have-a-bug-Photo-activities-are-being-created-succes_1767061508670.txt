@@ -1,0 +1,71 @@
+We have a bug: Photo activities are being created successfully, but they are not appearing in the Project Timeline. I need you to fix it by verifying linking, retrieval, and rendering. Do the steps below and don’t stop until the created photo activity shows in the timeline immediately after saving.
+
+1) Verify the photo activity is linked to the correct Project
+
+When creating a Photo activity, confirm the saved record includes:
+
+project_id = currentProject.id (NOT null, NOT site_id, NOT customer_id)
+
+type = "photo"
+
+created_at is set
+
+it is not filtered out by any deleted/archived flags
+
+Add temporary logs at creation time to print the saved activity object and ensure project_id is correct.
+
+2) Fix the Project Timeline fetch/query so it includes photo activities
+
+In the API/query that loads the Project Timeline, ensure:
+
+It filters by project_id = currentProjectId
+
+It does NOT exclude photo types (no “type IN (...)” list that omits “photo”)
+
+It does NOT require note_text/message fields (photos won’t have these)
+
+It does NOT require work_order_id (photos may not be linked to a WO)
+
+If there is a type whitelist, include "photo".
+
+3) Ensure the timeline response includes the photo URLs/attachments
+
+If photos are stored as separate attachments, the timeline endpoint must return them with each activity:
+
+The timeline entry for type “photo” must include attachments with URLs (and thumbnails if available)
+
+If we store attachments in another table, join/lookup by activity_id and include them in the response
+
+Right now the activity may be returned but appears blank because attachments aren’t included.
+
+4) Fix the frontend so timeline updates immediately after photo save
+
+After the photo activity is created, do ONE of these:
+
+Re-fetch the project timeline list, OR
+
+Insert the returned activity into the timeline state (at the top)
+
+Do not only update the uploader UI—update the timeline UI.
+
+Also confirm the timeline sort is ORDER BY created_at DESC so the new item appears at the top.
+
+5) Add/confirm the timeline renderer supports “photo” type
+
+In the timeline card rendering logic, ensure there is a case for type === "photo":
+
+Render a thumbnail grid from activity.attachments
+
+Clicking opens a full-size viewer/gallery
+
+If the type isn’t recognized, show a fallback card instead of rendering nothing.
+
+Acceptance test (must pass)
+
+Open a project → Timeline
+
+Add Activity → Photo → upload 1–3 photos → Save
+
+The new entry appears instantly at the top of the timeline with thumbnails
+
+Refresh the page → the entry still appears (persisted + correct query)
