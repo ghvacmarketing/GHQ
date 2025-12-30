@@ -6170,24 +6170,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workOrderCount = Number(workOrdersResult?.count || 0);
       }
 
-      // Count quotes linked to this customer (via accountId - the actual column in the database)
-      const [quotesResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(crmQuotes)
-        .where(eq(crmQuotes.accountId, customerId));
-
-      const quoteCount = Number(quotesResult?.count || 0);
+      // Count quotes linked to this customer (using raw SQL since schema doesn't match database)
+      const quotesResult = await db.execute(
+        sql`SELECT count(*) as count FROM crm_quotes WHERE account_id = ${customerId}`
+      );
+      const quoteCount = Number(quotesResult.rows?.[0]?.count || 0);
 
       // Count invoices linked to this customer
-      const [invoicesResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(crmInvoices)
-        .where(or(
-          eq(crmInvoices.customerId, customerId),
-          eq(crmInvoices.jobId, customerId)
-        ));
-
-      const invoiceCount = Number(invoicesResult?.count || 0);
+      const invoicesResult = await db.execute(
+        sql`SELECT count(*) as count FROM crm_invoices WHERE customer_id = ${customerId}`
+      );
+      const invoiceCount = Number(invoicesResult.rows?.[0]?.count || 0);
 
       return res.json({
         projects: projectCount,
