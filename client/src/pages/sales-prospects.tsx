@@ -548,30 +548,15 @@ export default function SalesProspects() {
                 </div>
               </SelectTrigger>
               <SelectContent>
-                {["All Active", "New", "Contacted", "Quote Sent", "Negotiating", "Won", "Lost"].map((filter) => {
-                  const employeeFilteredLeads = selectedEmployeeId === "all" 
-                    ? allLeads 
-                    : allLeads.filter((l) => l.assignedEmployeeId === selectedEmployeeId);
-                  const count = (() => {
-                    if (filter === "All Active") return employeeFilteredLeads.filter((l) => !l.won && !l.lost).length;
-                    if (filter === "Won") return employeeFilteredLeads.filter((l) => l.won).length;
-                    if (filter === "Lost") return employeeFilteredLeads.filter((l) => l.lost).length;
-                    return employeeFilteredLeads.filter((l) => l.status === filter && !l.won && !l.lost).length;
-                  })();
-
-                  return (
-                    <SelectItem 
-                      key={filter} 
-                      value={filter}
-                      data-testid={`select-filter-option-${filter.toLowerCase().replace(/\s+/g, "-")}`}
-                    >
-                      <div className="flex items-center justify-between w-full gap-3">
-                        <span>{filter}</span>
-                        <Badge variant="secondary" className="text-xs">{count}</Badge>
-                      </div>
-                    </SelectItem>
-                  );
-                })}
+                {["All Active", "New", "Contacted", "Quote Sent", "Negotiating", "Won", "Lost"].map((filter) => (
+                  <SelectItem 
+                    key={filter} 
+                    value={filter}
+                    data-testid={`select-filter-option-${filter.toLowerCase().replace(/\s+/g, "-")}`}
+                  >
+                    {filter}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             
@@ -616,30 +601,15 @@ export default function SalesProspects() {
                   </div>
                 </SelectTrigger>
                 <SelectContent>
-                  {["All Active", "New", "Contacted", "Quote Sent", "Negotiating", "Won", "Lost"].map((filter) => {
-                    const employeeFilteredLeads = selectedEmployeeId === "all" 
-                      ? allLeads 
-                      : allLeads.filter((l) => l.assignedEmployeeId === selectedEmployeeId);
-                    const count = (() => {
-                      if (filter === "All Active") return employeeFilteredLeads.filter((l) => !l.won && !l.lost).length;
-                      if (filter === "Won") return employeeFilteredLeads.filter((l) => l.won).length;
-                      if (filter === "Lost") return employeeFilteredLeads.filter((l) => l.lost).length;
-                      return employeeFilteredLeads.filter((l) => l.status === filter && !l.won && !l.lost).length;
-                    })();
-
-                    return (
-                      <SelectItem 
-                        key={filter} 
-                        value={filter}
-                        data-testid={`select-filter-option-desktop-${filter.toLowerCase().replace(/\s+/g, "-")}`}
-                      >
-                        <div className="flex items-center justify-between w-full gap-3">
-                          <span>{filter}</span>
-                          <Badge variant="secondary" className="text-xs">{count}</Badge>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
+                  {["All Active", "New", "Contacted", "Quote Sent", "Negotiating", "Won", "Lost"].map((filter) => (
+                    <SelectItem 
+                      key={filter} 
+                      value={filter}
+                      data-testid={`select-filter-option-desktop-${filter.toLowerCase().replace(/\s+/g, "-")}`}
+                    >
+                      {filter}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
