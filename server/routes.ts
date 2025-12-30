@@ -9164,6 +9164,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workOrder: activity.workOrderId ? workOrdersMap.get(activity.workOrderId) : null,
       }));
 
+      // DEBUG: Log fetched activities
+      console.log(`[TIMELINE DEBUG] GET activities for project ${projectId}:`, {
+        count: enrichedActivities.length,
+        ids: enrichedActivities.slice(0, 10).map(a => ({ id: a.id, type: a.activityType, title: a.title })),
+        filters: { type, startDate, endDate, pinnedOnly },
+      });
+
       return res.json(enrichedActivities);
     } catch (error) {
       console.error("Error fetching project activities:", error);
@@ -9233,6 +9240,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const [activity] = await db.insert(projectActivities).values(result.data).returning();
+
+      // DEBUG: Log created activity
+      console.log(`[TIMELINE DEBUG] Activity CREATED:`, {
+        id: activity.id,
+        projectId: activity.projectId,
+        workOrderId: activity.workOrderId,
+        activityType: activity.activityType,
+        title: activity.title,
+        createdAt: activity.createdAt,
+      });
+
+      // DEBUG: Read back from DB to verify persistence
+      const [readBack] = await db
+        .select({
+          id: projectActivities.id,
+          projectId: projectActivities.projectId,
+          workOrderId: projectActivities.workOrderId,
+          activityType: projectActivities.activityType,
+          title: projectActivities.title,
+          createdAt: projectActivities.createdAt,
+        })
+        .from(projectActivities)
+        .where(eq(projectActivities.id, activity.id));
+      
+      console.log(`[TIMELINE DEBUG] DB read-back for ${activity.id}:`, readBack);
 
       return res.status(201).json(activity);
     } catch (error) {

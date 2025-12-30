@@ -1,0 +1,89 @@
+We still have the bug: Photo activity is created but never shows in the Project Timeline.
+I need you to diagnose it using a proof chain and then fix the exact failing link. Do not guess.
+
+A) Add a “Timeline Debug Trace” for one create action
+
+When I click Add Activity → Photo → Save, log these four things in the console/server logs:
+
+CREATE response (the activity object returned after insert)
+
+log: activity.id, activity.project_id, activity.work_order_id, activity.type, activity.created_at, and any org_id/account_id fields
+
+DB read-back by ID immediately after create
+
+right after creation, query the DB by activity.id and log the same fields to confirm what actually persisted.
+
+Timeline API response for that project
+
+immediately call the timeline fetch for that same project_id and log whether the new activity.id is included.
+
+print count + list of returned IDs (first 20) so we can see if it’s filtered out.
+
+UI state after timeline refresh
+
+after the fetch, log timelineItems.map(x=>x.id) and confirm the new id is in the state array.
+
+This will tell us exactly where it breaks: creation, persistence, API filtering, or UI rendering.
+
+B) Fix based on which of these fails
+Case 1: DB read-back shows project_id is null or wrong
+
+Fix create logic so project_id is ALWAYS set even when linking to a work order.
+(Work order link should be optional, but project link is mandatory.)
+
+Case 2: DB is correct, but Timeline API does not include the new activity id
+
+The timeline query is filtering it out. Check for:
+
+type whitelist missing "photo"
+
+entity_type mismatch ("Project" vs "project")
+
+requiring note_text/message not null
+
+requiring work_order_id not null
+
+join that drops rows when attachments don’t exist yet
+
+org/account filter mismatch (activity created under a different org/account than the fetch filter)
+
+Update the timeline query to: return all activity types for the project regardless of work_order_id and do not require note text.
+
+Case 3: Timeline API includes the activity id, but UI state doesn’t
+
+Fix frontend data flow:
+
+after save, either refetch timeline or insert returned activity
+
+ensure React Query/SWR cache key includes projectId (common bug: cache key missing projectId so it never refetches correctly)
+
+Case 4: API + state include it, but it still doesn’t render
+
+Fix timeline renderer:
+
+ensure there is a render case for type === "photo"
+
+ensure it doesn’t do a guard like if (!activity.message) return null (photos won’t have message)
+
+if attachments load async, show a placeholder card instead of returning null
+
+C) Remove race conditions with attachments (very common)
+
+If photos are uploaded separately, we must avoid “activity created, attachments not linked yet” causing the timeline card to render nothing.
+
+Implement either:
+
+Create activity → upload photos → attach → return a fully hydrated activity (with attachment URLs), THEN refresh timeline
+OR
+
+Timeline renderer displays the photo activity even if attachments are still processing (shows “Photos uploading…” until URLs arrive)
+
+Acceptance test (must pass)
+
+Add Photo activity to a project (with and without linking a work order)
+
+It appears immediately in timeline with a visible card
+
+Hard refresh page → still appears
+
+Filters (Photos) shows it

@@ -1121,7 +1121,17 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
 
   const { data: activitiesData, isLoading, refetch } = useQuery<ProjectActivityWithMeta[]>({
     queryKey: ["/api/crm/projects", projectId, "activities", queryParams.toString()],
-    queryFn: () => fetch(`/api/crm/projects/${projectId}/activities?${queryParams.toString()}`, { credentials: 'include' }).then(r => r.json()),
+    queryFn: async () => {
+      const url = `/api/crm/projects/${projectId}/activities?${queryParams.toString()}`;
+      console.log("[TIMELINE DEBUG] Frontend - Fetching activities from:", url);
+      const response = await fetch(url, { credentials: 'include' });
+      const data = await response.json();
+      console.log("[TIMELINE DEBUG] Frontend - Received activities:", {
+        count: Array.isArray(data) ? data.length : 0,
+        ids: Array.isArray(data) ? data.slice(0, 10).map((a: any) => ({ id: a.id, type: a.activityType, title: a.title })) : [],
+      });
+      return data;
+    },
   });
   const activities = Array.isArray(activitiesData) ? activitiesData : [];
 
@@ -1186,13 +1196,23 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
 
   const createActivityMutation = useMutation({
     mutationFn: async (data: { activityType: string; title: string; description?: string; workOrderId?: string; metadata?: Record<string, any> }) => {
-      return apiRequest("POST", `/api/crm/projects/${projectId}/activities`, data);
+      const response = await apiRequest("POST", `/api/crm/projects/${projectId}/activities`, data);
+      const created = await response.json();
+      console.log("[TIMELINE DEBUG] Frontend - Activity created:", created);
+      return created;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("[TIMELINE DEBUG] Frontend - onSuccess, invalidating queries for projectId:", projectId);
+      console.log("[TIMELINE DEBUG] Frontend - Query key to invalidate:", ["/api/crm/projects", projectId, "activities"]);
       toast({ title: "Activity added" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "activities"], exact: false });
       setShowAddDialog(false);
       resetFormState();
+      // Force refetch after a short delay to ensure cache is cleared
+      setTimeout(() => {
+        console.log("[TIMELINE DEBUG] Frontend - Forcing refetch");
+        refetch();
+      }, 500);
     },
     onError: () => {
       toast({ title: "Failed to add activity", variant: "destructive" });
