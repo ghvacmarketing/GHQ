@@ -2995,12 +2995,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       allLeads.forEach(lead => {
-        const status = lead.status || 'New';
         const value = parseFloat(lead.estimatedValue || '0');
         
-        if (statusBreakdown[status as keyof typeof statusBreakdown]) {
-          statusBreakdown[status as keyof typeof statusBreakdown].count++;
-          statusBreakdown[status as keyof typeof statusBreakdown].value += value;
+        // Use boolean flags as primary indicator for Won/Lost
+        if (lead.won || lead.status === 'Won') {
+          statusBreakdown.Won.count++;
+          statusBreakdown.Won.value += value;
+        } else if (lead.lost || lead.status === 'Lost') {
+          statusBreakdown.Lost.count++;
+          statusBreakdown.Lost.value += value;
+        } else {
+          // For active leads, use the status field
+          const status = lead.status || 'New';
+          if (statusBreakdown[status as keyof typeof statusBreakdown]) {
+            statusBreakdown[status as keyof typeof statusBreakdown].count++;
+            statusBreakdown[status as keyof typeof statusBreakdown].value += value;
+          }
         }
       });
 

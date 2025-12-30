@@ -1757,7 +1757,6 @@ export default function ProposalBuilder() {
   const handleCustomBuildBack = () => {
     if (customEquipmentType === "Crawlspace Services") {
       setCustomEquipmentType(null);
-      setCustomBuildStep(1);
       setSelectedCrawlspaceServices([]);
       setSelectedDoorOption(null);
       setCrawlspaceServicesSqft("1000");
