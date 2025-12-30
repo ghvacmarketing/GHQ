@@ -1481,8 +1481,8 @@ export default function ProposalBuilder() {
 
   const customBuildStep = useMemo(() => {
     if (!customEquipmentType) return 1;
-    // Mini-Split and Ducting skip tonnage selection (step 2)
-    if (customEquipmentType === "Mini-Split" || customEquipmentType === "Ducting") return 3;
+    // Mini-Split, Ducting, and Crawlspace Services skip tonnage selection (step 2)
+    if (customEquipmentType === "Mini-Split" || customEquipmentType === "Ducting" || customEquipmentType === "Crawlspace Services") return 3;
     if (!customTonnage) return 2;
     return 3;
   }, [customEquipmentType, customTonnage]);
@@ -3739,9 +3739,6 @@ export default function ProposalBuilder() {
                         className="cursor-pointer hover:border-primary transition-colors"
                         onClick={() => {
                           setCustomEquipmentType(type);
-                          if (type === "Crawlspace Services") {
-                            setCustomBuildStep(3);
-                          }
                         }}
                         data-testid={`custom-equipment-type-${type.toLowerCase()}`}
                       >

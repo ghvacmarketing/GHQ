@@ -59,9 +59,10 @@ export default function SalesProspects() {
   const [searchTerm, setSearchTerm] = useState<string>("");
 
   // Queries
-  const { data: allLeads = [], isLoading: isLoadingLeads } = useQuery<Lead[]>({
+  const { data: leadsResponse, isLoading: isLoadingLeads } = useQuery<{ leads: Lead[], pagination: any }>({
     queryKey: ["/api/leads"],
   });
+  const allLeads = leadsResponse?.leads || [];
 
   const { data: metrics, isLoading: isLoadingMetrics } = useQuery<MetricsData>({
     queryKey: ["/api/leads/metrics"],
