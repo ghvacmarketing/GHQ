@@ -55,6 +55,7 @@ import {
   FolderOpen,
   AlertTriangle,
   Search,
+  Edit,
 } from "lucide-react";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkOrderStatus } from "@shared/schema";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -172,6 +173,12 @@ export default function CrmWorkOrders() {
   // Project linking state
   const [projectSearch, setProjectSearch] = useState("");
   const [projectSearchOpen, setProjectSearchOpen] = useState(false);
+  
+  // Customer reassignment state (for detail sheet)
+  const [reassignCustomerSearch, setReassignCustomerSearch] = useState("");
+  const [reassignCustomerSearchOpen, setReassignCustomerSearchOpen] = useState(false);
+  const [reassignPropertyId, setReassignPropertyId] = useState<string>("");
+  const debouncedReassignCustomerSearch = useDebounce(reassignCustomerSearch, 300);
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
@@ -303,6 +310,38 @@ export default function CrmWorkOrders() {
   });
 
   const linkableProjects = linkableProjectsData || [];
+
+  // Query for customer search in reassignment (detail sheet)
+  const { data: reassignCustomersData, isLoading: reassignCustomersLoading } = useQuery<CustomersResponse>({
+    queryKey: ["/api/crm/customers", debouncedReassignCustomerSearch, "reassign"],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: "1", limit: "10" });
+      if (debouncedReassignCustomerSearch) params.set("search", debouncedReassignCustomerSearch);
+      const res = await fetch(`/api/crm/customers?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch customers");
+      return res.json();
+    },
+    enabled: !!currentUser && sheetOpen && reassignCustomerSearchOpen,
+  });
+
+  const reassignCustomers = reassignCustomersData?.customers || [];
+
+  // Query for properties of the current work order's customer (for property reassignment)
+  const { data: woPropertiesData } = useQuery<CrmProperty[]>({
+    queryKey: ["/api/crm/properties", selectedWorkOrder?.customerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/properties?customerId=${selectedWorkOrder?.customerId}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch properties");
+      return res.json();
+    },
+    enabled: !!currentUser && !!selectedWorkOrder?.customerId && sheetOpen,
+  });
+
+  const woProperties = woPropertiesData || [];
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -464,6 +503,10 @@ export default function CrmWorkOrders() {
       setRescheduleTimeSlot(getTimeSlotFromSchedule(data.scheduledStart));
       setProjectSearch("");
       setProjectSearchOpen(false);
+      // Reset customer reassignment state
+      setReassignCustomerSearch("");
+      setReassignCustomerSearchOpen(false);
+      setReassignPropertyId(data.propertyId || "");
       setSheetOpen(true);
     }
   };
@@ -547,6 +590,70 @@ export default function CrmWorkOrders() {
       setProjectSearchOpen(false);
       setProjectSearch("");
     }
+  };
+
+  const handleReassignCustomer = (newCustomer: CustomerWithInfo) => {
+    if (!selectedWorkOrder) return;
+    
+    // Check if there's a linked project that needs to be updated
+    const hasLinkedProject = !!selectedWorkOrder.projectId;
+    
+    // Optimistically update the selected work order
+    setSelectedWorkOrder({
+      ...selectedWorkOrder,
+      customerId: newCustomer.id,
+      customer: {
+        id: newCustomer.id,
+        displayName: newCustomer.name,
+        name: newCustomer.name,
+        customerType: newCustomer.customerType || "residential",
+        customerStatus: "active",
+      } as CrmCustomer,
+      // Clear property since it belongs to old customer
+      propertyId: null,
+      property: null,
+      // Clear project since projects are customer-specific
+      projectId: null,
+      project: null,
+    });
+    
+    // Make the API call
+    updateWorkOrderMutation.mutate({
+      id: selectedWorkOrder.id,
+      updates: { 
+        customerId: newCustomer.id, 
+        propertyId: null, // Clear property
+        projectId: null, // Unlink project (user can relink to new customer's project)
+        updateProjectCustomer: hasLinkedProject, // Update the project's customer if it existed
+      },
+    });
+    
+    setReassignCustomerSearchOpen(false);
+    setReassignCustomerSearch("");
+    
+    toast({
+      title: "Customer reassigned",
+      description: hasLinkedProject 
+        ? "Customer updated. Please select a new property and project for this customer."
+        : "Customer updated. Please select a property for this customer.",
+    });
+  };
+
+  const handleUpdateProperty = (propertyId: string) => {
+    if (!selectedWorkOrder) return;
+    
+    const property = woProperties.find(p => p.id === propertyId) || null;
+    
+    setSelectedWorkOrder({
+      ...selectedWorkOrder,
+      propertyId,
+      property,
+    });
+    
+    updateWorkOrderMutation.mutate({
+      id: selectedWorkOrder.id,
+      updates: { propertyId },
+    });
   };
 
   const formatDateTime = (date: Date | string | null) => {
@@ -788,17 +895,90 @@ export default function CrmWorkOrders() {
 
             {selectedWorkOrder && (
               <div className="mt-6 space-y-6">
+                {/* Customer Section with Reassignment */}
                 <div className="space-y-3">
                   <h4 className="font-medium text-sm text-slate-700">Customer</h4>
-                  <p className="text-slate-900">{selectedWorkOrder.customer?.name || "—"}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-slate-900">{selectedWorkOrder.customer?.name || "—"}</p>
+                    <Popover open={reassignCustomerSearchOpen} onOpenChange={setReassignCustomerSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-[#711419] hover:bg-[#711419]/10"
+                          data-testid="button-change-customer"
+                        >
+                          <Edit className="h-3.5 w-3.5 mr-1" />
+                          Change
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[350px] p-0" align="end">
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            placeholder="Search customers..."
+                            value={reassignCustomerSearch}
+                            onValueChange={setReassignCustomerSearch}
+                            data-testid="input-reassign-customer-search"
+                          />
+                          <CommandList>
+                            {reassignCustomersLoading ? (
+                              <div className="p-4 text-center text-sm text-slate-500">
+                                Loading...
+                              </div>
+                            ) : reassignCustomers.length === 0 ? (
+                              <CommandEmpty>No customers found.</CommandEmpty>
+                            ) : (
+                              <CommandGroup>
+                                {reassignCustomers.map((customer) => (
+                                  <CommandItem
+                                    key={customer.id}
+                                    value={customer.id}
+                                    onSelect={() => handleReassignCustomer(customer)}
+                                    data-testid={`reassign-customer-${customer.id}`}
+                                  >
+                                    <User className="h-4 w-4 mr-2 text-slate-500" />
+                                    <div>
+                                      <p className="font-medium">{customer.name}</p>
+                                      <p className="text-xs text-slate-500">{customer.fullAddress || customer.customerType}</p>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
 
-                {selectedWorkOrder.property && (
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm text-slate-700">Property</h4>
-                    <p className="text-slate-900 text-sm">{getPropertyAddress(selectedWorkOrder.property)}</p>
-                  </div>
-                )}
+                {/* Property Section with Selector */}
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Property</h4>
+                  {woProperties.length > 0 ? (
+                    <Select 
+                      value={selectedWorkOrder.propertyId || ""} 
+                      onValueChange={handleUpdateProperty}
+                    >
+                      <SelectTrigger className="w-full" data-testid="select-property">
+                        <SelectValue placeholder="Select a property">
+                          {selectedWorkOrder.property 
+                            ? getPropertyAddress(selectedWorkOrder.property) 
+                            : "Select a property"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {woProperties.map((property) => (
+                          <SelectItem key={property.id} value={property.id}>
+                            {getPropertyAddress(property)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm text-slate-500">No properties for this customer</p>
+                  )}
+                </div>
 
                 {/* Project Linking Section */}
                 <div className="space-y-3">
