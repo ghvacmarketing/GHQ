@@ -43,6 +43,15 @@ import {
   CheckCircle,
   AlertCircle,
   Receipt,
+  Pin,
+  PinOff,
+  Image,
+  File,
+  MessageSquare,
+  Activity,
+  Filter,
+  X,
+  History,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
@@ -440,6 +449,13 @@ export default function CrmProjectDetail() {
             >
               Invoices ({invoices?.length || 0})
             </TabsTrigger>
+            <TabsTrigger 
+              value="timeline" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              data-testid="tab-timeline"
+            >
+              Timeline
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-0 space-y-6">
@@ -776,6 +792,10 @@ export default function CrmProjectDetail() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="timeline" className="mt-4">
+            <ProjectTimelineTab projectId={id!} />
+          </TabsContent>
         </Tabs>
 
         <Dialog open={createQuoteDialogOpen} onOpenChange={setCreateQuoteDialogOpen}>
@@ -895,5 +915,419 @@ export default function CrmProjectDetail() {
         </Dialog>
       </div>
     </CrmLayout>
+  );
+}
+
+type ProjectActivityWithMeta = {
+  id: string;
+  projectId: string;
+  workOrderId: string | null;
+  userId: string | null;
+  activityType: string;
+  title: string;
+  description: string | null;
+  metadata: Record<string, any> | null;
+  isPinned: boolean | null;
+  createdAt: string | null;
+  userName: string | null;
+  workOrder: { id: string; workOrderNumber: number | null; title: string | null } | null;
+};
+
+const activityTypeIcons: Record<string, any> = {
+  note: MessageSquare,
+  photo: Image,
+  file: File,
+  status_change: Activity,
+  financial: DollarSign,
+  approval: CheckCircle,
+  work_order_created: ClipboardList,
+  work_order_completed: CheckCircle,
+  quote_sent: FileText,
+  quote_accepted: CheckCircle,
+  invoice_sent: Receipt,
+  invoice_paid: DollarSign,
+};
+
+const activityTypeColors: Record<string, { bg: string; text: string; border: string }> = {
+  note: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
+  photo: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200" },
+  file: { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200" },
+  status_change: { bg: "bg-yellow-50", text: "text-yellow-700", border: "border-yellow-200" },
+  financial: { bg: "bg-green-50", text: "text-green-700", border: "border-green-200" },
+  approval: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
+  work_order_created: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" },
+  work_order_completed: { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200" },
+  quote_sent: { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200" },
+  quote_accepted: { bg: "bg-green-50", text: "text-green-700", border: "border-green-200" },
+  invoice_sent: { bg: "bg-cyan-50", text: "text-cyan-700", border: "border-cyan-200" },
+  invoice_paid: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
+};
+
+const activityTypeLabels: Record<string, string> = {
+  note: "Note",
+  photo: "Photo",
+  file: "File",
+  status_change: "Status Change",
+  financial: "Financial",
+  approval: "Approval",
+  work_order_created: "Work Order Created",
+  work_order_completed: "Work Order Completed",
+  quote_sent: "Quote Sent",
+  quote_accepted: "Quote Accepted",
+  invoice_sent: "Invoice Sent",
+  invoice_paid: "Invoice Paid",
+};
+
+const filterOptions = [
+  { value: "all", label: "All Activities" },
+  { value: "note", label: "Notes" },
+  { value: "photo", label: "Photos" },
+  { value: "file", label: "Files" },
+  { value: "financial", label: "Financial" },
+  { value: "approval", label: "Approvals" },
+  { value: "status_change", label: "Status Changes" },
+];
+
+function ProjectTimelineTab({ projectId }: { projectId: string }) {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newActivityType, setNewActivityType] = useState("note");
+  const [newActivityTitle, setNewActivityTitle] = useState("");
+  const [newActivityDescription, setNewActivityDescription] = useState("");
+  const [newActivityWorkOrderId, setNewActivityWorkOrderId] = useState("");
+
+  const queryParams = new URLSearchParams();
+  if (typeFilter !== "all") queryParams.set("type", typeFilter);
+  if (startDate) queryParams.set("startDate", startDate);
+  if (endDate) queryParams.set("endDate", endDate);
+  if (pinnedOnly) queryParams.set("pinnedOnly", "true");
+
+  const { data: activities = [], isLoading, refetch } = useQuery<ProjectActivityWithMeta[]>({
+    queryKey: ["/api/crm/projects", projectId, "activities", queryParams.toString()],
+    queryFn: () => fetch(`/api/crm/projects/${projectId}/activities?${queryParams.toString()}`).then(r => r.json()),
+  });
+
+  const { data: workOrders = [] } = useQuery<{ id: string; workOrderNumber: number; title: string | null }[]>({
+    queryKey: ["/api/crm/work-orders", { projectId }],
+    queryFn: () => fetch(`/api/crm/work-orders?projectId=${projectId}`).then(r => r.json()).then(d => d.workOrders || []),
+  });
+
+  const createActivityMutation = useMutation({
+    mutationFn: async (data: { activityType: string; title: string; description?: string; workOrderId?: string }) => {
+      return apiRequest("POST", `/api/crm/projects/${projectId}/activities`, data);
+    },
+    onSuccess: () => {
+      toast({ title: "Activity added" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "activities"], exact: false });
+      setShowAddDialog(false);
+      setNewActivityTitle("");
+      setNewActivityDescription("");
+      setNewActivityWorkOrderId("");
+    },
+    onError: () => {
+      toast({ title: "Failed to add activity", variant: "destructive" });
+    },
+  });
+
+  const togglePinMutation = useMutation({
+    mutationFn: async ({ activityId, isPinned }: { activityId: string; isPinned: boolean }) => {
+      return apiRequest("PATCH", `/api/crm/projects/${projectId}/activities/${activityId}`, { isPinned });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "activities"], exact: false });
+    },
+  });
+
+  const groupedByDay = activities.reduce((acc, activity) => {
+    const date = activity.createdAt ? format(new Date(activity.createdAt), "yyyy-MM-dd") : "Unknown";
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(activity);
+    return acc;
+  }, {} as Record<string, ProjectActivityWithMeta[]>);
+
+  const sortedDates = Object.keys(groupedByDay).sort((a, b) => b.localeCompare(a));
+
+  const pinnedActivities = activities.filter(a => a.isPinned);
+  const hasFilters = typeFilter !== "all" || startDate || endDate || pinnedOnly;
+
+  const clearFilters = () => {
+    setTypeFilter("all");
+    setStartDate("");
+    setEndDate("");
+    setPinnedOnly(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="text-lg font-semibold flex items-center gap-2">
+            <History className="w-5 h-5" />
+            Project Timeline
+          </CardTitle>
+          <Button onClick={() => setShowAddDialog(true)} size="sm" data-testid="button-add-activity">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Activity
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3 mb-4 pb-4 border-b">
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[160px]" data-testid="select-activity-type-filter">
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                {filterOptions.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-[140px]"
+                placeholder="Start date"
+                data-testid="input-start-date"
+              />
+              <span className="text-sm text-muted-foreground">to</span>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-[140px]"
+                placeholder="End date"
+                data-testid="input-end-date"
+              />
+            </div>
+
+            <Button
+              variant={pinnedOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPinnedOnly(!pinnedOnly)}
+              className="gap-1"
+              data-testid="button-toggle-pinned"
+            >
+              <Pin className="w-4 h-4" />
+              Pinned Only
+            </Button>
+
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
+                <X className="w-4 h-4 mr-1" />
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          {pinnedActivities.length > 0 && !pinnedOnly && (
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                <Pin className="w-4 h-4" />
+                Pinned Items
+              </h4>
+              <div className="space-y-2">
+                {pinnedActivities.map(activity => (
+                  <ActivityCard
+                    key={activity.id}
+                    activity={activity}
+                    onTogglePin={(isPinned) => togglePinMutation.mutate({ activityId: activity.id, isPinned })}
+                    onNavigateToWorkOrder={(woId) => navigate(`/crm/work-orders/${woId}`)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-20 w-full" />
+              ))}
+            </div>
+          ) : activities.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <History className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>No activities yet</p>
+              <p className="text-sm mt-1">Add notes, photos, or track changes to build your timeline</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {sortedDates.map(date => (
+                <div key={date}>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    {date === "Unknown" ? "Unknown Date" : format(new Date(date), "EEEE, MMMM d, yyyy")}
+                  </h4>
+                  <div className="space-y-2 ml-2 border-l-2 border-slate-200 pl-4">
+                    {groupedByDay[date].map(activity => (
+                      <ActivityCard
+                        key={activity.id}
+                        activity={activity}
+                        onTogglePin={(isPinned) => togglePinMutation.mutate({ activityId: activity.id, isPinned })}
+                        onNavigateToWorkOrder={(woId) => navigate(`/crm/work-orders/${woId}`)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Activity</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Activity Type</Label>
+              <Select value={newActivityType} onValueChange={setNewActivityType}>
+                <SelectTrigger data-testid="select-new-activity-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="note">Note</SelectItem>
+                  <SelectItem value="photo">Photo</SelectItem>
+                  <SelectItem value="file">File</SelectItem>
+                  <SelectItem value="financial">Financial Update</SelectItem>
+                  <SelectItem value="approval">Approval</SelectItem>
+                  <SelectItem value="status_change">Status Change</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input
+                value={newActivityTitle}
+                onChange={(e) => setNewActivityTitle(e.target.value)}
+                placeholder="Activity title"
+                data-testid="input-activity-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description (optional)</Label>
+              <Textarea
+                value={newActivityDescription}
+                onChange={(e) => setNewActivityDescription(e.target.value)}
+                placeholder="Add more details..."
+                rows={3}
+                data-testid="input-activity-description"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Link to Work Order (optional)</Label>
+              <Select value={newActivityWorkOrderId} onValueChange={setNewActivityWorkOrderId}>
+                <SelectTrigger data-testid="select-link-work-order">
+                  <SelectValue placeholder="Select a work order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {workOrders.map(wo => (
+                    <SelectItem key={wo.id} value={wo.id}>
+                      WO #{wo.workOrderNumber} - {wo.title || "Untitled"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createActivityMutation.mutate({
+                activityType: newActivityType,
+                title: newActivityTitle,
+                description: newActivityDescription || undefined,
+                workOrderId: newActivityWorkOrderId || undefined,
+              })}
+              disabled={!newActivityTitle || createActivityMutation.isPending}
+              data-testid="button-submit-activity"
+            >
+              {createActivityMutation.isPending ? "Adding..." : "Add Activity"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function ActivityCard({
+  activity,
+  onTogglePin,
+  onNavigateToWorkOrder,
+}: {
+  activity: ProjectActivityWithMeta;
+  onTogglePin: (isPinned: boolean) => void;
+  onNavigateToWorkOrder: (woId: string) => void;
+}) {
+  const IconComponent = activityTypeIcons[activity.activityType] || Activity;
+  const colors = activityTypeColors[activity.activityType] || activityTypeColors.note;
+  const label = activityTypeLabels[activity.activityType] || activity.activityType;
+
+  return (
+    <div
+      className={`p-3 rounded-lg border ${colors.border} ${colors.bg} flex items-start gap-3`}
+      data-testid={`activity-card-${activity.id}`}
+    >
+      <div className={`p-2 rounded-lg bg-white ${colors.border} border`}>
+        <IconComponent className={`w-4 h-4 ${colors.text}`} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="font-medium text-sm">{activity.title}</p>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-1">
+              <Badge variant="outline" className={`${colors.bg} ${colors.text} ${colors.border} text-xs`}>
+                {label}
+              </Badge>
+              {activity.createdAt && (
+                <span>{format(new Date(activity.createdAt), "h:mm a")}</span>
+              )}
+              {activity.userName && (
+                <span className="flex items-center gap-1">
+                  <User className="w-3 h-3" />
+                  {activity.userName}
+                </span>
+              )}
+              {activity.workOrder && (
+                <button
+                  onClick={() => onNavigateToWorkOrder(activity.workOrder!.id)}
+                  className="flex items-center gap-1 text-blue-600 hover:underline"
+                >
+                  <Wrench className="w-3 h-3" />
+                  WO #{activity.workOrder.workOrderNumber}
+                </button>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onTogglePin(!activity.isPinned)}
+            className={activity.isPinned ? "text-amber-600" : "text-muted-foreground"}
+            data-testid={`button-toggle-pin-${activity.id}`}
+          >
+            {activity.isPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
+          </Button>
+        </div>
+        {activity.description && (
+          <p className="text-sm text-muted-foreground mt-2">{activity.description}</p>
+        )}
+      </div>
+    </div>
   );
 }

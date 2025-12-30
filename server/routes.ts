@@ -8995,10 +8995,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(sql`${projectActivities.createdAt} <= ${endDateObj}`);
       }
 
+      const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
       const activities = await db
         .select()
         .from(projectActivities)
-        .where(and(...conditions))
+        .where(whereClause)
         .orderBy(desc(projectActivities.createdAt));
 
       // Enrich with user and work order info
