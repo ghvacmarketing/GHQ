@@ -1061,35 +1061,39 @@ export default function CrmDispatch() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-3">
-        {/* Compact header row with all controls */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
+      <div className="space-y-4">
+        {/* Search bar at top - DoorLoop style centered */}
+        <div className="flex justify-center mb-2">
+          <div className="relative w-full max-w-xl">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search work orders..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+              data-testid="input-search-dispatch"
+            />
+          </div>
+        </div>
+
+        {/* Title + action buttons row */}
+        <div className="flex items-center justify-between">
+          <div>
             <h1 className="text-xl font-bold text-slate-900" data-testid="text-dispatch-title">
               Dispatch Board
             </h1>
-            <span className="text-slate-500 text-sm hidden sm:inline">({filteredWorkOrders.length} work orders)</span>
+            <p className="text-sm text-slate-500">Daily Schedule - {filteredWorkOrders.length} work orders</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-9 h-8 w-40 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
-                data-testid="input-search-dispatch"
-              />
-            </div>
+          <div className="flex items-center gap-2">
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button 
                   variant="outline" 
                   size="sm"
-                  className="text-slate-600 h-8"
+                  className="text-slate-600"
                   data-testid="button-date-picker"
                 >
-                  <CalendarDays className="h-4 w-4 mr-1.5" />
+                  <CalendarDays className="h-4 w-4 mr-2" />
                   {dateDisplay}
                 </Button>
               </PopoverTrigger>
@@ -1106,9 +1110,9 @@ export default function CrmDispatch() {
             
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="text-slate-600 h-8" data-testid="button-legend">
-                  <Info className="h-4 w-4" />
-                  <span className="hidden sm:inline ml-1.5">Legend</span>
+                <Button variant="outline" size="sm" className="text-slate-600" data-testid="button-legend">
+                  <Info className="h-4 w-4 mr-1.5" />
+                  Legend
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[340px] p-0" align="end">
@@ -1174,11 +1178,11 @@ export default function CrmDispatch() {
                 setScheduledDate(selectedDate);
                 setCreateDialogOpen(true);
               }}
-              className="bg-[#711419] hover:bg-[#5a1014] text-white h-8"
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
               data-testid="button-create-work-order"
             >
               <Plus className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Create</span>
+              New Work Order
             </Button>
           </div>
         </div>
