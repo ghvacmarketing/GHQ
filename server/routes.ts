@@ -6170,11 +6170,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workOrderCount = Number(workOrdersResult?.count || 0);
       }
 
-      // Count quotes linked to this customer (via customerId)
+      // Count quotes linked to this customer (via accountId - the actual column in the database)
       const [quotesResult] = await db
         .select({ count: sql<number>`count(*)` })
         .from(crmQuotes)
-        .where(eq(crmQuotes.customerId, customerId));
+        .where(eq(crmQuotes.accountId, customerId));
 
       const quoteCount = Number(quotesResult?.count || 0);
 
@@ -6182,7 +6182,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [invoicesResult] = await db
         .select({ count: sql<number>`count(*)` })
         .from(crmInvoices)
-        .where(eq(crmInvoices.customerId, customerId));
+        .where(or(
+          eq(crmInvoices.customerId, customerId),
+          eq(crmInvoices.jobId, customerId)
+        ));
 
       const invoiceCount = Number(invoicesResult?.count || 0);
 
