@@ -58,9 +58,23 @@ export default function SalesProspects() {
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
 
-  // Queries
+  // Map filter to API status parameter
+  const getApiStatus = (filter: string) => {
+    if (filter === "All Active") return null; // No status filter - get all and filter client-side
+    return filter; // Pass status directly for specific filters (Won, Lost, New, etc.)
+  };
+
+  // Queries - pass status filter to API for Won/Lost, get more leads
+  const apiStatus = getApiStatus(activeFilter);
   const { data: leadsResponse, isLoading: isLoadingLeads } = useQuery<{ leads: Lead[], pagination: any }>({
-    queryKey: ["/api/leads"],
+    queryKey: ["/api/leads", { status: apiStatus }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", "100"); // Get more leads
+      if (apiStatus) params.set("status", apiStatus);
+      const res = await fetch(`/api/leads?${params.toString()}`);
+      return res.json();
+    },
   });
   const allLeads = leadsResponse?.leads || [];
 

@@ -2904,10 +2904,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const search = req.query.search as string;
       const offset = (page - 1) * limit;
       
+      // Build status filter that handles Won/Lost with boolean flags
+      const buildStatusFilter = () => {
+        if (!status || status === 'all') return null;
+        if (status === 'Won') {
+          return sql`(${leads.won} = true OR ${leads.status} = 'Won')`;
+        }
+        if (status === 'Lost') {
+          return sql`(${leads.lost} = true OR ${leads.status} = 'Lost')`;
+        }
+        // For active statuses, exclude won/lost leads
+        return sql`${leads.status} = ${status} AND ${leads.won} = false AND ${leads.lost} = false`;
+      };
+      
+      const statusFilter = buildStatusFilter();
+      
       // Get total count first
       let query = db.select({ count: sql<number>`count(*)` }).from(leads);
-      if (status && status !== 'all') {
-        query = query.where(eq(leads.status, status)) as typeof query;
+      if (statusFilter) {
+        query = query.where(statusFilter) as typeof query;
       }
       if (search && search.length >= 2) {
         query = query.where(sql`LOWER(${leads.name}) LIKE LOWER(${'%' + search + '%'}) OR LOWER(${leads.phone}) LIKE LOWER(${'%' + search + '%'}) OR LOWER(${leads.email}) LIKE LOWER(${'%' + search + '%'})`) as typeof query;
@@ -2917,8 +2932,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get paginated data
       let dataQuery = db.select().from(leads);
-      if (status && status !== 'all') {
-        dataQuery = dataQuery.where(eq(leads.status, status)) as typeof dataQuery;
+      if (statusFilter) {
+        dataQuery = dataQuery.where(statusFilter) as typeof dataQuery;
       }
       if (search && search.length >= 2) {
         dataQuery = dataQuery.where(sql`LOWER(${leads.name}) LIKE LOWER(${'%' + search + '%'}) OR LOWER(${leads.phone}) LIKE LOWER(${'%' + search + '%'}) OR LOWER(${leads.email}) LIKE LOWER(${'%' + search + '%'})`) as typeof dataQuery;
