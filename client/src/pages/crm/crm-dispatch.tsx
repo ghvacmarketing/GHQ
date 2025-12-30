@@ -159,7 +159,7 @@ const END_HOUR = 20;
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i + START_HOUR);
 const SLOT_WIDTH = 48;
-const HOUR_WIDTH = SLOT_WIDTH * 4;
+const HOUR_WIDTH = SLOT_WIDTH * 2;
 const TIMELINE_WIDTH = TOTAL_HOURS * HOUR_WIDTH;
 
 const statusColors: Record<string, { bg: string; border: string; text: string }> = {
@@ -293,12 +293,12 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
       const deltaHours = deltaX * hoursPerPixel;
       
       if (isResizingLeft) {
-        let newStart = Math.round((originalStart.current + deltaHours) * 4) / 4;
-        newStart = Math.max(START_HOUR, Math.min(newStart, originalEnd.current - 0.25));
+        let newStart = Math.round((originalStart.current + deltaHours) * 2) / 2;
+        newStart = Math.max(START_HOUR, Math.min(newStart, originalEnd.current - 0.5));
         setVisualStart(newStart);
       } else if (isResizingRight) {
-        let newEnd = Math.round((originalEnd.current + deltaHours) * 4) / 4;
-        newEnd = Math.max(originalStart.current + 0.25, Math.min(newEnd, END_HOUR));
+        let newEnd = Math.round((originalEnd.current + deltaHours) * 2) / 2;
+        newEnd = Math.max(originalStart.current + 0.5, Math.min(newEnd, END_HOUR));
         setVisualEnd(newEnd);
       }
     };
@@ -618,11 +618,11 @@ export default function CrmDispatch() {
   const [endTime, setEndTime] = useState("10:00");
   const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
   
-  // Generate 15-minute interval time options from 6:00 AM to 8:00 PM
+  // Generate 30-minute interval time options from 8:00 AM to 8:00 PM
   const timeOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [];
-    for (let hour = 6; hour <= 20; hour++) {
-      for (let minute = 0; minute < 60; minute += 15) {
+    for (let hour = 8; hour <= 20; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
         if (hour === 20 && minute > 0) break; // Stop at 8:00 PM
         const hourStr = hour.toString().padStart(2, "0");
         const minuteStr = minute.toString().padStart(2, "0");
@@ -949,10 +949,10 @@ export default function CrmDispatch() {
       const duration = endHour - startHour;
       
       const hoursPerPixel = TOTAL_HOURS / TIMELINE_WIDTH;
-      const deltaHours = Math.round((delta.x * hoursPerPixel) * 4) / 4;
+      const deltaHours = Math.round((delta.x * hoursPerPixel) * 2) / 2;
       
       let newStartHour = startHour + deltaHours;
-      newStartHour = Math.round(newStartHour * 4) / 4;
+      newStartHour = Math.round(newStartHour * 2) / 2;
       newStartHour = Math.max(START_HOUR, Math.min(newStartHour, END_HOUR - duration));
       const newEndHour = newStartHour + duration;
 

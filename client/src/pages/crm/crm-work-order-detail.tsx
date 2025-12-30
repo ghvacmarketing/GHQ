@@ -160,11 +160,11 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
   urgent: { bg: "bg-red-100", text: "text-red-700" },
 };
 
-// Generate 15-minute interval time options from 6:00 AM to 8:00 PM
+// Generate 30-minute interval time options from 8:00 AM to 8:00 PM
 const generateTimeOptions = () => {
   const options: { value: string; label: string }[] = [];
-  for (let hour = 6; hour <= 20; hour++) {
-    for (let minute = 0; minute < 60; minute += 15) {
+  for (let hour = 8; hour <= 20; hour++) {
+    for (let minute = 0; minute < 60; minute += 30) {
       if (hour === 20 && minute > 0) break; // Stop at 8:00 PM
       const hourStr = hour.toString().padStart(2, "0");
       const minuteStr = minute.toString().padStart(2, "0");

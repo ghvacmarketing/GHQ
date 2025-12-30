@@ -196,11 +196,11 @@ export default function CrmWorkOrders() {
   const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
   const [priority, setPriority] = useState<string>("normal");
   
-  // Generate 15-minute interval time options from 8 AM to 8 PM
+  // Generate 30-minute interval time options from 8 AM to 8 PM
   const timeOptions = (() => {
     const options: { value: string; label: string }[] = [];
     for (let hour = 8; hour <= 20; hour++) {
-      for (let min = 0; min < 60; min += 15) {
+      for (let min = 0; min < 60; min += 30) {
         if (hour === 20 && min > 0) break;
         const h = hour.toString().padStart(2, "0");
         const m = min.toString().padStart(2, "0");
@@ -219,7 +219,7 @@ export default function CrmWorkOrders() {
     if (!date) return "08:00";
     const d = new Date(date);
     const hours = d.getHours().toString().padStart(2, "0");
-    const minutes = (Math.floor(d.getMinutes() / 15) * 15).toString().padStart(2, "0");
+    const minutes = (Math.floor(d.getMinutes() / 30) * 30).toString().padStart(2, "0");
     return `${hours}:${minutes}`;
   };
 
