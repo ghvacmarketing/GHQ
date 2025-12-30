@@ -279,7 +279,7 @@ export default function CrmWorkOrders() {
 
   const properties = propertiesData || [];
 
-  const { data: projectsData } = useQuery<CrmProject[]>({
+  const { data: projectsResponse } = useQuery<{ projects: CrmProject[]; pagination: any }>({
     queryKey: ["/api/crm/projects", selectedCustomer?.id],
     queryFn: async () => {
       const res = await fetch(`/api/crm/projects?customerId=${selectedCustomer!.id}`, {
@@ -291,10 +291,10 @@ export default function CrmWorkOrders() {
     enabled: !!selectedCustomer?.id && createDialogOpen,
   });
 
-  const projects = projectsData || [];
+  const projects = projectsResponse?.projects || [];
 
   // Query for linking projects in the detail sheet (different from create dialog)
-  const { data: linkableProjectsData, isLoading: linkableProjectsLoading } = useQuery<CrmProject[]>({
+  const { data: linkableProjectsResponse, isLoading: linkableProjectsLoading } = useQuery<{ projects: CrmProject[]; pagination: any }>({
     queryKey: ["/api/crm/projects", selectedWorkOrder?.customerId, debouncedProjectSearch],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -309,7 +309,7 @@ export default function CrmWorkOrders() {
     enabled: !!currentUser && !!selectedWorkOrder?.customerId && sheetOpen && projectSearchOpen,
   });
 
-  const linkableProjects = linkableProjectsData || [];
+  const linkableProjects = linkableProjectsResponse?.projects || [];
 
   // Query for customer search in reassignment (detail sheet)
   const { data: reassignCustomersData, isLoading: reassignCustomersLoading } = useQuery<CustomersResponse>({

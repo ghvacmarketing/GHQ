@@ -526,6 +526,7 @@ interface CustomerTabbedViewProps {
   onCreateProject: () => void;
   onScheduleVisit: () => void;
   onEditCustomer: () => void;
+  onEditProperty: (property: CrmProperty) => void;
   toast: ReturnType<typeof useToast>['toast'];
   propertyDialogOpen: boolean;
   setPropertyDialogOpen: (open: boolean) => void;
@@ -549,6 +550,7 @@ function CustomerTabbedView({
   onCreateProject,
   onScheduleVisit,
   onEditCustomer,
+  onEditProperty,
   toast,
   propertyDialogOpen,
   setPropertyDialogOpen,
@@ -927,7 +929,7 @@ function CustomerTabbedView({
                       size="sm"
                       variant="ghost"
                       className="absolute top-2 right-2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleEditProperty(property)}
+                      onClick={() => onEditProperty(property)}
                       data-testid={`button-edit-property-${property.id}`}
                     >
                       <Pencil className="h-4 w-4" />
@@ -2400,7 +2402,7 @@ export default function CrmCustomerDetail() {
                   <SelectContent>
                     {customerProperties?.map((prop) => (
                       <SelectItem key={prop.id} value={prop.id} data-testid={`wo-property-${prop.id}`}>
-                        {prop.name || prop.address || `Property ${prop.id.slice(-4)}`}
+                        {prop.address1}{prop.city ? `, ${prop.city}` : ''}
                       </SelectItem>
                     ))}
                     {(!customerProperties || customerProperties.length === 0) && (
@@ -3263,6 +3265,7 @@ export default function CrmCustomerDetail() {
           onCreateProject={() => setCreateProjectDialogOpen(true)}
           onScheduleVisit={() => setScheduleVisitDialogOpen(true)}
           onEditCustomer={() => setEditDialogOpen(true)}
+          onEditProperty={handleEditProperty}
           toast={toast}
           propertyDialogOpen={propertyDialogOpen}
           setPropertyDialogOpen={setPropertyDialogOpen}

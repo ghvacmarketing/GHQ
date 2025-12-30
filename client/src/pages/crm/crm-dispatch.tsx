@@ -686,7 +686,7 @@ export default function CrmDispatch() {
 
   const properties = propertiesData || [];
 
-  const { data: projectsData } = useQuery<CrmProject[]>({
+  const { data: projectsResponse } = useQuery<{ projects: CrmProject[]; pagination: any }>({
     queryKey: ["/api/crm/projects", selectedCustomer?.id],
     queryFn: async () => {
       const res = await fetch(`/api/crm/projects?customerId=${selectedCustomer!.id}`, {
@@ -698,7 +698,7 @@ export default function CrmDispatch() {
     enabled: !!selectedCustomer?.id && createDialogOpen,
   });
 
-  const projects = projectsData || [];
+  const projects = projectsResponse?.projects || [];
 
   const { data: workOrdersData, isLoading: workOrdersLoading } = useQuery<any[]>({
     queryKey: ["/api/crm/dispatch/work-orders", dateString],
