@@ -1681,7 +1681,6 @@ export default function ProposalBuilder() {
     setSelectedDoorOption(null);
     setCrawlspaceServicesSqft("1000");
     setCustomEquipmentType(null);
-    setCustomBuildStep(1);
   };
 
   const addToCartWithElite = (pkg: PricebookPackage, index: number) => {
