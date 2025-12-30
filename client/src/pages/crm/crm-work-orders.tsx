@@ -294,6 +294,7 @@ export default function CrmWorkOrders() {
   const projects = projectsResponse?.projects || [];
 
   // Query for linking projects in the detail sheet (different from create dialog)
+  // Fetch immediately when sheet opens so user can see project options
   const { data: linkableProjectsResponse, isLoading: linkableProjectsLoading } = useQuery<{ projects: CrmProject[]; pagination: any }>({
     queryKey: ["/api/crm/projects", selectedWorkOrder?.customerId, debouncedProjectSearch],
     queryFn: async () => {
@@ -306,7 +307,7 @@ export default function CrmWorkOrders() {
       if (!res.ok) throw new Error("Failed to fetch projects");
       return res.json();
     },
-    enabled: !!currentUser && !!selectedWorkOrder?.customerId && sheetOpen && projectSearchOpen,
+    enabled: !!currentUser && !!selectedWorkOrder?.customerId && sheetOpen,
   });
 
   const linkableProjects = linkableProjectsResponse?.projects || [];
@@ -1023,8 +1024,6 @@ export default function CrmWorkOrders() {
                     </div>
                   ) : linkableProjectsLoading ? (
                     <p className="text-sm text-slate-500">Loading...</p>
-                  ) : linkableProjects.length === 0 ? (
-                    <p className="text-sm text-slate-500">No projects for this customer</p>
                   ) : (
                     <Popover open={projectSearchOpen} onOpenChange={setProjectSearchOpen}>
                       <PopoverTrigger asChild>
@@ -1035,7 +1034,7 @@ export default function CrmWorkOrders() {
                           data-testid="button-add-to-project"
                         >
                           <FolderOpen className="h-4 w-4 mr-2" />
-                          Add to Project
+                          {linkableProjects.length === 0 ? "No projects - Create one" : "Add to Project"}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-[300px] p-0" align="start">
@@ -1047,22 +1046,41 @@ export default function CrmWorkOrders() {
                             data-testid="input-project-search"
                           />
                           <CommandList>
-                            <CommandGroup>
-                              {linkableProjects.map((project) => (
-                                <CommandItem
-                                  key={project.id}
-                                  value={project.id}
-                                  onSelect={() => handleLinkProject(project.id)}
-                                  data-testid={`project-option-${project.id}`}
+                            {linkableProjects.length === 0 ? (
+                              <div className="p-4 text-center">
+                                <p className="text-sm text-slate-500 mb-3">No projects for this customer</p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setProjectSearchOpen(false);
+                                    setSheetOpen(false);
+                                    navigate(`/crm/customers/${selectedWorkOrder.customerId}`);
+                                  }}
+                                  data-testid="button-create-project"
                                 >
-                                  <FolderOpen className="h-4 w-4 mr-2 text-slate-500" />
-                                  <div>
-                                    <p className="font-medium">{project.title}</p>
-                                    <p className="text-xs text-slate-500">{project.projectType}</p>
-                                  </div>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Create Project
+                                </Button>
+                              </div>
+                            ) : (
+                              <CommandGroup>
+                                {linkableProjects.map((project) => (
+                                  <CommandItem
+                                    key={project.id}
+                                    value={project.id}
+                                    onSelect={() => handleLinkProject(project.id)}
+                                    data-testid={`project-option-${project.id}`}
+                                  >
+                                    <FolderOpen className="h-4 w-4 mr-2 text-slate-500" />
+                                    <div>
+                                      <p className="font-medium">{project.title}</p>
+                                      <p className="text-xs text-slate-500">{project.projectType}</p>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            )}
                           </CommandList>
                         </Command>
                       </PopoverContent>
