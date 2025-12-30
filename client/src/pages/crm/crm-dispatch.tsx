@@ -1061,51 +1061,35 @@ export default function CrmDispatch() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-4">
-        {/* Row 1: Search bar + Create Work Order button - aligned right so button sits above Date/Legend */}
-        <div className="flex items-center justify-end gap-3 mb-3">
-          <div className="relative flex-1 max-w-xl">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search work orders..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 h-9 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
-              data-testid="input-search-dispatch"
-            />
-          </div>
-          <Button
-            size="sm"
-            onClick={() => {
-              setScheduledDate(selectedDate);
-              setCreateDialogOpen(true);
-            }}
-            className="bg-[#711419] hover:bg-[#5a1014] text-white"
-            data-testid="button-create-work-order"
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            Create Work Order
-          </Button>
-        </div>
-
-        {/* Row 2: Title + Date/Legend */}
-        <div className="flex items-center justify-between gap-3">
-          <div>
+      <div className="space-y-3">
+        {/* Compact header row with all controls */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold text-slate-900" data-testid="text-dispatch-title">
               Dispatch Board
             </h1>
-            <p className="text-slate-500 text-sm">Daily Schedule - {filteredWorkOrders.length} work orders</p>
+            <span className="text-slate-500 text-sm hidden sm:inline">({filteredWorkOrders.length} work orders)</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="pl-9 h-8 w-40 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+                data-testid="input-search-dispatch"
+              />
+            </div>
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button 
                   variant="outline" 
                   size="sm"
-                  className="text-slate-600"
+                  className="text-slate-600 h-8"
                   data-testid="button-date-picker"
                 >
-                  <CalendarDays className="h-4 w-4 mr-2" />
+                  <CalendarDays className="h-4 w-4 mr-1.5" />
                   {dateDisplay}
                 </Button>
               </PopoverTrigger>
@@ -1122,9 +1106,9 @@ export default function CrmDispatch() {
             
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="text-slate-600" data-testid="button-legend">
-                  <Info className="h-4 w-4 mr-1.5" />
-                  Legend
+                <Button variant="outline" size="sm" className="text-slate-600 h-8" data-testid="button-legend">
+                  <Info className="h-4 w-4" />
+                  <span className="hidden sm:inline ml-1.5">Legend</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[340px] p-0" align="end">
@@ -1183,6 +1167,19 @@ export default function CrmDispatch() {
                 </div>
               </PopoverContent>
             </Popover>
+            
+            <Button
+              size="sm"
+              onClick={() => {
+                setScheduledDate(selectedDate);
+                setCreateDialogOpen(true);
+              }}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white h-8"
+              data-testid="button-create-work-order"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Create</span>
+            </Button>
           </div>
         </div>
 
@@ -1210,11 +1207,6 @@ export default function CrmDispatch() {
         </div>
 
         <Card className="bg-white border hidden lg:block" data-testid="card-timeline">
-          <CardHeader className="py-3 px-4">
-            <CardTitle className="text-base font-medium text-slate-800">
-              Daily Schedule - {localWorkOrders.length} work orders
-            </CardTitle>
-          </CardHeader>
           <CardContent className="p-0">
             <DndContext
               sensors={sensors}
