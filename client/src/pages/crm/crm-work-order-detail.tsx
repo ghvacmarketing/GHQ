@@ -644,6 +644,42 @@ export default function CrmWorkOrderDetail() {
           </CardContent>
         </Card>
 
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
+            <TabsTrigger
+              value="details"
+              data-testid="tab-details"
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
+            >
+              <ClipboardList className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Details</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="quotes"
+              data-testid="tab-quotes"
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
+            >
+              <FileText className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Quotes</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="invoices"
+              data-testid="tab-invoices"
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
+            >
+              <DollarSign className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Invoices</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="edit"
+              data-testid="tab-edit"
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
+            >
+              <Pencil className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Edit</span>
+            </TabsTrigger>
+          </TabsList>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="shadow-sm">
             <CardHeader className="pb-3 border-b bg-slate-50/50">
@@ -775,42 +811,6 @@ export default function CrmWorkOrderDetail() {
             </CardContent>
           </Card>
         </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
-            <TabsTrigger
-              value="details"
-              data-testid="tab-details"
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
-            >
-              <ClipboardList className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">Details</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="quotes"
-              data-testid="tab-quotes"
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
-            >
-              <FileText className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">Quotes</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="invoices"
-              data-testid="tab-invoices"
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
-            >
-              <DollarSign className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">Invoices</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="edit"
-              data-testid="tab-edit"
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
-            >
-              <Pencil className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">Edit</span>
-            </TabsTrigger>
-          </TabsList>
 
           <TabsContent value="details" className="mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
