@@ -1114,7 +1114,7 @@ export default function CrmDispatch() {
               <PopoverContent className="w-[340px] p-0" align="end">
                 <div className="p-4 space-y-4">
                   <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Job Type (Background)</p>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Visit Type (Background)</p>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 rounded bg-sky-100 border border-sky-200" />
@@ -1136,7 +1136,7 @@ export default function CrmDispatch() {
                   </div>
                   
                   <div className="border-t border-slate-100 pt-4">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Visit Type (Left Stripe)</p>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Status (Left Stripe)</p>
                     <div className="grid grid-cols-3 gap-x-3 gap-y-2">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
@@ -1312,8 +1312,8 @@ export default function CrmDispatch() {
                     </div>
                     
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-500">Job Type</span>
-                      <span className="text-sm font-medium text-slate-900" data-testid="text-job-type">{selectedWorkOrder.jobType}</span>
+                      <span className="text-sm text-slate-500">Visit Type</span>
+                      <span className="text-sm font-medium text-slate-900" data-testid="text-visit-type">{selectedWorkOrder.jobType}</span>
                     </div>
                     
                     <div className="flex items-center justify-between">
