@@ -1119,6 +1119,73 @@ export const insertProjectActivitySchema = createInsertSchema(projectActivities)
 export type InsertProjectActivity = z.infer<typeof insertProjectActivitySchema>;
 export type ProjectActivity = typeof projectActivities.$inferSelect;
 
+// Activity Metadata Schemas (type-specific payloads stored in metadata JSON)
+export const activityAttachmentSchema = z.object({
+  id: z.string(),
+  filename: z.string(),
+  originalName: z.string(),
+  mimeType: z.string(),
+  size: z.number(),
+  url: z.string(),
+  tag: z.string().optional(), // For photos: before/after/indoor/outdoor
+  category: z.string().optional(), // For files: proposal/invoice/permit/manual/other
+});
+export type ActivityAttachment = z.infer<typeof activityAttachmentSchema>;
+
+export const noteMetadataSchema = z.object({
+  content: z.string().min(1, "Note content is required"),
+});
+export type NoteMetadata = z.infer<typeof noteMetadataSchema>;
+
+export const photoMetadataSchema = z.object({
+  photos: z.array(activityAttachmentSchema).min(1, "At least one photo is required"),
+  caption: z.string().optional(),
+});
+export type PhotoMetadata = z.infer<typeof photoMetadataSchema>;
+
+export const fileMetadataSchema = z.object({
+  files: z.array(activityAttachmentSchema).min(1, "At least one file is required"),
+  category: z.enum(["proposal", "invoice", "permit", "manual", "other"]).optional(),
+  note: z.string().optional(),
+});
+export type FileMetadata = z.infer<typeof fileMetadataSchema>;
+
+export const financialSubtypeEnum = ["estimate", "invoice", "payment", "credit", "change_order"] as const;
+export type FinancialSubtype = typeof financialSubtypeEnum[number];
+
+export const financialMetadataSchema = z.object({
+  subtype: z.enum(financialSubtypeEnum),
+  amount: z.number(),
+  status: z.enum(["pending", "approved", "paid", "cancelled"]).optional(),
+  date: z.string().optional(), // ISO date string
+  attachments: z.array(activityAttachmentSchema).optional(),
+  note: z.string().optional(),
+});
+export type FinancialMetadata = z.infer<typeof financialMetadataSchema>;
+
+export const approvalStatusEnum = ["requested", "approved", "denied"] as const;
+export type ApprovalStatus = typeof approvalStatusEnum[number];
+
+export const approvalMetadataSchema = z.object({
+  approverType: z.enum(["pm", "tenant", "owner", "other"]),
+  approverName: z.string().optional(),
+  status: z.enum(approvalStatusEnum),
+  amount: z.number().optional(),
+  attachments: z.array(activityAttachmentSchema).optional(),
+  note: z.string().optional(),
+  previousActivityId: z.string().optional(), // For audit trail
+});
+export type ApprovalMetadata = z.infer<typeof approvalMetadataSchema>;
+
+export const statusChangeMetadataSchema = z.object({
+  entityType: z.enum(["project", "work_order"]),
+  entityId: z.string(),
+  fromStatus: z.string(),
+  toStatus: z.string(),
+  changedBy: z.string().optional(),
+});
+export type StatusChangeMetadata = z.infer<typeof statusChangeMetadataSchema>;
+
 // CRM Agreements Status Enum
 export const crmAgreementStatusEnum = ["active", "expiring", "expired", "cancelled"] as const;
 export type CrmAgreementStatus = typeof crmAgreementStatusEnum[number];
