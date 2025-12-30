@@ -638,7 +638,7 @@ const SCHEDULE_START_HOUR = 8;
 const SCHEDULE_END_HOUR = 20;
 const SCHEDULE_TOTAL_MINUTES = (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) * 60;
 const SCHEDULE_INTERVAL = 30;
-const SCHEDULE_TIMELINE_WIDTH = 1200;
+const SCHEDULE_TIMELINE_WIDTH = 900;
 
 function getScheduleLeftPercent(date: Date): number {
   const hours = date.getHours();
@@ -653,6 +653,22 @@ function getScheduleWidthPercent(startDate: Date, endDate: Date | null): number 
   const snappedDuration = Math.max(SCHEDULE_INTERVAL, Math.round(durationMinutes / SCHEDULE_INTERVAL) * SCHEDULE_INTERVAL);
   return (snappedDuration / SCHEDULE_TOTAL_MINUTES) * 100;
 }
+
+const scheduleVisitTypeColors: Record<string, string> = {
+  SERVICE: "bg-blue-100",
+  INSTALL: "bg-yellow-100",
+  MAINTENANCE: "bg-green-100",
+  SALES: "bg-pink-100",
+};
+
+const scheduleStatusStripes: Record<string, string> = {
+  scheduled: "border-l-4 border-l-blue-500",
+  dispatched: "border-l-4 border-l-purple-500",
+  en_route: "border-l-4 border-l-amber-500",
+  on_site: "border-l-4 border-l-orange-500",
+  completed: "border-l-4 border-l-green-500",
+  cancelled: "border-l-4 border-l-red-400",
+};
 
 const scheduleCardColors: Record<string, string> = {
   scheduled: "bg-blue-500",
@@ -868,6 +884,7 @@ interface DraggableScheduleCardProps {
   leftPercent: number;
   widthPercent: number;
   bgColor: string;
+  statusStripe?: string;
   onWorkOrderClick?: (id: string) => void;
   onResizeLocal?: (workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => void;
   onResizeEnd?: (workOrderId: string) => void;
@@ -879,6 +896,7 @@ function DraggableScheduleCard({
   leftPercent, 
   widthPercent, 
   bgColor, 
+  statusStripe = "",
   onWorkOrderClick,
   onResizeLocal,
   onResizeEnd,
@@ -946,7 +964,7 @@ function DraggableScheduleCard({
         (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
       style={style}
-      className={`absolute top-2 bottom-2 ${bgColor} text-white rounded-md px-2 py-1 cursor-grab hover:opacity-90 transition-opacity overflow-hidden shadow-sm group ${isResizing ? 'cursor-ew-resize' : ''}`}
+      className={`absolute top-2 bottom-2 ${bgColor} ${statusStripe} text-slate-800 rounded-md px-2 py-1 cursor-grab hover:shadow-md transition-all overflow-hidden shadow-sm group ${isResizing ? 'cursor-ew-resize' : ''}`}
       data-testid={`schedule-card-${workOrder.id}`}
       {...attributes}
       {...listeners}
@@ -958,22 +976,22 @@ function DraggableScheduleCard({
       }}
     >
       <div 
-        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-white/30 hover:bg-white/50 transition-opacity"
+        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-slate-400/30 hover:bg-slate-400/50 transition-opacity"
         onMouseDown={(e) => handleMouseDown(e, 'start')}
         data-testid={`resize-start-${workOrder.id}`}
       />
       <div 
-        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-white/30 hover:bg-white/50 transition-opacity"
+        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-slate-400/30 hover:bg-slate-400/50 transition-opacity"
         onMouseDown={(e) => handleMouseDown(e, 'end')}
         data-testid={`resize-end-${workOrder.id}`}
       />
       
       <div className="flex items-center gap-1.5">
-        {workOrder.status === "completed" && <CheckSquare className="h-3 w-3 flex-shrink-0" />}
+        {workOrder.status === "completed" && <CheckSquare className="h-3 w-3 flex-shrink-0 text-green-600" />}
         <p className="text-xs font-medium truncate">{workOrder.customerName}</p>
       </div>
       {workOrder.propertyAddress && (
-        <p className="text-[10px] opacity-90 truncate">{workOrder.propertyAddress}</p>
+        <p className="text-[10px] text-slate-600 truncate">{workOrder.propertyAddress}</p>
       )}
     </div>
   );
@@ -1054,7 +1072,9 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                     
                     const leftPercent = getScheduleLeftPercent(startDate);
                     const widthPercent = getScheduleWidthPercent(startDate, endDate);
-                    const bgColor = scheduleCardColors[wo.status] || scheduleCardColors.scheduled;
+                    const visitType = wo.visitType || "SERVICE";
+                    const bgColor = scheduleVisitTypeColors[visitType] || scheduleVisitTypeColors.SERVICE;
+                    const statusStripe = scheduleStatusStripes[wo.status] || scheduleStatusStripes.scheduled;
                     
                     const startMinutesFrom8 = (startDate.getHours() - SCHEDULE_START_HOUR) * 60 + startDate.getMinutes();
                     if (startMinutesFrom8 < 0 || startMinutesFrom8 >= SCHEDULE_TOTAL_MINUTES) return null;
@@ -1066,6 +1086,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                         leftPercent={leftPercent}
                         widthPercent={widthPercent}
                         bgColor={bgColor}
+                        statusStripe={statusStripe}
                         onWorkOrderClick={onWorkOrderClick}
                         onResizeLocal={onResizeLocal}
                         onResizeEnd={onResizeEnd}
@@ -2077,7 +2098,7 @@ export default function CrmDispatch() {
         const { startHour, endHour } = getWorkOrderDisplayTimes(wo);
         const duration = endHour - startHour;
         
-        const hoursPerPixel = (END_HOUR - START_HOUR) / TIMELINE_WIDTH;
+        const hoursPerPixel = (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) / SCHEDULE_TIMELINE_WIDTH;
         const deltaHours = Math.round((delta.x * hoursPerPixel) * 2) / 2;
         
         let newStartHour = startHour + deltaHours;
@@ -2310,7 +2331,7 @@ export default function CrmDispatch() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-4">
             <div>
               <h1 className="text-xl font-bold text-slate-900" data-testid="text-dispatch-title">
@@ -2343,7 +2364,7 @@ export default function CrmDispatch() {
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             
             <Popover>
               <PopoverTrigger asChild>
