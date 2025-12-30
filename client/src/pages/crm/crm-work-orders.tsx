@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
+import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -165,8 +166,12 @@ export default function CrmWorkOrders() {
   const [editingTechNotes, setEditingTechNotes] = useState<string>("");
   const [reassignTechId, setReassignTechId] = useState<string>("unassigned");
   const [newStatus, setNewStatus] = useState<string>("");
-  const [rescheduleStart, setRescheduleStart] = useState<Date | null>(null);
-  const [rescheduleEnd, setRescheduleEnd] = useState<Date | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState<Date | undefined>(undefined);
+  const [rescheduleTimeSlot, setRescheduleTimeSlot] = useState<string>("");
+  
+  // Project linking state
+  const [projectSearch, setProjectSearch] = useState("");
+  const [projectSearchOpen, setProjectSearchOpen] = useState(false);
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
@@ -189,8 +194,21 @@ export default function CrmWorkOrders() {
     { value: "13:00-15:00", label: "1:00 PM - 3:00 PM" },
     { value: "15:00-17:00", label: "3:00 PM - 5:00 PM" },
   ];
+  
+  // Helper to determine time slot from scheduled times
+  const getTimeSlotFromSchedule = (start: Date | string | null): string => {
+    if (!start) return "08:00-10:00";
+    const startDate = new Date(start);
+    const hours = startDate.getHours();
+    if (hours >= 8 && hours < 10) return "08:00-10:00";
+    if (hours >= 10 && hours < 12) return "10:00-12:00";
+    if (hours >= 13 && hours < 15) return "13:00-15:00";
+    if (hours >= 15 && hours < 17) return "15:00-17:00";
+    return "08:00-10:00";
+  };
 
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
+  const debouncedProjectSearch = useDebounce(projectSearch, 300);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -267,6 +285,24 @@ export default function CrmWorkOrders() {
   });
 
   const projects = projectsData || [];
+
+  // Query for linking projects in the detail sheet (different from create dialog)
+  const { data: linkableProjectsData, isLoading: linkableProjectsLoading } = useQuery<CrmProject[]>({
+    queryKey: ["/api/crm/projects", selectedWorkOrder?.customerId, debouncedProjectSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedWorkOrder?.customerId) params.set("customerId", selectedWorkOrder.customerId);
+      if (debouncedProjectSearch) params.set("search", debouncedProjectSearch);
+      const res = await fetch(`/api/crm/projects?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch projects");
+      return res.json();
+    },
+    enabled: !!currentUser && !!selectedWorkOrder?.customerId && sheetOpen && projectSearchOpen,
+  });
+
+  const linkableProjects = linkableProjectsData || [];
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -424,8 +460,10 @@ export default function CrmWorkOrders() {
       setEditingTechNotes(data.techNotes || "");
       setReassignTechId(data.assignedTechId || "unassigned");
       setNewStatus(data.status);
-      setRescheduleStart(data.scheduledStart ? new Date(data.scheduledStart) : null);
-      setRescheduleEnd(data.scheduledEnd ? new Date(data.scheduledEnd) : null);
+      setRescheduleDate(data.scheduledStart ? new Date(data.scheduledStart) : new Date());
+      setRescheduleTimeSlot(getTimeSlotFromSchedule(data.scheduledStart));
+      setProjectSearch("");
+      setProjectSearchOpen(false);
       setSheetOpen(true);
     }
   };
@@ -467,14 +505,35 @@ export default function CrmWorkOrders() {
   };
 
   const handleReschedule = () => {
-    if (selectedWorkOrder && rescheduleStart && rescheduleEnd) {
+    if (selectedWorkOrder && rescheduleDate && rescheduleTimeSlot) {
+      const [startTimeStr, endTimeStr] = rescheduleTimeSlot.split("-");
+      const [startHours, startMinutes] = startTimeStr.split(":").map(Number);
+      const [endHours, endMinutes] = endTimeStr.split(":").map(Number);
+      
+      const scheduledStart = new Date(rescheduleDate);
+      scheduledStart.setHours(startHours, startMinutes, 0, 0);
+      
+      const scheduledEnd = new Date(rescheduleDate);
+      scheduledEnd.setHours(endHours, endMinutes, 0, 0);
+      
       updateWorkOrderMutation.mutate({
         id: selectedWorkOrder.id,
         updates: {
-          scheduledStart: rescheduleStart,
-          scheduledEnd: rescheduleEnd,
+          scheduledStart,
+          scheduledEnd,
         },
       });
+    }
+  };
+  
+  const handleLinkProject = (projectId: string | null) => {
+    if (selectedWorkOrder) {
+      updateWorkOrderMutation.mutate({
+        id: selectedWorkOrder.id,
+        updates: { projectId },
+      });
+      setProjectSearchOpen(false);
+      setProjectSearch("");
     }
   };
 
@@ -729,12 +788,82 @@ export default function CrmWorkOrders() {
                   </div>
                 )}
 
-                {selectedWorkOrder.project && (
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm text-slate-700">Linked Project</h4>
-                    <p className="text-slate-900">{selectedWorkOrder.project.title}</p>
-                  </div>
-                )}
+                {/* Project Linking Section */}
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Linked Project</h4>
+                  {selectedWorkOrder.project ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FolderOpen className="h-4 w-4 text-slate-500" />
+                        <Link 
+                          to={`/crm/projects/${selectedWorkOrder.projectId}`}
+                          className="text-[#711419] hover:underline font-medium"
+                        >
+                          {selectedWorkOrder.project.title}
+                        </Link>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleLinkProject(null)}
+                        className="text-slate-500 hover:text-red-600"
+                        data-testid="button-unlink-project"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <Popover open={projectSearchOpen} onOpenChange={setProjectSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start"
+                          data-testid="button-add-to-project"
+                        >
+                          <FolderOpen className="h-4 w-4 mr-2" />
+                          Add to Project
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0" align="start">
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            placeholder="Search projects..."
+                            value={projectSearch}
+                            onValueChange={setProjectSearch}
+                            data-testid="input-project-search"
+                          />
+                          <CommandList>
+                            {linkableProjectsLoading ? (
+                              <div className="p-4 text-center text-sm text-slate-500">
+                                Loading...
+                              </div>
+                            ) : linkableProjects.length === 0 ? (
+                              <CommandEmpty>No projects found for this customer.</CommandEmpty>
+                            ) : (
+                              <CommandGroup>
+                                {linkableProjects.map((project) => (
+                                  <CommandItem
+                                    key={project.id}
+                                    value={project.id}
+                                    onSelect={() => handleLinkProject(project.id)}
+                                    data-testid={`project-option-${project.id}`}
+                                  >
+                                    <FolderOpen className="h-4 w-4 mr-2 text-slate-500" />
+                                    <div>
+                                      <p className="font-medium">{project.title}</p>
+                                      <p className="text-xs text-slate-500">{project.projectType}</p>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
 
                 <Separator />
 
@@ -793,30 +922,53 @@ export default function CrmWorkOrders() {
 
                 <div className="space-y-3">
                   <h4 className="font-medium text-sm text-slate-700">Schedule</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">Start</Label>
-                      <Input
-                        type="datetime-local"
-                        value={rescheduleStart ? format(rescheduleStart, "yyyy-MM-dd'T'HH:mm") : ""}
-                        onChange={(e) => setRescheduleStart(e.target.value ? new Date(e.target.value) : null)}
-                        data-testid="input-reschedule-start"
-                      />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !rescheduleDate && "text-muted-foreground"
+                            )}
+                            data-testid="button-reschedule-date"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {rescheduleDate ? format(rescheduleDate, "MMM d, yyyy") : "Pick date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={rescheduleDate}
+                            onSelect={setRescheduleDate}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
-                    <div>
-                      <Label className="text-xs">End</Label>
-                      <Input
-                        type="datetime-local"
-                        value={rescheduleEnd ? format(rescheduleEnd, "yyyy-MM-dd'T'HH:mm") : ""}
-                        onChange={(e) => setRescheduleEnd(e.target.value ? new Date(e.target.value) : null)}
-                        data-testid="input-reschedule-end"
-                      />
+                    <div className="space-y-1">
+                      <Label className="text-xs">Time Slot</Label>
+                      <Select value={rescheduleTimeSlot} onValueChange={setRescheduleTimeSlot}>
+                        <SelectTrigger data-testid="select-reschedule-time-slot">
+                          <SelectValue placeholder="Select time" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {timeSlots.map((slot) => (
+                            <SelectItem key={slot.value} value={slot.value}>
+                              {slot.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   <Button
                     size="sm"
                     onClick={handleReschedule}
-                    disabled={updateWorkOrderMutation.isPending || !rescheduleStart || !rescheduleEnd}
+                    disabled={updateWorkOrderMutation.isPending || !rescheduleDate || !rescheduleTimeSlot}
                     data-testid="button-reschedule"
                   >
                     Reschedule
