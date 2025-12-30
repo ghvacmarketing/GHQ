@@ -869,7 +869,8 @@ interface DraggableScheduleCardProps {
   widthPercent: number;
   bgColor: string;
   onWorkOrderClick?: (id: string) => void;
-  onResize?: (workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => void;
+  onResizeLocal?: (workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => void;
+  onResizeEnd?: (workOrderId: string) => void;
   isDragging?: boolean;
 }
 
@@ -879,13 +880,15 @@ function DraggableScheduleCard({
   widthPercent, 
   bgColor, 
   onWorkOrderClick,
-  onResize,
+  onResizeLocal,
+  onResizeEnd,
   isDragging = false,
 }: DraggableScheduleCardProps) {
   const [isResizing, setIsResizing] = useState(false);
-  const [resizeEdge, setResizeEdge] = useState<'start' | 'end' | null>(null);
-  const [startX, setStartX] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const accumulatedDeltaRef = useRef(0);
+  const startXRef = useRef(0);
+  const edgeRef = useRef<'start' | 'end'>('end');
   
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `schedule-${workOrder.id}`,
@@ -897,27 +900,31 @@ function DraggableScheduleCard({
     e.stopPropagation();
     e.preventDefault();
     setIsResizing(true);
-    setResizeEdge(edge);
-    setStartX(e.clientX);
+    startXRef.current = e.clientX;
+    edgeRef.current = edge;
+    accumulatedDeltaRef.current = 0;
     
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!containerRef.current) return;
       const parentWidth = containerRef.current.parentElement?.offsetWidth || SCHEDULE_TIMELINE_WIDTH;
-      const deltaX = moveEvent.clientX - startX;
+      const deltaX = moveEvent.clientX - startXRef.current;
       const deltaPercent = (deltaX / parentWidth) * 100;
       const deltaMinutes = Math.round((deltaPercent / 100) * SCHEDULE_TOTAL_MINUTES / 15) * 15;
       
-      if (Math.abs(deltaMinutes) >= 15 && onResize) {
-        onResize(workOrder.id, edge, deltaMinutes);
-        setStartX(moveEvent.clientX);
+      if (Math.abs(deltaMinutes) >= 15 && onResizeLocal) {
+        onResizeLocal(workOrder.id, edgeRef.current, deltaMinutes);
+        accumulatedDeltaRef.current += deltaMinutes;
+        startXRef.current = moveEvent.clientX;
       }
     };
     
     const handleMouseUp = () => {
       setIsResizing(false);
-      setResizeEdge(null);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      if (accumulatedDeltaRef.current !== 0 && onResizeEnd) {
+        onResizeEnd(workOrder.id);
+      }
     };
     
     document.addEventListener('mousemove', handleMouseMove);
@@ -977,11 +984,12 @@ interface TechnicianScheduleBoardProps {
   workOrders: DispatchWorkOrder[];
   onWorkOrderClick?: (workOrderId: string) => void;
   selectedDate: Date;
-  onResize?: (workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => void;
+  onResizeLocal?: (workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => void;
+  onResizeEnd?: (workOrderId: string) => void;
   activeId?: string | null;
 }
 
-function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResize, activeId }: TechnicianScheduleBoardProps) {
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeLocal, onResizeEnd, activeId }: TechnicianScheduleBoardProps) {
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
     for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
@@ -1059,7 +1067,8 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                         widthPercent={widthPercent}
                         bgColor={bgColor}
                         onWorkOrderClick={onWorkOrderClick}
-                        onResize={onResize}
+                        onResizeLocal={onResizeLocal}
+                        onResizeEnd={onResizeEnd}
                         isDragging={activeId === `schedule-${wo.id}`}
                       />
                     );
@@ -1932,7 +1941,7 @@ export default function CrmDispatch() {
     });
   }, [localWorkOrders, selectedDate, updateWorkOrderMutation]);
 
-  const handleScheduleResize = useCallback((workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => {
+  const handleScheduleResizeLocal = useCallback((workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => {
     const wo = localWorkOrders.find(w => w.id === workOrderId);
     if (!wo || !wo.scheduledStart) return;
 
@@ -1962,12 +1971,17 @@ export default function CrmDispatch() {
     setLocalWorkOrders(prev => prev.map(w =>
       w.id === workOrderId ? { ...w, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any } : w
     ));
+  }, [localWorkOrders]);
+
+  const handleScheduleResizeEnd = useCallback((workOrderId: string) => {
+    const wo = localWorkOrders.find(w => w.id === workOrderId);
+    if (!wo || !wo.scheduledStart || !wo.scheduledEnd) return;
 
     updateWorkOrderMutation.mutate({
       workOrderId,
       updates: {
-        scheduledStart: scheduledStartISO,
-        scheduledEnd: scheduledEndISO,
+        scheduledStart: wo.scheduledStart as string,
+        scheduledEnd: wo.scheduledEnd as string,
       },
     });
   }, [localWorkOrders, updateWorkOrderMutation]);
@@ -2423,7 +2437,8 @@ export default function CrmDispatch() {
                 workOrders={localWorkOrders.filter(wo => wo.assignedTechId)}
                 onWorkOrderClick={handleWorkOrderClick}
                 selectedDate={selectedDate}
-                onResize={handleScheduleResize}
+                onResizeLocal={handleScheduleResizeLocal}
+                onResizeEnd={handleScheduleResizeEnd}
                 activeId={activeId}
               />
               
