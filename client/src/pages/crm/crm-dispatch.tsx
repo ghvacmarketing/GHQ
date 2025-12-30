@@ -154,7 +154,7 @@ function getInitials(name: string): string {
   return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
-const START_HOUR = 6;
+const START_HOUR = 8;
 const END_HOUR = 20;
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i + START_HOUR);
