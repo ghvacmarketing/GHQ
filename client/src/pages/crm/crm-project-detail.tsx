@@ -24,10 +24,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
-  Calendar,
+  Calendar as CalendarIcon,
   Clock,
   User,
   Phone,
@@ -573,7 +575,7 @@ export default function CrmProjectDetail() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <CalendarIcon className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">Created</span>
                   </div>
                   <p className="text-lg font-semibold">{formatDate(project.createdAt)}</p>
@@ -612,7 +614,7 @@ export default function CrmProjectDetail() {
                                 {wo.title || `WO #${wo.workOrderNumber}`}
                               </p>
                               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Calendar className="w-3 h-3" />
+                                <CalendarIcon className="w-3 h-3" />
                                 {wo.scheduledStart ? formatDateTime(wo.scheduledStart) : "Not scheduled"}
                               </div>
                             </div>
@@ -1091,25 +1093,95 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
               </SelectContent>
             </Select>
 
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-[140px]"
-                placeholder="Start date"
-                data-testid="input-start-date"
-              />
-              <span className="text-sm text-muted-foreground">to</span>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-[140px]"
-                placeholder="End date"
-                data-testid="input-end-date"
-              />
-            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2" data-testid="button-date-range">
+                  <CalendarIcon className="w-4 h-4" />
+                  {startDate && endDate 
+                    ? `${format(new Date(startDate), "MMM d")} - ${format(new Date(endDate), "MMM d")}`
+                    : startDate 
+                      ? `From ${format(new Date(startDate), "MMM d")}`
+                      : endDate 
+                        ? `Until ${format(new Date(endDate), "MMM d")}`
+                        : "Date Range"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-4" align="start">
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const today = new Date();
+                        setStartDate(format(today, "yyyy-MM-dd"));
+                        setEndDate(format(today, "yyyy-MM-dd"));
+                      }}
+                    >
+                      Today
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const today = new Date();
+                        const weekAgo = new Date(today);
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        setStartDate(format(weekAgo, "yyyy-MM-dd"));
+                        setEndDate(format(today, "yyyy-MM-dd"));
+                      }}
+                    >
+                      Last 7 Days
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const today = new Date();
+                        const monthAgo = new Date(today);
+                        monthAgo.setDate(monthAgo.getDate() - 30);
+                        setStartDate(format(monthAgo, "yyyy-MM-dd"));
+                        setEndDate(format(today, "yyyy-MM-dd"));
+                      }}
+                    >
+                      Last 30 Days
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium mb-2">Start Date</p>
+                      <CalendarPicker
+                        mode="single"
+                        selected={startDate ? new Date(startDate) : undefined}
+                        onSelect={(date) => setStartDate(date ? format(date, "yyyy-MM-dd") : "")}
+                        initialFocus
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium mb-2">End Date</p>
+                      <CalendarPicker
+                        mode="single"
+                        selected={endDate ? new Date(endDate) : undefined}
+                        onSelect={(date) => setEndDate(date ? format(date, "yyyy-MM-dd") : "")}
+                      />
+                    </div>
+                  </div>
+                  {(startDate || endDate) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        setStartDate("");
+                        setEndDate("");
+                      }}
+                    >
+                      Clear Dates
+                    </Button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
 
             <Button
               variant={pinnedOnly ? "default" : "outline"}
@@ -1166,7 +1238,7 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
               {sortedDates.map(date => (
                 <div key={date}>
                   <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
+                    <CalendarIcon className="w-4 h-4" />
                     {date === "Unknown" ? "Unknown Date" : format(new Date(date), "EEEE, MMMM d, yyyy")}
                   </h4>
                   <div className="space-y-2 ml-2 border-l-2 border-slate-200 pl-4">
@@ -1229,12 +1301,12 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
             </div>
             <div className="space-y-2">
               <Label>Link to Work Order (optional)</Label>
-              <Select value={newActivityWorkOrderId} onValueChange={setNewActivityWorkOrderId}>
+              <Select value={newActivityWorkOrderId || "none"} onValueChange={(v) => setNewActivityWorkOrderId(v === "none" ? "" : v)}>
                 <SelectTrigger data-testid="select-link-work-order">
                   <SelectValue placeholder="Select a work order" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {workOrders.map(wo => (
                     <SelectItem key={wo.id} value={wo.id}>
                       WO #{wo.workOrderNumber} - {wo.title || "Untitled"}
