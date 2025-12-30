@@ -6249,15 +6249,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workOrderCount = Number(workOrdersResult?.count || 0);
       }
 
-      // Count quotes using raw SQL (database uses account_id, not customerId)
+      // Count quotes using raw SQL (database uses account_id column)
       const quotesResult = await db.execute(
         sql`SELECT count(*) as count FROM crm_quotes WHERE account_id = ${customerId}`
       );
       const quoteCount = Number(quotesResult.rows?.[0]?.count || 0);
 
-      // Count invoices using raw SQL (database uses account_id, not customer_id)  
+      // Count invoices using raw SQL (database uses customer_id column)  
       const invoicesResult = await db.execute(
-        sql`SELECT count(*) as count FROM crm_invoices WHERE account_id = ${customerId}`
+        sql`SELECT count(*) as count FROM crm_invoices WHERE customer_id = ${customerId}`
       );
       const invoiceCount = Number(invoicesResult.rows?.[0]?.count || 0);
 
