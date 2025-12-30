@@ -140,7 +140,7 @@ type CrawlspaceCartItem = {
   eliteData?: ElitePackageData;
 };
 
-type CartItem = CartPackage | CustomBuildCart | CrawlspaceCartItem;
+type CartItem = CartPackage | CustomBuildCart | CrawlspaceCartItem | CrawlspaceServicesCartItem;
 
 const packages: PricebookPackage[] = packagesData as PricebookPackage[];
 const components: PricebookComponent[] = componentsData as PricebookComponent[];
@@ -153,6 +153,7 @@ const UNIT_TYPE_INFO: Record<string, { name: string; description: string; icon: 
   GP: { name: "GP", description: "All-in-one gas/electric package unit", icon: Package },
   "Mini-Split": { name: "Mini-Split", description: "Ductless single-zone heating & cooling", icon: Zap },
   "Ducting": { name: "Ducting", description: "Complete duct system replacement", icon: Package },
+  "Crawlspace Services": { name: "Crawlspace Services", description: "Joist cleaning, mold treatment, excavation & more", icon: Wrench },
 };
 
 const TIER_INFO: Record<string, { description: string }> = {
@@ -348,6 +349,64 @@ const CRAWLSPACE_TIERS: CrawlspaceTier[] = [
   { id: "crawl-20mil", name: "Ultimate", milThickness: 20, rollPrice: 559.99, description: "20 Mil Reinforced Liner + Aprilaire E070 Dehumidifier" }
 ];
 
+// Crawlspace Services Pricing (add-on services based on square footage)
+const CRAWLSPACE_SERVICES = {
+  SQFT_OPTIONS: [250, 500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000],
+  SERVICES: [
+    {
+      id: "joist-cleaning",
+      name: "Joist Cleaning (HEPA Vacuum)",
+      ratePerSqft: 3.25,
+      minSqft: 250,
+      description: "Deep clean floor joists using HEPA vacuum"
+    },
+    {
+      id: "mold-treatment",
+      name: "Mold Treatment",
+      ratePerSqft: 1.35,
+      minSqft: 250,
+      description: "Professional mold treatment and prevention"
+    },
+    {
+      id: "excavation",
+      name: "Excavation",
+      ratePerSqft: 2.50,
+      minSqft: 250,
+      description: "Crawlspace excavation and grading"
+    }
+  ],
+  DOOR_OPTIONS: [
+    {
+      id: "door-replacement",
+      name: "Replacement Door Installation",
+      price: 1000,
+      description: "Replaces existing crawl space door",
+      features: ["Custom built", "10-year warranty included", "Option to rekey to match home locks"]
+    },
+    {
+      id: "door-new",
+      name: "New Door Installation (No Existing Door)",
+      price: 2500,
+      description: "Includes cutting opening in home exterior",
+      features: ["Door installation", "Weatherproofing", "Custom built", "10-year warranty included", "Option to rekey to match home locks"]
+    }
+  ]
+};
+
+type CrawlspaceServiceSelection = {
+  sqft: number;
+  services: string[]; // service ids
+  doorOption: string | null; // door option id
+};
+
+type CrawlspaceServicesCartItem = {
+  id: string;
+  isCrawlspaceServices: true;
+  selections: CrawlspaceServiceSelection;
+  totalPrice: number;
+  quantity: number;
+};
+
 // Crawlspace Elite Bundles (all required when Elite is ON)
 // Formula: Crawlspace Elite Add-On Total = P + $3,090 (where P = tier price)
 const CRAWLSPACE_ELITE_BUNDLES: EliteBundle[] = [
@@ -465,13 +524,17 @@ function isCrawlspaceItem(item: CartItem): item is CrawlspaceCartItem {
   return 'isCrawlspace' in item && item.isCrawlspace === true;
 }
 
+function isCrawlspaceServicesItem(item: CartItem): item is CrawlspaceServicesCartItem {
+  return 'isCrawlspaceServices' in item && item.isCrawlspaceServices === true;
+}
+
 function isCustomBuild(item: CartItem): item is CustomBuildCart {
   return 'isCustomBuild' in item && item.isCustomBuild === true;
 }
 
 type HvacPackageCartItem = PricebookPackage & { id: string; extractedTonnage: string; quantity: number; isCustomBuild?: false; eliteData?: ElitePackageData };
 function isHvacPackage(item: CartItem): item is HvacPackageCartItem {
-  return !isCrawlspaceItem(item) && !isCustomBuild(item);
+  return !isCrawlspaceItem(item) && !isCustomBuild(item) && !isCrawlspaceServicesItem(item);
 }
 
 const formatPrice = (price: number) => '$' + price.toLocaleString();
@@ -715,6 +778,11 @@ export default function ProposalBuilder() {
   const [selectedCrawlspaceTier, setSelectedCrawlspaceTier] = useState<CrawlspaceTier | null>(null);
   const [crawlspaceEliteEnabled, setCrawlspaceEliteEnabled] = useState(false);
   const [crawlspaceSqft, setCrawlspaceSqft] = useState<string>("1000");
+  
+  // Crawlspace Services state
+  const [crawlspaceServicesSqft, setCrawlspaceServicesSqft] = useState<string>("1000");
+  const [selectedCrawlspaceServices, setSelectedCrawlspaceServices] = useState<string[]>([]);
+  const [selectedDoorOption, setSelectedDoorOption] = useState<string | null>(null);
   
   // Debounce customer search
   useEffect(() => {
@@ -1316,6 +1384,10 @@ export default function ProposalBuilder() {
         // For Elite: use originalTotal (pre-discount), otherwise base tier price
         const price = (item.eliteData ? item.eliteData.originalTotal : item.pricingBreakdown.totalPrice) * item.quantity;
         return { low: acc.low + price, high: acc.high + price };
+      } else if (isCrawlspaceServicesItem(item)) {
+        // Crawlspace services: use totalPrice directly
+        const price = item.totalPrice * item.quantity;
+        return { low: acc.low + price, high: acc.high + price };
       } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
         return { low: acc.low + estimate.low * item.quantity, high: acc.high + estimate.high * item.quantity };
@@ -1356,6 +1428,10 @@ export default function ProposalBuilder() {
         // Crawlspace: derive monthly from price / 67
         const basePrice = item.eliteData ? item.eliteData.finalTotal : item.pricingBreakdown.totalPrice;
         const monthly = Math.round(basePrice / 67) * item.quantity;
+        return { low: acc.low + monthly, high: acc.high + monthly };
+      } else if (isCrawlspaceServicesItem(item)) {
+        // Crawlspace services: derive monthly from price / 67
+        const monthly = Math.round(item.totalPrice / 67) * item.quantity;
         return { low: acc.low + monthly, high: acc.high + monthly };
       } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
@@ -1529,6 +1605,85 @@ export default function ProposalBuilder() {
     setCrawlspaceSqft("1000");
   };
 
+  const calculateCrawlspaceServicesTotal = (sqft: number, serviceIds: string[], doorOptionId: string | null): number => {
+    let total = 0;
+    
+    for (const serviceId of serviceIds) {
+      const service = CRAWLSPACE_SERVICES.SERVICES.find(s => s.id === serviceId);
+      if (service) {
+        const effectiveSqft = Math.max(sqft, service.minSqft);
+        total += effectiveSqft * service.ratePerSqft;
+      }
+    }
+    
+    if (doorOptionId) {
+      const doorOption = CRAWLSPACE_SERVICES.DOOR_OPTIONS.find(d => d.id === doorOptionId);
+      if (doorOption) {
+        total += doorOption.price;
+      }
+    }
+    
+    return Math.round(total * 100) / 100;
+  };
+
+  const addCrawlspaceServicesToCart = () => {
+    const sqft = parseInt(crawlspaceServicesSqft) || 1000;
+    
+    if (selectedCrawlspaceServices.length === 0 && !selectedDoorOption) {
+      toast({
+        title: "No services selected",
+        description: "Please select at least one service or door option.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const totalPrice = calculateCrawlspaceServicesTotal(sqft, selectedCrawlspaceServices, selectedDoorOption);
+    const id = `crawlspace-services-${sqft}-${selectedCrawlspaceServices.join('-')}-${selectedDoorOption || 'none'}`;
+    
+    const servicesItem: CrawlspaceServicesCartItem = {
+      id,
+      isCrawlspaceServices: true,
+      selections: {
+        sqft,
+        services: selectedCrawlspaceServices,
+        doorOption: selectedDoorOption,
+      },
+      totalPrice,
+      quantity: 1,
+    };
+    
+    setCart(prev => {
+      const existing = prev.find(item => item.id === id);
+      if (existing) {
+        return prev.map(item =>
+          item.id === id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...prev, servicesItem];
+    });
+    
+    const serviceNames = selectedCrawlspaceServices.map(id => 
+      CRAWLSPACE_SERVICES.SERVICES.find(s => s.id === id)?.name || id
+    ).join(', ');
+    const doorName = selectedDoorOption 
+      ? CRAWLSPACE_SERVICES.DOOR_OPTIONS.find(d => d.id === selectedDoorOption)?.name 
+      : null;
+    
+    toast({
+      title: "Crawlspace Services Added",
+      description: `${serviceNames}${doorName ? `, ${doorName}` : ''} for ${sqft} sqft added.`,
+    });
+    
+    setSelectedCrawlspaceServices([]);
+    setSelectedDoorOption(null);
+    setCrawlspaceServicesSqft("1000");
+    setCustomEquipmentType(null);
+    setCustomBuildStep(1);
+  };
+
   const addToCartWithElite = (pkg: PricebookPackage, index: number) => {
     const extractedTonnage = selectedTonnage || getPackageTonnageDisplay(pkg);
     const airflowSelection = selectedAirflowByIndex[index];
@@ -1600,7 +1755,13 @@ export default function ProposalBuilder() {
   };
 
   const handleCustomBuildBack = () => {
-    if (customTonnage) {
+    if (customEquipmentType === "Crawlspace Services") {
+      setCustomEquipmentType(null);
+      setCustomBuildStep(1);
+      setSelectedCrawlspaceServices([]);
+      setSelectedDoorOption(null);
+      setCrawlspaceServicesSqft("1000");
+    } else if (customTonnage) {
       setCustomTonnage(null);
       setSelectedOutdoorUnit(null);
       setSelectedCoil(null);
@@ -3569,14 +3730,19 @@ export default function ProposalBuilder() {
                 <h2 className="text-xl font-semibold mb-2">Select Equipment Type</h2>
                 <p className="text-muted-foreground mb-4">Choose the type of system you want to build</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {["SGA", "SHP", "PHP", "GP", "Mini-Split", "Ducting"].map(type => {
+                  {["SGA", "SHP", "PHP", "GP", "Mini-Split", "Ducting", "Crawlspace Services"].map(type => {
                     const typeInfo = UNIT_TYPE_INFO[type];
                     const TypeIcon = typeInfo?.icon || Package;
                     return (
                       <Card
                         key={type}
                         className="cursor-pointer hover:border-primary transition-colors"
-                        onClick={() => setCustomEquipmentType(type)}
+                        onClick={() => {
+                          setCustomEquipmentType(type);
+                          if (type === "Crawlspace Services") {
+                            setCustomBuildStep(3);
+                          }
+                        }}
                         data-testid={`custom-equipment-type-${type.toLowerCase()}`}
                       >
                         <CardHeader className="pb-2">
@@ -3637,8 +3803,209 @@ export default function ProposalBuilder() {
 
             {customBuildStep === 3 && (
               <div>
-                {/* Mini-Split and Ducting compact layout */}
-                {(customEquipmentType === "Mini-Split" || customEquipmentType === "Ducting") ? (
+                {/* Crawlspace Services layout */}
+                {customEquipmentType === "Crawlspace Services" ? (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-2">Crawlspace Services</h2>
+                    <p className="text-muted-foreground mb-4">Select services and square footage for pricing</p>
+                    
+                    {/* Square Footage Selection */}
+                    <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-950/50 rounded-lg border border-orange-200 dark:border-orange-800">
+                      <Label htmlFor="crawlspace-services-sqft" className="text-sm font-medium mb-2 block">
+                        Crawlspace Square Footage
+                      </Label>
+                      <div className="flex items-center gap-3">
+                        <Select value={crawlspaceServicesSqft} onValueChange={setCrawlspaceServicesSqft}>
+                          <SelectTrigger className="w-40 min-h-[44px]" data-testid="select-crawlspace-services-sqft">
+                            <SelectValue placeholder="Select size" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CRAWLSPACE_SERVICES.SQFT_OPTIONS.map(sqft => (
+                              <SelectItem key={sqft} value={sqft.toString()}>
+                                {sqft.toLocaleString()} sq ft
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span className="text-xs text-muted-foreground">
+                          Minimum: 250 sq ft
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Services Selection */}
+                    <div className="mb-6">
+                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                        <Wrench className="h-4 w-4" />
+                        Select Services
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {CRAWLSPACE_SERVICES.SERVICES.map(service => {
+                          const sqft = parseInt(crawlspaceServicesSqft) || 1000;
+                          const effectiveSqft = Math.max(sqft, service.minSqft);
+                          const price = effectiveSqft * service.ratePerSqft;
+                          const isSelected = selectedCrawlspaceServices.includes(service.id);
+                          
+                          return (
+                            <Card 
+                              key={service.id}
+                              className={`cursor-pointer transition-all hover:shadow-md ${
+                                isSelected ? 'ring-2 ring-orange-500 border-orange-500 bg-orange-50 dark:bg-orange-950/50' : ''
+                              }`}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedCrawlspaceServices(prev => prev.filter(id => id !== service.id));
+                                } else {
+                                  setSelectedCrawlspaceServices(prev => [...prev, service.id]);
+                                }
+                              }}
+                              data-testid={`service-${service.id}`}
+                            >
+                              <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                  <Checkbox 
+                                    checked={isSelected}
+                                    className="mr-2"
+                                    onClick={e => e.stopPropagation()}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedCrawlspaceServices(prev => [...prev, service.id]);
+                                      } else {
+                                        setSelectedCrawlspaceServices(prev => prev.filter(id => id !== service.id));
+                                      }
+                                    }}
+                                  />
+                                  <CardTitle className="text-base flex-1">{service.name}</CardTitle>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="pt-0">
+                                <p className="text-xs text-muted-foreground mb-2">{service.description}</p>
+                                <div className="text-xs text-muted-foreground mb-2">
+                                  Rate: ${service.ratePerSqft.toFixed(2)}/sq ft
+                                </div>
+                                <div className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                                  {formatPrice(price)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  for {effectiveSqft.toLocaleString()} sq ft
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Door Options */}
+                    <div className="mb-6">
+                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Door Installation (Optional)
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {CRAWLSPACE_SERVICES.DOOR_OPTIONS.map(option => {
+                          const isSelected = selectedDoorOption === option.id;
+                          
+                          return (
+                            <Card 
+                              key={option.id}
+                              className={`cursor-pointer transition-all hover:shadow-md ${
+                                isSelected ? 'ring-2 ring-orange-500 border-orange-500 bg-orange-50 dark:bg-orange-950/50' : ''
+                              }`}
+                              onClick={() => {
+                                setSelectedDoorOption(isSelected ? null : option.id);
+                              }}
+                              data-testid={`door-${option.id}`}
+                            >
+                              <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                  <RadioGroupItem
+                                    value={option.id}
+                                    checked={isSelected}
+                                    className="mr-2"
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                  <CardTitle className="text-base flex-1">{option.name}</CardTitle>
+                                  <Badge className="bg-orange-500 text-white">
+                                    {formatPrice(option.price)}
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="pt-0">
+                                <p className="text-xs text-muted-foreground mb-2">{option.description}</p>
+                                <ul className="text-xs space-y-1">
+                                  {option.features.map((feature, i) => (
+                                    <li key={i} className="flex items-center gap-2">
+                                      <Check className="h-3 w-3 text-green-500" />
+                                      {feature}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Pricing Summary and Add Button */}
+                    {(selectedCrawlspaceServices.length > 0 || selectedDoorOption) && (
+                      <div className="mt-6 p-4 border-2 border-orange-200 dark:border-orange-800 rounded-xl bg-gradient-to-r from-orange-50 to-white dark:from-orange-950 dark:to-gray-900">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                          <div>
+                            <h3 className="text-lg font-semibold flex items-center gap-2">
+                              <Wrench className="h-5 w-5 text-orange-500" />
+                              Selected Services Summary
+                            </h3>
+                            <div className="text-sm text-muted-foreground mt-2 space-y-1">
+                              {selectedCrawlspaceServices.map(serviceId => {
+                                const service = CRAWLSPACE_SERVICES.SERVICES.find(s => s.id === serviceId);
+                                if (!service) return null;
+                                const sqft = parseInt(crawlspaceServicesSqft) || 1000;
+                                const effectiveSqft = Math.max(sqft, service.minSqft);
+                                const price = effectiveSqft * service.ratePerSqft;
+                                return (
+                                  <div key={serviceId} className="flex justify-between gap-4">
+                                    <span>{service.name} ({effectiveSqft.toLocaleString()} sq ft)</span>
+                                    <span className="font-medium">{formatPrice(price)}</span>
+                                  </div>
+                                );
+                              })}
+                              {selectedDoorOption && (() => {
+                                const door = CRAWLSPACE_SERVICES.DOOR_OPTIONS.find(d => d.id === selectedDoorOption);
+                                return door ? (
+                                  <div className="flex justify-between gap-4">
+                                    <span>{door.name}</span>
+                                    <span className="font-medium">{formatPrice(door.price)}</span>
+                                  </div>
+                                ) : null;
+                              })()}
+                            </div>
+                            <div className="mt-3 pt-3 border-t flex justify-between items-center">
+                              <span className="font-semibold">Total:</span>
+                              <span className="text-xl font-bold text-orange-600 dark:text-orange-400">
+                                {formatPrice(calculateCrawlspaceServicesTotal(
+                                  parseInt(crawlspaceServicesSqft) || 1000,
+                                  selectedCrawlspaceServices,
+                                  selectedDoorOption
+                                ))}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <Button
+                            className="min-h-[44px] bg-orange-600 hover:bg-orange-700"
+                            onClick={addCrawlspaceServicesToCart}
+                            data-testid="button-add-crawlspace-services"
+                          >
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            Add to Proposal
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (customEquipmentType === "Mini-Split" || customEquipmentType === "Ducting") ? (
                   <div>
                     <h2 className="text-xl font-semibold mb-2">
                       {customEquipmentType === "Mini-Split" ? "Select Mini-Split System" : "Select Duct System Size"}
@@ -4450,6 +4817,60 @@ export default function ProposalBuilder() {
                               <Badge variant="outline" className="text-xs border-green-300 text-green-700 dark:border-green-600 dark:text-green-300">Estimated Price</Badge>
                             </div>
                             <p className="text-2xl font-bold text-green-700 dark:text-green-300">{formatPriceRange(priceLow, priceHigh)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  } else if (isCrawlspaceServicesItem(item)) {
+                    const itemPrice = item.totalPrice * item.quantity;
+                    return (
+                      <div key={item.id} className="rounded-xl border-2 border-orange-200 dark:border-orange-800 bg-gradient-to-br from-orange-50 to-white dark:from-orange-950 dark:to-gray-900 overflow-hidden shadow-sm">
+                        <div className="bg-orange-500 text-white px-4 py-2 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Wrench className="h-4 w-4" />
+                            <span className="font-semibold">Crawlspace Services</span>
+                            <span className="opacity-70">•</span>
+                            <span className="opacity-90">{item.selections.sqft.toLocaleString()} sq ft</span>
+                          </div>
+                          {item.quantity > 1 && <Badge className="bg-white/20 text-white">x{item.quantity}</Badge>}
+                        </div>
+                        <div className="p-4">
+                          <div className="space-y-2 mb-4">
+                            {item.selections.services.map(serviceId => {
+                              const service = CRAWLSPACE_SERVICES.SERVICES.find(s => s.id === serviceId);
+                              if (!service) return null;
+                              const effectiveSqft = Math.max(item.selections.sqft, service.minSqft);
+                              const price = effectiveSqft * service.ratePerSqft;
+                              return (
+                                <div key={serviceId} className="flex justify-between items-center text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <Check className="h-4 w-4 text-orange-500" />
+                                    <span>{service.name}</span>
+                                    <span className="text-xs text-muted-foreground">({effectiveSqft.toLocaleString()} sq ft)</span>
+                                  </div>
+                                  <span className="font-medium">{formatPrice(price)}</span>
+                                </div>
+                              );
+                            })}
+                            {item.selections.doorOption && (() => {
+                              const door = CRAWLSPACE_SERVICES.DOOR_OPTIONS.find(d => d.id === item.selections.doorOption);
+                              if (!door) return null;
+                              return (
+                                <div className="flex justify-between items-center text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <Check className="h-4 w-4 text-orange-500" />
+                                    <span>{door.name}</span>
+                                  </div>
+                                  <span className="font-medium">{formatPrice(door.price)}</span>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                          <div className="bg-orange-100 dark:bg-orange-900/50 rounded-lg p-3 flex items-center justify-between">
+                            <div className="text-sm text-muted-foreground">
+                              {formatPrice(Math.round(itemPrice / 67))}/mo financing
+                            </div>
+                            <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{formatPrice(itemPrice)}</p>
                           </div>
                         </div>
                       </div>
