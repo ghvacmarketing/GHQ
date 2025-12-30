@@ -954,7 +954,7 @@ export default function CrmWorkOrders() {
 
                 {/* Site Section with Selector */}
                 <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Site</h4>
+                  <h4 className="font-medium text-sm text-slate-700">Site <span className="text-red-500">*</span></h4>
                   {woProperties.length > 0 ? (
                     <Select 
                       value={selectedWorkOrder.propertyId || ""} 
@@ -976,7 +976,24 @@ export default function CrmWorkOrders() {
                       </SelectContent>
                     </Select>
                   ) : (
-                    <p className="text-sm text-slate-500">No sites for this customer</p>
+                    <div className="space-y-2">
+                      <p className="text-sm text-slate-500">No sites for this customer</p>
+                      {selectedWorkOrder.customerId && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSheetOpen(false);
+                            navigate(`/crm/customers/${selectedWorkOrder.customerId}`);
+                          }}
+                          className="w-full"
+                          data-testid="button-add-site"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Site
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -1286,22 +1303,41 @@ export default function CrmWorkOrders() {
                 </Popover>
               </div>
 
-              {selectedCustomer && properties.length > 0 && (
+              {selectedCustomer && (
                 <div className="space-y-2">
-                  <Label>Site</Label>
-                  <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
-                    <SelectTrigger data-testid="select-site">
-                      <SelectValue placeholder="Select site (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">No site selected</SelectItem>
-                      {properties.map((prop) => (
-                        <SelectItem key={prop.id} value={prop.id}>
-                          {prop.address1}, {prop.city}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Site <span className="text-red-500">*</span></Label>
+                  {properties.length > 0 ? (
+                    <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                      <SelectTrigger data-testid="select-site">
+                        <SelectValue placeholder="Select a site" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {properties.map((prop) => (
+                          <SelectItem key={prop.id} value={prop.id}>
+                            {prop.address1}, {prop.city}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm text-slate-500">No sites for this customer</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setCreateDialogOpen(false);
+                          navigate(`/crm/customers/${selectedCustomer.id}`);
+                        }}
+                        className="w-full"
+                        data-testid="button-add-site-create"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Site First
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 
