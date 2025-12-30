@@ -1004,6 +1004,10 @@ export default function CrmWorkOrders() {
                         Remove
                       </Button>
                     </div>
+                  ) : linkableProjectsLoading ? (
+                    <p className="text-sm text-slate-500">Loading...</p>
+                  ) : linkableProjects.length === 0 ? (
+                    <p className="text-sm text-slate-500">No projects for this customer</p>
                   ) : (
                     <Popover open={projectSearchOpen} onOpenChange={setProjectSearchOpen}>
                       <PopoverTrigger asChild>
@@ -1026,30 +1030,22 @@ export default function CrmWorkOrders() {
                             data-testid="input-project-search"
                           />
                           <CommandList>
-                            {linkableProjectsLoading ? (
-                              <div className="p-4 text-center text-sm text-slate-500">
-                                Loading...
-                              </div>
-                            ) : linkableProjects.length === 0 ? (
-                              <CommandEmpty>No projects found for this customer.</CommandEmpty>
-                            ) : (
-                              <CommandGroup>
-                                {linkableProjects.map((project) => (
-                                  <CommandItem
-                                    key={project.id}
-                                    value={project.id}
-                                    onSelect={() => handleLinkProject(project.id)}
-                                    data-testid={`project-option-${project.id}`}
-                                  >
-                                    <FolderOpen className="h-4 w-4 mr-2 text-slate-500" />
-                                    <div>
-                                      <p className="font-medium">{project.title}</p>
-                                      <p className="text-xs text-slate-500">{project.projectType}</p>
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            )}
+                            <CommandGroup>
+                              {linkableProjects.map((project) => (
+                                <CommandItem
+                                  key={project.id}
+                                  value={project.id}
+                                  onSelect={() => handleLinkProject(project.id)}
+                                  data-testid={`project-option-${project.id}`}
+                                >
+                                  <FolderOpen className="h-4 w-4 mr-2 text-slate-500" />
+                                  <div>
+                                    <p className="font-medium">{project.title}</p>
+                                    <p className="text-xs text-slate-500">{project.projectType}</p>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
                           </CommandList>
                         </Command>
                       </PopoverContent>
