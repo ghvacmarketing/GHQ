@@ -9098,70 +9098,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { type, startDate, endDate, pinnedOnly } = req.query;
       const projectId = req.params.id;
 
-      const conditions: any[] = [eq(projectActivities.projectId, projectId)];
+      // Build SQL query directly to avoid Drizzle ORM issues
+      let sqlQuery = `
+        SELECT 
+          pa.id, pa.project_id as "projectId", pa.work_order_id as "workOrderId",
+          pa.user_id as "userId", pa.activity_type as "activityType", 
+          pa.title, pa.description, pa.metadata, pa.is_pinned as "isPinned",
+          pa.created_at as "createdAt",
+          u.display_name as "userName",
+          wo.work_order_number as "workOrderNumber", wo.title as "workOrderTitle"
+        FROM project_activities pa
+        LEFT JOIN crm_users u ON pa.user_id = u.id
+        LEFT JOIN crm_work_orders wo ON pa.work_order_id = wo.id
+        WHERE pa.project_id = $1
+      `;
+      const params: any[] = [projectId];
+      let paramIndex = 2;
 
       if (type && type !== "all") {
-        conditions.push(eq(projectActivities.activityType, type as string));
+        sqlQuery += ` AND pa.activity_type = $${paramIndex}`;
+        params.push(type);
+        paramIndex++;
       }
 
       if (pinnedOnly === "true") {
-        conditions.push(eq(projectActivities.isPinned, true));
+        sqlQuery += ` AND pa.is_pinned = true`;
       }
 
       if (startDate) {
-        conditions.push(sql`${projectActivities.createdAt} >= ${new Date(startDate as string)}`);
+        sqlQuery += ` AND pa.created_at >= $${paramIndex}`;
+        params.push(new Date(startDate as string));
+        paramIndex++;
       }
 
       if (endDate) {
         const endDateObj = new Date(endDate as string);
         endDateObj.setHours(23, 59, 59, 999);
-        conditions.push(sql`${projectActivities.createdAt} <= ${endDateObj}`);
+        sqlQuery += ` AND pa.created_at <= $${paramIndex}`;
+        params.push(endDateObj);
+        paramIndex++;
       }
 
-      const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
-      // Use simple select() to avoid column reference issues
-      const activities = await db
-        .select()
-        .from(projectActivities)
-        .where(whereClause)
-        .orderBy(desc(projectActivities.createdAt));
+      sqlQuery += ` ORDER BY pa.created_at DESC`;
 
-      // Enrich with user and work order info
-      const userIds = [...new Set(activities.map(a => a.userId).filter(Boolean))] as string[];
-      const workOrderIds = [...new Set(activities.map(a => a.workOrderId).filter(Boolean))] as string[];
+      const result = await db.execute(sql.raw(sqlQuery.replace(/\$(\d+)/g, (_, n) => {
+        const val = params[parseInt(n) - 1];
+        if (val === null || val === undefined) return 'NULL';
+        if (val instanceof Date) return `'${val.toISOString()}'`;
+        if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`;
+        return String(val);
+      })));
 
-      const usersMap = new Map<string, { id: string; displayName: string | null }>();
-      if (userIds.length > 0) {
-        const usersList = await db
-          .select({ id: crmUsers.id, displayName: crmUsers.displayName })
-          .from(crmUsers)
-          .where(inArray(crmUsers.id, userIds));
-        usersList.forEach(u => usersMap.set(u.id, u));
-      }
-
-      const workOrdersMap = new Map<string, { id: string; workOrderNumber: number | null; title: string | null }>();
-      if (workOrderIds.length > 0) {
-        const woList = await db
-          .select({ id: crmWorkOrders.id, workOrderNumber: crmWorkOrders.workOrderNumber, title: crmWorkOrders.title })
-          .from(crmWorkOrders)
-          .where(inArray(crmWorkOrders.id, workOrderIds));
-        woList.forEach(wo => workOrdersMap.set(wo.id, wo));
-      }
-
-      const enrichedActivities = activities.map(activity => ({
-        ...activity,
-        userName: activity.userId ? usersMap.get(activity.userId)?.displayName || "Unknown User" : null,
-        workOrder: activity.workOrderId ? workOrdersMap.get(activity.workOrderId) : null,
+      const activities = (result.rows || []).map((row: any) => ({
+        id: row.id,
+        projectId: row.projectId,
+        workOrderId: row.workOrderId,
+        userId: row.userId,
+        activityType: row.activityType,
+        title: row.title,
+        description: row.description,
+        metadata: row.metadata,
+        isPinned: row.isPinned,
+        createdAt: row.createdAt,
+        userName: row.userName || null,
+        workOrder: row.workOrderId ? {
+          id: row.workOrderId,
+          workOrderNumber: row.workOrderNumber,
+          title: row.workOrderTitle,
+        } : null,
       }));
 
       // DEBUG: Log fetched activities
       console.log(`[TIMELINE DEBUG] GET activities for project ${projectId}:`, {
-        count: enrichedActivities.length,
-        ids: enrichedActivities.slice(0, 10).map(a => ({ id: a.id, type: a.activityType, title: a.title })),
+        count: activities.length,
+        ids: activities.slice(0, 10).map((a: any) => ({ id: a.id, type: a.activityType, title: a.title })),
         filters: { type, startDate, endDate, pinnedOnly },
       });
 
-      return res.json(enrichedActivities);
+      return res.json(activities);
     } catch (error) {
       console.error("Error fetching project activities:", error);
       return res.status(500).json({ message: "Failed to fetch project activities" });

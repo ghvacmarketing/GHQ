@@ -1,0 +1,64 @@
+Perfect — that screenshot tells us exactly what’s wrong.
+
+What your logs prove
+
+✅ Photo activity IS being created with the correct projectId and activityType: 'photo'.
+
+❌ Immediately after, the app tries to GET the timeline from
+/api/crm/projects/<projectId>/activities
+
+That request returns 500 (Internal Server Error), and the frontend ends up with {count: 0, ids: []}.
+
+So this is not a frontend state/refresh issue anymore. The timeline can’t show photos because the timeline fetch endpoint is crashing.
+
+What to tell Replit (copy/paste)
+
+We found the failure point. Photo activity creation works, but the timeline fetch endpoint is crashing.
+
+Evidence:
+
+Frontend logs show Activity created with correct projectId and activityType: 'photo'.
+
+Then GET /api/crm/projects/<projectId>/activities returns 500 Internal Server Error.
+
+Frontend then receives {count: 0, ids: []} because the fetch failed.
+
+Fix required:
+
+Open server logs for the failing request to:
+GET /api/crm/projects/:projectId/activities
+and paste the stack trace. The fix is in this endpoint.
+
+Update the endpoint so it returns 200 with activities and does not crash when activities include photo type.
+
+Likely cause (please check in code):
+
+The endpoint is doing something that breaks for photo activities, such as:
+
+assuming message/noteText exists and calling .trim() on null
+
+trying to JSON.parse() a null/undefined field
+
+an INNER JOIN to attachments/photos that returns null and then code crashes
+
+mapping/serialization code that doesn’t handle photo payload shape
+
+a DB query error (wrong column name, bad join, wrong schema)
+
+Required behavior:
+
+The timeline fetch must return activities even if a photo activity has 0 attachments yet (show placeholder like “Photos uploading…” rather than crashing).
+
+Use a safe join / null-safe mapping for attachments.
+
+If activityType is photo, it should return an attachments array (can be empty).
+
+Acceptance test:
+
+Add Photo activity → timeline GET must return 200
+
+Timeline response must include the new activity id
+
+Timeline UI shows a card immediately
+
+Refresh page → it persists and still shows
