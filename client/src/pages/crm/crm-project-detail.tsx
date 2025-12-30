@@ -1361,11 +1361,18 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
   };
 
   const groupedByDay = activities.reduce((acc, activity) => {
-    const date = activity.createdAt ? format(new Date(activity.createdAt), "yyyy-MM-dd") : "Unknown";
-    if (!acc[date]) acc[date] = [];
-    acc[date].push(activity);
+    if (!activity.createdAt) {
+      if (!acc["Unknown"]) acc["Unknown"] = { label: "Unknown Date", activities: [] };
+      acc["Unknown"].activities.push(activity);
+      return acc;
+    }
+    const localDate = new Date(activity.createdAt);
+    const dateKey = format(localDate, "yyyy-MM-dd");
+    const dateLabel = format(localDate, "EEEE, MMMM d, yyyy");
+    if (!acc[dateKey]) acc[dateKey] = { label: dateLabel, activities: [] };
+    acc[dateKey].activities.push(activity);
     return acc;
-  }, {} as Record<string, ProjectActivityWithMeta[]>);
+  }, {} as Record<string, { label: string; activities: ProjectActivityWithMeta[] }>);
 
   const sortedDates = Object.keys(groupedByDay).sort((a, b) => b.localeCompare(a));
 
@@ -1931,10 +1938,10 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
                 <div key={date}>
                   <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4" />
-                    {date === "Unknown" ? "Unknown Date" : format(new Date(date), "EEEE, MMMM d, yyyy")}
+                    {groupedByDay[date].label}
                   </h4>
                   <div className="space-y-2 ml-2 border-l-2 border-slate-200 pl-4">
-                    {groupedByDay[date].map(activity => (
+                    {groupedByDay[date].activities.map(activity => (
                       <ActivityCard
                         key={activity.id}
                         activity={activity}
