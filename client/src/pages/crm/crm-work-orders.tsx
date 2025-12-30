@@ -138,12 +138,15 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
   urgent: { bg: "bg-red-100", text: "text-red-700" },
 };
 
-type FilterTab = "all" | "unassigned" | "needs_scheduling" | "scheduled" | "in_progress" | "completed" | "ready_to_invoice" | "invoiced" | "closed" | "cancelled";
+type FilterTab = "all" | "needs_scheduling" | "ready_to_dispatch" | "waiting_on_parts" | "needs_approval" | "on_hold" | "scheduled" | "in_progress" | "completed" | "ready_to_invoice" | "invoiced" | "closed" | "cancelled" | "unassigned";
 
 const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> = {
   all: { label: "All", shortLabel: "All" },
-  unassigned: { label: "Unassigned", shortLabel: "Unassigned" },
   needs_scheduling: { label: "Needs Scheduling", shortLabel: "Unscheduled" },
+  ready_to_dispatch: { label: "Ready to Dispatch", shortLabel: "Ready" },
+  waiting_on_parts: { label: "Waiting on Parts", shortLabel: "Parts" },
+  needs_approval: { label: "Needs Approval", shortLabel: "Approval" },
+  on_hold: { label: "On Hold", shortLabel: "Hold" },
   scheduled: { label: "Scheduled", shortLabel: "Scheduled" },
   in_progress: { label: "In Progress", shortLabel: "Active" },
   completed: { label: "Completed", shortLabel: "Done" },
@@ -151,6 +154,7 @@ const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> 
   invoiced: { label: "Invoiced / Awaiting Payment", shortLabel: "Invoiced" },
   closed: { label: "Closed", shortLabel: "Closed" },
   cancelled: { label: "Cancelled", shortLabel: "Cancelled" },
+  unassigned: { label: "Unassigned", shortLabel: "Unassigned" },
 };
 
 export default function CrmWorkOrders() {
@@ -414,8 +418,23 @@ export default function CrmWorkOrders() {
         (wo.dispatchQueueStage && unassignedStages.includes(wo.dispatchQueueStage))
       );
     } else if (activeTab === "needs_scheduling") {
-      // Work orders without a scheduled date
+      // Work orders without a scheduled date (no time set)
       orders = orders.filter(wo => !wo.scheduledStart);
+    } else if (activeTab === "ready_to_dispatch") {
+      // Time set but no tech assigned
+      orders = orders.filter(wo => wo.scheduledStart && !wo.assignedTechId);
+    } else if (activeTab === "waiting_on_parts") {
+      // Explicitly marked as waiting on parts
+      orders = orders.filter(wo => wo.dispatchQueueStage === "WaitingOnParts");
+    } else if (activeTab === "needs_approval") {
+      // Explicitly marked as needs approval
+      orders = orders.filter(wo => wo.dispatchQueueStage === "NeedsApproval");
+    } else if (activeTab === "on_hold") {
+      // Explicitly marked as on hold
+      orders = orders.filter(wo => wo.dispatchQueueStage === "OnHold");
+    } else if (activeTab === "scheduled") {
+      // Scheduled with tech and time set
+      orders = orders.filter(wo => wo.scheduledStart && wo.assignedTechId && wo.status === "scheduled");
     } else if (activeTab === "in_progress") {
       // Active work - dispatched, en route, or on site
       orders = orders.filter(wo => ["dispatched", "en_route", "on_site"].includes(wo.status));
