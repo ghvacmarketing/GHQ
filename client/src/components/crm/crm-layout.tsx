@@ -208,27 +208,24 @@ function SidebarContent({
         <div className="p-3 bg-slate-800/50 rounded-lg">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full bg-[#711419] flex items-center justify-center text-white font-semibold text-sm">
-              {currentUser.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .toUpperCase()
-                .slice(0, 2)}
+              {currentUser?.name
+                ? currentUser.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+                : "U"}
             </div>
             <div className="flex-1 min-w-0">
               <p
                 className="text-sm font-medium text-white truncate"
                 data-testid="text-sidebar-user-name"
               >
-                {currentUser.name}
+                {currentUser?.name || "User"}
               </p>
               <Badge
                 className={`text-xs capitalize mt-0.5 border ${getRoleBadgeClass(
-                  currentUser.role
+                  currentUser?.role || "user"
                 )}`}
                 data-testid="badge-sidebar-user-role"
               >
-                {currentUser.role}
+                {currentUser?.role || "User"}
               </Badge>
             </div>
           </div>
@@ -287,15 +284,12 @@ export function CrmLayout({ children, currentUser }: CrmLayoutProps) {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-slate-600">
-              {currentUser.name.split(" ")[0]}
+              {currentUser?.name?.split(" ")[0] || "User"}
             </span>
             <div className="w-8 h-8 rounded-full bg-[#711419] flex items-center justify-center text-white font-semibold text-xs">
-              {currentUser.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .toUpperCase()
-                .slice(0, 2)}
+              {currentUser?.name
+                ? currentUser.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+                : "U"}
             </div>
           </div>
         </div>
