@@ -57,7 +57,7 @@ import {
   Search,
   Edit,
 } from "lucide-react";
-import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkOrderStatus } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkOrderStatus, workCategoryEnum, workSubtypeByCategory, type WorkCategory, type WorkSubtype } from "@shared/schema";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, isToday, isThisWeek, addDays } from "date-fns";
@@ -159,6 +159,8 @@ export default function CrmWorkOrders() {
   const [searchInput, setSearchInput] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [techFilter, setTechFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<WorkCategory | "all">("all");
+  const [subtypeFilter, setSubtypeFilter] = useState<string>("all");
   const debouncedSearch = useDebounce(searchInput, 300);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<EnrichedWorkOrder | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -190,6 +192,8 @@ export default function CrmWorkOrders() {
   const [woTitle, setWoTitle] = useState("");
   const [woDescription, setWoDescription] = useState("");
   const [visitType, setVisitType] = useState<WorkOrderVisitType>("SERVICE");
+  const [workCategory, setWorkCategory] = useState<WorkCategory>("Service");
+  const [workSubtype, setWorkSubtype] = useState<WorkSubtype>("Other");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("10:00");
@@ -395,6 +399,16 @@ export default function CrmWorkOrders() {
       });
     }
     
+    // Apply category filter
+    if (categoryFilter !== "all") {
+      orders = orders.filter(wo => wo.workCategory === categoryFilter);
+    }
+    
+    // Apply subtype filter
+    if (subtypeFilter !== "all") {
+      orders = orders.filter(wo => wo.workSubtype === subtypeFilter);
+    }
+    
     // Apply tab-based status filtering (for tabs not handled server-side)
     if (activeTab === "needs_scheduling") {
       // Work orders without a scheduled date
@@ -427,7 +441,7 @@ export default function CrmWorkOrders() {
       const dateB = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
       return dateA - dateB;
     });
-  }, [workOrdersData, activeTab, debouncedSearch]);
+  }, [workOrdersData, activeTab, debouncedSearch, categoryFilter, subtypeFilter]);
 
   const updateWorkOrderMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<CrmWorkOrder> & { updateProjectCustomer?: boolean } }) => {
@@ -450,6 +464,8 @@ export default function CrmWorkOrders() {
     setWoTitle("");
     setWoDescription("");
     setVisitType("SERVICE");
+    setWorkCategory("Service");
+    setWorkSubtype("Other");
     setScheduledDate(new Date());
     setStartTime("08:00");
     setEndTime("10:00");
@@ -481,6 +497,8 @@ export default function CrmWorkOrders() {
         title: woTitle || null,
         description: woDescription || null,
         visitType,
+        workCategory,
+        workSubtype,
         scheduledStart: scheduledStart.toISOString(),
         scheduledEnd: scheduledEnd.toISOString(),
         assignedTechId: assignedTechId === "unassigned" ? null : assignedTechId,
@@ -768,6 +786,58 @@ export default function CrmWorkOrders() {
               <span className="sm:hidden">{filterTabConfig[tab].shortLabel}</span>
             </button>
           ))}
+        </div>
+
+        {/* Category and Subtype filters */}
+        <div className="flex gap-3 flex-wrap">
+          <Select 
+            value={categoryFilter} 
+            onValueChange={(v) => {
+              setCategoryFilter(v as WorkCategory | "all");
+              setSubtypeFilter("all");
+            }}
+          >
+            <SelectTrigger className="w-[160px]" data-testid="select-category-filter">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {workCategoryEnum.map((cat) => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Select 
+            value={subtypeFilter} 
+            onValueChange={setSubtypeFilter}
+            disabled={categoryFilter === "all"}
+          >
+            <SelectTrigger className="w-[200px]" data-testid="select-subtype-filter">
+              <SelectValue placeholder="All Subtypes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Subtypes</SelectItem>
+              {categoryFilter !== "all" && workSubtypeByCategory[categoryFilter].map((sub) => (
+                <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {(categoryFilter !== "all" || subtypeFilter !== "all") && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => {
+                setCategoryFilter("all");
+                setSubtypeFilter("all");
+              }}
+              className="text-slate-500"
+              data-testid="button-clear-filters"
+            >
+              Clear Filters
+            </Button>
+          )}
         </div>
 
         {workOrdersLoading ? (
@@ -1390,6 +1460,46 @@ export default function CrmWorkOrders() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Work Category <span className="text-red-500">*</span></Label>
+                  <Select 
+                    value={workCategory} 
+                    onValueChange={(v) => {
+                      const cat = v as WorkCategory;
+                      setWorkCategory(cat);
+                      setWorkSubtype(workSubtypeByCategory[cat][0]);
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-work-category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workCategoryEnum.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Work Subtype <span className="text-red-500">*</span></Label>
+                  <Select value={workSubtype} onValueChange={(v) => setWorkSubtype(v as WorkSubtype)}>
+                    <SelectTrigger data-testid="select-work-subtype">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workSubtypeByCategory[workCategory].map((sub) => (
+                        <SelectItem key={sub} value={sub}>
+                          {sub}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">

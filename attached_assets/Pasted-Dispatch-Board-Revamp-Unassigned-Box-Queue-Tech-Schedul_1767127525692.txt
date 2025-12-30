@@ -1,0 +1,157 @@
+Dispatch Board Revamp — “Unassigned Box Queue + Tech Schedule Grid” (Spec)
+Goal
+
+Revamp the Dispatch Board so unassigned work orders are not a useless row. Replace “Unassigned” with a box-style queue that’s organized and dispatchable, while keeping the technician time grid for assigned jobs.
+
+1) New Layout
+
+Keep the top header (Search, Date picker, Legend, New Work Order).
+
+Below that, split the board into 2 main sections:
+
+A) Unassigned Queue (Box View)
+
+This replaces the Unassigned technician row
+
+Shows only work orders where assignedTechId == null
+
+B) Technician Schedule Grid (Time View)
+
+Shows only work orders where assignedTechId != null
+
+Placed on the grid by scheduledStart + durationMinutes
+
+Drag/drop supports re-time and reassign
+
+2) Unassigned Queue (Box Strategy)
+Grouping
+
+Unassigned work orders should be grouped into “boxes” based on a new field (NOT the dispatch status tabs). Example boxes:
+
+Needs Scheduling (no scheduledStart yet)
+
+Ready to Dispatch (has scheduledStart but no tech assigned)
+
+Waiting on Parts
+
+Needs Approval / Quote
+
+On Hold
+
+Callbacks / Priority (optional)
+
+Card contents
+
+Each card should show:
+
+Customer name + Site/Address
+
+Work category + subtype (Service/Maintenance/Sales/Install + subtype)
+
+Visit type
+
+Priority indicator (if any)
+
+Age/unassigned time (how long it’s been sitting)
+
+Time window (if any)
+
+Short notes preview + tags
+
+Card actions
+
+Quick assign dropdown (assign a tech)
+
+Quick schedule control (set time window or start time)
+
+Mark “Waiting on Parts” / “Needs Approval” / “On Hold”
+
+Add quick note
+
+Drag/drop
+
+Drag card from a box → drop onto a technician row/time slot:
+
+sets assignedTechId
+
+sets scheduledStart
+
+removes it from unassigned queue
+
+Drag within unassigned boxes:
+
+changes its queue group (dispatchQueueStage)
+
+3) Technician Schedule Grid (Assigned Only)
+
+Only render WOs with assigned tech
+
+Use time slots (we already want 30-min intervals)
+
+Drag within grid to reschedule (snap to 30 minutes)
+
+Drag to another tech row to reassign
+
+Tabs at top (Scheduled/Dispatched/En Route/On Site/Completed) are Dispatch Status only.
+
+4) Data Model Change (Important)
+
+Add a new field on WorkOrder:
+
+dispatchQueueStage (string/enum)
+
+Values like:
+
+NeedsScheduling
+
+ReadyToDispatch
+
+WaitingOnParts
+
+NeedsApproval
+
+OnHold
+
+(optional) CallbackPriority
+
+Rules:
+
+If assignedTechId == null, show in Unassigned Queue grouped by dispatchQueueStage
+
+If assigned, it leaves the queue and shows on grid
+
+Dispatch status remains separate and unchanged
+
+Default logic:
+
+If no scheduledStart → dispatchQueueStage = NeedsScheduling
+
+If has scheduledStart but no tech → dispatchQueueStage = ReadyToDispatch
+
+If flagged parts needed → dispatchQueueStage = WaitingOnParts
+
+5) Filters (make it usable)
+
+Above the Unassigned Queue add quick filters:
+
+Work category (Service/Maintenance/Sales/Install)
+
+Priority
+
+Callback only
+
+PM only
+
+Date scope: Today / Tomorrow / This Week
+
+6) Acceptance Criteria
+
+Unassigned work orders never appear as a single long row
+
+Unassigned WOs are organized into boxes and can be dispatched via drag/drop
+
+Assigned work orders only appear on the grid
+
+Dispatch status tabs still work for assigned jobs
+
+Scheduling/reassigning updates the work order correctly
