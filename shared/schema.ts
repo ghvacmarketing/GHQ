@@ -926,23 +926,31 @@ export const crmProjects = pgTable("crm_projects", {
 export const workOrderVisitTypeEnum = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
 export type WorkOrderVisitType = typeof workOrderVisitTypeEnum[number];
 
-// Work Category (required - what type of work)
+// Work Category - DEPRECATED: Now derived from Visit Type
 export const workCategoryEnum = ["Service", "Maintenance", "Sales", "Install"] as const;
 export type WorkCategory = typeof workCategoryEnum[number];
 
-// Work Subtype options by category
+// Work Subtype options by Visit Type (direct mapping)
+export const workSubtypeByVisitType = {
+  SERVICE: ["No Cool", "No Heat", "Water Leak", "Electrical", "Thermostat", "Airflow", "Noise", "IAQ", "Other"] as const,
+  MAINTENANCE: ["Spring Tune-Up", "Fall Tune-Up", "Maintenance Plan Visit", "Safety Inspection", "Duct Cleaning", "IAQ Service"] as const,
+  SALES: ["Replace System Estimate", "Add-on IAQ", "Duct Renovation", "Crawlspace", "Maintenance Plan Sale"] as const,
+  INSTALL: ["Full System", "Changeout", "Add Ducts", "Replace Ducts", "IAQ Install", "Mini-split", "Crawlspace"] as const,
+} as const;
+
+// Legacy mapping - DEPRECATED, use workSubtypeByVisitType instead
 export const workSubtypeByCategory = {
-  Service: ["No Cool", "No Heat", "Water Leak", "Electrical", "Thermostat", "Airflow", "Noise", "IAQ", "Other"] as const,
-  Maintenance: ["Spring Tune-Up", "Fall Tune-Up", "Maintenance Plan Visit", "Safety Inspection", "Duct Cleaning", "IAQ Service"] as const,
-  Sales: ["Replace System Estimate", "Add-on IAQ", "Duct Renovation", "Crawlspace", "Maintenance Plan Sale"] as const,
-  Install: ["Full System", "Changeout", "Add Ducts", "Replace Ducts", "IAQ Install", "Mini-split", "Crawlspace"] as const,
+  Service: workSubtypeByVisitType.SERVICE,
+  Maintenance: workSubtypeByVisitType.MAINTENANCE,
+  Sales: workSubtypeByVisitType.SALES,
+  Install: workSubtypeByVisitType.INSTALL,
 } as const;
 
 export type WorkSubtype = 
-  | typeof workSubtypeByCategory.Service[number]
-  | typeof workSubtypeByCategory.Maintenance[number]
-  | typeof workSubtypeByCategory.Sales[number]
-  | typeof workSubtypeByCategory.Install[number];
+  | typeof workSubtypeByVisitType.SERVICE[number]
+  | typeof workSubtypeByVisitType.MAINTENANCE[number]
+  | typeof workSubtypeByVisitType.SALES[number]
+  | typeof workSubtypeByVisitType.INSTALL[number];
 
 // Billing Disposition - how a completed work order was billed
 export const billingDispositionEnum = ["invoice_created", "no_charge", "billed_elsewhere"] as const;
@@ -968,7 +976,7 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   workOrderNumber: integer("work_order_number").notNull().default(1),
   assignedTechId: varchar("assigned_tech_id").references(() => crmUsers.id),
   visitType: text("visit_type").$type<WorkOrderVisitType>().default("SERVICE"),
-  workCategory: text("work_category").$type<WorkCategory>().notNull(),
+  workCategory: text("work_category").$type<WorkCategory>(),
   workSubtype: text("work_subtype").$type<WorkSubtype>().notNull(),
   title: text("title"),
   description: text("description"),

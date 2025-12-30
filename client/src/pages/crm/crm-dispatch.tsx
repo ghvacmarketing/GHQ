@@ -85,7 +85,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject, WorkOrderStatus } from "@shared/schema";
-import { workOrderVisitTypeEnum, type WorkOrderVisitType, workCategoryEnum, workSubtypeByCategory, type WorkCategory, type WorkSubtype, dispatchQueueStageEnum, type DispatchQueueStage } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType, workSubtypeByVisitType, type WorkSubtype, dispatchQueueStageEnum, type DispatchQueueStage } from "@shared/schema";
 
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
@@ -417,11 +417,8 @@ function DraggableQueueCard({
             {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
           </Badge>
           
-          {workOrder.workCategory && (
-            <span className="text-slate-600">{workOrder.workCategory}</span>
-          )}
           {workOrder.workSubtype && workOrder.workSubtype !== "Other" && (
-            <span className="text-slate-400">• {workOrder.workSubtype}</span>
+            <span className="text-slate-600">{workOrder.workSubtype}</span>
           )}
         </div>
         
@@ -1192,8 +1189,7 @@ export default function CrmDispatch() {
   const [woTitle, setWoTitle] = useState("");
   const [woDescription, setWoDescription] = useState("");
   const [visitType, setVisitType] = useState<WorkOrderVisitType>("SERVICE");
-  const [workCategory, setWorkCategory] = useState<WorkCategory>("Service");
-  const [workSubtype, setWorkSubtype] = useState<WorkSubtype>("Other");
+  const [workSubtype, setWorkSubtype] = useState<WorkSubtype>("No Cool");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("10:00");
@@ -1382,7 +1378,6 @@ export default function CrmDispatch() {
         title: woTitle || null,
         description: woDescription || null,
         visitType,
-        workCategory,
         workSubtype,
         scheduledStart: scheduledStart.toISOString(),
         scheduledEnd: scheduledEnd.toISOString(),
@@ -2257,7 +2252,11 @@ export default function CrmDispatch() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Visit Type</Label>
-                <Select value={visitType} onValueChange={(v) => setVisitType(v as WorkOrderVisitType)}>
+                <Select value={visitType} onValueChange={(v) => {
+                  const newVisitType = v as WorkOrderVisitType;
+                  setVisitType(newVisitType);
+                  setWorkSubtype(workSubtypeByVisitType[newVisitType][0]);
+                }}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -2284,37 +2283,18 @@ export default function CrmDispatch() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Work Category</Label>
-                <Select value={workCategory} onValueChange={(v) => {
-                  setWorkCategory(v as WorkCategory);
-                  setWorkSubtype("Other");
-                }}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {workCategoryEnum.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Work Subtype</Label>
-                <Select value={workSubtype} onValueChange={(v) => setWorkSubtype(v as WorkSubtype)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {workSubtypeByCategory[workCategory].map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Work Subtype</Label>
+              <Select value={workSubtype} onValueChange={(v) => setWorkSubtype(v as WorkSubtype)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {workSubtypeByVisitType[visitType].map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
