@@ -3000,6 +3000,39 @@ export default function ProposalBuilder() {
                                     </div>
                                   </div>
                                 </>
+                              ) : isCrawlspaceServicesItem(item) ? (
+                                <>
+                                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                    <Badge className="bg-orange-500 text-white text-xs">
+                                      <Wrench className="h-3 w-3 mr-1" />
+                                      Crawlspace Services
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                      x{item.quantity}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm">{item.selections.sqft.toLocaleString()} sq ft</p>
+                                    <div className="text-xs text-muted-foreground space-y-0.5">
+                                      {item.selections.services.map(serviceId => {
+                                        const service = CRAWLSPACE_SERVICES.SERVICES.find(s => s.id === serviceId);
+                                        return service ? <p key={serviceId}>{service.name}</p> : null;
+                                      })}
+                                      {item.selections.doorOption && (() => {
+                                        const door = CRAWLSPACE_SERVICES.DOOR_OPTIONS.find(d => d.id === item.selections.doorOption);
+                                        return door ? <p>{door.name}</p> : null;
+                                      })()}
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 pt-2 border-t">
+                                    <p className="font-bold text-sm text-primary">
+                                      {formatPrice(item.totalPrice * item.quantity)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatPrice(Math.round(item.totalPrice * item.quantity / 67))}/mo
+                                    </p>
+                                  </div>
+                                </>
                               ) : (
                                 <>
                                   <div className="flex items-center gap-2 mb-2 flex-wrap">
