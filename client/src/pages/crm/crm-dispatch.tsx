@@ -608,9 +608,16 @@ export default function CrmDispatch() {
   const [woDescription, setWoDescription] = useState("");
   const [visitType, setVisitType] = useState<WorkOrderVisitType>("SERVICE");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
-  const [startTime, setStartTime] = useState("08:00");
-  const [endTime, setEndTime] = useState("17:00");
+  const [timeSlot, setTimeSlot] = useState("08:00-10:00");
   const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
+  
+  // Time slot options (2-hour blocks from 8am to 5pm)
+  const timeSlots = [
+    { value: "08:00-10:00", label: "8:00 AM - 10:00 AM" },
+    { value: "10:00-12:00", label: "10:00 AM - 12:00 PM" },
+    { value: "13:00-15:00", label: "1:00 PM - 3:00 PM" },
+    { value: "15:00-17:00", label: "3:00 PM - 5:00 PM" },
+  ];
   const [priority, setPriority] = useState<string>("normal");
 
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
@@ -760,8 +767,10 @@ export default function CrmDispatch() {
       if (!selectedCustomer) throw new Error("Customer is required");
       if (!scheduledDate) throw new Error("Scheduled date is required");
 
-      const [startHours, startMinutes] = startTime.split(":").map(Number);
-      const [endHours, endMinutes] = endTime.split(":").map(Number);
+      // Parse time slot to get start and end times
+      const [startTimeStr, endTimeStr] = timeSlot.split("-");
+      const [startHours, startMinutes] = startTimeStr.split(":").map(Number);
+      const [endHours, endMinutes] = endTimeStr.split(":").map(Number);
       
       const scheduledStart = new Date(scheduledDate);
       scheduledStart.setHours(startHours, startMinutes, 0, 0);
@@ -1661,25 +1670,20 @@ export default function CrmDispatch() {
               </Popover>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Start Time</Label>
-                <Input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  data-testid="input-start-time"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>End Time</Label>
-                <Input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  data-testid="input-end-time"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Time Slot</Label>
+              <Select value={timeSlot} onValueChange={setTimeSlot}>
+                <SelectTrigger data-testid="select-time-slot">
+                  <SelectValue placeholder="Select time slot" />
+                </SelectTrigger>
+                <SelectContent>
+                  {timeSlots.map((slot) => (
+                    <SelectItem key={slot.value} value={slot.value}>
+                      {slot.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

@@ -1299,11 +1299,18 @@ export default function CrmCustomerDetail() {
   const [woPropertyId, setWoPropertyId] = useState<string>("");
   const [woProjectId, setWoProjectId] = useState<string>("");
   const [woDate, setWoDate] = useState<Date | undefined>(new Date());
-  const [woStartTime, setWoStartTime] = useState<string>("08:00");
-  const [woEndTime, setWoEndTime] = useState<string>("10:00");
+  const [woTimeSlot, setWoTimeSlot] = useState<string>("08:00-10:00");
   const [woTechId, setWoTechId] = useState<string>("unassigned");
   const [woDescription, setWoDescription] = useState<string>("");
   const [woPriority, setWoPriority] = useState<string>("normal");
+  
+  // Time slot options (2-hour blocks from 8am to 5pm)
+  const timeSlots = [
+    { value: "08:00-10:00", label: "8:00 AM - 10:00 AM" },
+    { value: "10:00-12:00", label: "10:00 AM - 12:00 PM" },
+    { value: "13:00-15:00", label: "1:00 PM - 3:00 PM" },
+    { value: "15:00-17:00", label: "3:00 PM - 5:00 PM" },
+  ];
 
   // Form state for Create Project dialog
   const [projTitle, setProjTitle] = useState<string>("");
@@ -1317,8 +1324,7 @@ export default function CrmCustomerDetail() {
   const [visitJobId, setVisitJobId] = useState<string>("");
   const [visitType, setVisitType] = useState<WorkOrderVisitType>("SERVICE");
   const [visitDate, setVisitDate] = useState<Date | undefined>(new Date());
-  const [visitStartTime, setVisitStartTime] = useState<string>("08:00");
-  const [visitEndTime, setVisitEndTime] = useState<string>("10:00");
+  const [visitTimeSlot, setVisitTimeSlot] = useState<string>("08:00-10:00");
   const [visitTechId, setVisitTechId] = useState<string>("unassigned");
   const [createNewJobForVisit, setCreateNewJobForVisit] = useState(false);
   const [newJobTypeForVisit, setNewJobTypeForVisit] = useState<string>("SERVICE");
@@ -1330,8 +1336,7 @@ export default function CrmCustomerDetail() {
     setWoPropertyId("");
     setWoProjectId("");
     setWoDate(new Date());
-    setWoStartTime("08:00");
-    setWoEndTime("10:00");
+    setWoTimeSlot("08:00-10:00");
     setWoTechId("unassigned");
     setWoDescription("");
     setWoPriority("normal");
@@ -1613,11 +1618,12 @@ export default function CrmCustomerDetail() {
       
       // If creating a new job for this visit
       if (createNewJobForVisit) {
-        const [hours, minutes] = visitStartTime.split(":").map(Number);
+        const [startTimeStr, endTimeStr] = visitTimeSlot.split("-");
+        const [hours, minutes] = startTimeStr.split(":").map(Number);
         const scheduledStart = new Date(visitDate);
         scheduledStart.setHours(hours, minutes, 0, 0);
         
-        const [endHours, endMinutes] = visitEndTime.split(":").map(Number);
+        const [endHours, endMinutes] = endTimeStr.split(":").map(Number);
         const scheduledEnd = new Date(visitDate);
         scheduledEnd.setHours(endHours, endMinutes, 0, 0);
 
@@ -1636,11 +1642,12 @@ export default function CrmCustomerDetail() {
       
       if (!jobIdToUse) throw new Error("Project is required");
 
-      const [hours, minutes] = visitStartTime.split(":").map(Number);
+      const [startTimeStr2, endTimeStr2] = visitTimeSlot.split("-");
+      const [hours, minutes] = startTimeStr2.split(":").map(Number);
       const scheduledStart = new Date(visitDate);
       scheduledStart.setHours(hours, minutes, 0, 0);
       
-      const [endHours, endMinutes] = visitEndTime.split(":").map(Number);
+      const [endHours, endMinutes] = endTimeStr2.split(":").map(Number);
       const scheduledEnd = new Date(visitDate);
       scheduledEnd.setHours(endHours, endMinutes, 0, 0);
 
@@ -1736,11 +1743,12 @@ export default function CrmCustomerDetail() {
     mutationFn: async () => {
       if (!woDate) throw new Error("Date is required");
 
-      const [hours, minutes] = woStartTime.split(":").map(Number);
+      const [startTimeStr, endTimeStr] = woTimeSlot.split("-");
+      const [hours, minutes] = startTimeStr.split(":").map(Number);
       const scheduledStart = new Date(woDate);
       scheduledStart.setHours(hours, minutes, 0, 0);
       
-      const [endHours, endMinutes] = woEndTime.split(":").map(Number);
+      const [endHours, endMinutes] = endTimeStr.split(":").map(Number);
       const scheduledEnd = new Date(woDate);
       scheduledEnd.setHours(endHours, endMinutes, 0, 0);
 
@@ -2460,7 +2468,7 @@ export default function CrmCustomerDetail() {
               </div>
 
               {/* Date and Time */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Date *</Label>
                   <Popover>
@@ -2488,22 +2496,19 @@ export default function CrmCustomerDetail() {
                   </Popover>
                 </div>
                 <div className="space-y-2">
-                  <Label>Start Time</Label>
-                  <Input
-                    type="time"
-                    value={woStartTime}
-                    onChange={(e) => setWoStartTime(e.target.value)}
-                    data-testid="input-wo-start-time"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>End Time</Label>
-                  <Input
-                    type="time"
-                    value={woEndTime}
-                    onChange={(e) => setWoEndTime(e.target.value)}
-                    data-testid="input-wo-end-time"
-                  />
+                  <Label>Time Slot</Label>
+                  <Select value={woTimeSlot} onValueChange={setWoTimeSlot}>
+                    <SelectTrigger data-testid="select-wo-time-slot">
+                      <SelectValue placeholder="Select time slot" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timeSlots.map((slot) => (
+                        <SelectItem key={slot.value} value={slot.value}>
+                          {slot.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
