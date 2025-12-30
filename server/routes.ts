@@ -8210,13 +8210,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allowedFields = insertCrmWorkOrderSchema.partial().pick({
         status: true,
         assignedTechId: true,
-        scheduledStart: true,
-        scheduledEnd: true,
         checklist: true,
         partsUsed: true,
         techNotes: true,
-        startedAt: true,
-        completedAt: true,
         projectId: true,
         title: true,
         description: true,
@@ -8227,6 +8223,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId: true,
         propertyId: true,
       }).extend({
+        scheduledStart: z.union([z.string(), z.date(), z.null()]).optional(),
+        scheduledEnd: z.union([z.string(), z.date(), z.null()]).optional(),
+        startedAt: z.union([z.string(), z.date(), z.null()]).optional(),
+        completedAt: z.union([z.string(), z.date(), z.null()]).optional(),
         updateProjectCustomer: z.boolean().optional(),
       });
 
