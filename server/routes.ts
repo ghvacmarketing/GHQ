@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum } from "@shared/schema";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
@@ -8962,6 +8962,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting project:", error);
       return res.status(500).json({ message: "Failed to delete project" });
+    }
+  });
+
+  // ============================================
+  // PROJECT ACTIVITY (TIMELINE) ROUTES
+  // ============================================
+
+  // GET /api/crm/projects/:id/activities - List activities for a project with filters
+  app.get("/api/crm/projects/:id/activities", requireCrmAuth, async (req, res) => {
+    try {
+      const { type, startDate, endDate, pinnedOnly } = req.query;
+      const projectId = req.params.id;
+
+      const conditions: any[] = [eq(projectActivities.projectId, projectId)];
+
+      if (type && type !== "all") {
+        conditions.push(eq(projectActivities.activityType, type as string));
+      }
+
+      if (pinnedOnly === "true") {
+        conditions.push(eq(projectActivities.isPinned, true));
+      }
+
+      if (startDate) {
+        conditions.push(sql`${projectActivities.createdAt} >= ${new Date(startDate as string)}`);
+      }
+
+      if (endDate) {
+        const endDateObj = new Date(endDate as string);
+        endDateObj.setHours(23, 59, 59, 999);
+        conditions.push(sql`${projectActivities.createdAt} <= ${endDateObj}`);
+      }
+
+      const activities = await db
+        .select()
+        .from(projectActivities)
+        .where(and(...conditions))
+        .orderBy(desc(projectActivities.createdAt));
+
+      // Enrich with user and work order info
+      const userIds = [...new Set(activities.map(a => a.userId).filter(Boolean))] as string[];
+      const workOrderIds = [...new Set(activities.map(a => a.workOrderId).filter(Boolean))] as string[];
+
+      const usersMap = new Map<string, { id: string; displayName: string | null }>();
+      if (userIds.length > 0) {
+        const usersList = await db
+          .select({ id: crmUsers.id, displayName: crmUsers.displayName })
+          .from(crmUsers)
+          .where(inArray(crmUsers.id, userIds));
+        usersList.forEach(u => usersMap.set(u.id, u));
+      }
+
+      const workOrdersMap = new Map<string, { id: string; workOrderNumber: number | null; title: string | null }>();
+      if (workOrderIds.length > 0) {
+        const woList = await db
+          .select({ id: crmWorkOrders.id, workOrderNumber: crmWorkOrders.workOrderNumber, title: crmWorkOrders.title })
+          .from(crmWorkOrders)
+          .where(inArray(crmWorkOrders.id, workOrderIds));
+        woList.forEach(wo => workOrdersMap.set(wo.id, wo));
+      }
+
+      const enrichedActivities = activities.map(activity => ({
+        ...activity,
+        userName: activity.userId ? usersMap.get(activity.userId)?.displayName || "Unknown User" : null,
+        workOrder: activity.workOrderId ? workOrdersMap.get(activity.workOrderId) : null,
+      }));
+
+      return res.json(enrichedActivities);
+    } catch (error) {
+      console.error("Error fetching project activities:", error);
+      return res.status(500).json({ message: "Failed to fetch project activities" });
+    }
+  });
+
+  // POST /api/crm/projects/:id/activities - Create a new activity
+  app.post("/api/crm/projects/:id/activities", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const projectId = req.params.id;
+
+      // Verify project exists
+      const [project] = await db.select().from(crmProjects).where(eq(crmProjects.id, projectId));
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const activityData = {
+        ...req.body,
+        projectId,
+        userId: user.id,
+      };
+
+      const result = insertProjectActivitySchema.safeParse(activityData);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid activity data", errors: result.error.errors });
+      }
+
+      const [activity] = await db.insert(projectActivities).values(result.data).returning();
+
+      return res.status(201).json(activity);
+    } catch (error) {
+      console.error("Error creating project activity:", error);
+      return res.status(500).json({ message: "Failed to create project activity" });
+    }
+  });
+
+  // PATCH /api/crm/projects/:projectId/activities/:activityId - Update activity (toggle pin)
+  app.patch("/api/crm/projects/:projectId/activities/:activityId", requireCrmAuth, async (req, res) => {
+    try {
+      const { activityId } = req.params;
+      const { isPinned } = req.body;
+
+      const [existing] = await db.select().from(projectActivities).where(eq(projectActivities.id, activityId));
+      if (!existing) {
+        return res.status(404).json({ message: "Activity not found" });
+      }
+
+      const [updated] = await db
+        .update(projectActivities)
+        .set({ isPinned: isPinned !== undefined ? isPinned : existing.isPinned })
+        .where(eq(projectActivities.id, activityId))
+        .returning();
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating project activity:", error);
+      return res.status(500).json({ message: "Failed to update project activity" });
+    }
+  });
+
+  // DELETE /api/crm/projects/:projectId/activities/:activityId - Delete activity
+  app.delete("/api/crm/projects/:projectId/activities/:activityId", requireCrmAuth, async (req, res) => {
+    try {
+      const { activityId } = req.params;
+
+      const [existing] = await db.select().from(projectActivities).where(eq(projectActivities.id, activityId));
+      if (!existing) {
+        return res.status(404).json({ message: "Activity not found" });
+      }
+
+      await db.delete(projectActivities).where(eq(projectActivities.id, activityId));
+
+      return res.json({ message: "Activity deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting project activity:", error);
+      return res.status(500).json({ message: "Failed to delete project activity" });
     }
   });
 
