@@ -922,9 +922,27 @@ export const crmProjects = pgTable("crm_projects", {
 });
 
 // CRM Work Orders (standalone scheduled visits - can optionally link to projects)
-// Work Order Visit Types
+// Work Order Visit Types (appointment purpose)
 export const workOrderVisitTypeEnum = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
 export type WorkOrderVisitType = typeof workOrderVisitTypeEnum[number];
+
+// Work Category (required - what type of work)
+export const workCategoryEnum = ["Service", "Maintenance", "Sales", "Install"] as const;
+export type WorkCategory = typeof workCategoryEnum[number];
+
+// Work Subtype options by category
+export const workSubtypeByCategory = {
+  Service: ["No Cool", "No Heat", "Water Leak", "Electrical", "Thermostat", "Airflow", "Noise", "IAQ", "Other"] as const,
+  Maintenance: ["Spring Tune-Up", "Fall Tune-Up", "Maintenance Plan Visit", "Safety Inspection", "Duct Cleaning", "IAQ Service"] as const,
+  Sales: ["Replace System Estimate", "Add-on IAQ", "Duct Renovation", "Crawlspace", "Maintenance Plan Sale"] as const,
+  Install: ["Full System", "Changeout", "Add Ducts", "Replace Ducts", "IAQ Install", "Mini-split", "Crawlspace"] as const,
+} as const;
+
+export type WorkSubtype = 
+  | typeof workSubtypeByCategory.Service[number]
+  | typeof workSubtypeByCategory.Maintenance[number]
+  | typeof workSubtypeByCategory.Sales[number]
+  | typeof workSubtypeByCategory.Install[number];
 
 // Billing Disposition - how a completed work order was billed
 export const billingDispositionEnum = ["invoice_created", "no_charge", "billed_elsewhere"] as const;
@@ -939,6 +957,8 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   workOrderNumber: integer("work_order_number").notNull().default(1),
   assignedTechId: varchar("assigned_tech_id").references(() => crmUsers.id),
   visitType: text("visit_type").$type<WorkOrderVisitType>().default("SERVICE"),
+  workCategory: text("work_category").$type<WorkCategory>().notNull(),
+  workSubtype: text("work_subtype").$type<WorkSubtype>().notNull(),
   title: text("title"),
   description: text("description"),
   scheduledStart: timestamp("scheduled_start"),
