@@ -852,101 +852,97 @@ export default function CrmWorkOrders() {
             </CardContent>
           </Card>
         ) : activeTab === "unassigned" && categorizedUnassigned ? (
-          <div className="space-y-6">
-            {(Object.keys(unassignedCategoryConfig) as UnassignedCategory[]).map((category) => {
-              const config = unassignedCategoryConfig[category];
-              const categoryOrders = categorizedUnassigned[category];
-              
-              return (
-                <div key={category}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <h3 className="text-lg font-semibold text-slate-800">{config.label}</h3>
-                    {config.description && (
-                      <span className="text-sm text-slate-500">({config.description})</span>
-                    )}
-                    <Badge variant="secondary" className="ml-auto">{categoryOrders.length}</Badge>
-                  </div>
-                  
-                  {categoryOrders.length === 0 ? (
-                    <Card className="bg-slate-50 border border-dashed">
-                      <CardContent className="py-6 text-center">
-                        <p className="text-slate-400 text-sm">No work orders in this category</p>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {categoryOrders.map((wo) => {
-                        const statusStyle = statusColors[wo.status] || statusColors.scheduled;
-                        const visitStyle = visitTypeColors[wo.visitType || "SERVICE"] || visitTypeColors.SERVICE;
-                        const prioStyle = priorityColors[wo.priority || "normal"] || priorityColors.normal;
-                        
-                        return (
-                          <Card
-                            key={wo.id}
-                            className="bg-white border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                            onClick={() => handleOpenDetail(wo)}
-                            data-testid={`card-work-order-${wo.id}`}
-                          >
-                            <CardContent className="p-4">
-                              <div className="flex items-start justify-between gap-2 mb-3">
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold text-slate-900 truncate">
+          <div className="overflow-x-auto pb-4">
+            <div className="flex gap-4 min-w-max">
+              {(Object.keys(unassignedCategoryConfig) as UnassignedCategory[]).map((category) => {
+                const config = unassignedCategoryConfig[category];
+                const categoryOrders = categorizedUnassigned[category];
+                
+                return (
+                  <div 
+                    key={category} 
+                    className="w-72 flex-shrink-0 bg-slate-100 rounded-lg border border-slate-200"
+                    data-testid={`kanban-column-${category}`}
+                  >
+                    <div className="p-3 border-b border-slate-200 bg-slate-50 rounded-t-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold text-slate-800 text-sm">{config.label}</h3>
+                          {config.description && (
+                            <p className="text-xs text-slate-500">{config.description}</p>
+                          )}
+                        </div>
+                        <Badge variant="secondary" className="text-xs">{categoryOrders.length}</Badge>
+                      </div>
+                    </div>
+                    
+                    <div className="p-2 space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto">
+                      {categoryOrders.length === 0 ? (
+                        <div className="py-8 text-center">
+                          <p className="text-slate-400 text-xs">No work orders</p>
+                        </div>
+                      ) : (
+                        categoryOrders.map((wo) => {
+                          const statusStyle = statusColors[wo.status] || statusColors.scheduled;
+                          const visitStyle = visitTypeColors[wo.visitType || "SERVICE"] || visitTypeColors.SERVICE;
+                          
+                          return (
+                            <Card
+                              key={wo.id}
+                              className="bg-white border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                              onClick={() => handleOpenDetail(wo)}
+                              data-testid={`card-work-order-${wo.id}`}
+                            >
+                              <CardContent className="p-3">
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                  <p className="font-semibold text-slate-900 text-sm truncate flex-1">
                                     WO-{wo.workOrderNumber}
                                   </p>
-                                  {(wo.title || wo.description) && (
-                                    <p className="text-sm text-slate-600 truncate mt-0.5">
-                                      {wo.title || wo.description}
-                                    </p>
+                                  <Badge className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} text-xs shrink-0`}>
+                                    {statusLabels[wo.status]}
+                                  </Badge>
+                                </div>
+                                
+                                {(wo.title || wo.description) && (
+                                  <p className="text-xs text-slate-600 truncate mb-2">
+                                    {wo.title || wo.description}
+                                  </p>
+                                )}
+
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex items-center gap-1.5 text-slate-600">
+                                    <User className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{wo.customer?.name || "—"}</span>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 text-slate-600">
+                                    <CalendarIcon className="h-3 w-3 shrink-0" />
+                                    <span>
+                                      {wo.scheduledStart ? formatDate(wo.scheduledStart) : "Not scheduled"}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 mt-2 pt-2 border-t">
+                                  <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`}>
+                                    {visitTypeLabels[wo.visitType || "SERVICE"]}
+                                  </Badge>
+                                  {wo.priority && wo.priority !== "normal" && (
+                                    <Badge className="bg-orange-100 text-orange-700 text-xs">
+                                      {wo.priority.charAt(0).toUpperCase() + wo.priority.slice(1)}
+                                    </Badge>
                                   )}
                                 </div>
-                                <Badge className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} shrink-0`}>
-                                  {statusLabels[wo.status]}
-                                </Badge>
-                              </div>
-
-                              <div className="space-y-2 text-sm">
-                                <div className="flex items-center gap-2 text-slate-600">
-                                  <User className="h-4 w-4 shrink-0" />
-                                  <span className="truncate">{wo.customer?.name || "—"}</span>
-                                </div>
-
-                                <div className="flex items-center gap-2 text-slate-600">
-                                  <CalendarIcon className="h-4 w-4 shrink-0" />
-                                  <span>
-                                    {wo.scheduledStart ? formatDate(wo.scheduledStart) : "Not scheduled"}
-                                    {wo.scheduledStart && (
-                                      <span className="text-slate-400 ml-1">
-                                        {formatTime(wo.scheduledStart)} - {formatTime(wo.scheduledEnd)}
-                                      </span>
-                                    )}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center gap-2 text-slate-600">
-                                  <UserCheck className="h-4 w-4 shrink-0" />
-                                  <span className="truncate">{wo.tech?.name || "Unassigned"}</span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-2 mt-3 pt-3 border-t">
-                                <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`}>
-                                  {visitTypeLabels[wo.visitType || "SERVICE"]}
-                                </Badge>
-                                {wo.priority && wo.priority !== "normal" && (
-                                  <Badge className={`${prioStyle.bg} ${prioStyle.text} text-xs`}>
-                                    {wo.priority.charAt(0).toUpperCase() + wo.priority.slice(1)}
-                                  </Badge>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
+                              </CardContent>
+                            </Card>
+                          );
+                        })
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
