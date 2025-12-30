@@ -38,6 +38,7 @@ import {
   CheckSquare,
   Package,
   Search,
+  Plus,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -861,7 +862,7 @@ export default function CrmDispatch() {
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
         {/* Search bar at top - DoorLoop style */}
-        <div className="flex justify-center mb-2">
+        <div className="flex justify-center items-center gap-3 mb-2">
           <div className="relative w-full max-w-xl">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
@@ -872,6 +873,14 @@ export default function CrmDispatch() {
               data-testid="input-search-dispatch"
             />
           </div>
+          <Button
+            onClick={() => navigate("/crm/work-orders?create=true")}
+            className="bg-[#711419] hover:bg-[#5a1014] text-white h-10 whitespace-nowrap"
+            data-testid="button-create-work-order"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Create Work Order
+          </Button>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -938,7 +947,7 @@ export default function CrmDispatch() {
                 </div>
                 
                 <div className="border-t border-slate-100 pt-4">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Status (Left Stripe)</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Visit Type (Left Stripe)</p>
                   <div className="grid grid-cols-3 gap-x-3 gap-y-2">
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />

@@ -196,6 +196,16 @@ export default function CrmWorkOrders() {
     }
   }, [authLoading, currentUser, navigate]);
 
+  // Handle ?create=true query parameter to auto-open create dialog
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") === "true") {
+      setCreateDialogOpen(true);
+      // Remove the query parameter from the URL
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   const { data: techniciansData } = useQuery<CrmUser[]>({
     queryKey: ["/api/crm/users"],
     enabled: !!currentUser,
