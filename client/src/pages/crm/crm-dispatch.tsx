@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -23,6 +23,29 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   CalendarDays,
@@ -39,8 +62,10 @@ import {
   Package,
   Search,
   Plus,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { format } from "date-fns";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -51,7 +76,34 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 import { CrmLayout } from "@/components/crm/crm-layout";
-import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, WorkOrderStatus } from "@shared/schema";
+import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject, WorkOrderStatus } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType } from "@shared/schema";
+
+const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+
+type CustomerWithInfo = {
+  id: string;
+  name: string;
+  customerType: string;
+  fullAddress: string | null;
+};
+
+type CustomersResponse = {
+  customers: CustomerWithInfo[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+const visitTypeLabels: Record<string, string> = {
+  SERVICE: "Service",
+  INSTALL: "Install",
+  MAINTENANCE: "Maintenance",
+  SALES: "Sales",
+};
 import {
   DndContext,
   closestCenter,
@@ -546,6 +598,23 @@ export default function CrmDispatch() {
   const [newNote, setNewNote] = useState("");
   const { toast } = useToast();
   
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithInfo | null>(null);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [woTitle, setWoTitle] = useState("");
+  const [woDescription, setWoDescription] = useState("");
+  const [visitType, setVisitType] = useState<WorkOrderVisitType>("SERVICE");
+  const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
+  const [startTime, setStartTime] = useState("08:00");
+  const [endTime, setEndTime] = useState("17:00");
+  const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
+  const [priority, setPriority] = useState<string>("normal");
+
+  const debouncedCustomerSearch = useDebounce(customerSearch, 300);
+  
   const selectedWorkOrder = selectedWorkOrderId ? localWorkOrders.find(wo => wo.id === selectedWorkOrderId) : null;
 
   const handleWorkOrderClick = useCallback((workOrderId: string) => {
@@ -573,6 +642,56 @@ export default function CrmDispatch() {
     queryKey: ["/api/crm/users"],
     enabled: !!currentUser,
   });
+
+  const techniciansList = useMemo(() => 
+    (techniciansData || []).filter(u => u.role === "tech"),
+    [techniciansData]
+  );
+
+  const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
+    queryKey: ["/api/crm/customers", debouncedCustomerSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (debouncedCustomerSearch) params.set("search", debouncedCustomerSearch);
+      params.set("limit", "10");
+      const res = await fetch(`/api/crm/customers?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch customers");
+      return res.json();
+    },
+    enabled: !!currentUser && createDialogOpen && customerSearchOpen,
+  });
+
+  const customers = customersData?.customers || [];
+
+  const { data: propertiesData } = useQuery<CrmProperty[]>({
+    queryKey: ["/api/crm/properties", selectedCustomer?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/properties?customerId=${selectedCustomer!.id}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch properties");
+      return res.json();
+    },
+    enabled: !!selectedCustomer?.id && createDialogOpen,
+  });
+
+  const properties = propertiesData || [];
+
+  const { data: projectsData } = useQuery<CrmProject[]>({
+    queryKey: ["/api/crm/projects", selectedCustomer?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/projects?customerId=${selectedCustomer!.id}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch projects");
+      return res.json();
+    },
+    enabled: !!selectedCustomer?.id && createDialogOpen,
+  });
+
+  const projects = projectsData || [];
 
   const { data: workOrdersData, isLoading: workOrdersLoading } = useQuery<any[]>({
     queryKey: ["/api/crm/dispatch/work-orders", dateString],
@@ -617,6 +736,63 @@ export default function CrmDispatch() {
       if (workOrdersData) {
         setLocalWorkOrders(workOrdersData.map(enrichWorkOrder));
       }
+    },
+  });
+
+  const resetCreateForm = () => {
+    setSelectedCustomer(null);
+    setSelectedPropertyId("");
+    setSelectedProjectId("");
+    setWoTitle("");
+    setWoDescription("");
+    setVisitType("SERVICE");
+    setScheduledDate(selectedDate);
+    setStartTime("08:00");
+    setEndTime("17:00");
+    setAssignedTechId("unassigned");
+    setPriority("normal");
+    setCustomerSearch("");
+    setCustomerSearchOpen(false);
+  };
+
+  const createWorkOrderMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedCustomer) throw new Error("Customer is required");
+      if (!scheduledDate) throw new Error("Scheduled date is required");
+
+      const [startHours, startMinutes] = startTime.split(":").map(Number);
+      const [endHours, endMinutes] = endTime.split(":").map(Number);
+      
+      const scheduledStart = new Date(scheduledDate);
+      scheduledStart.setHours(startHours, startMinutes, 0, 0);
+      
+      const scheduledEnd = new Date(scheduledDate);
+      scheduledEnd.setHours(endHours, endMinutes, 0, 0);
+
+      const res = await apiRequest("POST", "/api/crm/work-orders", {
+        customerId: selectedCustomer.id,
+        propertyId: selectedPropertyId || null,
+        projectId: selectedProjectId || null,
+        title: woTitle || null,
+        description: woDescription || null,
+        visitType,
+        scheduledStart: scheduledStart.toISOString(),
+        scheduledEnd: scheduledEnd.toISOString(),
+        assignedTechId: assignedTechId === "unassigned" ? null : assignedTechId,
+        priority,
+        status: "scheduled",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders", dateString] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
+      toast({ title: "Work order created", description: "New work order has been scheduled." });
+      setCreateDialogOpen(false);
+      resetCreateForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Creation failed", description: error.message, variant: "destructive" });
     },
   });
 
@@ -862,7 +1038,7 @@ export default function CrmDispatch() {
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
         {/* Search bar at top - DoorLoop style */}
-        <div className="flex justify-center items-center gap-3 mb-2">
+        <div className="flex justify-center mb-2">
           <div className="relative w-full max-w-xl">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
@@ -873,14 +1049,6 @@ export default function CrmDispatch() {
               data-testid="input-search-dispatch"
             />
           </div>
-          <Button
-            onClick={() => navigate("/crm/work-orders?create=true")}
-            className="bg-[#711419] hover:bg-[#5a1014] text-white h-10 whitespace-nowrap"
-            data-testid="button-create-work-order"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Create Work Order
-          </Button>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -978,6 +1146,20 @@ export default function CrmDispatch() {
               </div>
             </PopoverContent>
             </Popover>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-slate-600"
+              onClick={() => {
+                setScheduledDate(selectedDate);
+                setCreateDialogOpen(true);
+              }}
+              data-testid="button-create-work-order"
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              Create Work Order
+            </Button>
           </div>
         </div>
 
@@ -1345,6 +1527,248 @@ export default function CrmDispatch() {
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Work Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Customer <span className="text-red-500">*</span></Label>
+              <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={customerSearchOpen}
+                    className="w-full justify-between font-normal"
+                    data-testid="button-select-customer"
+                  >
+                    {selectedCustomer ? selectedCustomer.name : "Search for a customer..."}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[350px] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Type to search customers..."
+                      value={customerSearch}
+                      onValueChange={setCustomerSearch}
+                      data-testid="input-customer-search"
+                    />
+                    <CommandList>
+                      {customersLoading ? (
+                        <div className="p-4 text-center text-sm text-slate-500">
+                          Loading...
+                        </div>
+                      ) : customers.length === 0 ? (
+                        <CommandEmpty>No customers found.</CommandEmpty>
+                      ) : (
+                        <CommandGroup>
+                          {customers.map((customer) => (
+                            <CommandItem
+                              key={customer.id}
+                              value={customer.id}
+                              onSelect={() => {
+                                setSelectedCustomer(customer);
+                                setSelectedPropertyId("");
+                                setSelectedProjectId("");
+                                setCustomerSearchOpen(false);
+                                setCustomerSearch("");
+                              }}
+                              data-testid={`customer-option-${customer.id}`}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium">{customer.name}</span>
+                                {customer.fullAddress && (
+                                  <span className="text-xs text-slate-500">{customer.fullAddress}</span>
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {selectedCustomer && properties.length > 0 && (
+              <div className="space-y-2">
+                <Label>Property</Label>
+                <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                  <SelectTrigger data-testid="select-property">
+                    <SelectValue placeholder="Select property (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No property selected</SelectItem>
+                    {properties.map((prop) => (
+                      <SelectItem key={prop.id} value={prop.id}>
+                        {prop.address1}, {prop.city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input
+                value={woTitle}
+                onChange={(e) => setWoTitle(e.target.value)}
+                placeholder="Optional title for this work order"
+                data-testid="input-wo-title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Visit Type <span className="text-red-500">*</span></Label>
+              <Select value={visitType} onValueChange={(v) => setVisitType(v as WorkOrderVisitType)}>
+                <SelectTrigger data-testid="select-visit-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {workOrderVisitTypeEnum.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {visitTypeLabels[type]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Scheduled Date <span className="text-red-500">*</span></Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                    data-testid="button-scheduled-date"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {scheduledDate ? format(scheduledDate, "MMM d, yyyy") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={scheduledDate}
+                    onSelect={setScheduledDate}
+                    data-testid="calendar-scheduled-date"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Time</Label>
+                <Input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  data-testid="input-start-time"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>End Time</Label>
+                <Input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  data-testid="input-end-time"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Assigned Technician</Label>
+              <Select value={assignedTechId} onValueChange={setAssignedTechId}>
+                <SelectTrigger data-testid="select-assigned-tech">
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {techniciansList.map((tech) => (
+                    <SelectItem key={tech.id} value={tech.id}>
+                      {tech.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedCustomer && projects.length > 0 && (
+              <div className="space-y-2">
+                <Label>Link to Project</Label>
+                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                  <SelectTrigger data-testid="select-project">
+                    <SelectValue placeholder="Select project (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No project linked</SelectItem>
+                    {projects.map((proj) => (
+                      <SelectItem key={proj.id} value={proj.id}>
+                        {proj.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={woDescription}
+                onChange={(e) => setWoDescription(e.target.value)}
+                placeholder="Optional description or notes..."
+                className="min-h-[80px]"
+                data-testid="textarea-description"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Priority</Label>
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger data-testid="select-priority">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITIES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreateDialogOpen(false);
+                resetCreateForm();
+              }}
+              data-testid="button-cancel-create"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createWorkOrderMutation.mutate()}
+              disabled={createWorkOrderMutation.isPending || !selectedCustomer || !scheduledDate}
+              className="bg-[#711419] hover:bg-[#5a1014]"
+              data-testid="button-submit-create"
+            >
+              {createWorkOrderMutation.isPending ? "Creating..." : "Create Work Order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </CrmLayout>
   );
 }
