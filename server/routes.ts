@@ -8222,6 +8222,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: true,
         priority: true,
         visitType: true,
+        workSubtype: true,
+        dispatchQueueStage: true,
         customerId: true,
         propertyId: true,
       }).extend({
@@ -8236,7 +8238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, checklist, partsUsed, startedAt, completedAt, projectId, title, description, priority, visitType, customerId, propertyId, updateProjectCustomer } = result.data;
+      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, checklist, partsUsed, startedAt, completedAt, projectId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer } = result.data;
 
       // If projectId is provided (not null), verify it exists
       if (projectId !== undefined && projectId !== null) {
@@ -8282,6 +8284,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (description !== undefined) updateData.description = description;
       if (priority !== undefined) updateData.priority = priority;
       if (visitType !== undefined) updateData.visitType = visitType;
+      if (workSubtype !== undefined) updateData.workSubtype = workSubtype;
+      if (dispatchQueueStage !== undefined) updateData.dispatchQueueStage = dispatchQueueStage;
       if (customerId !== undefined) updateData.customerId = customerId;
       if (propertyId !== undefined) updateData.propertyId = propertyId;
 

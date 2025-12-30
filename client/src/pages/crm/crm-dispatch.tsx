@@ -886,8 +886,7 @@ interface DraggableScheduleCardProps {
   bgColor: string;
   statusStripe?: string;
   onWorkOrderClick?: (id: string) => void;
-  onResizeLocal?: (workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => void;
-  onResizeEnd?: (workOrderId: string) => void;
+  onResizeComplete?: (workOrderId: string, deltaStartMinutes: number, deltaEndMinutes: number) => void;
   isDragging?: boolean;
 }
 
@@ -898,15 +897,16 @@ function DraggableScheduleCard({
   bgColor, 
   statusStripe = "",
   onWorkOrderClick,
-  onResizeLocal,
-  onResizeEnd,
+  onResizeComplete,
   isDragging = false,
 }: DraggableScheduleCardProps) {
   const [isResizing, setIsResizing] = useState(false);
+  const [resizeOffset, setResizeOffset] = useState({ left: 0, width: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
-  const accumulatedDeltaRef = useRef(0);
   const startXRef = useRef(0);
   const edgeRef = useRef<'start' | 'end'>('end');
+  const accumulatedStartDeltaRef = useRef(0);
+  const accumulatedEndDeltaRef = useRef(0);
   
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `schedule-${workOrder.id}`,
@@ -920,7 +920,9 @@ function DraggableScheduleCard({
     setIsResizing(true);
     startXRef.current = e.clientX;
     edgeRef.current = edge;
-    accumulatedDeltaRef.current = 0;
+    accumulatedStartDeltaRef.current = 0;
+    accumulatedEndDeltaRef.current = 0;
+    setResizeOffset({ left: 0, width: 0 });
     
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!containerRef.current) return;
@@ -928,20 +930,25 @@ function DraggableScheduleCard({
       const deltaX = moveEvent.clientX - startXRef.current;
       const deltaPercent = (deltaX / parentWidth) * 100;
       const deltaMinutes = Math.round((deltaPercent / 100) * SCHEDULE_TOTAL_MINUTES / 15) * 15;
+      const deltaPercentSnapped = (deltaMinutes / SCHEDULE_TOTAL_MINUTES) * 100;
       
-      if (Math.abs(deltaMinutes) >= 15 && onResizeLocal) {
-        onResizeLocal(workOrder.id, edgeRef.current, deltaMinutes);
-        accumulatedDeltaRef.current += deltaMinutes;
-        startXRef.current = moveEvent.clientX;
+      if (edge === 'start') {
+        setResizeOffset({ left: deltaPercentSnapped, width: -deltaPercentSnapped });
+        accumulatedStartDeltaRef.current = deltaMinutes;
+      } else {
+        setResizeOffset({ left: 0, width: deltaPercentSnapped });
+        accumulatedEndDeltaRef.current = deltaMinutes;
       }
     };
     
     const handleMouseUp = () => {
       setIsResizing(false);
+      setResizeOffset({ left: 0, width: 0 });
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      if (accumulatedDeltaRef.current !== 0 && onResizeEnd) {
-        onResizeEnd(workOrder.id);
+      
+      if ((accumulatedStartDeltaRef.current !== 0 || accumulatedEndDeltaRef.current !== 0) && onResizeComplete) {
+        onResizeComplete(workOrder.id, accumulatedStartDeltaRef.current, accumulatedEndDeltaRef.current);
       }
     };
     
@@ -949,9 +956,12 @@ function DraggableScheduleCard({
     document.addEventListener('mouseup', handleMouseUp);
   };
 
+  const visualLeft = leftPercent + resizeOffset.left;
+  const visualWidth = Math.max(widthPercent + resizeOffset.width, 4);
+
   const style: React.CSSProperties = {
-    left: `${leftPercent}%`,
-    width: `${Math.max(widthPercent, 4)}%`,
+    left: `${visualLeft}%`,
+    width: `${visualWidth}%`,
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.3 : 1,
     zIndex: isDragging || isResizing ? 50 : 1,
@@ -1002,12 +1012,11 @@ interface TechnicianScheduleBoardProps {
   workOrders: DispatchWorkOrder[];
   onWorkOrderClick?: (workOrderId: string) => void;
   selectedDate: Date;
-  onResizeLocal?: (workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => void;
-  onResizeEnd?: (workOrderId: string) => void;
+  onResizeComplete?: (workOrderId: string, deltaStartMinutes: number, deltaEndMinutes: number) => void;
   activeId?: string | null;
 }
 
-function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeLocal, onResizeEnd, activeId }: TechnicianScheduleBoardProps) {
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId }: TechnicianScheduleBoardProps) {
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
     for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
@@ -1088,8 +1097,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                         bgColor={bgColor}
                         statusStripe={statusStripe}
                         onWorkOrderClick={onWorkOrderClick}
-                        onResizeLocal={onResizeLocal}
-                        onResizeEnd={onResizeEnd}
+                        onResizeComplete={onResizeComplete}
                         isDragging={activeId === `schedule-${wo.id}`}
                       />
                     );
@@ -1962,28 +1970,22 @@ export default function CrmDispatch() {
     });
   }, [localWorkOrders, selectedDate, updateWorkOrderMutation]);
 
-  const handleScheduleResizeLocal = useCallback((workOrderId: string, edge: 'start' | 'end', deltaMinutes: number) => {
+  const handleResizeComplete = useCallback((workOrderId: string, deltaStartMinutes: number, deltaEndMinutes: number) => {
     const wo = localWorkOrders.find(w => w.id === workOrderId);
     if (!wo || !wo.scheduledStart) return;
 
     const currentStart = new Date(wo.scheduledStart);
     const currentEnd = wo.scheduledEnd ? new Date(wo.scheduledEnd) : new Date(currentStart.getTime() + 60 * 60 * 1000);
     
-    let newStart = new Date(currentStart);
-    let newEnd = new Date(currentEnd);
+    let newStart = new Date(currentStart.getTime() + deltaStartMinutes * 60 * 1000);
+    let newEnd = new Date(currentEnd.getTime() + deltaEndMinutes * 60 * 1000);
     
-    if (edge === 'start') {
-      newStart = new Date(currentStart.getTime() + deltaMinutes * 60 * 1000);
-      if (newStart >= newEnd) return;
-      if (newStart.getHours() < SCHEDULE_START_HOUR) {
-        newStart.setHours(SCHEDULE_START_HOUR, 0, 0, 0);
-      }
-    } else {
-      newEnd = new Date(currentEnd.getTime() + deltaMinutes * 60 * 1000);
-      if (newEnd <= newStart) return;
-      if (newEnd.getHours() > SCHEDULE_END_HOUR || (newEnd.getHours() === SCHEDULE_END_HOUR && newEnd.getMinutes() > 0)) {
-        newEnd.setHours(SCHEDULE_END_HOUR, 0, 0, 0);
-      }
+    if (newStart >= newEnd) return;
+    if (newStart.getHours() < SCHEDULE_START_HOUR) {
+      newStart.setHours(SCHEDULE_START_HOUR, 0, 0, 0);
+    }
+    if (newEnd.getHours() > SCHEDULE_END_HOUR || (newEnd.getHours() === SCHEDULE_END_HOUR && newEnd.getMinutes() > 0)) {
+      newEnd.setHours(SCHEDULE_END_HOUR, 0, 0, 0);
     }
     
     const scheduledStartISO = newStart.toISOString();
@@ -1992,17 +1994,12 @@ export default function CrmDispatch() {
     setLocalWorkOrders(prev => prev.map(w =>
       w.id === workOrderId ? { ...w, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any } : w
     ));
-  }, [localWorkOrders]);
-
-  const handleScheduleResizeEnd = useCallback((workOrderId: string) => {
-    const wo = localWorkOrders.find(w => w.id === workOrderId);
-    if (!wo || !wo.scheduledStart || !wo.scheduledEnd) return;
 
     updateWorkOrderMutation.mutate({
       workOrderId,
       updates: {
-        scheduledStart: wo.scheduledStart as string,
-        scheduledEnd: wo.scheduledEnd as string,
+        scheduledStart: scheduledStartISO,
+        scheduledEnd: scheduledEndISO,
       },
     });
   }, [localWorkOrders, updateWorkOrderMutation]);
@@ -2458,8 +2455,7 @@ export default function CrmDispatch() {
                 workOrders={localWorkOrders.filter(wo => wo.assignedTechId)}
                 onWorkOrderClick={handleWorkOrderClick}
                 selectedDate={selectedDate}
-                onResizeLocal={handleScheduleResizeLocal}
-                onResizeEnd={handleScheduleResizeEnd}
+                onResizeComplete={handleResizeComplete}
                 activeId={activeId}
               />
               
