@@ -345,14 +345,26 @@ export default function DispatchBoardV2() {
                       >
                         Technicians
                       </div>
-                      <div className="flex justify-between" style={{ width: TIMELINE_WIDTH }}>
+                      <div 
+                        className="grid" 
+                        style={{ 
+                          width: TIMELINE_WIDTH,
+                          gridTemplateColumns: "repeat(24, minmax(0, 1fr))"
+                        }}
+                      >
                         {Array.from({ length: 13 }, (_, i) => {
                           const hour = START_HOUR + i;
                           const label = hour === 12 ? "12pm" : hour > 12 ? `${hour - 12}pm` : `${hour}am`;
+                          const isLast = i === 12;
                           return (
                             <div
                               key={i}
                               className="py-2 text-xs font-medium text-slate-600"
+                              style={{ 
+                                gridColumn: isLast ? "24 / span 1" : `${i * 2 + 1} / span 2`,
+                                textAlign: isLast ? "right" : "left",
+                                paddingRight: isLast ? 4 : 0,
+                              }}
                             >
                               {label}
                             </div>
@@ -490,9 +502,15 @@ function TechnicianRowV2({
         </div>
       </div>
 
-      <div className="relative bg-slate-50/30" style={{ width: TIMELINE_WIDTH }}>
+      <div 
+        className="grid relative" 
+        style={{ 
+          width: TIMELINE_WIDTH,
+          gridTemplateColumns: "repeat(24, minmax(0, 1fr))"
+        }}
+      >
         {Array.from({ length: TOTAL_SLOTS }, (_, idx) => (
-          <DropZonePercent
+          <DropZoneGrid
             key={idx}
             techId={tech.id}
             slotIndex={idx}
@@ -509,15 +527,15 @@ function TechnicianRowV2({
 
           if (minutesFrom8am < 0 || minutesFrom8am >= TOTAL_MINUTES) return null;
 
-          const leftPercent = minutesToPercent(minutesFrom8am);
-          const widthPercent = minutesToPercent(durationMins);
+          const startSlot = Math.floor(minutesFrom8am / INTERVAL_MINUTES);
+          const durationSlots = Math.max(1, Math.round(durationMins / INTERVAL_MINUTES));
 
           return (
-            <ScheduledWorkOrderCard
+            <ScheduledWorkOrderCardGrid
               key={wo.id}
               workOrder={wo}
-              leftPercent={leftPercent}
-              widthPercent={widthPercent}
+              startSlot={startSlot}
+              durationSlots={durationSlots}
             />
           );
         })}
@@ -526,34 +544,31 @@ function TechnicianRowV2({
   );
 }
 
-function DropZonePercent({ techId, slotIndex }: { techId: string; slotIndex: number }) {
+function DropZoneGrid({ techId, slotIndex }: { techId: string; slotIndex: number }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `tech-slot::${techId}::${slotIndex}`,
   });
 
-  const leftPercent = (slotIndex / TOTAL_SLOTS) * 100;
-  const widthPercent = (1 / TOTAL_SLOTS) * 100;
-
   return (
     <div
       ref={setNodeRef}
-      className={`absolute top-0 bottom-0 ${isOver ? "bg-blue-50" : ""}`}
+      className={`h-full ${isOver ? "bg-blue-50" : ""}`}
       style={{
-        left: `${leftPercent}%`,
-        width: `${widthPercent}%`,
+        gridColumn: `${slotIndex + 1} / span 1`,
+        gridRow: 1,
       }}
     />
   );
 }
 
-function ScheduledWorkOrderCard({
+function ScheduledWorkOrderCardGrid({
   workOrder,
-  leftPercent,
-  widthPercent,
+  startSlot,
+  durationSlots,
 }: {
   workOrder: EnrichedWorkOrder;
-  leftPercent: number;
-  widthPercent: number;
+  startSlot: number;
+  durationSlots: number;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: workOrder.id,
@@ -563,14 +578,13 @@ function ScheduledWorkOrderCard({
   const statusStyle = statusColors[workOrder.status] || statusColors.scheduled;
 
   const style: React.CSSProperties = {
-    position: "absolute",
-    top: 4,
-    bottom: 4,
-    left: `${leftPercent}%`,
-    width: `${widthPercent}%`,
+    gridColumn: `${startSlot + 1} / span ${durationSlots}`,
+    gridRow: 1,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
     opacity: isDragging ? 0.7 : 1,
     zIndex: isDragging ? 50 : 10,
+    marginTop: 4,
+    marginBottom: 4,
   };
 
   return (
