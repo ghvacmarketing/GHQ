@@ -201,10 +201,10 @@ export default function CrmWorkOrders() {
     const startDate = new Date(start);
     const hours = startDate.getHours();
     if (hours >= 8 && hours < 10) return "08:00-10:00";
-    if (hours >= 10 && hours < 12) return "10:00-12:00";
+    if (hours >= 10 && hours < 13) return "10:00-12:00"; // includes noon
     if (hours >= 13 && hours < 15) return "13:00-15:00";
     if (hours >= 15 && hours < 17) return "15:00-17:00";
-    return "08:00-10:00";
+    return "08:00-10:00"; // fallback for times outside business hours
   };
 
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
@@ -528,6 +528,18 @@ export default function CrmWorkOrders() {
   
   const handleLinkProject = (projectId: string | null) => {
     if (selectedWorkOrder) {
+      // Find the project to include in the optimistic update
+      const linkedProject = projectId 
+        ? linkableProjects.find(p => p.id === projectId) || null 
+        : null;
+      
+      // Optimistically update the local state for immediate UI feedback
+      setSelectedWorkOrder({
+        ...selectedWorkOrder,
+        projectId,
+        project: linkedProject,
+      });
+      
       updateWorkOrderMutation.mutate({
         id: selectedWorkOrder.id,
         updates: { projectId },
