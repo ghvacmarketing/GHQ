@@ -1462,12 +1462,12 @@ export default function CrmAccountDetail() {
               {sites.length > 0 && (
                 <div className="space-y-2">
                   <Label>Associated Site (optional)</Label>
-                  <Select value={contactForm.siteId} onValueChange={(value) => setContactForm({ ...contactForm, siteId: value })}>
+                  <Select value={contactForm.siteId || "none"} onValueChange={(value) => setContactForm({ ...contactForm, siteId: value === "none" ? "" : value })}>
                     <SelectTrigger data-testid="select-contact-site">
                       <SelectValue placeholder="No specific site" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No specific site</SelectItem>
+                      <SelectItem value="none">No specific site</SelectItem>
                       {sites.map((site) => (
                         <SelectItem key={site.id} value={site.id}>
                           {site.siteName || `${site.address1}, ${site.city}`}

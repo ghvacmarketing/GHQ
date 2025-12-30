@@ -1427,12 +1427,12 @@ export default function CrmWorkOrders() {
               {selectedCustomer && projects.length > 0 && (
                 <div className="space-y-2">
                   <Label>Link to Project</Label>
-                  <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                  <Select value={selectedProjectId || "none"} onValueChange={(v) => setSelectedProjectId(v === "none" ? "" : v)}>
                     <SelectTrigger data-testid="select-project">
                       <SelectValue placeholder="Select project (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No project linked</SelectItem>
+                      <SelectItem value="none">No project linked</SelectItem>
                       {projects.map((proj) => (
                         <SelectItem key={proj.id} value={proj.id}>
                           {proj.title}

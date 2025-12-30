@@ -2418,12 +2418,12 @@ export default function CrmCustomerDetail() {
               {/* Link to Project (optional) */}
               <div className="space-y-2">
                 <Label>Link to Project (optional)</Label>
-                <Select value={woProjectId} onValueChange={setWoProjectId}>
+                <Select value={woProjectId || "none"} onValueChange={(v) => setWoProjectId(v === "none" ? "" : v)}>
                   <SelectTrigger data-testid="select-wo-project">
                     <SelectValue placeholder="Select project" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="" data-testid="wo-project-none">
+                    <SelectItem value="none" data-testid="wo-project-none">
                       No project
                     </SelectItem>
                     {crmProjects?.filter(p => p.status !== "archived").map((proj) => (
@@ -2628,12 +2628,12 @@ export default function CrmCustomerDetail() {
               {/* Property Selection */}
               <div className="space-y-2">
                 <Label>Property (optional)</Label>
-                <Select value={projPropertyId} onValueChange={setProjPropertyId}>
+                <Select value={projPropertyId || "none"} onValueChange={(v) => setProjPropertyId(v === "none" ? "" : v)}>
                   <SelectTrigger data-testid="select-proj-property">
                     <SelectValue placeholder="Select property" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="" data-testid="proj-property-none">
+                    <SelectItem value="none" data-testid="proj-property-none">
                       No property
                     </SelectItem>
                     {customerProperties?.map((prop) => (

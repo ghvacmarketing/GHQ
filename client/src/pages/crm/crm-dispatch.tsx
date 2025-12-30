@@ -1604,12 +1604,12 @@ export default function CrmDispatch() {
             {selectedCustomer && properties.length > 0 && (
               <div className="space-y-2">
                 <Label>Property</Label>
-                <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                <Select value={selectedPropertyId || "none"} onValueChange={(v) => setSelectedPropertyId(v === "none" ? "" : v)}>
                   <SelectTrigger data-testid="select-property">
                     <SelectValue placeholder="Select property (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No property selected</SelectItem>
+                    <SelectItem value="none">No property selected</SelectItem>
                     {properties.map((prop) => (
                       <SelectItem key={prop.id} value={prop.id}>
                         {prop.address1}, {prop.city}
@@ -1706,12 +1706,12 @@ export default function CrmDispatch() {
             {selectedCustomer && projects.length > 0 && (
               <div className="space-y-2">
                 <Label>Link to Project</Label>
-                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <Select value={selectedProjectId || "none"} onValueChange={(v) => setSelectedProjectId(v === "none" ? "" : v)}>
                   <SelectTrigger data-testid="select-project">
                     <SelectValue placeholder="Select project (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No project linked</SelectItem>
+                    <SelectItem value="none">No project linked</SelectItem>
                     {projects.map((proj) => (
                       <SelectItem key={proj.id} value={proj.id}>
                         {proj.title}
