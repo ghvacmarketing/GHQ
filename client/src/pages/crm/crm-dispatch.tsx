@@ -631,20 +631,8 @@ function QueueStageBox({
   );
 }
 
-type DateScope = "today" | "tomorrow" | "thisWeek" | "all";
-
 interface UnassignedQueueSectionProps {
   workOrders: DispatchWorkOrder[];
-  queueCategoryFilter: WorkCategory | "all";
-  setQueueCategoryFilter: (v: WorkCategory | "all") => void;
-  queuePriorityFilter: string;
-  setQueuePriorityFilter: (v: string) => void;
-  callbacksOnly: boolean;
-  setCallbacksOnly: (v: boolean) => void;
-  pmOnly: boolean;
-  setPmOnly: (v: boolean) => void;
-  dateScope: DateScope;
-  setDateScope: (v: DateScope) => void;
   onWorkOrderClick?: (workOrderId: string) => void;
   technicians?: Technician[];
   onQuickAssign?: (workOrderId: string, techId: string) => void;
@@ -656,16 +644,6 @@ interface UnassignedQueueSectionProps {
 
 function UnassignedQueueSection({
   workOrders,
-  queueCategoryFilter,
-  setQueueCategoryFilter,
-  queuePriorityFilter,
-  setQueuePriorityFilter,
-  callbacksOnly,
-  setCallbacksOnly,
-  pmOnly,
-  setPmOnly,
-  dateScope,
-  setDateScope,
   onWorkOrderClick,
   technicians,
   onQuickAssign,
@@ -675,31 +653,8 @@ function UnassignedQueueSection({
   selectedDate,
 }: UnassignedQueueSectionProps) {
   const filteredWorkOrders = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const endOfWeek = new Date(today);
-    endOfWeek.setDate(endOfWeek.getDate() + (7 - endOfWeek.getDay()));
-    
-    return workOrders.filter(wo => {
-      if (queueCategoryFilter !== "all" && wo.workCategory !== queueCategoryFilter) return false;
-      if (queuePriorityFilter !== "all" && wo.priority !== queuePriorityFilter) return false;
-      if (callbacksOnly) {
-        const stage = getEffectiveQueueStage(wo);
-        if (stage !== "CallbackPriority") return false;
-      }
-      if (pmOnly && wo.workCategory !== "Maintenance") return false;
-      if (dateScope !== "all" && wo.scheduledStart) {
-        const woDate = new Date(wo.scheduledStart);
-        woDate.setHours(0, 0, 0, 0);
-        if (dateScope === "today" && woDate.getTime() !== today.getTime()) return false;
-        if (dateScope === "tomorrow" && woDate.getTime() !== tomorrow.getTime()) return false;
-        if (dateScope === "thisWeek" && (woDate < today || woDate > endOfWeek)) return false;
-      }
-      return true;
-    });
-  }, [workOrders, queueCategoryFilter, queuePriorityFilter, callbacksOnly, pmOnly, dateScope]);
+    return workOrders;
+  }, [workOrders]);
 
   const groupedByStage = useMemo(() => {
     const groups: Record<DispatchQueueStage, DispatchWorkOrder[]> = {
@@ -732,63 +687,6 @@ function UnassignedQueueSection({
     <div className="space-y-3" data-testid="unassigned-queue-section">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-800">Unassigned Queue ({workOrders.length})</h2>
-        <div className="flex items-center gap-3 flex-wrap">
-          <Select value={dateScope} onValueChange={(v) => setDateScope(v as DateScope)}>
-            <SelectTrigger className="w-[120px] h-8 text-xs" data-testid="select-date-scope">
-              <SelectValue placeholder="Date Scope" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Dates</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="tomorrow">Tomorrow</SelectItem>
-              <SelectItem value="thisWeek">This Week</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Select value={queueCategoryFilter} onValueChange={(v) => setQueueCategoryFilter(v as WorkCategory | "all")}>
-            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-queue-category">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {workCategoryEnum.map((cat) => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Select value={queuePriorityFilter} onValueChange={setQueuePriorityFilter}>
-            <SelectTrigger className="w-[120px] h-8 text-xs" data-testid="select-queue-priority">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              {PRIORITIES.map((p) => (
-                <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <div className="flex items-center gap-2">
-            <Switch 
-              checked={pmOnly} 
-              onCheckedChange={setPmOnly}
-              id="pm-only"
-              data-testid="switch-pm-only"
-            />
-            <Label htmlFor="pm-only" className="text-xs text-slate-600 cursor-pointer">PM Only</Label>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Switch 
-              checked={callbacksOnly} 
-              onCheckedChange={setCallbacksOnly}
-              id="callbacks-only"
-              data-testid="switch-callbacks-only"
-            />
-            <Label htmlFor="callbacks-only" className="text-xs text-slate-600 cursor-pointer">Callbacks Only</Label>
-          </div>
-        </div>
       </div>
       
       {filteredWorkOrders.length === 0 ? (
@@ -1131,8 +1029,6 @@ export default function CrmDispatch() {
   const [, navigate] = useLocation();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [filter, setFilter] = useState<FilterStatus>("all");
-  const [categoryFilter, setCategoryFilter] = useState<WorkCategory | "all">("all");
-  const [subtypeFilter, setSubtypeFilter] = useState<string>("all");
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebounce(searchInput, 300);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -1142,12 +1038,6 @@ export default function CrmDispatch() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
   const { toast } = useToast();
-  
-  const [queueCategoryFilter, setQueueCategoryFilter] = useState<WorkCategory | "all">("all");
-  const [queuePriorityFilter, setQueuePriorityFilter] = useState<string>("all");
-  const [callbacksOnly, setCallbacksOnly] = useState(false);
-  const [pmOnly, setPmOnly] = useState(false);
-  const [dateScope, setDateScope] = useState<DateScope>("all");
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
@@ -1703,14 +1593,11 @@ export default function CrmDispatch() {
         if (!matchesSearch) return false;
       }
       
-      if (categoryFilter !== "all" && wo.workCategory !== categoryFilter) return false;
-      if (subtypeFilter !== "all" && wo.workSubtype !== subtypeFilter) return false;
-      
       if (filter === "all") return true;
       if (filter === "completed") return wo.status === "completed";
       return wo.status === filter;
     });
-  }, [localWorkOrders, debouncedSearch, categoryFilter, subtypeFilter, filter]);
+  }, [localWorkOrders, debouncedSearch, filter]);
 
   const getWorkOrdersForTechnician = useCallback((techId: string) => {
     return assignedWorkOrders.filter((wo) => wo.assignedTechId === techId);
@@ -1894,27 +1781,6 @@ export default function CrmDispatch() {
           onDragEnd={handleDragEnd}
         >
           <div className="hidden lg:block space-y-6">
-            <UnassignedQueueSection
-              workOrders={unassignedWorkOrders}
-              queueCategoryFilter={queueCategoryFilter}
-              setQueueCategoryFilter={setQueueCategoryFilter}
-              queuePriorityFilter={queuePriorityFilter}
-              setQueuePriorityFilter={setQueuePriorityFilter}
-              callbacksOnly={callbacksOnly}
-              setCallbacksOnly={setCallbacksOnly}
-              pmOnly={pmOnly}
-              setPmOnly={setPmOnly}
-              dateScope={dateScope}
-              setDateScope={setDateScope}
-              onWorkOrderClick={handleWorkOrderClick}
-              technicians={technicians}
-              onQuickAssign={handleQuickAssign}
-              onQuickSchedule={handleQuickSchedule}
-              onQuickStageChange={handleQuickStageChange}
-              onQuickNote={handleQuickNote}
-              selectedDate={selectedDate}
-            />
-
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-slate-800">Technician Schedule ({assignedWorkOrders.length})</h2>
@@ -1940,57 +1806,6 @@ export default function CrmDispatch() {
                     </button>
                   );
                 })}
-              </div>
-
-              <div className="flex gap-3 flex-wrap">
-                <Select 
-                  value={categoryFilter} 
-                  onValueChange={(v) => {
-                    setCategoryFilter(v as WorkCategory | "all");
-                    setSubtypeFilter("all");
-                  }}
-                >
-                  <SelectTrigger className="w-[160px]" data-testid="select-category-filter">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {workCategoryEnum.map((cat) => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <Select 
-                  value={subtypeFilter} 
-                  onValueChange={setSubtypeFilter}
-                  disabled={categoryFilter === "all"}
-                >
-                  <SelectTrigger className="w-[200px]" data-testid="select-subtype-filter">
-                    <SelectValue placeholder="All Subtypes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Subtypes</SelectItem>
-                    {categoryFilter !== "all" && workSubtypeByCategory[categoryFilter].map((sub) => (
-                      <SelectItem key={sub} value={sub}>{sub}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                {(categoryFilter !== "all" || subtypeFilter !== "all") && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => {
-                      setCategoryFilter("all");
-                      setSubtypeFilter("all");
-                    }}
-                    className="text-slate-500"
-                    data-testid="button-clear-filters"
-                  >
-                    Clear Filters
-                  </Button>
-                )}
               </div>
 
               <Card className="bg-white border" data-testid="card-timeline">
@@ -2040,6 +1855,17 @@ export default function CrmDispatch() {
                 </CardContent>
               </Card>
             </div>
+
+            <UnassignedQueueSection
+              workOrders={unassignedWorkOrders}
+              onWorkOrderClick={handleWorkOrderClick}
+              technicians={technicians}
+              onQuickAssign={handleQuickAssign}
+              onQuickSchedule={handleQuickSchedule}
+              onQuickStageChange={handleQuickStageChange}
+              onQuickNote={handleQuickNote}
+              selectedDate={selectedDate}
+            />
           </div>
           
           <DragOverlay>
