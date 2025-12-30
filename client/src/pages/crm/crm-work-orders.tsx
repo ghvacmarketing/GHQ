@@ -138,10 +138,11 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
   urgent: { bg: "bg-red-100", text: "text-red-700" },
 };
 
-type FilterTab = "all" | "needs_scheduling" | "scheduled" | "in_progress" | "completed" | "ready_to_invoice" | "invoiced" | "closed" | "cancelled";
+type FilterTab = "all" | "unassigned" | "needs_scheduling" | "scheduled" | "in_progress" | "completed" | "ready_to_invoice" | "invoiced" | "closed" | "cancelled";
 
 const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> = {
   all: { label: "All", shortLabel: "All" },
+  unassigned: { label: "Unassigned", shortLabel: "Unassigned" },
   needs_scheduling: { label: "Needs Scheduling", shortLabel: "Unscheduled" },
   scheduled: { label: "Scheduled", shortLabel: "Scheduled" },
   in_progress: { label: "In Progress", shortLabel: "Active" },
@@ -410,7 +411,14 @@ export default function CrmWorkOrders() {
     }
     
     // Apply tab-based status filtering (for tabs not handled server-side)
-    if (activeTab === "needs_scheduling") {
+    if (activeTab === "unassigned") {
+      // Unassigned work orders - no tech assigned or in queue stages
+      const unassignedStages = ["NeedsScheduling", "ReadyToDispatch", "WaitingOnParts", "NeedsApproval", "OnHold"];
+      orders = orders.filter(wo => 
+        !wo.assignedTechId || 
+        (wo.dispatchQueueStage && unassignedStages.includes(wo.dispatchQueueStage))
+      );
+    } else if (activeTab === "needs_scheduling") {
       // Work orders without a scheduled date
       orders = orders.filter(wo => !wo.scheduledStart);
     } else if (activeTab === "in_progress") {
