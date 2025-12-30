@@ -161,7 +161,6 @@ export default function CrmWorkOrders() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [techFilter, setTechFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<WorkCategory | "all">("all");
-  const [subtypeFilter, setSubtypeFilter] = useState<string>("all");
   const debouncedSearch = useDebounce(searchInput, 300);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<EnrichedWorkOrder | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -405,10 +404,6 @@ export default function CrmWorkOrders() {
       orders = orders.filter(wo => wo.workCategory === categoryFilter);
     }
     
-    // Apply subtype filter
-    if (subtypeFilter !== "all") {
-      orders = orders.filter(wo => wo.workSubtype === subtypeFilter);
-    }
     
     // Apply tab-based status filtering (for tabs not handled server-side)
     if (activeTab === "unassigned") {
@@ -449,7 +444,7 @@ export default function CrmWorkOrders() {
       const dateB = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
       return dateA - dateB;
     });
-  }, [workOrdersData, activeTab, debouncedSearch, categoryFilter, subtypeFilter]);
+  }, [workOrdersData, activeTab, debouncedSearch, categoryFilter]);
 
   const updateWorkOrderMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<CrmWorkOrder> & { updateProjectCustomer?: boolean } }) => {
@@ -757,6 +752,20 @@ export default function CrmWorkOrders() {
             <p className="text-sm text-slate-500">Total: {total}</p>
           </div>
           <div className="flex items-center gap-2">
+            <Select 
+              value={categoryFilter} 
+              onValueChange={(v) => setCategoryFilter(v as WorkCategory | "all")}
+            >
+              <SelectTrigger className="w-[140px]" data-testid="select-category-filter">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {workCategoryEnum.map((cat) => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               onClick={() => setCreateDialogOpen(true)}
               className="bg-[#711419] hover:bg-[#5a1014] text-white"
@@ -765,14 +774,6 @@ export default function CrmWorkOrders() {
             >
               <Plus className="h-4 w-4 mr-1" />
               Create Work Order
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => refetch()}
-              data-testid="button-refresh-work-orders"
-            >
-              <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -794,58 +795,6 @@ export default function CrmWorkOrders() {
               <span className="sm:hidden">{filterTabConfig[tab].shortLabel}</span>
             </button>
           ))}
-        </div>
-
-        {/* Category and Subtype filters */}
-        <div className="flex gap-3 flex-wrap">
-          <Select 
-            value={categoryFilter} 
-            onValueChange={(v) => {
-              setCategoryFilter(v as WorkCategory | "all");
-              setSubtypeFilter("all");
-            }}
-          >
-            <SelectTrigger className="w-[160px]" data-testid="select-category-filter">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {workCategoryEnum.map((cat) => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Select 
-            value={subtypeFilter} 
-            onValueChange={setSubtypeFilter}
-            disabled={categoryFilter === "all"}
-          >
-            <SelectTrigger className="w-[200px]" data-testid="select-subtype-filter">
-              <SelectValue placeholder="All Subtypes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Subtypes</SelectItem>
-              {categoryFilter !== "all" && workSubtypeByCategory[categoryFilter].map((sub) => (
-                <SelectItem key={sub} value={sub}>{sub}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          {(categoryFilter !== "all" || subtypeFilter !== "all") && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => {
-                setCategoryFilter("all");
-                setSubtypeFilter("all");
-              }}
-              className="text-slate-500"
-              data-testid="button-clear-filters"
-            >
-              Clear Filters
-            </Button>
-          )}
         </div>
 
         {workOrdersLoading ? (
