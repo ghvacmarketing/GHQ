@@ -1,0 +1,26 @@
+flowchart LR
+    Backend[Express Backend] --> OpenAI[OpenAI API]
+    Backend --> Resend[Resend Email]
+    Backend --> GoogleSheets[Google Sheets API]
+    Backend --> GCS[Google Cloud Storage]
+    Backend --> Twilio[Twilio SMS]
+    Backend --> WeatherAPI[Weather API]
+    Backend --> Trello[Trello Webhooks]
+
+    OpenAI -->|GPT-3.5-turbo| QuoteGen[Quote Generation]
+    OpenAI -->|Whisper| Transcription[Voice Transcription]
+    OpenAI -->|Embeddings| VectorStore[Vector Store]
+
+    Resend -->|HTML Templates| EmailQuotes[Quote Emails]
+    Resend -->|HTML Templates| EmailInvoices[Invoice Emails]
+
+    GoogleSheets -->|Customer Data| Sync[Customer Sync]
+    GoogleSheets -->|Equipment Data| Equipment[Equipment Pricing]
+
+    GCS -->|File Upload| Attachments[Activity Attachments]
+
+    Twilio -->|SMS| Notifications[Customer Notifications]
+
+    WeatherAPI -->|Forecast Data| Impact[Weather Impact Analysis]
+
+    Trello -->|Voicemail Webhook| VoicemailLog[Voicemail Tracking]

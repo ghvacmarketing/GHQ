@@ -1,0 +1,57 @@
+flowchart TD
+    GenerateQuote([POST /api/quotes/generate]) --> ValidateInput{Validate<br/>Input Data}
+    ValidateInput -->|Invalid| Error400[400 Bad Request]
+    ValidateInput -->|Valid| PrepareCart[Prepare Cart Items<br/>Equipment, Labor, Accessories]
+
+    PrepareCart --> CalculateTotals[Calculate Subtotals<br/>& Grand Total]
+    CalculateTotals --> CheckElitePackage{Elite Package<br/>Eligible?}
+
+    CheckElitePackage -->|Yes| ApplyDiscount[Apply 20% Discount]
+    CheckElitePackage -->|No| NoDiscount[No Discount]
+
+    ApplyDiscount --> BuildContext[Build AI Context<br/>Customer, Address, Cart]
+    NoDiscount --> BuildContext
+
+    BuildContext --> FetchHistory[Fetch Conversation History<br/>quote_conversations]
+    FetchHistory --> CallOpenAI[Call OpenAI API<br/>gpt-3.5-turbo]
+
+    CallOpenAI --> AIResponse{AI Response<br/>Valid?}
+    AIResponse -->|Error| Error500[500 Internal Error]
+    AIResponse -->|Success| ParseResponse[Parse Structured Response<br/>Title, Description, Line Items]
+
+    ParseResponse --> SaveConversation[Save to quote_conversations]
+    SaveConversation --> SaveMessage[Save to quote_messages<br/>User + Assistant]
+    SaveMessage --> FormatQuote[Format as Professional<br/>PDF Proposal]
+
+    FormatQuote --> ReturnQuote[Return Quote Data<br/>with Formatting]
+    ReturnQuote --> Success([200 OK])
+
+    Error400 --> End([Response])
+    Error500 --> End
+    Success --> End
+
+    SendQuote([POST /api/crm/quotes/:id/send]) --> ValidateAuthSend{CRM Auth<br/>Sales or Above?}
+    ValidateAuthSend -->|No| Error403[403 Forbidden]
+    ValidateAuthSend -->|Yes| FetchQuote[Fetch Quote<br/>from crm_quotes]
+
+    FetchQuote --> QuoteExists{Quote<br/>Exists?}
+    QuoteExists -->|No| Error404[404 Not Found]
+    QuoteExists -->|Yes| ValidateEmail{Customer Email<br/>Valid?}
+
+    ValidateEmail -->|No| Error400b[400 Bad Request]
+    ValidateEmail -->|Yes| RenderTemplate[Render Email Template<br/>HTML with Line Items]
+
+    RenderTemplate --> CallResend[Call Resend API<br/>Send Email]
+    CallResend --> EmailSent{Email<br/>Sent?}
+
+    EmailSent -->|Error| Error500b[500 Internal Error]
+    EmailSent -->|Success| UpdateQuote[Update Quote Status<br/>sentAt timestamp]
+
+    UpdateQuote --> AuditLog[Log to crm_audit_log<br/>Action: quote_sent]
+    AuditLog --> Success2([200 OK])
+
+    Error403 --> End2([Response])
+    Error404 --> End2
+    Error400b --> End2
+    Error500b --> End2
+    Success2 --> End2

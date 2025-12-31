@@ -1,0 +1,41 @@
+flowchart TD
+    SyncTrigger([Scheduled Sync / Manual Trigger]) --> CheckRateLimit{Daily Sync<br/>Limit Reached?}
+    CheckRateLimit -->|Yes| Skip([Skip Sync])
+    CheckRateLimit -->|No| FetchSheets[Call Google Sheets API<br/>Read Customer Data]
+
+    FetchSheets --> SheetsSuccess{API Call<br/>Success?}
+    SheetsSuccess -->|Error| LogError[Log Error<br/>Update Sync Status]
+    SheetsSuccess -->|Success| CalculateHash[Calculate Data Hash<br/>Detect Changes]
+
+    CalculateHash --> DataChanged{Data Hash<br/>Changed?}
+    DataChanged -->|No| UpdateTimestamp[Update lastCheck<br/>Skip Processing]
+    DataChanged -->|Yes| ProcessRows[Iterate Through Rows]
+
+    ProcessRows --> ForEachRow{For Each<br/>Row}
+    ForEachRow -->|Row| CalculateChecksum[Calculate Row Checksum]
+
+    CalculateChecksum --> LookupCustomer[Lookup Existing Customer<br/>By Email/Phone/Name]
+    LookupCustomer --> CustomerExists{Customer<br/>Exists?}
+
+    CustomerExists -->|No| CreateCustomer[Insert New Customer<br/>to crm_customers]
+    CreateCustomer --> IncrementCreated[Increment Created Count]
+
+    CustomerExists -->|Yes| ChecksumMatch{Checksum<br/>Match?}
+    ChecksumMatch -->|Yes| IncrementSkipped[Increment Skipped Count]
+    ChecksumMatch -->|No| UpdateCustomer[Update Existing Customer<br/>Data]
+
+    UpdateCustomer --> IncrementUpdated[Increment Updated Count]
+
+    IncrementCreated --> NextRow{More<br/>Rows?}
+    IncrementSkipped --> NextRow
+    IncrementUpdated --> NextRow
+
+    NextRow -->|Yes| ForEachRow
+    NextRow -->|No| UpdateSyncStatus[Update Sync Status<br/>Results & Timestamp]
+
+    UpdateSyncStatus --> LogSuccess[Log Sync Success<br/>Counts & Duration]
+    LogSuccess --> Complete([Sync Complete])
+
+    UpdateTimestamp --> Complete
+    LogError --> Complete
+    Skip --> Complete

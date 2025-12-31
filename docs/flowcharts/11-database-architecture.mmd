@@ -1,0 +1,52 @@
+graph LR
+    subgraph CoreTables[Core Tables]
+        CU[crm_customers]
+        PR[crm_properties]
+        EQ[crm_equipment]
+        US[crm_users]
+        SE[crm_sessions]
+    end
+
+    subgraph WorkManagement[Work Management]
+        JB[crm_jobs]
+        WO[crm_work_orders]
+        PJ[crm_projects]
+    end
+
+    subgraph Financial
+        QT[crm_quotes]
+        QL[crm_quote_line_items]
+        IN[crm_invoices]
+        IL[crm_invoice_line_items]
+        PM[crm_payments]
+        AG[crm_agreements]
+    end
+
+    subgraph Commercial
+        AC[crm_accounts]
+        SI[crm_sites]
+        CN[crm_contacts]
+    end
+
+    subgraph Audit
+        AL[crm_audit_log]
+    end
+
+    CU -->|has many| PR
+    CU -->|has many| JB
+    CU -->|has one| AC
+    PR -->|has many| EQ
+    PR -->|has many| WO
+    JB -->|has many| WO
+    WO -->|has many| QT
+    WO -->|has one| IN
+    QT -->|has many| QL
+    IN -->|has many| IL
+    IN -->|has many| PM
+    AC -->|has many| SI
+    AC -->|has many| CN
+    US -->|has many| SE
+    AL -.->|logs all| CU
+    AL -.->|logs all| WO
+    AL -.->|logs all| QT
+    AL -.->|logs all| IN

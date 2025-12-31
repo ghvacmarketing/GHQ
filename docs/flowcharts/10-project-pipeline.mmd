@@ -1,0 +1,74 @@
+flowchart TD
+    CreateProject([POST /api/crm/projects]) --> ValidateAuth{CRM Auth<br/>Sales or Above?}
+    ValidateAuth -->|No| Error403[403 Forbidden]
+    ValidateAuth -->|Yes| ValidateInput{Validate<br/>Project Data}
+
+    ValidateInput -->|Invalid| Error400[400 Bad Request]
+    ValidateInput -->|Valid| CheckCustomer[Verify Customer<br/>& Property Exist]
+
+    CheckCustomer --> RefsValid{References<br/>Valid?}
+    RefsValid -->|No| Error404[404 Not Found]
+    RefsValid -->|Yes| InsertProject[Insert to crm_projects<br/>Status: lead]
+
+    InsertProject --> SetDefaults[Set Default Values<br/>Priority, Type, Value]
+    SetDefaults --> AuditLog[Log to crm_audit_log<br/>Action: project_created]
+
+    AuditLog --> ReturnProject[Return Project Object]
+    ReturnProject --> Success([201 Created])
+
+    UpdateStatus([PATCH /api/crm/projects/:id/status]) --> ValidateAuthUpdate{CRM Auth<br/>Sales or Above?}
+    ValidateAuthUpdate -->|No| Error403b[403 Forbidden]
+    ValidateAuthUpdate -->|Yes| FetchProject[Fetch Project]
+
+    FetchProject --> ProjectExists{Project<br/>Exists?}
+    ProjectExists -->|No| Error404b[404 Not Found]
+    ProjectExists -->|Yes| ValidateStatus{Valid Status<br/>Transition?}
+
+    ValidateStatus -->|Invalid| Error400b[400 Bad Request]
+    ValidateStatus -->|Valid| UpdateStatusField[Update status Field]
+
+    UpdateStatusField --> SetTimestamp{Set Status<br/>Timestamp?}
+    SetTimestamp -->|proposal_sent| UpdateProposalDate[Set proposalSentAt]
+    SetTimestamp -->|approved| UpdateApprovalDate[Set approvedAt]
+    SetTimestamp -->|completed| UpdateCompletionDate[Set completedAt]
+    SetTimestamp -->|Other| SkipTimestamp[Skip Timestamp]
+
+    UpdateProposalDate --> AuditLogStatus[Log to crm_audit_log<br/>Action: project_status_changed]
+    UpdateApprovalDate --> AuditLogStatus
+    UpdateCompletionDate --> AuditLogStatus
+    SkipTimestamp --> AuditLogStatus
+
+    AuditLogStatus --> Success2([200 OK])
+
+    AddActivity([POST /api/crm/projects/:id/activities]) --> ValidateAuthActivity{CRM Auth<br/>Valid?}
+    ValidateAuthActivity -->|No| Error401[401 Unauthorized]
+    ValidateAuthActivity -->|Yes| FetchProjectActivity[Fetch Project]
+
+    FetchProjectActivity --> ProjectExistsActivity{Project<br/>Exists?}
+    ProjectExistsActivity -->|No| Error404c[404 Not Found]
+    ProjectExistsActivity -->|Yes| ValidateActivity{Validate<br/>Activity Data}
+
+    ValidateActivity -->|Invalid| Error400c[400 Bad Request]
+    ValidateActivity -->|Valid| InsertActivity[Insert to project_activities<br/>Type, Description, Files]
+
+    InsertActivity --> FileUploads{Files<br/>Attached?}
+    FileUploads -->|Yes| UploadToGCS[Upload to Google Cloud Storage]
+    FileUploads -->|No| SkipUpload[Skip Upload]
+
+    UploadToGCS --> AuditLogActivity[Log to crm_audit_log<br/>Action: activity_added]
+    SkipUpload --> AuditLogActivity
+
+    AuditLogActivity --> Success3([201 Created])
+
+    Error403 --> End([Response])
+    Error400 --> End
+    Error404 --> End
+    Error403b --> End
+    Error404b --> End
+    Error400b --> End
+    Error401 --> End
+    Error404c --> End
+    Error400c --> End
+    Success --> End
+    Success2 --> End
+    Success3 --> End
