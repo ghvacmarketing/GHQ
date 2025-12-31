@@ -10457,25 +10457,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       const quotesResult = quotesQuery.rows as any[];
 
-      // BATCH LOAD: Get customer names for list view using raw SQL
-      const customerIds = [...new Set(quotesResult.map(q => q.customerId).filter(Boolean))] as string[];
-      
-      const customersMap = new Map<string, string>();
-      if (customerIds.length > 0) {
-        const customersQuery = await db.execute(sql`
-          SELECT id, display_name as "displayName" 
-          FROM crm_customers 
-          WHERE id = ANY(${customerIds}::text[])
-        `);
-        (customersQuery.rows as any[]).forEach(c => customersMap.set(c.id, c.displayName || ''));
-      }
-      
-      const enrichedQuotes = quotesResult.map((quote) => ({
-        ...quote,
-        customerName: quote.customerId 
-          ? (customersMap.get(quote.customerId) || quote.customerName || null)
-          : (quote.customerName || null),
-      }));
+      // Quick quotes store customerName directly, so no enrichment needed
+      // Just pass through the quotes with their stored customerName
+      const enrichedQuotes = quotesResult;
 
       return res.json({
         quotes: enrichedQuotes,
@@ -10539,7 +10523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let customer = null;
       if (quote.customerId) {
         const custQuery = await db.execute(sql`
-          SELECT id, display_name as "displayName", email, phone 
+          SELECT id, name, email, phone 
           FROM crm_customers WHERE id = ${quote.customerId} LIMIT 1
         `);
         customer = custQuery.rows[0] || null;
