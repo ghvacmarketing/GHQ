@@ -10457,21 +10457,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       const quotesResult = quotesQuery.rows as any[];
 
-      // BATCH LOAD: Get customer names for list view
+      // BATCH LOAD: Get customer names for list view using raw SQL
       const customerIds = [...new Set(quotesResult.map(q => q.customerId).filter(Boolean))] as string[];
       
       const customersMap = new Map<string, string>();
       if (customerIds.length > 0) {
-        const customersList = await db
-          .select({ id: crmCustomers.id, displayName: crmCustomers.displayName })
-          .from(crmCustomers)
-          .where(inArray(crmCustomers.id, customerIds));
-        customersList.forEach(c => customersMap.set(c.id, c.displayName || ''));
+        const customersQuery = await db.execute(sql`
+          SELECT id, display_name as "displayName" 
+          FROM crm_customers 
+          WHERE id = ANY(${customerIds}::text[])
+        `);
+        (customersQuery.rows as any[]).forEach(c => customersMap.set(c.id, c.displayName || ''));
       }
       
       const enrichedQuotes = quotesResult.map((quote) => ({
         ...quote,
-        customerName: quote.customerId ? customersMap.get(quote.customerId) || null : null,
+        customerName: quote.customerId 
+          ? (customersMap.get(quote.customerId) || quote.customerName || null)
+          : (quote.customerName || null),
       }));
 
       return res.json({
@@ -10492,31 +10495,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/quotes/:id - Get single quote with line items
   app.get("/api/crm/quotes/:id", requireCrmAuth, async (req, res) => {
     try {
-      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      // Use raw SQL to fetch quote to bypass Drizzle ORM issues
+      const quoteQuery = await db.execute(sql`
+        SELECT 
+          id, quote_number as "quoteNumber", customer_id as "customerId", 
+          customer_name as "customerName", customer_email as "customerEmail",
+          customer_phone as "customerPhone", service_address as "serviceAddress",
+          title, description, line_items as "lineItems", subtotal, 
+          tax_rate as "taxRate", tax_amount as "taxAmount",
+          tax_total as "taxTotal", labor_total as "laborTotal", total, status,
+          valid_until as "validUntil", sent_at as "sentAt", viewed_at as "viewedAt",
+          accepted_at as "acceptedAt", declined_at as "declinedAt",
+          work_order_id as "workOrderId", project_id as "projectId", scope, notes,
+          created_at as "createdAt", updated_at as "updatedAt",
+          job_id as "jobId", account_id as "accountId", site_id as "siteId",
+          contact_id as "contactId", created_by_id as "createdById",
+          assigned_to_id as "assignedToId", internal_notes as "internalNotes",
+          customer_notes as "customerNotes", property_id as "propertyId",
+          accepted_by as "acceptedBy", decline_reason as "declineReason", created_by as "createdBy"
+        FROM crm_quotes 
+        WHERE id = ${req.params.id}
+        LIMIT 1
+      `);
+      const quote = quoteQuery.rows[0] as any;
       if (!quote) {
         return res.status(404).json({ message: "Quote not found" });
       }
       
-      const lineItems = await db.select().from(crmQuoteLineItems)
-        .where(eq(crmQuoteLineItems.quoteId, req.params.id))
-        .orderBy(asc(crmQuoteLineItems.sortOrder));
+      // Use raw SQL for line items too
+      const lineItemsQuery = await db.execute(sql`
+        SELECT 
+          id, quote_id as "quoteId", line_type as "lineType", description,
+          part_number as "partNumber", quantity, unit_price as "unitPrice",
+          line_total as "lineTotal", taxable, sort_order as "sortOrder",
+          item_id as "itemId", is_discount_line as "isDiscountLine",
+          discount_kind as "discountKind", created_at as "createdAt"
+        FROM crm_quote_line_items
+        WHERE quote_id = ${req.params.id}
+        ORDER BY sort_order ASC
+      `);
+      const lineItems = lineItemsQuery.rows as any[];
       
       let customer = null;
       if (quote.customerId) {
-        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, quote.customerId));
-        customer = cust || null;
+        const custQuery = await db.execute(sql`
+          SELECT id, display_name as "displayName", email, phone 
+          FROM crm_customers WHERE id = ${quote.customerId} LIMIT 1
+        `);
+        customer = custQuery.rows[0] || null;
       }
       
       let workOrder = null;
       if (quote.workOrderId) {
-        const [wo] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, quote.workOrderId));
-        workOrder = wo || null;
+        const woQuery = await db.execute(sql`
+          SELECT id, title, status FROM crm_work_orders WHERE id = ${quote.workOrderId} LIMIT 1
+        `);
+        workOrder = woQuery.rows[0] || null;
       }
       
       let project = null;
       if (quote.projectId) {
-        const [proj] = await db.select().from(crmProjects).where(eq(crmProjects.id, quote.projectId));
-        project = proj || null;
+        const projQuery = await db.execute(sql`
+          SELECT id, name, status FROM crm_projects WHERE id = ${quote.projectId} LIMIT 1
+        `);
+        project = projQuery.rows[0] || null;
       }
       
       return res.json({

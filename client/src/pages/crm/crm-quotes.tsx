@@ -577,7 +577,7 @@ export default function CrmQuotes() {
                       key={quote.id}
                       className="cursor-pointer hover:bg-slate-50 transition-colors"
                       data-testid={`row-quote-${quote.id}`}
-                      onClick={() => setSelectedQuote(quote)}
+                      onClick={() => navigate(`/crm/quotes/${quote.id}`)}
                     >
                       <TableCell className="font-medium text-slate-900">
                         {quote.quoteNumber}
@@ -613,7 +613,7 @@ export default function CrmQuotes() {
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2"
-                            onClick={() => setSelectedQuote(quote)}
+                            onClick={() => navigate(`/crm/quotes/${quote.id}`)}
                             data-testid={`button-view-${quote.id}`}
                           >
                             <Eye className="h-3 w-3" />
