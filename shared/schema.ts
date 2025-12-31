@@ -1002,42 +1002,58 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
 export const crmQuoteStatusEnum = ["draft", "sent", "accepted", "declined", "expired"] as const;
 export type CrmQuoteStatus = typeof crmQuoteStatusEnum[number];
 
-export const crmQuoteScopeEnum = ["work_order", "project"] as const;
+export const crmQuoteScopeEnum = ["work_order", "project", "standalone"] as const;
 export type CrmQuoteScope = typeof crmQuoteScopeEnum[number];
 
 // CRM Quotes (proposals attached to either a Work Order or Project)
 export const crmQuotes = pgTable("crm_quotes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   quoteNumber: text("quote_number").notNull(),
-  customerId: varchar("customer_id"),
-  propertyId: varchar("property_id"),
-  scope: text("scope").$type<CrmQuoteScope>().notNull(),
-  workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id, { onDelete: "set null" }),
-  projectId: varchar("project_id").references(() => crmProjects.id, { onDelete: "set null" }),
-  status: text("status").$type<CrmQuoteStatus>().notNull().default("draft"),
-  title: text("title").notNull(),
+  jobId: varchar("job_id"),
+  accountId: varchar("account_id"),
+  siteId: varchar("site_id"),
+  contactId: varchar("contact_id"),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  serviceAddress: text("service_address"),
+  title: text("title"),
   description: text("description"),
-  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).default("0"),
+  lineItems: json("line_items").default([]),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull().default("0"),
+  taxRate: decimal("tax_rate", { precision: 10, scale: 4 }).default("0.0825"),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).notNull().default("0"),
   laborTotal: decimal("labor_total", { precision: 10, scale: 2 }).default("0"),
-  taxTotal: decimal("tax_total", { precision: 10, scale: 2 }).default("0"),
-  total: decimal("total", { precision: 10, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull().default("0"),
+  status: text("status").$type<CrmQuoteStatus>().notNull().default("draft"),
   validUntil: timestamp("valid_until"),
   sentAt: timestamp("sent_at"),
+  viewedAt: timestamp("viewed_at"),
   acceptedAt: timestamp("accepted_at"),
   declinedAt: timestamp("declined_at"),
+  createdById: varchar("created_by_id"),
+  assignedToId: varchar("assigned_to_id"),
+  internalNotes: text("internal_notes"),
+  customerNotes: text("customer_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  customerId: varchar("customer_id"),
+  propertyId: varchar("property_id"),
+  workOrderId: varchar("work_order_id"),
+  projectId: varchar("project_id"),
+  scope: text("scope").$type<CrmQuoteScope>(),
+  taxTotal: decimal("tax_total", { precision: 10, scale: 2 }).default("0"),
   acceptedBy: text("accepted_by"),
   declineReason: text("decline_reason"),
   notes: text("notes"),
-  createdBy: varchar("created_by").references(() => crmUsers.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdBy: varchar("created_by"),
 });
 
 // CRM Quote Line Items
 export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   quoteId: varchar("quote_id").notNull().references(() => crmQuotes.id, { onDelete: "cascade" }),
-  lineType: text("line_type").$type<"part" | "labor" | "service" | "other">().notNull().default("part"),
+  lineType: text("line_type").$type<"part" | "labor" | "service" | "other" | "discount">().notNull().default("part"),
   description: text("description").notNull(),
   partNumber: text("part_number"),
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
@@ -1045,6 +1061,9 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
   taxable: boolean("taxable").default(true),
   sortOrder: integer("sort_order").default(0),
+  itemId: varchar("item_id").references(() => crmItems.id, { onDelete: "set null" }),
+  isDiscountLine: boolean("is_discount_line").default(false),
+  discountKind: text("discount_kind").$type<DiscountKind>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1084,7 +1103,7 @@ export const crmInvoices = pgTable("crm_invoices", {
 export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   invoiceId: varchar("invoice_id").notNull().references(() => crmInvoices.id, { onDelete: "cascade" }),
-  lineType: text("line_type").$type<"part" | "labor" | "service" | "other">().notNull().default("part"),
+  lineType: text("line_type").$type<"part" | "labor" | "service" | "other" | "discount">().notNull().default("part"),
   description: text("description").notNull(),
   partNumber: text("part_number"),
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
@@ -1092,8 +1111,54 @@ export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
   lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
   taxable: boolean("taxable").default(true),
   sortOrder: integer("sort_order").default(0),
+  itemId: varchar("item_id").references(() => crmItems.id, { onDelete: "set null" }),
+  isDiscountLine: boolean("is_discount_line").default(false),
+  discountKind: text("discount_kind").$type<DiscountKind>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// CRM Items (parts, services, materials catalog)
+// itemType = what it IS (controls quote section placement)
+export const crmItemTypeEnum = ["parts", "equipment", "material", "service", "discount", "agreement", "residential", "commercial", "crawlspace"] as const;
+export type CrmItemType = typeof crmItemTypeEnum[number];
+
+// category = where it belongs (navigation/filtering)
+export const crmItemCategoryEnum = ["install", "service", "maintenance", "discount"] as const;
+export type CrmItemCategory = typeof crmItemCategoryEnum[number];
+
+export const discountKindEnum = ["promotion", "maintenance"] as const;
+export type DiscountKind = typeof discountKindEnum[number];
+
+export const crmItems = pgTable("crm_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").$type<CrmItemCategory>().default("install"),
+  itemType: text("item_type").$type<CrmItemType>().default("parts"),
+  partNumber: text("part_number"),
+  rate: decimal("rate", { precision: 10, scale: 2 }).default("0"),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
+  unit: text("unit").default("each"),
+  taxable: boolean("taxable").default(true),
+  inStock: boolean("in_stock").default(true),
+  isActive: boolean("is_active").default(true),
+  isVariableRate: boolean("is_variable_rate").default(false),
+  isDiscount: boolean("is_discount").default(false),
+  discountKind: text("discount_kind").$type<DiscountKind>(),
+  isSystemItem: boolean("is_system_item").default(false),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCrmItemSchema = createInsertSchema(crmItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCrmItem = z.infer<typeof insertCrmItemSchema>;
+export type CrmItem = typeof crmItems.$inferSelect;
 
 // CRM Job Assignments (techs assigned to jobs)
 export const crmJobAssignments = pgTable("crm_job_assignments", {
@@ -1669,3 +1734,35 @@ export const insertAttachmentSchema = createInsertSchema(attachments).omit({
 
 export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
 export type Attachment = typeof attachments.$inferSelect;
+
+// Proposal Builder Sessions (autosave)
+export const proposalSessions = pgTable("proposal_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => crmCustomers.id, { onDelete: "cascade" }),
+  siteId: varchar("site_id").references(() => crmProperties.id, { onDelete: "set null" }),
+  selectionsJson: json("selections_json").$type<{
+    systemType?: string;
+    tier?: string;
+    tonnage?: string;
+  }>(),
+  cartJson: json("cart_json").$type<unknown[]>(),
+  pricingTotalsJson: json("pricing_totals_json").$type<{
+    subtotal?: number;
+    savings?: number;
+    total?: number;
+    monthlyPayment?: number;
+  }>(),
+  aiNotes: text("ai_notes"),
+  createdBy: varchar("created_by").references(() => crmUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertProposalSessionSchema = createInsertSchema(proposalSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertProposalSession = z.infer<typeof insertProposalSessionSchema>;
+export type ProposalSession = typeof proposalSessions.$inferSelect;

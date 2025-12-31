@@ -1,0 +1,235 @@
+PSEUDO INSTRUCTIONS FOR REPLIT — “Install Pricing Worksheet (Manual)” Quote Type
+0) Goal
+
+Add a 3rd quote creation option:
+
+Quick Quote (from Items / fixed pricebook)
+
+Proposal Builder
+
+Install Pricing Worksheet (Manual Entry, independent from Items)
+
+This worksheet is a calculator. It does NOT pull from Items and does NOT update Items. It produces a final sell price and attaches the breakdown to the quote.
+
+1) New Data Models (DB tables)
+A) install_worksheets
+
+Fields:
+
+id (uuid)
+
+quote_id (nullable until finalized)
+
+customer_id
+
+site_id
+
+install_subtype ENUM: residential | commercial | crawlspace
+
+created_by_user_id
+
+status ENUM: draft | finalized
+
+Inputs (editable)
+
+hours_to_install (number)
+
+top_man_hourly_rate (number)
+
+labor_benefits_pct (decimal, default 0.40)
+
+overhead_pct (decimal, default 0.25)
+
+profit_pct (decimal, default 0.10)
+
+financing_pct (decimal, default 0.03)
+
+commission_pct (decimal, default 0.03)
+
+tax_rate (decimal, default e.g. 0.08)
+
+warranty_reserve_dollar (number, default 25)
+
+crew_day_hours (number, default 16)
+
+discount_dollar (number, default 0)
+
+Calculated outputs (stored for fast rendering, but re-calc anytime inputs change)
+
+labor_payroll
+
+labor_benefits
+
+taxable_subtotal
+
+sales_tax
+
+direct_cost
+
+sell_price
+
+gross_profit
+
+gross_margin_pct
+
+crew_days
+
+gross_profit_per_crew_day
+
+discounted_sell_price
+
+discounted_gross_profit
+
+discounted_gross_margin_pct
+
+discounted_gp_per_crew_day
+
+B) install_worksheet_lines
+
+Fields:
+
+id (uuid)
+
+worksheet_id (fk)
+
+category ENUM: equipment | materials | accessories | subcontractor | permit | spiff | other
+
+description (text)
+
+cost (number)
+
+taxable (boolean)
+
+NOTE: These lines are manual entry. No reference to Items.
+
+2) UI / Screens
+A) Quote creation step 1
+
+Add button: “Install Pricing Worksheet (Manual)”
+
+Flow:
+
+User selects Customer + Site (same as other quote flows)
+
+Then open Worksheet screen
+
+B) Worksheet screen layout
+
+Inputs panel (hours, top-man rate, all %’s, tax rate, warranty reserve, crew day hours, discount)
+
+Editable grid for manual rows:
+
+Section headers (Equipment, Materials, Accessories, etc.)
+
+Each row: Description | Cost | Taxable checkbox | Category
+
+Add row / delete row
+
+Totals panel:
+
+Direct cost
+
+Sell price
+
+Gross margin %
+
+Gross profit $ per crew day
+
+Discount scenario outputs
+
+Buttons:
+
+Save Draft
+
+Finalize → Create Quote
+
+3) Calculation Logic (single source of truth function)
+calcWorksheet(worksheetInputs, worksheetLines) returns totals
+
+Pseudo:
+
+labor_payroll = hours_to_install * top_man_hourly_rate
+
+labor_benefits = labor_payroll * labor_benefits_pct
+
+lines_total = sum(line.cost for all lines)
+
+taxable_subtotal = sum(line.cost for lines where taxable=true)
+
+sales_tax = taxable_subtotal * tax_rate
+
+direct_cost = lines_total + labor_payroll + labor_benefits + sales_tax + warranty_reserve_dollar
+
+denom = 1 - overhead_pct - profit_pct - financing_pct - commission_pct
+
+sell_price = direct_cost / denom
+
+gross_profit = sell_price - direct_cost
+
+gross_margin_pct = 1 - (direct_cost / sell_price)
+
+crew_days = hours_to_install / crew_day_hours
+
+gross_profit_per_crew_day = gross_profit / crew_days
+
+Discount scenario:
+
+discounted_sell_price = sell_price - discount_dollar
+
+discounted_gross_profit = discounted_sell_price - direct_cost
+
+discounted_gross_margin_pct = 1 - (direct_cost / discounted_sell_price)
+
+discounted_gp_per_crew_day = discounted_gross_profit / crew_days
+
+Return all fields and write them back to install_worksheets.
+
+Trigger rules:
+
+Recalculate on any change to inputs or lines
+
+Save calculated totals in DB each time for easy display/reporting
+
+4) Finalize Behavior (Create Quote)
+
+When user clicks “Finalize → Create Quote”:
+
+Validate:
+
+customer_id, site_id exist
+
+denom > 0 (prevent impossible margin settings)
+
+sell_price > direct_cost
+
+Create Quote record (normal quote table)
+
+Create ONE quote line item (NOT from Items):
+
+description = Install - {install_subtype} (Calculated)
+
+quantity = 1
+
+unit_price = sell_price (or discounted_sell_price if discount applied)
+
+internal_cost = direct_cost (store internal only)
+
+Attach worksheet to quote:
+
+set install_worksheets.quote_id = quote.id
+
+set install_worksheets.status = finalized
+
+Quote PDF / Customer view:
+
+only show the single line price (clean)
+
+optionally show high-level summary (no cost breakdown to customer unless we choose)
+
+IMPORTANT:
+
+Worksheet remains independent of Items pricing forever.
+
+Do not create/edit Items based on this worksheet.
+
+Do not require selecting any Items to complete worksheet.

@@ -40,11 +40,16 @@ const CrmWorkOrders = lazy(() => import("@/pages/crm/crm-work-orders"));
 const CrmWorkOrderDetail = lazy(() => import("@/pages/crm/crm-work-order-detail"));
 const CrmInvoices = lazy(() => import("@/pages/crm/crm-invoices"));
 const CrmQuotes = lazy(() => import("@/pages/crm/crm-quotes"));
+const CrmQuoteCreate = lazy(() => import("@/pages/crm/crm-quote-create"));
+const CrmQuoteDetail = lazy(() => import("@/pages/crm/crm-quote-detail"));
 const CrmAgreements = lazy(() => import("@/pages/crm/crm-agreements"));
 const CrmProjects = lazy(() => import("@/pages/crm/crm-projects"));
 const CrmProjectDetail = lazy(() => import("@/pages/crm/crm-project-detail"));
 const CrmLeads = lazy(() => import("@/pages/crm/crm-leads"));
 const CrmMarketing = lazy(() => import("@/pages/crm/crm-marketing"));
+const CrmItems = lazy(() => import("@/pages/crm/crm-items"));
+const CrmInstallWorksheet = lazy(() => import("@/pages/crm/crm-install-worksheet"));
+const CrmProposalBuilder = lazy(() => import("@/pages/crm/crm-proposal-builder"));
 
 // Global Error Boundary to prevent blank screens
 class ErrorBoundary extends Component<
@@ -163,12 +168,18 @@ function Router() {
       <Route path="/crm/customers/:id">{() => <CrmWrapper><CrmCustomerDetail /></CrmWrapper>}</Route>
       <Route path="/crm/customers">{() => <CrmWrapper><CrmCustomers /></CrmWrapper>}</Route>
       <Route path="/crm/invoices">{() => <CrmWrapper><CrmInvoices /></CrmWrapper>}</Route>
+      <Route path="/crm/quotes/install-worksheet/:id">{() => <CrmWrapper><CrmInstallWorksheet /></CrmWrapper>}</Route>
+      <Route path="/crm/quotes/proposal/:customerId">{() => <CrmWrapper><CrmProposalBuilder /></CrmWrapper>}</Route>
+      <Route path="/crm/quotes/proposal">{() => <CrmWrapper><CrmProposalBuilder /></CrmWrapper>}</Route>
+      <Route path="/crm/quotes/new">{() => <CrmWrapper><CrmQuoteCreate /></CrmWrapper>}</Route>
+      <Route path="/crm/quotes/:id">{() => <CrmWrapper><CrmQuoteDetail /></CrmWrapper>}</Route>
       <Route path="/crm/quotes">{() => <CrmWrapper><CrmQuotes /></CrmWrapper>}</Route>
       <Route path="/crm/agreements">{() => <CrmWrapper><CrmAgreements /></CrmWrapper>}</Route>
       <Route path="/crm/projects/:id">{() => <CrmWrapper><CrmProjectDetail /></CrmWrapper>}</Route>
       <Route path="/crm/projects">{() => <CrmWrapper><CrmProjects /></CrmWrapper>}</Route>
       <Route path="/crm/leads">{() => <CrmWrapper><CrmLeads /></CrmWrapper>}</Route>
       <Route path="/crm/marketing">{() => <CrmWrapper><CrmMarketing /></CrmWrapper>}</Route>
+      <Route path="/crm/items">{() => <CrmWrapper><CrmItems /></CrmWrapper>}</Route>
       <Route path="/crm">{() => <CrmWrapper><CrmDashboard /></CrmWrapper>}</Route>
       <Route component={NotFound} />
     </Switch>

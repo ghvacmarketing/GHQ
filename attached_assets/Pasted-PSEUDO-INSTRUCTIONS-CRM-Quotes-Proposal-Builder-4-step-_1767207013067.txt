@@ -1,0 +1,217 @@
+PSEUDO INSTRUCTIONS — CRM Quotes → Proposal Builder (4-step wizard + cart + quote preview + AI)
+Goal
+
+When user goes to CRM → Quotes → New Quote and selects Proposal Builder, launch a 4-step Proposal Builder wizard inside the CRM (same CRM layout/nav). It must have:
+
+Stepper header (Step 1–4)
+
+Same package selector UI
+
+Same cart drawer/popup when packages are added
+
+“Generate Quote” opens the same Quote Preview modal with AI generator + Download PDF + Accept Quote
+
+On Accept, save as a CRM Quote with correct status + attach proposal data.
+
+1) Where this lives (routes)
+
+/crm/quotes/new?mode=proposal_builder
+
+This is inside CRM shell (sidebar, header, permissions).
+
+2) The 4 steps (exact behavior)
+Step 1 of 4 — Customer + Site
+
+Purpose: lock the context before building.
+
+Search/select Customer
+
+Select Site OR create new Site if none exists
+
+Next button enabled only when Customer + Site selected
+
+On Next:
+
+create or load a Proposal Builder Session (autosave container)
+
+status internal: builder_session
+
+Step 2 of 4 — Build Packages
+
+Purpose: choose system type + package tiers + tonnage/options.
+
+Show the same “Select System Type” cards (PHP/GP/SGA/SHP/Mini-Split/Ducting/Crawlspace etc.)
+
+Show tier tabs (Essential/Premium/Ultimate)
+
+Selecting any package adds it to cart
+
+Cart behavior:
+
+When a package is selected, open the same cart drawer/popup (the one shown in screenshots)
+
+Cart should show:
+
+package badge (Better/Elite etc.)
+
+included items icons
+
+base price, savings, final price
+
+financing monthly payment
+
+remove item, clear cart
+
+“View Quote” / “Generate Quote” button
+
+Step navigation:
+
+Next button allowed if cart has at least 1 package
+
+Step 3 of 4 — Cart / Review
+
+Purpose: review/edit cart before generating quote.
+
+Full cart view (same totals, savings, financing)
+
+Controls:
+
+adjust quantities/tonnage options if supported
+
+add/remove accessories (optional)
+
+apply discount if allowed
+
+Buttons:
+
+Back to Builder
+
+Generate Quote (primary)
+
+Step 4 of 4 — Quote Preview (Modal) + AI
+
+Purpose: show customer-facing quote preview + let salesperson generate narrative + finalize.
+
+When user clicks Generate Quote:
+
+Open the same “Equipment Proposal” Quote Preview modal shown in screenshots (over the CRM page)
+
+Quote Preview Modal must include:
+
+Customer + Site displayed (already selected in Step 1; no searching inside modal anymore)
+
+Package cards with included equipment + add-ons
+
+Pricing summary:
+
+total investment
+
+savings
+
+monthly financing
+
+validity (e.g., 30 days)
+
+Buttons:
+
+Close
+
+Save Quote (internal)
+
+Download PDF
+
+Accept Quote
+
+Add AI generator area inside the modal (same modal page):
+
+“Generate Proposal Summary / Scope / Why this package” button
+
+It should write text into a “proposal notes” section
+
+That text gets saved into the Quote record and appears on PDF
+
+3) Data saving + statuses (important)
+
+We do NOT want Draft quotes in the customer profile list.
+
+Use Builder Sessions until Presented/Sent/Accepted
+
+Create table: proposal_builder_sessions
+
+id, user_id, customer_id, site_id
+
+selections_json (system type, tier, packages, add-ons)
+
+cart_json (final cart state)
+
+pricing_totals_json
+
+ai_notes (generated text)
+
+updated_at
+
+Autosave:
+
+every X seconds + on every cart change
+
+When Quote Preview modal opens
+
+mark session as “presented_started_at” (optional)
+
+When user clicks “Save Quote”
+
+create CRM Quote record:
+
+quote_type = proposal_builder
+
+status = Presented (or Sent if they text/email it)
+
+total = cart total
+
+attach selections_json + pricing + ai_notes
+
+generate quote_number
+
+When user clicks “Accept Quote”
+
+status → Approved
+
+store:
+
+approved_at timestamp
+
+approved_by (user)
+
+signature/acceptance method (if you add signature now or later)
+
+After approval
+
+allow “Convert to Invoice” from the quote page later
+
+4) Cart component must be reusable
+
+Refactor existing cart drawer into a reusable component used in:
+
+Step 2 builder
+
+Step 3 cart review
+
+Quote Preview modal (read-only summary)
+
+Do not duplicate cart logic.
+
+5) Acceptance criteria checklist
+
+Selecting Proposal Builder in CRM Quotes launches 4-step wizard with stepper
+
+Same UI for system type + tier selection
+
+Same cart drawer/popup appears when packages selected
+
+“Generate Quote” opens the Quote Preview modal exactly like screenshots
+
+AI generator exists inside the Quote Preview modal and saves output into quote notes
+
+Accept Quote creates/updates CRM Quote with status = Approved and attaches all data
+
+No “Draft” quotes show in the main CRM quotes list (builder sessions are internal)

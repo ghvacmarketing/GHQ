@@ -422,7 +422,7 @@ export default function CrmAccountCreate() {
                 className={cn(
                   "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors",
                   currentStep === step.number
-                    ? "border-indigo-600 bg-indigo-600 text-white"
+                    ? "border-[#d3b07d] bg-[#d3b07d] text-white"
                     : currentStep > step.number
                     ? "border-green-500 bg-green-500 text-white"
                     : "border-slate-300 bg-white text-slate-400"
@@ -434,7 +434,7 @@ export default function CrmAccountCreate() {
               <span
                 className={cn(
                   "ml-2 text-sm font-medium hidden sm:block",
-                  currentStep === step.number ? "text-indigo-600" : "text-slate-500"
+                  currentStep === step.number ? "text-[#d3b07d]" : "text-slate-500"
                 )}
               >
                 {step.label}
@@ -471,26 +471,26 @@ export default function CrmAccountCreate() {
                         className={cn(
                           "flex flex-col items-center p-6 rounded-lg border-2 transition-all text-left",
                           isSelected
-                            ? "border-indigo-600 bg-indigo-50"
-                            : "border-slate-200 hover:border-indigo-300 hover:bg-slate-50"
+                            ? "border-[#d3b07d] bg-[#faf6ef]"
+                            : "border-slate-200 hover:border-[#e5cfa6] hover:bg-slate-50"
                         )}
                         data-testid={`select-type-${type.value.toLowerCase()}`}
                       >
                         <div
                           className={cn(
                             "p-3 rounded-full mb-3",
-                            isSelected ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"
+                            isSelected ? "bg-[#d3b07d] text-white" : "bg-slate-100 text-slate-600"
                           )}
                         >
                           <Icon className="h-6 w-6" />
                         </div>
-                        <h3 className={cn("font-semibold", isSelected ? "text-indigo-600" : "text-slate-900")}>
+                        <h3 className={cn("font-semibold", isSelected ? "text-[#b8944d]" : "text-slate-900")}>
                           {type.label}
                         </h3>
                         <p className="text-sm text-slate-500 text-center mt-1">{type.description}</p>
                         {isSelected && (
                           <div className="mt-3">
-                            <Check className="h-5 w-5 text-indigo-600" />
+                            <Check className="h-5 w-5 text-[#d3b07d]" />
                           </div>
                         )}
                       </button>

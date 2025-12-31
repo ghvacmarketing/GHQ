@@ -7,7 +7,7 @@ import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { z } from "zod";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
@@ -70,6 +70,127 @@ function requireAdminAuth(req: any, res: any, next: any) {
     return res.status(401).json({ message: "Unauthorized - Admin access required" });
   }
   next();
+}
+
+// Discount line item validation helper
+// Validates rules for discount line items in quotes and invoices
+type DiscountLineItem = {
+  isDiscountLine?: boolean;
+  lineType?: string;
+  discountKind?: string;
+  quantity?: string | number;
+  taxable?: boolean;
+  unitPrice?: string | number;
+  lineTotal?: string | number;
+};
+
+type ExistingLineItem = {
+  isDiscountLine?: boolean | null;
+  lineType?: string | null;
+  discountKind?: string | null;
+  id?: string;
+};
+
+function validateDiscountLineItem(
+  lineItem: DiscountLineItem,
+  existingLineItems: ExistingLineItem[] = [],
+  currentLineItemId?: string,
+  entityType: 'quote' | 'invoice' = 'quote'
+): { valid: boolean; error?: string } {
+  const isDiscount = lineItem.isDiscountLine === true || lineItem.lineType === 'discount';
+  
+  if (!isDiscount) {
+    return { valid: true };
+  }
+
+  // Validate quantity equals 1
+  const qty = typeof lineItem.quantity === 'string' ? parseFloat(lineItem.quantity) : lineItem.quantity;
+  if (qty !== undefined && qty !== 1) {
+    return { valid: false, error: "Discount quantity must be 1" };
+  }
+
+  // Validate taxable is false
+  if (lineItem.taxable === true) {
+    return { valid: false, error: "Discount lines cannot be taxable" };
+  }
+
+  // Validate unitPrice is <= 0
+  const price = typeof lineItem.unitPrice === 'string' ? parseFloat(lineItem.unitPrice) : lineItem.unitPrice;
+  if (price !== undefined && price > 0) {
+    return { valid: false, error: "Discount amount must be negative or zero" };
+  }
+
+  // Validate lineTotal is <= 0
+  const total = typeof lineItem.lineTotal === 'string' ? parseFloat(lineItem.lineTotal) : lineItem.lineTotal;
+  if (total !== undefined && total > 0) {
+    return { valid: false, error: "Discount amount must be negative or zero" };
+  }
+
+  // Check for duplicate discount kinds (promotion, maintenance)
+  if (lineItem.discountKind === 'promotion' || lineItem.discountKind === 'maintenance') {
+    const existingOfSameKind = existingLineItems.filter(item => {
+      // Exclude current item when updating
+      if (currentLineItemId && item.id === currentLineItemId) {
+        return false;
+      }
+      const itemIsDiscount = item.isDiscountLine === true || item.lineType === 'discount';
+      return itemIsDiscount && item.discountKind === lineItem.discountKind;
+    });
+
+    if (existingOfSameKind.length > 0) {
+      if (lineItem.discountKind === 'promotion') {
+        return { valid: false, error: `Only one promotion discount allowed per ${entityType}` };
+      }
+      if (lineItem.discountKind === 'maintenance') {
+        return { valid: false, error: `Only one maintenance discount allowed per ${entityType}` };
+      }
+    }
+  }
+
+  return { valid: true };
+}
+
+// Validate an array of line items for discount rules
+function validateDiscountLineItems(
+  lineItems: DiscountLineItem[],
+  existingLineItems: ExistingLineItem[] = [],
+  entityType: 'quote' | 'invoice' = 'quote'
+): { valid: boolean; error?: string } {
+  // Track discount kinds in this batch
+  const batchPromotionCount = lineItems.filter(item => 
+    (item.isDiscountLine === true || item.lineType === 'discount') && item.discountKind === 'promotion'
+  ).length;
+  
+  const batchMaintenanceCount = lineItems.filter(item => 
+    (item.isDiscountLine === true || item.lineType === 'discount') && item.discountKind === 'maintenance'
+  ).length;
+
+  // Check existing counts
+  const existingPromotionCount = existingLineItems.filter(item => 
+    (item.isDiscountLine === true || item.lineType === 'discount') && item.discountKind === 'promotion'
+  ).length;
+  
+  const existingMaintenanceCount = existingLineItems.filter(item => 
+    (item.isDiscountLine === true || item.lineType === 'discount') && item.discountKind === 'maintenance'
+  ).length;
+
+  if (batchPromotionCount + existingPromotionCount > 1) {
+    return { valid: false, error: `Only one promotion discount allowed per ${entityType}` };
+  }
+
+  if (batchMaintenanceCount + existingMaintenanceCount > 1) {
+    return { valid: false, error: `Only one maintenance discount allowed per ${entityType}` };
+  }
+
+  // Validate each individual line item
+  for (const lineItem of lineItems) {
+    const result = validateDiscountLineItem(lineItem, [], undefined, entityType);
+    if (!result.valid) {
+      return result;
+    }
+  }
+
+  return { valid: true };
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -8357,14 +8478,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const dateParam = req.query.date as string;
       const statusParam = req.query.status as string;
-      const date = dateParam ? new Date(dateParam) : new Date();
+      
+      // Parse date in UTC to avoid timezone issues (same approach as /api/crm/dispatch)
+      let targetDateStr: string;
+      if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+        targetDateStr = dateParam;
+      } else {
+        const now = new Date();
+        targetDateStr = now.toISOString().split("T")[0];
+      }
 
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Use UTC-based date range for consistent querying
+      const startOfDay = new Date(targetDateStr + "T00:00:00.000Z");
+      const endOfDay = new Date(targetDateStr + "T23:59:59.999Z");
 
       let workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);
+      
+      // Also fetch unassigned work orders that need to be scheduled
+      const unassignedWorkOrders = await storage.getUnassignedWorkOrders();
+      
+      // Merge work orders, avoiding duplicates (unassigned WO might already be in date range)
+      const allWorkOrderIds = new Set(workOrders.map(wo => wo.id));
+      for (const uwo of unassignedWorkOrders) {
+        if (!allWorkOrderIds.has(uwo.id)) {
+          workOrders.push(uwo);
+        }
+      }
       
       if (statusParam) {
         workOrders = workOrders.filter(wo => wo.status === statusParam);
@@ -9584,6 +9723,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let createdLineItems: CrmInvoiceLineItem[] = [];
       if (lineItems && Array.isArray(lineItems)) {
+        // Validate discount line items before creating
+        const discountValidation = validateDiscountLineItems(lineItems, [], 'invoice');
+        if (!discountValidation.valid) {
+          // Rollback: delete the invoice we just created
+          await db.delete(crmInvoices).where(eq(crmInvoices.id, invoice.id));
+          await db.update(crmWorkOrders)
+            .set({ billingDisposition: null, invoiceId: null, updatedAt: new Date() })
+            .where(eq(crmWorkOrders.id, invoiceData.workOrderId));
+          return res.status(400).json({ message: discountValidation.error });
+        }
+        
         for (const item of lineItems) {
           const lineItemData = { ...item, invoiceId: invoice.id };
           const lineItemParseResult = insertCrmInvoiceLineItemSchema.safeParse(lineItemData);
@@ -9928,6 +10078,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Can only add line items to draft invoices" });
       }
       
+      // Get existing line items for discount validation
+      const existingLineItems = await db.select().from(crmInvoiceLineItems)
+        .where(eq(crmInvoiceLineItems.invoiceId, req.params.id));
+      
+      // Validate discount line item rules
+      const discountValidation = validateDiscountLineItem(req.body, existingLineItems, undefined, 'invoice');
+      if (!discountValidation.valid) {
+        return res.status(400).json({ message: discountValidation.error });
+      }
+      
       const lineItemData = { ...req.body, invoiceId: req.params.id };
       const parseResult = insertCrmInvoiceLineItemSchema.safeParse(lineItemData);
       if (!parseResult.success) {
@@ -9982,7 +10142,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Line item not found" });
       }
       
-      const { description, partNumber, quantity, unitPrice, lineTotal, taxable, sortOrder, lineType } = req.body;
+      const { description, partNumber, quantity, unitPrice, lineTotal, taxable, sortOrder, lineType, isDiscountLine, discountKind } = req.body;
+      
+      // Merge existing line item data with updates to validate the final state
+      const mergedLineItem = {
+        ...existingLineItem,
+        ...(description !== undefined && { description }),
+        ...(partNumber !== undefined && { partNumber }),
+        ...(quantity !== undefined && { quantity }),
+        ...(unitPrice !== undefined && { unitPrice }),
+        ...(lineTotal !== undefined && { lineTotal }),
+        ...(taxable !== undefined && { taxable }),
+        ...(sortOrder !== undefined && { sortOrder }),
+        ...(lineType !== undefined && { lineType }),
+        ...(isDiscountLine !== undefined && { isDiscountLine }),
+        ...(discountKind !== undefined && { discountKind }),
+      };
+      
+      // Get all line items for this invoice for discount validation
+      const allLineItems = await db.select().from(crmInvoiceLineItems)
+        .where(eq(crmInvoiceLineItems.invoiceId, req.params.id));
+      
+      // Validate discount line item rules
+      const discountValidation = validateDiscountLineItem(mergedLineItem, allLineItems, req.params.lineItemId, 'invoice');
+      if (!discountValidation.valid) {
+        return res.status(400).json({ message: discountValidation.error });
+      }
+      
       const updates: any = {};
       if (description !== undefined) updates.description = description;
       if (partNumber !== undefined) updates.partNumber = partNumber;
@@ -9992,6 +10178,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (taxable !== undefined) updates.taxable = taxable;
       if (sortOrder !== undefined) updates.sortOrder = sortOrder;
       if (lineType !== undefined) updates.lineType = lineType;
+      if (isDiscountLine !== undefined) updates.isDiscountLine = isDiscountLine;
+      if (discountKind !== undefined) updates.discountKind = discountKind;
       
       const [updatedLineItem] = await db.update(crmInvoiceLineItems)
         .set(updates)
@@ -10060,6 +10248,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // =============================================
+  // CRM ITEMS ROUTES
+  // =============================================
+
+  // GET /api/crm/items - List all items (with optional search query)
+  app.get("/api/crm/items", requireCrmAuth, async (req, res) => {
+    try {
+      const { search } = req.query;
+      
+      let items: CrmItem[];
+      if (search && typeof search === 'string' && search.trim()) {
+        items = await storage.searchCrmItems(search.trim());
+      } else {
+        items = await storage.getAllCrmItems();
+      }
+      
+      return res.json(items);
+    } catch (error) {
+      console.error("Error fetching CRM items:", error);
+      return res.status(500).json({ message: "Failed to fetch items" });
+    }
+  });
+
+  // GET /api/crm/items/:id - Get single item
+  app.get("/api/crm/items/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const item = await storage.getCrmItem(req.params.id);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      return res.json(item);
+    } catch (error) {
+      console.error("Error fetching CRM item:", error);
+      return res.status(500).json({ message: "Failed to fetch item" });
+    }
+  });
+
+  // POST /api/crm/items - Create item (requires sales or above)
+  app.post("/api/crm/items", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const validatedData = insertCrmItemSchema.parse(req.body);
+      const item = await storage.createCrmItem(validatedData);
+      
+      await logCrmAudit(
+        user.id,
+        "item.created",
+        "crm_item",
+        item.id,
+        { name: item.name },
+        req.ip
+      );
+      
+      return res.status(201).json(item);
+    } catch (error) {
+      console.error("Error creating CRM item:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      return res.status(500).json({ message: "Failed to create item" });
+    }
+  });
+
+  // PATCH /api/crm/items/:id - Update item (requires sales or above)
+  app.patch("/api/crm/items/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const existingItem = await storage.getCrmItem(req.params.id);
+      if (!existingItem) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+
+      const validatedData = insertCrmItemSchema.partial().parse(req.body);
+      const item = await storage.updateCrmItem(req.params.id, validatedData);
+      
+      await logCrmAudit(
+        user.id,
+        "item.updated",
+        "crm_item",
+        req.params.id,
+        { changes: validatedData },
+        req.ip
+      );
+      
+      return res.json(item);
+    } catch (error) {
+      console.error("Error updating CRM item:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      return res.status(500).json({ message: "Failed to update item" });
+    }
+  });
+
+  // DELETE /api/crm/items/:id - Delete item (requires sales or above)
+  app.delete("/api/crm/items/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const existingItem = await storage.getCrmItem(req.params.id);
+      if (!existingItem) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+
+      const deleted = await storage.deleteCrmItem(req.params.id);
+      if (!deleted) {
+        return res.status(500).json({ message: "Failed to delete item" });
+      }
+      
+      await logCrmAudit(
+        user.id,
+        "item.deleted",
+        "crm_item",
+        req.params.id,
+        { name: existingItem.name },
+        req.ip
+      );
+      
+      return res.json({ message: "Item deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting CRM item:", error);
+      return res.status(500).json({ message: "Failed to delete item" });
+    }
+  });
+
+  // =============================================
   // CRM QUOTES ROUTES
   // =============================================
 
@@ -10111,21 +10435,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
       
-      // Get total count
-      const [countResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(crmQuotes)
-        .where(whereClause);
-      const total = Number(countResult?.count) || 0;
+      // Get total count using raw SQL to bypass Drizzle ORM issues
+      const countQuery = await db.execute(sql`SELECT COUNT(*) as count FROM crm_quotes`);
+      const total = Number(countQuery.rows[0]?.count) || 0;
 
-      // Get paginated quotes
-      const quotesResult = await db
-        .select()
-        .from(crmQuotes)
-        .where(whereClause)
-        .orderBy(desc(crmQuotes.createdAt))
-        .limit(limitNum)
-        .offset(offset);
+      // Get paginated quotes using raw SQL to bypass Drizzle ORM issue
+      const quotesQuery = await db.execute(sql`
+        SELECT 
+          id, quote_number as "quoteNumber", customer_id as "customerId", 
+          customer_name as "customerName", customer_email as "customerEmail",
+          customer_phone as "customerPhone", service_address as "serviceAddress",
+          title, description, subtotal, tax_rate as "taxRate", tax_amount as "taxAmount",
+          tax_total as "taxTotal", labor_total as "laborTotal", total, status,
+          valid_until as "validUntil", sent_at as "sentAt", viewed_at as "viewedAt",
+          accepted_at as "acceptedAt", declined_at as "declinedAt",
+          work_order_id as "workOrderId", project_id as "projectId", scope, notes,
+          created_at as "createdAt", updated_at as "updatedAt"
+        FROM crm_quotes 
+        ORDER BY created_at DESC 
+        LIMIT ${limitNum} OFFSET ${offset}
+      `);
+      const quotesResult = quotesQuery.rows as any[];
 
       // BATCH LOAD: Get customer names for list view
       const customerIds = [...new Set(quotesResult.map(q => q.customerId).filter(Boolean))] as string[];
@@ -10265,6 +10595,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create line items if provided
       let createdLineItems: CrmQuoteLineItem[] = [];
       if (lineItems && Array.isArray(lineItems)) {
+        // Validate discount line items before creating
+        const discountValidation = validateDiscountLineItems(lineItems, [], 'quote');
+        if (!discountValidation.valid) {
+          // Rollback: delete the quote we just created
+          await db.delete(crmQuotes).where(eq(crmQuotes.id, newQuote.id));
+          return res.status(400).json({ message: discountValidation.error });
+        }
+        
         for (const item of lineItems) {
           const lineItemData = { ...item, quoteId: newQuote.id };
           const lineItemParseResult = insertCrmQuoteLineItemSchema.safeParse(lineItemData);
@@ -10288,6 +10626,448 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating CRM quote:", error);
       return res.status(500).json({ message: "Failed to create quote" });
+    }
+  });
+
+  // POST /api/crm/quotes/from-worksheet - Create quote from install pricing worksheet
+  app.post("/api/crm/quotes/from-worksheet", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { customerId, newCustomer, installSubtype, inputs, lines } = req.body;
+
+      if (!lines || !Array.isArray(lines) || lines.length === 0) {
+        return res.status(400).json({ message: "At least one line item is required" });
+      }
+
+      let targetCustomerId = customerId;
+
+      // Create new customer if needed
+      if (!customerId && newCustomer) {
+        if (!newCustomer.name || !newCustomer.name.trim()) {
+          return res.status(400).json({ message: "Customer name is required" });
+        }
+
+        const [createdCustomer] = await db.insert(crmCustomers).values({
+          name: newCustomer.name.trim(),
+          email: newCustomer.email?.trim() || null,
+          phone: newCustomer.phone?.trim() || null,
+          fullAddress: newCustomer.address?.trim() || null,
+          customerStatus: "prospect",
+          customerType: "residential",
+        }).returning();
+
+        targetCustomerId = createdCustomer.id;
+
+        await logCrmAudit(
+          user.id,
+          "customer.created",
+          "crm_customer",
+          createdCustomer.id,
+          { name: createdCustomer.name, source: "worksheet" },
+          req.ip
+        );
+      }
+
+      if (!targetCustomerId) {
+        return res.status(400).json({ message: "Either customerId or newCustomer is required" });
+      }
+
+      // Verify customer exists if using existing
+      if (customerId) {
+        const [existingCustomer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+        if (!existingCustomer) {
+          return res.status(400).json({ message: "Customer not found" });
+        }
+      }
+
+      // Generate quote number
+      const quoteNumber = await generateQuoteNumber();
+
+      // Calculate totals from worksheet
+      const { calcWorksheet } = await import("@shared/calcWorksheet");
+      const worksheetLines = lines.map((l: { cost: number; taxable: boolean }) => ({
+        cost: l.cost,
+        taxable: l.taxable,
+      }));
+      const calcs = calcWorksheet(inputs, worksheetLines);
+
+      // Create the quote
+      const [newQuote] = await db.insert(crmQuotes).values({
+        quoteNumber,
+        customerId: targetCustomerId,
+        scope: "project",
+        status: "draft",
+        title: `Install - ${installSubtype.charAt(0).toUpperCase() + installSubtype.slice(1)}`,
+        description: `Generated from Install Pricing Worksheet.\nInstall Type: ${installSubtype}\nHours: ${inputs.hoursToInstall}\nCrew Days: ${calcs.crewDays.toFixed(2)}`,
+        subtotal: calcs.linesTotal.toString(),
+        taxTotal: calcs.salesTax.toString(),
+        total: calcs.discountedSellPrice.toString(),
+        createdBy: user.id,
+      }).returning();
+
+      // Create line items from worksheet lines
+      let sortOrder = 0;
+      for (const line of lines) {
+        const cost = line.cost || 0;
+        await db.insert(crmQuoteLineItems).values({
+          quoteId: newQuote.id,
+          lineType: "part",
+          description: line.description || line.category,
+          unitPrice: cost.toString(),
+          quantity: "1",
+          lineTotal: cost.toString(),
+          taxable: line.taxable,
+          sortOrder: sortOrder++,
+        });
+      }
+
+      // Add labor line item
+      const laborTotal = calcs.laborPayroll + calcs.laborBenefits;
+      if (laborTotal > 0) {
+        await db.insert(crmQuoteLineItems).values({
+          quoteId: newQuote.id,
+          lineType: "labor",
+          description: `Labor (${inputs.hoursToInstall} hours)`,
+          unitPrice: laborTotal.toString(),
+          quantity: "1",
+          lineTotal: laborTotal.toString(),
+          taxable: false,
+          sortOrder: sortOrder++,
+        });
+      }
+
+      // Add warranty reserve line item
+      if (inputs.warrantyReserveDollar > 0) {
+        await db.insert(crmQuoteLineItems).values({
+          quoteId: newQuote.id,
+          lineType: "other",
+          description: "Warranty Reserve",
+          unitPrice: inputs.warrantyReserveDollar.toString(),
+          quantity: "1",
+          lineTotal: inputs.warrantyReserveDollar.toString(),
+          taxable: false,
+          sortOrder: sortOrder++,
+        });
+      }
+
+      await logCrmAudit(
+        user.id,
+        "quote.created",
+        "crm_quote",
+        newQuote.id,
+        { quoteNumber: newQuote.quoteNumber, source: "worksheet", installSubtype, customerId: targetCustomerId },
+        req.ip
+      );
+
+      return res.status(201).json({ quoteId: newQuote.id });
+    } catch (error) {
+      console.error("Error creating quote from worksheet:", error);
+      return res.status(500).json({ message: "Failed to create quote from worksheet" });
+    }
+  });
+
+  // Proposal Sessions CRUD (autosave for proposal builder)
+  // POST /api/crm/proposal-sessions - Create new builder session
+  app.post("/api/crm/proposal-sessions", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const { customerId, siteId, selectionsJson, cartJson, pricingTotalsJson, aiNotes } = req.body;
+
+      const [session] = await db.insert(proposalSessions).values({
+        customerId: customerId || null,
+        siteId: siteId || null,
+        selectionsJson: selectionsJson || null,
+        cartJson: cartJson || null,
+        pricingTotalsJson: pricingTotalsJson || null,
+        aiNotes: aiNotes || null,
+        createdBy: user.id,
+      }).returning();
+
+      return res.status(201).json(session);
+    } catch (error) {
+      console.error("Error creating proposal session:", error);
+      return res.status(500).json({ message: "Failed to create proposal session" });
+    }
+  });
+
+  // GET /api/crm/proposal-sessions/:id - Get session by ID
+  app.get("/api/crm/proposal-sessions/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const [session] = await db.select().from(proposalSessions).where(eq(proposalSessions.id, req.params.id));
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      return res.json(session);
+    } catch (error) {
+      console.error("Error fetching proposal session:", error);
+      return res.status(500).json({ message: "Failed to fetch proposal session" });
+    }
+  });
+
+  // PATCH /api/crm/proposal-sessions/:id - Update existing session
+  app.patch("/api/crm/proposal-sessions/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const { customerId, siteId, selectionsJson, cartJson, pricingTotalsJson, aiNotes } = req.body;
+
+      const [existing] = await db.select().from(proposalSessions).where(eq(proposalSessions.id, req.params.id));
+      if (!existing) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      const [updated] = await db.update(proposalSessions)
+        .set({
+          customerId: customerId !== undefined ? customerId : existing.customerId,
+          siteId: siteId !== undefined ? siteId : existing.siteId,
+          selectionsJson: selectionsJson !== undefined ? selectionsJson : existing.selectionsJson,
+          cartJson: cartJson !== undefined ? cartJson : existing.cartJson,
+          pricingTotalsJson: pricingTotalsJson !== undefined ? pricingTotalsJson : existing.pricingTotalsJson,
+          aiNotes: aiNotes !== undefined ? aiNotes : existing.aiNotes,
+          updatedAt: new Date(),
+        })
+        .where(eq(proposalSessions.id, req.params.id))
+        .returning();
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating proposal session:", error);
+      return res.status(500).json({ message: "Failed to update proposal session" });
+    }
+  });
+
+  // DELETE /api/crm/proposal-sessions/:id - Delete session
+  app.delete("/api/crm/proposal-sessions/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const [existing] = await db.select().from(proposalSessions).where(eq(proposalSessions.id, req.params.id));
+      if (!existing) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      await db.delete(proposalSessions).where(eq(proposalSessions.id, req.params.id));
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting proposal session:", error);
+      return res.status(500).json({ message: "Failed to delete proposal session" });
+    }
+  });
+
+  // POST /api/crm/quotes/from-proposal - Create standalone quote from proposal builder
+  app.post("/api/crm/quotes/from-proposal", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { customerId, propertyId, title, description, notes, lineItems, status, aiNotes } = req.body;
+
+      if (!customerId) {
+        return res.status(400).json({ message: "Customer is required" });
+      }
+
+      if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
+        return res.status(400).json({ message: "At least one line item is required" });
+      }
+
+      // Validate status if provided
+      const validStatuses = ["draft", "presented", "approved"];
+      const quoteStatus = validStatuses.includes(status) ? status : "draft";
+
+      // Verify customer exists
+      const [existingCustomer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      if (!existingCustomer) {
+        return res.status(400).json({ message: "Customer not found" });
+      }
+
+      // Calculate totals from line items
+      let subtotal = 0;
+      let taxableSubtotal = 0;
+      for (const item of lineItems) {
+        const lineTotal = (item.quantity || 1) * (item.unitPrice || 0);
+        subtotal += lineTotal;
+        if (item.taxable !== false) {
+          taxableSubtotal += lineTotal;
+        }
+      }
+      const taxRate = 0.0825; // 8.25% tax
+      const taxTotal = taxableSubtotal * taxRate;
+      const total = subtotal + taxTotal;
+
+      // Generate quote number
+      const quoteNumber = await generateQuoteNumber();
+
+      // Build notes with AI notes if provided
+      const combinedNotes = [notes, aiNotes ? `AI Generated Notes:\n${aiNotes}` : null].filter(Boolean).join("\n\n");
+
+      // Create the quote
+      const [newQuote] = await db.insert(crmQuotes).values({
+        quoteNumber,
+        customerId,
+        propertyId: propertyId || null,
+        customerName: existingCustomer.name,
+        customerAddress: existingCustomer.fullAddress || null,
+        customerPhone: existingCustomer.phone || null,
+        customerEmail: existingCustomer.email || null,
+        scope: "standalone",
+        status: quoteStatus,
+        title: title || "Proposal Quote",
+        description: description || null,
+        notes: combinedNotes || null,
+        subtotal: subtotal.toFixed(2),
+        taxTotal: taxTotal.toFixed(2),
+        total: total.toFixed(2),
+        createdBy: user.id,
+        acceptedAt: quoteStatus === "approved" ? new Date() : null,
+        acceptedBy: quoteStatus === "approved" ? user.name : null,
+      }).returning();
+
+      // Create line items
+      const createdLineItems = [];
+      let sortOrder = 0;
+      for (const item of lineItems) {
+        if (!item.description?.trim()) continue;
+        
+        const quantity = item.quantity || 1;
+        const unitPrice = item.unitPrice || 0;
+        const lineTotal = quantity * unitPrice;
+
+        const [createdItem] = await db.insert(crmQuoteLineItems).values({
+          quoteId: newQuote.id,
+          lineType: "part",
+          description: item.description.trim(),
+          quantity: quantity.toString(),
+          unitPrice: unitPrice.toString(),
+          lineTotal: lineTotal.toString(),
+          taxable: item.taxable !== false,
+          sortOrder: sortOrder++,
+        }).returning();
+        createdLineItems.push(createdItem);
+      }
+
+      await logCrmAudit(
+        user.id,
+        "quote.created",
+        "crm_quote",
+        newQuote.id,
+        { quoteNumber: newQuote.quoteNumber, scope: "standalone", source: "proposal-builder", customerId, status: quoteStatus },
+        req.ip
+      );
+
+      return res.status(201).json({ quoteId: newQuote.id, quote: newQuote, lineItems: createdLineItems });
+    } catch (error) {
+      console.error("Error creating quote from proposal:", error);
+      return res.status(500).json({ message: "Failed to create quote from proposal" });
+    }
+  });
+
+  // POST /api/crm/quotes/quick - Create standalone quick quote
+  app.post("/api/crm/quotes/quick", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { customerId, title, description, notes, lineItems } = req.body;
+
+      if (!customerId) {
+        return res.status(400).json({ message: "Customer is required" });
+      }
+
+      if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
+        return res.status(400).json({ message: "At least one line item is required" });
+      }
+
+      // Verify customer exists
+      const [existingCustomer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      if (!existingCustomer) {
+        return res.status(400).json({ message: "Customer not found" });
+      }
+
+      // Calculate totals from line items
+      let subtotal = 0;
+      let taxableSubtotal = 0;
+      for (const item of lineItems) {
+        const lineTotal = (item.quantity || 1) * (item.unitPrice || 0);
+        if (!item.isDiscountLine) {
+          subtotal += lineTotal;
+          if (item.taxable !== false) {
+            taxableSubtotal += lineTotal;
+          }
+        } else {
+          subtotal += lineTotal; // discounts are negative
+        }
+      }
+      const taxRate = 0.0825; // 8.25% tax
+      const taxTotal = taxableSubtotal * taxRate;
+      const total = subtotal + taxTotal;
+
+      // Generate quote number
+      const quoteNumber = await generateQuoteNumber();
+
+      // Create the quote with customer info
+      const [newQuote] = await db.insert(crmQuotes).values({
+        quoteNumber,
+        customerId,
+        customerName: existingCustomer.displayName || existingCustomer.name || "Customer",
+        customerEmail: existingCustomer.email || null,
+        customerPhone: existingCustomer.phone || null,
+        serviceAddress: existingCustomer.address || null,
+        scope: "standalone",
+        status: "draft",
+        title: title || "Quick Quote",
+        description: description || null,
+        notes: notes || null,
+        subtotal: subtotal.toFixed(2),
+        taxRate: "0.0825",
+        taxAmount: taxTotal.toFixed(2),
+        taxTotal: taxTotal.toFixed(2),
+        total: total.toFixed(2),
+        createdBy: user.id,
+      }).returning();
+
+      // Create line items
+      const createdLineItems = [];
+      let sortOrder = 0;
+      for (const item of lineItems) {
+        if (!item.description?.trim()) continue;
+        
+        const quantity = item.quantity || 1;
+        const unitPrice = item.unitPrice || 0;
+        const lineTotal = quantity * unitPrice;
+
+        const [createdItem] = await db.insert(crmQuoteLineItems).values({
+          quoteId: newQuote.id,
+          lineType: item.isDiscountLine ? "discount" : (item.lineType || "part"),
+          description: item.description.trim(),
+          quantity: quantity.toString(),
+          unitPrice: unitPrice.toString(),
+          lineTotal: lineTotal.toString(),
+          taxable: item.isDiscountLine ? false : (item.taxable !== false),
+          isDiscountLine: item.isDiscountLine || false,
+          discountKind: item.discountKind || null,
+          sortOrder: sortOrder++,
+        }).returning();
+        createdLineItems.push(createdItem);
+      }
+
+      await logCrmAudit(
+        user.id,
+        "quote.created",
+        "crm_quote",
+        newQuote.id,
+        { quoteNumber: newQuote.quoteNumber, scope: "standalone", source: "quick", customerId },
+        req.ip
+      );
+
+      return res.status(201).json({ quoteId: newQuote.id, quote: newQuote, lineItems: createdLineItems });
+    } catch (error) {
+      console.error("Error creating quick quote:", error);
+      return res.status(500).json({ message: "Failed to create quick quote" });
     }
   });
 
@@ -10375,6 +11155,192 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting CRM quote:", error);
       return res.status(500).json({ message: "Failed to delete quote" });
+    }
+  });
+
+  // POST /api/crm/quotes/:id/line-items - Add line item to quote
+  app.post("/api/crm/quotes/:id/line-items", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id));
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+      
+      if (quote.status !== "draft") {
+        return res.status(400).json({ message: "Can only add line items to draft quotes" });
+      }
+      
+      // Get existing line items for discount validation
+      const existingLineItems = await db.select().from(crmQuoteLineItems)
+        .where(eq(crmQuoteLineItems.quoteId, req.params.id));
+      
+      // Validate discount line item rules
+      const discountValidation = validateDiscountLineItem(req.body, existingLineItems, undefined, 'quote');
+      if (!discountValidation.valid) {
+        return res.status(400).json({ message: discountValidation.error });
+      }
+      
+      const lineItemData = { ...req.body, quoteId: req.params.id };
+      const parseResult = insertCrmQuoteLineItemSchema.safeParse(lineItemData);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: parseResult.error.errors 
+        });
+      }
+      
+      const [lineItem] = await db.insert(crmQuoteLineItems).values(parseResult.data).returning();
+      
+      await logCrmAudit(
+        user.id,
+        "quote_line_item.created",
+        "quote_line_item",
+        lineItem.id,
+        { quoteId: req.params.id, description: lineItem.description },
+        req.ip
+      );
+      
+      return res.status(201).json(lineItem);
+    } catch (error) {
+      console.error("Error creating quote line item:", error);
+      return res.status(500).json({ message: "Failed to create quote line item" });
+    }
+  });
+
+  // PATCH /api/crm/quotes/:id/line-items/:lineItemId - Update line item
+  app.patch("/api/crm/quotes/:id/line-items/:lineItemId", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id));
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+      
+      if (quote.status !== "draft") {
+        return res.status(400).json({ message: "Can only update line items on draft quotes" });
+      }
+      
+      const [existingLineItem] = await db.select().from(crmQuoteLineItems)
+        .where(and(
+          eq(crmQuoteLineItems.id, req.params.lineItemId),
+          eq(crmQuoteLineItems.quoteId, req.params.id)
+        ));
+      
+      if (!existingLineItem) {
+        return res.status(404).json({ message: "Line item not found" });
+      }
+      
+      const { description, partNumber, quantity, unitPrice, lineTotal, taxable, sortOrder, lineType, isDiscountLine, discountKind } = req.body;
+      
+      // Merge existing line item data with updates to validate the final state
+      const mergedLineItem = {
+        ...existingLineItem,
+        ...(description !== undefined && { description }),
+        ...(partNumber !== undefined && { partNumber }),
+        ...(quantity !== undefined && { quantity }),
+        ...(unitPrice !== undefined && { unitPrice }),
+        ...(lineTotal !== undefined && { lineTotal }),
+        ...(taxable !== undefined && { taxable }),
+        ...(sortOrder !== undefined && { sortOrder }),
+        ...(lineType !== undefined && { lineType }),
+        ...(isDiscountLine !== undefined && { isDiscountLine }),
+        ...(discountKind !== undefined && { discountKind }),
+      };
+      
+      // Get all line items for this quote for discount validation
+      const allLineItems = await db.select().from(crmQuoteLineItems)
+        .where(eq(crmQuoteLineItems.quoteId, req.params.id));
+      
+      // Validate discount line item rules
+      const discountValidation = validateDiscountLineItem(mergedLineItem, allLineItems, req.params.lineItemId, 'quote');
+      if (!discountValidation.valid) {
+        return res.status(400).json({ message: discountValidation.error });
+      }
+      
+      const updates: any = {};
+      if (description !== undefined) updates.description = description;
+      if (partNumber !== undefined) updates.partNumber = partNumber;
+      if (quantity !== undefined) updates.quantity = quantity;
+      if (unitPrice !== undefined) updates.unitPrice = unitPrice;
+      if (lineTotal !== undefined) updates.lineTotal = lineTotal;
+      if (taxable !== undefined) updates.taxable = taxable;
+      if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      if (lineType !== undefined) updates.lineType = lineType;
+      if (isDiscountLine !== undefined) updates.isDiscountLine = isDiscountLine;
+      if (discountKind !== undefined) updates.discountKind = discountKind;
+      
+      const [updatedLineItem] = await db.update(crmQuoteLineItems)
+        .set(updates)
+        .where(eq(crmQuoteLineItems.id, req.params.lineItemId))
+        .returning();
+      
+      await logCrmAudit(
+        user.id,
+        "quote_line_item.updated",
+        "quote_line_item",
+        req.params.lineItemId,
+        { quoteId: req.params.id, changes: updates },
+        req.ip
+      );
+      
+      return res.json(updatedLineItem);
+    } catch (error) {
+      console.error("Error updating quote line item:", error);
+      return res.status(500).json({ message: "Failed to update quote line item" });
+    }
+  });
+
+  // DELETE /api/crm/quotes/:id/line-items/:lineItemId - Delete line item
+  app.delete("/api/crm/quotes/:id/line-items/:lineItemId", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id));
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+      
+      if (quote.status !== "draft") {
+        return res.status(400).json({ message: "Can only delete line items from draft quotes" });
+      }
+      
+      const [existingLineItem] = await db.select().from(crmQuoteLineItems)
+        .where(and(
+          eq(crmQuoteLineItems.id, req.params.lineItemId),
+          eq(crmQuoteLineItems.quoteId, req.params.id)
+        ));
+      
+      if (!existingLineItem) {
+        return res.status(404).json({ message: "Line item not found" });
+      }
+      
+      await db.delete(crmQuoteLineItems).where(eq(crmQuoteLineItems.id, req.params.lineItemId));
+      
+      await logCrmAudit(
+        user.id,
+        "quote_line_item.deleted",
+        "quote_line_item",
+        req.params.lineItemId,
+        { quoteId: req.params.id, description: existingLineItem.description },
+        req.ip
+      );
+      
+      return res.json({ message: "Line item deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting quote line item:", error);
+      return res.status(500).json({ message: "Failed to delete quote line item" });
     }
   });
 

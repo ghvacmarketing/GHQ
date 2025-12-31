@@ -1,7 +1,7 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc } from "drizzle-orm";
+import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // Quote operations
@@ -212,6 +212,7 @@ export interface IStorage {
   getWorkOrdersByProjectId(projectId: string): Promise<CrmWorkOrder[]>;
   getWorkOrdersByDateRange(startDate: Date, endDate: Date): Promise<CrmWorkOrder[]>;
   getWorkOrdersByTechId(techId: string, date?: Date): Promise<CrmWorkOrder[]>;
+  getUnassignedWorkOrders(): Promise<CrmWorkOrder[]>;
   updateWorkOrder(id: string, data: Partial<InsertCrmWorkOrder>): Promise<CrmWorkOrder | undefined>;
   deleteWorkOrder(id: string): Promise<boolean>;
 
@@ -228,6 +229,14 @@ export interface IStorage {
   getInvoiceLineItems(invoiceId: string): Promise<CrmInvoiceLineItem[]>;
   updateInvoiceLineItem(id: string, data: Partial<InsertCrmInvoiceLineItem>): Promise<CrmInvoiceLineItem | undefined>;
   deleteInvoiceLineItem(id: string): Promise<boolean>;
+
+  // CRM Items operations
+  getAllCrmItems(): Promise<CrmItem[]>;
+  getCrmItem(id: string): Promise<CrmItem | undefined>;
+  createCrmItem(data: InsertCrmItem): Promise<CrmItem>;
+  updateCrmItem(id: string, data: Partial<InsertCrmItem>): Promise<CrmItem | undefined>;
+  deleteCrmItem(id: string): Promise<boolean>;
+  searchCrmItems(query: string): Promise<CrmItem[]>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -1595,6 +1604,20 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(crmWorkOrders.scheduledStart));
   }
 
+  async getUnassignedWorkOrders(): Promise<CrmWorkOrder[]> {
+    // Get unassigned work orders that are not completed or cancelled
+    return await db
+      .select()
+      .from(crmWorkOrders)
+      .where(
+        and(
+          isNull(crmWorkOrders.assignedTechId),
+          notInArray(crmWorkOrders.status, ['completed', 'cancelled'])
+        )
+      )
+      .orderBy(desc(crmWorkOrders.createdAt));
+  }
+
   async updateWorkOrder(id: string, data: Partial<InsertCrmWorkOrder>): Promise<CrmWorkOrder | undefined> {
     const [workOrder] = await db
       .update(crmWorkOrders)
@@ -1697,6 +1720,44 @@ export class DatabaseStorage implements IStorage {
   async deleteInvoiceLineItem(id: string): Promise<boolean> {
     const result = await db.delete(crmInvoiceLineItems).where(eq(crmInvoiceLineItems.id, id));
     return (result.rowCount || 0) > 0;
+  }
+
+  // CRM Items operations
+  async getAllCrmItems(): Promise<CrmItem[]> {
+    return await db.select().from(crmItems).where(eq(crmItems.isActive, true)).orderBy(asc(crmItems.name));
+  }
+
+  async getCrmItem(id: string): Promise<CrmItem | undefined> {
+    const [item] = await db.select().from(crmItems).where(eq(crmItems.id, id));
+    return item || undefined;
+  }
+
+  async createCrmItem(data: InsertCrmItem): Promise<CrmItem> {
+    const [item] = await db.insert(crmItems).values(data).returning();
+    return item;
+  }
+
+  async updateCrmItem(id: string, data: Partial<InsertCrmItem>): Promise<CrmItem | undefined> {
+    const [item] = await db.update(crmItems).set({ ...data, updatedAt: new Date() }).where(eq(crmItems.id, id)).returning();
+    return item || undefined;
+  }
+
+  async deleteCrmItem(id: string): Promise<boolean> {
+    const result = await db.delete(crmItems).where(eq(crmItems.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async searchCrmItems(query: string): Promise<CrmItem[]> {
+    return await db.select().from(crmItems)
+      .where(and(
+        eq(crmItems.isActive, true),
+        or(
+          ilike(crmItems.name, `%${query}%`),
+          ilike(crmItems.description, `%${query}%`),
+          ilike(crmItems.partNumber, `%${query}%`)
+        )
+      ))
+      .orderBy(asc(crmItems.name));
   }
 
   // Initialize default data if needed

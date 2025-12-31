@@ -1,0 +1,153 @@
+A) Database fields (Items table)
+
+Add these columns to your existing items table:
+
+category (string) → include "Discounts"
+
+item_type (enum) → service | install | maintenance | discount
+
+default_rate (decimal, nullable) → set to 0 or NULL for discounts
+
+is_variable_rate (boolean) → true for discounts
+
+is_discount (boolean) → true for discounts
+
+discount_kind (enum, nullable) → promotion | maintenance (only for discount items)
+
+is_taxable (boolean) → false for discounts
+
+is_active (boolean)
+
+sort_order (int) optional
+
+Create only 2 discount items (seed data, locked):
+
+Promotion Discount
+
+item_type=discount, discount_kind=promotion, is_variable_rate=true, default_rate=0, is_taxable=false
+
+Maintenance Discount
+
+item_type=discount, discount_kind=maintenance, is_variable_rate=true, default_rate=0, is_taxable=false
+
+Locking rule (recommended):
+
+is_system_item (boolean) → true for those 2
+
+Disallow edits/deletes unless admin + special setting.
+
+B) Quote/Invoice line item fields
+
+In your invoice_lines / quote_lines table:
+
+item_id (nullable)
+
+description (string)
+
+qty (decimal)
+
+unit_price (decimal)
+
+line_total (decimal) (or computed)
+
+is_discount_line (boolean)
+
+discount_kind (enum nullable) promotion|maintenance
+
+taxable (boolean)
+
+qb_account_ref / qb_item_ref (if you store mappings)
+
+cost_internal (optional internal cost)
+
+For discount lines:
+
+qty should always be 1
+
+unit_price is negative (ex: -250.00)
+
+taxable=false
+
+is_discount_line=true
+
+discount_kind copied from the item
+
+C) UI rules (so users don’t add discounts incorrectly)
+1) Items page
+
+Add a new tab next to Install/Service/Maintenance:
+
+Discounts
+
+On that tab:
+
+Show only the 2 discount items
+
+Display “Variable amount” instead of a rate
+
+Disable edit/delete unless Owner/Admin
+
+2) Quote/Invoice builder
+
+Do NOT show discounts in the normal item picker (optional but recommended).
+Instead:
+
+Add a dedicated button:
+
+Add Discount
+
+When clicked:
+
+Choose Type: Promotion or Maintenance
+
+Choose Mode: $ or %
+
+Enter Value
+
+Then insert a discount line:
+
+If $ entered: unit_price = -ABS(value)
+
+If % entered: unit_price = -ROUND(subtotal_eligible * pct, 2)
+
+Subtotal eligible rules:
+
+Promotion discount applies to: Install + Service (your choice)
+
+Maintenance discount applies to: Maintenance only
+(You decide. But enforce it.)
+
+D) Validation rules (hard stop errors)
+
+These should be enforced server-side too:
+
+If is_discount_line=true:
+
+qty MUST = 1
+
+taxable MUST = false
+
+unit_price MUST be <= 0
+
+line_total MUST be <= 0
+
+Discount line cannot be the only line item unless allowed (optional):
+
+Require at least one non-discount line.
+
+Only allow one of each discount kind per invoice (recommended):
+
+Max 1 Promotion Discount line
+
+Max 1 Maintenance Discount line
+(If user adds again, update existing one.)
+
+Permission:
+
+Only certain roles can apply discounts
+
+Or allow techs up to a max:
+
+e.g. max $200 or max 5%
+
+Above that → require manager approval

@@ -135,13 +135,13 @@ import {
   DndContext,
   closestCenter,
   DragEndEvent,
-  DragOverlay,
   DragStartEvent,
   useSensor,
   useSensors,
   PointerSensor,
   useDroppable,
   useDraggable,
+  Modifier,
 } from "@dnd-kit/core";
 
 type FilterStatus = "all" | "scheduled" | "dispatched" | "en_route" | "on_site" | "completed";
@@ -213,6 +213,14 @@ const timeSlots = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
 
 const SLOT_WIDTH = 60;
 const TIMELINE_WIDTH = TOTAL_SLOTS * SLOT_WIDTH;
+
+const snapToGridModifier: Modifier = ({ transform }) => {
+  return {
+    ...transform,
+    x: Math.round(transform.x / SLOT_WIDTH) * SLOT_WIDTH,
+    y: transform.y,
+  };
+};
 
 const statusColors: Record<string, { bg: string; border: string; text: string }> = {
   scheduled: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
@@ -348,7 +356,8 @@ function DraggableQueueCard({
 
   const style: React.CSSProperties = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: 1,
+    zIndex: isDragging ? 1000 : undefined,
   };
   
   const handleScheduleSubmit = () => {
@@ -638,7 +647,7 @@ const SCHEDULE_START_HOUR = 8;
 const SCHEDULE_END_HOUR = 20;
 const SCHEDULE_TOTAL_MINUTES = (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) * 60;
 const SCHEDULE_INTERVAL = 30;
-const SCHEDULE_TIMELINE_WIDTH = 900;
+const SCHEDULE_TIMELINE_WIDTH = TIMELINE_WIDTH;
 
 function getScheduleLeftPercent(date: Date): number {
   const hours = date.getHours();
@@ -907,6 +916,7 @@ function DraggableScheduleCard({
   const edgeRef = useRef<'start' | 'end'>('end');
   const accumulatedStartDeltaRef = useRef(0);
   const accumulatedEndDeltaRef = useRef(0);
+  const justResizedRef = useRef(false);
   
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `schedule-${workOrder.id}`,
@@ -947,6 +957,9 @@ function DraggableScheduleCard({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       
+      justResizedRef.current = true;
+      setTimeout(() => { justResizedRef.current = false; }, 100);
+      
       if ((accumulatedStartDeltaRef.current !== 0 || accumulatedEndDeltaRef.current !== 0) && onResizeComplete) {
         onResizeComplete(workOrder.id, accumulatedStartDeltaRef.current, accumulatedEndDeltaRef.current);
       }
@@ -963,8 +976,8 @@ function DraggableScheduleCard({
     left: `${visualLeft}%`,
     width: `${visualWidth}%`,
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: isDragging ? 0.3 : 1,
-    zIndex: isDragging || isResizing ? 50 : 1,
+    opacity: 1,
+    zIndex: isDragging ? 1000 : isResizing ? 50 : 1,
   };
 
   const dragListeners = isResizing ? {} : listeners;
@@ -981,7 +994,7 @@ function DraggableScheduleCard({
       {...attributes}
       {...dragListeners}
       onClick={(e) => {
-        if (!isResizing) {
+        if (!isResizing && !justResizedRef.current) {
           e.stopPropagation();
           onWorkOrderClick?.(workOrder.id);
         }
@@ -1307,7 +1320,8 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
     left: `${leftPx}px`,
     width: `${Math.max(widthPx, 48)}px`,
     transform: isDragging && transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: 1,
+    zIndex: isDragging ? 1000 : undefined,
   };
 
   return (
@@ -2451,6 +2465,7 @@ export default function CrmDispatch() {
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
+          modifiers={[snapToGridModifier]}
         >
           {viewMode === "day" ? (
             <div className="hidden lg:block space-y-6">
@@ -2501,13 +2516,6 @@ export default function CrmDispatch() {
             </div>
           )}
           
-          <DragOverlay>
-            {activeWorkOrder ? (
-              activeId && localWorkOrders.find(wo => wo.id === activeId)?.assignedTechId 
-                ? <WorkOrderCardOverlay workOrder={activeWorkOrder} />
-                : <QueueCardOverlay workOrder={activeWorkOrder} />
-            ) : null}
-          </DragOverlay>
         </DndContext>
 
         <div className="lg:hidden space-y-4" data-testid="mobile-workorder-list">

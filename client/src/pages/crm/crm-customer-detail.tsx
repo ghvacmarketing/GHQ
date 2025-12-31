@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,7 +60,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty } from "@shared/schema";
+import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty, CrmQuote } from "@shared/schema";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus } from "@shared/schema";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -516,6 +516,8 @@ interface CustomerTabbedViewProps {
   projectsLoading: boolean;
   crmWorkOrders: any[] | undefined;
   workOrdersLoading: boolean;
+  crmQuotes: CrmQuote[] | undefined;
+  quotesLoading: boolean;
   jobs: JobWithTech[] | undefined;
   notes: CustomerNoteWithUser[];
   notesLoading: boolean;
@@ -540,6 +542,8 @@ function CustomerTabbedView({
   projectsLoading,
   crmWorkOrders,
   workOrdersLoading,
+  crmQuotes,
+  quotesLoading,
   jobs,
   notes,
   notesLoading,
@@ -1148,31 +1152,87 @@ function CustomerTabbedView({
         </Card>
       </TabsContent>
 
-      {/* Quotes Tab - Placeholder */}
+      {/* Quotes Tab */}
       <TabsContent value="quotes" className="space-y-6" data-testid="tab-content-quotes">
         <Card data-testid="card-quotes">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-[#711419]" />
-              Quotes
+              Quotes ({crmQuotes?.length || 0})
             </CardTitle>
-            <Button 
-              size="sm"
-              className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              data-testid="button-create-quote"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Create Quote
-            </Button>
+            <Link href={`/crm/quotes/new?customerId=${customer.id}`}>
+              <Button 
+                size="sm"
+                className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                data-testid="button-create-quote"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Create Quote
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8">
-              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 mb-2">No quotes yet</p>
-              <p className="text-sm text-slate-400">
-                Quotes for this customer will appear here.
-              </p>
-            </div>
+            {quotesLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : !crmQuotes || crmQuotes.length === 0 ? (
+              <div className="text-center py-8">
+                <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 mb-2">No quotes yet</p>
+                <p className="text-sm text-slate-400">
+                  Quotes for this customer will appear here.
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Quote Number</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead>Created Date</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {crmQuotes.map((quote) => (
+                    <TableRow key={quote.id} data-testid={`row-quote-${quote.id}`}>
+                      <TableCell className="font-medium">{quote.quoteNumber}</TableCell>
+                      <TableCell>{quote.title}</TableCell>
+                      <TableCell>
+                        <Badge className={cn(
+                          "text-xs",
+                          quote.status === "draft" && "bg-slate-100 text-slate-700",
+                          quote.status === "sent" && "bg-blue-100 text-blue-700",
+                          quote.status === "accepted" && "bg-green-100 text-green-700",
+                          quote.status === "declined" && "bg-red-100 text-red-700",
+                          quote.status === "expired" && "bg-yellow-100 text-yellow-700"
+                        )}>
+                          {quote.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {quote.total ? `$${Number(quote.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                      </TableCell>
+                      <TableCell>
+                        {quote.createdAt ? format(new Date(quote.createdAt), 'MMM d, yyyy') : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Link href="/crm/quotes">
+                          <Button variant="ghost" size="sm" data-testid={`button-view-quote-${quote.id}`}>
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </TabsContent>
@@ -1504,6 +1564,18 @@ export default function CrmCustomerDetail() {
     },
     enabled: !!currentUser && !!customerId,
   });
+
+  // Fetch CRM Quotes for this customer
+  const { data: crmQuotesData, isLoading: quotesLoading } = useQuery<{ quotes: CrmQuote[]; pagination: any }>({
+    queryKey: ["/api/crm/quotes", { customerId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/quotes?customerId=${customerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch quotes");
+      return res.json();
+    },
+    enabled: !!currentUser && !!customerId,
+  });
+  const crmQuotes = crmQuotesData?.quotes || [];
 
   // Fetch customer properties for all views (needed for property_manager tabs)
   const { data: customerProperties, isLoading: propertiesLoading } = useQuery<CrmProperty[]>({
@@ -3255,6 +3327,8 @@ export default function CrmCustomerDetail() {
           projectsLoading={projectsLoading}
           crmWorkOrders={crmWorkOrders}
           workOrdersLoading={workOrdersLoading}
+          crmQuotes={crmQuotes}
+          quotesLoading={quotesLoading}
           jobs={jobs}
           notes={notes || []}
           notesLoading={notesLoading}

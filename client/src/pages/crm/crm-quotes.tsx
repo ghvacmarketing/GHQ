@@ -29,6 +29,16 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import {
   Search,
@@ -46,8 +56,9 @@ import {
   Send,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { format, subDays, isAfter } from "date-fns";
+import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
 import type { CrmUser, CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 
 type QuotesResponse = {
@@ -77,10 +88,11 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 const statusLabels: Record<string, string> = {
-  draft: "Draft",
+  draft: "Presented",
   sent: "Sent",
   viewed: "Viewed",
-  accepted: "Accepted",
+  accepted: "Approved",
+  converted: "Converted",
   declined: "Declined",
   expired: "Expired",
 };
@@ -90,18 +102,19 @@ const statusColors: Record<string, string> = {
   sent: "bg-blue-100 text-blue-700 border-blue-200",
   viewed: "bg-purple-100 text-purple-700 border-purple-200",
   accepted: "bg-green-100 text-green-700 border-green-200",
+  converted: "bg-emerald-100 text-emerald-700 border-emerald-200",
   declined: "bg-red-100 text-red-700 border-red-200",
   expired: "bg-orange-100 text-orange-700 border-orange-200",
 };
 
 const tabFilters = [
   { key: "all", label: "All" },
-  { key: "accepted", label: "Accepted" },
+  { key: "draft", label: "Presented" },
   { key: "sent", label: "Sent" },
-  { key: "draft", label: "Draft" },
-  { key: "last90", label: "Last 90 Days" },
-  { key: "last30", label: "Last 30 Days" },
-  { key: "recent", label: "Recent (7 Days)" },
+  { key: "accepted", label: "Approved" },
+  { key: "converted", label: "Converted" },
+  { key: "declined", label: "Declined" },
+  { key: "expired", label: "Expired" },
 ];
 
 const amountRanges = [
@@ -120,6 +133,7 @@ export default function CrmQuotes() {
   const [activeTab, setActiveTab] = useState("all");
   const [page, setPage] = useState(1);
   const [selectedQuote, setSelectedQuote] = useState<CrmQuote | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   
   // Sorting state
   const [sortField, setSortField] = useState<SortField>("createdAt");
@@ -127,6 +141,16 @@ export default function CrmQuotes() {
   
   // Additional filters
   const [amountFilter, setAmountFilter] = useState("all");
+
+  // Create form state
+  const [createForm, setCreateForm] = useState({
+    customerName: "",
+    customerEmail: "",
+    customerPhone: "",
+    serviceAddress: "",
+    title: "",
+    description: "",
+  });
 
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -157,6 +181,29 @@ export default function CrmQuotes() {
     enabled: !!currentUser,
   });
 
+  const createQuoteMutation = useMutation({
+    mutationFn: async (data: typeof createForm) => {
+      const res = await apiRequest("POST", "/api/crm/quotes", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setShowCreateDialog(false);
+      setCreateForm({
+        customerName: "",
+        customerEmail: "",
+        customerPhone: "",
+        serviceAddress: "",
+        title: "",
+        description: "",
+      });
+      toast({ title: "Quote created successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create quote", variant: "destructive" });
+    },
+  });
+
   const deleteQuoteMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/crm/quotes/${id}`);
@@ -173,8 +220,8 @@ export default function CrmQuotes() {
 
   // Count quotes by status for tab badges
   const statusCounts = useMemo(() => {
-    if (!quotesData?.quotes) return { accepted: 0, sent: 0, draft: 0 };
-    const counts = { accepted: 0, sent: 0, draft: 0 };
+    if (!quotesData?.quotes) return { draft: 0, sent: 0, accepted: 0, converted: 0, declined: 0, expired: 0 };
+    const counts = { draft: 0, sent: 0, accepted: 0, converted: 0, declined: 0, expired: 0 };
     quotesData.quotes.forEach((quote) => {
       const status = quote.status || "draft";
       if (status in counts) counts[status as keyof typeof counts]++;
@@ -201,28 +248,9 @@ export default function CrmQuotes() {
       });
     }
 
-    // Tab filter (status or date-based)
-    if (activeTab === "accepted") {
-      filtered = filtered.filter((quote) => quote.status === "accepted");
-    } else if (activeTab === "sent") {
-      filtered = filtered.filter((quote) => quote.status === "sent");
-    } else if (activeTab === "draft") {
-      filtered = filtered.filter((quote) => quote.status === "draft");
-    } else if (activeTab === "last90") {
-      const cutoff = subDays(new Date(), 90);
-      filtered = filtered.filter((quote) => 
-        quote.createdAt && isAfter(new Date(quote.createdAt), cutoff)
-      );
-    } else if (activeTab === "last30") {
-      const cutoff = subDays(new Date(), 30);
-      filtered = filtered.filter((quote) => 
-        quote.createdAt && isAfter(new Date(quote.createdAt), cutoff)
-      );
-    } else if (activeTab === "recent") {
-      const cutoff = subDays(new Date(), 7);
-      filtered = filtered.filter((quote) => 
-        quote.createdAt && isAfter(new Date(quote.createdAt), cutoff)
-      );
+    // Tab filter (status-based)
+    if (activeTab !== "all") {
+      filtered = filtered.filter((quote) => quote.status === activeTab);
     }
 
     // Amount filter
@@ -329,6 +357,21 @@ export default function CrmQuotes() {
     }
   };
 
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.customerName.trim()) {
+      toast({ title: "Customer name is required", variant: "destructive" });
+      return;
+    }
+    const hasPhoneError = createForm.customerPhone && !validatePhone(createForm.customerPhone);
+    const hasEmailError = createForm.customerEmail && !validateEmail(createForm.customerEmail);
+    if (hasPhoneError || hasEmailError) {
+      toast({ title: "Please fix validation errors", variant: "destructive" });
+      return;
+    }
+    createQuoteMutation.mutate(createForm);
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
@@ -387,15 +430,16 @@ export default function CrmQuotes() {
                 Reset
               </Button>
             )}
-            <Button 
-              size="sm" 
-              className="bg-[#711419] hover:bg-[#5a1014]" 
-              onClick={() => navigate("/crm/quotes/new")}
-              data-testid="button-create-quote"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              New Quote
-            </Button>
+            <Link href="/crm/quotes/new">
+              <Button 
+                size="sm" 
+                className="bg-[#711419] hover:bg-[#5a1014]" 
+                data-testid="button-create-quote"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                New Quote
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -403,10 +447,7 @@ export default function CrmQuotes() {
         <div className="flex items-center justify-between border-b border-slate-200">
           <div className="flex overflow-x-auto">
             {tabFilters.map((tab) => {
-              const count = tab.key === "accepted" ? statusCounts.accepted 
-                : tab.key === "sent" ? statusCounts.sent 
-                : tab.key === "draft" ? statusCounts.draft 
-                : null;
+              const count = tab.key !== "all" ? statusCounts[tab.key as keyof typeof statusCounts] : null;
               
               return (
                 <button
@@ -528,17 +569,6 @@ export default function CrmQuotes() {
                           ? "Try adjusting your search or filters"
                           : "Create your first CRM quote"}
                       </p>
-                      {!hasActiveFilters && (
-                        <Button 
-                          variant="outline" 
-                          className="mt-4" 
-                          onClick={() => navigate("/crm/quotes/new")}
-                          data-testid="button-create-first-quote"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Quote
-                        </Button>
-                      )}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -769,6 +799,121 @@ export default function CrmQuotes() {
         </SheetContent>
       </Sheet>
 
+      {/* Create Quote Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={(open) => {
+        setShowCreateDialog(open);
+        if (!open) {
+          setCreateForm({
+            customerName: "",
+            customerEmail: "",
+            customerPhone: "",
+            serviceAddress: "",
+            title: "",
+            description: "",
+          });
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Quote</DialogTitle>
+            <DialogDescription>
+              Enter customer information to create a new CRM quote.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="customerName">Customer Name *</Label>
+              <Input
+                id="customerName"
+                value={createForm.customerName}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, customerName: e.target.value }))}
+                placeholder="Enter customer name"
+                data-testid="input-customer-name"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="customerEmail">Email</Label>
+                <Input
+                  id="customerEmail"
+                  type="email"
+                  value={createForm.customerEmail}
+                  onChange={(e) => {
+                    setCreateForm(prev => ({ ...prev, customerEmail: e.target.value }));
+                  }}
+                  placeholder="email@example.com"
+                  className={createForm.customerEmail && !validateEmail(createForm.customerEmail) ? "border-red-500" : ""}
+                  data-testid="input-customer-email"
+                />
+                {createForm.customerEmail && !validateEmail(createForm.customerEmail) && (
+                  <p className="text-sm text-red-500">Please enter a valid email</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customerPhone">Phone</Label>
+                <Input
+                  id="customerPhone"
+                  value={createForm.customerPhone}
+                  onChange={(e) => {
+                    const formatted = formatPhoneNumber(e.target.value);
+                    setCreateForm(prev => ({ ...prev, customerPhone: formatted }));
+                  }}
+                  placeholder="(555) 123-4567"
+                  className={createForm.customerPhone && !validatePhone(createForm.customerPhone) ? "border-red-500" : ""}
+                  data-testid="input-customer-phone"
+                />
+                {createForm.customerPhone && !validatePhone(createForm.customerPhone) && (
+                  <p className="text-sm text-red-500">Please enter a valid phone number</p>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="serviceAddress">Service Address</Label>
+              <Input
+                id="serviceAddress"
+                value={createForm.serviceAddress}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, serviceAddress: e.target.value }))}
+                placeholder="123 Main St, City, State"
+                data-testid="input-service-address"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="title">Quote Title</Label>
+              <Input
+                id="title"
+                value={createForm.title}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="e.g., AC Unit Replacement"
+                data-testid="input-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={createForm.description}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe the work to be done..."
+                rows={3}
+                data-testid="input-description"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                className="bg-[#711419] hover:bg-[#5a1014]"
+                disabled={createQuoteMutation.isPending}
+                data-testid="button-submit-create"
+              >
+                {createQuoteMutation.isPending ? "Creating..." : "Create Quote"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </CrmLayout>
   );
 }

@@ -23,6 +23,7 @@ import {
   FolderKanban,
   Target,
   Megaphone,
+  Package,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
@@ -65,6 +66,7 @@ const navSections: NavSection[] = [
       { label: "Work Orders", href: "/crm/work-orders", icon: ClipboardList },
       { label: "Projects", href: "/crm/projects", icon: FolderKanban },
       { label: "Quotes", href: "/crm/quotes", icon: FileText },
+      { label: "Items", href: "/crm/items", icon: Package },
     ],
   },
   {
@@ -250,7 +252,7 @@ export function CrmLayout({ children, currentUser }: CrmLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-white flex">
       <aside className="hidden lg:flex w-60 flex-shrink-0 fixed inset-y-0 left-0 z-40">
         <SidebarContent currentUser={currentUser} />
       </aside>
