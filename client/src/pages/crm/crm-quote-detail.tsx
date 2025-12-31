@@ -12,6 +12,16 @@ import {
   DialogContent,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -33,6 +43,7 @@ import {
   Download,
   Eye,
   X,
+  Trash2,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -80,6 +91,7 @@ export default function CrmQuoteDetail() {
   const quoteId = params?.id;
   const { toast } = useToast();
   const [showPreview, setShowPreview] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -131,6 +143,34 @@ export default function CrmQuoteDetail() {
 
   const handleDecline = () => {
     updateStatusMutation.mutate("declined");
+  };
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/crm/quotes/${quoteId}`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to delete quote");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      toast({ title: "Quote deleted", description: "The quote has been permanently deleted." });
+      navigate("/crm/quotes");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete quote", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleDelete = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    deleteMutation.mutate();
+    setShowDeleteConfirm(false);
   };
 
   const handleDownloadPDF = () => {
@@ -563,6 +603,23 @@ export default function CrmQuoteDetail() {
                   </Button>
                 </>
               ) : null}
+              
+              <Separator orientation="vertical" className="h-10 mx-2" />
+              
+              <Button
+                onClick={handleDelete}
+                variant="outline"
+                className="border-red-600 text-red-600 hover:bg-red-50"
+                disabled={deleteMutation.isPending}
+                data-testid="button-delete"
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Delete
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -840,6 +897,27 @@ export default function CrmQuoteDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Quote</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this quote ({quote.quoteNumber})? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-confirm-delete"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </CrmLayout>
   );
 }
