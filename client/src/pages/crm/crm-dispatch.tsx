@@ -2264,7 +2264,7 @@ export default function CrmDispatch() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-4">
+      <div className="space-y-4 max-w-full overflow-hidden">
         <div className="flex justify-center mb-2">
           <div className="relative w-full max-w-xl">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
