@@ -1,0 +1,42 @@
+flowchart TD
+    CreateCustomer([POST /api/crm/customers]) --> ValidateAuth{CRM Auth<br/>Sales or Above?}
+    ValidateAuth -->|No| Error403[403 Forbidden]
+    ValidateAuth -->|Yes| ValidateInput{Validate<br/>Customer Data}
+
+    ValidateInput -->|Invalid| Error400[400 Bad Request]
+    ValidateInput -->|Valid| CheckDuplicate[Check for Duplicate<br/>Name/Email/Phone]
+
+    CheckDuplicate --> DuplicateExists{Duplicate<br/>Found?}
+    DuplicateExists -->|Yes| Error409[409 Conflict]
+    DuplicateExists -->|No| InsertCustomer[Insert to crm_customers<br/>Generate UUID]
+
+    InsertCustomer --> CustomerType{Customer<br/>Type?}
+    CustomerType -->|Commercial| CreateAccount[Create crmAccount Entry]
+    CustomerType -->|Property Manager| CreateAccount
+    CustomerType -->|Residential| SkipAccount[Skip Account Creation]
+
+    CreateAccount --> AuditLog[Log to crm_audit_log<br/>Action: customer_created]
+    SkipAccount --> AuditLog
+
+    AuditLog --> ReturnCustomer[Return Customer Object<br/>with Properties & Jobs]
+    ReturnCustomer --> Success([201 Created])
+
+    Error403 --> End([Response])
+    Error400 --> End
+    Error409 --> End
+    Success --> End
+
+    GetCustomer([GET /api/crm/customers/:id]) --> ValidateAuthGet{CRM Auth<br/>Valid?}
+    ValidateAuthGet -->|No| Error401[401 Unauthorized]
+    ValidateAuthGet -->|Yes| QueryDB[Query crm_customers<br/>WHERE id AND NOT deleted]
+
+    QueryDB --> CustomerFound{Customer<br/>Found?}
+    CustomerFound -->|No| Error404[404 Not Found]
+    CustomerFound -->|Yes| FetchRelated[Fetch Related Data<br/>Properties, Jobs, Equipment]
+
+    FetchRelated --> ReturnData[Return Complete<br/>Customer Object]
+    ReturnData --> Success2([200 OK])
+
+    Error401 --> End2([Response])
+    Error404 --> End2
+    Success2 --> End2

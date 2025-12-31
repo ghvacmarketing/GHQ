@@ -1,0 +1,58 @@
+flowchart TD
+    CreateWO([POST /api/crm/work-orders]) --> ValidateAuth{CRM Auth<br/>Dispatcher or Above?}
+    ValidateAuth -->|No| Error403[403 Forbidden]
+    ValidateAuth -->|Yes| ValidateInput{Validate<br/>Work Order Data}
+
+    ValidateInput -->|Invalid| Error400[400 Bad Request]
+    ValidateInput -->|Valid| CheckCustomer[Verify Customer Exists<br/>& Property if Provided]
+
+    CheckCustomer --> CustomerValid{Customer<br/>Valid?}
+    CustomerValid -->|No| Error404[404 Not Found]
+    CustomerValid -->|Yes| InsertWO[Insert to crm_work_orders<br/>Status: scheduled]
+
+    InsertWO --> SetDefaults[Set Default Values<br/>dispatchQueueStage, visitType]
+    SetDefaults --> CreateChecklist[Initialize Checklist<br/>Based on workSubtype]
+    CreateChecklist --> AuditLog[Log to crm_audit_log<br/>Action: work_order_created]
+
+    AuditLog --> ReturnWO[Return Work Order Object]
+    ReturnWO --> Success([201 Created])
+
+    UpdateWO([PATCH /api/crm/work-orders/:id]) --> ValidateAuthUpdate{CRM Auth<br/>Valid?}
+    ValidateAuthUpdate -->|No| Error401[401 Unauthorized]
+    ValidateAuthUpdate -->|Yes| FetchWO[Fetch Existing<br/>Work Order]
+
+    FetchWO --> WOExists{WO<br/>Exists?}
+    WOExists -->|No| Error404b[404 Not Found]
+    WOExists -->|Yes| ValidateUpdate{Validate<br/>Update Fields}
+
+    ValidateUpdate -->|Invalid| Error400b[400 Bad Request]
+    ValidateUpdate -->|Valid| StatusChange{Status<br/>Changing?}
+
+    StatusChange -->|scheduled→dispatched| CheckAssignment{Tech<br/>Assigned?}
+    CheckAssignment -->|No| Error400c[400 Bad Request<br/>Must assign tech]
+    CheckAssignment -->|Yes| UpdateStatus[Update Status & Timestamps]
+
+    StatusChange -->|dispatched→en_route| UpdateStatus
+    StatusChange -->|en_route→on_site| UpdateStatus
+    StatusChange -->|on_site→completed| ValidateCompletion{Checklist<br/>Complete?}
+
+    ValidateCompletion -->|No| Warn[Warning: Incomplete Checklist]
+    ValidateCompletion -->|Yes| UpdateStatus
+    Warn --> UpdateStatus
+
+    StatusChange -->|No Status Change| UpdateFields[Update Other Fields]
+    UpdateStatus --> AuditLogUpdate[Log to crm_audit_log<br/>Action: work_order_updated]
+    UpdateFields --> AuditLogUpdate
+
+    AuditLogUpdate --> ReturnUpdated[Return Updated WO]
+    ReturnUpdated --> Success2([200 OK])
+
+    Error403 --> End([Response])
+    Error400 --> End
+    Error404 --> End
+    Error401 --> End
+    Error404b --> End
+    Error400b --> End
+    Error400c --> End
+    Success --> End
+    Success2 --> End

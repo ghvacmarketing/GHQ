@@ -1,0 +1,33 @@
+flowchart TD
+    LoginReq([POST /api/employee-portal/login]) --> ValidateInput{Validate<br/>Username & Password}
+    ValidateInput -->|Invalid| Error401[401 Unauthorized]
+    ValidateInput -->|Valid| LookupUser[Query portalUsers Table]
+
+    LookupUser --> UserExists{User Exists<br/>& Active?}
+    UserExists -->|No| Error401
+    UserExists -->|Yes| VerifyPassword[Verify Password<br/>scrypt hash]
+
+    VerifyPassword --> PasswordMatch{Password<br/>Match?}
+    PasswordMatch -->|No| Error401
+    PasswordMatch -->|Yes| CreateSession[Create Session<br/>PostgreSQL Store]
+
+    CreateSession --> SetCookie[Set session.sid Cookie<br/>8 Hour Expiry]
+    SetCookie --> UpdateLastLogin[Update lastLogin<br/>Timestamp]
+    UpdateLastLogin --> ReturnUser[Return User Profile<br/>username, email, role]
+
+    ReturnUser --> Success([200 OK])
+    Error401 --> End([Response])
+    Success --> End
+
+    ChangePasswordReq([POST /api/employee-portal/change-password]) --> AuthCheck{Session<br/>Valid?}
+    AuthCheck -->|No| Error401b[401 Unauthorized]
+    AuthCheck -->|Yes| VerifyCurrentPwd[Verify Current Password]
+
+    VerifyCurrentPwd --> CurrentMatch{Match?}
+    CurrentMatch -->|No| Error401b
+    CurrentMatch -->|Yes| HashNewPwd[Hash New Password<br/>scrypt]
+
+    HashNewPwd --> UpdateDB[Update Password<br/>in Database]
+    UpdateDB --> Success2([200 OK])
+    Error401b --> End2([Response])
+    Success2 --> End2

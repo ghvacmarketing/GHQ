@@ -1,0 +1,34 @@
+flowchart TD
+    TranscribeReq([POST /api/voice/transcribe-with-context]) --> ValidateAuth{CRM Auth<br/>Valid?}
+    ValidateAuth -->|No| Error401[401 Unauthorized]
+    ValidateAuth -->|Yes| CheckFile{Audio File<br/>Uploaded?}
+
+    CheckFile -->|No| Error400[400 Bad Request]
+    CheckFile -->|Yes| ValidateFormat{Valid Audio<br/>Format?}
+
+    ValidateFormat -->|No| Error400b[400 Unsupported Format]
+    ValidateFormat -->|Yes| CallWhisper[Call OpenAI Whisper API<br/>whisper-1 model]
+
+    CallWhisper --> WhisperSuccess{Transcription<br/>Success?}
+    WhisperSuccess -->|Error| Error500[500 Internal Error]
+    WhisperSuccess -->|Success| GetTranscript[Extract Text Transcript]
+
+    GetTranscript --> HasContext{Field Context<br/>Provided?}
+    HasContext -->|No| ReturnRaw[Return Raw Transcript]
+    HasContext -->|Yes| BuildPrompt[Build Context Prompt<br/>Field Type & Usage]
+
+    BuildPrompt --> CallGPT[Call GPT-3.5-turbo<br/>Format & Clean Text]
+    CallGPT --> GPTSuccess{GPT Response<br/>Valid?}
+
+    GPTSuccess -->|Error| ReturnRaw
+    GPTSuccess -->|Success| FormatText[Extract Formatted Text<br/>Grammar Corrected]
+
+    FormatText --> ReturnFormatted[Return Formatted Transcript]
+    ReturnRaw --> Success([200 OK])
+    ReturnFormatted --> Success
+
+    Error401 --> End([Response])
+    Error400 --> End
+    Error400b --> End
+    Error500 --> End
+    Success --> End

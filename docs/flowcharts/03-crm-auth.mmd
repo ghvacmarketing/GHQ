@@ -1,0 +1,48 @@
+flowchart TD
+    LoginReq([POST /api/crm/auth/login]) --> ValidateInput{Validate<br/>Username & Password}
+    ValidateInput -->|Invalid| Error401[401 Unauthorized]
+    ValidateInput -->|Valid| LookupUser[Query crmUsers Table]
+
+    LookupUser --> UserExists{User Exists<br/>& Active?}
+    UserExists -->|No| Error401
+    UserExists -->|Yes| VerifyPassword[Verify Password<br/>Timing-safe Compare]
+
+    VerifyPassword --> PasswordMatch{Password<br/>Match?}
+    PasswordMatch -->|No| Error401
+    PasswordMatch -->|Yes| GenerateToken[Generate Session Token<br/>32-byte hex]
+
+    GenerateToken --> SaveSession[Insert to crmSessions<br/>8 Hour Expiry]
+    SaveSession --> SetCookie[Set crm_session Cookie]
+    SetCookie --> AuditLog[Log to crm_audit_log<br/>Action: login]
+    AuditLog --> ReturnData[Return User + Token]
+
+    ReturnData --> Success([200 OK])
+    Error401 --> End([Response])
+    Success --> End
+
+    AuthMiddleware([CRM Request with Auth]) --> ExtractToken{Extract Token<br/>Cookie or Bearer?}
+    ExtractToken -->|Missing| Error401b[401 Unauthorized]
+    ExtractToken -->|Present| ValidateSession[Query crmSessions<br/>JOIN crmUsers]
+
+    ValidateSession --> SessionValid{Session Valid<br/>& Not Expired?}
+    SessionValid -->|No| Error401b
+    SessionValid -->|Yes| UserActive{User<br/>Active?}
+
+    UserActive -->|No| Error401b
+    UserActive -->|Yes| UpdateLastSeen[Update lastSeenAt<br/>Throttled to 1/min]
+    UpdateLastSeen --> AttachUser[Attach User to req.user]
+    AttachUser --> RoleCheck{Role Check<br/>Required?}
+
+    RoleCheck -->|Admin Required| CheckAdmin{Role >= Manager?}
+    CheckAdmin -->|No| Error403[403 Forbidden]
+    CheckAdmin -->|Yes| Continue([Continue to Handler])
+
+    RoleCheck -->|Sales Required| CheckSales{Role >= Sales?}
+    CheckSales -->|No| Error403
+    CheckSales -->|Yes| Continue
+
+    RoleCheck -->|No Role Check| Continue
+
+    Error401b --> End2([Response])
+    Error403 --> End2
+    Continue --> End2

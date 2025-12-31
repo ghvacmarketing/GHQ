@@ -1,0 +1,72 @@
+flowchart TD
+    CreateInvoice([POST /api/crm/invoices]) --> ValidateAuth{CRM Auth<br/>Sales or Above?}
+    ValidateAuth -->|No| Error403[403 Forbidden]
+    ValidateAuth -->|Yes| ValidateInput{Validate<br/>Invoice Data}
+
+    ValidateInput -->|Invalid| Error400[400 Bad Request]
+    ValidateInput -->|Valid| CheckCustomer[Verify Customer<br/>& Work Order Exist]
+
+    CheckCustomer --> RefsValid{References<br/>Valid?}
+    RefsValid -->|No| Error404[404 Not Found]
+    RefsValid -->|Yes| CalculateTotal[Calculate Total<br/>Sum Line Items]
+
+    CalculateTotal --> InsertInvoice[Insert to crm_invoices<br/>Status: draft]
+    InsertInvoice --> InsertLineItems[Insert to crm_invoice_line_items]
+    InsertLineItems --> UpdateWO[Update Work Order<br/>billingDisposition]
+
+    UpdateWO --> AuditLog[Log to crm_audit_log<br/>Action: invoice_created]
+    AuditLog --> ReturnInvoice[Return Invoice Object<br/>with Line Items]
+    ReturnInvoice --> Success([201 Created])
+
+    SendInvoice([POST /api/crm/invoices/:id/send]) --> ValidateAuthSend{CRM Auth<br/>Sales or Above?}
+    ValidateAuthSend -->|No| Error403b[403 Forbidden]
+    ValidateAuthSend -->|Yes| FetchInvoice[Fetch Invoice<br/>with Line Items]
+
+    FetchInvoice --> InvoiceExists{Invoice<br/>Exists?}
+    InvoiceExists -->|No| Error404b[404 Not Found]
+    InvoiceExists -->|Yes| CheckDraft{Status =<br/>draft?}
+
+    CheckDraft -->|No| Error400b[400 Bad Request<br/>Already Sent]
+    CheckDraft -->|Yes| RenderEmail[Render Invoice Email<br/>HTML Template]
+
+    RenderEmail --> CallResend[Call Resend API<br/>Send Email]
+    CallResend --> EmailSent{Email<br/>Sent?}
+
+    EmailSent -->|Error| Error500[500 Internal Error]
+    EmailSent -->|Success| UpdateStatus[Update Status: sent<br/>sentAt timestamp]
+
+    UpdateStatus --> AuditLogSend[Log to crm_audit_log<br/>Action: invoice_sent]
+    AuditLogSend --> Success2([200 OK])
+
+    PayInvoice([POST /api/crm/invoices/:id/pay]) --> ValidateAuthPay{CRM Auth<br/>Valid?}
+    ValidateAuthPay -->|No| Error401[401 Unauthorized]
+    ValidateAuthPay -->|Yes| FetchInvoicePay[Fetch Invoice]
+
+    FetchInvoicePay --> InvoiceExistsPay{Invoice<br/>Exists?}
+    InvoiceExistsPay -->|No| Error404c[404 Not Found]
+    InvoiceExistsPay -->|Yes| CheckPaid{Already<br/>Paid?}
+
+    CheckPaid -->|Yes| Error400c[400 Already Paid]
+    CheckPaid -->|No| ValidatePayment{Validate Payment<br/>Amount & Method}
+
+    ValidatePayment -->|Invalid| Error400d[400 Bad Request]
+    ValidatePayment -->|Valid| RecordPayment[Insert to crm_payments<br/>Amount, Method, Date]
+
+    RecordPayment --> UpdateInvoiceStatus[Update Invoice<br/>Status: paid]
+    UpdateInvoiceStatus --> AuditLogPay[Log to crm_audit_log<br/>Action: payment_received]
+    AuditLogPay --> Success3([200 OK])
+
+    Error403 --> End([Response])
+    Error400 --> End
+    Error404 --> End
+    Error403b --> End
+    Error404b --> End
+    Error400b --> End
+    Error500 --> End
+    Error401 --> End
+    Error404c --> End
+    Error400c --> End
+    Error400d --> End
+    Success --> End
+    Success2 --> End
+    Success3 --> End

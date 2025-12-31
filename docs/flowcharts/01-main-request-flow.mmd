@@ -1,0 +1,24 @@
+flowchart TD
+    Start([HTTP Request]) --> Server[Express Server<br/>Port 5000]
+    Server --> Middleware{Middleware Chain}
+
+    Middleware --> Compression[Compression]
+    Compression --> Session[Session Management<br/>PostgreSQL Store]
+    Session --> Passport[Passport.js<br/>Employee Auth]
+    Passport --> Router{Route Matching}
+
+    Router -->|/api/employee-portal/*| EmployeeAuth[Employee Portal Routes]
+    Router -->|/api/crm/*| CRMAuth[CRM Routes]
+    Router -->|/api/quotes/*| QuoteRoutes[Quote Routes]
+    Router -->|/api/voice/*| VoiceRoutes[Voice Routes]
+    Router -->|/api/weather| WeatherRoutes[Weather Routes]
+    Router -->|/health| Health[Health Check]
+    Router -->|Static Files| Static[Serve Client App]
+
+    EmployeeAuth --> Response([Response])
+    CRMAuth --> Response
+    QuoteRoutes --> Response
+    VoiceRoutes --> Response
+    WeatherRoutes --> Response
+    Health --> Response
+    Static --> Response
