@@ -2870,7 +2870,15 @@ export default function CrmProposalBuilder() {
       <div className="flex flex-col h-full min-h-0">
         {/* Fixed Header */}
         <div className="flex items-center justify-between pb-4 border-b mb-4">
-          <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Proposal Builder</h1>
+          <div className="flex items-center gap-3">
+            <Link href="/crm/quotes">
+              <Button variant="ghost" size="sm" data-testid="button-back-to-quotes">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Proposal Builder</h1>
+          </div>
           <div className="flex items-center space-x-2">
             <Sheet open={cartOpen} onOpenChange={setCartOpen}>
               <SheetTrigger asChild>
