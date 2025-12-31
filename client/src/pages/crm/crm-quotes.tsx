@@ -109,6 +109,7 @@ const statusColors: Record<string, string> = {
 
 const tabFilters = [
   { key: "all", label: "All" },
+  { key: "draft", label: "Draft" },
   { key: "sent", label: "Sent" },
   { key: "accepted", label: "Approved" },
   { key: "converted", label: "Converted" },
