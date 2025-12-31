@@ -1068,7 +1068,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
             <div className="flex-1 relative" style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}>
               <div className="flex justify-between px-2 py-3">
                 {hourLabels.map((label, i) => (
-                  <div key={i} className="text-xs font-medium text-slate-500" style={{ width: i === hourLabels.length - 1 ? 'auto' : `${100 / (hourLabels.length - 1)}%` }}>
+                  <div key={i} className="text-xs font-medium text-slate-500 whitespace-nowrap" style={{ width: i === hourLabels.length - 1 ? 'auto' : `${100 / (hourLabels.length - 1)}%` }}>
                     {label}
                   </div>
                 ))}
