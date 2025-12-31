@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -734,11 +734,11 @@ function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClic
   
   return (
     <Card className="bg-white border overflow-hidden" ref={setNodeRef}>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-auto max-h-full">
         <table className="w-full min-w-[900px] border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="w-40 px-3 py-2 text-left text-xs font-semibold text-slate-600 border-r border-slate-200">
+              <th className="w-40 px-3 py-2 text-left text-xs font-semibold text-slate-600 border-r border-slate-200 bg-slate-50 sticky left-0 z-20">
                 Technicians
               </th>
               {weekDates.map((date, i) => {
@@ -762,7 +762,7 @@ function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClic
           <tbody>
             {technicians.map((tech) => (
               <tr key={tech.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                <td className="px-3 py-2 border-r border-slate-100">
+                <td className="px-3 py-2 border-r border-slate-100 bg-white sticky left-0 z-10">
                   <div className="flex items-center gap-2">
                     <div className={`w-7 h-7 rounded-full ${tech.color} text-white flex items-center justify-center text-[10px] font-medium`}>
                       {tech.initials}
@@ -1059,10 +1059,10 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
 
   return (
     <Card className="bg-white border overflow-hidden">
-      <ScrollArea className="w-full">
+      <div className="overflow-x-auto overflow-y-auto max-h-full">
         <div style={{ minWidth: SCHEDULE_TIMELINE_WIDTH + 200 }}>
-          <div className="flex border-b border-slate-200 sticky top-0 bg-white z-10">
-            <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-200 text-sm font-semibold text-slate-700">
+          <div className="flex border-b border-slate-200 sticky top-0 bg-white z-20">
+            <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-200 text-sm font-semibold text-slate-700 bg-white sticky left-0 z-30">
               Technicians
             </div>
             <div className="flex-1 relative" style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}>
@@ -1080,7 +1080,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
             const techWorkOrders = getWorkOrdersForTech(tech.id);
             return (
               <DroppableScheduleRow key={tech.id} techId={tech.id}>
-                <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-100 flex items-center gap-3">
+                <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-100 flex items-center gap-3 bg-white sticky left-0 z-10">
                   <div className={`w-8 h-8 rounded-full ${tech.color} text-white flex items-center justify-center text-xs font-medium`}>
                     {tech.initials}
                   </div>
@@ -1124,8 +1124,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
             );
           })}
         </div>
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
+      </div>
     </Card>
   );
 }
@@ -2471,9 +2470,9 @@ export default function CrmDispatch() {
           onDragEnd={handleDragEnd}
           modifiers={[snapToGridModifier]}
         >
-          <div className="flex flex-col flex-1 min-h-0 gap-4">
-            {/* Scrollable Technician Schedule */}
-            <div className="flex-1 min-h-0 overflow-auto">
+          <div className="flex flex-col flex-1 min-h-0 gap-4 overflow-hidden">
+            {/* Scrollable Technician Schedule - vertical scroll here, horizontal inside component */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
               {viewMode === "day" ? (
                 <TechnicianScheduleBoard
                   technicians={technicians}
@@ -2499,7 +2498,7 @@ export default function CrmDispatch() {
             </div>
             
             {/* Fixed Unassigned Queue */}
-            <div className="flex-shrink-0 max-h-[280px] overflow-auto">
+            <div className="flex-shrink-0 max-h-[280px] overflow-y-auto overflow-x-hidden">
               <UnassignedQueueSection
                 workOrders={unassignedWorkOrders}
                 onWorkOrderClick={handleWorkOrderClick}
