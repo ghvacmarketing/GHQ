@@ -88,7 +88,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 const statusLabels: Record<string, string> = {
-  draft: "Presented",
+  draft: "Draft",
   sent: "Sent",
   viewed: "Viewed",
   accepted: "Approved",
@@ -109,7 +109,6 @@ const statusColors: Record<string, string> = {
 
 const tabFilters = [
   { key: "all", label: "All" },
-  { key: "draft", label: "Presented" },
   { key: "sent", label: "Sent" },
   { key: "accepted", label: "Approved" },
   { key: "converted", label: "Converted" },

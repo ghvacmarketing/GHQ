@@ -32,7 +32,6 @@ import {
 import {
   ArrowLeft,
   Send,
-  Presentation,
   CheckCircle,
   XCircle,
   Loader2,
@@ -66,7 +65,7 @@ type QuoteWithLines = CrmQuote & {
 };
 
 const statusLabels: Record<string, string> = {
-  draft: "Presented",
+  draft: "Draft",
   sent: "Sent",
   viewed: "Viewed",
   accepted: "Approved",
@@ -128,10 +127,6 @@ export default function CrmQuoteDetail() {
       toast({ title: "Failed to update status", variant: "destructive" });
     },
   });
-
-  const handlePresent = () => {
-    toast({ title: "Quote presented", description: "The quote is now marked as presented to the customer." });
-  };
 
   const handleSend = () => {
     updateStatusMutation.mutate("sent");
@@ -546,17 +541,8 @@ export default function CrmQuoteDetail() {
           <CardContent>
             <div className="flex flex-wrap gap-3">
               <Button
-                onClick={handlePresent}
-                className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
-                data-testid="button-present"
-              >
-                <Presentation className="h-4 w-4 mr-2" />
-                Present
-              </Button>
-              <Button
                 onClick={handleSend}
-                variant="outline"
-                className="border-[#d3b07d] text-[#d3b07d] hover:bg-[#d3b07d]/10"
+                className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
                 disabled={updateStatusMutation.isPending}
                 data-testid="button-send"
               >
