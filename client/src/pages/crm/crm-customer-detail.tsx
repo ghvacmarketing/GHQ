@@ -1206,13 +1206,13 @@ function CustomerTabbedView({
                       <TableCell>
                         <Badge className={cn(
                           "text-xs",
-                          quote.status === "draft" && "bg-slate-100 text-slate-700",
+                          quote.status === "draft" && "bg-blue-100 text-blue-700",
                           quote.status === "sent" && "bg-blue-100 text-blue-700",
                           quote.status === "accepted" && "bg-green-100 text-green-700",
                           quote.status === "declined" && "bg-red-100 text-red-700",
                           quote.status === "expired" && "bg-yellow-100 text-yellow-700"
                         )}>
-                          {quote.status}
+                          {quote.status === "draft" ? "Sent" : quote.status === "accepted" ? "Approved" : quote.status?.charAt(0).toUpperCase() + quote.status?.slice(1)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
