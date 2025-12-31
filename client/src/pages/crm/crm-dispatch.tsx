@@ -2264,89 +2264,91 @@ export default function CrmDispatch() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-4 max-w-full overflow-hidden">
-        <div className="flex justify-center mb-2">
-          <div className="relative w-full max-w-xl">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search work orders..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
-              data-testid="input-search-dispatch"
-            />
+      <div className="flex flex-col h-[calc(100vh-6rem)] max-w-full overflow-hidden">
+        {/* Fixed Header Section */}
+        <div className="flex-shrink-0 space-y-3 pb-3">
+          <div className="flex justify-center">
+            <div className="relative w-full max-w-xl">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search work orders..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+                data-testid="input-search-dispatch"
+              />
+            </div>
           </div>
-        </div>
 
-        <div className="flex justify-center mb-4">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const newDate = new Date(selectedDate);
-                newDate.setDate(newDate.getDate() - (viewMode === "week" ? 7 : 1));
-                setSelectedDate(newDate);
-              }}
-              data-testid="button-prev-date"
-            >
-              ←
-            </Button>
-            
-            {viewMode === "day" ? (
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    className="text-slate-700 font-medium min-w-[160px]"
-                    data-testid="button-date-picker"
-                  >
-                    {dateDisplay}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="center">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelect}
-                    initialFocus
-                    data-testid="calendar-picker"
-                  />
-                </PopoverContent>
-              </Popover>
-            ) : (
-              <span className="text-sm font-medium text-slate-700 px-2 min-w-[160px] text-center">
-                {formatWeekRange(weekDates)}
-              </span>
-            )}
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const newDate = new Date(selectedDate);
-                newDate.setDate(newDate.getDate() + (viewMode === "week" ? 7 : 1));
-                setSelectedDate(newDate);
-              }}
-              data-testid="button-next-date"
-            >
-              →
-            </Button>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelectedDate(new Date())}
-              className="ml-2"
-              data-testid="button-today"
-            >
-              Today
-            </Button>
+          <div className="flex justify-center">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const newDate = new Date(selectedDate);
+                  newDate.setDate(newDate.getDate() - (viewMode === "week" ? 7 : 1));
+                  setSelectedDate(newDate);
+                }}
+                data-testid="button-prev-date"
+              >
+                ←
+              </Button>
+              
+              {viewMode === "day" ? (
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="text-slate-700 font-medium min-w-[160px]"
+                      data-testid="button-date-picker"
+                    >
+                      {dateDisplay}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="center">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={handleDateSelect}
+                      initialFocus
+                      data-testid="calendar-picker"
+                    />
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <span className="text-sm font-medium text-slate-700 px-2 min-w-[160px] text-center">
+                  {formatWeekRange(weekDates)}
+                </span>
+              )}
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const newDate = new Date(selectedDate);
+                  newDate.setDate(newDate.getDate() + (viewMode === "week" ? 7 : 1));
+                  setSelectedDate(newDate);
+                }}
+                data-testid="button-next-date"
+              >
+                →
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedDate(new Date())}
+                className="ml-2"
+                data-testid="button-today"
+              >
+                Today
+              </Button>
+            </div>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-4">
             <div>
               <h1 className="text-xl font-bold text-slate-900" data-testid="text-dispatch-title">
@@ -2458,8 +2460,10 @@ export default function CrmDispatch() {
               New Work Order
             </Button>
           </div>
+          </div>
         </div>
 
+        {/* Main Content Area - Scrollable Schedule + Fixed Queue */}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -2467,76 +2471,48 @@ export default function CrmDispatch() {
           onDragEnd={handleDragEnd}
           modifiers={[snapToGridModifier]}
         >
-          {viewMode === "day" ? (
-            <div className="hidden lg:block space-y-6">
-              <TechnicianScheduleBoard
-                technicians={technicians}
-                workOrders={localWorkOrders.filter(wo => wo.assignedTechId)}
-                onWorkOrderClick={handleWorkOrderClick}
-                selectedDate={selectedDate}
-                onResizeComplete={handleResizeComplete}
-                activeId={activeId}
-              />
-              
-              <UnassignedQueueSection
-                workOrders={unassignedWorkOrders}
-                onWorkOrderClick={handleWorkOrderClick}
-                technicians={technicians}
-                onQuickAssign={handleQuickAssign}
-                onQuickSchedule={handleQuickSchedule}
-                onQuickStageChange={handleQuickStageChange}
-                onQuickNote={handleQuickNote}
-                selectedDate={selectedDate}
-              />
-            </div>
-          ) : (
-            <div className="hidden lg:block space-y-6">
-              <WeekDispatchBoard
-                technicians={technicians}
-                workOrders={localWorkOrders}
-                weekDates={weekDates}
-                onWorkOrderClick={handleWorkOrderClick}
-                onQuickAssign={handleQuickAssign}
-                onDayClick={(date) => {
-                  setSelectedDate(date);
-                  setViewMode("day");
-                }}
-              />
-              
-              <UnassignedQueueSection
-                workOrders={unassignedWorkOrders}
-                onWorkOrderClick={handleWorkOrderClick}
-                technicians={technicians}
-                onQuickAssign={handleQuickAssign}
-                onQuickSchedule={handleQuickSchedule}
-                onQuickStageChange={handleQuickStageChange}
-                onQuickNote={handleQuickNote}
-                selectedDate={selectedDate}
-              />
-            </div>
-          )}
-          
-        </DndContext>
-
-        <div className="lg:hidden space-y-4" data-testid="mobile-workorder-list">
-          <Card className="bg-white border">
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="text-base font-medium text-slate-800">
-                Today's Work Orders ({localWorkOrders.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {localWorkOrders.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-4">No work orders for this date</p>
+          <div className="flex flex-col flex-1 min-h-0 gap-4">
+            {/* Scrollable Technician Schedule */}
+            <div className="flex-1 min-h-0 overflow-auto">
+              {viewMode === "day" ? (
+                <TechnicianScheduleBoard
+                  technicians={technicians}
+                  workOrders={localWorkOrders.filter(wo => wo.assignedTechId)}
+                  onWorkOrderClick={handleWorkOrderClick}
+                  selectedDate={selectedDate}
+                  onResizeComplete={handleResizeComplete}
+                  activeId={activeId}
+                />
               ) : (
-                localWorkOrders.map((wo) => {
-                  const tech = technicians.find((t) => t.id === wo.assignedTechId);
-                  return <MobileWorkOrderCard key={wo.id} workOrder={wo} technician={tech} onClick={handleWorkOrderClick} />;
-                })
+                <WeekDispatchBoard
+                  technicians={technicians}
+                  workOrders={localWorkOrders}
+                  weekDates={weekDates}
+                  onWorkOrderClick={handleWorkOrderClick}
+                  onQuickAssign={handleQuickAssign}
+                  onDayClick={(date) => {
+                    setSelectedDate(date);
+                    setViewMode("day");
+                  }}
+                />
               )}
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+            
+            {/* Fixed Unassigned Queue */}
+            <div className="flex-shrink-0 max-h-[280px] overflow-auto">
+              <UnassignedQueueSection
+                workOrders={unassignedWorkOrders}
+                onWorkOrderClick={handleWorkOrderClick}
+                technicians={technicians}
+                onQuickAssign={handleQuickAssign}
+                onQuickSchedule={handleQuickSchedule}
+                onQuickStageChange={handleQuickStageChange}
+                onQuickNote={handleQuickNote}
+                selectedDate={selectedDate}
+              />
+            </div>
+          </div>
+        </DndContext>
 
       </div>
 
