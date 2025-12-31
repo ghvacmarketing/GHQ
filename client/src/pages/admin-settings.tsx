@@ -25,6 +25,7 @@ import redlogo from "@assets/redlogo.webp";
 function AdminLogin({ onLogin }: { onLogin: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   
@@ -95,9 +96,19 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
   
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-center">Admin Access Required</CardTitle>
+      <div className="w-full max-w-md">
+        <Button
+          variant="ghost"
+          onClick={() => setLocation("/")}
+          className="mb-4"
+          data-testid="button-back"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">Admin Access Required</CardTitle>
           <p className="text-center text-sm text-muted-foreground">
             Enter admin password to view Google Sheets pricing data
           </p>
@@ -134,7 +145,8 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
             </Button>
           </form>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }
