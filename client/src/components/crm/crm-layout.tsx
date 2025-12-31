@@ -31,6 +31,7 @@ import ghqLogo from "@assets/redlogo.webp";
 interface CrmLayoutProps {
   children: React.ReactNode;
   currentUser: CrmUser;
+  disableScroll?: boolean;
 }
 
 type NavItem = {
@@ -248,7 +249,7 @@ function SidebarContent({
   );
 }
 
-export function CrmLayout({ children, currentUser }: CrmLayoutProps) {
+export function CrmLayout({ children, currentUser, disableScroll = false }: CrmLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -298,11 +299,17 @@ export function CrmLayout({ children, currentUser }: CrmLayoutProps) {
       </div>
 
       <main className="flex-1 lg:ml-60">
-        <div className="min-h-screen pt-16 lg:pt-0">
-          <ScrollArea className="h-[calc(100vh-4rem)] lg:h-screen">
-            <div className="p-4 lg:p-6">{children}</div>
-          </ScrollArea>
-        </div>
+        {disableScroll ? (
+          <div className="h-screen pt-16 lg:pt-0 overflow-hidden">
+            <div className="h-full p-4 lg:p-6">{children}</div>
+          </div>
+        ) : (
+          <div className="min-h-screen pt-16 lg:pt-0">
+            <ScrollArea className="h-[calc(100vh-4rem)] lg:h-screen">
+              <div className="p-4 lg:p-6">{children}</div>
+            </ScrollArea>
+          </div>
+        )}
       </main>
     </div>
   );

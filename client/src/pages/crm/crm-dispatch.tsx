@@ -2263,8 +2263,8 @@ export default function CrmDispatch() {
   };
 
   return (
-    <CrmLayout currentUser={currentUser}>
-      <div className="flex flex-col h-[calc(100vh-6rem)] max-w-full overflow-hidden">
+    <CrmLayout currentUser={currentUser} disableScroll>
+      <div className="flex flex-col h-full max-w-full overflow-hidden">
         {/* Fixed Header Section */}
         <div className="flex-shrink-0 space-y-3 pb-3">
           <div className="flex justify-center">
