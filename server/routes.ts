@@ -17,7 +17,7 @@ import { voiceService } from "./services/voice";
 import { sendCrmQuoteEmail } from "./services/crmQuoteEmail";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
-import { eq, inArray, desc, sql, and, or, ilike, asc, count } from "drizzle-orm";
+import { eq, inArray, desc, sql, and, or, ilike, asc, count, isNull } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -8100,7 +8100,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (projectId) {
         workOrders = await storage.getWorkOrdersByProjectId(projectId as string);
       } else {
-        workOrders = await storage.getWorkOrdersByDateRange(startDate, endDate);
+        // Get scheduled work orders in date range
+        const scheduledWorkOrders = await storage.getWorkOrdersByDateRange(startDate, endDate);
+        // Also get unscheduled work orders (no scheduledStart date) 
+        const unscheduledWorkOrders = await db
+          .select()
+          .from(crmWorkOrders)
+          .where(isNull(crmWorkOrders.scheduledStart))
+          .orderBy(desc(crmWorkOrders.createdAt));
+        // Combine both sets, avoiding duplicates
+        const workOrderIds = new Set(scheduledWorkOrders.map(wo => wo.id));
+        workOrders = [...scheduledWorkOrders, ...unscheduledWorkOrders.filter(wo => !workOrderIds.has(wo.id))];
       }
 
       if (techId) {
