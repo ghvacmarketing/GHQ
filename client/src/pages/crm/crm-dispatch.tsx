@@ -134,6 +134,7 @@ const queueStageColors: Record<DispatchQueueStage, { bg: string; border: string;
 
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   DragEndEvent,
   DragStartEvent,
@@ -2517,6 +2518,35 @@ export default function CrmDispatch() {
               />
             </div>
           </div>
+          
+          {/* Drag Overlay - shows a preview of the dragging card */}
+          <DragOverlay dropAnimation={null}>
+            {activeId ? (
+              (() => {
+                const draggingWo = localWorkOrders.find(w => w.id === activeId);
+                if (!draggingWo) return null;
+                const visitTypeColor = getJobTypeColor(draggingWo.visitType || draggingWo.jobType);
+                const scheduledWindow = draggingWo.scheduledStart && draggingWo.scheduledEnd
+                  ? `${format(new Date(draggingWo.scheduledStart), "h:mm a")} - ${format(new Date(draggingWo.scheduledEnd), "h:mm a")}`
+                  : null;
+                return (
+                  <div className="p-3 bg-white border-2 border-[#711419] rounded-lg shadow-2xl w-64 cursor-grabbing">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${visitTypeColor.dot}`} />
+                        <span className="text-xs font-medium text-slate-600">WO #{draggingWo.workOrderNumber}</span>
+                      </div>
+                      {scheduledWindow && (
+                        <span className="text-xs text-slate-500">{scheduledWindow}</span>
+                      )}
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800 truncate">{draggingWo.customerName}</p>
+                    <p className="text-xs text-slate-500 truncate">{draggingWo.title || draggingWo.description || "No description"}</p>
+                  </div>
+                );
+              })()
+            ) : null}
+          </DragOverlay>
         </DndContext>
 
       </div>
