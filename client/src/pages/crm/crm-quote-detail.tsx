@@ -196,6 +196,7 @@ export default function CrmQuoteDetail() {
       const mutedColor: [number, number, number] = [100, 116, 139];
       const lightBg: [number, number, number] = [248, 250, 252];
       const tableRowAlt: [number, number, number] = [248, 250, 252];
+      const isOptionsMode = quote.quoteMode === "options";
 
       const addPageHeader = () => {
         doc.setFillColor(...brandColor);
@@ -217,210 +218,450 @@ export default function CrmQuoteDetail() {
         doc.text("www.ghvacinc.com", pageWidth - margin - 8, y + 20, { align: 'right' });
       };
 
-      const addTableHeader = () => {
-        doc.setFillColor(...goldColor);
-        doc.rect(margin, y, contentWidth, 10, 'F');
-        
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(255, 255, 255);
-        doc.text("Line Items", margin + 5, y + 7);
-        y += 10;
-        
-        doc.setFillColor(...lightBg);
-        doc.rect(margin, y, contentWidth, 8, 'F');
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...textColor);
-        doc.text("Description", margin + 5, y + 5.5);
-        doc.text("Qty", margin + contentWidth * 0.52, y + 5.5, { align: 'center' });
-        doc.text("Unit Price", margin + contentWidth * 0.70, y + 5.5, { align: 'center' });
-        doc.text("Amount", pageWidth - margin - 5, y + 5.5, { align: 'right' });
-        y += 8;
-      };
-
       const checkPageBreak = (neededSpace: number) => {
         if (y + neededSpace > pageHeight - 45) {
           doc.addPage();
           y = margin;
           addPageHeader();
           y += 35;
-          addTableHeader();
         }
       };
 
       addPageHeader();
       y += 35;
 
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...textColor);
-      doc.text("QUOTE", margin, y);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...mutedColor);
-      doc.text(quote.quoteNumber || "", margin, y + 6);
+      // Check if this is an AI-generated quote from proposal builder
+      if (quote.aiGeneratedQuote) {
+        const aiQuote = quote.aiGeneratedQuote;
 
-      const statusText = statusLabels[status] || status;
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...mutedColor);
-      doc.text(statusText, pageWidth - margin, y + 2, { align: 'right' });
-
-      y += 14;
-
-      const boxWidth = (contentWidth - 6) / 2;
-      const boxHeight = 32;
-      
-      doc.setFillColor(...lightBg);
-      doc.roundedRect(margin, y, boxWidth, boxHeight, 2, 2, 'F');
-      doc.roundedRect(margin + boxWidth + 6, y, boxWidth, boxHeight, 2, 2, 'F');
-
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...textColor);
-      doc.text("Bill To", margin + 5, y + 8);
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      const customerName = quote.customer?.name || quote.customerName || "Customer";
-      doc.text(customerName, margin + 5, y + 14);
-      let infoY = y + 14;
-      doc.setTextColor(...mutedColor);
-      if (quote.customer?.email || quote.customerEmail) {
-        infoY += 4;
-        doc.text(String(quote.customer?.email || quote.customerEmail), margin + 5, infoY);
-      }
-      if (quote.customer?.phone || quote.customerPhone) {
-        infoY += 4;
-        doc.text(String(quote.customer?.phone || quote.customerPhone), margin + 5, infoY);
-      }
-      if (quote.serviceAddress) {
-        infoY += 4;
-        const addrLines = doc.splitTextToSize(quote.serviceAddress, boxWidth - 10);
-        addrLines.forEach((line: string) => {
-          doc.text(line, margin + 5, infoY);
-          infoY += 4;
-        });
-      }
-
-      const detailsX = margin + boxWidth + 11;
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...textColor);
-      doc.text("Quote Details", detailsX, y + 8);
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...mutedColor);
-      doc.text("Date:", detailsX, y + 14);
-      doc.text("Valid Until:", detailsX, y + 19);
-      if (quote.title) {
-        doc.text("Title:", detailsX, y + 24);
-      }
-      
-      doc.setTextColor(...textColor);
-      doc.text(formatDate(quote.createdAt), pageWidth - margin - 5, y + 14, { align: 'right' });
-      doc.text(quote.validUntil ? formatDate(quote.validUntil) : "30 days", pageWidth - margin - 5, y + 19, { align: 'right' });
-      if (quote.title) {
-        doc.text(quote.title, pageWidth - margin - 5, y + 24, { align: 'right' });
-      }
-
-      y += boxHeight + 8;
-
-      addTableHeader();
-
-      const lineItems = quote.lineItems || [];
-      let rowIndex = 0;
-      lineItems.forEach((item) => {
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(...textColor);
-        
-        const descLines = doc.splitTextToSize(item.description || "", contentWidth * 0.45);
-        const rowHeight = Math.max(8, descLines.length * 4 + 3);
-        
-        checkPageBreak(rowHeight);
-
-        if (rowIndex % 2 === 1) {
-          doc.setFillColor(...tableRowAlt);
-          doc.rect(margin, y, contentWidth, rowHeight, 'F');
+        // Title section
+        if (aiQuote.quote_title) {
+          doc.setFontSize(16);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...textColor);
+          doc.text(aiQuote.quote_title, margin, y);
+          y += 8;
         }
 
-        let textY = y + 5.5;
-        descLines.forEach((line: string, idx: number) => {
-          doc.text(line, margin + 5, textY + (idx * 4));
-        });
-        
-        doc.text(String(item.quantity || 1), margin + contentWidth * 0.52, y + 5.5, { align: 'center' });
-        doc.text(formatCurrency(item.unitPrice), margin + contentWidth * 0.70, y + 5.5, { align: 'center' });
+        // Package description
+        if (aiQuote.package_description) {
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(...mutedColor);
+          const descLines = doc.splitTextToSize(aiQuote.package_description, contentWidth);
+          descLines.forEach((line: string) => {
+            doc.text(line, margin, y);
+            y += 5;
+          });
+          y += 3;
+        }
+
+        // Customer info box
+        const boxHeight = 32;
+        doc.setFillColor(...lightBg);
+        doc.roundedRect(margin, y, contentWidth, boxHeight, 2, 2, 'F');
+        doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
-        doc.text(formatCurrency(item.lineTotal), pageWidth - margin - 5, y + 5.5, { align: 'right' });
+        doc.setTextColor(...textColor);
+        doc.text("Customer", margin + 5, y + 8);
+        doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
-        y += rowHeight;
-        rowIndex++;
-      });
-
-      if (lineItems.length === 0) {
+        const customerName = quote.customer?.name || quote.customerName || "Customer";
+        doc.text(customerName, margin + 5, y + 14);
+        let custY = y + 14;
         doc.setTextColor(...mutedColor);
-        doc.text("No line items", pageWidth / 2, y + 10, { align: 'center' });
-        y += 20;
-      }
+        if (quote.customer?.email || quote.customerEmail) {
+          custY += 4;
+          doc.text(String(quote.customer?.email || quote.customerEmail), margin + 5, custY);
+        }
+        if (quote.customer?.phone || quote.customerPhone) {
+          custY += 4;
+          doc.text(String(quote.customer?.phone || quote.customerPhone), margin + 5, custY);
+        }
+        if (quote.serviceAddress) {
+          custY += 4;
+          doc.text(quote.serviceAddress.substring(0, 60), margin + 5, custY);
+        }
+        y += boxHeight + 8;
 
-      doc.setDrawColor(220, 220, 220);
-      doc.setLineWidth(0.3);
-      doc.line(margin, y, pageWidth - margin, y);
+        // Pricing Details table header
+        doc.setFillColor(...brandColor);
+        doc.rect(margin, y, contentWidth, 10, 'F');
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("Pricing Details", margin + 5, y + 7);
+        y += 10;
 
-      checkPageBreak(45);
-      y += 8;
-
-      const totalsBoxWidth = 80;
-      const totalsX = pageWidth - margin - totalsBoxWidth;
-      
-      doc.setFillColor(...lightBg);
-      doc.roundedRect(totalsX, y, totalsBoxWidth, 28, 2, 2, 'F');
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...mutedColor);
-      doc.text("Subtotal", totalsX + 5, y + 7);
-      doc.setTextColor(...textColor);
-      doc.text(formatCurrency(quote.subtotal), pageWidth - margin - 5, y + 7, { align: 'right' });
-      
-      doc.setTextColor(...mutedColor);
-      doc.text("Tax (8.25%)", totalsX + 5, y + 13);
-      doc.setTextColor(...textColor);
-      doc.text(formatCurrency(quote.taxTotal || quote.taxAmount), pageWidth - margin - 5, y + 13, { align: 'right' });
-      
-      doc.setDrawColor(...goldColor);
-      doc.setLineWidth(0.5);
-      doc.line(totalsX + 5, y + 17, pageWidth - margin - 5, y + 17);
-      
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...textColor);
-      doc.text("Total", totalsX + 5, y + 24);
-      doc.setTextColor(...brandColor);
-      doc.text(formatCurrency(quote.total), pageWidth - margin - 5, y + 24, { align: 'right' });
-
-      y += 35;
-
-      if (quote.description) {
-        checkPageBreak(25);
-        doc.setFillColor(254, 252, 232);
-        doc.setDrawColor(253, 230, 138);
-        doc.roundedRect(margin, y, contentWidth, 20, 2, 2, 'FD');
+        // Table column headers
+        const col1Width = contentWidth * 0.60;
+        const col2Width = contentWidth * 0.15;
+        const col3Width = contentWidth * 0.25;
+        doc.setFillColor(...lightBg);
+        doc.rect(margin, y, contentWidth, 8, 'F');
         doc.setFontSize(9);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(120, 53, 15);
-        doc.text("Notes", margin + 5, y + 7);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(146, 64, 14);
-        const noteLines = doc.splitTextToSize(quote.description, contentWidth - 10);
-        noteLines.slice(0, 2).forEach((line: string, idx: number) => {
-          doc.text(line, margin + 5, y + 13 + (idx * 4));
+        doc.setTextColor(...textColor);
+        doc.text("Item", margin + 3, y + 5.5);
+        doc.text("Qty", margin + col1Width + col2Width/2, y + 5.5, { align: 'center' });
+        doc.text("Price", margin + col1Width + col2Width + col3Width - 3, y + 5.5, { align: 'right' });
+        y += 8;
+
+        // Line items from AI quote
+        const lineItems = aiQuote.line_items || [];
+        let rowIndex = 0;
+        lineItems.forEach((item) => {
+          const nameLines = doc.splitTextToSize(item.name || "", col1Width - 6);
+          const descLines = item.description ? doc.splitTextToSize(item.description, col1Width - 6) : [];
+          const nameHeight = nameLines.length * 4;
+          const descHeight = descLines.length * 3.5;
+          const rowHeight = Math.max(12, nameHeight + descHeight + 6);
+          
+          checkPageBreak(rowHeight + 2);
+          if (rowIndex % 2 === 0) {
+            doc.setFillColor(...tableRowAlt);
+            doc.rect(margin, y, contentWidth, rowHeight, 'F');
+          }
+          
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...textColor);
+          let textY = y + 5;
+          nameLines.forEach((line: string) => {
+            doc.text(line, margin + 3, textY);
+            textY += 4;
+          });
+          
+          doc.setFont("helvetica", "normal");
+          doc.text(String(item.qty || 1), margin + col1Width + col2Width/2, y + 5, { align: 'center' });
+          doc.text(`$${(item.price || 0).toLocaleString()}`, margin + col1Width + col2Width + col3Width - 3, y + 5, { align: 'right' });
+          
+          if (descLines.length > 0) {
+            doc.setFontSize(7);
+            doc.setTextColor(...mutedColor);
+            descLines.forEach((line: string) => {
+              doc.text(line, margin + 3, textY);
+              textY += 3.5;
+            });
+            doc.setTextColor(...textColor);
+            doc.setFontSize(9);
+          }
+          
+          y += rowHeight;
+          rowIndex++;
         });
-        y += 25;
+
+        // Separator line
+        doc.setDrawColor(...brandColor);
+        doc.setLineWidth(0.5);
+        doc.line(margin, y, margin + contentWidth, y);
+        y += 6;
+
+        // Only show Subtotal/Total in single mode - hidden in options mode
+        if (!isOptionsMode) {
+          // Calculate subtotal from line items
+          const subtotal = lineItems.reduce((sum, item) => sum + (item.price || 0) * (item.qty || 1), 0);
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.text("Subtotal:", margin + col1Width, y);
+          doc.text(`$${subtotal.toLocaleString()}`, margin + contentWidth - 3, y, { align: 'right' });
+          y += 6;
+
+          checkPageBreak(12);
+          doc.setFillColor(...brandColor);
+          doc.rect(margin, y, contentWidth, 10, 'F');
+          doc.setFontSize(12);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(255, 255, 255);
+          doc.text("TOTAL:", margin + col1Width, y + 7);
+          doc.text(`$${subtotal.toLocaleString()}`, margin + contentWidth - 3, y + 7, { align: 'right' });
+          y += 16;
+          doc.setTextColor(...textColor);
+        }
+
+        // Financing text
+        if (aiQuote.financing_text) {
+          checkPageBreak(10);
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(...mutedColor);
+          const finLines = doc.splitTextToSize(aiQuote.financing_text, contentWidth);
+          finLines.forEach((line: string) => {
+            doc.text(line, margin, y);
+            y += 4;
+          });
+          y += 4;
+        }
+
+        // Warranties & Terms
+        if (aiQuote.warranties_and_terms && aiQuote.warranties_and_terms.length > 0) {
+          checkPageBreak(25);
+          doc.setFontSize(12);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...brandColor);
+          doc.text("Warranties & Terms", margin, y);
+          y += 7;
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(...textColor);
+          aiQuote.warranties_and_terms.forEach((term: string) => {
+            checkPageBreak(6);
+            const termLines = doc.splitTextToSize(`• ${term}`, contentWidth - 10);
+            termLines.forEach((line: string) => {
+              doc.text(line, margin + 5, y);
+              y += 4;
+            });
+            y += 2;
+          });
+          y += 5;
+        }
+
+        // What's Included section
+        if (aiQuote.whats_included && aiQuote.whats_included.length > 0) {
+          checkPageBreak(20);
+          doc.setFontSize(12);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...brandColor);
+          doc.text("What's Included", margin, y);
+          y += 7;
+          
+          aiQuote.whats_included.forEach((category) => {
+            checkPageBreak(15);
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(...textColor);
+            doc.text(category.category, margin + 5, y);
+            y += 5;
+            
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(...mutedColor);
+            category.items.forEach((item: string) => {
+              checkPageBreak(5);
+              doc.text(`  • ${item}`, margin + 10, y);
+              y += 4;
+            });
+            y += 3;
+          });
+        }
+
+        // Next steps
+        if (aiQuote.next_steps && aiQuote.next_steps.length > 0) {
+          checkPageBreak(20);
+          doc.setFontSize(12);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...brandColor);
+          doc.text("Next Steps", margin, y);
+          y += 7;
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(...textColor);
+          aiQuote.next_steps.forEach((step: string, idx: number) => {
+            checkPageBreak(6);
+            const stepLines = doc.splitTextToSize(`${idx + 1}. ${step}`, contentWidth - 10);
+            stepLines.forEach((line: string) => {
+              doc.text(line, margin + 5, y);
+              y += 4;
+            });
+          });
+        }
+
+      } else {
+        // Standard line-item PDF for non-AI quotes
+        const addTableHeader = () => {
+          doc.setFillColor(...goldColor);
+          doc.rect(margin, y, contentWidth, 10, 'F');
+          
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(255, 255, 255);
+          doc.text("Line Items", margin + 5, y + 7);
+          y += 10;
+          
+          doc.setFillColor(...lightBg);
+          doc.rect(margin, y, contentWidth, 8, 'F');
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...textColor);
+          doc.text("Description", margin + 5, y + 5.5);
+          doc.text("Qty", margin + contentWidth * 0.52, y + 5.5, { align: 'center' });
+          doc.text("Unit Price", margin + contentWidth * 0.70, y + 5.5, { align: 'center' });
+          doc.text("Amount", pageWidth - margin - 5, y + 5.5, { align: 'right' });
+          y += 8;
+        };
+
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...textColor);
+        doc.text("QUOTE", margin, y);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...mutedColor);
+        doc.text(quote.quoteNumber || "", margin, y + 6);
+
+        const statusText = statusLabels[status] || status;
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...mutedColor);
+        doc.text(statusText, pageWidth - margin, y + 2, { align: 'right' });
+
+        y += 14;
+
+        const boxWidth = (contentWidth - 6) / 2;
+        const boxHeight = 32;
+        
+        doc.setFillColor(...lightBg);
+        doc.roundedRect(margin, y, boxWidth, boxHeight, 2, 2, 'F');
+        doc.roundedRect(margin + boxWidth + 6, y, boxWidth, boxHeight, 2, 2, 'F');
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...textColor);
+        doc.text("Bill To", margin + 5, y + 8);
+        
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        const customerName = quote.customer?.name || quote.customerName || "Customer";
+        doc.text(customerName, margin + 5, y + 14);
+        let infoY = y + 14;
+        doc.setTextColor(...mutedColor);
+        if (quote.customer?.email || quote.customerEmail) {
+          infoY += 4;
+          doc.text(String(quote.customer?.email || quote.customerEmail), margin + 5, infoY);
+        }
+        if (quote.customer?.phone || quote.customerPhone) {
+          infoY += 4;
+          doc.text(String(quote.customer?.phone || quote.customerPhone), margin + 5, infoY);
+        }
+        if (quote.serviceAddress) {
+          infoY += 4;
+          const addrLines = doc.splitTextToSize(quote.serviceAddress, boxWidth - 10);
+          addrLines.forEach((line: string) => {
+            doc.text(line, margin + 5, infoY);
+            infoY += 4;
+          });
+        }
+
+        const detailsX = margin + boxWidth + 11;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...textColor);
+        doc.text("Quote Details", detailsX, y + 8);
+        
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...mutedColor);
+        doc.text("Date:", detailsX, y + 14);
+        doc.text("Valid Until:", detailsX, y + 19);
+        if (quote.title) {
+          doc.text("Title:", detailsX, y + 24);
+        }
+        
+        doc.setTextColor(...textColor);
+        doc.text(formatDate(quote.createdAt), pageWidth - margin - 5, y + 14, { align: 'right' });
+        doc.text(quote.validUntil ? formatDate(quote.validUntil) : "30 days", pageWidth - margin - 5, y + 19, { align: 'right' });
+        if (quote.title) {
+          doc.text(quote.title, pageWidth - margin - 5, y + 24, { align: 'right' });
+        }
+
+        y += boxHeight + 8;
+
+        addTableHeader();
+
+        const lineItems = quote.lineItems || [];
+        let rowIndex = 0;
+        lineItems.forEach((item) => {
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(...textColor);
+          
+          const descLines = doc.splitTextToSize(item.description || "", contentWidth * 0.45);
+          const rowHeight = Math.max(8, descLines.length * 4 + 3);
+          
+          checkPageBreak(rowHeight);
+
+          if (rowIndex % 2 === 1) {
+            doc.setFillColor(...tableRowAlt);
+            doc.rect(margin, y, contentWidth, rowHeight, 'F');
+          }
+
+          let textY = y + 5.5;
+          descLines.forEach((line: string, idx: number) => {
+            doc.text(line, margin + 5, textY + (idx * 4));
+          });
+          
+          doc.text(String(item.quantity || 1), margin + contentWidth * 0.52, y + 5.5, { align: 'center' });
+          doc.text(formatCurrency(item.unitPrice), margin + contentWidth * 0.70, y + 5.5, { align: 'center' });
+          doc.setFont("helvetica", "bold");
+          doc.text(formatCurrency(item.lineTotal), pageWidth - margin - 5, y + 5.5, { align: 'right' });
+          doc.setFont("helvetica", "normal");
+          y += rowHeight;
+          rowIndex++;
+        });
+
+        if (lineItems.length === 0) {
+          doc.setTextColor(...mutedColor);
+          doc.text("No line items", pageWidth / 2, y + 10, { align: 'center' });
+          y += 20;
+        }
+
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.3);
+        doc.line(margin, y, pageWidth - margin, y);
+
+        checkPageBreak(45);
+        y += 8;
+
+        // Only show totals for non-options mode
+        if (!isOptionsMode) {
+          const totalsBoxWidth = 80;
+          const totalsX = pageWidth - margin - totalsBoxWidth;
+          
+          doc.setFillColor(...lightBg);
+          doc.roundedRect(totalsX, y, totalsBoxWidth, 28, 2, 2, 'F');
+          
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(...mutedColor);
+          doc.text("Subtotal", totalsX + 5, y + 7);
+          doc.setTextColor(...textColor);
+          doc.text(formatCurrency(quote.subtotal), pageWidth - margin - 5, y + 7, { align: 'right' });
+          
+          doc.setTextColor(...mutedColor);
+          doc.text("Tax (8.25%)", totalsX + 5, y + 13);
+          doc.setTextColor(...textColor);
+          doc.text(formatCurrency(quote.taxTotal || quote.taxAmount), pageWidth - margin - 5, y + 13, { align: 'right' });
+          
+          doc.setDrawColor(...goldColor);
+          doc.setLineWidth(0.5);
+          doc.line(totalsX + 5, y + 17, pageWidth - margin - 5, y + 17);
+          
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...textColor);
+          doc.text("Total", totalsX + 5, y + 24);
+          doc.setTextColor(...brandColor);
+          doc.text(formatCurrency(quote.total), pageWidth - margin - 5, y + 24, { align: 'right' });
+
+          y += 35;
+        }
+
+        if (quote.description) {
+          checkPageBreak(25);
+          doc.setFillColor(254, 252, 232);
+          doc.setDrawColor(253, 230, 138);
+          doc.roundedRect(margin, y, contentWidth, 20, 2, 2, 'FD');
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(120, 53, 15);
+          doc.text("Notes", margin + 5, y + 7);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(146, 64, 14);
+          const noteLines = doc.splitTextToSize(quote.description, contentWidth - 10);
+          noteLines.slice(0, 2).forEach((line: string, idx: number) => {
+            doc.text(line, margin + 5, y + 13 + (idx * 4));
+          });
+          y += 25;
+        }
       }
 
       const footerY = pageHeight - 18;
@@ -705,21 +946,24 @@ export default function CrmQuoteDetail() {
               </TableBody>
             </Table>
 
-            <div className="mt-6 border-t pt-4 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-slate-600">Subtotal</span>
-                <span>{formatCurrency(quote.subtotal)}</span>
+            {/* Hide subtotal/tax/total for options mode since each package is a separate choice */}
+            {quote.quoteMode !== "options" && (
+              <div className="mt-6 border-t pt-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Subtotal</span>
+                  <span>{formatCurrency(quote.subtotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Tax</span>
+                  <span>{formatCurrency(quote.taxTotal)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-lg font-semibold">
+                  <span>Total</span>
+                  <span className="text-[#d3b07d]">{formatCurrency(quote.total)}</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600">Tax</span>
-                <span>{formatCurrency(quote.taxTotal)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-lg font-semibold">
-                <span>Total</span>
-                <span className="text-[#d3b07d]">{formatCurrency(quote.total)}</span>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
