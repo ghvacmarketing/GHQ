@@ -135,6 +135,7 @@ export default function CrmInvoiceCreate() {
   
   const [itemSearchOpen, setItemSearchOpen] = useState(false);
   const [itemSearchQuery, setItemSearchQuery] = useState("");
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "install" | "service" | "maintenance">("all");
 
   const urlParams = new URLSearchParams(window.location.search);
   const workOrderIdFromUrl = urlParams.get("workOrderId");
@@ -423,6 +424,9 @@ export default function CrmInvoiceCreate() {
   }) || [];
 
   const filteredCatalogItems = crmItems?.filter(item => {
+    if (catalogCategoryFilter !== "all" && item.category !== catalogCategoryFilter) {
+      return false;
+    }
     if (!itemSearchQuery) return true;
     const search = itemSearchQuery.toLowerCase();
     return (
@@ -1017,15 +1021,28 @@ export default function CrmInvoiceCreate() {
             <DialogTitle>Add from Catalog</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search parts, services..."
-                value={itemSearchQuery}
-                onChange={(e) => setItemSearchQuery(e.target.value)}
-                className="pl-9"
-                data-testid="input-catalog-search"
-              />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search parts, services..."
+                  value={itemSearchQuery}
+                  onChange={(e) => setItemSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-catalog-search"
+                />
+              </div>
+              <Select value={catalogCategoryFilter} onValueChange={(v) => setCatalogCategoryFilter(v as any)}>
+                <SelectTrigger className="w-40" data-testid="select-catalog-category">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="install">Install</SelectItem>
+                  <SelectItem value="service">Service</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="max-h-80 overflow-y-auto border rounded-lg">
               {filteredCatalogItems.length === 0 ? (
