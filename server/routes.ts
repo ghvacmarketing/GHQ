@@ -12158,7 +12158,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const currentUser = await getCurrentCrmUser(req);
       
-      const parseResult = insertCrmFollowUpSchema.safeParse(req.body);
+      // Convert dueAt string to Date if needed
+      const bodyWithDate = {
+        ...req.body,
+        dueAt: req.body.dueAt ? new Date(req.body.dueAt) : undefined,
+      };
+      
+      const parseResult = insertCrmFollowUpSchema.safeParse(bodyWithDate);
       if (!parseResult.success) {
         return res.status(400).json({ message: "Invalid follow-up data", errors: parseResult.error.errors });
       }
