@@ -63,6 +63,7 @@ import {
   XCircle,
   Loader2,
   Trash2,
+  Wand2,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -730,10 +731,26 @@ export default function CrmProjectDetail() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Quotes</CardTitle>
-                <Button onClick={() => setCreateQuoteDialogOpen(true)} data-testid="button-create-quote">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Quote
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const params = new URLSearchParams();
+                      params.set("projectId", project.id);
+                      if (project.customerId) params.set("customerId", project.customerId);
+                      if (project.propertyId) params.set("propertyId", project.propertyId);
+                      navigate(`/crm/proposal-builder?${params.toString()}`);
+                    }}
+                    data-testid="button-generate-proposal"
+                  >
+                    <Wand2 className="w-4 h-4 mr-2" />
+                    Generate Proposal
+                  </Button>
+                  <Button onClick={() => setCreateQuoteDialogOpen(true)} data-testid="button-create-quote">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Quote
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {quotesLoading ? (

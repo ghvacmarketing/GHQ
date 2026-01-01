@@ -1047,6 +1047,18 @@ export const crmQuotes = pgTable("crm_quotes", {
   declineReason: text("decline_reason"),
   notes: text("notes"),
   createdBy: varchar("created_by"),
+  // AI-generated proposal content from Proposal Builder
+  aiGeneratedQuote: json("ai_generated_quote").$type<{
+    quote_title?: string;
+    package_description?: string;
+    whats_included?: Array<{ category: string; items: string[] }>;
+    best_for?: string;
+    line_items?: Array<{ name: string; qty: number; price: number; description: string }>;
+    financing_text?: string;
+    warranties_and_terms?: string[];
+    next_steps?: string[];
+  }>(),
+  quoteMode: text("quote_mode").$type<"single" | "options">(),
 });
 
 // CRM Quote Line Items

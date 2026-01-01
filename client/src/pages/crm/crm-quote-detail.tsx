@@ -62,6 +62,17 @@ const COMPANY_INFO = {
 type QuoteWithLines = CrmQuote & {
   lineItems?: CrmQuoteLineItem[];
   customer?: { id: string; name: string; email?: string; phone?: string } | null;
+  aiGeneratedQuote?: {
+    quote_title?: string;
+    package_description?: string;
+    whats_included?: Array<{ category: string; items: string[] }>;
+    best_for?: string;
+    line_items?: Array<{ name: string; qty: number; price: number; description: string }>;
+    financing_text?: string;
+    warranties_and_terms?: string[];
+    next_steps?: string[];
+  } | null;
+  quoteMode?: "single" | "options" | null;
 };
 
 const statusLabels: Record<string, string> = {
@@ -719,6 +730,77 @@ export default function CrmQuoteDetail() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-slate-600 whitespace-pre-wrap">{quote.description}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {quote.aiGeneratedQuote && (
+          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2 text-blue-800">
+                <FileText className="h-4 w-4" />
+                AI-Generated Proposal
+                {quote.quoteMode === "options" && (
+                  <Badge variant="outline" className="ml-2 text-xs">Options Mode</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {quote.aiGeneratedQuote.quote_title && (
+                <h3 className="text-lg font-semibold text-slate-900">
+                  {quote.aiGeneratedQuote.quote_title}
+                </h3>
+              )}
+              
+              {quote.aiGeneratedQuote.package_description && (
+                <p className="text-sm text-slate-600">
+                  {quote.aiGeneratedQuote.package_description}
+                </p>
+              )}
+              
+              {quote.aiGeneratedQuote.best_for && (
+                <p className="text-sm italic text-slate-500">
+                  <span className="font-medium not-italic">Best For:</span> {quote.aiGeneratedQuote.best_for}
+                </p>
+              )}
+              
+              {quote.aiGeneratedQuote.whats_included && quote.aiGeneratedQuote.whats_included.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase">What's Included</h4>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {quote.aiGeneratedQuote.whats_included.map((category: { category: string; items: string[] }, idx: number) => (
+                      <div key={idx} className="bg-white p-3 rounded-lg border">
+                        <p className="font-medium text-sm text-slate-800 mb-2">{category.category}</p>
+                        <ul className="text-xs text-slate-600 space-y-1">
+                          {category.items.map((item: string, i: number) => (
+                            <li key={i} className="flex items-start gap-1.5">
+                              <span className="text-blue-500 mt-0.5">•</span>
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {quote.aiGeneratedQuote.warranties_and_terms && quote.aiGeneratedQuote.warranties_and_terms.length > 0 && (
+                <div className="pt-3 border-t">
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase mb-2">Warranties & Terms</h4>
+                  <ul className="text-xs text-slate-600 space-y-1">
+                    {quote.aiGeneratedQuote.warranties_and_terms.map((term: string, idx: number) => (
+                      <li key={idx}>• {term}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {quote.aiGeneratedQuote.financing_text && (
+                <p className="text-sm text-slate-600 pt-2 border-t">
+                  {quote.aiGeneratedQuote.financing_text}
+                </p>
+              )}
             </CardContent>
           </Card>
         )}

@@ -777,6 +777,40 @@ export default function CrmProposalBuilder() {
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchAllFields, setSearchAllFields] = useState(false);
+  
+  // Pre-loaded entity IDs from URL parameters
+  const [preloadedProjectId, setPreloadedProjectId] = useState<string | null>(null);
+  const [preloadedWorkOrderId, setPreloadedWorkOrderId] = useState<string | null>(null);
+  const [preloadedPropertyId, setPreloadedPropertyId] = useState<string | null>(null);
+  
+  // Parse URL parameters on mount and pre-fill customer if provided
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const customerId = params.get("customerId");
+    const projectId = params.get("projectId");
+    const workOrderId = params.get("workOrderId");
+    const propertyId = params.get("propertyId");
+    
+    if (projectId) setPreloadedProjectId(projectId);
+    if (workOrderId) setPreloadedWorkOrderId(workOrderId);
+    if (propertyId) setPreloadedPropertyId(propertyId);
+    
+    // Fetch customer by ID if provided
+    if (customerId) {
+      fetch(`/api/customers/${customerId}`)
+        .then(res => res.ok ? res.json() : null)
+        .then((customer: Customer | null) => {
+          if (customer) {
+            // Inline customer selection to avoid dependency issues
+            const cleanName = customer.displayName.replace(/^["']|["']$/g, '');
+            setCustomerName(cleanName);
+            setCustomerAddress(customer.fullAddress || '');
+            setSelectedCustomer(customer);
+          }
+        })
+        .catch(console.error);
+    }
+  }, []);
 
   // Elite Package state - per-package (key = package index)
   const [eliteEnabledByIndex, setEliteEnabledByIndex] = useState<Record<number, boolean>>({});
@@ -1006,6 +1040,119 @@ export default function CrmProposalBuilder() {
       packageDescription: aiGeneratedQuote.package_description || undefined,
       total: String(aiGeneratedQuote.total),
       quoteData: JSON.stringify(fullQuoteData),
+    });
+  };
+
+  // Save to CRM Quote mutation
+  const saveToCrmMutation = useMutation({
+    mutationFn: async (data: {
+      customerId: string;
+      propertyId?: string;
+      projectId?: string;
+      workOrderId?: string;
+      title: string;
+      description?: string;
+      notes?: string;
+      lineItems: Array<{
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        taxable?: boolean;
+      }>;
+      status?: string;
+      aiGeneratedQuote?: object;
+      quoteMode?: string;
+    }) => {
+      const res = await apiRequest("POST", "/api/crm/quotes/from-proposal", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Saved to CRM!",
+        description: `Quote ${data.quote?.quoteNumber || ''} created successfully.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to save to CRM. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Save to CRM error:", error);
+    },
+  });
+
+  const handleSaveToCrm = () => {
+    if (!aiGeneratedQuote) {
+      toast({
+        title: "No Quote",
+        description: "Please generate a quote first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedCustomer) {
+      toast({
+        title: "Customer Required",
+        description: "Please search and select a customer to save to CRM.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Build line items from AI quote
+    const lineItems = (aiGeneratedQuote.line_items || []).map((item: { name: string; qty: number; price: number; description: string }) => ({
+      description: `${item.name} - ${item.description}`,
+      quantity: item.qty,
+      unitPrice: item.price,
+      taxable: true,
+    }));
+
+    if (lineItems.length === 0) {
+      // Fallback - use cart items to create line items
+      cart.forEach(item => {
+        if (isHvacPackage(item)) {
+          const price = item.eliteData ? item.eliteData.finalTotal : parseFloat(item.totalInvestment) || 0;
+          lineItems.push({
+            description: `${item.packageLevel} Package - ${item.extractedTonnage} - ${item.outdoorBrand} ${item.outdoorName}`,
+            quantity: item.quantity,
+            unitPrice: price,
+            taxable: true,
+          });
+        } else if (isCrawlspaceItem(item)) {
+          const price = item.eliteData ? item.eliteData.finalTotal : item.pricingBreakdown.totalPrice;
+          lineItems.push({
+            description: `Crawlspace Encapsulation - ${item.tier.name} (${item.pricingBreakdown.bandSqft.toLocaleString()} sqft)`,
+            quantity: item.quantity,
+            unitPrice: price,
+            taxable: true,
+          });
+        } else if (isCustomBuild(item)) {
+          const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
+          lineItems.push({
+            description: `Custom Build - ${item.tonnage} System`,
+            quantity: item.quantity,
+            unitPrice: estimate.high,
+            taxable: true,
+          });
+        }
+      });
+    }
+
+    saveToCrmMutation.mutate({
+      customerId: selectedCustomer.id,
+      propertyId: preloadedPropertyId || undefined,
+      projectId: preloadedProjectId || undefined,
+      workOrderId: preloadedWorkOrderId || undefined,
+      title: aiGeneratedQuote.quote_title || "Equipment Proposal",
+      description: aiGeneratedQuote.package_description || undefined,
+      notes: customerNotes || undefined,
+      lineItems,
+      status: "draft",
+      aiGeneratedQuote: aiGeneratedQuote,
+      quoteMode: quoteMode,
     });
   };
 
@@ -5439,6 +5586,20 @@ export default function CrmProposalBuilder() {
                   <Save className="h-4 w-4 mr-2" />
                 )}
                 Save Quote
+              </Button>
+              <Button
+                variant="default"
+                onClick={handleSaveToCrm}
+                disabled={!aiGeneratedQuote || !selectedCustomer || saveToCrmMutation.isPending}
+                className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700"
+                data-testid="button-save-to-crm"
+              >
+                {saveToCrmMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4 mr-2" />
+                )}
+                Save to CRM
               </Button>
               <Button
                 onClick={downloadQuoteAsPDF}

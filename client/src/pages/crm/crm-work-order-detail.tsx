@@ -72,6 +72,7 @@ import {
   FolderOpen,
   Edit,
   Trash2,
+  Wand2,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
@@ -949,14 +950,32 @@ export default function CrmWorkOrderDetail() {
               <CardHeader className="pb-3 border-b bg-slate-50/50">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base font-semibold">Quotes</CardTitle>
-                  <Button
-                    size="sm"
-                    onClick={() => setCreateQuoteDialogOpen(true)}
-                    data-testid="button-create-quote"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Create Quote
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const params = new URLSearchParams();
+                        params.set("workOrderId", workOrder.id);
+                        if (workOrder.customerId) params.set("customerId", workOrder.customerId);
+                        if (workOrder.projectId) params.set("projectId", workOrder.projectId);
+                        if (workOrder.propertyId) params.set("propertyId", workOrder.propertyId);
+                        navigate(`/crm/proposal-builder?${params.toString()}`);
+                      }}
+                      data-testid="button-generate-proposal"
+                    >
+                      <Wand2 className="h-4 w-4 mr-1" />
+                      Generate Proposal
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setCreateQuoteDialogOpen(true)}
+                      data-testid="button-create-quote"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Create Quote
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-4">

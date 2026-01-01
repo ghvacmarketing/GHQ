@@ -10891,7 +10891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { customerId, propertyId, title, description, notes, lineItems, status, aiNotes } = req.body;
+      const { customerId, propertyId, projectId, workOrderId, title, description, notes, lineItems, status, aiNotes, aiGeneratedQuote, quoteMode } = req.body;
 
       if (!customerId) {
         return res.status(400).json({ message: "Customer is required" });
@@ -10931,16 +10931,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Build notes with AI notes if provided
       const combinedNotes = [notes, aiNotes ? `AI Generated Notes:\n${aiNotes}` : null].filter(Boolean).join("\n\n");
 
+      // Determine scope based on linked entities
+      let scope: "standalone" | "project" | "work_order" = "standalone";
+      if (projectId) scope = "project";
+      else if (workOrderId) scope = "work_order";
+
       // Create the quote
       const [newQuote] = await db.insert(crmQuotes).values({
         quoteNumber,
         customerId,
         propertyId: propertyId || null,
+        projectId: projectId || null,
+        workOrderId: workOrderId || null,
         customerName: existingCustomer.name,
         customerAddress: existingCustomer.fullAddress || null,
         customerPhone: existingCustomer.phone || null,
         customerEmail: existingCustomer.email || null,
-        scope: "standalone",
+        scope,
         status: quoteStatus,
         title: title || "Proposal Quote",
         description: description || null,
@@ -10951,6 +10958,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: user.id,
         acceptedAt: quoteStatus === "approved" ? new Date() : null,
         acceptedBy: quoteStatus === "approved" ? user.name : null,
+        aiGeneratedQuote: aiGeneratedQuote || null,
+        quoteMode: quoteMode || null,
       }).returning();
 
       // Create line items
