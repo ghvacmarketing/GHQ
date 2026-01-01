@@ -123,6 +123,7 @@ interface FormData {
   isProspect: boolean;
   salesStage: string;
   interestLevel: string;
+  potentialValue: string;
   scheduleFollowUp: boolean;
   followUpType: string;
   followUpDate: Date | null;
@@ -179,6 +180,7 @@ const initialFormData: FormData = {
   isProspect: true,
   salesStage: "new",
   interestLevel: "",
+  potentialValue: "",
   scheduleFollowUp: false,
   followUpType: "call",
   followUpDate: null,
@@ -280,6 +282,7 @@ export default function CrmAccountCreate() {
           ...(formData.isProspect && {
             salesStage: formData.salesStage,
             interestLevel: formData.interestLevel || null,
+            potentialValue: formData.potentialValue || null,
           }),
         },
         property: shouldCreateProperty ? {
@@ -310,6 +313,8 @@ export default function CrmAccountCreate() {
       toast({ title: "Customer created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects/metrics"] });
       if (data?.customer?.id) {
         navigate(`/crm/customers/${data.customer.id}`);
       } else {
@@ -1173,6 +1178,18 @@ export default function CrmAccountCreate() {
                               </SelectContent>
                             </Select>
                           </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Potential Value ($)</Label>
+                          <Input
+                            type="number"
+                            placeholder="e.g., 5000"
+                            value={formData.potentialValue}
+                            onChange={(e) => updateField("potentialValue", e.target.value)}
+                            data-testid="input-potential-value"
+                          />
+                          <p className="text-xs text-slate-500">Estimated value of this prospect</p>
                         </div>
 
                         <Separator />

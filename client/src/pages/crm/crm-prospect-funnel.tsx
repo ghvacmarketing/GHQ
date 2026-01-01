@@ -67,7 +67,8 @@ type ProspectMetrics = {
   activeProspects: number;
   pendingActions: number;
   conversionRate: string;
-  statusBreakdown: {
+  pipelineValue: number;
+  funnelCounts: {
     new: number;
     contacted: number;
     quote_sent: number;
@@ -221,6 +222,7 @@ export default function CrmProspectFunnel() {
     queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!currentUser,
   });
+
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -495,24 +497,16 @@ export default function CrmProspectFunnel() {
                 </CardContent>
               </Card>
 
-              <Card data-testid="card-metric-breakdown">
+              <Card data-testid="card-metric-pipeline">
                 <CardHeader className="pb-2">
-                  <CardDescription className="text-xs sm:text-sm">Status Breakdown</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm flex items-center gap-1">
+                    <TrendingUp className="h-4 w-4" />
+                    Pipeline Value
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="grid grid-cols-3 gap-1 text-xs">
-                    <div className="text-center">
-                      <div className="font-bold text-blue-600">{metrics?.statusBreakdown?.new || 0}</div>
-                      <div className="text-muted-foreground">New</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="font-bold text-amber-600">{metrics?.statusBreakdown?.contacted || 0}</div>
-                      <div className="text-muted-foreground">Contacted</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="font-bold text-purple-600">{metrics?.statusBreakdown?.quote_sent || 0}</div>
-                      <div className="text-muted-foreground">Quote</div>
-                    </div>
+                <CardContent>
+                  <div className="text-2xl sm:text-3xl font-bold text-green-600" data-testid="text-pipeline-value">
+                    ${(metrics?.pipelineValue || 0).toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
@@ -532,37 +526,37 @@ export default function CrmProspectFunnel() {
               <div className="text-center">
                 <div className="text-sm text-muted-foreground">New</div>
                 <div className="text-2xl font-bold text-blue-600" data-testid="text-funnel-new">
-                  {metrics?.statusBreakdown?.new || 0}
+                  {metrics?.funnelCounts?.new || 0}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-sm text-muted-foreground">Contacted</div>
                 <div className="text-2xl font-bold text-amber-600" data-testid="text-funnel-contacted">
-                  {metrics?.statusBreakdown?.contacted || 0}
+                  {metrics?.funnelCounts?.contacted || 0}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-sm text-muted-foreground">Quote Sent</div>
                 <div className="text-2xl font-bold text-purple-600" data-testid="text-funnel-quote-sent">
-                  {metrics?.statusBreakdown?.quote_sent || 0}
+                  {metrics?.funnelCounts?.quote_sent || 0}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-sm text-muted-foreground">Negotiating</div>
                 <div className="text-2xl font-bold text-green-600" data-testid="text-funnel-negotiating">
-                  {metrics?.statusBreakdown?.negotiating || 0}
+                  {metrics?.funnelCounts?.negotiating || 0}
                 </div>
               </div>
               <div className="text-center bg-green-50 p-2 rounded">
                 <div className="text-sm text-muted-foreground">Won</div>
                 <div className="text-2xl font-bold text-green-600" data-testid="text-funnel-won">
-                  {metrics?.statusBreakdown?.won || 0}
+                  {metrics?.funnelCounts?.won || 0}
                 </div>
               </div>
               <div className="text-center bg-red-50 p-2 rounded">
                 <div className="text-sm text-muted-foreground">Lost</div>
                 <div className="text-2xl font-bold text-red-600" data-testid="text-funnel-lost">
-                  {metrics?.statusBreakdown?.lost || 0}
+                  {metrics?.funnelCounts?.lost || 0}
                 </div>
               </div>
             </div>

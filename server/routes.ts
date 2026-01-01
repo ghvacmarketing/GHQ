@@ -5105,6 +5105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notes: customerData.notes || null,
         salesStage: customerData.salesStage || null,
         interestLevel: customerData.interestLevel || null,
+        potentialValue: customerData.potentialValue && !isNaN(Number(customerData.potentialValue)) ? parseInt(String(customerData.potentialValue), 10) : null,
         assignedSalesRepId: customerData.assignedSalesRepId || null,
       }).returning();
 
@@ -12319,28 +12320,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? (wonProspects.length / totalClosed) * 100 
         : 0;
       
-      // Build status breakdown
-      const statusBreakdown: Record<string, number> = {
-        new: 0,
-        contacted: 0,
-        quote_sent: 0,
-        negotiating: 0,
-        won: 0,
-        lost: 0,
-      };
+      // Calculate pipeline value (sum of potentialValue for active prospects)
+      const pipelineValue = activeProspects.reduce((sum, p) => sum + (p.potentialValue || 0), 0);
       
-      for (const prospect of allProspects) {
-        const stage = prospect.salesStage as string;
-        if (stage in statusBreakdown) {
-          statusBreakdown[stage]++;
-        }
-      }
+      // Build funnel counts
+      const funnelCounts = {
+        new: activeProspects.filter(p => p.salesStage === 'new').length,
+        contacted: activeProspects.filter(p => p.salesStage === 'contacted').length,
+        quote_sent: activeProspects.filter(p => p.salesStage === 'quote_sent').length,
+        negotiating: activeProspects.filter(p => p.salesStage === 'negotiating').length,
+        won: wonProspects.length,
+        lost: lostProspects.length,
+      };
       
       return res.json({
         activeProspects: activeProspects.length,
         pendingActions: Number(pendingFollowUps[0]?.count || 0),
         conversionRate: conversionRate.toFixed(1),
-        statusBreakdown,
+        pipelineValue,
+        funnelCounts,
       });
     } catch (error) {
       console.error("Error fetching prospect metrics:", error);

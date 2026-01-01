@@ -841,6 +841,7 @@ export const crmCustomers = pgTable("crm_customers", {
   // Prospect funnel fields
   salesStage: text("sales_stage").$type<SalesStage>(),
   interestLevel: text("interest_level").$type<InterestLevel>(),
+  potentialValue: integer("potential_value"),
   assignedSalesRepId: varchar("assigned_sales_rep_id"),
   nextFollowUpAt: timestamp("next_follow_up_at"),
   convertedAt: timestamp("converted_at"),
