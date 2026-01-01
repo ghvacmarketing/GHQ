@@ -748,8 +748,9 @@ export default function CrmQuoteCreate() {
                         <Select
                           value={item.itemCategory || "install"}
                           onValueChange={(value) => updateLineItem(item.id, "itemCategory", value as "install" | "service" | "maintenance")}
+                          disabled={!!item.crmItemId}
                         >
-                          <SelectTrigger id={`item-cat-${item.id}`} data-testid={`select-line-item-category-${index}`}>
+                          <SelectTrigger id={`item-cat-${item.id}`} data-testid={`select-line-item-category-${index}`} className={item.crmItemId ? "opacity-60" : ""}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
