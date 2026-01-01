@@ -72,15 +72,16 @@ export default function CreateLeadPage() {
     return () => clearTimeout(timer);
   }, [customerSearchTerm]);
 
+  // Search customers directly from Google Sheet for Sales Prospects (separate from CRM)
   const { data: customerSearchResults = [], isFetching: isSearchingCustomers } = useQuery<Customer[]>({
-    queryKey: ["/api/customers/search", debouncedCustomerSearch, searchAllFields],
+    queryKey: ["/api/leads/sheet-customers/search", debouncedCustomerSearch, searchAllFields],
     queryFn: async () => {
       if (debouncedCustomerSearch.length < 2) return [];
       const params = new URLSearchParams({
         term: debouncedCustomerSearch,
         ...(searchAllFields && { searchAll: 'true' })
       });
-      const res = await fetch(`/api/customers/search?${params}`);
+      const res = await fetch(`/api/leads/sheet-customers/search?${params}`);
       if (!res.ok) throw new Error("Failed to search customers");
       return res.json();
     },

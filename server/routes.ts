@@ -3022,6 +3022,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // LEAD MANAGEMENT API ROUTES
   // ========================================
 
+  // GET /api/leads/sheet-customers/search - Search customers directly from Google Sheet for Sales Prospects
+  app.get("/api/leads/sheet-customers/search", async (req, res) => {
+    try {
+      const term = req.query.term as string;
+      const searchAll = req.query.searchAll === 'true';
+      
+      if (!term || term.length < 2) {
+        return res.json([]);
+      }
+
+      const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
+      const sheetId = process.env.FIELDEDGE_CUSTOMER_SHEET_ID || '1POeQRuDUTia0BUYsVmEsBOqW6BDBvfL5qyKv-GQICU0';
+      
+      if (!apiKey) {
+        return res.status(500).json({ message: "Google Sheets API key not configured" });
+      }
+
+      // Fetch directly from Google Sheet
+      const range = encodeURIComponent('Sheet1');
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error('Google Sheets API error:', response.status, response.statusText);
+        return res.status(500).json({ message: "Failed to fetch from Google Sheets" });
+      }
+
+      const data = await response.json();
+      
+      if (!data.values || data.values.length === 0) {
+        return res.json([]);
+      }
+
+      const headers = data.values[0] as string[];
+      const rows = data.values.slice(1) as string[][];
+      
+      // Map column indices
+      const colIndex = {
+        displayName: headers.indexOf('Display Name'),
+        customerType: headers.indexOf('Customer Type'),
+        customerStatus: headers.indexOf('Customer Status'),
+        fullAddress: headers.indexOf('Full Address'),
+        phone: headers.indexOf('Phone'),
+        email: headers.indexOf('Email'),
+        leadSource: headers.indexOf('Lead Source'),
+      };
+
+      const searchLower = term.toLowerCase();
+      
+      // Filter and transform matching rows
+      const results = rows
+        .map((row, idx) => ({
+          id: `sheet-${idx}`,
+          displayName: row[colIndex.displayName] || '',
+          customerType: row[colIndex.customerType] || 'Residential',
+          customerStatus: row[colIndex.customerStatus] || 'Customer',
+          fullAddress: row[colIndex.fullAddress] || '',
+          phone: row[colIndex.phone] || '',
+          email: row[colIndex.email] || '',
+          leadSource: row[colIndex.leadSource] || '',
+        }))
+        .filter(customer => {
+          if (!customer.displayName) return false;
+          
+          if (searchAll) {
+            // Search across all fields
+            return (
+              customer.displayName.toLowerCase().includes(searchLower) ||
+              customer.phone.toLowerCase().includes(searchLower) ||
+              customer.email.toLowerCase().includes(searchLower) ||
+              customer.fullAddress.toLowerCase().includes(searchLower)
+            );
+          } else {
+            // Search only by name
+            return customer.displayName.toLowerCase().includes(searchLower);
+          }
+        })
+        .slice(0, 20); // Limit to 20 results
+
+      res.json(results);
+    } catch (error) {
+      console.error('Error searching sheet customers:', error);
+      res.status(500).json({ message: "Error searching customers" });
+    }
+  });
+
   // 1. GET /api/leads - Get all leads
   app.get("/api/leads", async (req, res) => {
     try {
