@@ -2229,7 +2229,7 @@ export default function CrmDispatch() {
     }
   }, [localWorkOrders, selectedDate, updateWorkOrderMutation, technicians, toast]);
 
-  const unassignedWorkOrders = localWorkOrders.filter(wo => !wo.assignedTechId);
+  const unassignedWorkOrders = localWorkOrders.filter(wo => !wo.assignedTechId || !wo.scheduledStart);
 
   const assignedWorkOrders = useMemo(() => {
     return localWorkOrders.filter((wo) => {
