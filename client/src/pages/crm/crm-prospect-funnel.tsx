@@ -122,27 +122,29 @@ function FollowUpBadge({ nextFollowUpAt }: { nextFollowUpAt: Date | string | nul
   
   if (isPast(date) && !isToday(date)) {
     return (
-      <Badge variant="outline" className="text-xs bg-red-100 text-red-700 border-red-200">
-        <AlertTriangle className="h-3 w-3 mr-1" />
-        Overdue
-      </Badge>
+      <div className="flex items-center gap-1.5 text-red-700 font-medium text-sm">
+        <AlertTriangle className="h-4 w-4" />
+        <span>Follow-up overdue</span>
+        <span className="text-red-500 text-xs">({format(date, "MMM d")})</span>
+      </div>
     );
   }
   
   if (isToday(date)) {
     return (
-      <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-200">
-        <Clock className="h-3 w-3 mr-1" />
-        Today
-      </Badge>
+      <div className="flex items-center gap-1.5 text-amber-700 font-medium text-sm">
+        <Clock className="h-4 w-4" />
+        <span>Follow-up due today</span>
+      </div>
     );
   }
   
   return (
-    <Badge variant="outline" className="text-xs bg-gray-100 text-gray-600 border-gray-200">
-      <Calendar className="h-3 w-3 mr-1" />
-      {format(date, "MMM d")}
-    </Badge>
+    <div className="flex items-center gap-1.5 text-slate-600 text-sm">
+      <Calendar className="h-4 w-4 text-blue-500" />
+      <span>Follow-up</span>
+      <span className="font-medium">{format(date, "MMM d")}</span>
+    </div>
   );
 }
 
@@ -607,14 +609,14 @@ export default function CrmProspectFunnel() {
             </Select>
 
             <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-              <SelectTrigger className="w-[150px]" data-testid="select-employee-filter">
+              <SelectTrigger className="w-[160px]" data-testid="select-salesperson-filter">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  <SelectValue placeholder="All Employees" />
+                  <SelectValue placeholder="All Sales People" />
                 </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Employees</SelectItem>
+                <SelectItem value="all">All Sales People</SelectItem>
                 <SelectItem value="chandler">Chandler</SelectItem>
                 <SelectItem value="earnest">Earnest</SelectItem>
               </SelectContent>
@@ -694,51 +696,57 @@ export default function CrmProspectFunnel() {
                       )}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                      <FollowUpBadge nextFollowUpAt={prospect.nextFollowUpAt} />
-                      {prospect.companyName && (
-                        <Badge variant="secondary" className="text-xs">
-                          {prospect.companyName}
-                        </Badge>
-                      )}
-                    </div>
+                    {(prospect.nextFollowUpAt || prospect.companyName) && (
+                      <div className="flex flex-wrap items-center gap-2 mt-3">
+                        {prospect.nextFollowUpAt && (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200">
+                            <FollowUpBadge nextFollowUpAt={prospect.nextFollowUpAt} />
+                          </div>
+                        )}
+                        {prospect.companyName && (
+                          <Badge variant="secondary" className="text-xs">
+                            {prospect.companyName}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </CardHeader>
 
                   <CardContent className="pt-0">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2">
                         {isActive && (
                           <>
                             <Button 
-                              size="icon" 
+                              size="sm" 
                               variant="outline" 
-                              className="h-8 w-8 touch-manipulation" 
+                              className="h-8 px-3 touch-manipulation border-green-200 bg-green-50 hover:bg-green-100 text-green-700" 
                               onClick={() => {
                                 setConfirmProspectId(prospect.id);
                                 setWonConfirmOpen(true);
                               }}
-                              title="Mark Won" 
                               data-testid={`button-mark-won-${prospect.id}`}
                             >
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Won
                             </Button>
                             <Button 
-                              size="icon" 
+                              size="sm" 
                               variant="outline" 
-                              className="h-8 w-8 touch-manipulation" 
+                              className="h-8 px-3 touch-manipulation border-red-200 bg-red-50 hover:bg-red-100 text-red-700" 
                               onClick={() => {
                                 setConfirmProspectId(prospect.id);
                                 setLostConfirmOpen(true);
                               }}
-                              title="Mark Lost" 
                               data-testid={`button-mark-lost-${prospect.id}`}
                             >
-                              <X className="h-4 w-4 text-red-600" />
+                              <X className="h-4 w-4 mr-1" />
+                              Lost
                             </Button>
                             {nextStage && nextStage !== "won" && (
                               <Button 
                                 size="sm" 
-                                variant="outline" 
+                                variant="default" 
                                 className="h-8 text-xs" 
                                 onClick={() => handleMoveToNextStage(prospect)}
                                 disabled={updateStageMutation.isPending}
@@ -751,21 +759,21 @@ export default function CrmProspectFunnel() {
                           </>
                         )}
                         <Button 
-                          size="icon" 
+                          size="sm" 
                           variant="outline" 
-                          className="h-8 w-8 touch-manipulation" 
+                          className="h-8 px-3 touch-manipulation border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700" 
                           onClick={() => handleAddFollowUp(prospect.id)}
-                          title="Add Follow-up" 
                           data-testid={`button-add-followup-${prospect.id}`}
                         >
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <Calendar className="h-4 w-4 mr-1" />
+                          Follow-up
                         </Button>
                       </div>
 
                       <Button 
                         size="sm" 
                         variant="ghost" 
-                        className="text-xs h-8" 
+                        className="text-xs h-8 text-muted-foreground hover:text-foreground" 
                         onClick={() => {
                           setExpandedProspectId(prospect.id);
                           setActiveTab("details");
@@ -773,6 +781,7 @@ export default function CrmProspectFunnel() {
                         data-testid={`button-expand-${prospect.id}`}
                       >
                         Details
+                        <ChevronRight className="h-3 w-3 ml-1" />
                       </Button>
                     </div>
                   </CardContent>
