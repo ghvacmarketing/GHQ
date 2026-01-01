@@ -14,20 +14,6 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  DndContext,
-  DragOverlay,
-  closestCorners,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragStartEvent,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { useDroppable } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -75,7 +61,6 @@ import {
   MessageSquare,
   StickyNote,
   List,
-  LayoutGrid,
   CalendarDays,
   DollarSign,
   BarChart3,
@@ -232,99 +217,6 @@ function FollowUpTypeIcon({ type }: { type: FollowUpType }) {
   }
 }
 
-function KanbanColumn({ 
-  stage, 
-  prospects, 
-  children,
-}: { 
-  stage: SalesStage; 
-  prospects: CrmCustomer[]; 
-  children: React.ReactNode;
-}) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: stage,
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`w-64 flex-shrink-0 bg-slate-100 rounded-lg p-3 ${isOver ? "ring-2 ring-[#711419] ring-inset" : ""}`}
-      data-testid={`kanban-column-${stage}`}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-sm text-slate-800">{STAGE_LABELS[stage]}</h3>
-        <span className="text-xs text-slate-500 bg-white px-2 py-0.5 rounded-full">{prospects.length}</span>
-      </div>
-      <SortableContext items={prospects.map(p => p.id)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-2 min-h-[200px]">
-          {children}
-        </div>
-      </SortableContext>
-    </div>
-  );
-}
-
-function KanbanCard({ prospect, onCardClick }: { prospect: CrmCustomer; onCardClick: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: prospect.id,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const nextFollowUp = prospect.nextFollowUpAt
-    ? typeof prospect.nextFollowUpAt === "string"
-      ? parseISO(prospect.nextFollowUpAt)
-      : prospect.nextFollowUpAt
-    : null;
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="bg-white rounded-md border border-slate-200 p-3 cursor-grab active:cursor-grabbing hover:shadow-sm transition-shadow"
-      data-testid={`kanban-card-${prospect.id}`}
-    >
-      <button
-        onClick={onCardClick}
-        className="font-medium text-sm text-left hover:text-[#711419] w-full truncate mb-2"
-        data-testid={`kanban-card-name-${prospect.id}`}
-      >
-        {prospect.name}
-      </button>
-      
-      <div className="flex items-center gap-2 flex-wrap">
-        <InterestBadge level={prospect.interestLevel as InterestLevel} />
-        
-        {nextFollowUp && (
-          <div className={`flex items-center gap-1 text-xs ${
-            isPast(nextFollowUp) && !isToday(nextFollowUp) 
-              ? "text-red-600" 
-              : isToday(nextFollowUp) 
-              ? "text-amber-600"
-              : "text-slate-500"
-          }`}>
-            <Calendar className="h-3 w-3" />
-            <span>{format(nextFollowUp, "MMM d")}</span>
-          </div>
-        )}
-      </div>
-      
-      {prospect.phone && (
-        <div className="flex items-center gap-1 text-xs text-slate-500 mt-2">
-          <Phone className="h-3 w-3" />
-          <span>{prospect.phone}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function CrmProspectFunnel() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -348,7 +240,6 @@ export default function CrmProspectFunnel() {
   
   const [mainViewTab, setMainViewTab] = useState<string>("overview");
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
-  const [draggedProspect, setDraggedProspect] = useState<CrmCustomer | null>(null);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -546,63 +437,6 @@ export default function CrmProspectFunnel() {
     ? null 
     : SALES_PEOPLE[selectedEmployeeId] || "Unknown";
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    }),
-    useSensor(KeyboardSensor)
-  );
-
-  const KANBAN_STAGES: SalesStage[] = ["new", "contacted", "quote_sent", "negotiating", "won", "lost"];
-
-  const getProspectsByStage = (stage: SalesStage) => {
-    return filteredProspects.filter((p) => p.salesStage === stage);
-  };
-
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const prospect = filteredProspects.find((p) => p.id === active.id);
-    if (prospect) {
-      setDraggedProspect(prospect);
-    }
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setDraggedProspect(null);
-
-    if (!over) return;
-
-    const prospectId = active.id as string;
-    const overId = over.id as string;
-    
-    const prospect = filteredProspects.find((p) => p.id === prospectId);
-    if (!prospect) return;
-
-    let newStage: SalesStage | null = null;
-    
-    if (KANBAN_STAGES.includes(overId as SalesStage)) {
-      newStage = overId as SalesStage;
-    } else {
-      const overProspect = filteredProspects.find((p) => p.id === overId);
-      if (overProspect && overProspect.salesStage) {
-        newStage = overProspect.salesStage;
-      }
-    }
-
-    if (!newStage || prospect.salesStage === newStage) return;
-
-    if (newStage === "won") {
-      setConfirmProspectId(prospectId);
-      setWonConfirmOpen(true);
-    } else if (newStage === "lost") {
-      setConfirmProspectId(prospectId);
-      setLostConfirmOpen(true);
-    } else {
-      updateStageMutation.mutate({ id: prospectId, salesStage: newStage });
-    }
-  };
-
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(calendarMonth);
     const monthEnd = endOfMonth(calendarMonth);
@@ -756,18 +590,6 @@ export default function CrmProspectFunnel() {
             >
               <List className="h-4 w-4" />
               List
-            </button>
-            <button
-              onClick={() => setMainViewTab("kanban")}
-              className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
-                mainViewTab === "kanban"
-                  ? "border-[#711419] text-[#711419]"
-                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-              }`}
-              data-testid="tab-kanban"
-            >
-              <LayoutGrid className="h-4 w-4" />
-              Kanban
             </button>
             <button
               onClick={() => setMainViewTab("calendar")}
@@ -1090,58 +912,6 @@ export default function CrmProspectFunnel() {
           </div>
         )}
           </TabsContent>
-
-            <TabsContent value="kanban" className="mt-4">
-              <div className="sticky top-0 z-10 bg-white pb-4">
-                <SearchFiltersComponent />
-              </div>
-              <DndContext
-              sensors={sensors}
-              collisionDetection={closestCorners}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] pb-4" data-testid="kanban-board">
-                <div className="inline-flex gap-3 pr-4">
-                  {KANBAN_STAGES.map((stage) => {
-                    const stageProspects = getProspectsByStage(stage);
-                    return (
-                      <KanbanColumn
-                        key={stage}
-                        stage={stage}
-                        prospects={stageProspects}
-                      >
-                        {stageProspects.length === 0 ? (
-                          <div className="text-center py-12 text-slate-400 text-sm" data-testid={`kanban-empty-${stage}`}>
-                            No prospects
-                          </div>
-                        ) : (
-                          stageProspects.map((prospect) => (
-                            <KanbanCard
-                              key={prospect.id}
-                              prospect={prospect}
-                              onCardClick={() => {
-                                setExpandedProspectId(prospect.id);
-                                setActiveTab("details");
-                              }}
-                            />
-                          ))
-                        )}
-                      </KanbanColumn>
-                    );
-                  })}
-                </div>
-              </div>
-              <DragOverlay>
-                {draggedProspect && (
-                  <div className="bg-white rounded-lg border shadow-lg p-3 w-64 opacity-90">
-                    <div className="font-medium text-sm truncate">{draggedProspect.name}</div>
-                    <InterestBadge level={draggedProspect.interestLevel as InterestLevel} />
-                  </div>
-                )}
-              </DragOverlay>
-            </DndContext>
-            </TabsContent>
 
             <TabsContent value="calendar" className="space-y-4 mt-4">
               <SearchFiltersComponent />
