@@ -39,6 +39,7 @@ const CrmAccountDetail = lazy(() => import("@/pages/crm/crm-account-detail"));
 const CrmWorkOrders = lazy(() => import("@/pages/crm/crm-work-orders"));
 const CrmWorkOrderDetail = lazy(() => import("@/pages/crm/crm-work-order-detail"));
 const CrmInvoices = lazy(() => import("@/pages/crm/crm-invoices"));
+const CrmInvoiceCreate = lazy(() => import("@/pages/crm/crm-invoice-create"));
 const CrmInvoiceDetail = lazy(() => import("@/pages/crm/crm-invoice-detail"));
 const CrmQuotes = lazy(() => import("@/pages/crm/crm-quotes"));
 const CrmQuoteCreate = lazy(() => import("@/pages/crm/crm-quote-create"));
