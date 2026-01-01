@@ -793,13 +793,13 @@ export default function CrmWorkOrders() {
               value={visitTypeFilter} 
               onValueChange={(v) => setVisitTypeFilter(v as WorkOrderVisitType | "all")}
             >
-              <SelectTrigger className="w-[140px]" data-testid="select-visit-type-filter">
+              <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-visit-type-filter">
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
+              <SelectContent className="bg-white">
+                <SelectItem value="all" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">All Types</SelectItem>
                 {workOrderVisitTypeEnum.map((type) => (
-                  <SelectItem key={type} value={type}>{visitTypeLabels[type]}</SelectItem>
+                  <SelectItem key={type} value={type} className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">{visitTypeLabels[type]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
