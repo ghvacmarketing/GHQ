@@ -147,6 +147,7 @@ export default function CrmInvoiceCreate() {
   const [newWOTitle, setNewWOTitle] = useState("");
   const [newWODescription, setNewWODescription] = useState("");
   const [newWOVisitType, setNewWOVisitType] = useState<"SERVICE" | "INSTALL" | "MAINTENANCE" | "SALES">("SERVICE");
+  const [newWOWorkSubtype, setNewWOWorkSubtype] = useState<string>("No Cool");
   const [newWOScheduledDate, setNewWOScheduledDate] = useState<Date>(new Date());
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -302,6 +303,7 @@ export default function CrmInvoiceCreate() {
         title: newWOTitle.trim(),
         description: newWODescription.trim(),
         visitType: newWOVisitType,
+        workSubtype: newWOWorkSubtype,
         scheduledStart: scheduledStart.toISOString(),
         scheduledEnd: scheduledEnd.toISOString(),
         status: "scheduled",
@@ -326,6 +328,7 @@ export default function CrmInvoiceCreate() {
       setNewWOTitle("");
       setNewWODescription("");
       setNewWOVisitType("SERVICE");
+      setNewWOWorkSubtype("No Cool");
       setNewWOScheduledDate(new Date());
       toast({ title: "Work order created", description: "The work order has been created and selected." });
     },
@@ -692,15 +695,27 @@ export default function CrmInvoiceCreate() {
                           <button
                             key={wo.id}
                             onClick={() => {
-                              setSelectedWorkOrder(wo);
-                              updateField("workOrderId", wo.id);
-                              setFormData(prev => ({
-                                ...prev,
-                                customerName: wo.customerName || wo.customer?.name || "",
-                                customerEmail: wo.customer?.email || "",
-                                customerPhone: wo.customer?.phone || "",
-                                serviceAddress: wo.customer?.fullAddress || "",
-                              }));
+                              if (formData.workOrderId === wo.id) {
+                                setSelectedWorkOrder(null);
+                                updateField("workOrderId", null);
+                                setFormData(prev => ({
+                                  ...prev,
+                                  customerName: "",
+                                  customerEmail: "",
+                                  customerPhone: "",
+                                  serviceAddress: "",
+                                }));
+                              } else {
+                                setSelectedWorkOrder(wo);
+                                updateField("workOrderId", wo.id);
+                                setFormData(prev => ({
+                                  ...prev,
+                                  customerName: wo.customerName || wo.customer?.name || "",
+                                  customerEmail: wo.customer?.email || "",
+                                  customerPhone: wo.customer?.phone || "",
+                                  serviceAddress: wo.customer?.fullAddress || "",
+                                }));
+                              }
                             }}
                             className={cn(
                               "w-full p-4 text-left hover:bg-slate-50 transition-colors",
@@ -1259,24 +1274,80 @@ export default function CrmInvoiceCreate() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Visit Type</Label>
-                <Select value={newWOVisitType} onValueChange={(v) => setNewWOVisitType(v as any)}>
-                  <SelectTrigger data-testid="select-wo-visit-type">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SERVICE">Service</SelectItem>
-                    <SelectItem value="INSTALL">Install</SelectItem>
-                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                    <SelectItem value="SALES">Sales</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Visit Type</Label>
+              <Select value={newWOVisitType} onValueChange={(val) => {
+                setNewWOVisitType(val as any);
+                const defaultSubtypes: Record<string, string> = {
+                  "INSTALL": "Full System",
+                  "SERVICE": "No Cool",
+                  "MAINTENANCE": "Spring Tune-Up",
+                  "SALES": "Replace System Estimate",
+                };
+                setNewWOWorkSubtype(defaultSubtypes[val] || "Other");
+              }}>
+                <SelectTrigger data-testid="select-wo-visit-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SERVICE">Service</SelectItem>
+                  <SelectItem value="INSTALL">Install</SelectItem>
+                  <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                  <SelectItem value="SALES">Sales</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="space-y-2">
-                <Label>Scheduled Date</Label>
+            <div className="space-y-2">
+              <Label>Work Type</Label>
+              <Select value={newWOWorkSubtype} onValueChange={setNewWOWorkSubtype}>
+                <SelectTrigger data-testid="select-wo-work-subtype">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {newWOVisitType === "INSTALL" && (
+                    <>
+                      <SelectItem value="Full System">Full System</SelectItem>
+                      <SelectItem value="Heat Pump">Heat Pump</SelectItem>
+                      <SelectItem value="Package Unit">Package Unit</SelectItem>
+                      <SelectItem value="Ductwork">Ductwork</SelectItem>
+                      <SelectItem value="Mini Split">Mini Split</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </>
+                  )}
+                  {newWOVisitType === "SERVICE" && (
+                    <>
+                      <SelectItem value="No Cool">No Cool</SelectItem>
+                      <SelectItem value="No Heat">No Heat</SelectItem>
+                      <SelectItem value="Leak">Leak</SelectItem>
+                      <SelectItem value="Electrical">Electrical</SelectItem>
+                      <SelectItem value="Noise">Noise</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </>
+                  )}
+                  {newWOVisitType === "MAINTENANCE" && (
+                    <>
+                      <SelectItem value="Spring Tune-Up">Spring Tune-Up</SelectItem>
+                      <SelectItem value="Fall Tune-Up">Fall Tune-Up</SelectItem>
+                      <SelectItem value="Filter Change">Filter Change</SelectItem>
+                      <SelectItem value="Duct Cleaning">Duct Cleaning</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </>
+                  )}
+                  {newWOVisitType === "SALES" && (
+                    <>
+                      <SelectItem value="Replace System Estimate">Replace System Estimate</SelectItem>
+                      <SelectItem value="New Construction">New Construction</SelectItem>
+                      <SelectItem value="Commercial Bid">Commercial Bid</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Scheduled Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -1300,7 +1371,6 @@ export default function CrmInvoiceCreate() {
                     />
                   </PopoverContent>
                 </Popover>
-              </div>
             </div>
           </div>
           <DialogFooter className="mt-4">
@@ -1313,6 +1383,7 @@ export default function CrmInvoiceCreate() {
                 setNewWOTitle("");
                 setNewWODescription("");
                 setNewWOVisitType("SERVICE");
+                setNewWOWorkSubtype("No Cool");
                 setNewWOScheduledDate(new Date());
               }}
               data-testid="button-wo-cancel"
