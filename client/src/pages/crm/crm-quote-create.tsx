@@ -112,6 +112,12 @@ export default function CrmQuoteCreate() {
   const stepContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Read URL params for auto-linking
+  const urlParams = new URLSearchParams(window.location.search);
+  const workOrderIdFromUrl = urlParams.get("workOrderId");
+  const customerIdFromUrl = urlParams.get("customerId");
+  const propertyIdFromUrl = urlParams.get("propertyId");
+
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
   const [discountKind, setDiscountKind] = useState<"promotion" | "maintenance">("promotion");
   const [discountMode, setDiscountMode] = useState<"amount" | "percentage">("amount");
@@ -229,6 +235,28 @@ export default function CrmQuoteCreate() {
       navigate("/crm/login");
     }
   }, [authLoading, currentUser, navigate]);
+
+  // Auto-fetch customer when coming from work order
+  useEffect(() => {
+    if (customerIdFromUrl && !selectedCustomer) {
+      fetch(`/api/crm/customers/${customerIdFromUrl}`)
+        .then(res => res.json())
+        .then(customer => {
+          if (customer && customer.id) {
+            setSelectedCustomer(customer);
+            setFormData(prev => ({
+              ...prev,
+              customerId: customer.id,
+              customerName: customer.name || customer.displayName || "",
+              customerEmail: customer.email || "",
+              customerPhone: customer.phone || "",
+              serviceAddress: customer.fullAddress || "",
+            }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [customerIdFromUrl, selectedCustomer]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -436,6 +464,8 @@ export default function CrmQuoteCreate() {
         title: formData.title || "Quick Quote",
         description: formData.description || undefined,
         notes: formData.notes || undefined,
+        workOrderId: workOrderIdFromUrl || undefined,
+        propertyId: propertyIdFromUrl || undefined,
         lineItems: validLineItems.map(item => ({
           description: item.description,
           quantity: item.quantity,

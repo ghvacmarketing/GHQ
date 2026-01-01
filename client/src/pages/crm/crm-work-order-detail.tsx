@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
@@ -985,56 +986,6 @@ export default function CrmWorkOrderDetail() {
               </Card>
             </div>
 
-            {/* Quick Actions */}
-            <Card className="shadow-sm bg-gradient-to-r from-slate-50 to-white border-l-4 border-l-[#711419]">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <Wand2 className="h-4 w-4 text-[#711419]" />
-                  Quick Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-[#711419] text-[#711419] hover:bg-[#711419] hover:text-white"
-                    onClick={() => {
-                      const params = new URLSearchParams();
-                      params.set("workOrderId", workOrder.id);
-                      if (workOrder.customerId) params.set("customerId", workOrder.customerId);
-                      if (workOrder.projectId) params.set("projectId", workOrder.projectId);
-                      if (workOrder.propertyId) params.set("propertyId", workOrder.propertyId);
-                      navigate(`/crm/proposal-builder?${params.toString()}`);
-                    }}
-                    data-testid="quick-action-generate-proposal"
-                  >
-                    <Wand2 className="h-4 w-4 mr-2" />
-                    Generate Proposal
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                    onClick={() => setCreateQuoteDialogOpen(true)}
-                    data-testid="quick-action-create-quote"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Create Quote
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => createInvoiceMutation.mutate()}
-                    disabled={createInvoiceMutation.isPending}
-                    data-testid="quick-action-create-invoice"
-                  >
-                    <DollarSign className="h-4 w-4 mr-2" />
-                    {createInvoiceMutation.isPending ? "Creating..." : "Create Invoice"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="shadow-sm">
                 <CardHeader className="pb-3 border-b bg-slate-50/50">
@@ -1147,7 +1098,13 @@ export default function CrmWorkOrderDetail() {
                     <Button
                       size="sm"
                       className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                      onClick={() => setCreateQuoteDialogOpen(true)}
+                      onClick={() => {
+                        const params = new URLSearchParams();
+                        params.set("workOrderId", workOrder.id);
+                        if (workOrder.customerId) params.set("customerId", workOrder.customerId);
+                        if (workOrder.propertyId) params.set("propertyId", workOrder.propertyId);
+                        navigate(`/crm/quotes/new?${params.toString()}`);
+                      }}
                       data-testid="button-create-quote"
                     >
                       <Plus className="h-4 w-4 mr-1" />
@@ -1308,7 +1265,13 @@ export default function CrmWorkOrderDetail() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setCreateQuoteDialogOpen(true)}
+                      onClick={() => {
+                        const params = new URLSearchParams();
+                        params.set("workOrderId", workOrder.id);
+                        if (workOrder.customerId) params.set("customerId", workOrder.customerId);
+                        if (workOrder.propertyId) params.set("propertyId", workOrder.propertyId);
+                        navigate(`/crm/quotes/new?${params.toString()}`);
+                      }}
                       data-testid="button-create-quote-empty"
                     >
                       <Plus className="h-4 w-4 mr-1" />

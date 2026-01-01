@@ -11364,7 +11364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { customerId, title, description, notes, lineItems } = req.body;
+      const { customerId, title, description, notes, lineItems, workOrderId, propertyId } = req.body;
 
       if (!customerId) {
         return res.status(400).json({ message: "Customer is required" });
@@ -11409,7 +11409,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerEmail: existingCustomer.email || null,
         customerPhone: existingCustomer.phone || null,
         serviceAddress: existingCustomer.address || null,
-        scope: "standalone",
+        scope: workOrderId ? "work_order" : "standalone",
+        workOrderId: workOrderId || null,
+        propertyId: propertyId || null,
         status: "draft",
         title: title || "Quick Quote",
         description: description || null,
