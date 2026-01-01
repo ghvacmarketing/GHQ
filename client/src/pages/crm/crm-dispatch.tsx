@@ -393,7 +393,7 @@ function DraggableQueueCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow ${isDragging ? 'z-50 shadow-lg cursor-grabbing' : ''}`}
+      className={`p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-all duration-150 ${isDragging ? 'z-50 shadow-xl cursor-grabbing ring-2 ring-[#711419]/50 scale-105' : ''}`}
       data-testid={`queue-card-${workOrder.id}`}
     >
       <div 
@@ -1421,10 +1421,10 @@ function DroppableTechnicianRow({ tech, workOrders, onResize, activeId, onWorkOr
   return (
     <div
       key={tech.id}
-      className={`flex border-b border-slate-100 last:border-b-0 ${isOver ? 'bg-slate-50' : ''}`}
+      className={`flex border-b border-slate-100 last:border-b-0 transition-all duration-150 ${isOver ? 'bg-[#711419]/5 ring-2 ring-inset ring-[#711419]/40' : ''}`}
       data-testid={`technician-row-${tech.id}`}
     >
-      <div className="w-44 flex-shrink-0 p-2 border-r border-slate-100 flex items-center sticky left-0 bg-white z-10">
+      <div className={`w-44 flex-shrink-0 p-2 border-r border-slate-100 flex items-center sticky left-0 z-10 transition-colors ${isOver ? 'bg-[#711419]/5' : 'bg-white'}`}>
         <div className={`w-1 h-10 rounded-full mr-2 ${workOrders.length > 0 ? 'bg-green-500' : 'bg-slate-300'}`} />
         <div className="w-10 h-10 rounded bg-slate-200 flex items-center justify-center mr-2 flex-shrink-0">
           <svg className="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
@@ -1436,7 +1436,7 @@ function DroppableTechnicianRow({ tech, workOrders, onResize, activeId, onWorkOr
           <p className="text-xs text-slate-400">{workOrders.length} work orders</p>
         </div>
       </div>
-      <div ref={setNodeRef} className={`relative h-14 ${isOver ? 'bg-slate-50' : ''}`} style={{ width: `${TIMELINE_WIDTH}px` }}>
+      <div ref={setNodeRef} className={`relative h-14 transition-colors ${isOver ? 'bg-[#711419]/5' : ''}`} style={{ width: `${TIMELINE_WIDTH}px` }}>
         <div className="absolute inset-0 flex">
           {timeSlots.map((slot, idx) => (
             <div
@@ -2062,56 +2062,68 @@ export default function CrmDispatch() {
       const newTechId = overId.replace('technician-', '');
       
       if (isFromQueue && !isFromSchedule) {
-        const defaultDuration = 1;
-        
-        let newStartHour = START_HOUR;
-        
-        const pointerEvent = event.activatorEvent as PointerEvent | MouseEvent | null;
-        const overRect = over.rect;
-        
-        if (pointerEvent && overRect) {
-          const dropX = pointerEvent.clientX - overRect.left + (delta?.x || 0);
-          const rawHour = START_HOUR + (dropX / SLOT_WIDTH) * (STEP_MINUTES / 60);
-          newStartHour = Math.round(rawHour * 2) / 2;
-          newStartHour = Math.max(START_HOUR, Math.min(newStartHour, END_HOUR - defaultDuration));
-        }
-        
-        const newEndHour = Math.min(newStartHour + defaultDuration, END_HOUR);
-        
-        const startHourInt = Math.floor(newStartHour);
-        const startMinutes = Math.round((newStartHour % 1) * 60);
-        const endHourInt = Math.floor(newEndHour);
-        const endMinutes = Math.round((newEndHour % 1) * 60);
-        
-        const startDate = new Date(selectedDate);
-        startDate.setHours(startHourInt, startMinutes, 0, 0);
-        const endDate = new Date(selectedDate);
-        endDate.setHours(endHourInt, endMinutes, 0, 0);
-        
-        const scheduledStartISO = startDate.toISOString();
-        const scheduledEndISO = endDate.toISOString();
-
         const newTech = technicians.find(t => t.id === newTechId);
+        
+        // Preserve existing scheduled time if available, otherwise use defaults
+        if (wo.scheduledStart && wo.scheduledEnd) {
+          // Keep the existing scheduled time, just assign the tech
+          setLocalWorkOrders(prev => prev.map(w => 
+            w.id === workOrderId 
+              ? { ...w, assignedTechId: newTechId, techName: newTech?.name || null } 
+              : w
+          ));
 
-        setLocalWorkOrders(prev => prev.map(w => 
-          w.id === workOrderId 
-            ? { ...w, assignedTechId: newTechId, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any, techName: newTech?.name || null } 
-            : w
-        ));
+          updateWorkOrderMutation.mutate({
+            workOrderId,
+            updates: {
+              assignedTechId: newTechId,
+            },
+          });
 
-        updateWorkOrderMutation.mutate({
-          workOrderId,
-          updates: {
-            assignedTechId: newTechId,
-            scheduledStart: scheduledStartISO,
-            scheduledEnd: scheduledEndISO,
-          },
-        });
+          const existingStart = new Date(wo.scheduledStart);
+          toast({
+            title: "Work order assigned",
+            description: `Assigned to ${newTech?.name || 'technician'} at ${format(existingStart, "h:mm a")}`,
+          });
+        } else {
+          // No scheduled time - set a default time
+          const defaultDuration = 1;
+          const newStartHour = START_HOUR;
+          const newEndHour = Math.min(newStartHour + defaultDuration, END_HOUR);
+          
+          const startHourInt = Math.floor(newStartHour);
+          const startMinutes = Math.round((newStartHour % 1) * 60);
+          const endHourInt = Math.floor(newEndHour);
+          const endMinutes = Math.round((newEndHour % 1) * 60);
+          
+          const startDate = new Date(selectedDate);
+          startDate.setHours(startHourInt, startMinutes, 0, 0);
+          const endDate = new Date(selectedDate);
+          endDate.setHours(endHourInt, endMinutes, 0, 0);
+          
+          const scheduledStartISO = startDate.toISOString();
+          const scheduledEndISO = endDate.toISOString();
 
-        toast({
-          title: "Work order assigned",
-          description: `Assigned to ${newTech?.name || 'technician'} at ${formatHour(Math.floor(newStartHour))}`,
-        });
+          setLocalWorkOrders(prev => prev.map(w => 
+            w.id === workOrderId 
+              ? { ...w, assignedTechId: newTechId, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any, techName: newTech?.name || null } 
+              : w
+          ));
+
+          updateWorkOrderMutation.mutate({
+            workOrderId,
+            updates: {
+              assignedTechId: newTechId,
+              scheduledStart: scheduledStartISO,
+              scheduledEnd: scheduledEndISO,
+            },
+          });
+
+          toast({
+            title: "Work order assigned",
+            description: `Assigned to ${newTech?.name || 'technician'} at ${formatHour(Math.floor(newStartHour))}`,
+          });
+        }
       } else {
         const { startHour, endHour } = getWorkOrderDisplayTimes(wo);
         const duration = endHour - startHour;
