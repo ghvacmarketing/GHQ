@@ -44,7 +44,18 @@ import {
   X,
   Trash2,
   Receipt,
+  Plus,
+  ClipboardList,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { jsPDF } from "jspdf";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
@@ -107,6 +118,14 @@ export default function CrmQuoteDetail() {
   const [showOptionSelection, setShowOptionSelection] = useState(false);
   const [availableOptions, setAvailableOptions] = useState<string[]>([]);
   const [selectedOption, setSelectedOption] = useState<string>("");
+  const [showWorkOrderSelection, setShowWorkOrderSelection] = useState(false);
+  const [availableWorkOrders, setAvailableWorkOrders] = useState<Array<{ id: string; title: string | null; workOrderNumber: number | null; visitType: string | null; scheduledStart: string | null }>>([]);
+  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string>("");
+  const [quoteContext, setQuoteContext] = useState<{ customerId?: string; propertyId?: string; projectId?: string }>({});
+  const [showCreateWorkOrder, setShowCreateWorkOrder] = useState(false);
+  const [newWorkOrderTitle, setNewWorkOrderTitle] = useState("");
+  const [newWorkOrderVisitType, setNewWorkOrderVisitType] = useState<string>("install");
+  const [isCreatingWorkOrder, setIsCreatingWorkOrder] = useState(false);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -218,10 +237,11 @@ export default function CrmQuoteDetail() {
   });
 
   const createInvoiceMutation = useMutation({
-    mutationFn: async (selectedOpt?: string) => {
+    mutationFn: async (params: { selectedOption?: string; workOrderId?: string }) => {
       const res = await apiRequest("POST", "/api/crm/invoices/from-quote", { 
         quoteId,
-        selectedOption: selectedOpt 
+        selectedOption: params.selectedOption,
+        workOrderId: params.workOrderId,
       });
       const data = await res.json();
       if (!res.ok) {
@@ -232,16 +252,29 @@ export default function CrmQuoteDetail() {
             availableOptions: data.availableOptions
           };
         }
+        if (data.requiresWorkOrder) {
+          throw {
+            message: data.message,
+            requiresWorkOrder: true,
+            availableWorkOrders: data.availableWorkOrders || [],
+            quoteCustomerId: data.quoteCustomerId,
+            quotePropertyId: data.quotePropertyId,
+            quoteProjectId: data.quoteProjectId,
+          };
+        }
         throw new Error(data.message || "Failed to create invoice");
       }
       return data;
     },
     onSuccess: (data) => {
       setShowOptionSelection(false);
+      setShowWorkOrderSelection(false);
       setSelectedOption("");
+      setSelectedWorkOrderId("");
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
       toast({ 
         title: "Invoice created!", 
         description: `Invoice ${data.invoice?.invoiceNumber || ''} has been created from this quote.`
@@ -250,10 +283,29 @@ export default function CrmQuoteDetail() {
         navigate(`/crm/invoices`);
       }
     },
-    onError: (error: { message?: string; requiresOptionSelection?: boolean; availableOptions?: string[] } | Error) => {
+    onError: (error: { 
+      message?: string; 
+      requiresOptionSelection?: boolean; 
+      availableOptions?: string[];
+      requiresWorkOrder?: boolean;
+      availableWorkOrders?: Array<{ id: string; title: string | null; workOrderNumber: number | null; visitType: string | null; scheduledStart: string | null }>;
+      quoteCustomerId?: string;
+      quotePropertyId?: string;
+      quoteProjectId?: string;
+    } | Error) => {
       if ('requiresOptionSelection' in error && error.requiresOptionSelection && error.availableOptions) {
         setAvailableOptions(error.availableOptions);
         setShowOptionSelection(true);
+        return;
+      }
+      if ('requiresWorkOrder' in error && error.requiresWorkOrder) {
+        setAvailableWorkOrders(error.availableWorkOrders || []);
+        setQuoteContext({
+          customerId: error.quoteCustomerId,
+          propertyId: error.quotePropertyId,
+          projectId: error.quoteProjectId,
+        });
+        setShowWorkOrderSelection(true);
         return;
       }
       toast({ 
@@ -265,7 +317,7 @@ export default function CrmQuoteDetail() {
   });
 
   const handleCreateInvoice = () => {
-    createInvoiceMutation.mutate(quote?.selectedOption || undefined);
+    createInvoiceMutation.mutate({ selectedOption: quote?.selectedOption || undefined });
   };
 
   const handleConfirmOptionSelection = () => {
@@ -273,7 +325,59 @@ export default function CrmQuoteDetail() {
       toast({ title: "Please select an option", variant: "destructive" });
       return;
     }
-    createInvoiceMutation.mutate(selectedOption);
+    createInvoiceMutation.mutate({ selectedOption });
+  };
+
+  const handleSelectWorkOrder = () => {
+    if (!selectedWorkOrderId) {
+      toast({ title: "Please select a work order", variant: "destructive" });
+      return;
+    }
+    createInvoiceMutation.mutate({ 
+      selectedOption: quote?.selectedOption || undefined,
+      workOrderId: selectedWorkOrderId 
+    });
+  };
+
+  const handleCreateAndSelectWorkOrder = async () => {
+    if (!quoteContext.customerId || !quoteContext.propertyId) {
+      toast({ title: "Missing customer or property information", variant: "destructive" });
+      return;
+    }
+    
+    setIsCreatingWorkOrder(true);
+    try {
+      const res = await apiRequest("POST", "/api/crm/work-orders", {
+        customerId: quoteContext.customerId,
+        propertyId: quoteContext.propertyId,
+        projectId: quoteContext.projectId || undefined,
+        title: newWorkOrderTitle || `Work Order from Quote ${quote?.quoteNumber}`,
+        visitType: newWorkOrderVisitType,
+        status: "scheduled",
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to create work order");
+      }
+      
+      const workOrder = await res.json();
+      toast({ title: "Work order created", description: `Work Order #${workOrder.workOrderNumber} created` });
+      
+      setShowCreateWorkOrder(false);
+      createInvoiceMutation.mutate({ 
+        selectedOption: quote?.selectedOption || undefined,
+        workOrderId: workOrder.id 
+      });
+    } catch (err) {
+      toast({ 
+        title: "Failed to create work order", 
+        description: (err as Error).message,
+        variant: "destructive" 
+      });
+    } finally {
+      setIsCreatingWorkOrder(false);
+    }
   };
 
   const handleDelete = () => {
@@ -1450,6 +1554,144 @@ export default function CrmQuoteDetail() {
               Create Invoice
             </AlertDialogAction>
           </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showWorkOrderSelection} onOpenChange={setShowWorkOrderSelection}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              Link to Work Order
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Invoices must be tied to a work order for scheduling and tracking. 
+              {availableWorkOrders.length > 0 
+                ? " Select an existing work order or create a new one."
+                : " Create a work order to proceed."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {!showCreateWorkOrder ? (
+            <>
+              {availableWorkOrders.length > 0 && (
+                <div className="py-4 space-y-2">
+                  <Label className="text-sm font-medium">Select Work Order</Label>
+                  {availableWorkOrders.map((wo) => (
+                    <button
+                      key={wo.id}
+                      onClick={() => setSelectedWorkOrderId(wo.id)}
+                      className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                        selectedWorkOrderId === wo.id
+                          ? "border-[#711419] bg-[#711419]/5"
+                          : "border-slate-200 hover:border-slate-300"
+                      }`}
+                      data-testid={`work-order-${wo.workOrderNumber}`}
+                    >
+                      <div className={`font-medium ${selectedWorkOrderId === wo.id ? "text-[#711419]" : ""}`}>
+                        WO #{wo.workOrderNumber} - {wo.title || wo.visitType || "Work Order"}
+                      </div>
+                      {wo.scheduledStart && (
+                        <div className="text-sm text-slate-500 mt-1">
+                          Scheduled: {format(new Date(wo.scheduledStart), "MMM d, yyyy")}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              <div className="border-t pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCreateWorkOrder(true)}
+                  className="w-full"
+                  data-testid="button-create-work-order"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New Work Order
+                </Button>
+              </div>
+              
+              <AlertDialogFooter>
+                <AlertDialogCancel 
+                  onClick={() => {
+                    setSelectedWorkOrderId("");
+                    setShowWorkOrderSelection(false);
+                  }}
+                  data-testid="button-cancel-work-order"
+                >
+                  Cancel
+                </AlertDialogCancel>
+                {availableWorkOrders.length > 0 && (
+                  <AlertDialogAction
+                    onClick={handleSelectWorkOrder}
+                    disabled={!selectedWorkOrderId || createInvoiceMutation.isPending}
+                    className="bg-[#711419] hover:bg-[#711419]/90"
+                    data-testid="button-select-work-order"
+                  >
+                    {createInvoiceMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : null}
+                    Create Invoice
+                  </AlertDialogAction>
+                )}
+              </AlertDialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="py-4 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="wo-title">Work Order Title</Label>
+                  <Input
+                    id="wo-title"
+                    value={newWorkOrderTitle}
+                    onChange={(e) => setNewWorkOrderTitle(e.target.value)}
+                    placeholder={`Work Order from Quote ${quote?.quoteNumber}`}
+                    data-testid="input-work-order-title"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="wo-type">Visit Type</Label>
+                  <Select value={newWorkOrderVisitType} onValueChange={setNewWorkOrderVisitType}>
+                    <SelectTrigger data-testid="select-visit-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="install">Installation</SelectItem>
+                      <SelectItem value="service">Service</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                      <SelectItem value="sales">Sales Visit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <AlertDialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCreateWorkOrder(false)}
+                  data-testid="button-back-work-order"
+                >
+                  Back
+                </Button>
+                <Button
+                  onClick={handleCreateAndSelectWorkOrder}
+                  disabled={isCreatingWorkOrder}
+                  className="bg-[#711419] hover:bg-[#711419]/90"
+                  data-testid="button-create-and-invoice"
+                >
+                  {isCreatingWorkOrder ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4 mr-2" />
+                  )}
+                  Create Work Order & Invoice
+                </Button>
+              </AlertDialogFooter>
+            </>
+          )}
         </AlertDialogContent>
       </AlertDialog>
     </CrmLayout>

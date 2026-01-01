@@ -9769,7 +9769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { quoteId, selectedOption } = req.body;
+      const { quoteId, selectedOption, workOrderId: providedWorkOrderId } = req.body;
       if (!quoteId) {
         return res.status(400).json({ message: "quoteId is required" });
       }
@@ -9785,15 +9785,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Only accepted quotes can be converted to invoices" });
       }
 
-      // If quote has a workOrderId, check for existing invoice on that work order
-      if (quote.workOrderId) {
-        const [existingInvoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.workOrderId, quote.workOrderId));
-        if (existingInvoice) {
-          return res.status(400).json({ 
-            message: "An invoice already exists for this work order",
-            existingInvoiceId: existingInvoice.id 
-          });
+      // Determine workOrderId - use provided, fall back to quote's, or require selection
+      let workOrderIdToUse = providedWorkOrderId || quote.workOrderId;
+
+      // If no work order is linked, require one for invoice creation
+      if (!workOrderIdToUse) {
+        // Get available work orders if this quote is tied to a project
+        let availableWorkOrders: Array<{ id: string; title: string | null; workOrderNumber: number | null; visitType: string | null; scheduledStart: Date | null }> = [];
+        
+        if (quote.projectId) {
+          availableWorkOrders = await db.select({
+            id: crmWorkOrders.id,
+            title: crmWorkOrders.title,
+            workOrderNumber: crmWorkOrders.workOrderNumber,
+            visitType: crmWorkOrders.visitType,
+            scheduledStart: crmWorkOrders.scheduledStart,
+          }).from(crmWorkOrders).where(eq(crmWorkOrders.projectId, quote.projectId));
         }
+        
+        return res.status(400).json({ 
+          message: "Invoices must be tied to a work order. Please select or create a work order first.",
+          requiresWorkOrder: true,
+          availableWorkOrders,
+          quoteCustomerId: quote.customerId,
+          quotePropertyId: quote.propertyId,
+          quoteProjectId: quote.projectId,
+        });
+      }
+
+      // If a new work order is being linked, update the quote
+      if (providedWorkOrderId && providedWorkOrderId !== quote.workOrderId) {
+        await db.update(crmQuotes)
+          .set({ workOrderId: providedWorkOrderId })
+          .where(eq(crmQuotes.id, quoteId));
+      }
+
+      // Check for existing invoice on the work order
+      const [existingInvoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.workOrderId, workOrderIdToUse));
+      if (existingInvoice) {
+        return res.status(400).json({ 
+          message: "An invoice already exists for this work order",
+          existingInvoiceId: existingInvoice.id 
+        });
       }
 
       // Check if this quote was already converted
@@ -9857,7 +9890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invoiceNumber,
         customerId: quote.customerId,
         propertyId: quote.propertyId,
-        workOrderId: quote.workOrderId,
+        workOrderId: workOrderIdToUse,
         projectId: quote.projectId,
         status: "draft" as const,
         subtotal: String(subtotal),
@@ -9898,15 +9931,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({ status: "converted" as const, updatedAt: new Date() })
         .where(eq(crmQuotes.id, quoteId));
 
-      // Update work order billing disposition (only if quote has a work order)
-      if (quote.workOrderId) {
+      // Update work order billing disposition
+      if (workOrderIdToUse) {
         await db.update(crmWorkOrders)
           .set({ 
             billingDisposition: "invoice_created" as const,
             invoiceId: invoice.id,
             updatedAt: new Date()
           })
-          .where(eq(crmWorkOrders.id, quote.workOrderId));
+          .where(eq(crmWorkOrders.id, workOrderIdToUse));
       }
 
       // Log audit
