@@ -813,8 +813,13 @@ export default function CrmInvoiceCreate() {
                           <button
                             key={quote.id}
                             onClick={() => {
-                              setSelectedQuote(quote);
-                              updateField("quoteId", quote.id);
+                              if (formData.quoteId === quote.id) {
+                                setSelectedQuote(null);
+                                updateField("quoteId", "");
+                              } else {
+                                setSelectedQuote(quote);
+                                updateField("quoteId", quote.id);
+                              }
                             }}
                             className={cn(
                               "w-full p-4 text-left hover:bg-slate-50 transition-colors",
