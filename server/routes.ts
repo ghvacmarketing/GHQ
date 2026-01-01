@@ -8464,6 +8464,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Work order not found" });
       }
 
+      // Check for linked invoices
+      const linkedInvoices = await db.select({ id: crmInvoices.id })
+        .from(crmInvoices)
+        .where(eq(crmInvoices.workOrderId, req.params.id));
+      
+      if (linkedInvoices.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete work order with linked invoices. Please delete the invoice(s) first.",
+          linkedInvoices: linkedInvoices.length
+        });
+      }
+
+      // Check for linked quotes
+      const linkedQuotes = await db.select({ id: crmQuotes.id })
+        .from(crmQuotes)
+        .where(eq(crmQuotes.workOrderId, req.params.id));
+      
+      if (linkedQuotes.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete work order with linked quotes. Please delete the quote(s) first.",
+          linkedQuotes: linkedQuotes.length
+        });
+      }
+
       const deleted = await storage.deleteWorkOrder(req.params.id);
       if (!deleted) {
         return res.status(500).json({ message: "Failed to delete work order" });
