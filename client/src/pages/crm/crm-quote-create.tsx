@@ -292,11 +292,11 @@ export default function CrmQuoteCreate() {
     return formData.lineItems
       .filter(item => {
         if (item.isDiscountLine || item.unitPrice <= 0) return false;
-        const category = item.itemCategory || "install";
-        if (kind === "promotion") {
-          return category === "install" || category === "service";
+        if (kind === "maintenance") {
+          return true;
         } else {
-          return category === "maintenance";
+          const category = item.itemCategory || "install";
+          return category === "install" || category === "service";
         }
       })
       .reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
@@ -314,16 +314,6 @@ export default function CrmQuoteCreate() {
   };
 
   const applyDiscount = () => {
-    const value = parseFloat(discountValue);
-    if (isNaN(value) || value <= 0) {
-      toast({
-        title: "Invalid Value",
-        description: "Please enter a valid positive number for the discount.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (hasDiscount(discountKind)) {
       toast({
         title: "Discount Exists",
@@ -347,26 +337,48 @@ export default function CrmQuoteCreate() {
     }
 
     let discountAmount: number;
-    if (discountMode === "amount") {
-      discountAmount = value;
-    } else {
-      const eligibleSubtotal = calculateEligibleSubtotal(discountKind);
-      if (eligibleSubtotal <= 0) {
+    
+    if (discountKind === "maintenance") {
+      const total = calculateSubtotal();
+      if (total <= 0) {
         toast({
           title: "No Eligible Items",
-          description: discountKind === "promotion" 
-            ? "No install or service items found to apply promotion discount."
-            : "No maintenance items found to apply maintenance discount.",
+          description: "Add line items with prices before applying a discount.",
           variant: "destructive",
         });
         return;
       }
-      discountAmount = eligibleSubtotal * (value / 100);
+      discountAmount = total * 0.15;
+    } else {
+      const value = parseFloat(discountValue);
+      if (isNaN(value) || value <= 0) {
+        toast({
+          title: "Invalid Value",
+          description: "Please enter a valid positive number for the discount.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (discountMode === "amount") {
+        discountAmount = value;
+      } else {
+        const eligibleSubtotal = calculateEligibleSubtotal(discountKind);
+        if (eligibleSubtotal <= 0) {
+          toast({
+            title: "No Eligible Items",
+            description: "No install or service items found to apply promotion discount.",
+            variant: "destructive",
+          });
+          return;
+        }
+        discountAmount = eligibleSubtotal * (value / 100);
+      }
     }
 
     const discountItem: LineItem = {
       id: `discount-${discountKind}-${Date.now()}`,
-      description: discountKind === "promotion" ? "Promotion Discount" : "Maintenance Discount",
+      description: discountKind === "promotion" ? "Promotion Discount" : "Maintenance Discount (15%)",
       quantity: 1,
       unitPrice: -Math.abs(discountAmount),
       lineType: "discount",
@@ -1063,54 +1075,68 @@ export default function CrmQuoteCreate() {
               </RadioGroup>
             </div>
 
-            <div className="space-y-3">
-              <Label>Discount Mode</Label>
-              <RadioGroup
-                value={discountMode}
-                onValueChange={(value) => setDiscountMode(value as "amount" | "percentage")}
-                className="flex gap-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="amount" id="mode-amount" data-testid="radio-mode-amount" />
-                  <Label htmlFor="mode-amount">$ Amount</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="percentage" id="mode-percentage" data-testid="radio-mode-percentage" />
-                  <Label htmlFor="mode-percentage">% Percentage</Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="discount-value">
-                {discountMode === "amount" ? "Discount Amount ($)" : "Discount Percentage (%)"}
-              </Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
-                  {discountMode === "amount" ? "$" : "%"}
-                </span>
-                <Input
-                  id="discount-value"
-                  type="number"
-                  min="0"
-                  step={discountMode === "amount" ? "0.01" : "1"}
-                  value={discountValue}
-                  onChange={(e) => setDiscountValue(e.target.value)}
-                  placeholder={discountMode === "amount" ? "0.00" : "0"}
-                  className="pl-8"
-                  data-testid="input-discount-value"
-                />
-              </div>
-              {discountMode === "percentage" && discountValue && (
-                <p className="text-sm text-slate-500">
-                  ≈ ${(calculateEligibleSubtotal(discountKind) * (parseFloat(discountValue) || 0) / 100).toFixed(2)} off ${calculateEligibleSubtotal(discountKind).toFixed(2)} eligible subtotal
-                  <br />
-                  <span className="text-xs text-slate-400">
-                    {discountKind === "promotion" ? "Applies to install & service items" : "Applies to maintenance items only"}
-                  </span>
+            {discountKind === "maintenance" ? (
+              <div className="p-4 bg-slate-50 rounded-lg border">
+                <p className="text-sm font-medium text-slate-700">Fixed 15% Discount</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  Maintenance discount is always 15% of the total quote amount.
                 </p>
-              )}
-            </div>
+                <p className="text-sm font-medium text-slate-800 mt-2">
+                  ≈ ${(calculateSubtotal() * 0.15).toFixed(2)} off ${calculateSubtotal().toFixed(2)} total
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  <Label>Discount Mode</Label>
+                  <RadioGroup
+                    value={discountMode}
+                    onValueChange={(value) => setDiscountMode(value as "amount" | "percentage")}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="amount" id="mode-amount" data-testid="radio-mode-amount" />
+                      <Label htmlFor="mode-amount">$ Amount</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="percentage" id="mode-percentage" data-testid="radio-mode-percentage" />
+                      <Label htmlFor="mode-percentage">% Percentage</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="discount-value">
+                    {discountMode === "amount" ? "Discount Amount ($)" : "Discount Percentage (%)"}
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+                      {discountMode === "amount" ? "$" : "%"}
+                    </span>
+                    <Input
+                      id="discount-value"
+                      type="number"
+                      min="0"
+                      step={discountMode === "amount" ? "0.01" : "1"}
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(e.target.value)}
+                      placeholder={discountMode === "amount" ? "0.00" : "0"}
+                      className="pl-8"
+                      data-testid="input-discount-value"
+                    />
+                  </div>
+                  {discountMode === "percentage" && discountValue && (
+                    <p className="text-sm text-slate-500">
+                      ≈ ${(calculateEligibleSubtotal("promotion") * (parseFloat(discountValue) || 0) / 100).toFixed(2)} off ${calculateEligibleSubtotal("promotion").toFixed(2)} eligible subtotal
+                      <br />
+                      <span className="text-xs text-slate-400">
+                        Applies to install & service items
+                      </span>
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button 
