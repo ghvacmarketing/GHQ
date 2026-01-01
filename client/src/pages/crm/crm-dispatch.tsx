@@ -194,6 +194,17 @@ function formatHour(hour: number): string {
   return `${hour}am`;
 }
 
+function formatDecimalHour(decimalHour: number): string {
+  const hours = Math.floor(decimalHour);
+  const minutes = Math.round((decimalHour % 1) * 60);
+  const displayHour = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  const ampm = hours >= 12 ? "pm" : "am";
+  if (minutes === 0) {
+    return `${displayHour}${ampm}`;
+  }
+  return `${displayHour}:${minutes.toString().padStart(2, "0")}${ampm}`;
+}
+
 // Create hour labels for 8am through 8pm (13 labels total)
 const hourLabels = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => ({
   hour: START_HOUR + i,
@@ -2630,7 +2641,7 @@ export default function CrmDispatch() {
                         {selectedWorkOrder.scheduledStart && selectedWorkOrder.scheduledEnd ? (
                           (() => {
                             const { startHour, endHour } = getWorkOrderDisplayTimes(selectedWorkOrder);
-                            return `${formatHour(Math.floor(startHour))} - ${formatHour(Math.floor(endHour))}`;
+                            return `${formatDecimalHour(startHour)} - ${formatDecimalHour(endHour)}`;
                           })()
                         ) : "Not scheduled"}
                       </span>
