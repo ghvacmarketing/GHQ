@@ -5337,48 +5337,50 @@ export default function CrmProposalBuilder() {
                     </div>
                   )}
                   
-                  {/* Pricing Breakdown Table */}
-                  <div className="border rounded-lg overflow-hidden mb-4">
-                    <table className="w-full text-sm">
-                      <tbody>
-                        {/* Subtotal */}
-                        <tr className="border-b">
-                          <td className="py-2 px-3 text-muted-foreground">Subtotal</td>
-                          <td className="py-2 px-3 text-right">{formatPrice(aiGeneratedQuote.subtotal)}</td>
-                        </tr>
-                        
-                        {/* Elite Bundle Discount - Subtle green row */}
-                        {aiGeneratedQuote.elite_discount_active && aiGeneratedQuote.elite_discount_amount > 0 && (
-                          <tr className="border-b bg-green-50 dark:bg-green-950/30">
-                            <td className="py-2 px-3 text-green-700 dark:text-green-400">
-                              Elite Bundle Discount ({aiGeneratedQuote.elite_discount_percent}%)
-                            </td>
-                            <td className="py-2 px-3 text-right text-green-700 dark:text-green-400">
-                              –{formatPrice(aiGeneratedQuote.elite_discount_amount)}
-                            </td>
+                  {/* Pricing Breakdown Table - Hidden in Options mode since each package is a separate choice */}
+                  {quoteMode !== "options" && (
+                    <div className="border rounded-lg overflow-hidden mb-4">
+                      <table className="w-full text-sm">
+                        <tbody>
+                          {/* Subtotal */}
+                          <tr className="border-b">
+                            <td className="py-2 px-3 text-muted-foreground">Subtotal</td>
+                            <td className="py-2 px-3 text-right">{formatPrice(aiGeneratedQuote.subtotal)}</td>
                           </tr>
-                        )}
-                        
-                        {/* Other discounts (non-Elite) */}
-                        {aiGeneratedQuote.discount_amount > 0 && !aiGeneratedQuote.elite_discount_active && (
-                          <tr className="border-b bg-green-50 dark:bg-green-950/30">
-                            <td className="py-2 px-3 text-green-700 dark:text-green-400">
-                              Discount ({aiGeneratedQuote.discount_percent}%)
-                            </td>
-                            <td className="py-2 px-3 text-right text-green-700 dark:text-green-400">
-                              –{formatPrice(aiGeneratedQuote.discount_amount)}
-                            </td>
+                          
+                          {/* Elite Bundle Discount - Subtle green row */}
+                          {aiGeneratedQuote.elite_discount_active && aiGeneratedQuote.elite_discount_amount > 0 && (
+                            <tr className="border-b bg-green-50 dark:bg-green-950/30">
+                              <td className="py-2 px-3 text-green-700 dark:text-green-400">
+                                Elite Bundle Discount ({aiGeneratedQuote.elite_discount_percent}%)
+                              </td>
+                              <td className="py-2 px-3 text-right text-green-700 dark:text-green-400">
+                                –{formatPrice(aiGeneratedQuote.elite_discount_amount)}
+                              </td>
+                            </tr>
+                          )}
+                          
+                          {/* Other discounts (non-Elite) */}
+                          {aiGeneratedQuote.discount_amount > 0 && !aiGeneratedQuote.elite_discount_active && (
+                            <tr className="border-b bg-green-50 dark:bg-green-950/30">
+                              <td className="py-2 px-3 text-green-700 dark:text-green-400">
+                                Discount ({aiGeneratedQuote.discount_percent}%)
+                              </td>
+                              <td className="py-2 px-3 text-right text-green-700 dark:text-green-400">
+                                –{formatPrice(aiGeneratedQuote.discount_amount)}
+                              </td>
+                            </tr>
+                          )}
+                          
+                          {/* Total */}
+                          <tr className="bg-muted/50 font-bold">
+                            <td className="py-3 px-3">Total</td>
+                            <td className="py-3 px-3 text-right text-primary text-lg">{formatPrice(aiGeneratedQuote.total)}</td>
                           </tr>
-                        )}
-                        
-                        {/* Total */}
-                        <tr className="bg-muted/50 font-bold">
-                          <td className="py-3 px-3">Total</td>
-                          <td className="py-3 px-3 text-right text-primary text-lg">{formatPrice(aiGeneratedQuote.total)}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                   
                   {/* Elite Warning */}
                   {aiGeneratedQuote.elite_warning && (
