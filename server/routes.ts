@@ -9857,7 +9857,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update quote status to converted
       await db.update(crmQuotes)
-        .set({ status: "converted", updatedAt: new Date() })
+        .set({ status: "converted" as const, updatedAt: new Date() })
         .where(eq(crmQuotes.id, quoteId));
 
       // Update work order billing disposition (only if quote has a work order)

@@ -999,7 +999,7 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
 });
 
 // CRM Quote Status and Scope
-export const crmQuoteStatusEnum = ["draft", "sent", "accepted", "declined", "expired"] as const;
+export const crmQuoteStatusEnum = ["draft", "sent", "accepted", "declined", "expired", "converted"] as const;
 export type CrmQuoteStatus = typeof crmQuoteStatusEnum[number];
 
 export const crmQuoteScopeEnum = ["work_order", "project", "standalone"] as const;
