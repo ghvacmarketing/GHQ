@@ -1046,11 +1046,9 @@ function DraggableScheduleCard({
       
       <div className="flex items-center gap-1.5">
         {workOrder.status === "completed" && <CheckSquare className="h-3 w-3 flex-shrink-0 text-green-600" />}
-        <p className="text-xs font-medium truncate">{workOrder.customerName}</p>
+        <p className="text-xs font-medium truncate">{workOrder.title || workOrder.description || workOrder.customerName}</p>
       </div>
-      {workOrder.propertyAddress && (
-        <p className="text-[10px] text-slate-600 truncate">{workOrder.propertyAddress}</p>
-      )}
+      <p className="text-[10px] text-slate-600 truncate">{workOrder.customerName}</p>
     </div>
   );
 }
