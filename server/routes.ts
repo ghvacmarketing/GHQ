@@ -11389,7 +11389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/crm/quotes/:id - Delete quote (only if draft)
+  // DELETE /api/crm/quotes/:id - Delete quote (any status)
   app.delete("/api/crm/quotes/:id", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
@@ -11400,11 +11400,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [existing] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
       if (!existing) {
         return res.status(404).json({ message: "Quote not found" });
-      }
-
-      // Only draft quotes can be deleted
-      if (existing.status !== 'draft') {
-        return res.status(400).json({ message: "Only draft quotes can be deleted" });
       }
 
       // Line items are deleted via cascade
