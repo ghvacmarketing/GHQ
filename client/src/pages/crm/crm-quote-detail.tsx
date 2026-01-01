@@ -611,13 +611,13 @@ export default function CrmQuoteDetail() {
         checkPageBreak(45);
         y += 8;
 
-        // Only show totals for non-options mode
+        // Only show totals for non-options mode (no tax - prices already include tax)
         if (!isOptionsMode) {
           const totalsBoxWidth = 80;
           const totalsX = pageWidth - margin - totalsBoxWidth;
           
           doc.setFillColor(...lightBg);
-          doc.roundedRect(totalsX, y, totalsBoxWidth, 28, 2, 2, 'F');
+          doc.roundedRect(totalsX, y, totalsBoxWidth, 20, 2, 2, 'F');
           
           doc.setFontSize(9);
           doc.setFont("helvetica", "normal");
@@ -626,23 +626,18 @@ export default function CrmQuoteDetail() {
           doc.setTextColor(...textColor);
           doc.text(formatCurrency(quote.subtotal), pageWidth - margin - 5, y + 7, { align: 'right' });
           
-          doc.setTextColor(...mutedColor);
-          doc.text("Tax (8.25%)", totalsX + 5, y + 13);
-          doc.setTextColor(...textColor);
-          doc.text(formatCurrency(quote.taxTotal || quote.taxAmount), pageWidth - margin - 5, y + 13, { align: 'right' });
-          
           doc.setDrawColor(...goldColor);
           doc.setLineWidth(0.5);
-          doc.line(totalsX + 5, y + 17, pageWidth - margin - 5, y + 17);
+          doc.line(totalsX + 5, y + 11, pageWidth - margin - 5, y + 11);
           
           doc.setFontSize(11);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(...textColor);
-          doc.text("Total", totalsX + 5, y + 24);
+          doc.text("Total", totalsX + 5, y + 17);
           doc.setTextColor(...brandColor);
-          doc.text(formatCurrency(quote.total), pageWidth - margin - 5, y + 24, { align: 'right' });
+          doc.text(formatCurrency(quote.subtotal), pageWidth - margin - 5, y + 17, { align: 'right' });
 
-          y += 35;
+          y += 28;
         }
 
         if (quote.description) {
@@ -946,21 +941,17 @@ export default function CrmQuoteDetail() {
               </TableBody>
             </Table>
 
-            {/* Hide subtotal/tax/total for options mode since each package is a separate choice */}
+            {/* Hide subtotal/total for options mode since each package is a separate choice */}
             {quote.quoteMode !== "options" && (
               <div className="mt-6 border-t pt-4 space-y-2">
                 <div className="flex justify-between">
                   <span className="text-slate-600">Subtotal</span>
                   <span>{formatCurrency(quote.subtotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Tax</span>
-                  <span>{formatCurrency(quote.taxTotal)}</span>
-                </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Total</span>
-                  <span className="text-[#d3b07d]">{formatCurrency(quote.total)}</span>
+                  <span className="text-[#d3b07d]">{formatCurrency(quote.subtotal)}</span>
                 </div>
               </div>
             )}
@@ -1181,14 +1172,10 @@ export default function CrmQuoteDetail() {
                     <span className="text-slate-600">Subtotal</span>
                     <span>{formatCurrency(quote.subtotal)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Tax (8.25%)</span>
-                    <span>{formatCurrency(quote.taxTotal)}</span>
-                  </div>
                   <Separator className="my-2" />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
-                    <span className="text-[#711419]">{formatCurrency(quote.total)}</span>
+                    <span className="text-[#711419]">{formatCurrency(quote.subtotal)}</span>
                   </div>
                 </div>
               </div>
