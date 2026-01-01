@@ -39,6 +39,7 @@ const CrmAccountDetail = lazy(() => import("@/pages/crm/crm-account-detail"));
 const CrmWorkOrders = lazy(() => import("@/pages/crm/crm-work-orders"));
 const CrmWorkOrderDetail = lazy(() => import("@/pages/crm/crm-work-order-detail"));
 const CrmInvoices = lazy(() => import("@/pages/crm/crm-invoices"));
+const CrmInvoiceDetail = lazy(() => import("@/pages/crm/crm-invoice-detail"));
 const CrmQuotes = lazy(() => import("@/pages/crm/crm-quotes"));
 const CrmQuoteCreate = lazy(() => import("@/pages/crm/crm-quote-create"));
 const CrmQuoteDetail = lazy(() => import("@/pages/crm/crm-quote-detail"));
@@ -167,6 +168,7 @@ function Router() {
       <Route path="/crm/accounts/:id">{() => <CrmWrapper><CrmAccountDetail /></CrmWrapper>}</Route>
       <Route path="/crm/customers/:id">{() => <CrmWrapper><CrmCustomerDetail /></CrmWrapper>}</Route>
       <Route path="/crm/customers">{() => <CrmWrapper><CrmCustomers /></CrmWrapper>}</Route>
+      <Route path="/crm/invoices/:id">{() => <CrmWrapper><CrmInvoiceDetail /></CrmWrapper>}</Route>
       <Route path="/crm/invoices">{() => <CrmWrapper><CrmInvoices /></CrmWrapper>}</Route>
       <Route path="/crm/quotes/install-worksheet/:id">{() => <CrmWrapper><CrmInstallWorksheet /></CrmWrapper>}</Route>
       <Route path="/crm/quotes/proposal/:customerId">{() => <CrmWrapper><CrmProposalBuilder /></CrmWrapper>}</Route>
