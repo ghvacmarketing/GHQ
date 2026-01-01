@@ -7,7 +7,7 @@ import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { z } from "zod";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
@@ -12073,6 +12073,276 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching quote email logs:", error);
       return res.status(500).json({ message: "Failed to fetch email logs" });
+    }
+  });
+
+  // ============================================
+  // CRM FOLLOW-UP ROUTES
+  // ============================================
+
+  // Helper function to recalculate and update customer's nextFollowUpAt
+  async function updateCustomerNextFollowUp(customerId: string) {
+    const pendingFollowUps = await db.select()
+      .from(crmFollowUps)
+      .where(and(
+        eq(crmFollowUps.customerId, customerId),
+        isNull(crmFollowUps.completedAt)
+      ))
+      .orderBy(asc(crmFollowUps.dueAt))
+      .limit(1);
+
+    const nextFollowUpAt = pendingFollowUps.length > 0 ? pendingFollowUps[0].dueAt : null;
+
+    await db.update(crmCustomers)
+      .set({ nextFollowUpAt, updatedAt: new Date() })
+      .where(eq(crmCustomers.id, customerId));
+  }
+
+  // GET /api/crm/follow-ups - List all follow-ups with optional filters
+  app.get("/api/crm/follow-ups", requireCrmAuth, async (req, res) => {
+    try {
+      const { customerId, assignedUserId, status } = req.query;
+      const conditions: any[] = [];
+
+      if (customerId && typeof customerId === 'string') {
+        conditions.push(eq(crmFollowUps.customerId, customerId));
+      }
+      if (assignedUserId && typeof assignedUserId === 'string') {
+        conditions.push(eq(crmFollowUps.assignedUserId, assignedUserId));
+      }
+
+      const now = new Date();
+      if (status === 'completed') {
+        conditions.push(sql`${crmFollowUps.completedAt} IS NOT NULL`);
+      } else if (status === 'due') {
+        conditions.push(isNull(crmFollowUps.completedAt));
+        conditions.push(sql`${crmFollowUps.dueAt} >= ${now}`);
+      } else if (status === 'overdue') {
+        conditions.push(isNull(crmFollowUps.completedAt));
+        conditions.push(sql`${crmFollowUps.dueAt} < ${now}`);
+      }
+
+      const followUps = await db.select()
+        .from(crmFollowUps)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(asc(crmFollowUps.dueAt));
+
+      return res.json(followUps);
+    } catch (error) {
+      console.error("Error fetching follow-ups:", error);
+      return res.status(500).json({ message: "Failed to fetch follow-ups" });
+    }
+  });
+
+  // GET /api/crm/follow-ups/:id - Get single follow-up
+  app.get("/api/crm/follow-ups/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const [followUp] = await db.select()
+        .from(crmFollowUps)
+        .where(eq(crmFollowUps.id, req.params.id))
+        .limit(1);
+
+      if (!followUp) {
+        return res.status(404).json({ message: "Follow-up not found" });
+      }
+
+      return res.json(followUp);
+    } catch (error) {
+      console.error("Error fetching follow-up:", error);
+      return res.status(500).json({ message: "Failed to fetch follow-up" });
+    }
+  });
+
+  // POST /api/crm/follow-ups - Create follow-up
+  app.post("/api/crm/follow-ups", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      
+      const parseResult = insertCrmFollowUpSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid follow-up data", errors: parseResult.error.errors });
+      }
+
+      const data = parseResult.data;
+      
+      // Verify customer exists
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, data.customerId)).limit(1);
+      if (!customer) {
+        return res.status(400).json({ message: "Customer not found" });
+      }
+
+      const [newFollowUp] = await db.insert(crmFollowUps)
+        .values({
+          ...data,
+          createdBy: currentUser?.id || null,
+        })
+        .returning();
+
+      // Update customer's nextFollowUpAt
+      await updateCustomerNextFollowUp(data.customerId);
+
+      return res.status(201).json(newFollowUp);
+    } catch (error) {
+      console.error("Error creating follow-up:", error);
+      return res.status(500).json({ message: "Failed to create follow-up" });
+    }
+  });
+
+  // PATCH /api/crm/follow-ups/:id - Update follow-up (mark complete, update outcome)
+  app.patch("/api/crm/follow-ups/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const [existingFollowUp] = await db.select()
+        .from(crmFollowUps)
+        .where(eq(crmFollowUps.id, req.params.id))
+        .limit(1);
+
+      if (!existingFollowUp) {
+        return res.status(404).json({ message: "Follow-up not found" });
+      }
+
+      const updateData: Partial<InsertCrmFollowUp> & { completedAt?: Date | null } = {};
+      
+      if (req.body.followUpType !== undefined) updateData.followUpType = req.body.followUpType;
+      if (req.body.dueAt !== undefined) updateData.dueAt = new Date(req.body.dueAt);
+      if (req.body.notes !== undefined) updateData.notes = req.body.notes;
+      if (req.body.outcome !== undefined) updateData.outcome = req.body.outcome;
+      if (req.body.assignedUserId !== undefined) updateData.assignedUserId = req.body.assignedUserId;
+      
+      // Handle marking as complete/incomplete
+      if (req.body.completedAt !== undefined) {
+        updateData.completedAt = req.body.completedAt ? new Date(req.body.completedAt) : null;
+      }
+
+      const [updatedFollowUp] = await db.update(crmFollowUps)
+        .set(updateData)
+        .where(eq(crmFollowUps.id, req.params.id))
+        .returning();
+
+      // Update customer's nextFollowUpAt
+      await updateCustomerNextFollowUp(existingFollowUp.customerId);
+
+      return res.json(updatedFollowUp);
+    } catch (error) {
+      console.error("Error updating follow-up:", error);
+      return res.status(500).json({ message: "Failed to update follow-up" });
+    }
+  });
+
+  // DELETE /api/crm/follow-ups/:id - Delete follow-up
+  app.delete("/api/crm/follow-ups/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const [existingFollowUp] = await db.select()
+        .from(crmFollowUps)
+        .where(eq(crmFollowUps.id, req.params.id))
+        .limit(1);
+
+      if (!existingFollowUp) {
+        return res.status(404).json({ message: "Follow-up not found" });
+      }
+
+      await db.delete(crmFollowUps).where(eq(crmFollowUps.id, req.params.id));
+
+      // Update customer's nextFollowUpAt
+      await updateCustomerNextFollowUp(existingFollowUp.customerId);
+
+      return res.json({ message: "Follow-up deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting follow-up:", error);
+      return res.status(500).json({ message: "Failed to delete follow-up" });
+    }
+  });
+
+  // ============================================
+  // CRM PROSPECT MANAGEMENT ROUTES
+  // ============================================
+
+  // GET /api/crm/prospects - Get customers with active sales stages (not null and not 'won')
+  app.get("/api/crm/prospects", requireCrmAuth, async (req, res) => {
+    try {
+      const prospects = await db.select()
+        .from(crmCustomers)
+        .where(and(
+          sql`${crmCustomers.salesStage} IS NOT NULL`,
+          sql`${crmCustomers.salesStage} != 'won'`
+        ))
+        .orderBy(asc(crmCustomers.nextFollowUpAt));
+
+      return res.json(prospects);
+    } catch (error) {
+      console.error("Error fetching prospects:", error);
+      return res.status(500).json({ message: "Failed to fetch prospects" });
+    }
+  });
+
+  // PATCH /api/crm/customers/:id/stage - Update customer's salesStage
+  app.patch("/api/crm/customers/:id/stage", requireCrmAuth, async (req, res) => {
+    try {
+      const { salesStage } = req.body;
+      
+      if (!salesStage || !salesStageEnum.includes(salesStage)) {
+        return res.status(400).json({ 
+          message: "Invalid sales stage", 
+          validStages: salesStageEnum 
+        });
+      }
+
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, req.params.id)).limit(1);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      const updateData: any = {
+        salesStage,
+        updatedAt: new Date(),
+      };
+
+      // Set convertedAt when moving to 'won'
+      if (salesStage === 'won' && customer.salesStage !== 'won') {
+        updateData.convertedAt = new Date();
+        updateData.customerStatus = 'client';
+      }
+
+      const [updatedCustomer] = await db.update(crmCustomers)
+        .set(updateData)
+        .where(eq(crmCustomers.id, req.params.id))
+        .returning();
+
+      return res.json(updatedCustomer);
+    } catch (error) {
+      console.error("Error updating customer sales stage:", error);
+      return res.status(500).json({ message: "Failed to update sales stage" });
+    }
+  });
+
+  // PATCH /api/crm/customers/:id/interest - Update customer's interestLevel
+  app.patch("/api/crm/customers/:id/interest", requireCrmAuth, async (req, res) => {
+    try {
+      const { interestLevel } = req.body;
+      
+      if (!interestLevel || !interestLevelEnum.includes(interestLevel)) {
+        return res.status(400).json({ 
+          message: "Invalid interest level", 
+          validLevels: interestLevelEnum 
+        });
+      }
+
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, req.params.id)).limit(1);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      const [updatedCustomer] = await db.update(crmCustomers)
+        .set({
+          interestLevel,
+          updatedAt: new Date(),
+        })
+        .where(eq(crmCustomers.id, req.params.id))
+        .returning();
+
+      return res.json(updatedCustomer);
+    } catch (error) {
+      console.error("Error updating customer interest level:", error);
+      return res.status(500).json({ message: "Failed to update interest level" });
     }
   });
 
