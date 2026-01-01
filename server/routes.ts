@@ -12268,18 +12268,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/prospects - Get customers with active sales stages (not null and not 'won')
   app.get("/api/crm/prospects", requireCrmAuth, async (req, res) => {
     try {
+      const { status } = req.query;
+      
+      let whereClause;
+      if (status === 'won' || status === 'lost') {
+        whereClause = eq(crmCustomers.salesStage, status);
+      } else if (status) {
+        whereClause = eq(crmCustomers.salesStage, status as string);
+      } else {
+        whereClause = and(
+          sql`${crmCustomers.salesStage} IS NOT NULL`,
+          sql`${crmCustomers.salesStage} != 'won'`,
+          sql`${crmCustomers.salesStage} != 'lost'`
+        );
+      }
+      
       const prospects = await db.select()
         .from(crmCustomers)
-        .where(and(
-          sql`${crmCustomers.salesStage} IS NOT NULL`,
-          sql`${crmCustomers.salesStage} != 'won'`
-        ))
+        .where(whereClause)
         .orderBy(asc(crmCustomers.nextFollowUpAt));
 
       return res.json(prospects);
     } catch (error) {
       console.error("Error fetching prospects:", error);
       return res.status(500).json({ message: "Failed to fetch prospects" });
+    }
+  });
+
+  // GET /api/crm/prospects/metrics - Get prospect funnel metrics
+  app.get("/api/crm/prospects/metrics", requireCrmAuth, async (req, res) => {
+    try {
+      const allProspects = await db.select()
+        .from(crmCustomers)
+        .where(sql`${crmCustomers.salesStage} IS NOT NULL`);
+      
+      const activeProspects = allProspects.filter(p => 
+        p.salesStage !== 'won' && p.salesStage !== 'lost'
+      );
+      const wonProspects = allProspects.filter(p => p.salesStage === 'won');
+      const lostProspects = allProspects.filter(p => p.salesStage === 'lost');
+      
+      // Get pending follow-ups count
+      const pendingFollowUps = await db.select({ count: sql<number>`count(*)` })
+        .from(crmFollowUps)
+        .where(sql`${crmFollowUps.completedAt} IS NULL`);
+      
+      // Calculate conversion rate
+      const totalClosed = wonProspects.length + lostProspects.length;
+      const conversionRate = totalClosed > 0 
+        ? (wonProspects.length / totalClosed) * 100 
+        : 0;
+      
+      // Build status breakdown
+      const statusBreakdown: Record<string, number> = {
+        new: 0,
+        contacted: 0,
+        quote_sent: 0,
+        negotiating: 0,
+        won: 0,
+        lost: 0,
+      };
+      
+      for (const prospect of allProspects) {
+        const stage = prospect.salesStage as string;
+        if (stage in statusBreakdown) {
+          statusBreakdown[stage]++;
+        }
+      }
+      
+      return res.json({
+        activeProspects: activeProspects.length,
+        pendingActions: Number(pendingFollowUps[0]?.count || 0),
+        conversionRate: conversionRate.toFixed(1),
+        statusBreakdown,
+      });
+    } catch (error) {
+      console.error("Error fetching prospect metrics:", error);
+      return res.status(500).json({ message: "Failed to fetch prospect metrics" });
     }
   });
 
