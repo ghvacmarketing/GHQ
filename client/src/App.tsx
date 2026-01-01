@@ -52,6 +52,7 @@ const CrmMarketing = lazy(() => import("@/pages/crm/crm-marketing"));
 const CrmItems = lazy(() => import("@/pages/crm/crm-items"));
 const CrmInstallWorksheet = lazy(() => import("@/pages/crm/crm-install-worksheet"));
 const CrmProposalBuilder = lazy(() => import("@/pages/crm/crm-proposal-builder"));
+const CrmPhone = lazy(() => import("@/pages/crm/crm-phone"));
 
 // Global Error Boundary to prevent blank screens
 class ErrorBoundary extends Component<
@@ -184,6 +185,7 @@ function Router() {
       <Route path="/crm/prospect-funnel">{() => <CrmWrapper><CrmProspectFunnel /></CrmWrapper>}</Route>
       <Route path="/crm/marketing">{() => <CrmWrapper><CrmMarketing /></CrmWrapper>}</Route>
       <Route path="/crm/items">{() => <CrmWrapper><CrmItems /></CrmWrapper>}</Route>
+      <Route path="/crm/phone">{() => <CrmWrapper><CrmPhone /></CrmWrapper>}</Route>
       <Route path="/crm">{() => <CrmWrapper><CrmDashboard /></CrmWrapper>}</Route>
       <Route component={NotFound} />
     </Switch>

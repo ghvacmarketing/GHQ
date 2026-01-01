@@ -24,6 +24,7 @@ import {
   Target,
   Megaphone,
   Package,
+  Phone,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
@@ -51,14 +52,16 @@ const navSections: NavSection[] = [
     items: [
       { label: "Dashboard", href: "/crm", icon: LayoutDashboard },
       { label: "Dispatch Board", href: "/crm/dispatch", icon: CalendarClock },
+      { label: "Phone", href: "/crm/phone", icon: Phone },
     ],
   },
   {
     title: "Admin",
     items: [
       { label: "Customers", href: "/crm/customers", icon: Users },
-      { label: "Invoices", href: "/crm/invoices", icon: Receipt },
       { label: "Agreements", href: "/crm/agreements", icon: FileCheck },
+      { label: "Quotes", href: "/crm/quotes", icon: FileText },
+      { label: "Invoices", href: "/crm/invoices", icon: Receipt },
     ],
   },
   {
@@ -66,7 +69,6 @@ const navSections: NavSection[] = [
     items: [
       { label: "Work Orders", href: "/crm/work-orders", icon: ClipboardList },
       { label: "Projects", href: "/crm/projects", icon: FolderKanban },
-      { label: "Quotes", href: "/crm/quotes", icon: FileText },
       { label: "Items", href: "/crm/items", icon: Package },
     ],
   },
