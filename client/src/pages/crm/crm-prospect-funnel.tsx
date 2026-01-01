@@ -414,7 +414,7 @@ export default function CrmProspectFunnel() {
           </div>
           <Button
             size="sm"
-            onClick={() => navigate("/crm/accounts/new")}
+            onClick={() => navigate("/crm/add-prospect")}
             className="bg-[#711419] hover:bg-[#5a1014]"
             data-testid="button-add-prospect"
           >
