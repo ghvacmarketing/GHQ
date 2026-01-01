@@ -8,11 +8,11 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-// System instruction block - always sent with every request
+// System instruction block - always sent with every request (SINGLE mode - combined quote)
 const SYSTEM_INSTRUCTIONS = `You are GHVAC's professional HVAC quoting assistant. Generate professional "Comprehensive Home Comfort Proposal" documents.
 
 DOCUMENT FORMAT (FOLLOW EXACTLY):
-1. quote_title: Format as "OPTION: $TOTAL" (e.g., "OPTION: $25,599.00") followed by a short descriptive subtitle
+1. quote_title: Format as "$TOTAL [Descriptive Title]" (e.g., "$25,599.00 Premium 3-Ton Trane HVAC System"). Do NOT use "OPTION:" prefix - this is a single combined quote.
 2. package_description: 2-3 sentence sales paragraph highlighting the package value proposition
 3. whats_included: Categorized bullet points grouped by component (e.g., "3.0 Ton Premium Ducting System", "Aprilaire E070 WiFi Dehumidifier")
 4. best_for: One sentence describing ideal customer for this package

@@ -1179,53 +1179,139 @@ export default function CrmQuoteDetail() {
                 </div>
               </div>
 
-              <div className="border rounded-lg overflow-hidden mb-6">
-                <div className="bg-[#d3b07d] text-white px-4 py-3">
-                  <h3 className="font-semibold">Line Items</h3>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-slate-50">
-                      <TableHead className="font-semibold">Description</TableHead>
-                      <TableHead className="text-center font-semibold">Qty</TableHead>
-                      <TableHead className="text-right font-semibold">Unit Price</TableHead>
-                      <TableHead className="text-right font-semibold">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {quote.lineItems && quote.lineItems.length > 0 ? (
-                      quote.lineItems.map((item, idx) => (
-                        <TableRow key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
-                          <TableCell className="font-medium">{item.description}</TableCell>
-                          <TableCell className="text-center">{item.quantity}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(item.lineTotal)}</TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-slate-500 py-8">
-                          No line items
-                        </TableCell>
-                      </TableRow>
+              {/* Show AI-generated proposal if available, otherwise show line items */}
+              {quote.aiGeneratedQuote ? (
+                <div className="space-y-6 mb-8">
+                  {/* AI Quote Title & Description */}
+                  <div className="border-l-4 border-[#711419] pl-4">
+                    <h3 className="text-xl font-bold text-slate-900">
+                      {quote.aiGeneratedQuote.quote_title || quote.title}
+                    </h3>
+                    {quote.aiGeneratedQuote.package_description && (
+                      <p className="text-slate-600 mt-2">{quote.aiGeneratedQuote.package_description}</p>
                     )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="flex justify-end mb-8">
-                <div className="w-72 bg-slate-50 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Subtotal</span>
-                    <span>{formatCurrency(quote.subtotal)}</span>
                   </div>
-                  <Separator className="my-2" />
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span className="text-[#711419]">{formatCurrency(quote.subtotal)}</span>
+
+                  {/* Best For */}
+                  {quote.aiGeneratedQuote.best_for && (
+                    <p className="text-sm italic text-slate-500 bg-slate-50 p-3 rounded-lg">
+                      <span className="font-medium not-italic">Best For:</span> {quote.aiGeneratedQuote.best_for}
+                    </p>
+                  )}
+
+                  {/* What's Included */}
+                  {quote.aiGeneratedQuote.whats_included && quote.aiGeneratedQuote.whats_included.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">What's Included</h4>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {quote.aiGeneratedQuote.whats_included.map((category: { category: string; items: string[] }, idx: number) => (
+                          <div key={idx} className="bg-slate-50 p-4 rounded-lg border">
+                            <p className="font-semibold text-slate-800 mb-2">{category.category}</p>
+                            <ul className="text-sm text-slate-600 space-y-1">
+                              {category.items.map((item: string, i: number) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-[#711419] mt-0.5">•</span>
+                                  <span>{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Warranties & Terms */}
+                  {quote.aiGeneratedQuote.warranties_and_terms && quote.aiGeneratedQuote.warranties_and_terms.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                      <h4 className="text-sm font-semibold text-amber-900 uppercase mb-2">Warranties & Terms</h4>
+                      <ul className="text-sm text-amber-800 space-y-1">
+                        {quote.aiGeneratedQuote.warranties_and_terms.map((term: string, idx: number) => (
+                          <li key={idx}>• {term}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Financing */}
+                  {quote.aiGeneratedQuote.financing_text && (
+                    <p className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      {quote.aiGeneratedQuote.financing_text}
+                    </p>
+                  )}
+
+                  {/* Pricing Summary */}
+                  <div className="flex justify-end">
+                    <div className="w-80 bg-slate-50 rounded-lg p-4 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Subtotal</span>
+                        <span>{formatCurrency((quote.aiGeneratedQuote as Record<string, unknown>).subtotal as number || quote.subtotal)}</span>
+                      </div>
+                      {(quote.aiGeneratedQuote as Record<string, unknown>).elite_discount_active && ((quote.aiGeneratedQuote as Record<string, unknown>).elite_discount_amount as number) > 0 && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>Elite Discount ({(quote.aiGeneratedQuote as Record<string, unknown>).elite_discount_percent}%)</span>
+                          <span>-{formatCurrency((quote.aiGeneratedQuote as Record<string, unknown>).elite_discount_amount as number)}</span>
+                        </div>
+                      )}
+                      <Separator className="my-2" />
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Total</span>
+                        <span className="text-[#711419]">{formatCurrency((quote.aiGeneratedQuote as Record<string, unknown>).total as number || quote.subtotal)}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="border rounded-lg overflow-hidden mb-6">
+                    <div className="bg-[#d3b07d] text-white px-4 py-3">
+                      <h3 className="font-semibold">Line Items</h3>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-50">
+                          <TableHead className="font-semibold">Description</TableHead>
+                          <TableHead className="text-center font-semibold">Qty</TableHead>
+                          <TableHead className="text-right font-semibold">Unit Price</TableHead>
+                          <TableHead className="text-right font-semibold">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {quote.lineItems && quote.lineItems.length > 0 ? (
+                          quote.lineItems.map((item, idx) => (
+                            <TableRow key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
+                              <TableCell className="font-medium">{item.description}</TableCell>
+                              <TableCell className="text-center">{item.quantity}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+                              <TableCell className="text-right font-medium">{formatCurrency(item.lineTotal)}</TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-slate-500 py-8">
+                              No line items
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="flex justify-end mb-8">
+                    <div className="w-72 bg-slate-50 rounded-lg p-4 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Subtotal</span>
+                        <span>{formatCurrency(quote.subtotal)}</span>
+                      </div>
+                      <Separator className="my-2" />
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Total</span>
+                        <span className="text-[#711419]">{formatCurrency(quote.subtotal)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {quote.description && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
