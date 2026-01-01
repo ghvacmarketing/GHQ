@@ -73,7 +73,19 @@ import {
   Edit,
   Trash2,
   Wand2,
+  MoreVertical,
+  Search,
+  Send,
+  Eye,
+  Loader2,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
 import type { CrmUser, CrmJob, CrmProperty, CrmWorkOrder, CrmInvoice, CrmQuote, CrmCustomer, CrmProject, WorkOrderStatus } from "@shared/schema";
@@ -252,6 +264,13 @@ export default function CrmWorkOrderDetail() {
   const [quoteTitle, setQuoteTitle] = useState("");
   const [quoteDescription, setQuoteDescription] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const [quoteSearch, setQuoteSearch] = useState("");
+  const [quoteStatusFilter, setQuoteStatusFilter] = useState("all");
+  const [invoiceSearch, setInvoiceSearch] = useState("");
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState("all");
+  const [deleteQuoteId, setDeleteQuoteId] = useState<string | null>(null);
+  const [deleteInvoiceId, setDeleteInvoiceId] = useState<string | null>(null);
 
   const [newStatus, setNewStatus] = useState<string>("");
   const [reassignTechId, setReassignTechId] = useState<string>("unassigned");
@@ -473,6 +492,96 @@ export default function CrmWorkOrderDetail() {
     },
   });
 
+  const deleteQuoteMutation = useMutation({
+    mutationFn: async (quoteId: string) => {
+      await apiRequest("DELETE", `/api/crm/quotes/${quoteId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Quote deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", workOrderId, "quotes"] });
+      setDeleteQuoteId(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete quote",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendQuoteMutation = useMutation({
+    mutationFn: async (quoteId: string) => {
+      const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/send`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Quote sent successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", workOrderId, "quotes"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to send quote",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteInvoiceMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      await apiRequest("DELETE", `/api/crm/invoices/${invoiceId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Invoice deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", workOrderId, "invoices"] });
+      setDeleteInvoiceId(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete invoice",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const markInvoicePaidMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const res = await apiRequest("PATCH", `/api/crm/invoices/${invoiceId}`, { status: "paid" });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invoice marked as paid" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", workOrderId, "invoices"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update invoice",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const voidInvoiceMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const res = await apiRequest("PATCH", `/api/crm/invoices/${invoiceId}`, { status: "void" });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invoice voided" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", workOrderId, "invoices"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to void invoice",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDeleteWorkOrder = () => {
     deleteWorkOrderMutation.mutate();
   };
@@ -688,6 +797,20 @@ export default function CrmWorkOrderDetail() {
                     <span>{formatTimeRange(workOrder.scheduledStart, workOrder.scheduledEnd)}</span>
                   </div>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  disabled={deleteWorkOrderMutation.isPending}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                  data-testid="button-delete-work-order"
+                >
+                  {deleteWorkOrderMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -949,7 +1072,10 @@ export default function CrmWorkOrderDetail() {
             <Card className="shadow-sm">
               <CardHeader className="pb-3 border-b bg-slate-50/50">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-semibold">Quotes</CardTitle>
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <FileText className="h-4 w-4 text-[#711419]" />
+                    Quotes ({quotes?.length || 0})
+                  </CardTitle>
                   <div className="flex gap-2">
                     <Button
                       size="sm"
@@ -969,6 +1095,7 @@ export default function CrmWorkOrderDetail() {
                     </Button>
                     <Button
                       size="sm"
+                      className="bg-[#711419] hover:bg-[#5a1014] text-white"
                       onClick={() => setCreateQuoteDialogOpen(true)}
                       data-testid="button-create-quote"
                     >
@@ -977,47 +1104,156 @@ export default function CrmWorkOrderDetail() {
                     </Button>
                   </div>
                 </div>
+                {quotes && quotes.length > 0 && (
+                  <div className="flex gap-2 mt-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input
+                        placeholder="Search quotes..."
+                        value={quoteSearch}
+                        onChange={(e) => setQuoteSearch(e.target.value)}
+                        className="pl-9 h-9"
+                        data-testid="input-quote-search"
+                      />
+                    </div>
+                    <Select value={quoteStatusFilter} onValueChange={setQuoteStatusFilter}>
+                      <SelectTrigger className="w-[140px] h-9" data-testid="select-quote-status-filter">
+                        <SelectValue placeholder="All Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="sent">Sent</SelectItem>
+                        <SelectItem value="accepted">Accepted</SelectItem>
+                        <SelectItem value="declined">Declined</SelectItem>
+                        <SelectItem value="expired">Expired</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="pt-4">
                 {quotesLoading ? (
                   <div className="space-y-3">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
                   </div>
                 ) : quotes && quotes.length > 0 ? (
-                  <div className="space-y-3">
-                    {quotes.map((quote) => {
-                      const qStatusColor = quoteStatusColors[quote.status] || quoteStatusColors.draft;
-                      return (
-                        <div
-                          key={quote.id}
-                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50"
-                          data-testid={`quote-item-${quote.id}`}
-                        >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm">{quote.title}</span>
-                              <Badge
-                                className={`${qStatusColor.bg} ${qStatusColor.text} border ${qStatusColor.border} text-xs`}
-                              >
-                                {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-slate-500">
-                              #{quote.quoteNumber} • {formatCurrency(quote.total)}
-                            </p>
-                          </div>
-                          <Button variant="ghost" size="sm" data-testid={`button-view-quote-${quote.id}`}>
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  (() => {
+                    const filteredQuotes = quotes.filter((quote) => {
+                      const matchesSearch = quoteSearch === "" || 
+                        quote.title?.toLowerCase().includes(quoteSearch.toLowerCase()) ||
+                        quote.quoteNumber?.toLowerCase().includes(quoteSearch.toLowerCase());
+                      const matchesStatus = quoteStatusFilter === "all" || quote.status === quoteStatusFilter;
+                      return matchesSearch && matchesStatus;
+                    });
+                    return filteredQuotes.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Quote Number</TableHead>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                            <TableHead>Created Date</TableHead>
+                            <TableHead className="w-[50px]"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredQuotes.map((quote) => (
+                            <TableRow 
+                              key={quote.id} 
+                              data-testid={`row-quote-${quote.id}`}
+                              className="cursor-pointer hover:bg-slate-50"
+                            >
+                              <TableCell className="font-medium">{quote.quoteNumber}</TableCell>
+                              <TableCell>{quote.title}</TableCell>
+                              <TableCell>
+                                <Badge className={cn(
+                                  "text-xs",
+                                  quote.status === "draft" && "bg-slate-100 text-slate-700",
+                                  quote.status === "sent" && "bg-blue-100 text-blue-700",
+                                  quote.status === "accepted" && "bg-green-100 text-green-700",
+                                  quote.status === "declined" && "bg-red-100 text-red-700",
+                                  quote.status === "expired" && "bg-yellow-100 text-yellow-700"
+                                )}>
+                                  {quote.status === "accepted" ? "Approved" : quote.status?.charAt(0).toUpperCase() + quote.status?.slice(1)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {quote.total ? `$${Number(quote.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                              </TableCell>
+                              <TableCell>
+                                {quote.createdAt ? format(new Date(quote.createdAt), 'MMM d, yyyy') : '—'}
+                              </TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      data-testid={`button-quote-actions-${quote.id}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onClick={() => navigate(`/crm/quotes/${quote.id}`)}
+                                      data-testid={`menu-view-quote-${quote.id}`}
+                                    >
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View
+                                    </DropdownMenuItem>
+                                    {quote.status === "draft" && (
+                                      <DropdownMenuItem
+                                        onClick={() => navigate(`/crm/quotes/${quote.id}/edit`)}
+                                        data-testid={`menu-edit-quote-${quote.id}`}
+                                      >
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                      onClick={() => sendQuoteMutation.mutate(quote.id)}
+                                      disabled={sendQuoteMutation.isPending}
+                                      data-testid={`menu-send-quote-${quote.id}`}
+                                    >
+                                      <Send className="h-4 w-4 mr-2" />
+                                      Send
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => setDeleteQuoteId(quote.id)}
+                                      className="text-red-600"
+                                      data-testid={`menu-delete-quote-${quote.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <div className="text-center py-8">
+                        <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                        <p className="text-slate-500 mb-2">No quotes match your filters</p>
+                        <p className="text-sm text-slate-400">Try adjusting your search or status filter</p>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <div className="text-center py-8">
                     <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                    <p className="text-slate-500 mb-4">No quotes yet</p>
+                    <p className="text-slate-500 mb-2">No quotes yet</p>
+                    <p className="text-sm text-slate-400 mb-4">
+                      Create a quote for this work order.
+                    </p>
                     <Button
                       size="sm"
                       variant="outline"
@@ -1037,9 +1273,13 @@ export default function CrmWorkOrderDetail() {
             <Card className="shadow-sm">
               <CardHeader className="pb-3 border-b bg-slate-50/50">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-semibold">Invoices</CardTitle>
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <DollarSign className="h-4 w-4 text-[#711419]" />
+                    Invoices ({invoices?.length || 0})
+                  </CardTitle>
                   <Button
                     size="sm"
+                    className="bg-[#711419] hover:bg-[#5a1014] text-white"
                     onClick={() => createInvoiceMutation.mutate()}
                     disabled={createInvoiceMutation.isPending}
                     data-testid="button-create-invoice"
@@ -1048,52 +1288,173 @@ export default function CrmWorkOrderDetail() {
                     {createInvoiceMutation.isPending ? "Creating..." : "Create Invoice"}
                   </Button>
                 </div>
+                {invoices && invoices.length > 0 && (
+                  <div className="flex gap-2 mt-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input
+                        placeholder="Search invoices..."
+                        value={invoiceSearch}
+                        onChange={(e) => setInvoiceSearch(e.target.value)}
+                        className="pl-9 h-9"
+                        data-testid="input-invoice-search"
+                      />
+                    </div>
+                    <Select value={invoiceStatusFilter} onValueChange={setInvoiceStatusFilter}>
+                      <SelectTrigger className="w-[140px] h-9" data-testid="select-invoice-status-filter">
+                        <SelectValue placeholder="All Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="sent">Sent</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="void">Void</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="pt-4">
                 {invoicesLoading ? (
                   <div className="space-y-3">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
                   </div>
                 ) : invoices && invoices.length > 0 ? (
-                  <div className="space-y-3">
-                    {invoices.map((invoice) => {
-                      const invStatusColor = invoiceStatusColors[invoice.status] || invoiceStatusColors.draft;
-                      return (
-                        <div
-                          key={invoice.id}
-                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50"
-                          data-testid={`invoice-item-${invoice.id}`}
-                        >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm">Invoice #{invoice.invoiceNumber}</span>
-                              <Badge
-                                className={`${invStatusColor.bg} ${invStatusColor.text} border ${invStatusColor.border} text-xs`}
-                              >
-                                {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-slate-500">
-                              {formatCurrency(invoice.total)} • {formatDateTime(invoice.createdAt)}
-                            </p>
-                          </div>
-                          <Button variant="ghost" size="sm" data-testid={`button-view-invoice-${invoice.id}`}>
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  (() => {
+                    const filteredInvoices = invoices.filter((invoice) => {
+                      const matchesSearch = invoiceSearch === "" || 
+                        invoice.invoiceNumber?.toLowerCase().includes(invoiceSearch.toLowerCase());
+                      const matchesStatus = invoiceStatusFilter === "all" || invoice.status === invoiceStatusFilter;
+                      return matchesSearch && matchesStatus;
+                    });
+                    return filteredInvoices.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Invoice Number</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                            <TableHead className="text-right">Balance Due</TableHead>
+                            <TableHead>Created Date</TableHead>
+                            <TableHead className="w-[50px]"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredInvoices.map((invoice) => (
+                            <TableRow 
+                              key={invoice.id} 
+                              data-testid={`row-invoice-${invoice.id}`}
+                              className="cursor-pointer hover:bg-slate-50"
+                            >
+                              <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                              <TableCell>
+                                <Badge className={cn(
+                                  "text-xs",
+                                  invoice.status === "draft" && "bg-slate-100 text-slate-700",
+                                  invoice.status === "sent" && "bg-blue-100 text-blue-700",
+                                  invoice.status === "paid" && "bg-green-100 text-green-700",
+                                  invoice.status === "partial" && "bg-amber-100 text-amber-700",
+                                  invoice.status === "void" && "bg-red-100 text-red-700"
+                                )}>
+                                  {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {invoice.total ? `$${Number(invoice.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {invoice.balanceDue ? `$${Number(invoice.balanceDue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                              </TableCell>
+                              <TableCell>
+                                {invoice.createdAt ? format(new Date(invoice.createdAt), 'MMM d, yyyy') : '—'}
+                              </TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      data-testid={`button-invoice-actions-${invoice.id}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onClick={() => navigate(`/crm/invoices/${invoice.id}`)}
+                                      data-testid={`menu-view-invoice-${invoice.id}`}
+                                    >
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View
+                                    </DropdownMenuItem>
+                                    {invoice.status === "draft" && (
+                                      <DropdownMenuItem
+                                        onClick={() => navigate(`/crm/invoices/${invoice.id}/edit`)}
+                                        data-testid={`menu-edit-invoice-${invoice.id}`}
+                                      >
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                    )}
+                                    {invoice.status !== "paid" && invoice.status !== "void" && (
+                                      <DropdownMenuItem
+                                        onClick={() => markInvoicePaidMutation.mutate(invoice.id)}
+                                        disabled={markInvoicePaidMutation.isPending}
+                                        data-testid={`menu-mark-paid-invoice-${invoice.id}`}
+                                      >
+                                        <CheckCircle className="h-4 w-4 mr-2" />
+                                        Mark Paid
+                                      </DropdownMenuItem>
+                                    )}
+                                    {invoice.status !== "void" && (
+                                      <DropdownMenuItem
+                                        onClick={() => voidInvoiceMutation.mutate(invoice.id)}
+                                        disabled={voidInvoiceMutation.isPending}
+                                        data-testid={`menu-void-invoice-${invoice.id}`}
+                                      >
+                                        <XCircle className="h-4 w-4 mr-2" />
+                                        Void
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                      onClick={() => setDeleteInvoiceId(invoice.id)}
+                                      className="text-red-600"
+                                      data-testid={`menu-delete-invoice-${invoice.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <div className="text-center py-8">
+                        <DollarSign className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                        <p className="text-slate-500 mb-2">No invoices match your filters</p>
+                        <p className="text-sm text-slate-400">Try adjusting your search or status filter</p>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <div className="text-center py-8">
                     <DollarSign className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                    <p className="text-slate-500 mb-4">No invoices yet</p>
+                    <p className="text-slate-500 mb-2">No invoices yet</p>
                     {workOrder.billingDisposition && (
                       <p className="text-xs text-slate-400 mb-4">
                         Billing Disposition: {workOrder.billingDisposition}
                       </p>
                     )}
+                    <p className="text-sm text-slate-400 mb-4">
+                      Create an invoice for this work order.
+                    </p>
                     <Button
                       size="sm"
                       variant="outline"
@@ -1634,6 +1995,48 @@ export default function CrmWorkOrderDetail() {
                 data-testid="button-confirm-delete"
               >
                 {deleteWorkOrderMutation.isPending ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={!!deleteQuoteId} onOpenChange={(open) => !open && setDeleteQuoteId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Quote</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this quote? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete-quote">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteQuoteId && deleteQuoteMutation.mutate(deleteQuoteId)}
+                className="bg-red-600 hover:bg-red-700"
+                data-testid="button-confirm-delete-quote"
+              >
+                {deleteQuoteMutation.isPending ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={!!deleteInvoiceId} onOpenChange={(open) => !open && setDeleteInvoiceId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this invoice? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete-invoice">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteInvoiceId && deleteInvoiceMutation.mutate(deleteInvoiceId)}
+                className="bg-red-600 hover:bg-red-700"
+                data-testid="button-confirm-delete-invoice"
+              >
+                {deleteInvoiceMutation.isPending ? "Deleting..." : "Delete"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
