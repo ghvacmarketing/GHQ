@@ -169,6 +169,55 @@ function FollowUpBadge({ nextFollowUpAt }: { nextFollowUpAt: Date | string | nul
   );
 }
 
+// Avatar colors based on name hash
+const AVATAR_COLORS = [
+  "bg-blue-500",
+  "bg-green-500", 
+  "bg-purple-500",
+  "bg-amber-500",
+  "bg-red-500",
+  "bg-teal-500",
+  "bg-indigo-500",
+  "bg-pink-500",
+  "bg-orange-500",
+  "bg-cyan-500",
+];
+
+function getInitials(name: string | null | undefined): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) {
+    return parts[0].charAt(0).toUpperCase();
+  }
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
+function getAvatarColor(name: string | null | undefined): string {
+  if (!name) return AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function InitialsAvatar({ name, size = "md" }: { name: string | null | undefined; size?: "sm" | "md" | "lg" }) {
+  const initials = getInitials(name);
+  const bgColor = getAvatarColor(name);
+  
+  const sizeClasses = {
+    sm: "h-6 w-6 text-xs",
+    md: "h-8 w-8 text-sm",
+    lg: "h-10 w-10 text-base",
+  };
+  
+  return (
+    <div className={`${sizeClasses[size]} ${bgColor} rounded-full flex items-center justify-center text-white font-medium flex-shrink-0`}>
+      {initials}
+    </div>
+  );
+}
+
 function FollowUpTypeIcon({ type }: { type: FollowUpType }) {
   switch (type) {
     case "call":
@@ -245,7 +294,8 @@ function KanbanCard({ prospect, onCardClick }: { prospect: CrmCustomer; onCardCl
       className="bg-white rounded-lg border shadow-sm p-3 cursor-grab active:cursor-grabbing"
       data-testid={`kanban-card-${prospect.id}`}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
+      <div className="flex items-start gap-2 mb-2">
+        <InitialsAvatar name={prospect.name} size="sm" />
         <button
           onClick={onCardClick}
           className="font-medium text-sm text-left hover:text-[#711419] truncate flex-1"
@@ -253,7 +303,7 @@ function KanbanCard({ prospect, onCardClick }: { prospect: CrmCustomer; onCardCl
         >
           {prospect.name}
         </button>
-        <div {...listeners} className="cursor-grab p-1 hover:bg-gray-100 rounded" data-testid={`kanban-card-drag-${prospect.id}`}>
+        <div {...listeners} className="cursor-grab p-1 hover:bg-gray-100 rounded flex-shrink-0" data-testid={`kanban-card-drag-${prospect.id}`}>
           <GripVertical className="h-4 w-4 text-gray-400" />
         </div>
       </div>
@@ -924,66 +974,71 @@ export default function CrmProspectFunnel() {
                   data-testid={`card-prospect-${prospect.id}`}
                 >
                   <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <CardTitle className="break-words text-base leading-tight flex-1 min-w-0" data-testid={`text-prospect-name-${prospect.id}`}>
-                        {prospect.name}
-                      </CardTitle>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <InterestBadge level={prospect.interestLevel as InterestLevel} />
-                        {isActive ? (
-                          <Select
-                            value={prospect.salesStage || "new"}
-                            onValueChange={(value) => updateStageMutation.mutate({ id: prospect.id, salesStage: value as SalesStage })}
-                          >
-                            <SelectTrigger className="h-8 min-w-[100px] text-xs" data-testid={`select-stage-${prospect.id}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="new">New</SelectItem>
-                              <SelectItem value="contacted">Contacted</SelectItem>
-                              <SelectItem value="quote_sent">Quote Sent</SelectItem>
-                              <SelectItem value="negotiating">Negotiating</SelectItem>
-                              <SelectItem value="won">Won</SelectItem>
-                              <SelectItem value="lost">Lost</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Badge variant={prospect.salesStage === "won" ? "default" : "destructive"} className="text-xs">
-                            {STAGE_LABELS[prospect.salesStage as SalesStage] || prospect.salesStage}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+                    <div className="flex items-start gap-3">
+                      <InitialsAvatar name={prospect.name} size="md" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <CardTitle className="break-words text-base leading-tight flex-1 min-w-0" data-testid={`text-prospect-name-${prospect.id}`}>
+                            {prospect.name}
+                          </CardTitle>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <InterestBadge level={prospect.interestLevel as InterestLevel} />
+                            {isActive ? (
+                              <Select
+                                value={prospect.salesStage || "new"}
+                                onValueChange={(value) => updateStageMutation.mutate({ id: prospect.id, salesStage: value as SalesStage })}
+                              >
+                                <SelectTrigger className="h-8 min-w-[100px] text-xs" data-testid={`select-stage-${prospect.id}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="new">New</SelectItem>
+                                  <SelectItem value="contacted">Contacted</SelectItem>
+                                  <SelectItem value="quote_sent">Quote Sent</SelectItem>
+                                  <SelectItem value="negotiating">Negotiating</SelectItem>
+                                  <SelectItem value="won">Won</SelectItem>
+                                  <SelectItem value="lost">Lost</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Badge variant={prospect.salesStage === "won" ? "default" : "destructive"} className="text-xs">
+                                {STAGE_LABELS[prospect.salesStage as SalesStage] || prospect.salesStage}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
 
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2">
-                      {prospect.phone && (
-                        <a href={`tel:${prospect.phone}`} className="flex items-center gap-1 hover:underline" data-testid={`link-phone-${prospect.id}`}>
-                          <Phone className="h-3 w-3" />
-                          <span>{prospect.phone}</span>
-                        </a>
-                      )}
-                      {prospect.email && (
-                        <a href={`mailto:${prospect.email}`} className="flex items-center gap-1 hover:underline truncate max-w-[180px]" data-testid={`link-email-${prospect.id}`}>
-                          <Mail className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate">{prospect.email}</span>
-                        </a>
-                      )}
-                    </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2">
+                          {prospect.phone && (
+                            <a href={`tel:${prospect.phone}`} className="flex items-center gap-1 hover:underline" data-testid={`link-phone-${prospect.id}`}>
+                              <Phone className="h-3 w-3" />
+                              <span>{prospect.phone}</span>
+                            </a>
+                          )}
+                          {prospect.email && (
+                            <a href={`mailto:${prospect.email}`} className="flex items-center gap-1 hover:underline truncate max-w-[180px]" data-testid={`link-email-${prospect.id}`}>
+                              <Mail className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">{prospect.email}</span>
+                            </a>
+                          )}
+                        </div>
 
-                    {(prospect.nextFollowUpAt || prospect.companyName) && (
-                      <div className="flex flex-wrap items-center gap-2 mt-3">
-                        {prospect.nextFollowUpAt && (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200">
-                            <FollowUpBadge nextFollowUpAt={prospect.nextFollowUpAt} />
+                        {(prospect.nextFollowUpAt || prospect.companyName) && (
+                          <div className="flex flex-wrap items-center gap-2 mt-3">
+                            {prospect.nextFollowUpAt && (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200">
+                                <FollowUpBadge nextFollowUpAt={prospect.nextFollowUpAt} />
+                              </div>
+                            )}
+                            {prospect.companyName && (
+                              <Badge variant="secondary" className="text-xs">
+                                {prospect.companyName}
+                              </Badge>
+                            )}
                           </div>
                         )}
-                        {prospect.companyName && (
-                          <Badge variant="secondary" className="text-xs">
-                            {prospect.companyName}
-                          </Badge>
-                        )}
                       </div>
-                    )}
+                    </div>
                   </CardHeader>
 
                   <CardContent className="pt-0">
