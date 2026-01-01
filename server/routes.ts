@@ -10012,7 +10012,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/crm/invoices/:id - Delete invoice (only draft invoices can be deleted)
+  // DELETE /api/crm/invoices/:id - Delete invoice (any status)
   app.delete("/api/crm/invoices/:id", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
@@ -10023,10 +10023,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [existingInvoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, req.params.id));
       if (!existingInvoice) {
         return res.status(404).json({ message: "Invoice not found" });
-      }
-      
-      if (existingInvoice.status !== "draft") {
-        return res.status(400).json({ message: "Only draft invoices can be deleted" });
       }
       
       if (existingInvoice.workOrderId) {
