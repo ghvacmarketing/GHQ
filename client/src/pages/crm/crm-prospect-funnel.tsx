@@ -614,15 +614,15 @@ export default function CrmProspectFunnel() {
   const expandedProspect = expandedProspectId ? filteredProspects.find(p => p.id === expandedProspectId) : null;
 
   const SearchFiltersComponent = () => (
-    <div className="space-y-3">
-      <div className="relative">
+    <div className="flex flex-col md:flex-row items-center justify-center gap-4 py-4 bg-slate-100 rounded-lg mb-4">
+      <div className="relative w-full max-w-md">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           type="text"
           placeholder="Search by name or phone..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
+          className="pl-10 bg-white rounded-full border-slate-300"
           data-testid="input-search-prospects"
         />
         {searchTerm && (
@@ -638,9 +638,9 @@ export default function CrmProspectFunnel() {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex gap-2">
         <Select value={activeFilter} onValueChange={setActiveFilter}>
-          <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
+          <SelectTrigger className="w-[130px] bg-white rounded-full border-slate-300" data-testid="select-status-filter">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
               <SelectValue />
@@ -658,7 +658,7 @@ export default function CrmProspectFunnel() {
         </Select>
 
         <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-          <SelectTrigger className="w-[160px]" data-testid="select-employee-filter">
+          <SelectTrigger className="w-[140px] bg-white rounded-full border-slate-300" data-testid="select-employee-filter">
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               <SelectValue placeholder="All Sales People" />
