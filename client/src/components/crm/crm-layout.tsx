@@ -73,7 +73,7 @@ const navSections: NavSection[] = [
   {
     title: "Sales",
     items: [
-      { label: "Sales Funnel", href: "/crm/prospect-funnel", icon: FolderKanban },
+      { label: "Prospect Funnel", href: "/crm/prospect-funnel", icon: FolderKanban },
     ],
   },
   {

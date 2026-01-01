@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -352,7 +351,7 @@ export default function CrmProspectFunnel() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">
-              Sales Funnel
+              Prospect Funnel
             </h1>
             <p className="text-sm text-slate-500">
               Track prospects through your sales pipeline
@@ -369,23 +368,23 @@ export default function CrmProspectFunnel() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-3 md:grid-cols-5 gap-2 md:gap-4">
           {STAGES.map(stage => (
             <Card key={stage.key} className={`${stage.bgColor} ${stage.borderColor} border`}>
-              <CardContent className="p-4 text-center">
-                <p className={`text-3xl font-bold ${stage.color}`} data-testid={`stat-${stage.key}-count`}>
+              <CardContent className="p-2 md:p-4 text-center">
+                <p className={`text-xl md:text-3xl font-bold ${stage.color}`} data-testid={`stat-${stage.key}-count`}>
                   {prospectsByStage[stage.key].length}
                 </p>
-                <p className={`text-sm ${stage.color}`}>{stage.label}</p>
+                <p className={`text-xs md:text-sm ${stage.color}`}>{stage.label}</p>
               </CardContent>
             </Card>
           ))}
           <Card className="bg-red-50 border-red-200 border">
-            <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-red-700" data-testid="stat-overdue-count">
+            <CardContent className="p-2 md:p-4 text-center">
+              <p className="text-xl md:text-3xl font-bold text-red-700" data-testid="stat-overdue-count">
                 {overdueCount}
               </p>
-              <p className="text-sm text-red-600">Overdue</p>
+              <p className="text-xs md:text-sm text-red-600">Overdue</p>
             </CardContent>
           </Card>
         </div>
@@ -434,10 +433,10 @@ export default function CrmProspectFunnel() {
             ))}
           </div>
         ) : (
-          <ScrollArea className="w-full">
-            <div className="flex gap-4 pb-4 min-w-max">
+          <div className="overflow-x-auto">
+            <div className="flex gap-4 pb-4" style={{ minWidth: "fit-content" }}>
               {STAGES.map(stage => (
-                <div key={stage.key} className="w-72 flex-shrink-0">
+                <div key={stage.key} className="w-64 md:w-72 flex-shrink-0">
                   <Card className={`${stage.bgColor} ${stage.borderColor} border mb-3`}>
                     <CardHeader className="py-3 px-4">
                       <CardTitle className={`text-sm font-semibold ${stage.color} flex items-center justify-between`}>
@@ -469,8 +468,7 @@ export default function CrmProspectFunnel() {
                 </div>
               ))}
             </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+          </div>
         )}
 
         <Dialog open={followUpDialogOpen} onOpenChange={setFollowUpDialogOpen}>
