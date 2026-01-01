@@ -490,6 +490,12 @@ export default function CrmWorkOrders() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && key[0] === "/api/crm/dispatch/work-orders";
+        }
+      });
       toast({ title: "Work order updated", description: "Changes have been saved." });
     },
     onError: (error: Error) => {
@@ -1256,8 +1262,10 @@ export default function CrmWorkOrders() {
                     </Select>
                     <Button
                       size="sm"
+                      variant="outline"
                       onClick={handleUpdateStatus}
                       disabled={updateWorkOrderMutation.isPending || newStatus === selectedWorkOrder.status}
+                      className="text-slate-700 hover:bg-slate-100"
                       data-testid="button-update-status"
                     >
                       Update
@@ -1283,8 +1291,10 @@ export default function CrmWorkOrders() {
                     </Select>
                     <Button
                       size="sm"
+                      variant="outline"
                       onClick={handleReassignTech}
                       disabled={updateWorkOrderMutation.isPending}
+                      className="text-slate-700 hover:bg-slate-100"
                       data-testid="button-reassign-tech"
                     >
                       Assign
@@ -1354,8 +1364,10 @@ export default function CrmWorkOrders() {
                   </div>
                   <Button
                     size="sm"
+                    variant="outline"
                     onClick={handleReschedule}
                     disabled={updateWorkOrderMutation.isPending || !rescheduleDate}
+                    className="text-slate-700 hover:bg-slate-100"
                     data-testid="button-reschedule"
                   >
                     Reschedule
@@ -1375,8 +1387,10 @@ export default function CrmWorkOrders() {
                   />
                   <Button
                     size="sm"
+                    variant="outline"
                     onClick={handleSaveTechNotes}
                     disabled={updateWorkOrderMutation.isPending}
+                    className="text-slate-700 hover:bg-slate-100"
                     data-testid="button-save-notes"
                   >
                     Save Notes
@@ -1406,8 +1420,10 @@ export default function CrmWorkOrders() {
                     </div>
                     <Button
                       size="sm"
+                      variant="outline"
                       onClick={handleSaveChecklist}
                       disabled={updateWorkOrderMutation.isPending}
+                      className="text-slate-700 hover:bg-slate-100"
                       data-testid="button-save-checklist"
                     >
                       Save Checklist
