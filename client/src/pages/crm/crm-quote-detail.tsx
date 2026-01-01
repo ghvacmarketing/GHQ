@@ -1136,7 +1136,7 @@ export default function CrmQuoteDetail() {
                   size="sm"
                   className="border-blue-500 text-blue-600"
                 >
-                  <Download className="h-4 w-4 mr-1" />
+                  <Printer className="h-4 w-4 mr-1" />
                   PDF
                 </Button>
                 <Button
