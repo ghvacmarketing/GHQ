@@ -603,7 +603,7 @@ export default function CrmInvoices() {
           <Button 
             size="sm" 
             className="bg-[#711419] hover:bg-[#5a1014] text-white" 
-            onClick={() => setShowCreateDialog(true)}
+            onClick={() => navigate("/crm/invoices/new")}
             data-testid="button-create-invoice"
           >
             <Plus className="h-4 w-4 mr-1" />

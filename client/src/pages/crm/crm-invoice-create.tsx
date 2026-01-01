@@ -890,7 +890,7 @@ export default function CrmInvoiceCreate() {
                               WO #{selectedWorkOrder.workOrderNumber} - {selectedWorkOrder.title}
                             </div>
                             <div className="text-sm text-slate-500">
-                              {selectedWorkOrder.customerName || selectedWorkOrder.customer?.displayName}
+                              {selectedWorkOrder.customerName || selectedWorkOrder.customer?.name}
                             </div>
                           </div>
                         ) : (

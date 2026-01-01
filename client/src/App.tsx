@@ -169,6 +169,7 @@ function Router() {
       <Route path="/crm/accounts/:id">{() => <CrmWrapper><CrmAccountDetail /></CrmWrapper>}</Route>
       <Route path="/crm/customers/:id">{() => <CrmWrapper><CrmCustomerDetail /></CrmWrapper>}</Route>
       <Route path="/crm/customers">{() => <CrmWrapper><CrmCustomers /></CrmWrapper>}</Route>
+      <Route path="/crm/invoices/new">{() => <CrmWrapper><CrmInvoiceCreate /></CrmWrapper>}</Route>
       <Route path="/crm/invoices/:id">{() => <CrmWrapper><CrmInvoiceDetail /></CrmWrapper>}</Route>
       <Route path="/crm/invoices">{() => <CrmWrapper><CrmInvoices /></CrmWrapper>}</Route>
       <Route path="/crm/quotes/install-worksheet/:id">{() => <CrmWrapper><CrmInstallWorksheet /></CrmWrapper>}</Route>
