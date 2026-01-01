@@ -52,10 +52,10 @@ import {
   User,
   Calendar,
   DollarSign,
-  Download,
   Printer,
   MapPin,
   CreditCard,
+  Trash2,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -93,6 +93,7 @@ export default function CrmInvoiceDetail() {
   const { toast } = useToast();
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showVoidConfirm, setShowVoidConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string>("check");
   const [paymentNotes, setPaymentNotes] = useState("");
@@ -202,6 +203,25 @@ export default function CrmInvoiceDetail() {
     });
   };
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/crm/invoices/${invoiceId}`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to delete invoice");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      toast({ title: "Invoice deleted", description: "Invoice has been deleted." });
+      navigate("/crm/invoices");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete invoice", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleVoid = () => {
     setShowVoidConfirm(true);
   };
@@ -211,8 +231,13 @@ export default function CrmInvoiceDetail() {
     setShowVoidConfirm(false);
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handleDelete = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    deleteMutation.mutate();
+    setShowDeleteConfirm(false);
   };
 
   const formatCurrency = (value: string | number | null) => {
@@ -485,87 +510,95 @@ export default function CrmInvoiceDetail() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        {/* Header - Two rows for cleaner layout */}
+        <div className="space-y-4">
+          {/* First row: Back button, Title, Status */}
+          <div className="flex items-center gap-3">
             <Link href="/crm/invoices">
               <Button variant="ghost" size="icon" data-testid="button-back">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-slate-900" data-testid="text-invoice-number">
-                  Invoice {invoice.invoiceNumber}
-                </h1>
-                <Badge className={`${statusColors[status]} border`} data-testid="badge-status">
-                  {statusLabels[status]}
-                </Badge>
-              </div>
-              <p className="text-sm text-slate-500 mt-1" data-testid="text-invoice-date">
-                Created {formatDate(invoice.createdAt)}
-              </p>
-            </div>
+            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-invoice-number">
+              Invoice {invoice.invoiceNumber}
+            </h1>
+            <Badge className={`${statusColors[status]} border`} data-testid="badge-status">
+              {statusLabels[status]}
+            </Badge>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSend}
-              disabled={isSent || isVoid || sendMutation.isPending}
-              data-testid="button-send"
-            >
-              {sendMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4 mr-2" />
-              )}
-              Send
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowPaymentDialog(true)}
-              disabled={isVoid || isPaid}
-              className="text-green-600 hover:text-green-700 hover:bg-green-50"
-              data-testid="button-record-payment"
-            >
-              <CreditCard className="h-4 w-4 mr-2" />
-              Record Payment
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleVoid}
-              disabled={isVoid || voidMutation.isPending}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              data-testid="button-void"
-            >
-              {voidMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <XCircle className="h-4 w-4 mr-2" />
-              )}
-              Void
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePrint}
-              data-testid="button-print"
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownloadPDF}
-              data-testid="button-download"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Download PDF
-            </Button>
+          
+          {/* Second row: Date and Actions */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-500" data-testid="text-invoice-date">
+              Created {formatDate(invoice.createdAt)}
+            </p>
+            
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSend}
+                disabled={isSent || isVoid || sendMutation.isPending}
+                data-testid="button-send"
+              >
+                {sendMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Send
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPaymentDialog(true)}
+                disabled={isVoid || isPaid}
+                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                data-testid="button-record-payment"
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                Record Payment
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadPDF}
+                data-testid="button-print"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleVoid}
+                disabled={isVoid || voidMutation.isPending}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                data-testid="button-void"
+              >
+                {voidMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <XCircle className="h-4 w-4 mr-2" />
+                )}
+                Void
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                data-testid="button-delete"
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Delete
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -788,6 +821,27 @@ export default function CrmInvoiceDetail() {
               data-testid="button-confirm-void"
             >
               Void Invoice
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Invoice?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete this invoice? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-confirm-delete"
+            >
+              Delete Invoice
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
