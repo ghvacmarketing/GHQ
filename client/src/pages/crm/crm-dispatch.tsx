@@ -1400,8 +1400,8 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
           onClick?.(workOrder.id);
         }}
       >
-        <p className="text-xs font-medium truncate">{workOrder.customerName}</p>
-        <p className="text-xs truncate opacity-70">{workOrder.jobType} #{workOrder.workOrderNumber}</p>
+        <p className="text-xs font-medium truncate">{workOrder.title || workOrder.description || workOrder.customerName}</p>
+        <p className="text-xs truncate opacity-70">{workOrder.customerName}</p>
       </div>
     </div>
   );
@@ -1428,8 +1428,8 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
           {workOrder.priority.toUpperCase()}
         </div>
       )}
-      <p className="text-xs font-medium truncate">{workOrder.customerName}</p>
-      <p className="text-xs truncate opacity-70">{workOrder.jobType} #{workOrder.workOrderNumber}</p>
+      <p className="text-xs font-medium truncate">{workOrder.title || workOrder.description || workOrder.customerName}</p>
+      <p className="text-xs truncate opacity-70">{workOrder.customerName}</p>
     </div>
   );
 }
