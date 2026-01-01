@@ -63,11 +63,12 @@ export default function CrmLeads() {
             </p>
           </div>
           <Button
+            size="sm"
             onClick={() => navigate("/sales-prospects/create")}
             className="bg-[#711419] hover:bg-[#5a1014]"
             data-testid="button-create-lead"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4 mr-1" />
             New Lead
           </Button>
         </div>
