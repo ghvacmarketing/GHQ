@@ -367,9 +367,14 @@ export default function CrmProspectFunnel() {
       .sort((a, b) => new Date(b.dueAt).getTime() - new Date(a.dueAt).getTime());
   };
 
+  const SALES_PEOPLE: Record<string, string> = {
+    chandler: "Chandler",
+    earnest: "Earnest",
+  };
+  
   const selectedEmployeeName = selectedEmployeeId === "all" 
     ? null 
-    : users.find((u) => u.id === selectedEmployeeId)?.name || "Unknown";
+    : SALES_PEOPLE[selectedEmployeeId] || "Unknown";
 
   if (authLoading) {
     return (
@@ -607,22 +612,19 @@ export default function CrmProspectFunnel() {
               </SelectContent>
             </Select>
 
-            {users.length > 0 && (
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger className="w-[150px]" data-testid="select-employee-filter">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    <SelectValue placeholder="All Employees" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Employees</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <SelectTrigger className="w-[150px]" data-testid="select-employee-filter">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  <SelectValue placeholder="All Employees" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Employees</SelectItem>
+                <SelectItem value="chandler">Chandler</SelectItem>
+                <SelectItem value="earnest">Earnest</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
