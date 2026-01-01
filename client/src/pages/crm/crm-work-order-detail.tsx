@@ -984,6 +984,57 @@ export default function CrmWorkOrderDetail() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Quick Actions */}
+            <Card className="shadow-sm bg-gradient-to-r from-slate-50 to-white border-l-4 border-l-[#711419]">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <Wand2 className="h-4 w-4 text-[#711419]" />
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-[#711419] text-[#711419] hover:bg-[#711419] hover:text-white"
+                    onClick={() => {
+                      const params = new URLSearchParams();
+                      params.set("workOrderId", workOrder.id);
+                      if (workOrder.customerId) params.set("customerId", workOrder.customerId);
+                      if (workOrder.projectId) params.set("projectId", workOrder.projectId);
+                      if (workOrder.propertyId) params.set("propertyId", workOrder.propertyId);
+                      navigate(`/crm/proposal-builder?${params.toString()}`);
+                    }}
+                    data-testid="quick-action-generate-proposal"
+                  >
+                    <Wand2 className="h-4 w-4 mr-2" />
+                    Generate Proposal
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                    onClick={() => setCreateQuoteDialogOpen(true)}
+                    data-testid="quick-action-create-quote"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Create Quote
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => createInvoiceMutation.mutate()}
+                    disabled={createInvoiceMutation.isPending}
+                    data-testid="quick-action-create-invoice"
+                  >
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    {createInvoiceMutation.isPending ? "Creating..." : "Create Invoice"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="shadow-sm">
                 <CardHeader className="pb-3 border-b bg-slate-50/50">
@@ -1472,411 +1523,464 @@ export default function CrmWorkOrderDetail() {
           </TabsContent>
 
           <TabsContent value="edit" className="mt-6">
-            <Card className="shadow-sm">
-              <CardHeader className="pb-3 border-b bg-slate-50/50">
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <Pencil className="h-4 w-4 text-[#711419]" />
-                  Edit Work Order
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-6">
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Customer</h4>
-                  <div className="flex items-center justify-between">
-                    <p className="text-slate-900">{workOrder.customer?.name || "—"}</p>
-                    <Popover open={reassignCustomerSearchOpen} onOpenChange={setReassignCustomerSearchOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-[#711419] hover:bg-[#711419]/10"
-                          data-testid="button-change-customer"
-                        >
-                          <Edit className="h-3.5 w-3.5 mr-1" />
-                          Change
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[350px] p-0" align="end">
-                        <Command shouldFilter={false}>
-                          <CommandInput
-                            placeholder="Search customers..."
-                            value={reassignCustomerSearch}
-                            onValueChange={setReassignCustomerSearch}
-                            data-testid="input-customer-search"
-                          />
-                          <CommandList>
-                            {reassignCustomersLoading ? (
-                              <div className="p-4 text-center text-sm text-slate-500">
-                                Loading...
-                              </div>
-                            ) : reassignCustomers.length === 0 ? (
-                              <CommandEmpty>No customers found.</CommandEmpty>
-                            ) : (
-                              <CommandGroup>
-                                {reassignCustomers.map((customer) => (
-                                  <CommandItem
-                                    key={customer.id}
-                                    value={customer.id}
-                                    onSelect={() => handleReassignCustomer(customer)}
-                                    data-testid={`reassign-customer-${customer.id}`}
-                                  >
-                                    <User className="h-4 w-4 mr-2 text-slate-500" />
-                                    <div>
-                                      <p className="font-medium">{customer.name}</p>
-                                      <p className="text-xs text-slate-500">{customer.fullAddress || customer.customerType}</p>
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            )}
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Site <span className="text-red-500">*</span></h4>
-                  {properties.length > 0 ? (
-                    <Select 
-                      value={workOrder.propertyId || ""} 
-                      onValueChange={handleUpdateProperty}
-                    >
-                      <SelectTrigger className="w-full" data-testid="select-edit-site">
-                        <SelectValue placeholder="Select a site">
-                          {workOrder.property 
-                            ? getPropertyAddress(workOrder.property) 
-                            : "Select a site"}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {properties.map((property) => (
-                          <SelectItem key={property.id} value={property.id}>
-                            {getPropertyAddress(property)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-sm text-slate-500">No sites for this customer</p>
-                      {workOrder.customerId && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/crm/customers/${workOrder.customerId}`)}
-                          className="w-full"
-                          data-testid="button-add-site"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Site
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Linked Project</h4>
-                  {workOrder.project ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Customer & Location Card */}
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3 border-b bg-slate-50/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <User className="h-4 w-4 text-[#711419]" />
+                    Customer & Location
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Customer</Label>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FolderOpen className="h-4 w-4 text-slate-500" />
-                        <Link 
-                          to={`/crm/projects/${workOrder.projectId}`}
-                          className="text-[#711419] hover:underline font-medium"
-                        >
-                          {workOrder.project.title}
-                        </Link>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => handleLinkProject(null)}
-                        className="text-slate-500 hover:text-red-600"
-                        data-testid="button-unlink-project"
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  ) : projectsLoading ? (
-                    <p className="text-sm text-slate-500">Loading...</p>
-                  ) : (
-                    <Popover open={projectSearchOpen} onOpenChange={setProjectSearchOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full justify-start"
-                          data-testid="button-link-project"
-                        >
-                          <FolderOpen className="h-4 w-4 mr-2" />
-                          {linkableProjects.length === 0 ? "No projects - Create one" : "Add to Project"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0" align="start">
-                        <Command shouldFilter={false}>
-                          <CommandInput
-                            placeholder="Search projects..."
-                            value={projectSearch}
-                            onValueChange={setProjectSearch}
-                            data-testid="input-project-search"
-                          />
-                          <CommandList>
-                            {linkableProjects.length === 0 ? (
-                              <div className="p-4 text-center">
-                                <p className="text-sm text-slate-500 mb-3">No projects for this customer</p>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setProjectSearchOpen(false);
-                                    navigate(`/crm/customers/${workOrder.customerId}`);
-                                  }}
-                                  data-testid="button-create-project"
-                                >
-                                  <Plus className="h-4 w-4 mr-2" />
-                                  Create Project
-                                </Button>
-                              </div>
-                            ) : (
-                              <CommandGroup>
-                                {linkableProjects.map((project) => (
-                                  <CommandItem
-                                    key={project.id}
-                                    value={project.id}
-                                    onSelect={() => handleLinkProject(project.id)}
-                                    data-testid={`project-option-${project.id}`}
-                                  >
-                                    <FolderOpen className="h-4 w-4 mr-2 text-slate-500" />
-                                    <div>
-                                      <p className="font-medium">{project.title}</p>
-                                      <p className="text-xs text-slate-500">{project.projectType}</p>
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            )}
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Status</h4>
-                  <div className="flex items-center gap-2">
-                    <Select value={newStatus} onValueChange={setNewStatus}>
-                      <SelectTrigger className="w-[180px]" data-testid="select-edit-status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"] as WorkOrderStatus[]).map((status) => (
-                          <SelectItem key={status} value={status}>
-                            {statusLabels[status]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      onClick={handleUpdateStatus}
-                      disabled={updateWorkOrderMutation.isPending || newStatus === workOrder.status}
-                      data-testid="button-update-status"
-                    >
-                      Update
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Assigned Tech</h4>
-                  <div className="flex items-center gap-2">
-                    <Select value={reassignTechId} onValueChange={setReassignTechId}>
-                      <SelectTrigger className="w-[180px]" data-testid="select-edit-tech">
-                        <SelectValue placeholder="Unassigned" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {technicians.map((tech) => (
-                          <SelectItem key={tech.id} value={tech.id}>
-                            {tech.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      onClick={handleReassignTech}
-                      disabled={updateWorkOrderMutation.isPending}
-                      data-testid="button-assign-tech"
-                    >
-                      Assign
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Schedule</h4>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Date</Label>
-                      <Popover>
+                      <p className="text-slate-900 font-medium">{workOrder.customer?.name || "—"}</p>
+                      <Popover open={reassignCustomerSearchOpen} onOpenChange={setReassignCustomerSearchOpen}>
                         <PopoverTrigger asChild>
                           <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !rescheduleDate && "text-muted-foreground"
-                            )}
-                            data-testid="calendar-reschedule"
+                            variant="ghost"
+                            size="sm"
+                            className="text-[#711419] hover:bg-[#711419]/10"
+                            data-testid="button-change-customer"
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {rescheduleDate ? format(rescheduleDate, "MMM d, yyyy") : "Pick date"}
+                            <Edit className="h-3.5 w-3.5 mr-1" />
+                            Change
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={rescheduleDate}
-                            onSelect={setRescheduleDate}
-                            initialFocus
-                          />
+                        <PopoverContent className="w-[350px] p-0" align="end">
+                          <Command shouldFilter={false}>
+                            <CommandInput
+                              placeholder="Search customers..."
+                              value={reassignCustomerSearch}
+                              onValueChange={setReassignCustomerSearch}
+                              data-testid="input-customer-search"
+                            />
+                            <CommandList>
+                              {reassignCustomersLoading ? (
+                                <div className="p-4 text-center text-sm text-slate-500">
+                                  Loading...
+                                </div>
+                              ) : reassignCustomers.length === 0 ? (
+                                <CommandEmpty>No customers found.</CommandEmpty>
+                              ) : (
+                                <CommandGroup>
+                                  {reassignCustomers.map((customer) => (
+                                    <CommandItem
+                                      key={customer.id}
+                                      value={customer.id}
+                                      onSelect={() => handleReassignCustomer(customer)}
+                                      data-testid={`reassign-customer-${customer.id}`}
+                                    >
+                                      <User className="h-4 w-4 mr-2 text-slate-500" />
+                                      <div>
+                                        <p className="font-medium">{customer.name}</p>
+                                        <p className="text-xs text-slate-500">{customer.fullAddress || customer.customerType}</p>
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              )}
+                            </CommandList>
+                          </Command>
                         </PopoverContent>
                       </Popover>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Start Time</Label>
-                      <Select value={rescheduleStartTime} onValueChange={setRescheduleStartTime}>
-                        <SelectTrigger data-testid="select-edit-start-time">
-                          <SelectValue placeholder="Start" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-[200px]">
-                          {timeOptions.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">End Time</Label>
-                      <Select value={rescheduleEndTime} onValueChange={setRescheduleEndTime}>
-                        <SelectTrigger data-testid="select-edit-end-time">
-                          <SelectValue placeholder="End" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-[200px]">
-                          {timeOptions.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={handleReschedule}
-                    disabled={updateWorkOrderMutation.isPending || !rescheduleDate || !rescheduleStartTime || !rescheduleEndTime}
-                    data-testid="button-reschedule"
-                  >
-                    Reschedule
-                  </Button>
-                </div>
 
-                <Separator />
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Checklist</h4>
                   <div className="space-y-2">
-                    {editingChecklist.map((item, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`checklist-item-${index}`}
-                          checked={item.completed}
-                          onCheckedChange={(checked) => {
-                            const newList = [...editingChecklist];
-                            newList[index] = { ...item, completed: !!checked };
-                            setEditingChecklist(newList);
-                          }}
-                        />
-                        <Input
-                          value={item.item}
-                          onChange={(e) => {
-                            const newList = [...editingChecklist];
-                            newList[index] = { ...item, item: e.target.value };
-                            setEditingChecklist(newList);
-                          }}
-                          className="h-8 text-sm"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-slate-400 hover:text-red-500"
-                          onClick={() => {
-                            setEditingChecklist(editingChecklist.filter((_, i) => i !== index));
-                          }}
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-xs"
-                      onClick={() => setEditingChecklist([...editingChecklist, { item: "", completed: false }])}
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add Item
-                    </Button>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={handleSaveChecklist}
-                    disabled={updateWorkOrderMutation.isPending}
-                    data-testid="button-save-checklist"
-                  >
-                    Save Checklist
-                  </Button>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Billing Disposition</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Disposition</Label>
-                      <Select value={billingDisposition} onValueChange={setBillingDisposition}>
-                        <SelectTrigger data-testid="select-billing-disposition">
-                          <SelectValue placeholder="Select disposition" />
+                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Site <span className="text-red-500">*</span></Label>
+                    {properties.length > 0 ? (
+                      <Select 
+                        value={workOrder.propertyId || ""} 
+                        onValueChange={handleUpdateProperty}
+                      >
+                        <SelectTrigger className="w-full" data-testid="select-edit-site">
+                          <SelectValue placeholder="Select a site">
+                            {workOrder.property 
+                              ? getPropertyAddress(workOrder.property) 
+                              : "Select a site"}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="not_set">Not Set</SelectItem>
-                          <SelectItem value="invoice_created">Invoice Created</SelectItem>
-                          <SelectItem value="no_charge">No Charge</SelectItem>
-                          <SelectItem value="billed_elsewhere">Billed Elsewhere</SelectItem>
+                          {properties.map((property) => (
+                            <SelectItem key={property.id} value={property.id}>
+                              {getPropertyAddress(property)}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Billing Notes</Label>
-                      <Textarea
-                        value={billingNotes}
-                        onChange={(e) => setBillingNotes(e.target.value)}
-                        placeholder="Billing specific notes..."
-                        className="min-h-[80px]"
-                        data-testid="textarea-billing-notes"
-                      />
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-sm text-slate-500">No sites for this customer</p>
+                        {workOrder.customerId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(`/crm/customers/${workOrder.customerId}`)}
+                            className="w-full"
+                            data-testid="button-add-site"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Site
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Linked Project</Label>
+                    {workOrder.project ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FolderOpen className="h-4 w-4 text-slate-500" />
+                          <Link 
+                            to={`/crm/projects/${workOrder.projectId}`}
+                            className="text-[#711419] hover:underline font-medium"
+                          >
+                            {workOrder.project.title}
+                          </Link>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleLinkProject(null)}
+                          className="text-slate-500 hover:text-red-600"
+                          data-testid="button-unlink-project"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ) : projectsLoading ? (
+                      <p className="text-sm text-slate-500">Loading...</p>
+                    ) : (
+                      <Popover open={projectSearchOpen} onOpenChange={setProjectSearchOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start"
+                            data-testid="button-link-project"
+                          >
+                            <FolderOpen className="h-4 w-4 mr-2" />
+                            {linkableProjects.length === 0 ? "No projects - Create one" : "Add to Project"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0" align="start">
+                          <Command shouldFilter={false}>
+                            <CommandInput
+                              placeholder="Search projects..."
+                              value={projectSearch}
+                              onValueChange={setProjectSearch}
+                              data-testid="input-project-search"
+                            />
+                            <CommandList>
+                              {linkableProjects.length === 0 ? (
+                                <div className="p-4 text-center">
+                                  <p className="text-sm text-slate-500 mb-3">No projects for this customer</p>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setProjectSearchOpen(false);
+                                      navigate(`/crm/customers/${workOrder.customerId}`);
+                                    }}
+                                    data-testid="button-create-project"
+                                  >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Create Project
+                                  </Button>
+                                </div>
+                              ) : (
+                                <CommandGroup>
+                                  {linkableProjects.map((project) => (
+                                    <CommandItem
+                                      key={project.id}
+                                      value={project.id}
+                                      onSelect={() => handleLinkProject(project.id)}
+                                      data-testid={`project-option-${project.id}`}
+                                    >
+                                      <FolderOpen className="h-4 w-4 mr-2 text-slate-500" />
+                                      <div>
+                                        <p className="font-medium">{project.title}</p>
+                                        <p className="text-xs text-slate-500">{project.projectType}</p>
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              )}
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Status & Assignment Card */}
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3 border-b bg-slate-50/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <Clock className="h-4 w-4 text-[#711419]" />
+                    Status & Assignment
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Status</Label>
+                    <div className="flex items-center gap-2">
+                      <Select value={newStatus} onValueChange={setNewStatus}>
+                        <SelectTrigger className="flex-1" data-testid="select-edit-status">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"] as WorkOrderStatus[]).map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {statusLabels[status]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        onClick={handleUpdateStatus}
+                        disabled={updateWorkOrderMutation.isPending || newStatus === workOrder.status}
+                        data-testid="button-update-status"
+                      >
+                        Update
+                      </Button>
                     </div>
                   </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Assigned Tech</Label>
+                    <div className="flex items-center gap-2">
+                      <Select value={reassignTechId} onValueChange={setReassignTechId}>
+                        <SelectTrigger className="flex-1" data-testid="select-edit-tech">
+                          <SelectValue placeholder="Unassigned" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {technicians.map((tech) => (
+                            <SelectItem key={tech.id} value={tech.id}>
+                              {tech.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        onClick={handleReassignTech}
+                        disabled={updateWorkOrderMutation.isPending}
+                        data-testid="button-assign-tech"
+                      >
+                        Assign
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Schedule</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Date</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !rescheduleDate && "text-muted-foreground"
+                              )}
+                              data-testid="calendar-reschedule"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {rescheduleDate ? format(rescheduleDate, "MMM d, yyyy") : "Pick date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={rescheduleDate}
+                              onSelect={setRescheduleDate}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Start Time</Label>
+                        <Select value={rescheduleStartTime} onValueChange={setRescheduleStartTime}>
+                          <SelectTrigger data-testid="select-edit-start-time">
+                            <SelectValue placeholder="Start" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[200px]">
+                            {timeOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">End Time</Label>
+                        <Select value={rescheduleEndTime} onValueChange={setRescheduleEndTime}>
+                          <SelectTrigger data-testid="select-edit-end-time">
+                            <SelectValue placeholder="End" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[200px]">
+                            {timeOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleReschedule}
+                      disabled={updateWorkOrderMutation.isPending || !rescheduleDate || !rescheduleStartTime || !rescheduleEndTime}
+                      data-testid="button-reschedule"
+                    >
+                      Reschedule
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Work Details & Billing Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+              {/* Work Details Card */}
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3 border-b bg-slate-50/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <ClipboardList className="h-4 w-4 text-[#711419]" />
+                    Work Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Checklist</Label>
+                    <div className="space-y-2">
+                      {editingChecklist.map((item, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`checklist-item-${index}`}
+                            checked={item.completed}
+                            onCheckedChange={(checked) => {
+                              const newList = [...editingChecklist];
+                              newList[index] = { ...item, completed: !!checked };
+                              setEditingChecklist(newList);
+                            }}
+                          />
+                          <Input
+                            value={item.item}
+                            onChange={(e) => {
+                              const newList = [...editingChecklist];
+                              newList[index] = { ...item, item: e.target.value };
+                              setEditingChecklist(newList);
+                            }}
+                            className="h-8 text-sm"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-red-500"
+                            onClick={() => {
+                              setEditingChecklist(editingChecklist.filter((_, i) => i !== index));
+                            }}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => setEditingChecklist([...editingChecklist, { item: "", completed: false }])}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add Item
+                      </Button>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveChecklist}
+                      disabled={updateWorkOrderMutation.isPending}
+                      data-testid="button-save-checklist"
+                    >
+                      Save Checklist
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Tech Notes</Label>
+                    <Textarea
+                      value={editingTechNotes}
+                      onChange={(e) => setEditingTechNotes(e.target.value)}
+                      placeholder="Add notes..."
+                      className="min-h-[80px]"
+                      data-testid="textarea-edit-tech-notes"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleSaveTechNotes}
+                      disabled={updateWorkOrderMutation.isPending}
+                      data-testid="button-save-notes"
+                    >
+                      Save Notes
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Billing Card */}
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3 border-b bg-slate-50/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <DollarSign className="h-4 w-4 text-[#711419]" />
+                    Billing
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Disposition</Label>
+                    <Select value={billingDisposition} onValueChange={setBillingDisposition}>
+                      <SelectTrigger data-testid="select-billing-disposition">
+                        <SelectValue placeholder="Select disposition" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="not_set">Not Set</SelectItem>
+                        <SelectItem value="invoice_created">Invoice Created</SelectItem>
+                        <SelectItem value="no_charge">No Charge</SelectItem>
+                        <SelectItem value="billed_elsewhere">Billed Elsewhere</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Billing Notes</Label>
+                    <Textarea
+                      value={billingNotes}
+                      onChange={(e) => setBillingNotes(e.target.value)}
+                      placeholder="Billing specific notes..."
+                      className="min-h-[100px]"
+                      data-testid="textarea-billing-notes"
+                    />
+                  </div>
+
                   <Button
                     size="sm"
                     onClick={handleSaveBilling}
@@ -1885,31 +1989,9 @@ export default function CrmWorkOrderDetail() {
                   >
                     Save Billing Info
                   </Button>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Tech Notes</h4>
-                  <Textarea
-                    value={editingTechNotes}
-                    onChange={(e) => setEditingTechNotes(e.target.value)}
-                    placeholder="Add notes..."
-                    className="min-h-[80px]"
-                    data-testid="textarea-edit-tech-notes"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleSaveTechNotes}
-                    disabled={updateWorkOrderMutation.isPending}
-                    data-testid="button-save-notes"
-                  >
-                    Save Notes
-                  </Button>
-                </div>
-
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
 
