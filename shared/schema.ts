@@ -1081,6 +1081,34 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// CRM Quote Email Logs - tracks email sends for quotes
+export const quoteEmailLogsStatusEnum = ["pending", "sent", "failed", "bounced"] as const;
+export type QuoteEmailLogStatus = typeof quoteEmailLogsStatusEnum[number];
+
+export const quoteEmailLogs = pgTable("quote_email_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteId: varchar("quote_id").notNull().references(() => crmQuotes.id, { onDelete: "cascade" }),
+  recipientEmail: text("recipient_email").notNull(),
+  recipientName: text("recipient_name"),
+  subject: text("subject").notNull(),
+  status: text("status").$type<QuoteEmailLogStatus>().notNull().default("pending"),
+  errorMessage: text("error_message"),
+  sentBy: varchar("sent_by"),
+  sentAt: timestamp("sent_at").defaultNow(),
+  deliveredAt: timestamp("delivered_at"),
+  openedAt: timestamp("opened_at"),
+  personalMessage: text("personal_message"),
+  isManual: boolean("is_manual").default(false),
+});
+
+export const insertQuoteEmailLogSchema = createInsertSchema(quoteEmailLogs).omit({
+  id: true,
+  sentAt: true,
+});
+
+export type InsertQuoteEmailLog = z.infer<typeof insertQuoteEmailLogSchema>;
+export type QuoteEmailLog = typeof quoteEmailLogs.$inferSelect;
+
 // CRM Invoice Status
 export const crmInvoiceStatusEnum = ["draft", "sent", "paid", "void", "partial"] as const;
 export type CrmInvoiceStatus = typeof crmInvoiceStatusEnum[number];
