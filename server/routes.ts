@@ -9536,9 +9536,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
 
   // Helper to generate invoice number: INV-YYYYMMDD-XXX (sequential)
+  // Uses America/New_York timezone (Eastern Time) for consistent date formatting
   async function generateInvoiceNumber(): Promise<string> {
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+    const dateStr = now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replace(/-/g, "");
     const prefix = `INV-${dateStr}-`;
     
     const todayInvoices = await db.select({ invoiceNumber: crmInvoices.invoiceNumber })
@@ -10388,9 +10389,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =============================================
 
   // Helper to generate quote number: Q-YYYYMMDD-XXX (sequential)
+  // Uses America/New_York timezone (Eastern Time) for consistent date formatting
   async function generateQuoteNumber(): Promise<string> {
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+    const dateStr = now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replace(/-/g, "");
     const prefix = `Q-${dateStr}-`;
     
     const todayQuotes = await db.select({ quoteNumber: crmQuotes.quoteNumber })
