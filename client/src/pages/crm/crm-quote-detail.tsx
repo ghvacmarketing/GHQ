@@ -133,6 +133,7 @@ export default function CrmQuoteDetail() {
   const [quoteContext, setQuoteContext] = useState<{ customerId?: string; propertyId?: string; projectId?: string }>({});
   const [showCreateWorkOrder, setShowCreateWorkOrder] = useState(false);
   const [newWorkOrderTitle, setNewWorkOrderTitle] = useState("");
+  const [newWorkOrderDescription, setNewWorkOrderDescription] = useState("");
   const [newWorkOrderVisitType, setNewWorkOrderVisitType] = useState<string>("INSTALL");
   const [newWorkOrderSubtype, setNewWorkOrderSubtype] = useState<string>("Full System");
   const [isCreatingWorkOrder, setIsCreatingWorkOrder] = useState(false);
@@ -482,13 +483,23 @@ export default function CrmQuoteDetail() {
       return;
     }
     
+    if (!newWorkOrderTitle.trim()) {
+      toast({ title: "Title is required", variant: "destructive" });
+      return;
+    }
+    if (!newWorkOrderDescription.trim()) {
+      toast({ title: "Description is required", variant: "destructive" });
+      return;
+    }
+    
     setIsCreatingWorkOrder(true);
     try {
       const res = await apiRequest("POST", "/api/crm/work-orders", {
         customerId: customerId,
         propertyId: propertyId,
         projectId: projectId || undefined,
-        title: newWorkOrderTitle || `Work Order from Quote ${quote?.quoteNumber}`,
+        title: newWorkOrderTitle,
+        description: newWorkOrderDescription,
         visitType: newWorkOrderVisitType,
         workSubtype: newWorkOrderSubtype,
         status: "scheduled",
@@ -2038,13 +2049,25 @@ export default function CrmQuoteDetail() {
             <>
               <div className="py-4 space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="wo-title">Work Order Title</Label>
+                  <Label htmlFor="wo-title">Title *</Label>
                   <Input
                     id="wo-title"
                     value={newWorkOrderTitle}
                     onChange={(e) => setNewWorkOrderTitle(e.target.value)}
                     placeholder={`Work Order from Quote ${quote?.quoteNumber}`}
                     data-testid="input-work-order-title"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="wo-description">Description *</Label>
+                  <Textarea
+                    id="wo-description"
+                    value={newWorkOrderDescription}
+                    onChange={(e) => setNewWorkOrderDescription(e.target.value)}
+                    placeholder="Describe the work to be done..."
+                    className="min-h-[80px]"
+                    data-testid="textarea-work-order-description"
                   />
                 </div>
                 
@@ -2138,7 +2161,7 @@ export default function CrmQuoteDetail() {
                 </Button>
                 <Button
                   onClick={handleCreateAndSelectWorkOrder}
-                  disabled={isCreatingWorkOrder}
+                  disabled={isCreatingWorkOrder || !newWorkOrderTitle.trim() || !newWorkOrderDescription.trim()}
                   className="bg-[#711419] hover:bg-[#711419]/90"
                   data-testid="button-create-and-invoice"
                 >

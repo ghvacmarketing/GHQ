@@ -8332,6 +8332,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!propertyId) {
         return res.status(400).json({ message: "propertyId is required" });
       }
+      if (!title || (typeof title === 'string' && !title.trim())) {
+        return res.status(400).json({ message: "Title is required" });
+      }
+      if (!description || (typeof description === 'string' && !description.trim())) {
+        return res.status(400).json({ message: "Description is required" });
+      }
 
       // Verify customer exists
       const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
@@ -8391,8 +8397,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         propertyId,
         jobId: jobId || null,
         projectId: projectId || null,
-        title: title || null,
-        description: description || null,
+        title: typeof title === 'string' ? title.trim() : title,
+        description: typeof description === 'string' ? description.trim() : description,
         workOrderNumber,
       });
 

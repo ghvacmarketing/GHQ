@@ -2524,6 +2524,8 @@ export default function CrmCustomerDetail() {
   // Create standalone Work Order mutation
   const createWorkOrderMutation = useMutation({
     mutationFn: async () => {
+      if (!woTitle.trim()) throw new Error("Title is required");
+      if (!woDescription.trim()) throw new Error("Description is required");
       if (!woDate) throw new Error("Date is required");
 
       const [startTimeStr, endTimeStr] = woTimeSlot.split("-");
@@ -2539,9 +2541,9 @@ export default function CrmCustomerDetail() {
         customerId,
         propertyId: woPropertyId || null,
         projectId: woProjectId || null,
-        title: woTitle.trim() || null,
+        title: woTitle.trim(),
         visitType: woVisitType,
-        description: woDescription.trim() || null,
+        description: woDescription.trim(),
         scheduledStart: scheduledStart.toISOString(),
         scheduledEnd: scheduledEnd.toISOString(),
         assignedTechId: woTechId !== "unassigned" ? woTechId : null,
@@ -3276,7 +3278,7 @@ export default function CrmCustomerDetail() {
             <div className="space-y-4 py-4">
               {/* Title */}
               <div className="space-y-2">
-                <Label>Title</Label>
+                <Label>Title *</Label>
                 <Input
                   placeholder="Work order title..."
                   value={woTitle}
@@ -3429,7 +3431,7 @@ export default function CrmCustomerDetail() {
 
               {/* Description */}
               <div className="space-y-2">
-                <Label>Description</Label>
+                <Label>Description *</Label>
                 <Textarea
                   placeholder="Work order description..."
                   value={woDescription}
@@ -3450,7 +3452,7 @@ export default function CrmCustomerDetail() {
               </Button>
               <Button
                 onClick={handleSubmitWorkOrder}
-                disabled={createWorkOrderMutation.isPending || !isWoFormValid}
+                disabled={createWorkOrderMutation.isPending || !isWoFormValid || !woTitle.trim() || !woDescription.trim()}
                 className="bg-[#711419] hover:bg-[#5a1014] text-white"
                 data-testid="button-submit-wo"
               >

@@ -212,6 +212,7 @@ export default function CrmProjectDetail() {
   
   const [scheduleWODialogOpen, setScheduleWODialogOpen] = useState(false);
   const [woTitle, setWoTitle] = useState("");
+  const [woDescription, setWoDescription] = useState("");
   const [woVisitType, setWoVisitType] = useState<string>("SERVICE");
   const [woScheduledStart, setWoScheduledStart] = useState("");
   const [woScheduledEnd, setWoScheduledEnd] = useState("");
@@ -290,8 +291,11 @@ export default function CrmProjectDetail() {
 
   const createWorkOrderMutation = useMutation({
     mutationFn: async () => {
+      if (!woTitle.trim()) throw new Error("Title is required");
+      if (!woDescription.trim()) throw new Error("Description is required");
       const res = await apiRequest("POST", "/api/crm/work-orders", {
         title: woTitle,
+        description: woDescription,
         visitType: woVisitType,
         projectId: projectId,
         customerId: project?.customerId || project?.customer?.id,
@@ -307,6 +311,7 @@ export default function CrmProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId] });
       setScheduleWODialogOpen(false);
       setWoTitle("");
+      setWoDescription("");
       setWoVisitType("SERVICE");
       setWoScheduledStart("");
       setWoScheduledEnd("");
@@ -949,13 +954,24 @@ export default function CrmProjectDetail() {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="wo-title">Title</Label>
+                <Label htmlFor="wo-title">Title *</Label>
                 <Input
                   id="wo-title"
                   placeholder="Work order title"
                   value={woTitle}
                   onChange={(e) => setWoTitle(e.target.value)}
                   data-testid="input-wo-title"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="wo-description">Description *</Label>
+                <Textarea
+                  id="wo-description"
+                  placeholder="Describe the work to be done..."
+                  value={woDescription}
+                  onChange={(e) => setWoDescription(e.target.value)}
+                  className="min-h-[80px]"
+                  data-testid="textarea-wo-description"
                 />
               </div>
               <div className="space-y-2">
@@ -1003,7 +1019,7 @@ export default function CrmProjectDetail() {
               </Button>
               <Button
                 onClick={() => createWorkOrderMutation.mutate()}
-                disabled={!woTitle || createWorkOrderMutation.isPending}
+                disabled={!woTitle.trim() || !woDescription.trim() || createWorkOrderMutation.isPending}
                 data-testid="button-submit-wo"
               >
                 {createWorkOrderMutation.isPending ? "Scheduling..." : "Schedule Work Order"}

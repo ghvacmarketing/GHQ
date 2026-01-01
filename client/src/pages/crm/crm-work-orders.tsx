@@ -517,6 +517,8 @@ export default function CrmWorkOrders() {
   const createWorkOrderMutation = useMutation({
     mutationFn: async () => {
       if (!selectedCustomer) throw new Error("Customer is required");
+      if (!woTitle.trim()) throw new Error("Title is required");
+      if (!woDescription.trim()) throw new Error("Description is required");
       if (!scheduledDate) throw new Error("Scheduled date is required");
 
       // Parse start and end times
@@ -533,8 +535,8 @@ export default function CrmWorkOrders() {
         customerId: selectedCustomer.id,
         propertyId: selectedPropertyId || null,
         projectId: selectedProjectId || null,
-        title: woTitle || null,
-        description: woDescription || null,
+        title: woTitle.trim(),
+        description: woDescription.trim(),
         visitType,
         workSubtype,
         scheduledStart: scheduledStart.toISOString(),
@@ -1652,7 +1654,7 @@ export default function CrmWorkOrders() {
               </div>
 
               <div className="space-y-2">
-                <Label>Title (Optional)</Label>
+                <Label>Title *</Label>
                 <Input
                   value={woTitle}
                   onChange={(e) => setWoTitle(e.target.value)}
@@ -1662,7 +1664,7 @@ export default function CrmWorkOrders() {
               </div>
 
               <div className="space-y-2">
-                <Label>Description (Optional)</Label>
+                <Label>Description *</Label>
                 <Textarea
                   value={woDescription}
                   onChange={(e) => setWoDescription(e.target.value)}
@@ -1704,7 +1706,7 @@ export default function CrmWorkOrders() {
               </Button>
               <Button
                 onClick={() => createWorkOrderMutation.mutate()}
-                disabled={createWorkOrderMutation.isPending || !selectedCustomer || !scheduledDate}
+                disabled={createWorkOrderMutation.isPending || !selectedCustomer || !scheduledDate || !woTitle.trim() || !woDescription.trim()}
                 className="bg-[#711419] hover:bg-[#5a1014]"
                 data-testid="button-submit-create"
               >
