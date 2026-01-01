@@ -1091,8 +1091,8 @@ export default function CrmProspectFunnel() {
         )}
           </TabsContent>
 
-            <TabsContent value="kanban" className="mt-4 flex flex-col h-[calc(100vh-220px)]">
-              <div className="flex-shrink-0 mb-4">
+            <TabsContent value="kanban" className="mt-4">
+              <div className="sticky top-0 z-10 bg-white pb-4">
                 <SearchFiltersComponent />
               </div>
               <DndContext
@@ -1101,8 +1101,8 @@ export default function CrmProspectFunnel() {
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
             >
-              <div className="flex-1 overflow-auto" data-testid="kanban-board">
-                <div className="flex gap-3 pb-4" style={{ minWidth: 'max-content' }}>
+              <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] pb-4" data-testid="kanban-board">
+                <div className="inline-flex gap-3 pr-4">
                   {KANBAN_STAGES.map((stage) => {
                     const stageProspects = getProspectsByStage(stage);
                     return (
