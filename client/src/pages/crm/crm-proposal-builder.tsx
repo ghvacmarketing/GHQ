@@ -1896,6 +1896,7 @@ export default function CrmProposalBuilder() {
           customerNotes,
           customInstructions: quoteInstructions || undefined,
           cartItems,
+          quoteMode, // "single" = combined total, "options" = individual pricing per package
           totals: {
             subtotal: cartSubtotalPreDiscount.high,
             eliteSavings: cartEliteDiscountAmount,
@@ -5308,43 +5309,90 @@ export default function CrmProposalBuilder() {
             <Separator className="my-6" />
 
             <div className="bg-muted rounded-lg p-4">
-              {/* Subtotal - Always shows pre-discount total */}
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">{formatPriceRange(cartSubtotalPreDiscount.low, cartSubtotalPreDiscount.high)}</span>
-              </div>
-              {hasEstimatedItems && (
-                <p className="text-xs text-muted-foreground mb-2">* Includes estimated pricing for custom builds</p>
-              )}
-              
-              {/* Elite Discount Row - Only shown when there's Elite savings */}
-              {cartEliteDiscountAmount > 0 && (
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
-                    <Crown className="h-4 w-4" />
-                    Elite Bundle Discount (20%)
-                  </span>
-                  <span className="font-medium text-green-600 dark:text-green-400">–{formatPrice(cartEliteDiscountAmount)}</span>
-                </div>
-              )}
-              
-              <Separator className="my-3" />
-              
-              {/* Total Investment - Shows post-discount total */}
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-bold">Total Investment</span>
-                <span className="text-2xl font-bold text-primary">{formatPriceRange(cartTotalAfterDiscount.low, cartTotalAfterDiscount.high)}</span>
-              </div>
-              <div className="flex justify-between items-center mt-1">
-                <span className="text-sm text-muted-foreground">Monthly Payment (with approved financing)</span>
-                <span className="text-sm font-medium">{formatPriceRange(cartMonthlyTotalRange.low, cartMonthlyTotalRange.high)}/mo</span>
-              </div>
-              
-              {/* Savings note - Small muted text instead of banner */}
-              {cartEliteDiscountAmount > 0 && (
-                <p className="text-xs text-muted-foreground italic mt-2">
-                  You save {formatPrice(cartEliteDiscountAmount)} with Elite Package!
-                </p>
+              {quoteMode === "options" ? (
+                <>
+                  {/* Options Mode - Show each package as a separate option */}
+                  <div className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    PRICING OPTIONS (Choose One)
+                  </div>
+                  <div className="space-y-3">
+                    {cart.map((item, idx) => {
+                      const optionLabel = isHvacPackage(item) ? item.packageLevel : 
+                                          isCrawlspaceItem(item) ? item.tier.name :
+                                          isCrawlspaceServicesItem(item) ? "Crawlspace Services" :
+                                          isCustomBuild(item) ? "Custom Build" : `Option ${idx + 1}`;
+                      const optionPrice = isHvacPackage(item) 
+                        ? (item.eliteData ? item.eliteData.finalTotal : parseFloat(item.totalInvestment) || 0) * item.quantity
+                        : isCrawlspaceItem(item)
+                        ? (item.eliteData ? item.eliteData.finalTotal : item.pricingBreakdown.totalPrice) * item.quantity
+                        : isCrawlspaceServicesItem(item)
+                        ? item.totalPrice * item.quantity
+                        : isCustomBuild(item)
+                        ? (() => { const est = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat); return est.high * item.quantity; })()
+                        : 0;
+                      const optionMonthly = Math.round(optionPrice / 67);
+                      const levelColor = isHvacPackage(item) ? getPackageLevelColor(item.packageLevel) : 'bg-gray-500';
+                      return (
+                        <div key={item.id} className="bg-white dark:bg-gray-800 rounded-lg p-3 border">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <Badge className={`${levelColor} text-white text-xs`}>
+                                {optionLabel}
+                              </Badge>
+                              {item.quantity > 1 && <span className="text-xs text-muted-foreground">x{item.quantity}</span>}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-primary">{formatPrice(optionPrice)}</p>
+                              <p className="text-xs text-muted-foreground">{formatPrice(optionMonthly)}/mo</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {hasEstimatedItems && (
+                    <p className="text-xs text-muted-foreground mt-2">* Includes estimated pricing for custom builds</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Single Mode - Combined totals */}
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="font-medium">{formatPriceRange(cartSubtotalPreDiscount.low, cartSubtotalPreDiscount.high)}</span>
+                  </div>
+                  {hasEstimatedItems && (
+                    <p className="text-xs text-muted-foreground mb-2">* Includes estimated pricing for custom builds</p>
+                  )}
+                  
+                  {cartEliteDiscountAmount > 0 && (
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                        <Crown className="h-4 w-4" />
+                        Elite Bundle Discount (20%)
+                      </span>
+                      <span className="font-medium text-green-600 dark:text-green-400">–{formatPrice(cartEliteDiscountAmount)}</span>
+                    </div>
+                  )}
+                  
+                  <Separator className="my-3" />
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-bold">Total Investment</span>
+                    <span className="text-2xl font-bold text-primary">{formatPriceRange(cartTotalAfterDiscount.low, cartTotalAfterDiscount.high)}</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-sm text-muted-foreground">Monthly Payment (with approved financing)</span>
+                    <span className="text-sm font-medium">{formatPriceRange(cartMonthlyTotalRange.low, cartMonthlyTotalRange.high)}/mo</span>
+                  </div>
+                  
+                  {cartEliteDiscountAmount > 0 && (
+                    <p className="text-xs text-muted-foreground italic mt-2">
+                      You save {formatPrice(cartEliteDiscountAmount)} with Elite Package!
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
