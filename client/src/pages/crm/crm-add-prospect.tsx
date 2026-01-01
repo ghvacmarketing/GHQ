@@ -79,10 +79,12 @@ export default function CrmAddProspect() {
     }
   }, [authLoading, currentUser, navigate]);
 
-  const { data: customers = [], isLoading: customersLoading } = useQuery<CrmCustomer[]>({
+  const { data: customersData, isLoading: customersLoading } = useQuery<{ customers: CrmCustomer[] }>({
     queryKey: ["/api/crm/customers"],
     enabled: !!currentUser && mode === "existing",
   });
+
+  const customers = customersData?.customers || [];
 
   const selectedCustomer = useMemo(() => {
     return customers.find((c) => c.id === selectedCustomerId);
