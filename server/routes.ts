@@ -7,13 +7,14 @@ import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { z } from "zod";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
+import { sendCrmQuoteEmail } from "./services/crmQuoteEmail";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
 import { eq, inArray, desc, sql, and, or, ilike, asc, count } from "drizzle-orm";
@@ -11800,6 +11801,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error marking quote as declined:", error);
       return res.status(500).json({ message: "Failed to mark quote as declined" });
+    }
+  });
+
+  // POST /api/crm/quotes/:id/send-email - Send quote via email
+  app.post("/api/crm/quotes/:id/send-email", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { recipientEmail, personalMessage } = req.body;
+
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      const emailTo = recipientEmail || quote.customerEmail;
+      if (!emailTo) {
+        return res.status(400).json({ message: "No recipient email provided and quote has no customer email" });
+      }
+
+      const lineItems = await db.select().from(crmQuoteLineItems)
+        .where(eq(crmQuoteLineItems.quoteId, quote.id))
+        .orderBy(crmQuoteLineItems.sortOrder);
+
+      const sentByName = user.displayName || user.email;
+      const subject = `Your Quote from Giesbrecht HVAC - ${quote.quoteNumber}`;
+
+      const result = await sendCrmQuoteEmail(quote, lineItems, emailTo, personalMessage, sentByName);
+
+      const [emailLog] = await db.insert(quoteEmailLogs).values({
+        quoteId: quote.id,
+        recipientEmail: emailTo,
+        recipientName: quote.customerName,
+        subject,
+        status: result.success ? "sent" : "failed",
+        errorMessage: result.error || null,
+        sentBy: user.id,
+        personalMessage: personalMessage || null,
+        isManual: false,
+      }).returning();
+
+      if (result.success) {
+        await db.update(crmQuotes)
+          .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
+          .where(eq(crmQuotes.id, quote.id));
+
+        await logCrmAudit(
+          user.id,
+          "quote.email_sent",
+          "crm_quote",
+          quote.id,
+          { quoteNumber: quote.quoteNumber, recipientEmail: emailTo, emailLogId: emailLog.id },
+          req.ip
+        );
+      }
+
+      return res.json({
+        success: result.success,
+        error: result.error,
+        emailLogId: emailLog.id,
+      });
+    } catch (error) {
+      console.error("Error sending quote email:", error);
+      return res.status(500).json({ message: "Failed to send quote email" });
+    }
+  });
+
+  // POST /api/crm/quotes/:id/mark-sent - Manually mark quote as sent without sending email
+  app.post("/api/crm/quotes/:id/mark-sent", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { note } = req.body;
+
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      const [updated] = await db.update(crmQuotes)
+        .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
+        .where(eq(crmQuotes.id, quote.id))
+        .returning();
+
+      await db.insert(quoteEmailLogs).values({
+        quoteId: quote.id,
+        recipientEmail: quote.customerEmail || "manual",
+        recipientName: quote.customerName,
+        subject: `Quote ${quote.quoteNumber} - Marked as sent manually`,
+        status: "sent",
+        sentBy: user.id,
+        personalMessage: note || null,
+        isManual: true,
+      });
+
+      await logCrmAudit(
+        user.id,
+        "quote.marked_sent",
+        "crm_quote",
+        quote.id,
+        { quoteNumber: quote.quoteNumber, note },
+        req.ip
+      );
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error marking quote as sent:", error);
+      return res.status(500).json({ message: "Failed to mark quote as sent" });
+    }
+  });
+
+  // GET /api/crm/quotes/:id/email-logs - Get email logs for a quote
+  app.get("/api/crm/quotes/:id/email-logs", requireCrmAuth, async (req, res) => {
+    try {
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      const logs = await db.select().from(quoteEmailLogs)
+        .where(eq(quoteEmailLogs.quoteId, quote.id))
+        .orderBy(desc(quoteEmailLogs.sentAt));
+
+      return res.json(logs);
+    } catch (error) {
+      console.error("Error fetching quote email logs:", error);
+      return res.status(500).json({ message: "Failed to fetch email logs" });
     }
   });
 
