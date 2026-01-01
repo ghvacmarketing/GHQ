@@ -116,6 +116,7 @@ export default function CrmQuoteDetail() {
   const [showPreview, setShowPreview] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showOptionSelection, setShowOptionSelection] = useState(false);
+  const [showAcceptOptionSelection, setShowAcceptOptionSelection] = useState(false);
   const [availableOptions, setAvailableOptions] = useState<string[]>([]);
   const [selectedOption, setSelectedOption] = useState<string>("");
   const [showWorkOrderSelection, setShowWorkOrderSelection] = useState(false);
@@ -168,21 +169,40 @@ export default function CrmQuoteDetail() {
   });
 
   const acceptMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/accept`);
+    mutationFn: async (params: { selectedOption?: string } = {}) => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ selectedOption: params.selectedOption }),
+      });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
+        if (data.requiresOptionSelection && data.availableOptions) {
+          throw {
+            message: data.message,
+            requiresOptionSelection: true,
+            availableOptions: data.availableOptions,
+          };
+        }
         throw new Error(data.message || "Failed to accept quote");
       }
-      return res.json();
+      return data;
     },
     onSuccess: () => {
+      setShowAcceptOptionSelection(false);
+      setSelectedOption("");
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       toast({ title: "Quote accepted", description: "Quote status updated to accepted." });
     },
-    onError: (error: Error) => {
-      toast({ title: "Failed to accept quote", description: error.message, variant: "destructive" });
+    onError: (error: { message?: string; requiresOptionSelection?: boolean; availableOptions?: string[] } | Error) => {
+      if ('requiresOptionSelection' in error && error.requiresOptionSelection && error.availableOptions) {
+        setAvailableOptions(error.availableOptions);
+        setShowAcceptOptionSelection(true);
+        return;
+      }
+      toast({ title: "Failed to accept quote", description: (error as Error).message || "Unknown error", variant: "destructive" });
     },
   });
 
@@ -210,7 +230,15 @@ export default function CrmQuoteDetail() {
   };
 
   const handleApprove = () => {
-    acceptMutation.mutate();
+    acceptMutation.mutate({});
+  };
+
+  const handleConfirmAcceptOption = () => {
+    if (!selectedOption) {
+      toast({ title: "Please select an option", variant: "destructive" });
+      return;
+    }
+    acceptMutation.mutate({ selectedOption });
   };
 
   const handleDecline = () => {
@@ -345,17 +373,21 @@ export default function CrmQuoteDetail() {
   };
 
   const handleCreateAndSelectWorkOrder = async () => {
-    if (!quoteContext.customerId || !quoteContext.propertyId) {
-      toast({ title: "Missing customer or property information", variant: "destructive" });
+    const customerId = quoteContext.customerId || quote?.customerId;
+    const propertyId = quoteContext.propertyId || quote?.propertyId;
+    const projectId = quoteContext.projectId || quote?.projectId;
+    
+    if (!customerId || !propertyId) {
+      toast({ title: "Missing customer or property information", description: "The quote needs a customer and property assigned.", variant: "destructive" });
       return;
     }
     
     setIsCreatingWorkOrder(true);
     try {
       const res = await apiRequest("POST", "/api/crm/work-orders", {
-        customerId: quoteContext.customerId,
-        propertyId: quoteContext.propertyId,
-        projectId: quoteContext.projectId || undefined,
+        customerId: customerId,
+        propertyId: propertyId,
+        projectId: projectId || undefined,
         title: newWorkOrderTitle || `Work Order from Quote ${quote?.quoteNumber}`,
         visitType: newWorkOrderVisitType,
         status: "scheduled",
@@ -1506,6 +1538,59 @@ export default function CrmQuoteDetail() {
               data-testid="button-confirm-delete"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showAcceptOptionSelection} onOpenChange={setShowAcceptOptionSelection}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Select Customer's Choice</AlertDialogTitle>
+            <AlertDialogDescription>
+              This is a multi-option quote. Which option did the customer accept?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-2">
+            {availableOptions.map((option) => (
+              <button
+                key={option}
+                onClick={() => setSelectedOption(option)}
+                className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                  selectedOption === option
+                    ? "border-[#711419] bg-[#711419]/5"
+                    : "border-slate-200 hover:border-slate-300"
+                }`}
+                data-testid={`accept-option-${option.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                <span className={`font-medium ${selectedOption === option ? "text-[#711419]" : ""}`}>
+                  {option}
+                </span>
+              </button>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                setSelectedOption("");
+                setShowAcceptOptionSelection(false);
+              }}
+              data-testid="button-cancel-accept-option"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmAcceptOption}
+              disabled={!selectedOption || acceptMutation.isPending}
+              className="bg-[#711419] hover:bg-[#711419]/90"
+              data-testid="button-confirm-accept-option"
+            >
+              {acceptMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-2" />
+              )}
+              Accept Quote
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

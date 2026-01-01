@@ -11700,13 +11700,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Only sent quotes can be accepted" });
       }
 
-      const { acceptedBy } = req.body;
+      const { acceptedBy, selectedOption } = req.body;
+
+      // For multi-option quotes, require option selection
+      if (existing.quoteMode === 'options') {
+        // Get available options from line items
+        const lineItems = await db.select().from(crmQuoteLineItems)
+          .where(eq(crmQuoteLineItems.quoteId, req.params.id));
+        
+        const availableOptions = [...new Set(
+          lineItems
+            .map(item => item.optionTag)
+            .filter((tag): tag is string => !!tag)
+        )];
+
+        // If no selectedOption provided and there are options to choose from
+        if (!selectedOption && availableOptions.length > 0) {
+          return res.status(400).json({
+            message: "This is a multi-option quote. Please select which option the customer chose.",
+            requiresOptionSelection: true,
+            availableOptions,
+          });
+        }
+
+        // Validate the selected option exists
+        if (selectedOption && availableOptions.length > 0 && !availableOptions.includes(selectedOption)) {
+          return res.status(400).json({
+            message: `Invalid option selected. Available options: ${availableOptions.join(', ')}`,
+          });
+        }
+      }
 
       const [updated] = await db.update(crmQuotes)
         .set({ 
           status: 'accepted', 
           acceptedAt: new Date(),
           acceptedBy: acceptedBy || null,
+          selectedOption: selectedOption || existing.selectedOption || null,
           updatedAt: new Date() 
         })
         .where(eq(crmQuotes.id, req.params.id))
@@ -11717,7 +11747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "quote.accepted",
         "crm_quote",
         req.params.id,
-        { quoteNumber: existing.quoteNumber, acceptedBy },
+        { quoteNumber: existing.quoteNumber, acceptedBy, selectedOption },
         req.ip
       );
 
