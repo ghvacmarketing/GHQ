@@ -521,6 +521,8 @@ interface CustomerTabbedViewProps {
   workOrdersLoading: boolean;
   crmQuotes: CrmQuote[] | undefined;
   quotesLoading: boolean;
+  crmInvoices: any[] | undefined;
+  invoicesLoading: boolean;
   jobs: JobWithTech[] | undefined;
   notes: CustomerNoteWithUser[];
   notesLoading: boolean;
@@ -536,6 +538,9 @@ interface CustomerTabbedViewProps {
   propertyDialogOpen: boolean;
   setPropertyDialogOpen: (open: boolean) => void;
   onViewQuote: (quoteId: string) => void;
+  onViewWorkOrder: (id: string) => void;
+  onViewProject: (id: string) => void;
+  onViewInvoice: (id: string) => void;
 }
 
 function CustomerTabbedView({
@@ -548,6 +553,8 @@ function CustomerTabbedView({
   workOrdersLoading,
   crmQuotes,
   quotesLoading,
+  crmInvoices,
+  invoicesLoading,
   jobs,
   notes,
   notesLoading,
@@ -563,6 +570,9 @@ function CustomerTabbedView({
   propertyDialogOpen,
   setPropertyDialogOpen,
   onViewQuote,
+  onViewWorkOrder,
+  onViewProject,
+  onViewInvoice,
 }: CustomerTabbedViewProps) {
   const completedJobs = jobs?.filter(j => ["completed", "invoiced", "paid"].includes(j.status)) || [];
   const customerType = (customer.customerType || "residential").toLowerCase();
@@ -993,6 +1003,7 @@ function CustomerTabbedView({
                     key={wo.id}
                     className="p-4 border rounded-lg hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-colors"
                     data-testid={`card-wo-tab-${wo.id}`}
+                    onClick={() => onViewWorkOrder(wo.id)}
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h4 className="font-medium text-sm line-clamp-1">{wo.title || wo.visitType}</h4>
@@ -1039,6 +1050,7 @@ function CustomerTabbedView({
                     key={wo.id}
                     className="p-4 border rounded-lg hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-colors"
                     data-testid={`card-completed-wo-${wo.id}`}
+                    onClick={() => onViewWorkOrder(wo.id)}
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h4 className="font-medium text-sm line-clamp-1">{wo.title || wo.visitType}</h4>
@@ -1089,9 +1101,7 @@ function CustomerTabbedView({
                   <div 
                     key={project.id}
                     className="p-4 border rounded-lg hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer transition-colors"
-                    onClick={() => {
-                      toast({ title: "Project Details", description: `Project: ${project.title}` });
-                    }}
+                    onClick={() => onViewProject(project.id)}
                     data-testid={`card-project-tab-${project.id}`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
@@ -1144,6 +1154,7 @@ function CustomerTabbedView({
                     key={project.id}
                     className="p-4 border rounded-lg hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-colors"
                     data-testid={`card-completed-project-${project.id}`}
+                    onClick={() => onViewProject(project.id)}
                   >
                     <h4 className="font-medium text-sm">{project.title}</h4>
                     <Badge variant="outline" className="text-xs mt-1">
@@ -1253,31 +1264,90 @@ function CustomerTabbedView({
         </Card>
       </TabsContent>
 
-      {/* Invoices & Payments Tab - Placeholder */}
+      {/* Invoices & Payments Tab */}
       <TabsContent value="invoices" className="space-y-6" data-testid="tab-content-invoices">
         <Card data-testid="card-invoices">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-[#711419]" />
-              Invoices & Payments
+              Invoices ({crmInvoices?.length || 0})
             </CardTitle>
-            <Button 
-              size="sm"
-              className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              data-testid="button-create-invoice"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Create Invoice
-            </Button>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8">
-              <Receipt className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 mb-2">No invoices yet</p>
-              <p className="text-sm text-slate-400">
-                Invoices and payment history for this customer will appear here.
-              </p>
-            </div>
+            {invoicesLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : !crmInvoices || crmInvoices.length === 0 ? (
+              <div className="text-center py-8">
+                <Receipt className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 mb-2">No invoices yet</p>
+                <p className="text-sm text-slate-400">
+                  Invoices and payment history for this customer will appear here.
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice Number</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Balance Due</TableHead>
+                    <TableHead>Created Date</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {crmInvoices.map((invoice) => (
+                    <TableRow 
+                      key={invoice.id} 
+                      data-testid={`row-invoice-${invoice.id}`}
+                      className="cursor-pointer hover:bg-slate-50"
+                      onClick={() => onViewInvoice(invoice.id)}
+                    >
+                      <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                      <TableCell>
+                        <Badge className={cn(
+                          "text-xs",
+                          invoice.status === "draft" && "bg-slate-100 text-slate-700",
+                          invoice.status === "sent" && "bg-blue-100 text-blue-700",
+                          invoice.status === "paid" && "bg-green-100 text-green-700",
+                          invoice.status === "partial" && "bg-amber-100 text-amber-700",
+                          invoice.status === "void" && "bg-red-100 text-red-700"
+                        )}>
+                          {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {invoice.total ? `$${Number(invoice.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {invoice.balanceDue ? `$${Number(invoice.balanceDue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                      </TableCell>
+                      <TableCell>
+                        {invoice.createdAt ? format(new Date(invoice.createdAt), 'MMM d, yyyy') : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          data-testid={`button-view-invoice-${invoice.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewInvoice(invoice.id);
+                          }}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </TabsContent>
@@ -1350,6 +1420,9 @@ export default function CrmCustomerDetail() {
   const [propertyDialogOpen, setPropertyDialogOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<CrmProperty | null>(null);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
+  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Edit form state
@@ -1594,6 +1667,30 @@ export default function CrmCustomerDetail() {
   });
   const crmQuotes = crmQuotesData?.quotes || [];
 
+  // Fetch CRM Invoices for this customer
+  interface InvoiceWithDetails {
+    id: string;
+    invoiceNumber: string;
+    customerId: string | null;
+    customerName?: string | null;
+    status: string;
+    total: string;
+    balanceDue: string;
+    createdAt: Date | null;
+    dueDate: Date | null;
+  }
+  
+  const { data: crmInvoicesData, isLoading: invoicesLoading } = useQuery<{ invoices: InvoiceWithDetails[]; pagination: any }>({
+    queryKey: ["/api/crm/invoices", { customerId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/invoices?customerId=${customerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch invoices");
+      return res.json();
+    },
+    enabled: !!currentUser && !!customerId,
+  });
+  const crmInvoices = crmInvoicesData?.invoices || [];
+
   // Fetch selected quote details for the detail sheet
   interface QuoteLineItem {
     id: string;
@@ -1620,6 +1717,61 @@ export default function CrmCustomerDetail() {
       return res.json();
     },
     enabled: !!currentUser && !!selectedQuoteId,
+  });
+
+  // Fetch selected work order details for the detail sheet
+  const { data: selectedWorkOrderData, isLoading: selectedWorkOrderLoading } = useQuery<WorkOrderWithDetails>({
+    queryKey: ["/api/crm/work-orders", selectedWorkOrderId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/work-orders/${selectedWorkOrderId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch work order");
+      return res.json();
+    },
+    enabled: !!currentUser && !!selectedWorkOrderId,
+  });
+
+  // Fetch selected project details for the detail sheet
+  const { data: selectedProjectData, isLoading: selectedProjectLoading } = useQuery<ProjectWithDetails>({
+    queryKey: ["/api/crm/projects", selectedProjectId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/projects/${selectedProjectId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch project");
+      return res.json();
+    },
+    enabled: !!currentUser && !!selectedProjectId,
+  });
+
+  // Fetch selected invoice details for the detail sheet
+  interface InvoiceLineItem {
+    id: string;
+    invoiceId: string;
+    lineType: string;
+    description: string;
+    partNumber?: string | null;
+    quantity: string;
+    unitPrice: string;
+    lineTotal: string;
+    taxable?: boolean;
+    sortOrder?: number;
+  }
+  
+  type InvoiceWithFullDetails = InvoiceWithDetails & {
+    lineItems?: InvoiceLineItem[];
+    paymentMethod?: string | null;
+    amountPaid?: string | null;
+    notes?: string | null;
+    workOrderId?: string | null;
+    projectId?: string | null;
+  };
+  
+  const { data: selectedInvoiceData, isLoading: selectedInvoiceLoading } = useQuery<InvoiceWithFullDetails>({
+    queryKey: ["/api/crm/invoices", selectedInvoiceId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/invoices/${selectedInvoiceId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch invoice");
+      return res.json();
+    },
+    enabled: !!currentUser && !!selectedInvoiceId,
   });
 
   // Fetch customer properties for all views (needed for property_manager tabs)
@@ -3374,6 +3526,8 @@ export default function CrmCustomerDetail() {
           workOrdersLoading={workOrdersLoading}
           crmQuotes={crmQuotes}
           quotesLoading={quotesLoading}
+          crmInvoices={crmInvoices}
+          invoicesLoading={invoicesLoading}
           jobs={jobs}
           notes={notes || []}
           notesLoading={notesLoading}
@@ -3389,6 +3543,9 @@ export default function CrmCustomerDetail() {
           propertyDialogOpen={propertyDialogOpen}
           setPropertyDialogOpen={setPropertyDialogOpen}
           onViewQuote={(quoteId) => setSelectedQuoteId(quoteId)}
+          onViewWorkOrder={(id) => setSelectedWorkOrderId(id)}
+          onViewProject={(id) => setSelectedProjectId(id)}
+          onViewInvoice={(id) => setSelectedInvoiceId(id)}
         />
 
         {/* Quote Detail Sheet */}
@@ -3581,6 +3738,455 @@ export default function CrmCustomerDetail() {
                   navigate(`/crm/quotes/${selectedQuoteId}`);
                 }}
                 data-testid="button-open-full-quote"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open Full Details
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Work Order Detail Sheet */}
+        <Sheet open={!!selectedWorkOrderId} onOpenChange={(open) => !open && setSelectedWorkOrderId(null)}>
+          <SheetContent className="w-full sm:max-w-2xl overflow-hidden flex flex-col" data-testid="sheet-work-order-detail">
+            <SheetHeader className="shrink-0 pb-4 border-b">
+              <SheetTitle className="flex items-center gap-2">
+                <Wrench className="h-5 w-5 text-[#711419]" />
+                Work Order Details
+              </SheetTitle>
+            </SheetHeader>
+            
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              {selectedWorkOrderLoading ? (
+                <div className="space-y-4 py-4">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : selectedWorkOrderData ? (
+                <div className="space-y-6 py-4">
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-lg">{selectedWorkOrderData.title || selectedWorkOrderData.visitType?.replace(/_/g, " ") || "Work Order"}</h3>
+                    <div className="flex items-center gap-3">
+                      <Badge className={cn(
+                        "text-xs",
+                        selectedWorkOrderData.status === "scheduled" && "bg-blue-100 text-blue-700",
+                        selectedWorkOrderData.status === "dispatched" && "bg-purple-100 text-purple-700",
+                        selectedWorkOrderData.status === "en_route" && "bg-amber-100 text-amber-700",
+                        selectedWorkOrderData.status === "on_site" && "bg-orange-100 text-orange-700",
+                        selectedWorkOrderData.status === "completed" && "bg-green-100 text-green-700",
+                        selectedWorkOrderData.status === "cancelled" && "bg-red-100 text-red-700",
+                        !["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"].includes(selectedWorkOrderData.status) && "bg-slate-100 text-slate-700"
+                      )}>
+                        {selectedWorkOrderData.status?.replace(/_/g, " ").charAt(0).toUpperCase() + selectedWorkOrderData.status?.slice(1).replace(/_/g, " ")}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {selectedWorkOrderData.visitType?.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Scheduled Date</p>
+                      <div className="flex items-center gap-1 text-sm">
+                        <CalendarIcon className="h-4 w-4 text-slate-400" />
+                        {selectedWorkOrderData.scheduledStart 
+                          ? format(new Date(selectedWorkOrderData.scheduledStart), 'MMM d, yyyy') 
+                          : '—'}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Time</p>
+                      <div className="flex items-center gap-1 text-sm">
+                        <Clock className="h-4 w-4 text-slate-400" />
+                        {selectedWorkOrderData.scheduledStart 
+                          ? format(new Date(selectedWorkOrderData.scheduledStart), 'h:mm a') 
+                          : '—'}
+                        {selectedWorkOrderData.scheduledEnd && 
+                          ` - ${format(new Date(selectedWorkOrderData.scheduledEnd), 'h:mm a')}`}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Assigned Tech</p>
+                      <div className="flex items-center gap-1 text-sm">
+                        <User className="h-4 w-4 text-slate-400" />
+                        {selectedWorkOrderData.assignedTechName || "Unassigned"}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Priority</p>
+                      <Badge className={cn(
+                        "text-xs",
+                        selectedWorkOrderData.priority === "low" && "bg-slate-100 text-slate-600",
+                        selectedWorkOrderData.priority === "normal" && "bg-blue-100 text-blue-600",
+                        selectedWorkOrderData.priority === "high" && "bg-amber-100 text-amber-600",
+                        selectedWorkOrderData.priority === "urgent" && "bg-red-100 text-red-600"
+                      )}>
+                        {selectedWorkOrderData.priority || "Normal"}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  {selectedWorkOrderData.propertyAddress && (
+                    <>
+                      <Separator />
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Service Address</p>
+                        <div className="flex items-start gap-1 text-sm">
+                          <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
+                          {selectedWorkOrderData.propertyAddress}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  
+                  {selectedWorkOrderData.description && (
+                    <>
+                      <Separator />
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Description</p>
+                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedWorkOrderData.description}</p>
+                      </div>
+                    </>
+                  )}
+                  
+                  {selectedWorkOrderData.projectTitle && (
+                    <>
+                      <Separator />
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Related Project</p>
+                        <div className="flex items-center gap-1 text-sm text-blue-600">
+                          <Briefcase className="h-4 w-4" />
+                          {selectedWorkOrderData.projectTitle}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 text-center py-8">Work order not found</p>
+              )}
+            </ScrollArea>
+            
+            <div className="shrink-0 pt-4 border-t flex items-center justify-between gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedWorkOrderId(null)}
+                data-testid="button-close-wo-sheet"
+              >
+                Close
+              </Button>
+              <Button
+                className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                onClick={() => {
+                  setSelectedWorkOrderId(null);
+                  navigate(`/crm/work-orders/${selectedWorkOrderId}`);
+                }}
+                data-testid="button-open-full-wo"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open Full Details
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Project Detail Sheet */}
+        <Sheet open={!!selectedProjectId} onOpenChange={(open) => !open && setSelectedProjectId(null)}>
+          <SheetContent className="w-full sm:max-w-2xl overflow-hidden flex flex-col" data-testid="sheet-project-detail">
+            <SheetHeader className="shrink-0 pb-4 border-b">
+              <SheetTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-[#711419]" />
+                Project Details
+              </SheetTitle>
+            </SheetHeader>
+            
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              {selectedProjectLoading ? (
+                <div className="space-y-4 py-4">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : selectedProjectData ? (
+                <div className="space-y-6 py-4">
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-lg">{selectedProjectData.title || "Untitled Project"}</h3>
+                    <div className="flex items-center gap-3">
+                      <Badge className={cn(
+                        "text-xs",
+                        selectedProjectData.status === "lead" && "bg-slate-100 text-slate-700",
+                        selectedProjectData.status === "proposal_sent" && "bg-amber-100 text-amber-700",
+                        selectedProjectData.status === "approved" && "bg-blue-100 text-blue-700",
+                        selectedProjectData.status === "in_progress" && "bg-green-100 text-green-700",
+                        selectedProjectData.status === "completed" && "bg-emerald-100 text-emerald-700",
+                        selectedProjectData.status === "archived" && "bg-gray-100 text-gray-700"
+                      )}>
+                        {selectedProjectData.status?.replace(/_/g, " ").charAt(0).toUpperCase() + selectedProjectData.status?.slice(1).replace(/_/g, " ")}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {selectedProjectData.projectType}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Project Type</p>
+                      <p className="text-sm font-medium">{selectedProjectData.projectType}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Expected Value</p>
+                      <div className="flex items-center gap-1 text-sm font-medium text-[#711419]">
+                        <DollarSign className="h-4 w-4" />
+                        {selectedProjectData.expectedValue 
+                          ? Number(selectedProjectData.expectedValue).toLocaleString('en-US', { minimumFractionDigits: 2 }) 
+                          : '—'}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Priority</p>
+                      <Badge className={cn(
+                        "text-xs",
+                        selectedProjectData.priority === "low" && "bg-slate-100 text-slate-600",
+                        selectedProjectData.priority === "normal" && "bg-blue-100 text-blue-600",
+                        selectedProjectData.priority === "high" && "bg-amber-100 text-amber-600",
+                        selectedProjectData.priority === "urgent" && "bg-red-100 text-red-600"
+                      )}>
+                        {selectedProjectData.priority || "Normal"}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Work Orders</p>
+                      <div className="flex items-center gap-1 text-sm">
+                        <Wrench className="h-4 w-4 text-slate-400" />
+                        {selectedProjectData.workOrderCount || 0} work order(s)
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {selectedProjectData.customerName && (
+                    <>
+                      <Separator />
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Customer</p>
+                        <p className="text-sm font-medium">{selectedProjectData.customerName}</p>
+                      </div>
+                    </>
+                  )}
+                  
+                  {selectedProjectData.propertyAddress && (
+                    <>
+                      <Separator />
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Property Address</p>
+                        <div className="flex items-start gap-1 text-sm">
+                          <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
+                          {selectedProjectData.propertyAddress}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  
+                  {selectedProjectData.description && (
+                    <>
+                      <Separator />
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Description</p>
+                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedProjectData.description}</p>
+                      </div>
+                    </>
+                  )}
+                  
+                  <Separator />
+                  
+                  <div className="grid grid-cols-2 gap-4 text-sm text-slate-500">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide mb-1">Created</p>
+                      <p>{selectedProjectData.createdAt ? format(new Date(selectedProjectData.createdAt), 'MMM d, yyyy') : '—'}</p>
+                    </div>
+                    {selectedProjectData.updatedAt && (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide mb-1">Last Updated</p>
+                        <p>{format(new Date(selectedProjectData.updatedAt), 'MMM d, yyyy')}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 text-center py-8">Project not found</p>
+              )}
+            </ScrollArea>
+            
+            <div className="shrink-0 pt-4 border-t flex items-center justify-between gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedProjectId(null)}
+                data-testid="button-close-project-sheet"
+              >
+                Close
+              </Button>
+              <Button
+                className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                onClick={() => {
+                  setSelectedProjectId(null);
+                  navigate(`/crm/projects/${selectedProjectId}`);
+                }}
+                data-testid="button-open-full-project"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open Full Details
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Invoice Detail Sheet */}
+        <Sheet open={!!selectedInvoiceId} onOpenChange={(open) => !open && setSelectedInvoiceId(null)}>
+          <SheetContent className="w-full sm:max-w-2xl overflow-hidden flex flex-col" data-testid="sheet-invoice-detail">
+            <SheetHeader className="shrink-0 pb-4 border-b">
+              <SheetTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-[#711419]" />
+                {selectedInvoiceData?.invoiceNumber || "Invoice Details"}
+              </SheetTitle>
+            </SheetHeader>
+            
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              {selectedInvoiceLoading ? (
+                <div className="space-y-4 py-4">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : selectedInvoiceData ? (
+                <div className="space-y-6 py-4">
+                  {/* Invoice Header */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <Badge className={cn(
+                        "text-xs",
+                        selectedInvoiceData.status === "draft" && "bg-slate-100 text-slate-700",
+                        selectedInvoiceData.status === "sent" && "bg-blue-100 text-blue-700",
+                        selectedInvoiceData.status === "paid" && "bg-green-100 text-green-700",
+                        selectedInvoiceData.status === "partial" && "bg-amber-100 text-amber-700",
+                        selectedInvoiceData.status === "void" && "bg-red-100 text-red-700"
+                      )}>
+                        {selectedInvoiceData.status?.charAt(0).toUpperCase() + selectedInvoiceData.status?.slice(1)}
+                      </Badge>
+                      {selectedInvoiceData.dueDate && (
+                        <span className="text-sm text-slate-500">
+                          Due: {format(new Date(selectedInvoiceData.dueDate), 'MMM d, yyyy')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Invoice Details */}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-slate-500">Created</p>
+                      <p className="font-medium">
+                        {selectedInvoiceData.createdAt ? format(new Date(selectedInvoiceData.createdAt), 'MMM d, yyyy') : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Due Date</p>
+                      <p className="font-medium">
+                        {selectedInvoiceData.dueDate ? format(new Date(selectedInvoiceData.dueDate), 'MMM d, yyyy') : '—'}
+                      </p>
+                    </div>
+                    {selectedInvoiceData.paymentMethod && (
+                      <div>
+                        <p className="text-slate-500">Payment Method</p>
+                        <p className="font-medium capitalize">{selectedInvoiceData.paymentMethod.replace('_', ' ')}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Financial Summary */}
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Total</span>
+                      <span className="font-semibold">
+                        ${Number(selectedInvoiceData.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    {selectedInvoiceData.amountPaid && Number(selectedInvoiceData.amountPaid) > 0 && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Amount Paid</span>
+                        <span>
+                          -${Number(selectedInvoiceData.amountPaid).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-bold border-t pt-2">
+                      <span>Balance Due</span>
+                      <span className={Number(selectedInvoiceData.balanceDue || 0) > 0 ? "text-red-600" : "text-green-600"}>
+                        ${Number(selectedInvoiceData.balanceDue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Line Items */}
+                  {selectedInvoiceData.lineItems && selectedInvoiceData.lineItems.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold">Line Items</h4>
+                      <div className="divide-y border rounded-lg">
+                        {selectedInvoiceData.lineItems.map((item) => (
+                          <div key={item.id} className="p-3 text-sm">
+                            <div className="flex justify-between">
+                              <span className="font-medium">{item.description}</span>
+                              <span className="font-semibold">
+                                ${Number(item.lineTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <div className="flex gap-4 text-slate-500 text-xs mt-1">
+                              <span>Qty: {item.quantity}</span>
+                              <span>@ ${Number(item.unitPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              {item.partNumber && <span>Part: {item.partNumber}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Notes */}
+                  {selectedInvoiceData.notes && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold">Notes</h4>
+                      <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedInvoiceData.notes}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 text-center py-8">Invoice not found</p>
+              )}
+            </ScrollArea>
+            
+            <div className="shrink-0 pt-4 border-t flex items-center justify-between gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedInvoiceId(null)}
+                data-testid="button-close-invoice-sheet"
+              >
+                Close
+              </Button>
+              <Button
+                className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                onClick={() => {
+                  setSelectedInvoiceId(null);
+                  navigate(`/crm/invoices/${selectedInvoiceId}`);
+                }}
+                data-testid="button-open-full-invoice"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open Full Details
