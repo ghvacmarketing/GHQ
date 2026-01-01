@@ -1171,7 +1171,7 @@ export default function CrmQuoteCreate() {
               </Select>
             </div>
 
-            <div className="border rounded-lg overflow-hidden flex-1 overflow-y-auto min-h-[300px]">
+            <div className="border rounded-lg overflow-hidden flex-1 overflow-y-auto min-h-[300px] max-h-[400px]">
               {isSearchingItems ? (
                 <div className="p-8 text-center text-slate-500">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
