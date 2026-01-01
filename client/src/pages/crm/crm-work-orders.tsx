@@ -808,7 +808,7 @@ export default function CrmWorkOrders() {
               data-testid="button-create-work-order"
             >
               <Plus className="h-4 w-4 mr-1" />
-              Create Work Order
+              New Work Order
             </Button>
           </div>
         </div>

@@ -248,21 +248,23 @@ function ResidentialOverview({ customer, openProjects, upcomingVisits, completed
         <CardContent className="pt-0">
           <div className="flex flex-wrap gap-3">
             <Button 
+              size="sm"
               onClick={onCreateProject}
               className="bg-[#711419] hover:bg-[#5a1014] text-white"
               data-testid="button-quick-create-project"
             >
-              <Briefcase className="h-4 w-4 mr-2" />
-              Create Project
+              <Plus className="h-4 w-4 mr-1" />
+              New Project
             </Button>
             <Button 
+              size="sm"
               onClick={onCreateWorkOrder}
               variant="outline"
               className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
               data-testid="button-quick-create-work-order"
             >
-              <CalendarPlus className="h-4 w-4 mr-2" />
-              Create Work Order
+              <Plus className="h-4 w-4 mr-1" />
+              New Work Order
             </Button>
           </div>
         </CardContent>
@@ -337,21 +339,23 @@ function PropertyManagerOverview({ customer, openProjects, upcomingVisits, compl
         <CardContent className="pt-0">
           <div className="flex flex-wrap gap-3">
             <Button 
+              size="sm"
               onClick={onCreateProject}
               className="bg-[#711419] hover:bg-[#5a1014] text-white"
               data-testid="button-quick-create-project"
             >
-              <Briefcase className="h-4 w-4 mr-2" />
-              Create Project
+              <Plus className="h-4 w-4 mr-1" />
+              New Project
             </Button>
             <Button 
+              size="sm"
               onClick={onCreateWorkOrder}
               variant="outline"
               className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
               data-testid="button-quick-create-work-order"
             >
-              <CalendarPlus className="h-4 w-4 mr-2" />
-              Create Work Order
+              <Plus className="h-4 w-4 mr-1" />
+              New Work Order
             </Button>
           </div>
         </CardContent>
@@ -426,21 +430,23 @@ function CommercialOverview({ customer, openProjects, upcomingVisits, completedP
         <CardContent className="pt-0">
           <div className="flex flex-wrap gap-3">
             <Button 
+              size="sm"
               onClick={onCreateProject}
               className="bg-[#711419] hover:bg-[#5a1014] text-white"
               data-testid="button-quick-create-project"
             >
-              <Briefcase className="h-4 w-4 mr-2" />
-              Create Project
+              <Plus className="h-4 w-4 mr-1" />
+              New Project
             </Button>
             <Button 
+              size="sm"
               onClick={onCreateWorkOrder}
               variant="outline"
               className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
               data-testid="button-quick-create-work-order"
             >
-              <CalendarPlus className="h-4 w-4 mr-2" />
-              Create Work Order
+              <Plus className="h-4 w-4 mr-1" />
+              New Work Order
             </Button>
           </div>
         </CardContent>
@@ -785,21 +791,23 @@ function CustomerTabbedView({
           <CardContent className="pt-0">
             <div className="flex flex-wrap gap-3">
               <Button 
+                size="sm"
                 onClick={onCreateProject}
                 className="bg-[#711419] hover:bg-[#5a1014] text-white"
                 data-testid="button-quick-create-project"
               >
-                <Briefcase className="h-4 w-4 mr-2" />
-                Create Project
+                <Plus className="h-4 w-4 mr-1" />
+                New Project
               </Button>
               <Button 
+                size="sm"
                 onClick={onScheduleVisit}
                 variant="outline"
                 className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
                 data-testid="button-quick-create-work-order"
               >
-                <CalendarPlus className="h-4 w-4 mr-2" />
-                Create Work Order
+                <Plus className="h-4 w-4 mr-1" />
+                New Work Order
               </Button>
             </div>
           </CardContent>
@@ -4971,17 +4979,18 @@ export default function CrmCustomerDetail() {
                         <Separator orientation="vertical" className="h-10 mx-2" />
                         
                         <Button
+                          size="sm"
                           onClick={() => projectCreateWorkOrderMutation.mutate()}
                           className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
                           disabled={projectCreateWorkOrderMutation.isPending}
                           data-testid="button-project-create-wo"
                         >
                           {projectCreateWorkOrderMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                           ) : (
-                            <CalendarPlus className="h-4 w-4 mr-2" />
+                            <Plus className="h-4 w-4 mr-1" />
                           )}
-                          Create Work Order
+                          New Work Order
                         </Button>
                         
                         <Button

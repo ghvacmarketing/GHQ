@@ -474,7 +474,7 @@ export default function CrmQuotes() {
           </div>
           <div className="shrink-0 pb-1">
             <Select value={amountFilter} onValueChange={setAmountFilter}>
-              <SelectTrigger className="w-[140px] h-8 text-xs border-slate-200 bg-white focus:ring-[#711419] focus:border-[#711419]" data-testid="select-amount-filter">
+              <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-amount-filter">
                 <SelectValue placeholder="Amount" />
               </SelectTrigger>
               <SelectContent className="bg-white">
