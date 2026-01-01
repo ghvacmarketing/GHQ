@@ -609,7 +609,7 @@ export default function CrmProspectFunnel() {
             </Select>
 
             <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-              <SelectTrigger className="w-[160px]" data-testid="select-salesperson-filter">
+              <SelectTrigger className="w-[160px]" data-testid="select-employee-filter">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   <SelectValue placeholder="All Sales People" />
