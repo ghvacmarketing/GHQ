@@ -44,7 +44,10 @@ import {
   Package,
   ClipboardList,
   Zap,
+  CalendarIcon,
 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -137,6 +140,15 @@ export default function CrmInvoiceCreate() {
   const [itemSearchQuery, setItemSearchQuery] = useState("");
   const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "install" | "service" | "maintenance">("all");
 
+  const [showCreateWODialog, setShowCreateWODialog] = useState(false);
+  const [newWOCustomerSearch, setNewWOCustomerSearch] = useState("");
+  const [newWOCustomerSearchOpen, setNewWOCustomerSearchOpen] = useState(false);
+  const [newWOSelectedCustomer, setNewWOSelectedCustomer] = useState<CrmCustomer | null>(null);
+  const [newWOTitle, setNewWOTitle] = useState("");
+  const [newWODescription, setNewWODescription] = useState("");
+  const [newWOVisitType, setNewWOVisitType] = useState<"SERVICE" | "INSTALL" | "MAINTENANCE" | "SALES">("SERVICE");
+  const [newWOScheduledDate, setNewWOScheduledDate] = useState<Date>(new Date());
+
   const urlParams = new URLSearchParams(window.location.search);
   const workOrderIdFromUrl = urlParams.get("workOrderId");
 
@@ -174,6 +186,21 @@ export default function CrmInvoiceCreate() {
   const { data: crmItems } = useQuery<CrmItem[]>({
     queryKey: ["/api/crm/items"],
     enabled: !!currentUser && formData.mode === "manual",
+  });
+
+  const { data: customerSearchResults, isLoading: isSearchingCustomers } = useQuery<{ customers: CrmCustomer[] }>({
+    queryKey: ["/api/crm/customers", "search", newWOCustomerSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (newWOCustomerSearch.trim()) {
+        params.set("search", newWOCustomerSearch.trim());
+      }
+      params.set("limit", "20");
+      const response = await fetch(`/api/crm/customers?${params.toString()}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to search customers");
+      return response.json();
+    },
+    enabled: showCreateWODialog && newWOCustomerSearchOpen,
   });
 
   useEffect(() => {
@@ -256,6 +283,54 @@ export default function CrmInvoiceCreate() {
         description: err.message || "An error occurred",
         variant: "destructive",
       });
+    },
+  });
+
+  const createWorkOrderMutation = useMutation({
+    mutationFn: async () => {
+      if (!newWOSelectedCustomer) throw new Error("Customer is required");
+      if (!newWOTitle.trim()) throw new Error("Title is required");
+      if (!newWODescription.trim()) throw new Error("Description is required");
+
+      const scheduledStart = new Date(newWOScheduledDate);
+      scheduledStart.setHours(8, 0, 0, 0);
+      const scheduledEnd = new Date(newWOScheduledDate);
+      scheduledEnd.setHours(10, 0, 0, 0);
+
+      const res = await apiRequest("POST", "/api/crm/work-orders", {
+        customerId: newWOSelectedCustomer.id,
+        title: newWOTitle.trim(),
+        description: newWODescription.trim(),
+        visitType: newWOVisitType,
+        scheduledStart: scheduledStart.toISOString(),
+        scheduledEnd: scheduledEnd.toISOString(),
+        status: "scheduled",
+      });
+      const data = await res.json();
+      return data.workOrder || data;
+    },
+    onSuccess: (newWO) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", "for-invoice"] });
+      setShowCreateWODialog(false);
+      setSelectedWorkOrder(newWO);
+      updateField("workOrderId", newWO.id);
+      setFormData(prev => ({
+        ...prev,
+        customerName: newWOSelectedCustomer?.name || "",
+        customerEmail: newWOSelectedCustomer?.email || "",
+        customerPhone: newWOSelectedCustomer?.phone || "",
+        serviceAddress: newWOSelectedCustomer?.fullAddress || "",
+      }));
+      setNewWOCustomerSearch("");
+      setNewWOSelectedCustomer(null);
+      setNewWOTitle("");
+      setNewWODescription("");
+      setNewWOVisitType("SERVICE");
+      setNewWOScheduledDate(new Date());
+      toast({ title: "Work order created", description: "The work order has been created and selected." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create work order", description: error.message, variant: "destructive" });
     },
   });
 
@@ -570,11 +645,22 @@ export default function CrmInvoiceCreate() {
 
               {currentStep === 2 && (
                 <div className="space-y-6">
-                  <div>
-                    <h3 className="text-base font-semibold mb-1">Select Work Order</h3>
-                    <p className="text-sm text-slate-500">
-                      Invoices must be tied to a work order
-                    </p>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-base font-semibold mb-1">Select Work Order</h3>
+                      <p className="text-sm text-slate-500">
+                        Invoices must be tied to a work order
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => setShowCreateWODialog(true)}
+                      className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                      data-testid="button-create-work-order"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Create New
+                    </Button>
                   </div>
 
                   <div className="relative">
@@ -1081,6 +1167,166 @@ export default function CrmInvoiceCreate() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setItemSearchOpen(false)}>
               Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCreateWODialog} onOpenChange={setShowCreateWODialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create Work Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="wo-customer">Customer *</Label>
+              <Popover open={newWOCustomerSearchOpen} onOpenChange={setNewWOCustomerSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                    data-testid="button-wo-customer-search"
+                  >
+                    {newWOSelectedCustomer ? newWOSelectedCustomer.name : "Select customer..."}
+                    <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search customers..."
+                      value={newWOCustomerSearch}
+                      onChange={(e) => setNewWOCustomerSearch(e.target.value)}
+                      data-testid="input-wo-customer-search"
+                    />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {isSearchingCustomers ? (
+                      <div className="p-4 text-center text-sm text-slate-500">
+                        <Loader2 className="h-4 w-4 animate-spin mx-auto mb-1" />
+                        Searching...
+                      </div>
+                    ) : customerSearchResults?.customers?.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-slate-500">
+                        No customers found
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {customerSearchResults?.customers?.map((customer) => (
+                          <button
+                            key={customer.id}
+                            onClick={() => {
+                              setNewWOSelectedCustomer(customer);
+                              setNewWOCustomerSearchOpen(false);
+                            }}
+                            className="w-full p-2 text-left hover:bg-slate-50 transition-colors"
+                            data-testid={`wo-customer-${customer.id}`}
+                          >
+                            <div className="font-medium text-sm">{customer.name}</div>
+                            {customer.fullAddress && (
+                              <div className="text-xs text-slate-500 truncate">{customer.fullAddress}</div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="wo-title">Title *</Label>
+              <Input
+                id="wo-title"
+                placeholder="e.g., AC Repair, Furnace Installation"
+                value={newWOTitle}
+                onChange={(e) => setNewWOTitle(e.target.value)}
+                data-testid="input-wo-title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="wo-description">Description *</Label>
+              <Textarea
+                id="wo-description"
+                placeholder="Describe the work to be done..."
+                value={newWODescription}
+                onChange={(e) => setNewWODescription(e.target.value)}
+                rows={3}
+                data-testid="textarea-wo-description"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Visit Type</Label>
+                <Select value={newWOVisitType} onValueChange={(v) => setNewWOVisitType(v as any)}>
+                  <SelectTrigger data-testid="select-wo-visit-type">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SERVICE">Service</SelectItem>
+                    <SelectItem value="INSTALL">Install</SelectItem>
+                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                    <SelectItem value="SALES">Sales</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Scheduled Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !newWOScheduledDate && "text-muted-foreground"
+                      )}
+                      data-testid="button-wo-scheduled-date"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newWOScheduledDate ? format(newWOScheduledDate, "MMM d, yyyy") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={newWOScheduledDate}
+                      onSelect={(date) => date && setNewWOScheduledDate(date)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateWODialog(false);
+                setNewWOCustomerSearch("");
+                setNewWOSelectedCustomer(null);
+                setNewWOTitle("");
+                setNewWODescription("");
+                setNewWOVisitType("SERVICE");
+                setNewWOScheduledDate(new Date());
+              }}
+              data-testid="button-wo-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createWorkOrderMutation.mutate()}
+              disabled={!newWOSelectedCustomer || !newWOTitle.trim() || !newWODescription.trim() || createWorkOrderMutation.isPending}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-wo-create"
+            >
+              {createWorkOrderMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Create Work Order
             </Button>
           </DialogFooter>
         </DialogContent>
