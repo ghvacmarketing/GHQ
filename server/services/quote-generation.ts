@@ -40,12 +40,42 @@ OUTPUT STRUCTURE:
 
 All prices must be numbers (not strings). Format prices as numbers, frontend handles currency formatting.`;
 
+// System instructions for OPTIONS mode - customer picks ONE option
+const SYSTEM_INSTRUCTIONS_OPTIONS = `You are GHVAC's professional HVAC quoting assistant. Generate a "Comprehensive Home Comfort Proposal" with MULTIPLE OPTIONS for the customer to choose from.
+
+CRITICAL: This is an OPTIONS proposal. The customer will SELECT ONE OPTION, not buy all of them.
+
+DOCUMENT FORMAT FOR OPTIONS MODE:
+1. quote_title: Format as "Your Home Comfort Options" or similar title indicating choices
+2. package_description: Explain that this proposal presents multiple options for the customer to choose from, each with different features and price points
+3. whats_included: List what's included for EACH OPTION separately. Group by option name (e.g., "Good Package", "Better Package", "Best Package")
+4. best_for: Describe who each tier is best for
+5. Pricing: Each option in line_items should show its INDIVIDUAL price - do NOT add them together
+
+IMPORTANT RULES FOR OPTIONS MODE:
+1. Do NOT sum the options together - they are mutually exclusive choices
+2. Each line_item represents a SEPARATE OPTION the customer can choose
+3. The subtotal should equal the HIGHEST priced option (for reference), NOT the sum of all options
+4. The total should be the highest priced option - the customer picks ONE
+5. In the description for each line item, make it clear this is an option to choose
+6. Use option names like "Good", "Better", "Best" or the provided package tags
+
+PRICING FOR OPTIONS:
+- line_items: Each option as a separate item with its own price
+- subtotal: Use the HIGHEST option price (customer picks one)
+- total: Same as subtotal (no combined total)
+- elite_discount_active/amount: Apply per-option if that option has Elite
+- financing_text: Show range of monthly payments for all options
+
+All prices must be numbers (not strings). Format prices as numbers, frontend handles currency formatting.`;
+
 export interface QuoteGenerationInput {
   conversationId?: string;
   customerName?: string;
   customerAddress?: string;
   customerNotes?: string;
   customInstructions?: string;
+  quoteMode?: 'single' | 'options'; // "single" = combined quote, "options" = separate options for customer to choose
   cartItems: Array<{
     type: 'hvac' | 'crawlspace' | 'custom';
     name: string;
@@ -60,6 +90,7 @@ export interface QuoteGenerationInput {
     tonnage?: string;
     brand?: string;
     model?: string;
+    packageTag?: string; // "Good", "Better", "Best", etc.
   }>;
   totals: {
     subtotal: number;
@@ -100,17 +131,27 @@ ${input.customerNotes ? `Notes: ${input.customerNotes}` : ''}`;
 }
 
 function buildUserPrompt(input: QuoteGenerationInput, context?: ConversationContext): string {
-  let prompt = `Generate a professional HVAC quote with the following details:
+  const isOptionsMode = input.quoteMode === 'options';
+  
+  let prompt = isOptionsMode 
+    ? `Generate a professional HVAC OPTIONS PROPOSAL with the following details. IMPORTANT: This is an OPTIONS proposal where the customer will CHOOSE ONE option, not buy all of them.`
+    : `Generate a professional HVAC quote with the following details:`;
+
+  prompt += `
 
 CUSTOMER INFORMATION:
 - Name: ${input.customerName || 'Valued Customer'}
 ${input.customerAddress ? `- Address: ${input.customerAddress}` : ''}
 ${input.customerNotes ? `- Notes: ${input.customerNotes}` : ''}
 
-EQUIPMENT/SERVICES IN QUOTE:
+${isOptionsMode ? 'OPTIONS FOR CUSTOMER TO CHOOSE FROM (each is a separate choice):' : 'EQUIPMENT/SERVICES IN QUOTE:'}
 ${input.cartItems.map((item, i) => {
-  let itemDetails = `
-${i + 1}. ${item.name}
+  const optionLabel = item.packageTag || `Option ${i + 1}`;
+  let itemDetails = isOptionsMode 
+    ? `\n${optionLabel.toUpperCase()}: ${item.name}`
+    : `\n${i + 1}. ${item.name}`;
+  
+  itemDetails += `
    - Type: ${item.type.toUpperCase()}
    - Description: ${item.description}
    - Quantity: ${item.quantity}
@@ -123,6 +164,7 @@ ${i + 1}. ${item.name}
   
   itemDetails += `\n   - Base Price: $${item.basePrice.toLocaleString()}`;
   itemDetails += `\n   - Final Price: $${item.finalPrice.toLocaleString()}`;
+  itemDetails += `\n   - Monthly Payment: $${Math.round(item.finalPrice / 67).toLocaleString()}/month`;
   
   if (item.isElite && item.eliteIncludes) {
     itemDetails += `\n   - Elite Includes: ${item.eliteIncludes.join(', ')}`;
@@ -132,13 +174,33 @@ ${i + 1}. ${item.name}
   }
   
   return itemDetails;
-}).join('\n')}
+}).join('\n')}`;
+
+  if (isOptionsMode) {
+    // For options mode, show pricing range, not combined totals
+    const prices = input.cartItems.map(item => item.finalPrice * item.quantity);
+    const lowestPrice = Math.min(...prices);
+    const highestPrice = Math.max(...prices);
+    const lowestMonthly = Math.round(lowestPrice / 67);
+    const highestMonthly = Math.round(highestPrice / 67);
+    
+    prompt += `
+
+PRICING SUMMARY (OPTIONS - DO NOT SUM TOGETHER):
+- Price Range: $${lowestPrice.toLocaleString()} to $${highestPrice.toLocaleString()}
+- Monthly Payment Range: $${lowestMonthly.toLocaleString()}/month to $${highestMonthly.toLocaleString()}/month
+- Number of Options: ${input.cartItems.length}
+
+IMPORTANT: Each line_item should represent ONE OPTION with its individual price. The customer picks ONE. Do NOT add the prices together.`;
+  } else {
+    prompt += `
 
 FINAL TOTALS (USE THESE EXACT VALUES):
 - Subtotal: $${input.totals.subtotal.toLocaleString()}
 - Elite Savings: $${input.totals.eliteSavings.toLocaleString()}
 - Grand Total: $${input.totals.grandTotal.toLocaleString()}
 - Monthly Payment (67-month financing): $${input.totals.monthlyPayment.toLocaleString()}/month`;
+  }
 
   if (context?.rollingSummary) {
     prompt += `\n\nCONVERSATION CONTEXT:
@@ -199,7 +261,9 @@ export async function generateQuoteWithAI(input: QuoteGenerationInput): Promise<
   }
 
   // Build messages array with knowledge base context
-  const systemContent = SYSTEM_INSTRUCTIONS + knowledgeBaseContext;
+  // Use different system instructions for options mode vs single quote mode
+  const baseInstructions = input.quoteMode === 'options' ? SYSTEM_INSTRUCTIONS_OPTIONS : SYSTEM_INSTRUCTIONS;
+  const systemContent = baseInstructions + knowledgeBaseContext;
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: systemContent }
   ];

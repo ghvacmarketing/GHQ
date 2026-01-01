@@ -1848,6 +1848,7 @@ export default function CrmProposalBuilder() {
             eliteIncludes: item.eliteData ? CRAWLSPACE_ELITE_BUNDLES.map(b => b.name) : undefined,
             eliteSavings: item.eliteData?.discountAmount,
             pricingBreakdown: item.pricingBreakdown,
+            packageTag: item.tier.name, // Use tier name as the option label
           };
         } else if (isCustomBuild(item)) {
           const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
@@ -1863,6 +1864,7 @@ export default function CrmProposalBuilder() {
             finalPrice: estimate.high,
             quantity: item.quantity,
             isElite: false,
+            packageTag: 'Custom Build', // Label for custom builds
           };
         } else {
           const unitTypeName = UNIT_TYPE_INFO[item.unitType]?.name || item.unitType;
@@ -1882,6 +1884,7 @@ export default function CrmProposalBuilder() {
             isElite: !!item.eliteData,
             eliteIncludes,
             eliteSavings: item.eliteData?.discountAmount,
+            packageTag: item.packageLevel, // Use package level (Good, Better, Best) as the option label
           };
         }
       });
