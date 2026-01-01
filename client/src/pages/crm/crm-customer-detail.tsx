@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
+import { jsPDF } from "jspdf";
 import {
   ArrowLeft,
   Plus,
@@ -49,6 +50,12 @@ import {
   History,
   UserCircle,
   LayoutGrid,
+  Download,
+  Eye,
+  X,
+  Loader2,
+  XCircle,
+  Navigation,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -101,6 +108,24 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
   normal: { bg: "bg-blue-100", text: "text-blue-600" },
   high: { bg: "bg-amber-100", text: "text-amber-600" },
   urgent: { bg: "bg-red-100", text: "text-red-600" },
+};
+
+const workOrderStatusColors: Record<string, { bg: string; text: string; border: string }> = {
+  scheduled: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
+  dispatched: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-200" },
+  en_route: { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
+  on_site: { bg: "bg-purple-100", text: "text-purple-700", border: "border-purple-200" },
+  completed: { bg: "bg-green-100", text: "text-green-700", border: "border-green-200" },
+  cancelled: { bg: "bg-red-100", text: "text-red-500", border: "border-red-200" },
+};
+
+const workOrderStatusLabels: Record<string, string> = {
+  scheduled: "Scheduled",
+  dispatched: "Dispatched",
+  en_route: "En Route",
+  on_site: "On Site",
+  completed: "Completed",
+  cancelled: "Cancelled",
 };
 
 function formatDate(date: Date | string | null): string {
@@ -1420,9 +1445,15 @@ export default function CrmCustomerDetail() {
   const [propertyDialogOpen, setPropertyDialogOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<CrmProperty | null>(null);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
+  const [showQuotePreview, setShowQuotePreview] = useState(false);
+  const [showQuoteDeleteConfirm, setShowQuoteDeleteConfirm] = useState(false);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [showInvoicePaymentDialog, setShowInvoicePaymentDialog] = useState(false);
+  const [showInvoiceVoidConfirm, setShowInvoiceVoidConfirm] = useState(false);
+  const [invoicePaymentAmount, setInvoicePaymentAmount] = useState("");
+  const [invoicePaymentMethod, setInvoicePaymentMethod] = useState<"cash" | "check" | "credit_card" | "bank_transfer" | "other">("check");
   const { toast } = useToast();
 
   // Edit form state
@@ -1707,6 +1738,19 @@ export default function CrmCustomerDetail() {
   
   type QuoteWithDetails = CrmQuote & {
     lineItems?: QuoteLineItem[];
+    customer?: { id: string; name: string; email?: string; phone?: string } | null;
+    aiGeneratedQuote?: {
+      quote_title?: string;
+      package_description?: string;
+      whats_included?: Array<{ category: string; items: string[] }>;
+      best_for?: string;
+      line_items?: Array<{ name: string; qty: number; price: number; description: string }>;
+      financing_text?: string;
+      warranties_and_terms?: string[];
+      next_steps?: string[];
+      options?: Array<{ title: string; description: string; price: number; tags?: string[]; inclusions?: string[] }>;
+    } | null;
+    quoteMode?: "single" | "options" | null;
   };
   
   const { data: selectedQuoteData, isLoading: selectedQuoteLoading } = useQuery<QuoteWithDetails>({
@@ -1718,6 +1762,330 @@ export default function CrmCustomerDetail() {
     },
     enabled: !!currentUser && !!selectedQuoteId,
   });
+
+  const quoteSendMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/crm/quotes/${selectedQuoteId}/send`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to send quote");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", selectedQuoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      toast({ title: "Quote sent", description: "Quote status updated to sent." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send quote", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const quoteAcceptMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/crm/quotes/${selectedQuoteId}/accept`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to accept quote");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", selectedQuoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      toast({ title: "Quote approved", description: "Quote status updated to approved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to approve quote", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const quoteDeclineMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/crm/quotes/${selectedQuoteId}/decline`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to decline quote");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", selectedQuoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      toast({ title: "Quote declined", description: "Quote status updated to declined." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to decline quote", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const quoteDeleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/crm/quotes/${selectedQuoteId}`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to delete quote");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      toast({ title: "Quote deleted", description: "The quote has been permanently deleted." });
+      setSelectedQuoteId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete quote", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const quoteCreateInvoiceMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/crm/invoices/from-quote", { quoteId: selectedQuoteId });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to create invoice");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", selectedQuoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      toast({ 
+        title: "Invoice created!", 
+        description: `Invoice ${data.invoice?.invoiceNumber || ''} has been created from this quote.`
+      });
+      setSelectedQuoteId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create invoice", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleQuoteDownloadPDF = () => {
+    if (!selectedQuoteData) return;
+    const quote = selectedQuoteData;
+
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - (margin * 2);
+      let y = margin;
+
+      const brandColor: [number, number, number] = [113, 20, 25];
+      const textColor: [number, number, number] = [30, 41, 59];
+      const mutedColor: [number, number, number] = [100, 116, 139];
+      const lightBg: [number, number, number] = [248, 250, 252];
+      const tableRowAlt: [number, number, number] = [248, 250, 252];
+      const isOptionsMode = quote.quoteMode === "options";
+
+      const addPageHeader = () => {
+        doc.setFillColor(...brandColor);
+        doc.roundedRect(margin, y, contentWidth, 28, 3, 3, 'F');
+        
+        doc.setFontSize(20);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("Giesbrecht HVAC", margin + 8, y + 12);
+        
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(220, 220, 220);
+        doc.text("PO Box 917, Wrens, GA 30833", margin + 8, y + 20);
+
+        doc.setFontSize(9);
+        doc.text("(706) 826-0644", pageWidth - margin - 8, y + 10, { align: 'right' });
+        doc.text("chandler@ghvacinc.com", pageWidth - margin - 8, y + 15, { align: 'right' });
+        doc.text("www.ghvacinc.com", pageWidth - margin - 8, y + 20, { align: 'right' });
+      };
+
+      const checkPageBreak = (neededSpace: number) => {
+        if (y + neededSpace > pageHeight - 45) {
+          doc.addPage();
+          y = margin;
+          addPageHeader();
+          y += 35;
+        }
+      };
+
+      addPageHeader();
+      y += 35;
+
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...textColor);
+      doc.text("QUOTE", margin, y);
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...mutedColor);
+      doc.text(`#${quote.quoteNumber || ""}`, margin + doc.getTextWidth("QUOTE") + 5, y);
+      y += 12;
+
+      const boxHeight = 32;
+      doc.setFillColor(...lightBg);
+      doc.roundedRect(margin, y, contentWidth, boxHeight, 2, 2, 'F');
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...textColor);
+      doc.text("Customer", margin + 5, y + 8);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      const customerName = quote.customer?.name || quote.customerName || "Customer";
+      doc.text(customerName, margin + 5, y + 14);
+      let custY = y + 14;
+      doc.setTextColor(...mutedColor);
+      if (quote.customer?.email || quote.customerEmail) {
+        custY += 4;
+        doc.text(String(quote.customer?.email || quote.customerEmail), margin + 5, custY);
+      }
+      if (quote.customer?.phone || quote.customerPhone) {
+        custY += 4;
+        doc.text(String(quote.customer?.phone || quote.customerPhone), margin + 5, custY);
+      }
+      y += boxHeight + 8;
+
+      doc.setFillColor(...brandColor);
+      doc.rect(margin, y, contentWidth, 10, 'F');
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("Line Items", margin + 5, y + 7);
+      y += 10;
+
+      const col1Width = contentWidth * 0.55;
+      const col2Width = contentWidth * 0.15;
+      const col3Width = contentWidth * 0.15;
+      const col4Width = contentWidth * 0.15;
+      doc.setFillColor(...lightBg);
+      doc.rect(margin, y, contentWidth, 8, 'F');
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...textColor);
+      doc.text("Description", margin + 3, y + 5.5);
+      doc.text("Qty", margin + col1Width + col2Width/2, y + 5.5, { align: 'center' });
+      doc.text("Unit Price", margin + col1Width + col2Width + col3Width/2, y + 5.5, { align: 'center' });
+      doc.text("Total", margin + contentWidth - 3, y + 5.5, { align: 'right' });
+      y += 8;
+
+      const lineItems = quote.lineItems || [];
+      let rowIndex = 0;
+      lineItems.forEach((item) => {
+        const descLines = doc.splitTextToSize(item.description || "", col1Width - 6);
+        const rowHeight = Math.max(10, descLines.length * 4 + 4);
+        
+        checkPageBreak(rowHeight + 2);
+        if (rowIndex % 2 === 0) {
+          doc.setFillColor(...tableRowAlt);
+          doc.rect(margin, y, contentWidth, rowHeight, 'F');
+        }
+        
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...textColor);
+        let textY = y + 5;
+        descLines.forEach((line: string) => {
+          doc.text(line, margin + 3, textY);
+          textY += 4;
+        });
+        
+        doc.text(String(item.quantity || 1), margin + col1Width + col2Width/2, y + 5, { align: 'center' });
+        doc.text(`$${Number(item.unitPrice || 0).toLocaleString()}`, margin + col1Width + col2Width + col3Width/2, y + 5, { align: 'center' });
+        doc.text(`$${Number(item.lineTotal || 0).toLocaleString()}`, margin + contentWidth - 3, y + 5, { align: 'right' });
+        
+        y += rowHeight;
+        rowIndex++;
+      });
+
+      doc.setDrawColor(...brandColor);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, margin + contentWidth, y);
+      y += 6;
+
+      if (!isOptionsMode) {
+        const subtotal = Number(quote.subtotal || quote.total || 0);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text("Subtotal:", margin + col1Width + col2Width, y);
+        doc.text(`$${subtotal.toLocaleString()}`, margin + contentWidth - 3, y, { align: 'right' });
+        y += 6;
+
+        checkPageBreak(12);
+        doc.setFillColor(...brandColor);
+        doc.rect(margin, y, contentWidth, 10, 'F');
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("TOTAL:", margin + col1Width + col2Width, y + 7);
+        doc.text(`$${subtotal.toLocaleString()}`, margin + contentWidth - 3, y + 7, { align: 'right' });
+        y += 16;
+        doc.setTextColor(...textColor);
+      }
+
+      const footerY = pageHeight - 18;
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.3);
+      doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
+      
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...textColor);
+      doc.text("Thank you for choosing Giesbrecht HVAC!", pageWidth / 2, footerY, { align: 'center' });
+      
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...mutedColor);
+      doc.text("Terms: Payment due upon completion. Prices valid for 30 days.", pageWidth / 2, footerY + 4, { align: 'center' });
+      doc.text("(706) 826-0644  |  chandler@ghvacinc.com  |  www.ghvacinc.com", pageWidth / 2, footerY + 9, { align: 'center' });
+
+      const custName = (quote.customer?.name || quote.customerName || "Quote").replace(/[^a-zA-Z0-9]/g, '_');
+      const dateStr = new Date().toISOString().split('T')[0];
+      doc.save(`GHVAC_Quote_${quote.quoteNumber || custName}_${dateStr}.pdf`);
+
+      toast({
+        title: "PDF Downloaded",
+        description: "Quote saved as PDF successfully.",
+      });
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      toast({
+        title: "Download Failed",
+        description: "Could not generate the PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const quoteStatusLabels: Record<string, string> = {
+    draft: "Draft",
+    sent: "Sent",
+    viewed: "Viewed",
+    accepted: "Approved",
+    converted: "Converted",
+    declined: "Declined",
+    expired: "Expired",
+  };
+
+  const quoteStatusColors: Record<string, string> = {
+    draft: "bg-slate-100 text-slate-700 border-slate-200",
+    sent: "bg-blue-100 text-blue-700 border-blue-200",
+    viewed: "bg-purple-100 text-purple-700 border-purple-200",
+    accepted: "bg-green-100 text-green-700 border-green-200",
+    converted: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    declined: "bg-red-100 text-red-700 border-red-200",
+    expired: "bg-orange-100 text-orange-700 border-orange-200",
+  };
+
+  const formatQuoteCurrency = (value: string | number | null) => {
+    if (value === null || value === undefined) return "$0.00";
+    const num = typeof value === "string" ? parseFloat(value) : value;
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(num);
+  };
 
   // Fetch selected work order details for the detail sheet
   const { data: selectedWorkOrderData, isLoading: selectedWorkOrderLoading } = useQuery<WorkOrderWithDetails>({
@@ -1773,6 +2141,142 @@ export default function CrmCustomerDetail() {
     },
     enabled: !!currentUser && !!selectedInvoiceId,
   });
+
+  const invoiceSendMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const res = await apiRequest("POST", `/api/crm/invoices/${invoiceId}/send`, {});
+      if (!res.ok) throw new Error("Failed to mark invoice as sent");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invoice marked as sent" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", selectedInvoiceId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "invoices"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send invoice", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const invoicePayMutation = useMutation({
+    mutationFn: async ({ invoiceId, amountPaid, paymentMethod }: { invoiceId: string; amountPaid: string; paymentMethod: string }) => {
+      const res = await apiRequest("POST", `/api/crm/invoices/${invoiceId}/pay`, { amountPaid, paymentMethod });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to record payment");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Payment recorded successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", selectedInvoiceId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "invoices"] });
+      setShowInvoicePaymentDialog(false);
+      setInvoicePaymentAmount("");
+      setInvoicePaymentMethod("check");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to record payment", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const invoiceVoidMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const res = await apiRequest("POST", `/api/crm/invoices/${invoiceId}/void`, {});
+      if (!res.ok) throw new Error("Failed to void invoice");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invoice voided" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", selectedInvoiceId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "invoices"] });
+      setShowInvoiceVoidConfirm(false);
+      setSelectedInvoiceId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to void invoice", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleInvoiceDownloadPDF = () => {
+    if (!selectedInvoiceData) return;
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 15;
+      const contentWidth = pageWidth - (margin * 2);
+      let y = margin;
+
+      const brandColor: [number, number, number] = [113, 20, 25];
+      const textColor: [number, number, number] = [30, 41, 59];
+      const mutedColor: [number, number, number] = [100, 116, 139];
+
+      doc.setFillColor(...brandColor);
+      doc.roundedRect(margin, y, contentWidth, 20, 3, 3, 'F');
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("INVOICE", margin + 8, y + 13);
+      doc.setFontSize(10);
+      doc.text(selectedInvoiceData.invoiceNumber || "", pageWidth - margin - 8, y + 13, { align: 'right' });
+      y += 30;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...textColor);
+      doc.text(`Created: ${selectedInvoiceData.createdAt ? format(new Date(selectedInvoiceData.createdAt), 'MMM d, yyyy') : '—'}`, margin, y);
+      doc.text(`Due: ${selectedInvoiceData.dueDate ? format(new Date(selectedInvoiceData.dueDate), 'MMM d, yyyy') : 'Upon Receipt'}`, pageWidth - margin, y, { align: 'right' });
+      y += 15;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Total:", margin, y);
+      doc.text(`$${Number(selectedInvoiceData.total || 0).toFixed(2)}`, pageWidth - margin, y, { align: 'right' });
+      y += 8;
+      if (selectedInvoiceData.amountPaid && Number(selectedInvoiceData.amountPaid) > 0) {
+        doc.setTextColor(22, 163, 74);
+        doc.text("Paid:", margin, y);
+        doc.text(`-$${Number(selectedInvoiceData.amountPaid).toFixed(2)}`, pageWidth - margin, y, { align: 'right' });
+        y += 8;
+      }
+      doc.setTextColor(...textColor);
+      doc.setFont("helvetica", "bold");
+      const balanceDue = Number(selectedInvoiceData.balanceDue || 0);
+      if (balanceDue > 0) {
+        doc.setTextColor(220, 38, 38);
+      } else {
+        doc.setTextColor(22, 163, 74);
+      }
+      doc.text("Balance Due:", margin, y);
+      doc.text(`$${balanceDue.toFixed(2)}`, pageWidth - margin, y, { align: 'right' });
+      y += 15;
+
+      if (selectedInvoiceData.lineItems && selectedInvoiceData.lineItems.length > 0) {
+        doc.setFontSize(11);
+        doc.setTextColor(...textColor);
+        doc.text("Line Items", margin, y);
+        y += 8;
+        doc.setFontSize(9);
+        selectedInvoiceData.lineItems.forEach((item) => {
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(...textColor);
+          doc.text(item.description || "", margin, y);
+          doc.text(`$${Number(item.lineTotal || 0).toFixed(2)}`, pageWidth - margin, y, { align: 'right' });
+          y += 5;
+          doc.setTextColor(...mutedColor);
+          doc.text(`Qty: ${item.quantity} @ $${Number(item.unitPrice || 0).toFixed(2)}`, margin + 5, y);
+          y += 7;
+        });
+      }
+
+      doc.save(`Invoice-${selectedInvoiceData.invoiceNumber || 'download'}.pdf`);
+      toast({ title: "PDF downloaded" });
+    } catch (error) {
+      toast({ title: "Failed to generate PDF", variant: "destructive" });
+    }
+  };
 
   // Fetch customer properties for all views (needed for property_manager tabs)
   const { data: customerProperties, isLoading: propertiesLoading } = useQuery<CrmProperty[]>({
@@ -2077,6 +2581,118 @@ export default function CrmCustomerDetail() {
   };
 
   const isWoFormValid = woDate && woPropertyId;
+
+  const woUpdateStatusMutation = useMutation({
+    mutationFn: async ({ workOrderId, status }: { workOrderId: string; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/crm/work-orders/${workOrderId}`, { status });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update status");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Work order status updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list", { customerId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", selectedWorkOrderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update status",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const woCreateQuoteMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedWorkOrderData) throw new Error("No work order selected");
+      const res = await apiRequest("POST", "/api/crm/quotes", {
+        title: `Quote for ${selectedWorkOrderData.title || selectedWorkOrderData.visitType || "Work Order"}`,
+        scope: "work_order",
+        workOrderId: selectedWorkOrderId,
+        customerId: selectedWorkOrderData.customerId,
+        propertyId: selectedWorkOrderData.propertyId,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create quote");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Quote created successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setSelectedWorkOrderId(null);
+      navigate(`/crm/quotes/${data.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create quote",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const projectUpdateStatusMutation = useMutation({
+    mutationFn: async ({ projectId, status }: { projectId: string; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/crm/projects/${projectId}`, { status });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update project status");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Project status updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects/customer", customerId] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update project status",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const projectCreateWorkOrderMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedProjectData) throw new Error("No project selected");
+      const res = await apiRequest("POST", "/api/crm/work-orders", {
+        title: `Work Order for ${selectedProjectData.title || "Project"}`,
+        visitType: selectedProjectData.projectType === "MAINTENANCE_AGREEMENT" ? "MAINTENANCE" : 
+                   selectedProjectData.projectType === "INSTALL" ? "INSTALL" : "SERVICE",
+        projectId: selectedProjectId,
+        customerId: selectedProjectData.customerId,
+        propertyId: selectedProjectData.propertyId,
+        status: "scheduled",
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create work order");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Work order created successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list", { customerId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", selectedProjectId] });
+      setSelectedProjectId(null);
+      navigate(`/crm/work-orders/${data.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create work order",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const deleteJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
@@ -3548,173 +4164,257 @@ export default function CrmCustomerDetail() {
           onViewInvoice={(id) => setSelectedInvoiceId(id)}
         />
 
-        {/* Quote Detail Sheet */}
-        <Sheet open={!!selectedQuoteId} onOpenChange={(open) => !open && setSelectedQuoteId(null)}>
-          <SheetContent className="w-full sm:max-w-2xl overflow-hidden flex flex-col" data-testid="sheet-quote-detail">
-            <SheetHeader className="shrink-0 pb-4 border-b">
-              <SheetTitle className="flex items-center gap-2">
+        {/* Quote Detail Dialog */}
+        <Dialog open={!!selectedQuoteId} onOpenChange={(open) => !open && setSelectedQuoteId(null)}>
+          <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] p-0 overflow-hidden" data-testid="dialog-quote-detail">
+            <div className="sticky top-0 z-10 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
                 <FileText className="h-5 w-5 text-[#711419]" />
-                {selectedQuoteData?.quoteNumber || "Quote Details"}
-              </SheetTitle>
-            </SheetHeader>
+                <div>
+                  <h2 className="font-semibold text-lg">{selectedQuoteData?.quoteNumber || "Quote Details"}</h2>
+                  <p className="text-sm text-slate-500">{selectedQuoteData?.title || ""}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setShowQuotePreview(true)}
+                  variant="outline"
+                  size="sm"
+                  className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
+                  data-testid="button-preview-quote"
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  Preview
+                </Button>
+                {selectedQuoteData && (
+                  <Badge variant="outline" className={quoteStatusColors[selectedQuoteData.status || "draft"]}>
+                    {quoteStatusLabels[selectedQuoteData.status || "draft"] || selectedQuoteData.status}
+                  </Badge>
+                )}
+              </div>
+            </div>
             
-            <ScrollArea className="flex-1 -mx-6 px-6">
+            <ScrollArea className="flex-1 max-h-[calc(90vh-180px)]">
               {selectedQuoteLoading ? (
-                <div className="space-y-4 py-4">
+                <div className="space-y-4 p-6">
                   <Skeleton className="h-6 w-48" />
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-32 w-full" />
                 </div>
               ) : selectedQuoteData ? (
-                <div className="space-y-6 py-4">
-                  {/* Quote Header */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-lg">{selectedQuoteData.title || "Untitled Quote"}</h3>
-                    <div className="flex items-center gap-3">
-                      <Badge className={cn(
-                        "text-xs",
-                        selectedQuoteData.status === "draft" && "bg-slate-100 text-slate-700",
-                        selectedQuoteData.status === "sent" && "bg-blue-100 text-blue-700",
-                        selectedQuoteData.status === "accepted" && "bg-green-100 text-green-700",
-                        selectedQuoteData.status === "declined" && "bg-red-100 text-red-700",
-                        selectedQuoteData.status === "expired" && "bg-yellow-100 text-yellow-700",
-                        (selectedQuoteData.status as string) === "converted" && "bg-emerald-100 text-emerald-700"
-                      )}>
-                        {selectedQuoteData.status === "accepted" ? "Approved" : 
-                         selectedQuoteData.status?.charAt(0).toUpperCase() + selectedQuoteData.status?.slice(1)}
-                      </Badge>
-                      <span className="text-sm text-slate-500">
-                        Created {selectedQuoteData.createdAt ? format(new Date(selectedQuoteData.createdAt), 'MMM d, yyyy') : '—'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <Separator />
-                  
-                  {/* Customer Info */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Customer</p>
-                      <p className="text-sm font-medium">{selectedQuoteData.customerName}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Service Address</p>
-                      <p className="text-sm">{selectedQuoteData.serviceAddress || "—"}</p>
-                    </div>
-                    {selectedQuoteData.customerEmail && (
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Email</p>
-                        <p className="text-sm">{selectedQuoteData.customerEmail}</p>
-                      </div>
-                    )}
-                    {selectedQuoteData.customerPhone && (
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Phone</p>
-                        <p className="text-sm">{selectedQuoteData.customerPhone}</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <Separator />
-                  
-                  {/* AI Generated Quote Content */}
-                  {selectedQuoteData.aiGeneratedQuote ? (
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-sm text-slate-700">Proposal</h4>
-                      {(() => {
-                        const aiQuote = selectedQuoteData.aiGeneratedQuote;
-                        const options = aiQuote?.options || [];
+                <div className="space-y-6 p-6">
+                  {/* Quote Actions Card */}
+                  <Card className="bg-gradient-to-br from-[#d3b07d]/10 to-amber-50 border-[#d3b07d]/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg text-amber-900">Quote Actions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-3">
+                        <Button
+                          onClick={() => quoteSendMutation.mutate()}
+                          className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
+                          disabled={quoteSendMutation.isPending}
+                          data-testid="button-send-quote"
+                        >
+                          {quoteSendMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4 mr-2" />
+                          )}
+                          Send
+                        </Button>
+                        <Button
+                          onClick={handleQuoteDownloadPDF}
+                          variant="outline"
+                          className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                          data-testid="button-download-pdf"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Download PDF
+                        </Button>
                         
-                        return options.length > 0 ? (
-                          <div className="space-y-4">
-                            {options.map((option: any, idx: number) => (
-                              <div key={idx} className="border rounded-lg p-4 bg-slate-50">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h5 className="font-semibold">{option.title || `Option ${idx + 1}`}</h5>
-                                  {option.tags && option.tags.length > 0 && (
-                                    <div className="flex gap-1">
-                                      {option.tags.map((tag: string, tagIdx: number) => (
-                                        <Badge key={tagIdx} variant="outline" className="text-xs">
-                                          {tag}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                                <p className="text-sm text-slate-600 mb-2">{option.description}</p>
-                                <p className="text-lg font-bold text-[#711419]">
-                                  ${Number(option.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                </p>
-                                {option.inclusions && option.inclusions.length > 0 && (
-                                  <div className="mt-3">
-                                    <p className="text-xs font-medium text-slate-500 mb-1">Includes:</p>
-                                    <ul className="text-sm text-slate-600 space-y-1">
-                                      {option.inclusions.map((item: string, iIdx: number) => (
-                                        <li key={iIdx} className="flex items-start gap-2">
-                                          <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                                          <span>{item}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="border rounded-lg p-4 bg-slate-50">
-                            <p className="text-sm text-slate-600">{aiQuote?.description || "No description available"}</p>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  ) : selectedQuoteData.lineItems && selectedQuoteData.lineItems.length > 0 ? (
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-sm text-slate-700">Line Items</h4>
-                      <div className="border rounded-lg overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead className="bg-slate-50">
-                            <tr>
-                              <th className="text-left p-2 font-medium text-slate-600">Description</th>
-                              <th className="text-right p-2 font-medium text-slate-600">Qty</th>
-                              <th className="text-right p-2 font-medium text-slate-600">Price</th>
-                              <th className="text-right p-2 font-medium text-slate-600">Total</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {selectedQuoteData.lineItems.map((item) => (
-                              <tr key={item.id} className="border-t">
-                                <td className="p-2">{item.description}</td>
-                                <td className="p-2 text-right">{item.quantity}</td>
-                                <td className="p-2 text-right">${Number(item.unitPrice).toFixed(2)}</td>
-                                <td className="p-2 text-right">${Number(item.lineTotal).toFixed(2)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                        <Separator orientation="vertical" className="h-10 mx-2" />
+                        
+                        {(selectedQuoteData.status === "draft" || selectedQuoteData.status === "sent") && (
+                          <>
+                            <Button
+                              onClick={() => quoteAcceptMutation.mutate()}
+                              variant="outline"
+                              className="border-green-500 text-green-600 hover:bg-green-50"
+                              disabled={quoteAcceptMutation.isPending}
+                              data-testid="button-approve-quote"
+                            >
+                              {quoteAcceptMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                              )}
+                              Approve
+                            </Button>
+                            <Button
+                              onClick={() => quoteDeclineMutation.mutate()}
+                              variant="outline"
+                              className="border-red-500 text-red-600 hover:bg-red-50"
+                              disabled={quoteDeclineMutation.isPending}
+                              data-testid="button-decline-quote"
+                            >
+                              {quoteDeclineMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <XCircle className="h-4 w-4 mr-2" />
+                              )}
+                              Decline
+                            </Button>
+                          </>
+                        )}
+                        
+                        {selectedQuoteData.status === "accepted" && (
+                          <Button
+                            onClick={() => quoteCreateInvoiceMutation.mutate()}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                            disabled={quoteCreateInvoiceMutation.isPending}
+                            data-testid="button-create-invoice"
+                          >
+                            {quoteCreateInvoiceMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Receipt className="h-4 w-4 mr-2" />
+                            )}
+                            Create Invoice
+                          </Button>
+                        )}
+                        
+                        <Separator orientation="vertical" className="h-10 mx-2" />
+                        
+                        <Button
+                          onClick={() => setShowQuoteDeleteConfirm(true)}
+                          variant="outline"
+                          className="border-red-600 text-red-600 hover:bg-red-50"
+                          data-testid="button-delete-quote"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </Button>
                       </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500 text-center py-4">No line items</p>
-                  )}
-                  
-                  <Separator />
-                  
-                  {/* Total */}
-                  <div className="flex justify-between items-center p-4 bg-slate-100 rounded-lg">
-                    <span className="font-medium">Total</span>
-                    <span className="text-xl font-bold text-[#711419]">
-                      ${Number(selectedQuoteData.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </span>
+                    </CardContent>
+                  </Card>
+
+                  {/* Customer and Details Cards */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          Customer
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <p className="font-medium">{selectedQuoteData.customer?.name || selectedQuoteData.customerName || "—"}</p>
+                        {(selectedQuoteData.customer?.email || selectedQuoteData.customerEmail) && (
+                          <p className="text-sm text-slate-500">{selectedQuoteData.customer?.email || selectedQuoteData.customerEmail}</p>
+                        )}
+                        {(selectedQuoteData.customer?.phone || selectedQuoteData.customerPhone) && (
+                          <p className="text-sm text-slate-500">{selectedQuoteData.customer?.phone || selectedQuoteData.customerPhone}</p>
+                        )}
+                        {selectedQuoteData.serviceAddress && (
+                          <p className="text-sm text-slate-500">{selectedQuoteData.serviceAddress}</p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Details
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-slate-500">Created</span>
+                          <span className="text-sm">{selectedQuoteData.createdAt ? format(new Date(selectedQuoteData.createdAt), 'MMM d, yyyy') : '—'}</span>
+                        </div>
+                        {selectedQuoteData.validUntil && (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-slate-500">Valid Until</span>
+                            <span className="text-sm">{format(new Date(selectedQuoteData.validUntil), 'MMM d, yyyy')}</span>
+                          </div>
+                        )}
+                        {selectedQuoteData.sentAt && (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-slate-500">Sent</span>
+                            <span className="text-sm">{format(new Date(selectedQuoteData.sentAt), 'MMM d, yyyy')}</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   </div>
-                  
+
+                  {/* Line Items */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <DollarSign className="h-4 w-4" />
+                        Line Items
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Description</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
+                            <TableHead className="text-right">Unit Price</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedQuoteData.lineItems && selectedQuoteData.lineItems.length > 0 ? (
+                            selectedQuoteData.lineItems.map((item) => (
+                              <TableRow key={item.id}>
+                                <TableCell>{item.description}</TableCell>
+                                <TableCell className="text-right">{item.quantity}</TableCell>
+                                <TableCell className="text-right">{formatQuoteCurrency(item.unitPrice)}</TableCell>
+                                <TableCell className="text-right">{formatQuoteCurrency(item.lineTotal)}</TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center text-slate-500 py-8">
+                                No line items
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+
+                      {selectedQuoteData.quoteMode !== "options" && (
+                        <div className="mt-6 border-t pt-4 space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Subtotal</span>
+                            <span>{formatQuoteCurrency(selectedQuoteData.subtotal)}</span>
+                          </div>
+                          <Separator />
+                          <div className="flex justify-between text-lg font-semibold">
+                            <span>Total</span>
+                            <span className="text-[#d3b07d]">{formatQuoteCurrency(selectedQuoteData.subtotal || selectedQuoteData.total)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
                   {/* Notes */}
                   {selectedQuoteData.notes && (
-                    <div>
-                      <h4 className="font-medium text-sm text-slate-700 mb-2">Notes</h4>
-                      <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedQuoteData.notes}</p>
-                    </div>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Notes</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedQuoteData.notes}</p>
+                      </CardContent>
+                    </Card>
                   )}
                 </div>
               ) : (
@@ -3723,11 +4423,11 @@ export default function CrmCustomerDetail() {
             </ScrollArea>
             
             {/* Footer Actions */}
-            <div className="shrink-0 pt-4 border-t flex items-center justify-between gap-3">
+            <div className="shrink-0 px-6 py-4 border-t bg-slate-50 flex items-center justify-between gap-3">
               <Button
                 variant="outline"
                 onClick={() => setSelectedQuoteId(null)}
-                data-testid="button-close-quote-sheet"
+                data-testid="button-close-quote-dialog"
               >
                 Close
               </Button>
@@ -3743,128 +4443,424 @@ export default function CrmCustomerDetail() {
                 Open Full Details
               </Button>
             </div>
-          </SheetContent>
-        </Sheet>
+          </DialogContent>
+        </Dialog>
 
-        {/* Work Order Detail Sheet */}
-        <Sheet open={!!selectedWorkOrderId} onOpenChange={(open) => !open && setSelectedWorkOrderId(null)}>
-          <SheetContent className="w-full sm:max-w-2xl overflow-hidden flex flex-col" data-testid="sheet-work-order-detail">
-            <SheetHeader className="shrink-0 pb-4 border-b">
-              <SheetTitle className="flex items-center gap-2">
-                <Wrench className="h-5 w-5 text-[#711419]" />
-                Work Order Details
-              </SheetTitle>
-            </SheetHeader>
+        {/* Quote Preview Dialog */}
+        <Dialog open={showQuotePreview} onOpenChange={setShowQuotePreview}>
+          <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 overflow-hidden">
+            <div className="h-full overflow-y-auto bg-white">
+              <div className="sticky top-0 z-10 bg-white border-b px-6 py-3 flex items-center justify-between">
+                <h2 className="font-semibold text-slate-900">Quote Preview</h2>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleQuoteDownloadPDF}
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-500 text-blue-600"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    PDF
+                  </Button>
+                  <Button
+                    onClick={() => setShowQuotePreview(false)}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              {selectedQuoteData && (
+                <div className="p-8">
+                  <div className="bg-[#711419] text-white p-6 rounded-lg mb-6">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h1 className="text-3xl font-bold">Giesbrecht HVAC</h1>
+                        <p className="text-white/80 mt-1">PO Box 917, Wrens, GA 30833</p>
+                      </div>
+                      <div className="text-right text-sm text-white/90">
+                        <p>(706) 826-0644</p>
+                        <p>chandler@ghvacinc.com</p>
+                        <p>www.ghvacinc.com</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h2 className="text-2xl font-bold text-slate-900">QUOTE</h2>
+                      <p className="text-slate-500">{selectedQuoteData.quoteNumber}</p>
+                    </div>
+                    <Badge variant="outline" className={quoteStatusColors[selectedQuoteData.status || "draft"]}>
+                      {quoteStatusLabels[selectedQuoteData.status || "draft"] || selectedQuoteData.status}
+                    </Badge>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6 mb-8">
+                    <div className="bg-slate-50 p-4 rounded-lg">
+                      <h3 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Bill To
+                      </h3>
+                      <p className="font-medium">{selectedQuoteData.customer?.name || selectedQuoteData.customerName || "—"}</p>
+                      {(selectedQuoteData.customer?.email || selectedQuoteData.customerEmail) && (
+                        <p className="text-sm text-slate-600">{selectedQuoteData.customer?.email || selectedQuoteData.customerEmail}</p>
+                      )}
+                      {(selectedQuoteData.customer?.phone || selectedQuoteData.customerPhone) && (
+                        <p className="text-sm text-slate-600">{selectedQuoteData.customer?.phone || selectedQuoteData.customerPhone}</p>
+                      )}
+                      {selectedQuoteData.serviceAddress && (
+                        <p className="text-sm text-slate-600 mt-1">{selectedQuoteData.serviceAddress}</p>
+                      )}
+                    </div>
+                    <div className="bg-slate-50 p-4 rounded-lg">
+                      <h3 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Quote Details
+                      </h3>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Date:</span>
+                          <span>{selectedQuoteData.createdAt ? format(new Date(selectedQuoteData.createdAt), 'MMM d, yyyy') : '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Valid Until:</span>
+                          <span>{selectedQuoteData.validUntil ? format(new Date(selectedQuoteData.validUntil), 'MMM d, yyyy') : "30 days"}</span>
+                        </div>
+                        {selectedQuoteData.title && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Title:</span>
+                            <span>{selectedQuoteData.title}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Line Items Table */}
+                  <div className="border rounded-lg overflow-hidden mb-6">
+                    <div className="bg-[#d3b07d] text-white px-4 py-3">
+                      <h3 className="font-semibold">Line Items</h3>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-50">
+                          <TableHead className="font-semibold">Description</TableHead>
+                          <TableHead className="text-center font-semibold">Qty</TableHead>
+                          <TableHead className="text-right font-semibold">Unit Price</TableHead>
+                          <TableHead className="text-right font-semibold">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedQuoteData.lineItems && selectedQuoteData.lineItems.length > 0 ? (
+                          selectedQuoteData.lineItems.map((item, idx) => (
+                            <TableRow key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
+                              <TableCell className="font-medium">{item.description}</TableCell>
+                              <TableCell className="text-center">{item.quantity}</TableCell>
+                              <TableCell className="text-right">{formatQuoteCurrency(item.unitPrice)}</TableCell>
+                              <TableCell className="text-right font-medium">{formatQuoteCurrency(item.lineTotal)}</TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-slate-500 py-8">
+                              No line items
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {selectedQuoteData.quoteMode !== "options" && (
+                    <div className="flex justify-end mb-8">
+                      <div className="w-72 bg-slate-50 rounded-lg p-4 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-600">Subtotal</span>
+                          <span>{formatQuoteCurrency(selectedQuoteData.subtotal)}</span>
+                        </div>
+                        <Separator className="my-2" />
+                        <div className="flex justify-between text-lg font-bold">
+                          <span>Total</span>
+                          <span className="text-[#711419]">{formatQuoteCurrency(selectedQuoteData.subtotal || selectedQuoteData.total)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedQuoteData.notes && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                      <h3 className="font-semibold text-amber-900 mb-2">Notes</h3>
+                      <p className="text-sm text-amber-800 whitespace-pre-wrap">{selectedQuoteData.notes}</p>
+                    </div>
+                  )}
+
+                  <div className="border-t pt-6 text-center text-sm text-slate-500">
+                    <p className="font-medium text-slate-700">Thank you for choosing Giesbrecht HVAC!</p>
+                    <p className="mt-1">Terms: Payment due upon completion. Prices valid for 30 days.</p>
+                    <p className="mt-2">(706) 826-0644 | chandler@ghvacinc.com | www.ghvacinc.com</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Quote Delete Confirmation */}
+        <AlertDialog open={showQuoteDeleteConfirm} onOpenChange={setShowQuoteDeleteConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Quote</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this quote ({selectedQuoteData?.quoteNumber})? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete-quote">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  quoteDeleteMutation.mutate();
+                  setShowQuoteDeleteConfirm(false);
+                }}
+                className="bg-red-600 hover:bg-red-700"
+                data-testid="button-confirm-delete-quote"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Work Order Detail Dialog */}
+        <Dialog open={!!selectedWorkOrderId} onOpenChange={(open) => !open && setSelectedWorkOrderId(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-work-order-detail">
+            <DialogHeader className="shrink-0 pb-4 border-b">
+              <div className="flex items-center justify-between">
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  <Wrench className="h-5 w-5 text-[#711419]" />
+                  {selectedWorkOrderData?.title || selectedWorkOrderData?.visitType?.replace(/_/g, " ") || "Work Order Details"}
+                </DialogTitle>
+                <div className="flex items-center gap-2">
+                  {selectedWorkOrderData && (
+                    <>
+                      <Badge className={cn(
+                        "text-xs",
+                        workOrderStatusColors[selectedWorkOrderData.status]?.bg,
+                        workOrderStatusColors[selectedWorkOrderData.status]?.text,
+                        workOrderStatusColors[selectedWorkOrderData.status]?.border
+                      )}>
+                        {workOrderStatusLabels[selectedWorkOrderData.status] || selectedWorkOrderData.status}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {selectedWorkOrderData.visitType?.replace(/_/g, " ")}
+                      </Badge>
+                    </>
+                  )}
+                </div>
+              </div>
+            </DialogHeader>
             
-            <ScrollArea className="flex-1 -mx-6 px-6">
+            <ScrollArea className="flex-1">
               {selectedWorkOrderLoading ? (
-                <div className="space-y-4 py-4">
+                <div className="space-y-4 p-6">
                   <Skeleton className="h-6 w-48" />
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-32 w-full" />
                 </div>
               ) : selectedWorkOrderData ? (
-                <div className="space-y-6 py-4">
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-lg">{selectedWorkOrderData.title || selectedWorkOrderData.visitType?.replace(/_/g, " ") || "Work Order"}</h3>
-                    <div className="flex items-center gap-3">
-                      <Badge className={cn(
-                        "text-xs",
-                        selectedWorkOrderData.status === "scheduled" && "bg-blue-100 text-blue-700",
-                        selectedWorkOrderData.status === "dispatched" && "bg-purple-100 text-purple-700",
-                        selectedWorkOrderData.status === "en_route" && "bg-amber-100 text-amber-700",
-                        selectedWorkOrderData.status === "on_site" && "bg-orange-100 text-orange-700",
-                        selectedWorkOrderData.status === "completed" && "bg-green-100 text-green-700",
-                        selectedWorkOrderData.status === "cancelled" && "bg-red-100 text-red-700",
-                        !["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"].includes(selectedWorkOrderData.status) && "bg-slate-100 text-slate-700"
-                      )}>
-                        {selectedWorkOrderData.status?.replace(/_/g, " ").charAt(0).toUpperCase() + selectedWorkOrderData.status?.slice(1).replace(/_/g, " ")}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {selectedWorkOrderData.visitType?.replace(/_/g, " ")}
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Scheduled Date</p>
-                      <div className="flex items-center gap-1 text-sm">
-                        <CalendarIcon className="h-4 w-4 text-slate-400" />
-                        {selectedWorkOrderData.scheduledStart 
-                          ? format(new Date(selectedWorkOrderData.scheduledStart), 'MMM d, yyyy') 
-                          : '—'}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Time</p>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Clock className="h-4 w-4 text-slate-400" />
-                        {selectedWorkOrderData.scheduledStart 
-                          ? format(new Date(selectedWorkOrderData.scheduledStart), 'h:mm a') 
-                          : '—'}
-                        {selectedWorkOrderData.scheduledEnd && 
-                          ` - ${format(new Date(selectedWorkOrderData.scheduledEnd), 'h:mm a')}`}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Assigned Tech</p>
-                      <div className="flex items-center gap-1 text-sm">
-                        <User className="h-4 w-4 text-slate-400" />
-                        {selectedWorkOrderData.assignedTechName || "Unassigned"}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Priority</p>
-                      <Badge className={cn(
-                        "text-xs",
-                        selectedWorkOrderData.priority === "low" && "bg-slate-100 text-slate-600",
-                        selectedWorkOrderData.priority === "normal" && "bg-blue-100 text-blue-600",
-                        selectedWorkOrderData.priority === "high" && "bg-amber-100 text-amber-600",
-                        selectedWorkOrderData.priority === "urgent" && "bg-red-100 text-red-600"
-                      )}>
-                        {selectedWorkOrderData.priority || "Normal"}
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  {selectedWorkOrderData.propertyAddress && (
-                    <>
-                      <Separator />
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Service Address</p>
-                        <div className="flex items-start gap-1 text-sm">
-                          <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
-                          {selectedWorkOrderData.propertyAddress}
+                <div className="space-y-6 p-6">
+                  {/* Work Order Actions Card */}
+                  <Card className="bg-gradient-to-br from-[#711419]/10 to-red-50 border-[#711419]/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg text-[#711419]">Work Order Actions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm font-medium text-slate-600">Status:</Label>
+                          <Select
+                            value={selectedWorkOrderData.status}
+                            onValueChange={(value) => {
+                              if (selectedWorkOrderId) {
+                                woUpdateStatusMutation.mutate({ workOrderId: selectedWorkOrderId, status: value });
+                              }
+                            }}
+                            disabled={woUpdateStatusMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[160px]" data-testid="select-wo-status">
+                              <SelectValue placeholder="Update Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="scheduled">Scheduled</SelectItem>
+                              <SelectItem value="dispatched">Dispatched</SelectItem>
+                              <SelectItem value="en_route">En Route</SelectItem>
+                              <SelectItem value="on_site">On Site</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
+                        
+                        <Separator orientation="vertical" className="h-10 mx-2" />
+                        
+                        <Button
+                          onClick={() => woCreateQuoteMutation.mutate()}
+                          className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
+                          disabled={woCreateQuoteMutation.isPending}
+                          data-testid="button-wo-create-quote"
+                        >
+                          {woCreateQuoteMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <FileText className="h-4 w-4 mr-2" />
+                          )}
+                          Create Quote
+                        </Button>
+                        
+                        {selectedWorkOrderData.propertyAddress && (
+                          <Button
+                            variant="outline"
+                            className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                            onClick={() => {
+                              const address = encodeURIComponent(selectedWorkOrderData.propertyAddress || "");
+                              window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, "_blank");
+                            }}
+                            data-testid="button-wo-navigate"
+                          >
+                            <Navigation className="h-4 w-4 mr-2" />
+                            Navigate
+                          </Button>
+                        )}
+                        
+                        <Button
+                          className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                          onClick={() => {
+                            const woId = selectedWorkOrderId;
+                            setSelectedWorkOrderId(null);
+                            navigate(`/crm/work-orders/${woId}`);
+                          }}
+                          data-testid="button-wo-open-full"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Open Full Details
+                        </Button>
                       </div>
-                    </>
-                  )}
-                  
+                    </CardContent>
+                  </Card>
+
+                  {/* Work Order Info Cards */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Schedule & Assignment Card */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base text-slate-800">Schedule & Assignment</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Scheduled Date</p>
+                            <div className="flex items-center gap-1 text-sm font-medium">
+                              <CalendarIcon className="h-4 w-4 text-slate-400" />
+                              {selectedWorkOrderData.scheduledStart 
+                                ? format(new Date(selectedWorkOrderData.scheduledStart), 'MMM d, yyyy') 
+                                : '—'}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Time</p>
+                            <div className="flex items-center gap-1 text-sm font-medium">
+                              <Clock className="h-4 w-4 text-slate-400" />
+                              {selectedWorkOrderData.scheduledStart 
+                                ? format(new Date(selectedWorkOrderData.scheduledStart), 'h:mm a') 
+                                : '—'}
+                              {selectedWorkOrderData.scheduledEnd && 
+                                ` - ${format(new Date(selectedWorkOrderData.scheduledEnd), 'h:mm a')}`}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Assigned Tech</p>
+                            <div className="flex items-center gap-1 text-sm">
+                              <User className="h-4 w-4 text-slate-400" />
+                              <span className="font-medium">{selectedWorkOrderData.assignedTechName || "Unassigned"}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Priority</p>
+                            <Badge className={cn(
+                              "text-xs",
+                              priorityColors[selectedWorkOrderData.priority || "normal"]?.bg,
+                              priorityColors[selectedWorkOrderData.priority || "normal"]?.text
+                            )}>
+                              {(selectedWorkOrderData.priority || "normal").charAt(0).toUpperCase() + (selectedWorkOrderData.priority || "normal").slice(1)}
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Service Address Card */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base text-slate-800">Service Location</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {selectedWorkOrderData.propertyAddress ? (
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-2">
+                              <MapPin className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
+                              <p className="text-sm text-slate-700">{selectedWorkOrderData.propertyAddress}</p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full border-blue-500 text-blue-600 hover:bg-blue-50"
+                              onClick={() => {
+                                const address = encodeURIComponent(selectedWorkOrderData.propertyAddress || "");
+                                window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, "_blank");
+                              }}
+                              data-testid="button-wo-navigate-card"
+                            >
+                              <Navigation className="h-4 w-4 mr-2" />
+                              Get Directions
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-500 italic">No address on file</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Description Card */}
                   {selectedWorkOrderData.description && (
-                    <>
-                      <Separator />
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Description</p>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base text-slate-800">Description</CardTitle>
+                      </CardHeader>
+                      <CardContent>
                         <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedWorkOrderData.description}</p>
-                      </div>
-                    </>
+                      </CardContent>
+                    </Card>
                   )}
-                  
+
+                  {/* Related Project Card */}
                   {selectedWorkOrderData.projectTitle && (
-                    <>
-                      <Separator />
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Related Project</p>
-                        <div className="flex items-center gap-1 text-sm text-blue-600">
-                          <Briefcase className="h-4 w-4" />
-                          {selectedWorkOrderData.projectTitle}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base text-slate-800">Related Project</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Briefcase className="h-4 w-4 text-blue-600" />
+                          <span className="font-medium text-blue-600">{selectedWorkOrderData.projectTitle}</span>
                         </div>
-                      </div>
-                    </>
+                      </CardContent>
+                    </Card>
                   )}
                 </div>
               ) : (
@@ -3872,52 +4868,42 @@ export default function CrmCustomerDetail() {
               )}
             </ScrollArea>
             
-            <div className="shrink-0 pt-4 border-t flex items-center justify-between gap-3">
+            <DialogFooter className="shrink-0 pt-4 border-t flex items-center justify-between gap-3 sm:justify-between">
               <Button
                 variant="outline"
                 onClick={() => setSelectedWorkOrderId(null)}
-                data-testid="button-close-wo-sheet"
+                data-testid="button-close-wo-dialog"
               >
                 Close
               </Button>
               <Button
                 className="bg-[#711419] hover:bg-[#5a1014] text-white"
                 onClick={() => {
+                  const woId = selectedWorkOrderId;
                   setSelectedWorkOrderId(null);
-                  navigate(`/crm/work-orders/${selectedWorkOrderId}`);
+                  navigate(`/crm/work-orders/${woId}`);
                 }}
                 data-testid="button-open-full-wo"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open Full Details
               </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-        {/* Project Detail Sheet */}
-        <Sheet open={!!selectedProjectId} onOpenChange={(open) => !open && setSelectedProjectId(null)}>
-          <SheetContent className="w-full sm:max-w-2xl overflow-hidden flex flex-col" data-testid="sheet-project-detail">
-            <SheetHeader className="shrink-0 pb-4 border-b">
-              <SheetTitle className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-[#711419]" />
-                Project Details
-              </SheetTitle>
-            </SheetHeader>
-            
-            <ScrollArea className="flex-1 -mx-6 px-6">
-              {selectedProjectLoading ? (
-                <div className="space-y-4 py-4">
-                  <Skeleton className="h-6 w-48" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-32 w-full" />
-                </div>
-              ) : selectedProjectData ? (
-                <div className="space-y-6 py-4">
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-lg">{selectedProjectData.title || "Untitled Project"}</h3>
-                    <div className="flex items-center gap-3">
+        {/* Project Detail Dialog */}
+        <Dialog open={!!selectedProjectId} onOpenChange={(open) => !open && setSelectedProjectId(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-project-detail">
+            <DialogHeader className="shrink-0 pb-4 border-b">
+              <div className="flex items-center justify-between">
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  <Briefcase className="h-5 w-5 text-[#711419]" />
+                  {selectedProjectData?.title || "Project Details"}
+                </DialogTitle>
+                <div className="flex items-center gap-2">
+                  {selectedProjectData && (
+                    <>
                       <Badge className={cn(
                         "text-xs",
                         selectedProjectData.status === "lead" && "bg-slate-100 text-slate-700",
@@ -3925,246 +4911,460 @@ export default function CrmCustomerDetail() {
                         selectedProjectData.status === "approved" && "bg-blue-100 text-blue-700",
                         selectedProjectData.status === "in_progress" && "bg-green-100 text-green-700",
                         selectedProjectData.status === "completed" && "bg-emerald-100 text-emerald-700",
+                        selectedProjectData.status === "closed" && "bg-slate-100 text-slate-600",
                         selectedProjectData.status === "archived" && "bg-gray-100 text-gray-700"
                       )}>
-                        {selectedProjectData.status?.replace(/_/g, " ").charAt(0).toUpperCase() + selectedProjectData.status?.slice(1).replace(/_/g, " ")}
+                        {selectedProjectData.status?.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) || "Lead"}
                       </Badge>
                       <Badge variant="outline" className="text-xs">
-                        {selectedProjectData.projectType}
+                        {selectedProjectData.projectType?.replace(/_/g, " ")}
                       </Badge>
-                    </div>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Project Type</p>
-                      <p className="text-sm font-medium">{selectedProjectData.projectType}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Expected Value</p>
-                      <div className="flex items-center gap-1 text-sm font-medium text-[#711419]">
-                        <DollarSign className="h-4 w-4" />
-                        {selectedProjectData.expectedValue 
-                          ? Number(selectedProjectData.expectedValue).toLocaleString('en-US', { minimumFractionDigits: 2 }) 
-                          : '—'}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Priority</p>
-                      <Badge className={cn(
-                        "text-xs",
-                        selectedProjectData.priority === "low" && "bg-slate-100 text-slate-600",
-                        selectedProjectData.priority === "normal" && "bg-blue-100 text-blue-600",
-                        selectedProjectData.priority === "high" && "bg-amber-100 text-amber-600",
-                        selectedProjectData.priority === "urgent" && "bg-red-100 text-red-600"
-                      )}>
-                        {selectedProjectData.priority || "Normal"}
-                      </Badge>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Work Orders</p>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Wrench className="h-4 w-4 text-slate-400" />
-                        {selectedProjectData.workOrderCount || 0} work order(s)
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {selectedProjectData.customerName && (
-                    <>
-                      <Separator />
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Customer</p>
-                        <p className="text-sm font-medium">{selectedProjectData.customerName}</p>
-                      </div>
                     </>
                   )}
-                  
-                  {selectedProjectData.propertyAddress && (
-                    <>
-                      <Separator />
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Property Address</p>
-                        <div className="flex items-start gap-1 text-sm">
-                          <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
-                          {selectedProjectData.propertyAddress}
+                </div>
+              </div>
+            </DialogHeader>
+            
+            <ScrollArea className="flex-1">
+              {selectedProjectLoading ? (
+                <div className="space-y-4 p-6">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : selectedProjectData ? (
+                <div className="space-y-6 p-6">
+                  {/* Project Actions Card */}
+                  <Card className="bg-gradient-to-br from-blue-500/10 to-blue-50 border-blue-200/50">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg text-blue-700">Project Actions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm font-medium text-slate-600">Status:</Label>
+                          <Select
+                            value={selectedProjectData.status}
+                            onValueChange={(value) => {
+                              if (selectedProjectId) {
+                                projectUpdateStatusMutation.mutate({ projectId: selectedProjectId, status: value });
+                              }
+                            }}
+                            disabled={projectUpdateStatusMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[160px]" data-testid="select-project-status">
+                              <SelectValue placeholder="Update Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="lead">Lead</SelectItem>
+                              <SelectItem value="proposal_sent">Proposal Sent</SelectItem>
+                              <SelectItem value="approved">Approved</SelectItem>
+                              <SelectItem value="in_progress">In Progress</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="closed">Closed</SelectItem>
+                              <SelectItem value="archived">Archived</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
+                        
+                        <Separator orientation="vertical" className="h-10 mx-2" />
+                        
+                        <Button
+                          onClick={() => projectCreateWorkOrderMutation.mutate()}
+                          className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
+                          disabled={projectCreateWorkOrderMutation.isPending}
+                          data-testid="button-project-create-wo"
+                        >
+                          {projectCreateWorkOrderMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <CalendarPlus className="h-4 w-4 mr-2" />
+                          )}
+                          Create Work Order
+                        </Button>
+                        
+                        <Button
+                          className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                          onClick={() => {
+                            const projId = selectedProjectId;
+                            setSelectedProjectId(null);
+                            navigate(`/crm/projects/${projId}`);
+                          }}
+                          data-testid="button-project-open-full-actions"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Open Full Details
+                        </Button>
                       </div>
-                    </>
-                  )}
-                  
-                  {selectedProjectData.description && (
-                    <>
-                      <Separator />
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Description</p>
-                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedProjectData.description}</p>
-                      </div>
-                    </>
-                  )}
-                  
-                  <Separator />
-                  
-                  <div className="grid grid-cols-2 gap-4 text-sm text-slate-500">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide mb-1">Created</p>
-                      <p>{selectedProjectData.createdAt ? format(new Date(selectedProjectData.createdAt), 'MMM d, yyyy') : '—'}</p>
-                    </div>
-                    {selectedProjectData.updatedAt && (
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wide mb-1">Last Updated</p>
-                        <p>{format(new Date(selectedProjectData.updatedAt), 'MMM d, yyyy')}</p>
-                      </div>
-                    )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Project Info Cards */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Project Details Card */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base text-slate-800">Project Information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Project Type</p>
+                            <Badge variant="outline" className="text-xs">
+                              {selectedProjectData.projectType?.replace(/_/g, " ")}
+                            </Badge>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Priority</p>
+                            <Badge className={cn(
+                              "text-xs",
+                              selectedProjectData.priority === "low" && "bg-slate-100 text-slate-600",
+                              selectedProjectData.priority === "normal" && "bg-blue-100 text-blue-600",
+                              selectedProjectData.priority === "high" && "bg-amber-100 text-amber-600",
+                              selectedProjectData.priority === "urgent" && "bg-red-100 text-red-600"
+                            )}>
+                              {(selectedProjectData.priority || "normal").charAt(0).toUpperCase() + (selectedProjectData.priority || "normal").slice(1)}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Created</p>
+                            <div className="flex items-center gap-1 text-sm font-medium">
+                              <Calendar className="h-4 w-4 text-slate-400" />
+                              {selectedProjectData.createdAt 
+                                ? format(new Date(selectedProjectData.createdAt), 'MMM d, yyyy') 
+                                : '—'}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Work Orders</p>
+                            <div className="flex items-center gap-1 text-sm font-medium">
+                              <Wrench className="h-4 w-4 text-slate-400" />
+                              {selectedProjectData.workOrderCount || 0} work order(s)
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Financial Card */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base text-slate-800">Customer & Value</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {selectedProjectData.customerName && (
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Customer</p>
+                            <div className="flex items-center gap-1 text-sm">
+                              <User className="h-4 w-4 text-slate-400" />
+                              <span className="font-medium">{selectedProjectData.customerName}</span>
+                            </div>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Expected Value</p>
+                          <div className="flex items-center gap-1 text-sm font-semibold text-[#711419]">
+                            <DollarSign className="h-4 w-4" />
+                            {selectedProjectData.expectedValue 
+                              ? Number(selectedProjectData.expectedValue).toLocaleString('en-US', { minimumFractionDigits: 2 }) 
+                              : '—'}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
+
+                  {/* Property Address Card */}
+                  {selectedProjectData.propertyAddress && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base text-slate-800">Property Location</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-start gap-2">
+                          <MapPin className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
+                          <p className="text-sm text-slate-700">{selectedProjectData.propertyAddress}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Description Card */}
+                  {selectedProjectData.description && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base text-slate-800">Description</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedProjectData.description}</p>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-slate-500 text-center py-8">Project not found</p>
               )}
             </ScrollArea>
             
-            <div className="shrink-0 pt-4 border-t flex items-center justify-between gap-3">
+            <DialogFooter className="shrink-0 pt-4 border-t flex items-center justify-between gap-3 sm:justify-between">
               <Button
                 variant="outline"
                 onClick={() => setSelectedProjectId(null)}
-                data-testid="button-close-project-sheet"
+                data-testid="button-close-project-dialog"
               >
                 Close
               </Button>
               <Button
                 className="bg-[#711419] hover:bg-[#5a1014] text-white"
                 onClick={() => {
+                  const projId = selectedProjectId;
                   setSelectedProjectId(null);
-                  navigate(`/crm/projects/${selectedProjectId}`);
+                  navigate(`/crm/projects/${projId}`);
                 }}
                 data-testid="button-open-full-project"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open Full Details
               </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-        {/* Invoice Detail Sheet */}
-        <Sheet open={!!selectedInvoiceId} onOpenChange={(open) => !open && setSelectedInvoiceId(null)}>
-          <SheetContent className="w-full sm:max-w-2xl overflow-hidden flex flex-col" data-testid="sheet-invoice-detail">
-            <SheetHeader className="shrink-0 pb-4 border-b">
-              <SheetTitle className="flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-[#711419]" />
-                {selectedInvoiceData?.invoiceNumber || "Invoice Details"}
-              </SheetTitle>
-            </SheetHeader>
+        {/* Invoice Detail Dialog */}
+        <Dialog open={!!selectedInvoiceId} onOpenChange={(open) => !open && setSelectedInvoiceId(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-invoice-detail">
+            <DialogHeader className="shrink-0 pb-4 border-b">
+              <div className="flex items-center justify-between">
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  <Receipt className="h-5 w-5 text-[#711419]" />
+                  {selectedInvoiceData?.invoiceNumber || "Invoice Details"}
+                </DialogTitle>
+                <div className="flex items-center gap-2">
+                  {selectedInvoiceData && (
+                    <Badge className={cn(
+                      "text-xs",
+                      selectedInvoiceData.status === "draft" && "bg-slate-100 text-slate-700",
+                      selectedInvoiceData.status === "sent" && "bg-blue-100 text-blue-700",
+                      selectedInvoiceData.status === "viewed" && "bg-purple-100 text-purple-700",
+                      selectedInvoiceData.status === "paid" && "bg-green-100 text-green-700",
+                      selectedInvoiceData.status === "partial" && "bg-amber-100 text-amber-700",
+                      selectedInvoiceData.status === "void" && "bg-red-100 text-red-700"
+                    )}>
+                      {selectedInvoiceData.status?.charAt(0).toUpperCase() + selectedInvoiceData.status?.slice(1)}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </DialogHeader>
             
-            <ScrollArea className="flex-1 -mx-6 px-6">
+            <ScrollArea className="flex-1">
               {selectedInvoiceLoading ? (
-                <div className="space-y-4 py-4">
+                <div className="space-y-4 p-6">
                   <Skeleton className="h-6 w-48" />
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-32 w-full" />
                 </div>
               ) : selectedInvoiceData ? (
-                <div className="space-y-6 py-4">
-                  {/* Invoice Header */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <Badge className={cn(
-                        "text-xs",
-                        selectedInvoiceData.status === "draft" && "bg-slate-100 text-slate-700",
-                        selectedInvoiceData.status === "sent" && "bg-blue-100 text-blue-700",
-                        selectedInvoiceData.status === "paid" && "bg-green-100 text-green-700",
-                        selectedInvoiceData.status === "partial" && "bg-amber-100 text-amber-700",
-                        selectedInvoiceData.status === "void" && "bg-red-100 text-red-700"
-                      )}>
-                        {selectedInvoiceData.status?.charAt(0).toUpperCase() + selectedInvoiceData.status?.slice(1)}
-                      </Badge>
-                      {selectedInvoiceData.dueDate && (
-                        <span className="text-sm text-slate-500">
-                          Due: {format(new Date(selectedInvoiceData.dueDate), 'MMM d, yyyy')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Invoice Details */}
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-slate-500">Created</p>
-                      <p className="font-medium">
-                        {selectedInvoiceData.createdAt ? format(new Date(selectedInvoiceData.createdAt), 'MMM d, yyyy') : '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500">Due Date</p>
-                      <p className="font-medium">
-                        {selectedInvoiceData.dueDate ? format(new Date(selectedInvoiceData.dueDate), 'MMM d, yyyy') : '—'}
-                      </p>
-                    </div>
-                    {selectedInvoiceData.paymentMethod && (
-                      <div>
-                        <p className="text-slate-500">Payment Method</p>
-                        <p className="font-medium capitalize">{selectedInvoiceData.paymentMethod.replace('_', ' ')}</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Financial Summary */}
-                  <div className="bg-slate-50 rounded-lg p-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Total</span>
-                      <span className="font-semibold">
-                        ${Number(selectedInvoiceData.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    {selectedInvoiceData.amountPaid && Number(selectedInvoiceData.amountPaid) > 0 && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span>Amount Paid</span>
-                        <span>
-                          -${Number(selectedInvoiceData.amountPaid).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-sm font-bold border-t pt-2">
-                      <span>Balance Due</span>
-                      <span className={Number(selectedInvoiceData.balanceDue || 0) > 0 ? "text-red-600" : "text-green-600"}>
-                        ${Number(selectedInvoiceData.balanceDue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* Line Items */}
-                  {selectedInvoiceData.lineItems && selectedInvoiceData.lineItems.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="font-semibold">Line Items</h4>
-                      <div className="divide-y border rounded-lg">
-                        {selectedInvoiceData.lineItems.map((item) => (
-                          <div key={item.id} className="p-3 text-sm">
-                            <div className="flex justify-between">
-                              <span className="font-medium">{item.description}</span>
-                              <span className="font-semibold">
-                                ${Number(item.lineTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            </div>
-                            <div className="flex gap-4 text-slate-500 text-xs mt-1">
-                              <span>Qty: {item.quantity}</span>
-                              <span>@ ${Number(item.unitPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              {item.partNumber && <span>Part: {item.partNumber}</span>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                <div className="space-y-6 p-6">
+                  {/* Invoice Actions Card */}
+                  {selectedInvoiceData.status !== "void" && (
+                    <Card className="bg-gradient-to-br from-green-500/10 to-green-50 border-green-200/50">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg text-green-700">Invoice Actions</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex flex-wrap items-center gap-3">
+                          {selectedInvoiceData.status === "draft" && (
+                            <Button
+                              onClick={() => selectedInvoiceId && invoiceSendMutation.mutate(selectedInvoiceId)}
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                              disabled={invoiceSendMutation.isPending}
+                              data-testid="button-invoice-send"
+                            >
+                              {invoiceSendMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <Send className="h-4 w-4 mr-2" />
+                              )}
+                              Mark as Sent
+                            </Button>
+                          )}
+                          
+                          {selectedInvoiceData.status !== "paid" && (
+                            <Button
+                              onClick={() => setShowInvoicePaymentDialog(true)}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              data-testid="button-invoice-pay"
+                            >
+                              <DollarSign className="h-4 w-4 mr-2" />
+                              Mark as Paid
+                            </Button>
+                          )}
+                          
+                          <Button
+                            onClick={handleInvoiceDownloadPDF}
+                            variant="outline"
+                            className="border-green-500 text-green-600 hover:bg-green-50"
+                            data-testid="button-invoice-download"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download PDF
+                          </Button>
+                          
+                          <Button
+                            onClick={() => setShowInvoiceVoidConfirm(true)}
+                            variant="outline"
+                            className="border-red-300 text-red-600 hover:bg-red-50"
+                            data-testid="button-invoice-void"
+                          >
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Void
+                          </Button>
+                          
+                          <Button
+                            className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                            onClick={() => {
+                              const invId = selectedInvoiceId;
+                              setSelectedInvoiceId(null);
+                              navigate(`/crm/invoices/${invId}`);
+                            }}
+                            data-testid="button-invoice-open-full-actions"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Open Full Details
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   )}
                   
-                  {/* Notes */}
+                  {/* Invoice Info Cards */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Invoice Details Card */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base text-slate-800">Invoice Information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Created</p>
+                            <div className="flex items-center gap-1 text-sm font-medium">
+                              <Calendar className="h-4 w-4 text-slate-400" />
+                              {selectedInvoiceData.createdAt 
+                                ? format(new Date(selectedInvoiceData.createdAt), 'MMM d, yyyy') 
+                                : '—'}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Due Date</p>
+                            <div className="flex items-center gap-1 text-sm font-medium">
+                              <Clock className="h-4 w-4 text-slate-400" />
+                              {selectedInvoiceData.dueDate 
+                                ? format(new Date(selectedInvoiceData.dueDate), 'MMM d, yyyy') 
+                                : 'Upon Receipt'}
+                            </div>
+                          </div>
+                        </div>
+                        {selectedInvoiceData.paymentMethod && (
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Payment Method</p>
+                            <p className="text-sm font-medium capitalize">{selectedInvoiceData.paymentMethod.replace('_', ' ')}</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Financial Summary Card */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base text-slate-800">Financial Summary</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-slate-600">Total</span>
+                          <span className="text-lg font-bold text-slate-900">
+                            ${Number(selectedInvoiceData.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        {selectedInvoiceData.amountPaid && Number(selectedInvoiceData.amountPaid) > 0 && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-green-600">Amount Paid</span>
+                            <span className="text-lg font-medium text-green-600">
+                              -${Number(selectedInvoiceData.amountPaid).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        )}
+                        <Separator />
+                        <div className="flex justify-between items-center pt-1">
+                          <span className="text-sm font-semibold">Balance Due</span>
+                          <span className={cn(
+                            "text-xl font-bold",
+                            Number(selectedInvoiceData.balanceDue || 0) > 0 ? "text-red-600" : "text-green-600"
+                          )}>
+                            ${Number(selectedInvoiceData.balanceDue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  {/* Line Items Table */}
+                  {selectedInvoiceData.lineItems && selectedInvoiceData.lineItems.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base text-slate-800">Line Items</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Description</TableHead>
+                              <TableHead className="text-center w-20">Qty</TableHead>
+                              <TableHead className="text-right w-28">Unit Price</TableHead>
+                              <TableHead className="text-right w-28">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {selectedInvoiceData.lineItems.map((item) => (
+                              <TableRow key={item.id}>
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium">{item.description}</p>
+                                    {item.partNumber && (
+                                      <p className="text-xs text-slate-500">Part: {item.partNumber}</p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center">{item.quantity}</TableCell>
+                                <TableCell className="text-right">
+                                  ${Number(item.unitPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  ${Number(item.lineTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {/* Notes Section */}
                   {selectedInvoiceData.notes && (
-                    <div className="space-y-2">
-                      <h4 className="font-semibold">Notes</h4>
-                      <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedInvoiceData.notes}</p>
-                    </div>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base text-slate-800">Notes</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedInvoiceData.notes}</p>
+                      </CardContent>
+                    </Card>
                   )}
                 </div>
               ) : (
@@ -4172,28 +5372,154 @@ export default function CrmCustomerDetail() {
               )}
             </ScrollArea>
             
-            <div className="shrink-0 pt-4 border-t flex items-center justify-between gap-3">
+            <DialogFooter className="shrink-0 pt-4 border-t flex items-center justify-between gap-3 sm:justify-between">
               <Button
                 variant="outline"
                 onClick={() => setSelectedInvoiceId(null)}
-                data-testid="button-close-invoice-sheet"
+                data-testid="button-close-invoice-dialog"
               >
                 Close
               </Button>
               <Button
                 className="bg-[#711419] hover:bg-[#5a1014] text-white"
                 onClick={() => {
+                  const invId = selectedInvoiceId;
                   setSelectedInvoiceId(null);
-                  navigate(`/crm/invoices/${selectedInvoiceId}`);
+                  navigate(`/crm/invoices/${invId}`);
                 }}
                 data-testid="button-open-full-invoice"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open Full Details
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Invoice Payment Dialog */}
+        <Dialog open={showInvoicePaymentDialog} onOpenChange={setShowInvoicePaymentDialog}>
+          <DialogContent className="max-w-md" data-testid="dialog-invoice-payment">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-green-600" />
+                Record Payment
+              </DialogTitle>
+              <DialogDescription>
+                Record a payment for invoice {selectedInvoiceData?.invoiceNumber}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="payment-amount">Payment Amount</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                  <Input
+                    id="payment-amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={invoicePaymentAmount}
+                    onChange={(e) => setInvoicePaymentAmount(e.target.value)}
+                    className="pl-7"
+                    data-testid="input-payment-amount"
+                  />
+                </div>
+                {selectedInvoiceData && (
+                  <p className="text-xs text-slate-500">
+                    Balance due: ${Number(selectedInvoiceData.balanceDue || 0).toFixed(2)}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="payment-method">Payment Method</Label>
+                <Select
+                  value={invoicePaymentMethod}
+                  onValueChange={(value: "cash" | "check" | "credit_card" | "bank_transfer" | "other") => setInvoicePaymentMethod(value)}
+                >
+                  <SelectTrigger data-testid="select-payment-method">
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="check">Check</SelectItem>
+                    <SelectItem value="credit_card">Credit Card</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </SheetContent>
-        </Sheet>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowInvoicePaymentDialog(false);
+                  setInvoicePaymentAmount("");
+                  setInvoicePaymentMethod("check");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => {
+                  if (selectedInvoiceId && invoicePaymentAmount) {
+                    invoicePayMutation.mutate({
+                      invoiceId: selectedInvoiceId,
+                      amountPaid: invoicePaymentAmount,
+                      paymentMethod: invoicePaymentMethod,
+                    });
+                  }
+                }}
+                disabled={!invoicePaymentAmount || invoicePayMutation.isPending}
+                data-testid="button-confirm-payment"
+              >
+                {invoicePayMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                )}
+                Record Payment
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Invoice Void Confirmation AlertDialog */}
+        <AlertDialog open={showInvoiceVoidConfirm} onOpenChange={setShowInvoiceVoidConfirm}>
+          <AlertDialogContent data-testid="dialog-invoice-void-confirm">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <XCircle className="h-5 w-5 text-red-600" />
+                Void Invoice?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to void invoice <strong>{selectedInvoiceData?.invoiceNumber}</strong>? 
+                This action cannot be undone. The invoice will be marked as void and will no longer be payable.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => {
+                  if (selectedInvoiceId) {
+                    invoiceVoidMutation.mutate(selectedInvoiceId);
+                  }
+                }}
+                disabled={invoiceVoidMutation.isPending}
+              >
+                {invoiceVoidMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <XCircle className="h-4 w-4 mr-2" />
+                )}
+                Void Invoice
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
       </div>
     </CrmLayout>
