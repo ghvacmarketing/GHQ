@@ -10,7 +10,12 @@ import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,6 +51,10 @@ import {
   Receipt,
   Plus,
   ClipboardList,
+  Mail,
+  Clock,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,8 +69,7 @@ import { jsPDF } from "jspdf";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import type { CrmUser, CrmQuote, CrmQuoteLineItem
- } from "@shared/schema";
+import type { CrmUser, CrmQuote, CrmQuoteLineItem, QuoteEmailLog } from "@shared/schema";
 
 const COMPANY_INFO = {
   name: "Giesbrecht HVAC",
@@ -127,6 +135,11 @@ export default function CrmQuoteDetail() {
   const [newWorkOrderTitle, setNewWorkOrderTitle] = useState("");
   const [newWorkOrderVisitType, setNewWorkOrderVisitType] = useState<string>("install");
   const [isCreatingWorkOrder, setIsCreatingWorkOrder] = useState(false);
+  const [showSendQuoteDialog, setShowSendQuoteDialog] = useState(false);
+  const [sendEmailRecipient, setSendEmailRecipient] = useState("");
+  const [sendEmailMessage, setSendEmailMessage] = useState("");
+  const [showMarkAsSentDialog, setShowMarkAsSentDialog] = useState(false);
+  const [markSentNote, setMarkSentNote] = useState("");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -138,6 +151,16 @@ export default function CrmQuoteDetail() {
     queryFn: async () => {
       const res = await fetch(`/api/crm/quotes/${quoteId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch quote");
+      return res.json();
+    },
+    enabled: !!quoteId && !!currentUser,
+  });
+
+  const { data: emailLogs = [], isLoading: emailLogsLoading } = useQuery<QuoteEmailLog[]>({
+    queryKey: ["/api/crm/quotes", quoteId, "email-logs"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}/email-logs`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch email logs");
       return res.json();
     },
     enabled: !!quoteId && !!currentUser,
@@ -165,6 +188,61 @@ export default function CrmQuoteDetail() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to send quote", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const sendEmailMutation = useMutation({
+    mutationFn: async (data: { recipientEmail: string; personalMessage?: string }) => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.message || "Failed to send email");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId, "email-logs"] });
+      setShowSendQuoteDialog(false);
+      setSendEmailRecipient("");
+      setSendEmailMessage("");
+      toast({ title: "Quote sent!", description: "The quote has been emailed to the customer." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send email", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const markAsSentMutation = useMutation({
+    mutationFn: async (data: { note?: string }) => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}/mark-sent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.message || "Failed to mark as sent");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId, "email-logs"] });
+      setShowMarkAsSentDialog(false);
+      setMarkSentNote("");
+      toast({ title: "Quote marked as sent", description: "The quote status has been updated to sent." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to mark as sent", description: error.message, variant: "destructive" });
     },
   });
 
@@ -227,6 +305,27 @@ export default function CrmQuoteDetail() {
 
   const handleSend = () => {
     sendMutation.mutate();
+  };
+
+  const handleOpenSendDialog = () => {
+    setSendEmailRecipient(quote?.customerEmail || quote?.customer?.email || "");
+    setSendEmailMessage("");
+    setShowSendQuoteDialog(true);
+  };
+
+  const handleSendEmail = () => {
+    if (!sendEmailRecipient.trim()) {
+      toast({ title: "Email required", description: "Please enter a recipient email address.", variant: "destructive" });
+      return;
+    }
+    sendEmailMutation.mutate({
+      recipientEmail: sendEmailRecipient.trim(),
+      personalMessage: sendEmailMessage.trim() || undefined,
+    });
+  };
+
+  const handleMarkAsSent = () => {
+    markAsSentMutation.mutate({ note: markSentNote.trim() || undefined });
   };
 
   const handleApprove = () => {
@@ -1031,20 +1130,30 @@ export default function CrmQuoteDetail() {
             </p>
             
             <div className="flex items-center gap-2">
-              <Button
-                onClick={handleSend}
-                variant="outline"
-                size="sm"
-                disabled={sendMutation.isPending}
-                data-testid="button-send"
-              >
-                {sendMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4 mr-2" />
-                )}
-                Send
-              </Button>
+              {["draft", "sent", "viewed"].includes(status) && (
+                <Button
+                  onClick={handleOpenSendDialog}
+                  variant="outline"
+                  size="sm"
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  data-testid="button-send-quote"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Quote
+                </Button>
+              )}
+              {status === "draft" && (
+                <Button
+                  onClick={() => setShowMarkAsSentDialog(true)}
+                  variant="outline"
+                  size="sm"
+                  className="text-slate-600 hover:text-slate-700"
+                  data-testid="button-mark-sent"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Mark as Sent
+                </Button>
+              )}
               <Button
                 onClick={handleDownloadPDF}
                 variant="outline"
@@ -1298,7 +1407,202 @@ export default function CrmQuoteDetail() {
             </CardContent>
           </Card>
         )}
+
+        {/* Email History Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              Email History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {emailLogsLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : emailLogs.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                <Mail className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                <p>No emails sent yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {emailLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className={`p-3 rounded-lg border ${
+                      log.status === "sent"
+                        ? "bg-green-50 border-green-200"
+                        : log.status === "failed"
+                        ? "bg-red-50 border-red-200"
+                        : "bg-slate-50 border-slate-200"
+                    }`}
+                    data-testid={`email-log-${log.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          {log.status === "sent" ? (
+                            <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          ) : log.status === "failed" ? (
+                            <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                          ) : (
+                            <Clock className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                          )}
+                          <span className="font-medium text-sm truncate">{log.recipientEmail}</span>
+                          {log.isManual && (
+                            <Badge variant="outline" className="text-xs bg-slate-100">Manual</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <Clock className="h-3 w-3" />
+                          <span>
+                            {log.sentAt
+                              ? format(new Date(log.sentAt), "MMM d, yyyy 'at' h:mm a")
+                              : "—"}
+                          </span>
+                        </div>
+                        {log.personalMessage && (
+                          <p className="mt-2 text-xs text-slate-600 bg-white p-2 rounded border">
+                            {log.personalMessage.length > 100
+                              ? `${log.personalMessage.substring(0, 100)}...`
+                              : log.personalMessage}
+                          </p>
+                        )}
+                        {log.status === "failed" && log.errorMessage && (
+                          <p className="mt-2 text-xs text-red-600">
+                            Error: {log.errorMessage}
+                          </p>
+                        )}
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={
+                          log.status === "sent"
+                            ? "bg-green-100 text-green-700 border-green-300"
+                            : log.status === "failed"
+                            ? "bg-red-100 text-red-700 border-red-300"
+                            : "bg-slate-100 text-slate-700 border-slate-300"
+                        }
+                      >
+                        {log.status === "sent" ? "Sent" : log.status === "failed" ? "Failed" : log.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Send Quote Dialog */}
+      <Dialog open={showSendQuoteDialog} onOpenChange={setShowSendQuoteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Send Quote via Email
+            </DialogTitle>
+            <DialogDescription>
+              Send this quote to the customer via email. They will receive a PDF attachment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="recipient-email">Recipient Email</Label>
+              <Input
+                id="recipient-email"
+                type="email"
+                placeholder="customer@example.com"
+                value={sendEmailRecipient}
+                onChange={(e) => setSendEmailRecipient(e.target.value)}
+                data-testid="input-recipient-email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="personal-message">Personal Message (optional)</Label>
+              <Textarea
+                id="personal-message"
+                placeholder="Add a personal note to the email..."
+                value={sendEmailMessage}
+                onChange={(e) => setSendEmailMessage(e.target.value)}
+                rows={3}
+                data-testid="input-personal-message"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowSendQuoteDialog(false)}
+              data-testid="button-cancel-send"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSendEmail}
+              disabled={sendEmailMutation.isPending}
+              className="bg-[#711419] hover:bg-[#711419]/90"
+              data-testid="button-confirm-send"
+            >
+              {sendEmailMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Send Quote
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark as Sent Dialog */}
+      <AlertDialog open={showMarkAsSentDialog} onOpenChange={setShowMarkAsSentDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Check className="h-5 w-5" />
+              Mark Quote as Sent
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Use this when you've shared the quote via phone, in-person, or another method.
+              This will update the quote status to "Sent" without sending an email.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <div className="space-y-2">
+              <Label htmlFor="mark-sent-note">Note (optional)</Label>
+              <Textarea
+                id="mark-sent-note"
+                placeholder="e.g., Discussed quote over phone with customer..."
+                value={markSentNote}
+                onChange={(e) => setMarkSentNote(e.target.value)}
+                rows={2}
+                data-testid="input-mark-sent-note"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-mark-sent">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleMarkAsSent}
+              disabled={markAsSentMutation.isPending}
+              className="bg-[#711419] hover:bg-[#711419]/90"
+              data-testid="button-confirm-mark-sent"
+            >
+              {markAsSentMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4 mr-2" />
+              )}
+              Mark as Sent
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 overflow-hidden">
