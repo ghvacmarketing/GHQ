@@ -374,18 +374,26 @@ export default function CrmInvoiceCreate() {
         customerPhone: formData.customerPhone || undefined,
         serviceAddress: formData.serviceAddress || undefined,
         description: formData.description || undefined,
-        lineItems: formData.lineItems.map((item, idx) => ({
-          lineType: item.lineType,
-          description: item.description,
-          quantity: item.quantity.toString(),
-          unitPrice: item.unitPrice.toString(),
-          lineTotal: (item.quantity * item.unitPrice * (item.isDiscountLine ? -1 : 1)).toString(),
-          taxable: item.taxable,
-          isDiscountLine: item.isDiscountLine,
-          discountKind: item.discountKind,
-          itemId: item.crmItemId,
-          sortOrder: idx,
-        })),
+        lineItems: formData.lineItems.map((item, idx) => {
+          const isDiscount = Boolean(item.isDiscountLine);
+          const rawQty = Number(item.quantity) || 1;
+          const rawPrice = Number(item.unitPrice) || 0;
+          const qty = isDiscount ? 1 : Math.max(rawQty, 0);
+          const unitPrice = isDiscount ? -Math.abs(rawPrice) : rawPrice;
+          const lineTotal = qty * unitPrice;
+          return {
+            lineType: isDiscount ? "discount" as const : (item.lineType ?? "service"),
+            description: item.description.trim(),
+            quantity: qty.toFixed(2),
+            unitPrice: unitPrice.toFixed(2),
+            lineTotal: lineTotal.toFixed(2),
+            taxable: !isDiscount && item.taxable !== false,
+            isDiscountLine: isDiscount,
+            discountKind: item.discountKind ?? null,
+            itemId: item.crmItemId ?? null,
+            sortOrder: idx,
+          };
+        }),
         subtotal: subtotal.toFixed(2),
         tax: tax.toFixed(2),
         total: total.toFixed(2),
