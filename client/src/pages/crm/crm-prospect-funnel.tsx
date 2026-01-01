@@ -79,6 +79,7 @@ import {
   LayoutGrid,
   CalendarDays,
   DollarSign,
+  BarChart3,
 } from "lucide-react";
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType } from "@shared/schema";
@@ -312,7 +313,7 @@ export default function CrmProspectFunnel() {
   const [lostConfirmOpen, setLostConfirmOpen] = useState(false);
   const [confirmProspectId, setConfirmProspectId] = useState<string | null>(null);
   
-  const [mainViewTab, setMainViewTab] = useState<string>("list");
+  const [mainViewTab, setMainViewTab] = useState<string>("overview");
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [draggedProspect, setDraggedProspect] = useState<CrmCustomer | null>(null);
 
@@ -612,48 +613,131 @@ export default function CrmProspectFunnel() {
 
   const expandedProspect = expandedProspectId ? filteredProspects.find(p => p.id === expandedProspectId) : null;
 
+  const SearchFiltersComponent = () => (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Search by name or phone..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+          data-testid="input-search-prospects"
+        />
+        {searchTerm && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+            onClick={() => setSearchTerm("")}
+            data-testid="button-clear-search"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Select value={activeFilter} onValueChange={setActiveFilter}>
+          <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              <SelectValue />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All Active">All Active</SelectItem>
+            <SelectItem value="New">New</SelectItem>
+            <SelectItem value="Contacted">Contacted</SelectItem>
+            <SelectItem value="Quote Sent">Quote Sent</SelectItem>
+            <SelectItem value="Negotiating">Negotiating</SelectItem>
+            <SelectItem value="Won">Won</SelectItem>
+            <SelectItem value="Lost">Lost</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+          <SelectTrigger className="w-[160px]" data-testid="select-employee-filter">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <SelectValue placeholder="All Sales People" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Sales People</SelectItem>
+            <SelectItem value="chandler">Chandler</SelectItem>
+            <SelectItem value="earnest">Earnest</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">
-              Prospect Funnel
-            </h1>
-            <p className="text-sm text-slate-500">
-              Track prospects through your sales pipeline
-            </p>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => navigate("/crm/add-prospect")}
-            className="bg-[#711419] hover:bg-[#5a1014]"
-            data-testid="button-add-prospect"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add New Prospect
-          </Button>
-        </div>
-
-        {selectedEmployeeName && (
-          <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Showing stats for: <strong>{selectedEmployeeName}</strong></span>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="ml-auto h-7 text-xs"
-                onClick={() => setSelectedEmployeeId("all")}
-              >
-                <X className="h-3 w-3 mr-1" />
-                Clear
-              </Button>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">
+                Prospect Funnel
+              </h1>
+              <p className="text-sm text-slate-500">
+                Track prospects through your sales pipeline
+              </p>
             </div>
+            <Button
+              size="sm"
+              onClick={() => navigate("/crm/add-prospect")}
+              className="bg-[#711419] hover:bg-[#5a1014]"
+              data-testid="button-add-prospect"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add New Prospect
+            </Button>
           </div>
-        )}
+          
+          <Tabs value={mainViewTab} onValueChange={setMainViewTab} className="w-full">
+            <TabsList className="bg-muted/50 p-1 rounded-lg" data-testid="tabs-main-view">
+              <TabsTrigger value="overview" className="rounded-md px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-overview">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="list" className="rounded-md px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-list">
+                <List className="h-4 w-4 mr-2" />
+                List
+              </TabsTrigger>
+              <TabsTrigger value="kanban" className="rounded-md px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-kanban">
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                Kanban
+              </TabsTrigger>
+              <TabsTrigger value="calendar" className="rounded-md px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-calendar">
+                <CalendarDays className="h-4 w-4 mr-2" />
+                Calendar
+              </TabsTrigger>
+            </TabsList>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            <TabsContent value="overview" className="space-y-6 mt-4">
+              {selectedEmployeeName && (
+                <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Showing stats for: <strong>{selectedEmployeeName}</strong></span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="ml-auto h-7 text-xs"
+                      onClick={() => setSelectedEmployeeId("all")}
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {metricsLoading ? (
             <>
               {[1, 2, 3, 4].map((i) => (
@@ -774,86 +858,13 @@ export default function CrmProspectFunnel() {
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+            </TabsContent>
 
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search by name or phone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-prospects"
-            />
-            {searchTerm && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
-                onClick={() => setSearchTerm("")}
-                data-testid="button-clear-search"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Select value={activeFilter} onValueChange={setActiveFilter}>
-              <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4" />
-                  <SelectValue />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All Active">All Active</SelectItem>
-                <SelectItem value="New">New</SelectItem>
-                <SelectItem value="Contacted">Contacted</SelectItem>
-                <SelectItem value="Quote Sent">Quote Sent</SelectItem>
-                <SelectItem value="Negotiating">Negotiating</SelectItem>
-                <SelectItem value="Won">Won</SelectItem>
-                <SelectItem value="Lost">Lost</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-              <SelectTrigger className="w-[160px]" data-testid="select-employee-filter">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  <SelectValue placeholder="All Sales People" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sales People</SelectItem>
-                <SelectItem value="chandler">Chandler</SelectItem>
-                <SelectItem value="earnest">Earnest</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <Tabs value={mainViewTab} onValueChange={setMainViewTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-4" data-testid="tabs-main-view">
-            <TabsTrigger value="list" className="flex items-center gap-2" data-testid="tab-list">
-              <List className="h-4 w-4" />
-              <span className="hidden sm:inline">List</span>
-            </TabsTrigger>
-            <TabsTrigger value="kanban" className="flex items-center gap-2" data-testid="tab-kanban">
-              <LayoutGrid className="h-4 w-4" />
-              <span className="hidden sm:inline">Kanban</span>
-            </TabsTrigger>
-            <TabsTrigger value="calendar" className="flex items-center gap-2" data-testid="tab-calendar">
-              <CalendarDays className="h-4 w-4" />
-              <span className="hidden sm:inline">Calendar</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="list">
-            {isLoading ? (
+            <TabsContent value="list" className="space-y-4 mt-4">
+              <SearchFiltersComponent />
+              {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} className="h-32 w-full" />
@@ -1008,8 +1019,9 @@ export default function CrmProspectFunnel() {
         )}
           </TabsContent>
 
-          <TabsContent value="kanban">
-            <DndContext
+            <TabsContent value="kanban" className="space-y-4 mt-4">
+              <SearchFiltersComponent />
+              <DndContext
               sensors={sensors}
               collisionDetection={closestCorners}
               onDragStart={handleDragStart}
@@ -1073,10 +1085,11 @@ export default function CrmProspectFunnel() {
                 )}
               </DragOverlay>
             </DndContext>
-          </TabsContent>
+            </TabsContent>
 
-          <TabsContent value="calendar">
-            <div className="space-y-4" data-testid="calendar-view">
+            <TabsContent value="calendar" className="space-y-4 mt-4">
+              <SearchFiltersComponent />
+              <div className="space-y-4" data-testid="calendar-view">
               <div className="flex items-center justify-between">
                 <Button
                   variant="outline"
@@ -1168,8 +1181,9 @@ export default function CrmProspectFunnel() {
                 })}
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+            </TabsContent>
+          </Tabs>
+        </div>
 
         <Sheet open={!!expandedProspectId} onOpenChange={(open) => !open && setExpandedProspectId(null)}>
           <SheetContent side="bottom" className="h-[95vh] p-0 flex flex-col">
