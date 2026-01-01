@@ -5103,6 +5103,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fullAddress: customerData.fullAddress || null,
         leadSource: customerData.leadSource || null,
         notes: customerData.notes || null,
+        salesStage: customerData.salesStage || null,
+        interestLevel: customerData.interestLevel || null,
+        assignedSalesRepId: customerData.assignedSalesRepId || null,
       }).returning();
 
       // Create property if provided
