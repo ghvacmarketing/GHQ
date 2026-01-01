@@ -241,9 +241,28 @@ function formatCurrency(amount: number | string | null | undefined): string {
 function getTimeFromSchedule(date: Date | string | null): string {
   if (!date) return "08:00";
   const d = new Date(date);
-  const hours = d.getHours().toString().padStart(2, "0");
-  const minutes = (Math.floor(d.getMinutes() / 15) * 15).toString().padStart(2, "0");
-  return `${hours}:${minutes}`;
+  let hours = d.getHours();
+  let minutes = d.getMinutes();
+  
+  if (minutes >= 45) {
+    hours = hours + 1;
+    minutes = 0;
+  } else if (minutes >= 15) {
+    minutes = 30;
+  } else {
+    minutes = 0;
+  }
+  
+  if (hours < 8) {
+    hours = 8;
+    minutes = 0;
+  }
+  if (hours > 20 || (hours === 20 && minutes > 0)) {
+    hours = 20;
+    minutes = 0;
+  }
+  
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 }
 
 function getPropertyAddress(property: CrmProperty | null): string {
@@ -462,6 +481,13 @@ export default function CrmWorkOrderDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", workOrderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && key[0] === "/api/crm/dispatch/work-orders";
+        }
+      });
       toast({ title: "Work order updated", description: "Changes have been saved." });
     },
     onError: (error: Error) => {
