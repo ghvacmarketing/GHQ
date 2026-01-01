@@ -2869,7 +2869,7 @@ export default function CrmProposalBuilder() {
     <CrmLayout currentUser={currentUser}>
       <div className="flex flex-col h-full min-h-0">
         {/* Fixed Header */}
-        <div className="flex items-center justify-between pb-4 border-b mb-4">
+        <div className="flex items-center justify-between pb-4 mb-4">
           <div className="flex items-center gap-3">
             <Link href="/crm/quotes">
               <Button variant="ghost" size="sm" data-testid="button-back-to-quotes">
