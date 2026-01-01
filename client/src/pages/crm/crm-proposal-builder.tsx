@@ -2736,25 +2736,46 @@ export default function CrmProposalBuilder() {
       doc.line(tableStartX, y, tableStartX + contentWidth, y);
       y += 6;
 
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text("Subtotal:", tableStartX + col1Width, y);
-      doc.text(`$${aiGeneratedQuote.subtotal.toLocaleString()}`, tableStartX + contentWidth - 3, y, { align: 'right' });
-      y += 6;
-
-      if (aiGeneratedQuote.elite_discount_active && aiGeneratedQuote.elite_discount_amount > 0) {
-        checkPageBreak(14);
-        doc.setFillColor(220, 255, 220);
-        doc.rect(tableStartX, y - 4, contentWidth, 12, 'F');
-        doc.setDrawColor(...BRAND_COLORS.eliteGreen);
-        doc.setLineWidth(1);
-        doc.rect(tableStartX, y - 4, contentWidth, 12, 'S');
+      // Only show Subtotal/Total in single mode - hidden in options mode since each package is a separate choice
+      if (quoteMode !== "options") {
         doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text("Subtotal:", tableStartX + col1Width, y);
+        doc.text(`$${aiGeneratedQuote.subtotal.toLocaleString()}`, tableStartX + contentWidth - 3, y, { align: 'right' });
+        y += 6;
+
+        if (aiGeneratedQuote.elite_discount_active && aiGeneratedQuote.elite_discount_amount > 0) {
+          checkPageBreak(14);
+          doc.setFillColor(220, 255, 220);
+          doc.rect(tableStartX, y - 4, contentWidth, 12, 'F');
+          doc.setDrawColor(...BRAND_COLORS.eliteGreen);
+          doc.setLineWidth(1);
+          doc.rect(tableStartX, y - 4, contentWidth, 12, 'S');
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...BRAND_COLORS.eliteGreen);
+          doc.text(`Elite Package Discount (${aiGeneratedQuote.elite_discount_percent}%):`, tableStartX + col1Width, y + 2);
+          doc.text(`-$${aiGeneratedQuote.elite_discount_amount.toLocaleString()}`, tableStartX + contentWidth - 3, y + 2, { align: 'right' });
+          y += 14;
+          doc.setTextColor(...BRAND_COLORS.text);
+        }
+
+        if (aiGeneratedQuote.discount_amount > 0 && !aiGeneratedQuote.elite_discount_active) {
+          doc.setFont("helvetica", "normal");
+          doc.text(`Discount (${aiGeneratedQuote.discount_percent}%):`, tableStartX + col1Width, y);
+          doc.text(`-$${aiGeneratedQuote.discount_amount.toLocaleString()}`, tableStartX + contentWidth - 3, y, { align: 'right' });
+          y += 6;
+        }
+
+        checkPageBreak(12);
+        doc.setFillColor(...BRAND_COLORS.primary);
+        doc.rect(tableStartX, y, contentWidth, 10, 'F');
+        doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(...BRAND_COLORS.eliteGreen);
-        doc.text(`Elite Package Discount (${aiGeneratedQuote.elite_discount_percent}%):`, tableStartX + col1Width, y + 2);
-        doc.text(`-$${aiGeneratedQuote.elite_discount_amount.toLocaleString()}`, tableStartX + contentWidth - 3, y + 2, { align: 'right' });
-        y += 14;
+        doc.setTextColor(...BRAND_COLORS.white);
+        doc.text("TOTAL:", tableStartX + col1Width, y + 7);
+        doc.text(`$${aiGeneratedQuote.total.toLocaleString()}`, tableStartX + contentWidth - 3, y + 7, { align: 'right' });
+        y += 16;
         doc.setTextColor(...BRAND_COLORS.text);
       }
 
@@ -2768,24 +2789,6 @@ export default function CrmProposalBuilder() {
         y += warnLines.length * 4 + 4;
         doc.setTextColor(...BRAND_COLORS.text);
       }
-
-      if (aiGeneratedQuote.discount_amount > 0 && !aiGeneratedQuote.elite_discount_active) {
-        doc.setFont("helvetica", "normal");
-        doc.text(`Discount (${aiGeneratedQuote.discount_percent}%):`, tableStartX + col1Width, y);
-        doc.text(`-$${aiGeneratedQuote.discount_amount.toLocaleString()}`, tableStartX + contentWidth - 3, y, { align: 'right' });
-        y += 6;
-      }
-
-      checkPageBreak(12);
-      doc.setFillColor(...BRAND_COLORS.primary);
-      doc.rect(tableStartX, y, contentWidth, 10, 'F');
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...BRAND_COLORS.white);
-      doc.text("TOTAL:", tableStartX + col1Width, y + 7);
-      doc.text(`$${aiGeneratedQuote.total.toLocaleString()}`, tableStartX + contentWidth - 3, y + 7, { align: 'right' });
-      y += 16;
-      doc.setTextColor(...BRAND_COLORS.text);
 
       if (aiGeneratedQuote.savings_note) {
         doc.setFontSize(9);
