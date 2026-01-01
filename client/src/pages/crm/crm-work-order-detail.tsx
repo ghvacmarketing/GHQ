@@ -1908,24 +1908,6 @@ export default function CrmWorkOrderDetail() {
                   </Button>
                 </div>
 
-                <Separator />
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-red-600">Danger Zone</h4>
-                  <p className="text-sm text-slate-500">
-                    Once you delete a work order, there is no going back. Please be certain.
-                  </p>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setDeleteDialogOpen(true)}
-                    disabled={deleteWorkOrderMutation.isPending}
-                    data-testid="button-delete-work-order"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Work Order
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
