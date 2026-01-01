@@ -10573,27 +10573,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
       
-      // Get total count using raw SQL to bypass Drizzle ORM issues
-      const countQuery = await db.execute(sql`SELECT COUNT(*) as count FROM crm_quotes`);
-      const total = Number(countQuery.rows[0]?.count) || 0;
+      // Get total count with filters
+      const countResult = await db.select({ count: sql<number>`count(*)` })
+        .from(crmQuotes)
+        .where(whereClause);
+      const total = Number(countResult[0]?.count) || 0;
 
-      // Get paginated quotes using raw SQL to bypass Drizzle ORM issue
-      const quotesQuery = await db.execute(sql`
-        SELECT 
-          id, quote_number as "quoteNumber", customer_id as "customerId", 
-          customer_name as "customerName", customer_email as "customerEmail",
-          customer_phone as "customerPhone", service_address as "serviceAddress",
-          title, description, subtotal, tax_rate as "taxRate", tax_amount as "taxAmount",
-          tax_total as "taxTotal", labor_total as "laborTotal", total, status,
-          valid_until as "validUntil", sent_at as "sentAt", viewed_at as "viewedAt",
-          accepted_at as "acceptedAt", declined_at as "declinedAt",
-          work_order_id as "workOrderId", project_id as "projectId", scope, notes,
-          created_at as "createdAt", updated_at as "updatedAt"
-        FROM crm_quotes 
-        ORDER BY created_at DESC 
-        LIMIT ${limitNum} OFFSET ${offset}
-      `);
-      const quotesResult = quotesQuery.rows as any[];
+      // Get paginated quotes with filters
+      const quotesResult = await db.select({
+        id: crmQuotes.id,
+        quoteNumber: crmQuotes.quoteNumber,
+        customerId: crmQuotes.customerId,
+        customerName: crmQuotes.customerName,
+        customerEmail: crmQuotes.customerEmail,
+        customerPhone: crmQuotes.customerPhone,
+        serviceAddress: crmQuotes.serviceAddress,
+        title: crmQuotes.title,
+        description: crmQuotes.description,
+        subtotal: crmQuotes.subtotal,
+        taxRate: crmQuotes.taxRate,
+        taxAmount: crmQuotes.taxAmount,
+        taxTotal: crmQuotes.taxTotal,
+        laborTotal: crmQuotes.laborTotal,
+        total: crmQuotes.total,
+        status: crmQuotes.status,
+        validUntil: crmQuotes.validUntil,
+        sentAt: crmQuotes.sentAt,
+        viewedAt: crmQuotes.viewedAt,
+        acceptedAt: crmQuotes.acceptedAt,
+        declinedAt: crmQuotes.declinedAt,
+        workOrderId: crmQuotes.workOrderId,
+        projectId: crmQuotes.projectId,
+        scope: crmQuotes.scope,
+        notes: crmQuotes.notes,
+        createdAt: crmQuotes.createdAt,
+        updatedAt: crmQuotes.updatedAt,
+      })
+        .from(crmQuotes)
+        .where(whereClause)
+        .orderBy(desc(crmQuotes.createdAt))
+        .limit(limitNum)
+        .offset(offset);
 
       // Quick quotes store customerName directly, so no enrichment needed
       // Just pass through the quotes with their stored customerName
