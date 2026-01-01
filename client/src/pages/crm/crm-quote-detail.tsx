@@ -238,10 +238,15 @@ export default function CrmQuoteDetail() {
 
   const createInvoiceMutation = useMutation({
     mutationFn: async (params: { selectedOption?: string; workOrderId?: string }) => {
-      const res = await apiRequest("POST", "/api/crm/invoices/from-quote", { 
-        quoteId,
-        selectedOption: params.selectedOption,
-        workOrderId: params.workOrderId,
+      const res = await fetch("/api/crm/invoices/from-quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ 
+          quoteId,
+          selectedOption: params.selectedOption,
+          workOrderId: params.workOrderId,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
