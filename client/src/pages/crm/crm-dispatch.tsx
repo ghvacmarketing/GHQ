@@ -1748,7 +1748,13 @@ export default function CrmDispatch() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders", dateString] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && typeof key[0] === "string" && key[0].startsWith("/api/crm/work-orders");
+        }
+      });
     },
     onError: (error: Error) => {
       toast({
