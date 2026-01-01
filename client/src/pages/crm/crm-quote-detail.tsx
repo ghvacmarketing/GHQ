@@ -230,7 +230,7 @@ export default function CrmQuoteDetail() {
         body: JSON.stringify(data),
       });
       const result = await res.json();
-      if (!res.ok || !result.success) {
+      if (!res.ok) {
         throw new Error(result.error || result.message || "Failed to mark as sent");
       }
       return result;
