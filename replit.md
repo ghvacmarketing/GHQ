@@ -52,7 +52,7 @@ Preferred communication style: Simple, everyday language.
 
 ## External Dependencies
 - **Google Sheets API**: Parts pricing and application settings.
-- **SendGrid**: Email notifications.
+- **Resend**: Email notifications for CRM quote delivery with professional HTML templates and email tracking via `quoteEmailLogs` table.
 - **Trello API**: Workflow management.
 - **Neon Database**: PostgreSQL hosting.
 - **OpenAI API (Whisper & GPT)**: Voice transcription, intelligent text formatting/extraction, and AI-powered quote generation using GPT-5.2 with structured outputs, conversation memory, and optional vector store knowledge base integration.

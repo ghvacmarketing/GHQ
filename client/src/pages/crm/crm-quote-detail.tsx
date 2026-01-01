@@ -200,8 +200,8 @@ export default function CrmQuoteDetail() {
         body: JSON.stringify(data),
       });
       const result = await res.json();
-      if (!res.ok) {
-        throw new Error(result.message || "Failed to send email");
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || result.message || "Failed to send email");
       }
       return result;
     },
@@ -228,8 +228,8 @@ export default function CrmQuoteDetail() {
         body: JSON.stringify(data),
       });
       const result = await res.json();
-      if (!res.ok) {
-        throw new Error(result.message || "Failed to mark as sent");
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || result.message || "Failed to mark as sent");
       }
       return result;
     },
