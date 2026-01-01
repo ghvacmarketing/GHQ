@@ -74,7 +74,6 @@ import {
   CheckCircle2,
   MessageSquare,
   StickyNote,
-  GripVertical,
   List,
   LayoutGrid,
   CalendarDays,
@@ -237,14 +236,10 @@ function KanbanColumn({
   stage, 
   prospects, 
   children,
-  headerColor,
-  bgColor 
 }: { 
   stage: SalesStage; 
   prospects: CrmCustomer[]; 
   children: React.ReactNode;
-  headerColor: string;
-  bgColor: string;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage,
@@ -253,15 +248,15 @@ function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`w-72 flex-shrink-0 rounded-lg border ${bgColor} p-2 ${isOver ? "ring-2 ring-[#711419] ring-inset" : ""}`}
+      className={`w-64 flex-shrink-0 bg-slate-100 rounded-lg p-3 ${isOver ? "ring-2 ring-[#711419] ring-inset" : ""}`}
       data-testid={`kanban-column-${stage}`}
     >
-      <div className={`flex items-center justify-between mb-3 px-2 py-1.5 rounded ${headerColor}`}>
-        <h3 className="font-semibold text-sm">{STAGE_LABELS[stage]}</h3>
-        <Badge variant="secondary" className="text-xs">{prospects.length}</Badge>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-sm text-slate-800">{STAGE_LABELS[stage]}</h3>
+        <span className="text-xs text-slate-500 bg-white px-2 py-0.5 rounded-full">{prospects.length}</span>
       </div>
       <SortableContext items={prospects.map(p => p.id)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-2 min-h-[100px]">
+        <div className="space-y-2 min-h-[200px]">
           {children}
         </div>
       </SortableContext>
@@ -291,53 +286,41 @@ function KanbanCard({ prospect, onCardClick }: { prospect: CrmCustomer; onCardCl
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className="bg-white rounded-lg border shadow-sm p-3 cursor-grab active:cursor-grabbing"
+      {...listeners}
+      className="bg-white rounded-md border border-slate-200 p-3 cursor-grab active:cursor-grabbing hover:shadow-sm transition-shadow"
       data-testid={`kanban-card-${prospect.id}`}
     >
-      <div className="flex items-start gap-2 mb-2">
-        <InitialsAvatar name={prospect.name} size="sm" />
-        <button
-          onClick={onCardClick}
-          className="font-medium text-sm text-left hover:text-[#711419] truncate flex-1"
-          data-testid={`kanban-card-name-${prospect.id}`}
-        >
-          {prospect.name}
-        </button>
-        <div {...listeners} className="cursor-grab p-1 hover:bg-gray-100 rounded flex-shrink-0" data-testid={`kanban-card-drag-${prospect.id}`}>
-          <GripVertical className="h-4 w-4 text-gray-400" />
-        </div>
-      </div>
+      <button
+        onClick={onCardClick}
+        className="font-medium text-sm text-left hover:text-[#711419] w-full truncate mb-2"
+        data-testid={`kanban-card-name-${prospect.id}`}
+      >
+        {prospect.name}
+      </button>
       
-      <div className="space-y-1.5">
+      <div className="flex items-center gap-2 flex-wrap">
         <InterestBadge level={prospect.interestLevel as InterestLevel} />
-        
-        {prospect.phone && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Phone className="h-3 w-3" />
-            <span>{prospect.phone}</span>
-          </div>
-        )}
         
         {nextFollowUp && (
           <div className={`flex items-center gap-1 text-xs ${
             isPast(nextFollowUp) && !isToday(nextFollowUp) 
-              ? "text-red-600 font-medium" 
+              ? "text-red-600" 
               : isToday(nextFollowUp) 
-              ? "text-amber-600 font-medium"
-              : "text-muted-foreground"
+              ? "text-amber-600"
+              : "text-slate-500"
           }`}>
             <Calendar className="h-3 w-3" />
             <span>{format(nextFollowUp, "MMM d")}</span>
           </div>
         )}
-        
-        {prospect.estimatedValue && Number(prospect.estimatedValue) > 0 && (
-          <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
-            <DollarSign className="h-3 w-3" />
-            <span>${Number(prospect.estimatedValue).toLocaleString()}</span>
-          </div>
-        )}
       </div>
+      
+      {prospect.phone && (
+        <div className="flex items-center gap-1 text-xs text-slate-500 mt-2">
+          <Phone className="h-3 w-3" />
+          <span>{prospect.phone}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -1108,44 +1091,28 @@ export default function CrmProspectFunnel() {
         )}
           </TabsContent>
 
-            <TabsContent value="kanban" className="mt-4">
-              <SearchFiltersComponent />
+            <TabsContent value="kanban" className="mt-4 flex flex-col h-[calc(100vh-220px)]">
+              <div className="flex-shrink-0 mb-4">
+                <SearchFiltersComponent />
+              </div>
               <DndContext
               sensors={sensors}
               collisionDetection={closestCorners}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
             >
-              <div className="w-full overflow-x-auto pb-4 -mx-4 px-4" data-testid="kanban-board">
-                <div className="flex gap-4" style={{ minWidth: 'max-content' }}>
+              <div className="flex-1 overflow-auto" data-testid="kanban-board">
+                <div className="flex gap-3 pb-4" style={{ minWidth: 'max-content' }}>
                   {KANBAN_STAGES.map((stage) => {
                     const stageProspects = getProspectsByStage(stage);
-                    const stageColors: Record<SalesStage, string> = {
-                      new: "bg-blue-50 border-blue-200",
-                      contacted: "bg-amber-50 border-amber-200",
-                      quote_sent: "bg-purple-50 border-purple-200",
-                      negotiating: "bg-green-50 border-green-200",
-                      won: "bg-emerald-50 border-emerald-300",
-                      lost: "bg-red-50 border-red-200",
-                    };
-                    const headerColors: Record<SalesStage, string> = {
-                      new: "bg-blue-100 text-blue-800",
-                      contacted: "bg-amber-100 text-amber-800",
-                      quote_sent: "bg-purple-100 text-purple-800",
-                      negotiating: "bg-green-100 text-green-800",
-                      won: "bg-emerald-100 text-emerald-800",
-                      lost: "bg-red-100 text-red-800",
-                    };
                     return (
                       <KanbanColumn
                         key={stage}
                         stage={stage}
                         prospects={stageProspects}
-                        headerColor={headerColors[stage]}
-                        bgColor={stageColors[stage]}
                       >
                         {stageProspects.length === 0 ? (
-                          <div className="text-center py-8 text-muted-foreground text-sm" data-testid={`kanban-empty-${stage}`}>
+                          <div className="text-center py-12 text-slate-400 text-sm" data-testid={`kanban-empty-${stage}`}>
                             No prospects
                           </div>
                         ) : (
@@ -1167,7 +1134,7 @@ export default function CrmProspectFunnel() {
               </div>
               <DragOverlay>
                 {draggedProspect && (
-                  <div className="bg-white rounded-lg border shadow-lg p-3 w-72 opacity-90">
+                  <div className="bg-white rounded-lg border shadow-lg p-3 w-64 opacity-90">
                     <div className="font-medium text-sm truncate">{draggedProspect.name}</div>
                     <InterestBadge level={draggedProspect.interestLevel as InterestLevel} />
                   </div>
