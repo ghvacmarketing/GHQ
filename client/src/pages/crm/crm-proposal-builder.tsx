@@ -755,6 +755,9 @@ export default function CrmProposalBuilder() {
   const [isGeneratingQuote, setIsGeneratingQuote] = useState(false);
   const [quoteInstructions, setQuoteInstructions] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
+  
+  // Quote mode: "single" = one combined quote, "options" = each package is a separate option
+  const [quoteMode, setQuoteMode] = useState<"single" | "options">("options");
 
   // Build Your Own state
   const [customEquipmentType, setCustomEquipmentType] = useState<string | null>(null);
@@ -3134,28 +3137,86 @@ export default function CrmProposalBuilder() {
                 </ScrollArea>
                 {cart.length > 0 && (
                   <div className="absolute bottom-0 left-0 right-0 p-4 bg-card border-t space-y-3">
+                    {/* Quote Mode Toggle */}
+                    <div className="flex items-center justify-between bg-slate-100 dark:bg-slate-800 rounded-lg p-2">
+                      <span className="text-xs font-medium text-muted-foreground">Quote Mode</span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant={quoteMode === "single" ? "default" : "ghost"}
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setQuoteMode("single")}
+                          data-testid="button-quote-mode-single"
+                        >
+                          Single
+                        </Button>
+                        <Button
+                          variant={quoteMode === "options" ? "default" : "ghost"}
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setQuoteMode("options")}
+                          data-testid="button-quote-mode-options"
+                        >
+                          Options
+                        </Button>
+                      </div>
+                    </div>
+                    
                     <div className="bg-muted p-3 rounded-lg">
-                      {cartEliteSavings > 0 && (
-                        <div className="flex justify-between items-center mb-2 pb-2 border-b border-green-200 dark:border-green-800">
-                          <span className="text-sm font-medium text-green-700 dark:text-green-400 flex items-center gap-1">
-                            <Crown className="h-4 w-4" />
-                            Elite Savings
-                          </span>
-                          <Badge className="bg-green-500 text-white">
-                            You Save {formatPrice(cartEliteSavings)}
-                          </Badge>
-                        </div>
+                      {quoteMode === "options" ? (
+                        <>
+                          <div className="text-xs font-medium text-muted-foreground mb-2">
+                            {cart.length} Option{cart.length !== 1 ? 's' : ''} (not combined)
+                          </div>
+                          <div className="space-y-2 max-h-32 overflow-y-auto">
+                            {cart.map((item, idx) => {
+                              const optionLabel = isHvacPackage(item) ? item.packageLevel : 
+                                                  isCrawlspaceItem(item) ? item.tier.name :
+                                                  isCrawlspaceServicesItem(item) ? "Crawlspace Services" :
+                                                  isCustomBuild(item) ? "Custom Build" : `Option ${idx + 1}`;
+                              const optionPrice = isHvacPackage(item) 
+                                ? (item.eliteData ? item.eliteData.finalTotal : parseFloat(item.totalInvestment) || 0) * item.quantity
+                                : isCrawlspaceItem(item)
+                                ? (item.eliteData ? item.eliteData.finalTotal : item.pricingBreakdown.totalPrice) * item.quantity
+                                : isCrawlspaceServicesItem(item)
+                                ? item.totalPrice * item.quantity
+                                : isCustomBuild(item)
+                                ? (() => { const est = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat); return est.high * item.quantity; })()
+                                : 0;
+                              return (
+                                <div key={item.id} className="flex justify-between items-center text-sm">
+                                  <span className="font-medium">{optionLabel}</span>
+                                  <span className="text-primary font-bold">{formatPrice(optionPrice)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {cartEliteSavings > 0 && (
+                            <div className="flex justify-between items-center mb-2 pb-2 border-b border-green-200 dark:border-green-800">
+                              <span className="text-sm font-medium text-green-700 dark:text-green-400 flex items-center gap-1">
+                                <Crown className="h-4 w-4" />
+                                Elite Savings
+                              </span>
+                              <Badge className="bg-green-500 text-white">
+                                You Save {formatPrice(cartEliteSavings)}
+                              </Badge>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm font-medium">
+                              Total Investment {hasEstimatedItems && <Badge variant="outline" className="ml-1 text-xs">Includes Est.</Badge>}
+                            </span>
+                            <span className="text-xl font-bold text-primary">{formatPrice(cartTotal)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm text-muted-foreground">
+                            <span>Monthly Payment</span>
+                            <span>{formatPrice(cartMonthlyTotal)}/mo</span>
+                          </div>
+                        </>
                       )}
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium">
-                          Total Investment {hasEstimatedItems && <Badge variant="outline" className="ml-1 text-xs">Includes Est.</Badge>}
-                        </span>
-                        <span className="text-xl font-bold text-primary">{formatPrice(cartTotal)}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm text-muted-foreground">
-                        <span>Monthly Payment</span>
-                        <span>{formatPrice(cartMonthlyTotal)}/mo</span>
-                      </div>
                     </div>
                     <div className="flex gap-2">
                       <Button
