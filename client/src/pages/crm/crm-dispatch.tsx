@@ -224,6 +224,24 @@ const snapToGridModifier: Modifier = ({ transform }) => {
   };
 };
 
+const createRestrictToContainerModifier = (containerRef: React.RefObject<HTMLDivElement | null>): Modifier => {
+  return ({ transform, draggingNodeRect }) => {
+    if (!containerRef.current || !draggingNodeRect) {
+      return transform;
+    }
+    
+    const containerRect = containerRef.current.getBoundingClientRect();
+    
+    const minY = containerRect.top - draggingNodeRect.top;
+    const maxY = containerRect.bottom - draggingNodeRect.bottom;
+    
+    return {
+      ...transform,
+      y: Math.min(Math.max(transform.y, minY), maxY),
+    };
+  };
+};
+
 const statusColors: Record<string, { bg: string; border: string; text: string }> = {
   scheduled: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
   dispatched: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700" },
@@ -2038,6 +2056,12 @@ export default function CrmDispatch() {
   }, []);
 
   const timelineRef = useRef<HTMLDivElement>(null);
+  const dispatchBoardRef = useRef<HTMLDivElement>(null);
+  
+  const combinedModifiers = useMemo(() => {
+    const restrictModifier = createRestrictToContainerModifier(dispatchBoardRef);
+    return [snapToGridModifier, restrictModifier];
+  }, []);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over, delta } = event;
@@ -2475,9 +2499,9 @@ export default function CrmDispatch() {
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          modifiers={[snapToGridModifier]}
+          modifiers={combinedModifiers}
         >
-          <div className="flex flex-col flex-1 min-h-0 gap-4 overflow-hidden">
+          <div ref={dispatchBoardRef} className="flex flex-col flex-1 min-h-0 gap-4 overflow-hidden">
             {/* Scrollable Technician Schedule - vertical scroll here, horizontal inside component */}
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
               {viewMode === "day" ? (
@@ -2533,7 +2557,7 @@ export default function CrmDispatch() {
                   <div className="p-3 bg-white border-2 border-[#711419] rounded-lg shadow-2xl w-64 cursor-grabbing">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${visitTypeColor.dot}`} />
+                        <div className={`w-2 h-2 rounded-full ${visitTypeColor.border.replace('border-', 'bg-')}`} />
                         <span className="text-xs font-medium text-slate-600">WO #{draggingWo.workOrderNumber}</span>
                       </div>
                       {scheduledWindow && (
