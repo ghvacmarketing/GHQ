@@ -1083,13 +1083,13 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
 export const crmInvoiceStatusEnum = ["draft", "sent", "paid", "void", "partial"] as const;
 export type CrmInvoiceStatus = typeof crmInvoiceStatusEnum[number];
 
-// CRM Invoices (always tied to a Work Order)
+// CRM Invoices (can be tied to a Work Order, Project, or standalone)
 export const crmInvoices = pgTable("crm_invoices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   invoiceNumber: text("invoice_number").notNull(),
   customerId: varchar("customer_id"),
   propertyId: varchar("property_id"),
-  workOrderId: varchar("work_order_id").notNull().references(() => crmWorkOrders.id, { onDelete: "cascade" }),
+  workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id, { onDelete: "cascade" }),
   projectId: varchar("project_id").references(() => crmProjects.id, { onDelete: "set null" }),
   status: text("status").$type<CrmInvoiceStatus>().notNull().default("draft"),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).default("0"),
