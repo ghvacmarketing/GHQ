@@ -5197,7 +5197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH /api/crm/customers/:id - Update customer
+  // PATCH /api/crm/customers/:id - Update customer (including prospect conversion)
   app.patch("/api/crm/customers/:id", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -5206,12 +5206,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const customerId = req.params.id;
-      const { name, customerType, customerStatus, phone, email, fullAddress, leadSource } = req.body;
-
-      // Validate required fields
-      if (!name || typeof name !== 'string' || !name.trim()) {
-        return res.status(400).json({ message: "Display name is required" });
-      }
+      const { 
+        name, customerType, customerStatus, phone, email, fullAddress, leadSource,
+        salesStage, potentialValue, assignedSalesRepId, interestLevel 
+      } = req.body;
 
       // Check if user can change customerType (only admin/owner)
       const canChangeType = ["admin", "owner"].includes(user.role);
@@ -5219,14 +5217,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check crmCustomers table first (primary source)
       const [existingCrmCustomer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
       if (existingCrmCustomer) {
-        const updateData: any = {
-          name: name.trim(),
-          phone: phone !== undefined ? phone : existingCrmCustomer.phone,
-          email: email !== undefined ? email : existingCrmCustomer.email,
-          customerStatus: customerStatus || existingCrmCustomer.customerStatus,
-          fullAddress: fullAddress !== undefined ? fullAddress : existingCrmCustomer.fullAddress,
-          leadSource: leadSource !== undefined ? leadSource : existingCrmCustomer.leadSource,
-        };
+        // Check if converting to prospect and already a prospect
+        if (customerStatus === "prospect" && existingCrmCustomer.customerStatus === "prospect") {
+          return res.status(400).json({ message: "This customer is already in the prospect funnel" });
+        }
+
+        const updateData: any = {};
+        
+        // Only update name if provided
+        if (name && typeof name === 'string' && name.trim()) {
+          updateData.name = name.trim();
+        }
+        if (phone !== undefined) updateData.phone = phone;
+        if (email !== undefined) updateData.email = email;
+        if (customerStatus) updateData.customerStatus = customerStatus;
+        if (fullAddress !== undefined) updateData.fullAddress = fullAddress;
+        if (leadSource !== undefined) updateData.leadSource = leadSource;
+        
+        // Prospect-related fields
+        if (salesStage !== undefined) updateData.salesStage = salesStage;
+        if (potentialValue !== undefined) updateData.potentialValue = potentialValue;
+        if (assignedSalesRepId !== undefined) updateData.assignedSalesRepId = assignedSalesRepId;
+        if (interestLevel !== undefined) updateData.interestLevel = interestLevel;
         
         if (canChangeType && customerType) {
           updateData.customerType = customerType;
@@ -5236,21 +5248,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .set(updateData)
           .where(eq(crmCustomers.id, customerId));
 
-        await logCrmAudit(user.id, "customer.updated", "customer", customerId, { name: name.trim() }, req.ip);
+        const auditDetails = name ? { name: name.trim() } : { customerId };
+        await logCrmAudit(user.id, "customer.updated", "customer", customerId, auditDetails, req.ip);
         return res.json({ success: true, origin: 'crm_customers' });
       }
 
       // Fall back to legacy customers table
       const [existingLegacy] = await db.select().from(customers).where(eq(customers.id, customerId));
       if (existingLegacy) {
-        const updateData: any = {
-          displayName: name.trim(),
-          phone: phone !== undefined ? phone : existingLegacy.phone,
-          email: email !== undefined ? email : existingLegacy.email,
-          customerStatus: customerStatus || existingLegacy.customerStatus,
-          fullAddress: fullAddress !== undefined ? fullAddress : existingLegacy.fullAddress,
-          leadSource: leadSource !== undefined ? leadSource : existingLegacy.leadSource,
-        };
+        // Check if converting to prospect and already a prospect
+        if (customerStatus === "prospect" && existingLegacy.customerStatus === "prospect") {
+          return res.status(400).json({ message: "This customer is already in the prospect funnel" });
+        }
+
+        const updateData: any = {};
+        
+        // Only update displayName if provided
+        if (name && typeof name === 'string' && name.trim()) {
+          updateData.displayName = name.trim();
+        }
+        if (phone !== undefined) updateData.phone = phone;
+        if (email !== undefined) updateData.email = email;
+        if (customerStatus) updateData.customerStatus = customerStatus;
+        if (fullAddress !== undefined) updateData.fullAddress = fullAddress;
+        if (leadSource !== undefined) updateData.leadSource = leadSource;
+        
+        // Note: legacy customers table may not have prospect fields
+        // but we still accept them for API compatibility
         
         if (canChangeType && customerType) {
           updateData.customerType = customerType;
@@ -5260,7 +5284,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .set(updateData)
           .where(eq(customers.id, customerId));
 
-        await logCrmAudit(user.id, "customer.updated", "customer", customerId, { name: name.trim() }, req.ip);
+        const auditDetails = name ? { name: name.trim() } : { customerId };
+        await logCrmAudit(user.id, "customer.updated", "customer", customerId, auditDetails, req.ip);
         return res.json({ success: true, origin: 'customers' });
       }
 

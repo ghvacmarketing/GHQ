@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +40,7 @@ import {
   Mail,
   MapPin,
   ChevronsUpDown,
+  AlertCircle,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { cn } from "@/lib/utils";
@@ -91,15 +93,20 @@ export default function CrmAddProspect() {
   }, [customers, selectedCustomerId]);
 
   const filteredCustomers = useMemo(() => {
-    if (!searchQuery) return customers;
-    const query = searchQuery.toLowerCase();
-    return customers.filter(
-      (c) =>
-        c.name?.toLowerCase().includes(query) ||
-        c.phone?.toLowerCase().includes(query) ||
-        c.email?.toLowerCase().includes(query)
-    );
+    let result = customers;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (c) =>
+          c.name?.toLowerCase().includes(query) ||
+          c.phone?.toLowerCase().includes(query) ||
+          c.email?.toLowerCase().includes(query)
+      );
+    }
+    return result;
   }, [customers, searchQuery]);
+
+  const isAlreadyProspect = selectedCustomer?.customerStatus === "prospect";
 
   const convertToProspectMutation = useMutation({
     mutationFn: async () => {
@@ -127,6 +134,10 @@ export default function CrmAddProspect() {
   const handleSubmit = () => {
     if (!selectedCustomerId) {
       toast({ title: "Please select a customer", variant: "destructive" });
+      return;
+    }
+    if (isAlreadyProspect) {
+      toast({ title: "This customer is already in the prospect funnel", variant: "destructive" });
       return;
     }
     if (!potentialValue) {
@@ -257,31 +268,41 @@ export default function CrmAddProspect() {
                           {customersLoading ? "Loading..." : "No customers found."}
                         </CommandEmpty>
                         <CommandGroup>
-                          {filteredCustomers.slice(0, 50).map((customer) => (
-                            <CommandItem
-                              key={customer.id}
-                              value={customer.id}
-                              onSelect={() => {
-                                setSelectedCustomerId(customer.id);
-                                setCustomerSearchOpen(false);
-                                setSearchQuery("");
-                              }}
-                              data-testid={`customer-option-${customer.id}`}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  selectedCustomerId === customer.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              <div className="flex flex-col">
-                                <span className="font-medium">{customer.name}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {customer.phone || customer.email || "No contact info"}
-                                </span>
-                              </div>
-                            </CommandItem>
-                          ))}
+                          {filteredCustomers.slice(0, 50).map((customer) => {
+                            const isProspect = customer.customerStatus === "prospect";
+                            return (
+                              <CommandItem
+                                key={customer.id}
+                                value={customer.id}
+                                onSelect={() => {
+                                  setSelectedCustomerId(customer.id);
+                                  setCustomerSearchOpen(false);
+                                  setSearchQuery("");
+                                }}
+                                data-testid={`customer-option-${customer.id}`}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedCustomerId === customer.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{customer.name}</span>
+                                    {isProspect && (
+                                      <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                        Already Prospect
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {customer.phone || customer.email || "No contact info"}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            );
+                          })}
                         </CommandGroup>
                       </CommandList>
                     </Command>
@@ -291,6 +312,15 @@ export default function CrmAddProspect() {
 
               {selectedCustomer && (
                 <>
+                  {isAlreadyProspect && (
+                    <Alert variant="destructive" className="border-amber-500 bg-amber-50 text-amber-800">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        This customer is already in the prospect funnel. You cannot convert them again.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  
                   <div className="bg-muted/50 rounded-lg p-4 space-y-3">
                     <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                       Customer Details
@@ -425,13 +455,13 @@ export default function CrmAddProspect() {
                     </Button>
                     <Button
                       onClick={handleSubmit}
-                      disabled={convertToProspectMutation.isPending}
+                      disabled={convertToProspectMutation.isPending || isAlreadyProspect}
                       data-testid="button-submit"
                     >
                       {convertToProspectMutation.isPending && (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       )}
-                      Convert to Prospect
+                      {isAlreadyProspect ? "Already a Prospect" : "Convert to Prospect"}
                     </Button>
                   </div>
                 </>
