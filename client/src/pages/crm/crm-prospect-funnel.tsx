@@ -698,25 +698,59 @@ export default function CrmProspectFunnel() {
             </Button>
           </div>
           
+          {/* Tabs styled like work orders page - underline style */}
+          <div className="flex overflow-x-auto border-b border-slate-200" data-testid="tabs-main-view">
+            <button
+              onClick={() => setMainViewTab("overview")}
+              className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+                mainViewTab === "overview"
+                  ? "border-[#711419] text-[#711419]"
+                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+              }`}
+              data-testid="tab-overview"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Overview
+            </button>
+            <button
+              onClick={() => setMainViewTab("list")}
+              className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+                mainViewTab === "list"
+                  ? "border-[#711419] text-[#711419]"
+                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+              }`}
+              data-testid="tab-list"
+            >
+              <List className="h-4 w-4" />
+              List
+            </button>
+            <button
+              onClick={() => setMainViewTab("kanban")}
+              className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+                mainViewTab === "kanban"
+                  ? "border-[#711419] text-[#711419]"
+                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+              }`}
+              data-testid="tab-kanban"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Kanban
+            </button>
+            <button
+              onClick={() => setMainViewTab("calendar")}
+              className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+                mainViewTab === "calendar"
+                  ? "border-[#711419] text-[#711419]"
+                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+              }`}
+              data-testid="tab-calendar"
+            >
+              <CalendarDays className="h-4 w-4" />
+              Calendar
+            </button>
+          </div>
+          
           <Tabs value={mainViewTab} onValueChange={setMainViewTab} className="w-full">
-            <TabsList className="bg-muted/50 p-1 rounded-lg" data-testid="tabs-main-view">
-              <TabsTrigger value="overview" className="rounded-md px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-overview">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="list" className="rounded-md px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-list">
-                <List className="h-4 w-4 mr-2" />
-                List
-              </TabsTrigger>
-              <TabsTrigger value="kanban" className="rounded-md px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-kanban">
-                <LayoutGrid className="h-4 w-4 mr-2" />
-                Kanban
-              </TabsTrigger>
-              <TabsTrigger value="calendar" className="rounded-md px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-calendar">
-                <CalendarDays className="h-4 w-4 mr-2" />
-                Calendar
-              </TabsTrigger>
-            </TabsList>
 
             <TabsContent value="overview" className="space-y-6 mt-4">
               {selectedEmployeeName && (
