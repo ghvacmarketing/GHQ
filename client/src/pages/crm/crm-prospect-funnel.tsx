@@ -433,10 +433,9 @@ export default function CrmProspectFunnel() {
             ))}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <div className="flex gap-4 pb-4" style={{ minWidth: "fit-content" }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {STAGES.map(stage => (
-                <div key={stage.key} className="w-64 md:w-72 flex-shrink-0">
+                <div key={stage.key} className="min-w-0">
                   <Card className={`${stage.bgColor} ${stage.borderColor} border mb-3`}>
                     <CardHeader className="py-3 px-4">
                       <CardTitle className={`text-sm font-semibold ${stage.color} flex items-center justify-between`}>
@@ -467,7 +466,6 @@ export default function CrmProspectFunnel() {
                   </div>
                 </div>
               ))}
-            </div>
           </div>
         )}
 
