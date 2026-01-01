@@ -239,22 +239,27 @@ export default function CrmQuoteCreate() {
   // Auto-fetch customer when coming from work order
   useEffect(() => {
     if (customerIdFromUrl && !selectedCustomer) {
-      fetch(`/api/crm/customers/${customerIdFromUrl}`)
-        .then(res => res.json())
+      fetch(`/api/crm/customers/${customerIdFromUrl}`, { credentials: "include" })
+        .then(res => {
+          if (!res.ok) throw new Error("Failed to fetch customer");
+          return res.json();
+        })
         .then(customer => {
           if (customer && customer.id) {
             setSelectedCustomer(customer);
             setFormData(prev => ({
               ...prev,
               customerId: customer.id,
-              customerName: customer.name || customer.displayName || "",
+              customerName: customer.displayName || customer.name || "",
               customerEmail: customer.email || "",
               customerPhone: customer.phone || "",
-              serviceAddress: customer.fullAddress || "",
+              serviceAddress: customer.fullAddress || customer.address || "",
             }));
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.error("Failed to auto-fetch customer:", err);
+        });
     }
   }, [customerIdFromUrl, selectedCustomer]);
 
