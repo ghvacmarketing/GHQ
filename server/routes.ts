@@ -8312,7 +8312,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(201).json(workOrder);
     } catch (error) {
       console.error("Error creating work order:", error);
-      return res.status(500).json({ message: "Failed to create work order" });
+      const errorMessage = error instanceof Error ? error.message : "Failed to create work order";
+      return res.status(500).json({ message: errorMessage });
     }
   });
 
