@@ -66,6 +66,7 @@ import {
   Plus,
   Calendar as CalendarIcon,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   AlertCircle,
   Timer,
@@ -2280,31 +2281,28 @@ export default function CrmDispatch() {
           </div>
 
           <div className="flex justify-center">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
+            <div className="flex items-center gap-1">
+              <button
                 onClick={() => {
                   const newDate = new Date(selectedDate);
                   newDate.setDate(newDate.getDate() - (viewMode === "week" ? 7 : 1));
                   setSelectedDate(newDate);
                 }}
+                className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors"
                 data-testid="button-prev-date"
               >
-                ←
-              </Button>
+                <ChevronLeft className="h-5 w-5" />
+              </button>
               
               {viewMode === "day" ? (
                 <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                   <PopoverTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="text-slate-700 font-medium min-w-[160px]"
+                    <button 
+                      className="text-slate-700 font-medium min-w-[160px] text-center hover:text-[#711419] transition-colors"
                       data-testid="button-date-picker"
                     >
                       {dateDisplay}
-                    </Button>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="center">
                     <Calendar
@@ -2322,28 +2320,17 @@ export default function CrmDispatch() {
                 </span>
               )}
               
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={() => {
                   const newDate = new Date(selectedDate);
                   newDate.setDate(newDate.getDate() + (viewMode === "week" ? 7 : 1));
                   setSelectedDate(newDate);
                 }}
+                className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors"
                 data-testid="button-next-date"
               >
-                →
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedDate(new Date())}
-                className="ml-2"
-                data-testid="button-today"
-              >
-                Today
-              </Button>
+                <ChevronRight className="h-5 w-5" />
+              </button>
             </div>
           </div>
 
@@ -2358,25 +2345,29 @@ export default function CrmDispatch() {
               </p>
             </div>
             
-            <div className="flex items-center bg-slate-100 rounded-lg p-1">
-              <Button
-                variant={viewMode === "day" ? "default" : "ghost"}
-                size="sm"
+            <div className="flex items-center border-b border-slate-200">
+              <button
                 onClick={() => setViewMode("day")}
-                className={viewMode === "day" ? "bg-white shadow-sm" : ""}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  viewMode === "day" 
+                    ? "text-[#711419] border-[#711419]" 
+                    : "text-slate-500 border-transparent hover:text-slate-700"
+                }`}
                 data-testid="button-view-day"
               >
                 Day
-              </Button>
-              <Button
-                variant={viewMode === "week" ? "default" : "ghost"}
-                size="sm"
+              </button>
+              <button
                 onClick={() => setViewMode("week")}
-                className={viewMode === "week" ? "bg-white shadow-sm" : ""}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  viewMode === "week" 
+                    ? "text-[#711419] border-[#711419]" 
+                    : "text-slate-500 border-transparent hover:text-slate-700"
+                }`}
                 data-testid="button-view-week"
               >
                 Week
-              </Button>
+              </button>
             </div>
           </div>
           
