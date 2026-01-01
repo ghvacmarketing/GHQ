@@ -28,7 +28,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import redlogo from "@assets/redlogo.webp";
 import packagesData from "@assets/pricebook-packages.json";
 import componentsData from "@assets/pricebook-components.json";
-import type { Customer, CrmUser } from "@shared/schema";
+import type { Customer, CrmUser, CrmCustomer } from "@shared/schema";
+
+// Simplified CRM customer type for proposal builder
+type CrmCustomerForProposal = {
+  id: string;
+  name: string;
+  fullAddress: string | null;
+  phone: string | null;
+  email: string | null;
+};
 
 const CART_STORAGE_KEY = 'ghvac-proposal-cart';
 const CUSTOMER_STORAGE_KEY = 'ghvac-proposal-customer';
@@ -771,11 +780,11 @@ export default function CrmProposalBuilder() {
   const [indoorBrandFilter, setIndoorBrandFilter] = useState<string>("All Brands");
   const [thermostatBrandFilter, setThermostatBrandFilter] = useState<string>("All Brands");
 
-  // Customer search state for Accept Quote
+  // Customer search state for Accept Quote (uses CRM customers, not FieldEdge customers)
   const [customerSearchTerm, setCustomerSearchTerm] = useState("");
   const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomerForProposal | null>(null);
   const [searchAllFields, setSearchAllFields] = useState(false);
   
   // Pre-loaded entity IDs from URL parameters
@@ -795,14 +804,14 @@ export default function CrmProposalBuilder() {
     if (workOrderId) setPreloadedWorkOrderId(workOrderId);
     if (propertyId) setPreloadedPropertyId(propertyId);
     
-    // Fetch customer by ID if provided
+    // Fetch CRM customer by ID if provided
     if (customerId) {
-      fetch(`/api/customers/${customerId}`)
+      fetch(`/api/crm/customers/${customerId}`, { credentials: 'include' })
         .then(res => res.ok ? res.json() : null)
-        .then((customer: Customer | null) => {
+        .then((customer: CrmCustomerForProposal | null) => {
           if (customer) {
             // Inline customer selection to avoid dependency issues
-            const cleanName = customer.displayName.replace(/^["']|["']$/g, '');
+            const cleanName = customer.name.replace(/^["']|["']$/g, '');
             setCustomerName(cleanName);
             setCustomerAddress(customer.fullAddress || '');
             setSelectedCustomer(customer);
@@ -832,18 +841,19 @@ export default function CrmProposalBuilder() {
     return () => clearTimeout(timer);
   }, [customerSearchTerm]);
 
-  // Customer search query
-  const { data: customerSearchResults = [], isFetching: isSearchingCustomers } = useQuery<Customer[]>({
-    queryKey: ["/api/customers/search", debouncedCustomerSearch, searchAllFields],
+  // Customer search query (uses CRM customers endpoint)
+  const { data: customerSearchResults = [], isFetching: isSearchingCustomers } = useQuery<CrmCustomerForProposal[]>({
+    queryKey: ["/api/crm/customers", debouncedCustomerSearch],
     queryFn: async () => {
       if (debouncedCustomerSearch.length < 2) return [];
       const params = new URLSearchParams({
-        term: debouncedCustomerSearch,
-        ...(searchAllFields && { searchAll: 'true' })
+        search: debouncedCustomerSearch,
+        limit: '20'
       });
-      const res = await fetch(`/api/customers/search?${params}`);
+      const res = await fetch(`/api/crm/customers?${params}`, { credentials: 'include' });
       if (!res.ok) throw new Error("Failed to search customers");
-      return res.json();
+      const data = await res.json();
+      return data.customers || [];
     },
     enabled: debouncedCustomerSearch.length >= 2,
     refetchOnWindowFocus: false,
@@ -931,7 +941,7 @@ export default function CrmProposalBuilder() {
       return;
     }
 
-    const customerNameToUse = selectedCustomer?.displayName || customerName || "Unknown Customer";
+    const customerNameToUse = selectedCustomer?.name || customerName || "Unknown Customer";
     
     // Build cart items with image URLs for proposal history
     const cartItemsForSave = cart.map(item => {
@@ -1156,8 +1166,8 @@ export default function CrmProposalBuilder() {
     });
   };
 
-  const handleSelectCustomer = (customer: Customer) => {
-    const cleanName = customer.displayName.replace(/^["']|["']$/g, '');
+  const handleSelectCustomer = (customer: CrmCustomerForProposal) => {
+    const cleanName = customer.name.replace(/^["']|["']$/g, '');
     setCustomerName(cleanName);
     setCustomerAddress(customer.fullAddress || '');
     setSelectedCustomer(customer);
@@ -2503,7 +2513,7 @@ export default function CrmProposalBuilder() {
       });
 
       const blob = await Packer.toBlob(doc);
-      const customerNameForFile = selectedCustomer?.displayName?.replace(/[^a-zA-Z0-9]/g, '_') || customerName?.replace(/[^a-zA-Z0-9]/g, '_') || 'Customer';
+      const customerNameForFile = selectedCustomer?.name?.replace(/[^a-zA-Z0-9]/g, '_') || customerName?.replace(/[^a-zA-Z0-9]/g, '_') || 'Customer';
       const date = new Date().toISOString().split('T')[0];
       saveAs(blob, `GHVAC_Quote_${customerNameForFile}_${date}.docx`);
       
@@ -2861,7 +2871,7 @@ export default function CrmProposalBuilder() {
         addFooter(i, totalPages);
       }
 
-      const customerNameForFile = selectedCustomer?.displayName?.replace(/[^a-zA-Z0-9]/g, '_') || customerName?.replace(/[^a-zA-Z0-9]/g, '_') || 'Customer';
+      const customerNameForFile = selectedCustomer?.name?.replace(/[^a-zA-Z0-9]/g, '_') || customerName?.replace(/[^a-zA-Z0-9]/g, '_') || 'Customer';
       const dateForFile = new Date().toISOString().split('T')[0];
       doc.save(`GHVAC_Quote_${customerNameForFile}_${dateForFile}.pdf`);
 
@@ -4905,7 +4915,7 @@ export default function CrmProposalBuilder() {
                         onClick={() => handleSelectCustomer(customer)}
                         data-testid={`customer-result-${customer.id}`}
                       >
-                        <p className="font-medium">{customer.displayName}</p>
+                        <p className="font-medium">{customer.name}</p>
                         <div className="text-sm text-muted-foreground space-y-0.5">
                           {customer.fullAddress && <p className="truncate">{customer.fullAddress}</p>}
                           {(customer.phone || customer.email) && (
@@ -4925,7 +4935,7 @@ export default function CrmProposalBuilder() {
                 <div className="mt-2 flex items-center gap-2">
                   <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                     <CheckCircle2 className="h-3 w-3 mr-1" />
-                    {selectedCustomer.displayName}
+                    {selectedCustomer.name}
                   </Badge>
                   <Button
                     variant="ghost"
