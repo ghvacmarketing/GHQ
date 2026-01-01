@@ -1240,26 +1240,6 @@ export default function CrmQuoteDetail() {
                     </p>
                   )}
 
-                  {/* Pricing Summary */}
-                  <div className="flex justify-end">
-                    <div className="w-80 bg-slate-50 rounded-lg p-4 space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Subtotal</span>
-                        <span>{formatCurrency((quote.aiGeneratedQuote as Record<string, unknown>).subtotal as number || quote.subtotal)}</span>
-                      </div>
-                      {(quote.aiGeneratedQuote as Record<string, unknown>).elite_discount_active && ((quote.aiGeneratedQuote as Record<string, unknown>).elite_discount_amount as number) > 0 && (
-                        <div className="flex justify-between text-sm text-green-600">
-                          <span>Elite Discount ({(quote.aiGeneratedQuote as Record<string, unknown>).elite_discount_percent}%)</span>
-                          <span>-{formatCurrency((quote.aiGeneratedQuote as Record<string, unknown>).elite_discount_amount as number)}</span>
-                        </div>
-                      )}
-                      <Separator className="my-2" />
-                      <div className="flex justify-between text-lg font-bold">
-                        <span>Total</span>
-                        <span className="text-[#711419]">{formatCurrency((quote.aiGeneratedQuote as Record<string, unknown>).total as number || quote.subtotal)}</span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <>
