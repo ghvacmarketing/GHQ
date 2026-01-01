@@ -614,8 +614,8 @@ export default function CrmProspectFunnel() {
   const expandedProspect = expandedProspectId ? filteredProspects.find(p => p.id === expandedProspectId) : null;
 
   const SearchFiltersComponent = () => (
-    <div className="flex flex-col md:flex-row items-center justify-center gap-4 py-4 bg-slate-100 rounded-lg mb-4">
-      <div className="relative w-full max-w-md">
+    <div className="flex w-full flex-col md:flex-row md:items-center gap-4 bg-slate-100 rounded-lg py-4 px-4 mb-4">
+      <div className="relative w-full md:flex-1 md:max-w-lg md:mx-auto">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           type="text"
@@ -638,7 +638,7 @@ export default function CrmProspectFunnel() {
         )}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 md:ml-auto flex-shrink-0">
         <Select value={activeFilter} onValueChange={setActiveFilter}>
           <SelectTrigger className="w-[130px] bg-white rounded-full border-slate-300" data-testid="select-status-filter">
             <div className="flex items-center gap-2">
