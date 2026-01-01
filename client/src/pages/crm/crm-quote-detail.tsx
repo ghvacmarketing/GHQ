@@ -824,19 +824,30 @@ export default function CrmQuoteDetail() {
       <div className="space-y-6 max-w-4xl mx-auto pb-8">
         {/* Header - Two rows for cleaner layout */}
         <div className="space-y-4">
-          {/* First row: Back button, Quote number, Title, Status */}
-          <div className="flex items-center gap-3">
-            <Link href="/crm/quotes">
-              <Button variant="ghost" size="icon" data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-quote-number">
-              {quote.quoteNumber}
-            </h1>
-            <Badge variant="outline" className={statusColors[status] || "bg-slate-100"}>
-              {statusLabels[status] || status}
-            </Badge>
+          {/* First row: Back button, Quote number, Status, Preview icon */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Link href="/crm/quotes">
+                <Button variant="ghost" size="icon" data-testid="button-back">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              </Link>
+              <h1 className="text-2xl font-bold text-slate-900" data-testid="text-quote-number">
+                {quote.quoteNumber}
+              </h1>
+              <Badge variant="outline" className={statusColors[status] || "bg-slate-100"}>
+                {statusLabels[status] || status}
+              </Badge>
+            </div>
+            <Button
+              onClick={() => setShowPreview(true)}
+              variant="ghost"
+              size="icon"
+              className="text-slate-500 hover:text-[#711419]"
+              data-testid="button-preview"
+            >
+              <Eye className="h-5 w-5" />
+            </Button>
           </div>
           
           {/* Second row: Title/Date and Actions */}
@@ -846,15 +857,6 @@ export default function CrmQuoteDetail() {
             </p>
             
             <div className="flex items-center gap-2">
-              <Button
-                onClick={() => setShowPreview(true)}
-                variant="outline"
-                size="sm"
-                data-testid="button-preview"
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                Preview
-              </Button>
               <Button
                 onClick={handleSend}
                 variant="outline"
@@ -878,7 +880,7 @@ export default function CrmQuoteDetail() {
                 <Printer className="h-4 w-4 mr-2" />
                 Print PDF
               </Button>
-              {(status === "draft" || status === "sent") && (
+              {status === "sent" && (
                 <>
                   <Button
                     onClick={handleApprove}
