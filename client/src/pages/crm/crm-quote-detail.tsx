@@ -125,31 +125,73 @@ export default function CrmQuoteDetail() {
     }
   }, [authLoading, currentUser, navigate]);
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async (status: string) => {
-      const res = await apiRequest("PATCH", `/api/crm/quotes/${quoteId}`, { status });
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/send`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to send quote");
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
-      toast({ title: "Quote status updated" });
+      toast({ title: "Quote sent", description: "Quote status updated to sent." });
     },
-    onError: () => {
-      toast({ title: "Failed to update status", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Failed to send quote", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/accept`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to accept quote");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      toast({ title: "Quote accepted", description: "Quote status updated to accepted." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to accept quote", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/decline`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to decline quote");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      toast({ title: "Quote declined", description: "Quote status updated to declined." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to decline quote", description: error.message, variant: "destructive" });
     },
   });
 
   const handleSend = () => {
-    updateStatusMutation.mutate("sent");
+    sendMutation.mutate();
   };
 
   const handleApprove = () => {
-    updateStatusMutation.mutate("accepted");
+    acceptMutation.mutate();
   };
 
   const handleDecline = () => {
-    updateStatusMutation.mutate("declined");
+    declineMutation.mutate();
   };
 
   const deleteMutation = useMutation({
@@ -821,10 +863,10 @@ export default function CrmQuoteDetail() {
               <Button
                 onClick={handleSend}
                 className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
-                disabled={updateStatusMutation.isPending}
+                disabled={sendMutation.isPending}
                 data-testid="button-send"
               >
-                {updateStatusMutation.isPending ? (
+                {sendMutation.isPending ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <Send className="h-4 w-4 mr-2" />
@@ -849,7 +891,7 @@ export default function CrmQuoteDetail() {
                     onClick={handleApprove}
                     variant="outline"
                     className="border-green-500 text-green-600 hover:bg-green-50"
-                    disabled={updateStatusMutation.isPending}
+                    disabled={acceptMutation.isPending}
                     data-testid="button-approve"
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
@@ -859,7 +901,7 @@ export default function CrmQuoteDetail() {
                     onClick={handleDecline}
                     variant="outline"
                     className="border-red-500 text-red-600 hover:bg-red-50"
-                    disabled={updateStatusMutation.isPending}
+                    disabled={declineMutation.isPending}
                     data-testid="button-decline"
                   >
                     <XCircle className="h-4 w-4 mr-2" />
