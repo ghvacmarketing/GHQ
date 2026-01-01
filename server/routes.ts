@@ -9844,6 +9844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           partNumber: quoteItem.partNumber,
           quantity: quoteItem.quantity,
           unitPrice: quoteItem.unitPrice,
+          amount: quoteItem.lineTotal, // Required column - same as lineTotal
           lineTotal: quoteItem.lineTotal,
           taxable: quoteItem.taxable,
           sortOrder: quoteItem.sortOrder,
