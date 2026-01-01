@@ -51,7 +51,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import type { CrmUser, CrmWorkOrder, CrmQuote, CrmQuoteLineItem, CrmItem, CrmCustomer } from "@shared/schema";
+import type { CrmUser, CrmWorkOrder, CrmQuote, CrmQuoteLineItem, CrmItem, CrmCustomer, CrmProperty } from "@shared/schema";
 import { format } from "date-fns";
 
 const INVOICE_MODES = [
@@ -149,6 +149,7 @@ export default function CrmInvoiceCreate() {
   const [newWOVisitType, setNewWOVisitType] = useState<"SERVICE" | "INSTALL" | "MAINTENANCE" | "SALES">("SERVICE");
   const [newWOWorkSubtype, setNewWOWorkSubtype] = useState<string>("No Cool");
   const [newWOScheduledDate, setNewWOScheduledDate] = useState<Date>(new Date());
+  const [newWOSelectedPropertyId, setNewWOSelectedPropertyId] = useState<string>("");
 
   const urlParams = new URLSearchParams(window.location.search);
   const workOrderIdFromUrl = urlParams.get("workOrderId");
@@ -203,6 +204,20 @@ export default function CrmInvoiceCreate() {
     },
     enabled: showCreateWODialog && newWOCustomerSearchOpen,
   });
+
+  const { data: propertiesData } = useQuery<CrmProperty[]>({
+    queryKey: ["/api/crm/properties", newWOSelectedCustomer?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/properties?customerId=${newWOSelectedCustomer!.id}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch properties");
+      return res.json();
+    },
+    enabled: !!newWOSelectedCustomer?.id && showCreateWODialog,
+  });
+
+  const newWOProperties = propertiesData || [];
 
   useEffect(() => {
     if (workOrderIdFromUrl && workOrders?.workOrders) {
@@ -290,6 +305,7 @@ export default function CrmInvoiceCreate() {
   const createWorkOrderMutation = useMutation({
     mutationFn: async () => {
       if (!newWOSelectedCustomer) throw new Error("Customer is required");
+      if (!newWOSelectedPropertyId) throw new Error("Property is required");
       if (!newWOTitle.trim()) throw new Error("Title is required");
       if (!newWODescription.trim()) throw new Error("Description is required");
 
@@ -300,6 +316,7 @@ export default function CrmInvoiceCreate() {
 
       const res = await apiRequest("POST", "/api/crm/work-orders", {
         customerId: newWOSelectedCustomer.id,
+        propertyId: newWOSelectedPropertyId,
         title: newWOTitle.trim(),
         description: newWODescription.trim(),
         visitType: newWOVisitType,
@@ -325,6 +342,7 @@ export default function CrmInvoiceCreate() {
       }));
       setNewWOCustomerSearch("");
       setNewWOSelectedCustomer(null);
+      setNewWOSelectedPropertyId("");
       setNewWOTitle("");
       setNewWODescription("");
       setNewWOVisitType("SERVICE");
@@ -1233,6 +1251,7 @@ export default function CrmInvoiceCreate() {
                             key={customer.id}
                             onClick={() => {
                               setNewWOSelectedCustomer(customer);
+                              setNewWOSelectedPropertyId("");
                               setNewWOCustomerSearchOpen(false);
                             }}
                             className="w-full p-2 text-left hover:bg-slate-50 transition-colors"
@@ -1250,6 +1269,28 @@ export default function CrmInvoiceCreate() {
                 </PopoverContent>
               </Popover>
             </div>
+
+            {newWOSelectedCustomer && (
+              <div className="space-y-2">
+                <Label>Property *</Label>
+                <Select value={newWOSelectedPropertyId} onValueChange={setNewWOSelectedPropertyId}>
+                  <SelectTrigger data-testid="select-wo-property">
+                    <SelectValue placeholder="Select property..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {newWOProperties.length > 0 ? (
+                      newWOProperties.map((prop) => (
+                        <SelectItem key={prop.id} value={prop.id}>
+                          {prop.address1}{prop.city ? `, ${prop.city}` : ""}{prop.state ? ` ${prop.state}` : ""}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="__none__" disabled>No properties found</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="wo-title">Title *</Label>
@@ -1380,6 +1421,7 @@ export default function CrmInvoiceCreate() {
                 setShowCreateWODialog(false);
                 setNewWOCustomerSearch("");
                 setNewWOSelectedCustomer(null);
+                setNewWOSelectedPropertyId("");
                 setNewWOTitle("");
                 setNewWODescription("");
                 setNewWOVisitType("SERVICE");
@@ -1392,7 +1434,7 @@ export default function CrmInvoiceCreate() {
             </Button>
             <Button
               onClick={() => createWorkOrderMutation.mutate()}
-              disabled={!newWOSelectedCustomer || !newWOTitle.trim() || !newWODescription.trim() || createWorkOrderMutation.isPending}
+              disabled={!newWOSelectedCustomer || !newWOSelectedPropertyId || !newWOTitle.trim() || !newWODescription.trim() || createWorkOrderMutation.isPending}
               className="bg-[#711419] hover:bg-[#5a1014] text-white"
               data-testid="button-wo-create"
             >
