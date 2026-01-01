@@ -58,6 +58,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty, CrmQuote } from "@shared/schema";
@@ -532,6 +535,7 @@ interface CustomerTabbedViewProps {
   toast: ReturnType<typeof useToast>['toast'];
   propertyDialogOpen: boolean;
   setPropertyDialogOpen: (open: boolean) => void;
+  onViewQuote: (quoteId: string) => void;
 }
 
 function CustomerTabbedView({
@@ -558,6 +562,7 @@ function CustomerTabbedView({
   toast,
   propertyDialogOpen,
   setPropertyDialogOpen,
+  onViewQuote,
 }: CustomerTabbedViewProps) {
   const completedJobs = jobs?.filter(j => ["completed", "invoiced", "paid"].includes(j.status)) || [];
   const customerType = (customer.customerType || "residential").toLowerCase();
@@ -1200,7 +1205,12 @@ function CustomerTabbedView({
                 </TableHeader>
                 <TableBody>
                   {crmQuotes.map((quote) => (
-                    <TableRow key={quote.id} data-testid={`row-quote-${quote.id}`}>
+                    <TableRow 
+                      key={quote.id} 
+                      data-testid={`row-quote-${quote.id}`}
+                      className="cursor-pointer hover:bg-slate-50"
+                      onClick={() => onViewQuote(quote.id)}
+                    >
                       <TableCell className="font-medium">{quote.quoteNumber}</TableCell>
                       <TableCell>{quote.title}</TableCell>
                       <TableCell>
@@ -1222,11 +1232,17 @@ function CustomerTabbedView({
                         {quote.createdAt ? format(new Date(quote.createdAt), 'MMM d, yyyy') : '—'}
                       </TableCell>
                       <TableCell>
-                        <Link href="/crm/quotes">
-                          <Button variant="ghost" size="sm" data-testid={`button-view-quote-${quote.id}`}>
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </Link>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          data-testid={`button-view-quote-${quote.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewQuote(quote.id);
+                          }}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1333,6 +1349,7 @@ export default function CrmCustomerDetail() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [propertyDialogOpen, setPropertyDialogOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<CrmProperty | null>(null);
+  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Edit form state
@@ -1576,6 +1593,34 @@ export default function CrmCustomerDetail() {
     enabled: !!currentUser && !!customerId,
   });
   const crmQuotes = crmQuotesData?.quotes || [];
+
+  // Fetch selected quote details for the detail sheet
+  interface QuoteLineItem {
+    id: string;
+    quoteId: string;
+    lineType: string;
+    description: string;
+    partNumber?: string | null;
+    quantity: string;
+    unitPrice: string;
+    lineTotal: string;
+    taxable?: boolean;
+    sortOrder?: number;
+  }
+  
+  type QuoteWithDetails = CrmQuote & {
+    lineItems?: QuoteLineItem[];
+  };
+  
+  const { data: selectedQuoteData, isLoading: selectedQuoteLoading } = useQuery<QuoteWithDetails>({
+    queryKey: ["/api/crm/quotes", selectedQuoteId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/quotes/${selectedQuoteId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch quote");
+      return res.json();
+    },
+    enabled: !!currentUser && !!selectedQuoteId,
+  });
 
   // Fetch customer properties for all views (needed for property_manager tabs)
   const { data: customerProperties, isLoading: propertiesLoading } = useQuery<CrmProperty[]>({
@@ -3343,7 +3388,206 @@ export default function CrmCustomerDetail() {
           toast={toast}
           propertyDialogOpen={propertyDialogOpen}
           setPropertyDialogOpen={setPropertyDialogOpen}
+          onViewQuote={(quoteId) => setSelectedQuoteId(quoteId)}
         />
+
+        {/* Quote Detail Sheet */}
+        <Sheet open={!!selectedQuoteId} onOpenChange={(open) => !open && setSelectedQuoteId(null)}>
+          <SheetContent className="w-full sm:max-w-2xl overflow-hidden flex flex-col" data-testid="sheet-quote-detail">
+            <SheetHeader className="shrink-0 pb-4 border-b">
+              <SheetTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-[#711419]" />
+                {selectedQuoteData?.quoteNumber || "Quote Details"}
+              </SheetTitle>
+            </SheetHeader>
+            
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              {selectedQuoteLoading ? (
+                <div className="space-y-4 py-4">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : selectedQuoteData ? (
+                <div className="space-y-6 py-4">
+                  {/* Quote Header */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-lg">{selectedQuoteData.title || "Untitled Quote"}</h3>
+                    <div className="flex items-center gap-3">
+                      <Badge className={cn(
+                        "text-xs",
+                        selectedQuoteData.status === "draft" && "bg-slate-100 text-slate-700",
+                        selectedQuoteData.status === "sent" && "bg-blue-100 text-blue-700",
+                        selectedQuoteData.status === "accepted" && "bg-green-100 text-green-700",
+                        selectedQuoteData.status === "declined" && "bg-red-100 text-red-700",
+                        selectedQuoteData.status === "expired" && "bg-yellow-100 text-yellow-700",
+                        (selectedQuoteData.status as string) === "converted" && "bg-emerald-100 text-emerald-700"
+                      )}>
+                        {selectedQuoteData.status === "accepted" ? "Approved" : 
+                         selectedQuoteData.status?.charAt(0).toUpperCase() + selectedQuoteData.status?.slice(1)}
+                      </Badge>
+                      <span className="text-sm text-slate-500">
+                        Created {selectedQuoteData.createdAt ? format(new Date(selectedQuoteData.createdAt), 'MMM d, yyyy') : '—'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  {/* Customer Info */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Customer</p>
+                      <p className="text-sm font-medium">{selectedQuoteData.customerName}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Service Address</p>
+                      <p className="text-sm">{selectedQuoteData.serviceAddress || "—"}</p>
+                    </div>
+                    {selectedQuoteData.customerEmail && (
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Email</p>
+                        <p className="text-sm">{selectedQuoteData.customerEmail}</p>
+                      </div>
+                    )}
+                    {selectedQuoteData.customerPhone && (
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Phone</p>
+                        <p className="text-sm">{selectedQuoteData.customerPhone}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <Separator />
+                  
+                  {/* AI Generated Quote Content */}
+                  {selectedQuoteData.aiGeneratedQuote ? (
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-sm text-slate-700">Proposal</h4>
+                      {(() => {
+                        const aiQuote = selectedQuoteData.aiGeneratedQuote;
+                        const options = aiQuote?.options || [];
+                        
+                        return options.length > 0 ? (
+                          <div className="space-y-4">
+                            {options.map((option: any, idx: number) => (
+                              <div key={idx} className="border rounded-lg p-4 bg-slate-50">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h5 className="font-semibold">{option.title || `Option ${idx + 1}`}</h5>
+                                  {option.tags && option.tags.length > 0 && (
+                                    <div className="flex gap-1">
+                                      {option.tags.map((tag: string, tagIdx: number) => (
+                                        <Badge key={tagIdx} variant="outline" className="text-xs">
+                                          {tag}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-sm text-slate-600 mb-2">{option.description}</p>
+                                <p className="text-lg font-bold text-[#711419]">
+                                  ${Number(option.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </p>
+                                {option.inclusions && option.inclusions.length > 0 && (
+                                  <div className="mt-3">
+                                    <p className="text-xs font-medium text-slate-500 mb-1">Includes:</p>
+                                    <ul className="text-sm text-slate-600 space-y-1">
+                                      {option.inclusions.map((item: string, iIdx: number) => (
+                                        <li key={iIdx} className="flex items-start gap-2">
+                                          <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                                          <span>{item}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="border rounded-lg p-4 bg-slate-50">
+                            <p className="text-sm text-slate-600">{aiQuote?.description || "No description available"}</p>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  ) : selectedQuoteData.lineItems && selectedQuoteData.lineItems.length > 0 ? (
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-sm text-slate-700">Line Items</h4>
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-50">
+                            <tr>
+                              <th className="text-left p-2 font-medium text-slate-600">Description</th>
+                              <th className="text-right p-2 font-medium text-slate-600">Qty</th>
+                              <th className="text-right p-2 font-medium text-slate-600">Price</th>
+                              <th className="text-right p-2 font-medium text-slate-600">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedQuoteData.lineItems.map((item) => (
+                              <tr key={item.id} className="border-t">
+                                <td className="p-2">{item.description}</td>
+                                <td className="p-2 text-right">{item.quantity}</td>
+                                <td className="p-2 text-right">${Number(item.unitPrice).toFixed(2)}</td>
+                                <td className="p-2 text-right">${Number(item.lineTotal).toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500 text-center py-4">No line items</p>
+                  )}
+                  
+                  <Separator />
+                  
+                  {/* Total */}
+                  <div className="flex justify-between items-center p-4 bg-slate-100 rounded-lg">
+                    <span className="font-medium">Total</span>
+                    <span className="text-xl font-bold text-[#711419]">
+                      ${Number(selectedQuoteData.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  
+                  {/* Notes */}
+                  {selectedQuoteData.notes && (
+                    <div>
+                      <h4 className="font-medium text-sm text-slate-700 mb-2">Notes</h4>
+                      <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedQuoteData.notes}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 text-center py-8">Quote not found</p>
+              )}
+            </ScrollArea>
+            
+            {/* Footer Actions */}
+            <div className="shrink-0 pt-4 border-t flex items-center justify-between gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedQuoteId(null)}
+                data-testid="button-close-quote-sheet"
+              >
+                Close
+              </Button>
+              <Button
+                className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                onClick={() => {
+                  setSelectedQuoteId(null);
+                  navigate(`/crm/quotes/${selectedQuoteId}`);
+                }}
+                data-testid="button-open-full-quote"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open Full Details
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
 
       </div>
     </CrmLayout>
