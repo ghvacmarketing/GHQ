@@ -133,7 +133,8 @@ export default function CrmQuoteDetail() {
   const [quoteContext, setQuoteContext] = useState<{ customerId?: string; propertyId?: string; projectId?: string }>({});
   const [showCreateWorkOrder, setShowCreateWorkOrder] = useState(false);
   const [newWorkOrderTitle, setNewWorkOrderTitle] = useState("");
-  const [newWorkOrderVisitType, setNewWorkOrderVisitType] = useState<string>("install");
+  const [newWorkOrderVisitType, setNewWorkOrderVisitType] = useState<string>("INSTALL");
+  const [newWorkOrderSubtype, setNewWorkOrderSubtype] = useState<string>("Full System");
   const [isCreatingWorkOrder, setIsCreatingWorkOrder] = useState(false);
   const [showSendQuoteDialog, setShowSendQuoteDialog] = useState(false);
   const [sendEmailRecipient, setSendEmailRecipient] = useState("");
@@ -489,6 +490,7 @@ export default function CrmQuoteDetail() {
         projectId: projectId || undefined,
         title: newWorkOrderTitle || `Work Order from Quote ${quote?.quoteNumber}`,
         visitType: newWorkOrderVisitType,
+        workSubtype: newWorkOrderSubtype,
         status: "scheduled",
       });
       
@@ -2048,15 +2050,79 @@ export default function CrmQuoteDetail() {
                 
                 <div className="space-y-2">
                   <Label htmlFor="wo-type">Visit Type</Label>
-                  <Select value={newWorkOrderVisitType} onValueChange={setNewWorkOrderVisitType}>
+                  <Select value={newWorkOrderVisitType} onValueChange={(val) => {
+                    setNewWorkOrderVisitType(val);
+                    // Set default subtype based on visit type
+                    const defaultSubtypes: Record<string, string> = {
+                      "INSTALL": "Full System",
+                      "SERVICE": "No Cool",
+                      "MAINTENANCE": "Spring Tune-Up",
+                      "SALES": "Replace System Estimate",
+                    };
+                    setNewWorkOrderSubtype(defaultSubtypes[val] || "Other");
+                  }}>
                     <SelectTrigger data-testid="select-visit-type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="install">Installation</SelectItem>
-                      <SelectItem value="service">Service</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="sales">Sales Visit</SelectItem>
+                      <SelectItem value="INSTALL">Installation</SelectItem>
+                      <SelectItem value="SERVICE">Service</SelectItem>
+                      <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                      <SelectItem value="SALES">Sales Visit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="wo-subtype">Work Type</Label>
+                  <Select value={newWorkOrderSubtype} onValueChange={setNewWorkOrderSubtype}>
+                    <SelectTrigger data-testid="select-work-subtype">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {newWorkOrderVisitType === "INSTALL" && (
+                        <>
+                          <SelectItem value="Full System">Full System</SelectItem>
+                          <SelectItem value="Changeout">Changeout</SelectItem>
+                          <SelectItem value="Add Ducts">Add Ducts</SelectItem>
+                          <SelectItem value="Replace Ducts">Replace Ducts</SelectItem>
+                          <SelectItem value="IAQ Install">IAQ Install</SelectItem>
+                          <SelectItem value="Mini-split">Mini-split</SelectItem>
+                          <SelectItem value="Crawlspace">Crawlspace</SelectItem>
+                        </>
+                      )}
+                      {newWorkOrderVisitType === "SERVICE" && (
+                        <>
+                          <SelectItem value="No Cool">No Cool</SelectItem>
+                          <SelectItem value="No Heat">No Heat</SelectItem>
+                          <SelectItem value="Water Leak">Water Leak</SelectItem>
+                          <SelectItem value="Electrical">Electrical</SelectItem>
+                          <SelectItem value="Thermostat">Thermostat</SelectItem>
+                          <SelectItem value="Airflow">Airflow</SelectItem>
+                          <SelectItem value="Noise">Noise</SelectItem>
+                          <SelectItem value="IAQ">IAQ</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </>
+                      )}
+                      {newWorkOrderVisitType === "MAINTENANCE" && (
+                        <>
+                          <SelectItem value="Spring Tune-Up">Spring Tune-Up</SelectItem>
+                          <SelectItem value="Fall Tune-Up">Fall Tune-Up</SelectItem>
+                          <SelectItem value="Maintenance Plan Visit">Maintenance Plan Visit</SelectItem>
+                          <SelectItem value="Safety Inspection">Safety Inspection</SelectItem>
+                          <SelectItem value="Duct Cleaning">Duct Cleaning</SelectItem>
+                          <SelectItem value="IAQ Service">IAQ Service</SelectItem>
+                        </>
+                      )}
+                      {newWorkOrderVisitType === "SALES" && (
+                        <>
+                          <SelectItem value="Replace System Estimate">Replace System Estimate</SelectItem>
+                          <SelectItem value="Add-on IAQ">Add-on IAQ</SelectItem>
+                          <SelectItem value="Duct Renovation">Duct Renovation</SelectItem>
+                          <SelectItem value="Crawlspace">Crawlspace</SelectItem>
+                          <SelectItem value="Maintenance Plan Sale">Maintenance Plan Sale</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
