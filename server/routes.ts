@@ -9769,7 +9769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { quoteId } = req.body;
+      const { quoteId, selectedOption } = req.body;
       if (!quoteId) {
         return res.status(400).json({ message: "quoteId is required" });
       }
@@ -9804,7 +9804,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get quote line items
-      const quoteLineItems = await db.select().from(crmQuoteLineItems).where(eq(crmQuoteLineItems.quoteId, quoteId));
+      let quoteLineItems = await db.select().from(crmQuoteLineItems).where(eq(crmQuoteLineItems.quoteId, quoteId));
+      
+      // For multi-option quotes, filter line items by selected option
+      // Fall back to persisted selectedOption if not provided in request
+      const optionToUse = selectedOption || quote.selectedOption;
+      
+      if (quote.quoteMode === "options") {
+        const uniqueOptions = [...new Set(quoteLineItems.map(item => item.optionTag).filter(Boolean))];
+        
+        if (uniqueOptions.length > 1 && !optionToUse) {
+          // Multi-option quote requires selecting an option
+          return res.status(400).json({ 
+            message: "This is a multi-option quote. Please select which option the customer chose.",
+            requiresOptionSelection: true,
+            availableOptions: uniqueOptions
+          });
+        }
+        
+        if (optionToUse) {
+          quoteLineItems = quoteLineItems.filter(item => item.optionTag === optionToUse);
+          
+          // Verify we have line items after filtering
+          if (quoteLineItems.length === 0) {
+            return res.status(400).json({ 
+              message: `No line items found for option "${optionToUse}". Please check that this quote has line items with this option tag.`,
+              requiresOptionSelection: true,
+              availableOptions: uniqueOptions
+            });
+          }
+          
+          // Update quote with selected option if not already set
+          if (selectedOption && selectedOption !== quote.selectedOption) {
+            await db.update(crmQuotes)
+              .set({ selectedOption })
+              .where(eq(crmQuotes.id, quoteId));
+          }
+        }
+      }
 
       // Generate invoice number
       const invoiceNumber = await generateInvoiceNumber();
@@ -11141,6 +11178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lineTotal: lineTotal.toString(),
           taxable: item.taxable !== false,
           sortOrder: sortOrder++,
+          optionTag: item.optionTag || null,
         }).returning();
         createdLineItems.push(createdItem);
       }

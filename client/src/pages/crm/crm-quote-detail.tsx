@@ -74,6 +74,7 @@ type QuoteWithLines = CrmQuote & {
     next_steps?: string[];
   } | null;
   quoteMode?: "single" | "options" | null;
+  selectedOption?: string | null;
 };
 
 const statusLabels: Record<string, string> = {
@@ -103,6 +104,9 @@ export default function CrmQuoteDetail() {
   const { toast } = useToast();
   const [showPreview, setShowPreview] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showOptionSelection, setShowOptionSelection] = useState(false);
+  const [availableOptions, setAvailableOptions] = useState<string[]>([]);
+  const [selectedOption, setSelectedOption] = useState<string>("");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -214,15 +218,27 @@ export default function CrmQuoteDetail() {
   });
 
   const createInvoiceMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/crm/invoices/from-quote", { quoteId });
+    mutationFn: async (selectedOpt?: string) => {
+      const res = await apiRequest("POST", "/api/crm/invoices/from-quote", { 
+        quoteId,
+        selectedOption: selectedOpt 
+      });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
+        if (data.requiresOptionSelection && data.availableOptions) {
+          throw { 
+            message: data.message, 
+            requiresOptionSelection: true,
+            availableOptions: data.availableOptions
+          };
+        }
         throw new Error(data.message || "Failed to create invoice");
       }
-      return res.json();
+      return data;
     },
     onSuccess: (data) => {
+      setShowOptionSelection(false);
+      setSelectedOption("");
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
@@ -234,13 +250,30 @@ export default function CrmQuoteDetail() {
         navigate(`/crm/invoices`);
       }
     },
-    onError: (error: Error) => {
-      toast({ title: "Failed to create invoice", description: error.message, variant: "destructive" });
+    onError: (error: { message?: string; requiresOptionSelection?: boolean; availableOptions?: string[] } | Error) => {
+      if ('requiresOptionSelection' in error && error.requiresOptionSelection && error.availableOptions) {
+        setAvailableOptions(error.availableOptions);
+        setShowOptionSelection(true);
+        return;
+      }
+      toast({ 
+        title: "Failed to create invoice", 
+        description: (error as Error).message || "Unknown error", 
+        variant: "destructive" 
+      });
     },
   });
 
   const handleCreateInvoice = () => {
-    createInvoiceMutation.mutate();
+    createInvoiceMutation.mutate(quote?.selectedOption || undefined);
+  };
+
+  const handleConfirmOptionSelection = () => {
+    if (!selectedOption) {
+      toast({ title: "Please select an option", variant: "destructive" });
+      return;
+    }
+    createInvoiceMutation.mutate(selectedOption);
   };
 
   const handleDelete = () => {
@@ -1364,6 +1397,57 @@ export default function CrmQuoteDetail() {
               data-testid="button-confirm-delete"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showOptionSelection} onOpenChange={setShowOptionSelection}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Select Customer's Choice</AlertDialogTitle>
+            <AlertDialogDescription>
+              This is a multi-option quote. Which option did the customer choose?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-2">
+            {availableOptions.map((option) => (
+              <button
+                key={option}
+                onClick={() => setSelectedOption(option)}
+                className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                  selectedOption === option
+                    ? "border-[#711419] bg-[#711419]/5"
+                    : "border-slate-200 hover:border-slate-300"
+                }`}
+                data-testid={`option-${option.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                <span className={`font-medium ${selectedOption === option ? "text-[#711419]" : ""}`}>
+                  {option}
+                </span>
+              </button>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                setSelectedOption("");
+                setShowOptionSelection(false);
+              }}
+              data-testid="button-cancel-option"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmOptionSelection}
+              disabled={!selectedOption || createInvoiceMutation.isPending}
+              className="bg-[#711419] hover:bg-[#711419]/90"
+              data-testid="button-confirm-option"
+            >
+              {createInvoiceMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Create Invoice
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

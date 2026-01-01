@@ -1068,6 +1068,7 @@ export default function CrmProposalBuilder() {
         quantity: number;
         unitPrice: number;
         taxable?: boolean;
+        optionTag?: string;
       }>;
       status?: string;
       aiGeneratedQuote?: object;
@@ -1112,44 +1113,45 @@ export default function CrmProposalBuilder() {
       return;
     }
 
-    // Build line items from AI quote
-    const lineItems = (aiGeneratedQuote.line_items || []).map((item: { name: string; qty: number; price: number; description: string }) => ({
-      description: `${item.name} - ${item.description}`,
-      quantity: item.qty,
-      unitPrice: item.price,
-      taxable: true,
-    }));
-
-    if (lineItems.length === 0) {
-      // Fallback - use cart items to create line items
-      cart.forEach(item => {
-        if (isHvacPackage(item)) {
-          const price = item.eliteData ? item.eliteData.finalTotal : parseFloat(item.totalInvestment) || 0;
-          lineItems.push({
-            description: `${item.packageLevel} Package - ${item.extractedTonnage} - ${item.outdoorBrand} ${item.outdoorName}`,
-            quantity: item.quantity,
-            unitPrice: price,
-            taxable: true,
-          });
-        } else if (isCrawlspaceItem(item)) {
-          const price = item.eliteData ? item.eliteData.finalTotal : item.pricingBreakdown.totalPrice;
-          lineItems.push({
-            description: `Crawlspace Encapsulation - ${item.tier.name} (${item.pricingBreakdown.bandSqft.toLocaleString()} sqft)`,
-            quantity: item.quantity,
-            unitPrice: price,
-            taxable: true,
-          });
-        } else if (isCustomBuild(item)) {
-          const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
-          lineItems.push({
-            description: `Custom Build - ${item.tonnage} System`,
-            quantity: item.quantity,
-            unitPrice: estimate.high,
-            taxable: true,
-          });
-        }
-      });
-    }
+    // Build line items from cart items (preserves optionTag for multi-option quotes)
+    const lineItems: Array<{
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      taxable: boolean;
+      optionTag?: string;
+    }> = [];
+    
+    cart.forEach(item => {
+      if (isHvacPackage(item)) {
+        const price = item.eliteData ? item.eliteData.finalTotal : parseFloat(item.totalInvestment) || 0;
+        lineItems.push({
+          description: `${item.packageLevel} Package - ${item.extractedTonnage} - ${item.outdoorBrand} ${item.outdoorName}`,
+          quantity: item.quantity,
+          unitPrice: price,
+          taxable: true,
+          optionTag: quoteMode === "options" ? item.packageLevel : undefined,
+        });
+      } else if (isCrawlspaceItem(item)) {
+        const price = item.eliteData ? item.eliteData.finalTotal : item.pricingBreakdown.totalPrice;
+        lineItems.push({
+          description: `Crawlspace Encapsulation - ${item.tier.name} (${item.pricingBreakdown.bandSqft.toLocaleString()} sqft)`,
+          quantity: item.quantity,
+          unitPrice: price,
+          taxable: true,
+          optionTag: quoteMode === "options" ? item.tier.name : undefined,
+        });
+      } else if (isCustomBuild(item)) {
+        const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
+        lineItems.push({
+          description: `Custom Build - ${item.tonnage} System`,
+          quantity: item.quantity,
+          unitPrice: estimate.high,
+          taxable: true,
+          optionTag: quoteMode === "options" ? "Custom Build" : undefined,
+        });
+      }
+    });
 
     saveToCrmMutation.mutate({
       customerId: selectedCustomer.id,
