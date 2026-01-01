@@ -3060,7 +3060,7 @@ export default function CrmProposalBuilder() {
                     Proposal Cart ({cartItemCount} packages)
                   </SheetTitle>
                 </SheetHeader>
-                <ScrollArea className="h-[calc(100vh-280px)] mt-4">
+                <ScrollArea className="h-[calc(100vh-380px)] mt-4 pr-2">
                   {cart.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
