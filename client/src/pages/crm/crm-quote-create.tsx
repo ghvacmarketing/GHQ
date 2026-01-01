@@ -58,7 +58,7 @@ const QUOTE_TYPES = [
   },
   {
     value: "worksheet",
-    label: "Install Pricing Worksheet (Manual)",
+    label: "Custom Pricing",
     description: "Calculate install pricing with labor, materials, and margins",
     icon: Calculator,
   },

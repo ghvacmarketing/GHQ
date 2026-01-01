@@ -230,7 +230,7 @@ export default function CrmInstallWorksheet() {
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">
-                Install Pricing Worksheet
+                Custom Pricing
               </h1>
               <p className="text-slate-500 text-sm mt-1">
                 Calculate install pricing with labor, materials, and margins
