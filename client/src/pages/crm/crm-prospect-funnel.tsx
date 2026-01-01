@@ -947,44 +947,31 @@ export default function CrmProspectFunnel() {
                         {isActive && (
                           <>
                             <Button 
-                              size="sm" 
+                              size="icon" 
                               variant="outline" 
-                              className="h-8 px-3 touch-manipulation border-green-200 bg-green-50 hover:bg-green-100 text-green-700" 
+                              className="h-8 w-8 touch-manipulation border-green-200 bg-green-50 hover:bg-green-100" 
                               onClick={() => {
                                 setConfirmProspectId(prospect.id);
                                 setWonConfirmOpen(true);
                               }}
+                              title="Mark Won"
                               data-testid={`button-mark-won-${prospect.id}`}
                             >
-                              <CheckCircle2 className="h-4 w-4 mr-1" />
-                              Won
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
                             </Button>
                             <Button 
-                              size="sm" 
+                              size="icon" 
                               variant="outline" 
-                              className="h-8 px-3 touch-manipulation border-red-200 bg-red-50 hover:bg-red-100 text-red-700" 
+                              className="h-8 w-8 touch-manipulation border-red-200 bg-red-50 hover:bg-red-100" 
                               onClick={() => {
                                 setConfirmProspectId(prospect.id);
                                 setLostConfirmOpen(true);
                               }}
+                              title="Mark Lost"
                               data-testid={`button-mark-lost-${prospect.id}`}
                             >
-                              <X className="h-4 w-4 mr-1" />
-                              Lost
+                              <X className="h-4 w-4 text-red-600" />
                             </Button>
-                            {nextStage && nextStage !== "won" && (
-                              <Button 
-                                size="sm" 
-                                variant="default" 
-                                className="h-8 text-xs" 
-                                onClick={() => handleMoveToNextStage(prospect)}
-                                disabled={updateStageMutation.isPending}
-                                data-testid={`button-next-stage-${prospect.id}`}
-                              >
-                                <ChevronRight className="h-3 w-3 mr-1" />
-                                Next Stage
-                              </Button>
-                            )}
                           </>
                         )}
                         <Button 
