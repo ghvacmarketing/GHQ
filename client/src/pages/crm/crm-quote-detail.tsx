@@ -39,7 +39,7 @@ import {
   User,
   Calendar,
   DollarSign,
-  Download,
+  Printer,
   Eye,
   X,
   Trash2,
@@ -822,47 +822,43 @@ export default function CrmQuoteDetail() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-6 max-w-4xl mx-auto pb-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        {/* Header - Two rows for cleaner layout */}
+        <div className="space-y-4">
+          {/* First row: Back button, Quote number, Title, Status */}
+          <div className="flex items-center gap-3">
             <Link href="/crm/quotes">
-              <Button variant="ghost" size="sm" data-testid="button-back">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900" data-testid="text-quote-number">
-                {quote.quoteNumber}
-              </h1>
-              <p className="text-sm text-slate-500">{quote.title}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={() => setShowPreview(true)}
-              variant="outline"
-              size="sm"
-              className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
-              data-testid="button-preview"
-            >
-              <Eye className="h-4 w-4 mr-1" />
-              Preview
-            </Button>
+            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-quote-number">
+              {quote.quoteNumber}
+            </h1>
             <Badge variant="outline" className={statusColors[status] || "bg-slate-100"}>
               {statusLabels[status] || status}
             </Badge>
           </div>
-        </div>
-
-        <Card className="bg-gradient-to-br from-[#d3b07d]/10 to-amber-50 border-[#d3b07d]/30">
-          <CardHeader>
-            <CardTitle className="text-lg text-amber-900">Quote Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3">
+          
+          {/* Second row: Title/Date and Actions */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-500" data-testid="text-quote-title">
+              {quote.title || "Quote"} • Created {quote.createdAt ? format(new Date(quote.createdAt), "MMM d, yyyy") : "—"}
+            </p>
+            
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setShowPreview(true)}
+                variant="outline"
+                size="sm"
+                data-testid="button-preview"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Preview
+              </Button>
               <Button
                 onClick={handleSend}
-                className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
+                variant="outline"
+                size="sm"
                 disabled={sendMutation.isPending}
                 data-testid="button-send"
               >
@@ -876,21 +872,19 @@ export default function CrmQuoteDetail() {
               <Button
                 onClick={handleDownloadPDF}
                 variant="outline"
-                className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                size="sm"
                 data-testid="button-download-pdf"
               >
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
+                <Printer className="h-4 w-4 mr-2" />
+                Print PDF
               </Button>
-              
-              <Separator orientation="vertical" className="h-10 mx-2" />
-              
-              {status === "draft" || status === "sent" ? (
+              {(status === "draft" || status === "sent") && (
                 <>
                   <Button
                     onClick={handleApprove}
                     variant="outline"
-                    className="border-green-500 text-green-600 hover:bg-green-50"
+                    size="sm"
+                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
                     disabled={acceptMutation.isPending}
                     data-testid="button-approve"
                   >
@@ -900,7 +894,8 @@ export default function CrmQuoteDetail() {
                   <Button
                     onClick={handleDecline}
                     variant="outline"
-                    className="border-red-500 text-red-600 hover:bg-red-50"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     disabled={declineMutation.isPending}
                     data-testid="button-decline"
                   >
@@ -908,12 +903,13 @@ export default function CrmQuoteDetail() {
                     Decline
                   </Button>
                 </>
-              ) : null}
-              
+              )}
               {status === "accepted" && (
                 <Button
                   onClick={handleCreateInvoice}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  variant="outline"
+                  size="sm"
+                  className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
                   disabled={createInvoiceMutation.isPending}
                   data-testid="button-create-invoice"
                 >
@@ -925,13 +921,11 @@ export default function CrmQuoteDetail() {
                   Create Invoice
                 </Button>
               )}
-              
-              <Separator orientation="vertical" className="h-10 mx-2" />
-              
               <Button
                 onClick={handleDelete}
                 variant="outline"
-                className="border-red-600 text-red-600 hover:bg-red-50"
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
                 disabled={deleteMutation.isPending}
                 data-testid="button-delete"
               >
@@ -943,8 +937,8 @@ export default function CrmQuoteDetail() {
                 Delete
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-6">
           <Card>
