@@ -14,6 +14,20 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useDroppable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -56,11 +70,17 @@ import {
   X,
   Filter,
   ChevronRight,
+  ChevronLeft,
   CheckCircle2,
   MessageSquare,
   StickyNote,
+  GripVertical,
+  List,
+  LayoutGrid,
+  CalendarDays,
+  DollarSign,
 } from "lucide-react";
-import { format, isToday, isPast, parseISO } from "date-fns";
+import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType } from "@shared/schema";
 
 type ProspectMetrics = {
@@ -163,6 +183,114 @@ function FollowUpTypeIcon({ type }: { type: FollowUpType }) {
   }
 }
 
+function KanbanColumn({ 
+  stage, 
+  prospects, 
+  children,
+  headerColor,
+  bgColor 
+}: { 
+  stage: SalesStage; 
+  prospects: CrmCustomer[]; 
+  children: React.ReactNode;
+  headerColor: string;
+  bgColor: string;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: stage,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`w-72 flex-shrink-0 rounded-lg border ${bgColor} p-2 ${isOver ? "ring-2 ring-[#711419] ring-inset" : ""}`}
+      data-testid={`kanban-column-${stage}`}
+    >
+      <div className={`flex items-center justify-between mb-3 px-2 py-1.5 rounded ${headerColor}`}>
+        <h3 className="font-semibold text-sm">{STAGE_LABELS[stage]}</h3>
+        <Badge variant="secondary" className="text-xs">{prospects.length}</Badge>
+      </div>
+      <SortableContext items={prospects.map(p => p.id)} strategy={verticalListSortingStrategy}>
+        <div className="space-y-2 min-h-[100px]">
+          {children}
+        </div>
+      </SortableContext>
+    </div>
+  );
+}
+
+function KanbanCard({ prospect, onCardClick }: { prospect: CrmCustomer; onCardClick: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: prospect.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const nextFollowUp = prospect.nextFollowUpAt
+    ? typeof prospect.nextFollowUpAt === "string"
+      ? parseISO(prospect.nextFollowUpAt)
+      : prospect.nextFollowUpAt
+    : null;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      className="bg-white rounded-lg border shadow-sm p-3 cursor-grab active:cursor-grabbing"
+      data-testid={`kanban-card-${prospect.id}`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <button
+          onClick={onCardClick}
+          className="font-medium text-sm text-left hover:text-[#711419] truncate flex-1"
+          data-testid={`kanban-card-name-${prospect.id}`}
+        >
+          {prospect.name}
+        </button>
+        <div {...listeners} className="cursor-grab p-1 hover:bg-gray-100 rounded" data-testid={`kanban-card-drag-${prospect.id}`}>
+          <GripVertical className="h-4 w-4 text-gray-400" />
+        </div>
+      </div>
+      
+      <div className="space-y-1.5">
+        <InterestBadge level={prospect.interestLevel as InterestLevel} />
+        
+        {prospect.phone && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Phone className="h-3 w-3" />
+            <span>{prospect.phone}</span>
+          </div>
+        )}
+        
+        {nextFollowUp && (
+          <div className={`flex items-center gap-1 text-xs ${
+            isPast(nextFollowUp) && !isToday(nextFollowUp) 
+              ? "text-red-600 font-medium" 
+              : isToday(nextFollowUp) 
+              ? "text-amber-600 font-medium"
+              : "text-muted-foreground"
+          }`}>
+            <Calendar className="h-3 w-3" />
+            <span>{format(nextFollowUp, "MMM d")}</span>
+          </div>
+        )}
+        
+        {prospect.estimatedValue && Number(prospect.estimatedValue) > 0 && (
+          <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
+            <DollarSign className="h-3 w-3" />
+            <span>${Number(prospect.estimatedValue).toLocaleString()}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function CrmProspectFunnel() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -183,6 +311,10 @@ export default function CrmProspectFunnel() {
   const [wonConfirmOpen, setWonConfirmOpen] = useState(false);
   const [lostConfirmOpen, setLostConfirmOpen] = useState(false);
   const [confirmProspectId, setConfirmProspectId] = useState<string | null>(null);
+  
+  const [mainViewTab, setMainViewTab] = useState<string>("list");
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  const [draggedProspect, setDraggedProspect] = useState<CrmCustomer | null>(null);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -379,6 +511,86 @@ export default function CrmProspectFunnel() {
   const selectedEmployeeName = selectedEmployeeId === "all" 
     ? null 
     : SALES_PEOPLE[selectedEmployeeId] || "Unknown";
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(KeyboardSensor)
+  );
+
+  const KANBAN_STAGES: SalesStage[] = ["new", "contacted", "quote_sent", "negotiating", "won", "lost"];
+
+  const getProspectsByStage = (stage: SalesStage) => {
+    return filteredProspects.filter((p) => p.salesStage === stage);
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const prospect = filteredProspects.find((p) => p.id === active.id);
+    if (prospect) {
+      setDraggedProspect(prospect);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setDraggedProspect(null);
+
+    if (!over) return;
+
+    const prospectId = active.id as string;
+    const overId = over.id as string;
+    
+    const prospect = filteredProspects.find((p) => p.id === prospectId);
+    if (!prospect) return;
+
+    let newStage: SalesStage | null = null;
+    
+    if (KANBAN_STAGES.includes(overId as SalesStage)) {
+      newStage = overId as SalesStage;
+    } else {
+      const overProspect = filteredProspects.find((p) => p.id === overId);
+      if (overProspect && overProspect.salesStage) {
+        newStage = overProspect.salesStage;
+      }
+    }
+
+    if (!newStage || prospect.salesStage === newStage) return;
+
+    if (newStage === "won") {
+      setConfirmProspectId(prospectId);
+      setWonConfirmOpen(true);
+    } else if (newStage === "lost") {
+      setConfirmProspectId(prospectId);
+      setLostConfirmOpen(true);
+    } else {
+      updateStageMutation.mutate({ id: prospectId, salesStage: newStage });
+    }
+  };
+
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(calendarMonth);
+    const monthEnd = endOfMonth(calendarMonth);
+    const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  }, [calendarMonth]);
+
+  const filteredProspectIds = useMemo(() => {
+    return new Set(filteredProspects.map((p) => p.id));
+  }, [filteredProspects]);
+
+  const getFollowUpsForDate = (date: Date) => {
+    return followUps.filter((f) => {
+      if (!filteredProspectIds.has(f.customerId)) return false;
+      const followUpDate = typeof f.dueAt === "string" ? parseISO(f.dueAt) : f.dueAt;
+      return isSameDay(followUpDate, date);
+    }).map((f) => {
+      const prospect = filteredProspects.find((p) => p.id === f.customerId);
+      return { ...f, prospect };
+    });
+  };
 
   if (authLoading) {
     return (
@@ -624,7 +836,24 @@ export default function CrmProspectFunnel() {
           </div>
         </div>
 
-        {isLoading ? (
+        <Tabs value={mainViewTab} onValueChange={setMainViewTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-4" data-testid="tabs-main-view">
+            <TabsTrigger value="list" className="flex items-center gap-2" data-testid="tab-list">
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">List</span>
+            </TabsTrigger>
+            <TabsTrigger value="kanban" className="flex items-center gap-2" data-testid="tab-kanban">
+              <LayoutGrid className="h-4 w-4" />
+              <span className="hidden sm:inline">Kanban</span>
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="flex items-center gap-2" data-testid="tab-calendar">
+              <CalendarDays className="h-4 w-4" />
+              <span className="hidden sm:inline">Calendar</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="list">
+            {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} className="h-32 w-full" />
@@ -790,6 +1019,170 @@ export default function CrmProspectFunnel() {
             })}
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="kanban">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="overflow-x-auto pb-4" data-testid="kanban-board">
+                <div className="flex gap-4 min-w-max">
+                  {KANBAN_STAGES.map((stage) => {
+                    const stageProspects = getProspectsByStage(stage);
+                    const stageColors: Record<SalesStage, string> = {
+                      new: "bg-blue-50 border-blue-200",
+                      contacted: "bg-amber-50 border-amber-200",
+                      quote_sent: "bg-purple-50 border-purple-200",
+                      negotiating: "bg-green-50 border-green-200",
+                      won: "bg-emerald-50 border-emerald-300",
+                      lost: "bg-red-50 border-red-200",
+                    };
+                    const headerColors: Record<SalesStage, string> = {
+                      new: "bg-blue-100 text-blue-800",
+                      contacted: "bg-amber-100 text-amber-800",
+                      quote_sent: "bg-purple-100 text-purple-800",
+                      negotiating: "bg-green-100 text-green-800",
+                      won: "bg-emerald-100 text-emerald-800",
+                      lost: "bg-red-100 text-red-800",
+                    };
+                    return (
+                      <KanbanColumn
+                        key={stage}
+                        stage={stage}
+                        prospects={stageProspects}
+                        headerColor={headerColors[stage]}
+                        bgColor={stageColors[stage]}
+                      >
+                        {stageProspects.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground text-sm" data-testid={`kanban-empty-${stage}`}>
+                            No prospects
+                          </div>
+                        ) : (
+                          stageProspects.map((prospect) => (
+                            <KanbanCard
+                              key={prospect.id}
+                              prospect={prospect}
+                              onCardClick={() => {
+                                setExpandedProspectId(prospect.id);
+                                setActiveTab("details");
+                              }}
+                            />
+                          ))
+                        )}
+                      </KanbanColumn>
+                    );
+                  })}
+                </div>
+              </div>
+              <DragOverlay>
+                {draggedProspect && (
+                  <div className="bg-white rounded-lg border shadow-lg p-3 w-72 opacity-90">
+                    <div className="font-medium text-sm truncate">{draggedProspect.name}</div>
+                    <InterestBadge level={draggedProspect.interestLevel as InterestLevel} />
+                  </div>
+                )}
+              </DragOverlay>
+            </DndContext>
+          </TabsContent>
+
+          <TabsContent value="calendar">
+            <div className="space-y-4" data-testid="calendar-view">
+              <div className="flex items-center justify-between">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}
+                  data-testid="button-prev-month"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <h3 className="text-lg font-semibold" data-testid="text-calendar-month">
+                  {format(calendarMonth, "MMMM yyyy")}
+                </h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}
+                  data-testid="button-next-month"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                  <div key={day} className="bg-gray-100 text-center py-2 text-xs font-medium text-gray-600">
+                    {day}
+                  </div>
+                ))}
+                {calendarDays.map((day, idx) => {
+                  const dayFollowUps = getFollowUpsForDate(day);
+                  const isCurrentMonth = isSameMonth(day, calendarMonth);
+                  const isTodayDate = isToday(day);
+                  const isPastDate = isPast(day) && !isTodayDate;
+                  
+                  return (
+                    <div
+                      key={idx}
+                      className={`min-h-[100px] bg-white p-1 ${
+                        !isCurrentMonth ? "bg-gray-50 text-gray-400" : ""
+                      } ${isTodayDate ? "ring-2 ring-amber-400 ring-inset" : ""}`}
+                      data-testid={`calendar-day-${format(day, "yyyy-MM-dd")}`}
+                    >
+                      <div className={`text-xs font-medium mb-1 ${
+                        isTodayDate ? "text-amber-600" : isPastDate ? "text-gray-400" : "text-gray-700"
+                      }`}>
+                        {format(day, "d")}
+                      </div>
+                      <div className="space-y-1">
+                        {dayFollowUps.slice(0, 3).map((followUp) => {
+                          const followUpDate = typeof followUp.dueAt === "string" ? parseISO(followUp.dueAt) : followUp.dueAt;
+                          const isOverdue = isPast(followUpDate) && !isToday(followUpDate) && !followUp.completedAt;
+                          
+                          return (
+                            <button
+                              key={followUp.id}
+                              onClick={() => {
+                                if (followUp.prospect) {
+                                  setExpandedProspectId(followUp.prospect.id);
+                                  setActiveTab("followups");
+                                }
+                              }}
+                              className={`w-full text-left text-xs p-1 rounded truncate cursor-pointer hover:opacity-80 ${
+                                isOverdue
+                                  ? "bg-red-100 text-red-700"
+                                  : isTodayDate
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-gray-100 text-gray-700"
+                              }`}
+                              data-testid={`calendar-followup-${followUp.id}`}
+                            >
+                              <div className="flex items-center gap-1">
+                                <FollowUpTypeIcon type={followUp.followUpType as FollowUpType} />
+                                <span className="truncate">{followUp.prospect?.name || "Unknown"}</span>
+                              </div>
+                              {followUp.notes && (
+                                <div className="truncate text-[10px] opacity-75">{followUp.notes}</div>
+                              )}
+                            </button>
+                          );
+                        })}
+                        {dayFollowUps.length > 3 && (
+                          <div className="text-[10px] text-muted-foreground text-center">
+                            +{dayFollowUps.length - 3} more
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
 
         <Sheet open={!!expandedProspectId} onOpenChange={(open) => !open && setExpandedProspectId(null)}>
           <SheetContent side="bottom" className="h-[95vh] p-0 flex flex-col">
