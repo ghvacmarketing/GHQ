@@ -10496,7 +10496,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           contact_id as "contactId", created_by_id as "createdById",
           assigned_to_id as "assignedToId", internal_notes as "internalNotes",
           customer_notes as "customerNotes", property_id as "propertyId",
-          accepted_by as "acceptedBy", decline_reason as "declineReason", created_by as "createdBy"
+          accepted_by as "acceptedBy", decline_reason as "declineReason", created_by as "createdBy",
+          ai_generated_quote as "aiGeneratedQuote", quote_mode as "quoteMode"
         FROM crm_quotes 
         WHERE id = ${req.params.id}
         LIMIT 1
