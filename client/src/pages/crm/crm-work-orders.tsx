@@ -851,8 +851,8 @@ export default function CrmWorkOrders() {
             </CardContent>
           </Card>
         ) : activeTab === "unassigned" && categorizedUnassigned ? (
-          <div className="overflow-x-auto pb-4">
-            <div className="flex gap-4 min-w-max">
+          <div className="w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {(Object.keys(unassignedCategoryConfig) as UnassignedCategory[]).map((category) => {
                 const config = unassignedCategoryConfig[category];
                 const categoryOrders = categorizedUnassigned[category];
@@ -860,7 +860,7 @@ export default function CrmWorkOrders() {
                 return (
                   <div 
                     key={category} 
-                    className="w-72 flex-shrink-0 bg-slate-100 rounded-lg border border-slate-200"
+                    className="bg-slate-100 rounded-lg border border-slate-200"
                     data-testid={`kanban-column-${category}`}
                   >
                     <div className="p-3 border-b border-slate-200 bg-slate-50 rounded-t-lg">
