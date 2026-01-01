@@ -1584,6 +1584,7 @@ export default function CrmDispatch() {
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebounce(searchInput, 300);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeFromQueue, setActiveFromQueue] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [localWorkOrders, setLocalWorkOrders] = useState<DispatchWorkOrder[]>([]);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
@@ -2046,7 +2047,9 @@ export default function CrmDispatch() {
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const id = event.active.id as string;
-    if (id.startsWith('queue-')) {
+    const isFromQueue = id.startsWith('queue-');
+    setActiveFromQueue(isFromQueue);
+    if (isFromQueue) {
       setActiveId(id.replace('queue-', ''));
     } else if (id.startsWith('schedule-')) {
       setActiveId(id.replace('schedule-', ''));
@@ -2066,6 +2069,7 @@ export default function CrmDispatch() {
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over, delta } = event;
     setActiveId(null);
+    setActiveFromQueue(false);
     
     if (!over) return;
     
@@ -2543,9 +2547,9 @@ export default function CrmDispatch() {
             </div>
           </div>
           
-          {/* Drag Overlay - shows a preview of the dragging card */}
+          {/* Drag Overlay - only shows when dragging from queue */}
           <DragOverlay dropAnimation={null}>
-            {activeId ? (
+            {activeId && activeFromQueue ? (
               (() => {
                 const draggingWo = localWorkOrders.find(w => w.id === activeId);
                 if (!draggingWo) return null;
