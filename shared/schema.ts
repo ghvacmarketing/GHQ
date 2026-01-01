@@ -807,6 +807,22 @@ export type CrmCustomerType = typeof crmCustomerTypeEnum[number];
 export const crmCustomerStatusEnum = ["prospect", "client"] as const;
 export type CrmCustomerStatus = typeof crmCustomerStatusEnum[number];
 
+// Sales Stage Enum for prospect funnel
+export const salesStageEnum = ["new", "contacted", "quote_sent", "negotiating", "won", "lost"] as const;
+export type SalesStage = typeof salesStageEnum[number];
+
+// Interest Level Enum
+export const interestLevelEnum = ["hot", "warm", "cold"] as const;
+export type InterestLevel = typeof interestLevelEnum[number];
+
+// Follow-up Type Enum
+export const followUpTypeEnum = ["call", "email", "visit", "text"] as const;
+export type FollowUpType = typeof followUpTypeEnum[number];
+
+// Follow-up Outcome Enum
+export const followUpOutcomeEnum = ["interested", "not_ready", "declined", "no_answer", "left_message", "scheduled", "other"] as const;
+export type FollowUpOutcome = typeof followUpOutcomeEnum[number];
+
 // CRM Customers
 export const crmCustomers = pgTable("crm_customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -822,6 +838,12 @@ export const crmCustomers = pgTable("crm_customers", {
   notes: text("notes"),
   sourceSystem: text("source_system"),
   sourceId: text("source_id"),
+  // Prospect funnel fields
+  salesStage: text("sales_stage").$type<SalesStage>(),
+  interestLevel: text("interest_level").$type<InterestLevel>(),
+  assignedSalesRepId: varchar("assigned_sales_rep_id"),
+  nextFollowUpAt: timestamp("next_follow_up_at"),
+  convertedAt: timestamp("converted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -851,6 +873,20 @@ export const crmProperties = pgTable("crm_properties", {
   paymentTerms: text("payment_terms"), // e.g., "net_30", "due_on_receipt", "net_15"
   paymentMethod: text("payment_method"), // e.g., "invoice", "credit_card", "check"
   approvalRule: text("approval_rule"), // e.g., "pm_approval_required", "tenant_direct", "auto_approve"
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// CRM Follow-Ups (scheduled follow-ups for prospects)
+export const crmFollowUps = pgTable("crm_follow_ups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => crmCustomers.id, { onDelete: "cascade" }),
+  followUpType: text("follow_up_type").$type<FollowUpType>().notNull().default("call"),
+  dueAt: timestamp("due_at").notNull(),
+  completedAt: timestamp("completed_at"),
+  outcome: text("outcome").$type<FollowUpOutcome>(),
+  notes: text("notes"),
+  assignedUserId: varchar("assigned_user_id").references(() => crmUsers.id),
+  createdBy: varchar("created_by").references(() => crmUsers.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1623,6 +1659,11 @@ export const insertCrmQuoteSchema = createInsertSchema(crmQuotes).omit({
   updatedAt: true,
 });
 
+export const insertCrmFollowUpSchema = createInsertSchema(crmFollowUps).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertCrmQuoteLineItemSchema = createInsertSchema(crmQuoteLineItems).omit({
   id: true,
   createdAt: true,
@@ -1661,6 +1702,8 @@ export type InsertCrmQuote = z.infer<typeof insertCrmQuoteSchema>;
 export type CrmQuote = typeof crmQuotes.$inferSelect;
 export type InsertCrmQuoteLineItem = z.infer<typeof insertCrmQuoteLineItemSchema>;
 export type CrmQuoteLineItem = typeof crmQuoteLineItems.$inferSelect;
+export type InsertCrmFollowUp = z.infer<typeof insertCrmFollowUpSchema>;
+export type CrmFollowUp = typeof crmFollowUps.$inferSelect;
 export type InsertCrmAgreement = z.infer<typeof insertCrmAgreementSchema>;
 export type CrmAgreement = typeof crmAgreements.$inferSelect;
 
