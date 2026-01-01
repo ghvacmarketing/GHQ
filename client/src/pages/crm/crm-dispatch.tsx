@@ -1754,6 +1754,7 @@ export default function CrmDispatch() {
   const createWorkOrderMutation = useMutation({
     mutationFn: async () => {
       if (!selectedCustomer) throw new Error("Customer is required");
+      if (!selectedPropertyId) throw new Error("Property is required");
       if (!woTitle.trim()) throw new Error("Title is required");
       if (!woDescription.trim()) throw new Error("Description is required");
       if (!scheduledDate) throw new Error("Scheduled date is required");
@@ -2749,20 +2750,23 @@ export default function CrmDispatch() {
               </Popover>
             </div>
 
-            {selectedCustomer && properties.length > 0 && (
+            {selectedCustomer && (
               <div className="space-y-2">
-                <Label>Property (Optional)</Label>
-                <Select value={selectedPropertyId || "none"} onValueChange={(v) => setSelectedPropertyId(v === "none" ? "" : v)}>
+                <Label>Property *</Label>
+                <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select property..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No specific property</SelectItem>
-                    {properties.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.address1} {p.city && `, ${p.city}`}
-                      </SelectItem>
-                    ))}
+                    {properties.length > 0 ? (
+                      properties.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.address1} {p.city && `, ${p.city}`}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-slate-500">No properties found for this customer</div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -2928,7 +2932,7 @@ export default function CrmDispatch() {
             </Button>
             <Button 
               onClick={() => createWorkOrderMutation.mutate()}
-              disabled={!selectedCustomer || !woTitle.trim() || !woDescription.trim() || createWorkOrderMutation.isPending}
+              disabled={!selectedCustomer || !selectedPropertyId || !woTitle.trim() || !woDescription.trim() || createWorkOrderMutation.isPending}
               className="bg-[#711419] hover:bg-[#5a1014]"
             >
               {createWorkOrderMutation.isPending ? (
