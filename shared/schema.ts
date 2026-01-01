@@ -1059,6 +1059,7 @@ export const crmQuotes = pgTable("crm_quotes", {
     next_steps?: string[];
   }>(),
   quoteMode: text("quote_mode").$type<"single" | "options">(),
+  selectedOption: text("selected_option"),
 });
 
 // CRM Quote Line Items
@@ -1076,6 +1077,7 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   itemId: varchar("item_id").references(() => crmItems.id, { onDelete: "set null" }),
   isDiscountLine: boolean("is_discount_line").default(false),
   discountKind: text("discount_kind").$type<DiscountKind>(),
+  optionTag: text("option_tag"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
