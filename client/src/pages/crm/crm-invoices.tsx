@@ -63,8 +63,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 type InvoiceWithRelations = CrmInvoice & {
-  customer: CrmCustomer | null;
-  job: CrmJob | null;
+  customer?: CrmCustomer | null;
+  customerName?: string | null;
+  job?: CrmJob | null;
 };
 
 type InvoiceDetailWithItems = CrmInvoice & {
@@ -240,7 +241,7 @@ export default function CrmInvoices() {
     if (debouncedSearch) {
       const searchLower = debouncedSearch.toLowerCase();
       filtered = filtered.filter((inv) => {
-        const customerName = inv.customer?.name?.toLowerCase() || "";
+        const customerName = inv.customerName?.toLowerCase() || "";
         const invoiceNumber = inv.invoiceNumber?.toLowerCase() || "";
         return customerName.includes(searchLower) || invoiceNumber.includes(searchLower);
       });
@@ -677,7 +678,7 @@ export default function CrmInvoices() {
                         {invoice.invoiceNumber}
                       </TableCell>
                       <TableCell className="text-slate-600">
-                        {invoice.customer?.name || "—"}
+                        {invoice.customerName || "—"}
                       </TableCell>
                       <TableCell className="text-slate-600">
                         {formatDate(invoice.createdAt)}
