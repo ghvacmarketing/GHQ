@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -119,6 +120,13 @@ interface FormData {
   billingState: string;
   billingZip: string;
   w9OnFile: boolean;
+  isProspect: boolean;
+  salesStage: string;
+  interestLevel: string;
+  scheduleFollowUp: boolean;
+  followUpType: string;
+  followUpDate: Date | null;
+  followUpNotes: string;
 }
 
 const initialFormData: FormData = {
@@ -168,6 +176,13 @@ const initialFormData: FormData = {
   billingState: "",
   billingZip: "",
   w9OnFile: false,
+  isProspect: true,
+  salesStage: "new",
+  interestLevel: "",
+  scheduleFollowUp: false,
+  followUpType: "call",
+  followUpDate: null,
+  followUpNotes: "",
 };
 
 export default function CrmAccountCreate() {
@@ -262,6 +277,10 @@ export default function CrmAccountCreate() {
           fullAddress: fullAddress,
           leadSource: formData.leadSource || null,
           notes: formData.pinnedNote || null,
+          ...(formData.isProspect && {
+            salesStage: formData.salesStage,
+            interestLevel: formData.interestLevel || null,
+          }),
         },
         property: shouldCreateProperty ? {
           address1: formData.address1,
@@ -274,7 +293,18 @@ export default function CrmAccountCreate() {
       };
 
       const res = await apiRequest("POST", "/api/crm/customers/create-with-property", payload);
-      return res.json();
+      const data = await res.json();
+
+      if (formData.scheduleFollowUp && formData.followUpDate && data?.customer?.id) {
+        await apiRequest("POST", "/api/crm/follow-ups", {
+          customerId: data.customer.id,
+          followUpType: formData.followUpType,
+          dueAt: formData.followUpDate.toISOString(),
+          notes: formData.followUpNotes || "Initial follow-up",
+        });
+      }
+
+      return data;
     },
     onSuccess: (data) => {
       toast({ title: "Customer created successfully" });
@@ -335,11 +365,15 @@ export default function CrmAccountCreate() {
         if (!formData.zip.trim()) errors.push("ZIP code is required");
         break;
       case 4:
+        if (formData.scheduleFollowUp && !formData.followUpDate) {
+          errors.push("Follow-up date is required when scheduling a follow-up");
+        }
         break;
       case 5:
         const step2Check = checkValidation(2);
         const step3Check = checkValidation(3);
-        errors.push(...step2Check.errors, ...step3Check.errors);
+        const step4Check = checkValidation(4);
+        errors.push(...step2Check.errors, ...step3Check.errors, ...step4Check.errors);
         break;
     }
 
@@ -1069,6 +1103,158 @@ export default function CrmAccountCreate() {
                     </div>
                   </div>
                 )}
+
+                <Separator className="my-6" />
+
+                <Collapsible defaultOpen>
+                  <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 py-2">
+                    <ChevronRight className="h-4 w-4 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
+                    Prospect & Sales Funnel
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="isProspect" className="text-sm font-medium">Track in Sales Funnel</Label>
+                        <p className="text-xs text-slate-500 mt-1">Enable to track this customer through the sales pipeline</p>
+                      </div>
+                      <Switch
+                        id="isProspect"
+                        checked={formData.isProspect}
+                        onCheckedChange={(checked) => updateField("isProspect", checked)}
+                        data-testid="switch-is-prospect"
+                      />
+                    </div>
+
+                    {formData.isProspect && (
+                      <div className="space-y-4 pl-4 border-l-2 border-slate-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Sales Stage</Label>
+                            <Select
+                              value={formData.salesStage}
+                              onValueChange={(val) => updateField("salesStage", val)}
+                            >
+                              <SelectTrigger data-testid="select-sales-stage">
+                                <SelectValue placeholder="Select stage" />
+                              </SelectTrigger>
+                              <SelectContent position="popper" sideOffset={4}>
+                                <SelectItem value="new">New</SelectItem>
+                                <SelectItem value="contacted">Contacted</SelectItem>
+                                <SelectItem value="quote_sent">Quote Sent</SelectItem>
+                                <SelectItem value="negotiating">Negotiating</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Interest Level</Label>
+                            <Select
+                              value={formData.interestLevel}
+                              onValueChange={(val) => updateField("interestLevel", val)}
+                            >
+                              <SelectTrigger data-testid="select-interest-level">
+                                <SelectValue placeholder="Select interest" />
+                              </SelectTrigger>
+                              <SelectContent position="popper" sideOffset={4}>
+                                <SelectItem value="hot">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="destructive" className="text-xs">Hot</Badge>
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="warm">
+                                  <div className="flex items-center gap-2">
+                                    <Badge className="bg-yellow-500 hover:bg-yellow-600 text-xs">Warm</Badge>
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="cold">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">Cold</Badge>
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label htmlFor="scheduleFollowUp" className="text-sm font-medium">Schedule Initial Follow-up</Label>
+                            <p className="text-xs text-slate-500 mt-1">Set a reminder to follow up with this prospect</p>
+                          </div>
+                          <Switch
+                            id="scheduleFollowUp"
+                            checked={formData.scheduleFollowUp}
+                            onCheckedChange={(checked) => updateField("scheduleFollowUp", checked)}
+                            data-testid="switch-schedule-followup"
+                          />
+                        </div>
+
+                        {formData.scheduleFollowUp && (
+                          <div className="space-y-4 pl-4 border-l-2 border-amber-200 bg-amber-50/50 p-3 rounded-r-md">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Follow-up Type</Label>
+                                <Select
+                                  value={formData.followUpType}
+                                  onValueChange={(val) => updateField("followUpType", val)}
+                                >
+                                  <SelectTrigger data-testid="select-followup-type">
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                  <SelectContent position="popper" sideOffset={4}>
+                                    <SelectItem value="call">Phone Call</SelectItem>
+                                    <SelectItem value="email">Email</SelectItem>
+                                    <SelectItem value="visit">Site Visit</SelectItem>
+                                    <SelectItem value="text">Text Message</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Follow-up Date *</Label>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className={cn(
+                                        "w-full justify-start text-left font-normal",
+                                        !formData.followUpDate && "text-muted-foreground"
+                                      )}
+                                      data-testid="button-followup-date"
+                                    >
+                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      {formData.followUpDate ? format(formData.followUpDate, "PPP") : "Pick a date"}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={formData.followUpDate || undefined}
+                                      onSelect={(date) => updateField("followUpDate", date || null)}
+                                      disabled={(date) => date < new Date()}
+                                      initialFocus
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="followUpNotes">Follow-up Notes</Label>
+                              <Textarea
+                                id="followUpNotes"
+                                placeholder="Notes for the follow-up..."
+                                value={formData.followUpNotes}
+                                onChange={(e) => updateField("followUpNotes", e.target.value)}
+                                rows={2}
+                                data-testid="textarea-followup-notes"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
             )}
 

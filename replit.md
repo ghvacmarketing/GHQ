@@ -31,6 +31,13 @@ Preferred communication style: Simple, everyday language.
 - **PDF Management**: Secure storage and viewing of Price Book PDFs in PostgreSQL.
 - **Announcement System**: Admin-configurable modal for user notifications with Markdown support.
 - **Sales Prospects**: CRM pipeline with lead management, notes, tasks, CSV import/export, phone/email validation, Geoapify address autocomplete, and HTML5 geolocation.
+- **Prospect Sales Funnel**: Kanban-style sales pipeline for tracking prospects through stages (New → Contacted → Quote Sent → Negotiating → Won/Lost). Features:
+  - `crmFollowUps` table for scheduling and tracking follow-up interactions (call, email, visit, text)
+  - Customer fields: salesStage, interestLevel (hot/warm/cold), assignedSalesRepId, nextFollowUpAt, convertedAt
+  - Customer creation form includes "Track in Sales Funnel" toggle with initial stage/interest and optional follow-up scheduling
+  - Sales Funnel page (`/crm/prospect-funnel`) with Kanban columns, prospect cards showing follow-up status, overdue badges
+  - Auto-sync of customer's nextFollowUpAt to earliest pending follow-up
+  - Quick actions for stage advancement and follow-up creation
 - **Installation Pipeline**: Kanban board for tracking installation jobs, integrating with sales leads. Features drag-and-drop, optimistic updates, and mobile-first design.
 - **Projects vs Work Orders Architecture**: Separated scheduling from pipeline tracking:
   - **Projects** (`crmProjects`): Big-ticket scope containers ($5k+) with pipeline statuses (Lead → Proposal Sent → Approved → In Progress → Completed → Closed → Archived). Project types: INSTALL, DUCT, COMMERCIAL, MAINTENANCE_AGREEMENT, MAJOR_REPAIR. Can contain multiple Work Orders.
