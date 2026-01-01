@@ -43,6 +43,7 @@ import {
   Eye,
   X,
   Trash2,
+  Receipt,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -169,6 +170,36 @@ export default function CrmQuoteDetail() {
       toast({ title: "Failed to delete quote", description: error.message, variant: "destructive" });
     },
   });
+
+  const createInvoiceMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/crm/invoices/from-quote", { quoteId });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to create invoice");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      toast({ 
+        title: "Invoice created!", 
+        description: `Invoice ${data.invoice?.invoiceNumber || ''} has been created from this quote.`
+      });
+      if (data.invoice?.id) {
+        navigate(`/crm/invoices`);
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create invoice", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleCreateInvoice = () => {
+    createInvoiceMutation.mutate();
+  };
 
   const handleDelete = () => {
     setShowDeleteConfirm(true);
@@ -836,6 +867,22 @@ export default function CrmQuoteDetail() {
                   </Button>
                 </>
               ) : null}
+              
+              {status === "accepted" && quote.workOrderId && (
+                <Button
+                  onClick={handleCreateInvoice}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  disabled={createInvoiceMutation.isPending}
+                  data-testid="button-create-invoice"
+                >
+                  {createInvoiceMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Receipt className="h-4 w-4 mr-2" />
+                  )}
+                  Create Invoice
+                </Button>
+              )}
               
               <Separator orientation="vertical" className="h-10 mx-2" />
               

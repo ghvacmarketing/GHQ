@@ -9761,6 +9761,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/crm/invoices/from-quote - Create invoice from accepted quote
+  app.post("/api/crm/invoices/from-quote", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { quoteId } = req.body;
+      if (!quoteId) {
+        return res.status(400).json({ message: "quoteId is required" });
+      }
+
+      // Get the quote with line items
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, quoteId));
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      // Quote must be accepted
+      if (quote.status !== "accepted") {
+        return res.status(400).json({ message: "Only accepted quotes can be converted to invoices" });
+      }
+
+      // Quote must have a workOrderId (invoices require work orders)
+      if (!quote.workOrderId) {
+        return res.status(400).json({ message: "Quote must be linked to a work order to create an invoice" });
+      }
+
+      // Check if invoice already exists for this work order
+      const [existingInvoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.workOrderId, quote.workOrderId));
+      if (existingInvoice) {
+        return res.status(400).json({ 
+          message: "An invoice already exists for this work order",
+          existingInvoiceId: existingInvoice.id 
+        });
+      }
+
+      // Get quote line items
+      const quoteLineItems = await db.select().from(crmQuoteLineItems).where(eq(crmQuoteLineItems.quoteId, quoteId));
+
+      // Generate invoice number
+      const invoiceNumber = await generateInvoiceNumber();
+
+      // Calculate totals from line items
+      let subtotal = 0;
+      for (const item of quoteLineItems) {
+        subtotal += parseFloat(item.lineTotal || "0");
+      }
+
+      // Create the invoice (no tax - prices already include tax per business logic)
+      const invoiceData = {
+        invoiceNumber,
+        customerId: quote.customerId,
+        propertyId: quote.propertyId,
+        workOrderId: quote.workOrderId,
+        projectId: quote.projectId,
+        status: "draft" as const,
+        subtotal: String(subtotal),
+        laborTotal: "0",
+        taxTotal: "0",
+        total: String(subtotal),
+        balanceDue: String(subtotal),
+        notes: quote.notes || undefined,
+        createdBy: user.id,
+      };
+
+      const [invoice] = await db.insert(crmInvoices).values(invoiceData).returning();
+
+      // Copy line items to invoice
+      const createdLineItems: CrmInvoiceLineItem[] = [];
+      for (const quoteItem of quoteLineItems) {
+        const invoiceLineItem = {
+          invoiceId: invoice.id,
+          lineType: quoteItem.lineType,
+          description: quoteItem.description,
+          partNumber: quoteItem.partNumber,
+          quantity: quoteItem.quantity,
+          unitPrice: quoteItem.unitPrice,
+          lineTotal: quoteItem.lineTotal,
+          taxable: quoteItem.taxable,
+          sortOrder: quoteItem.sortOrder,
+          itemId: quoteItem.itemId,
+          isDiscountLine: quoteItem.isDiscountLine,
+          discountKind: quoteItem.discountKind,
+        };
+        const [createdItem] = await db.insert(crmInvoiceLineItems).values(invoiceLineItem).returning();
+        createdLineItems.push(createdItem);
+      }
+
+      // Update quote status to converted
+      await db.update(crmQuotes)
+        .set({ status: "converted", updatedAt: new Date() })
+        .where(eq(crmQuotes.id, quoteId));
+
+      // Update work order billing disposition
+      await db.update(crmWorkOrders)
+        .set({ 
+          billingDisposition: "invoice_created" as const,
+          invoiceId: invoice.id,
+          updatedAt: new Date()
+        })
+        .where(eq(crmWorkOrders.id, quote.workOrderId));
+
+      // Log audit
+      await logCrmAudit(
+        user.id,
+        "invoice.created_from_quote",
+        "invoice",
+        invoice.id,
+        { invoiceNumber, quoteId, workOrderId: quote.workOrderId, total: invoice.total },
+        req.ip
+      );
+
+      return res.status(201).json({ 
+        invoice: { ...invoice, lineItems: createdLineItems },
+        message: "Invoice created from quote successfully"
+      });
+    } catch (error) {
+      console.error("Error creating invoice from quote:", error);
+      return res.status(500).json({ message: "Failed to create invoice from quote" });
+    }
+  });
+
   // PATCH /api/crm/invoices/:id - Update invoice (only draft invoices can be edited)
   app.patch("/api/crm/invoices/:id", requireCrmSalesOrAbove, async (req, res) => {
     try {
@@ -9971,15 +10095,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const totalAmount = parseFloat(invoice.total || "0");
+      const previouslyPaid = parseFloat(invoice.amountPaid || "0");
       const paidAmount = parseFloat(amountPaid);
-      const balanceDue = Math.max(0, totalAmount - paidAmount);
+      const totalPaid = previouslyPaid + paidAmount;
+      const balanceDue = Math.max(0, totalAmount - totalPaid);
+      
+      // Determine status based on whether balance is fully paid
+      // If fully paid, set to "paid"; if partial payment made, set to "partial"
+      const newStatus = balanceDue <= 0.01 ? "paid" as const : "partial" as const;
       
       const [updatedInvoice] = await db.update(crmInvoices)
         .set({ 
-          status: "paid" as const,
-          amountPaid: amountPaid.toString(),
-          balanceDue: balanceDue.toString(),
-          paidAt: new Date(),
+          status: newStatus,
+          amountPaid: totalPaid.toFixed(2),
+          balanceDue: balanceDue.toFixed(2),
+          paidAt: balanceDue <= 0.01 ? new Date() : null,
           paymentMethod: paymentMethod || null,
           paymentReference: paymentReference || null,
           updatedAt: new Date()
@@ -9989,10 +10119,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await logCrmAudit(
         user.id,
-        "invoice.paid",
+        balanceDue <= 0.01 ? "invoice.paid" : "invoice.payment",
         "invoice",
         req.params.id,
-        { invoiceNumber: invoice.invoiceNumber, amountPaid, paymentMethod, paymentReference },
+        { invoiceNumber: invoice.invoiceNumber, amountPaid: paidAmount, totalPaid, balanceDue, paymentMethod, paymentReference },
         req.ip
       );
       
