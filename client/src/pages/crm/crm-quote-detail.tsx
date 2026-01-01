@@ -1139,7 +1139,7 @@ export default function CrmQuoteDetail() {
           {/* Second row: Title/Date and Actions */}
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-500" data-testid="text-quote-title">
-              {quote.title || "Quote"} • Created {quote.createdAt ? format(new Date(quote.createdAt), "MMM d, yyyy") : "—"}
+              {quote.title || "Quote"}
             </p>
             
             <div className="flex items-center gap-2">
