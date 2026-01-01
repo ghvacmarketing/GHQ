@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download, Save, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download, Save, X, MapPin } from "lucide-react";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType } from "docx";
 import { saveAs } from "file-saver";
 import { jsPDF } from "jspdf";
@@ -792,6 +792,11 @@ export default function CrmProposalBuilder() {
   const [preloadedWorkOrderId, setPreloadedWorkOrderId] = useState<string | null>(null);
   const [preloadedPropertyId, setPreloadedPropertyId] = useState<string | null>(null);
   
+  // Customer properties for site selection
+  const [customerProperties, setCustomerProperties] = useState<Array<{ id: string; address: string; city?: string; state?: string }>>([]);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [isLoadingProperties, setIsLoadingProperties] = useState(false);
+  
   // Parse URL parameters on mount and pre-fill customer if provided
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -820,6 +825,39 @@ export default function CrmProposalBuilder() {
         .catch(console.error);
     }
   }, []);
+
+  // Fetch customer properties whenever selectedCustomer changes
+  useEffect(() => {
+    const fetchProperties = async () => {
+      if (!selectedCustomer) {
+        setCustomerProperties([]);
+        setSelectedPropertyId(null);
+        return;
+      }
+      
+      setIsLoadingProperties(true);
+      try {
+        const res = await fetch(`/api/crm/customers/${selectedCustomer.id}/properties`, { credentials: 'include' });
+        if (res.ok) {
+          const properties = await res.json();
+          setCustomerProperties(properties);
+          // Auto-select if preloadedPropertyId matches one of the properties
+          if (preloadedPropertyId && properties.some((p: { id: string }) => p.id === preloadedPropertyId)) {
+            setSelectedPropertyId(preloadedPropertyId);
+          } else if (properties.length === 1) {
+            // Auto-select if only one property
+            setSelectedPropertyId(properties[0].id);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch customer properties:", error);
+      } finally {
+        setIsLoadingProperties(false);
+      }
+    };
+    
+    fetchProperties();
+  }, [selectedCustomer, preloadedPropertyId]);
 
   // Elite Package state - per-package (key = package index)
   const [eliteEnabledByIndex, setEliteEnabledByIndex] = useState<Record<number, boolean>>({});
@@ -1113,6 +1151,15 @@ export default function CrmProposalBuilder() {
       return;
     }
 
+    if (isLoadingProperties) {
+      toast({
+        title: "Please Wait",
+        description: "Still loading customer properties...",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Build line items from cart items (preserves optionTag for multi-option quotes)
     const lineItems: Array<{
       description: string;
@@ -1153,9 +1200,29 @@ export default function CrmProposalBuilder() {
       }
     });
 
+    // Check if property selection is required and valid
+    const propertyIdToUse = selectedPropertyId || preloadedPropertyId;
+    
+    // Validate that propertyIdToUse belongs to current customer's properties
+    const isValidProperty = customerProperties.length === 0 || 
+      customerProperties.some(p => p.id === propertyIdToUse);
+    
+    if (customerProperties.length > 1 && (!propertyIdToUse || !isValidProperty)) {
+      toast({
+        title: "Property Required",
+        description: "Please select a property/site for this quote.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Only use propertyId if it's valid for this customer
+    const finalPropertyId = isValidProperty ? propertyIdToUse : 
+      (customerProperties.length === 1 ? customerProperties[0].id : undefined);
+
     saveToCrmMutation.mutate({
       customerId: selectedCustomer.id,
-      propertyId: preloadedPropertyId || undefined,
+      propertyId: finalPropertyId || undefined,
       projectId: preloadedProjectId || undefined,
       workOrderId: preloadedWorkOrderId || undefined,
       title: aiGeneratedQuote.quote_title || "Equipment Proposal",
@@ -1176,6 +1243,7 @@ export default function CrmProposalBuilder() {
     setCustomerSearchTerm("");
     setIsCustomerPopoverOpen(false);
     toast({ description: `Customer "${cleanName}" selected`, duration: 2000 });
+    // Properties are fetched via useEffect when selectedCustomer changes
   };
 
   const handleAcceptQuote = () => {
@@ -4950,10 +5018,46 @@ export default function CrmProposalBuilder() {
                       setSelectedCustomer(null);
                       setCustomerName('');
                       setCustomerAddress('');
+                      setCustomerProperties([]);
+                      setSelectedPropertyId(null);
                     }}
                   >
                     Clear
                   </Button>
+                </div>
+              )}
+              
+              {/* Property Selection for customers with multiple sites */}
+              {selectedCustomer && customerProperties.length > 1 && (
+                <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <label className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2 block">
+                    Select Property/Site *
+                  </label>
+                  <select
+                    value={selectedPropertyId || ""}
+                    onChange={(e) => setSelectedPropertyId(e.target.value || null)}
+                    className="w-full p-2 border rounded-md bg-white dark:bg-gray-900 text-sm"
+                    data-testid="select-property"
+                  >
+                    <option value="">-- Select a property --</option>
+                    {customerProperties.map((prop) => (
+                      <option key={prop.id} value={prop.id}>
+                        {prop.address}{prop.city ? `, ${prop.city}` : ''}{prop.state ? `, ${prop.state}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {selectedCustomer && isLoadingProperties && (
+                <div className="mt-2 text-sm text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Loading properties...
+                </div>
+              )}
+              {selectedCustomer && customerProperties.length === 1 && (
+                <div className="mt-2 text-sm text-muted-foreground flex items-center gap-2">
+                  <MapPin className="h-3 w-3" />
+                  {customerProperties[0].address}
                 </div>
               )}
             </div>
