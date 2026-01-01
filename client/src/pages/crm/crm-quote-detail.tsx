@@ -910,7 +910,7 @@ export default function CrmQuoteDetail() {
                 </>
               ) : null}
               
-              {status === "accepted" && quote.workOrderId && (
+              {status === "accepted" && (
                 <Button
                   onClick={handleCreateInvoice}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white"

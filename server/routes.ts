@@ -9785,17 +9785,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Only accepted quotes can be converted to invoices" });
       }
 
-      // Quote must have a workOrderId (invoices require work orders)
-      if (!quote.workOrderId) {
-        return res.status(400).json({ message: "Quote must be linked to a work order to create an invoice" });
+      // If quote has a workOrderId, check for existing invoice on that work order
+      if (quote.workOrderId) {
+        const [existingInvoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.workOrderId, quote.workOrderId));
+        if (existingInvoice) {
+          return res.status(400).json({ 
+            message: "An invoice already exists for this work order",
+            existingInvoiceId: existingInvoice.id 
+          });
+        }
       }
 
-      // Check if invoice already exists for this work order
-      const [existingInvoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.workOrderId, quote.workOrderId));
-      if (existingInvoice) {
+      // Check if this quote was already converted
+      if (quote.status === "converted") {
         return res.status(400).json({ 
-          message: "An invoice already exists for this work order",
-          existingInvoiceId: existingInvoice.id 
+          message: "This quote has already been converted to an invoice"
         });
       }
 
@@ -9856,14 +9860,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({ status: "converted", updatedAt: new Date() })
         .where(eq(crmQuotes.id, quoteId));
 
-      // Update work order billing disposition
-      await db.update(crmWorkOrders)
-        .set({ 
-          billingDisposition: "invoice_created" as const,
-          invoiceId: invoice.id,
-          updatedAt: new Date()
-        })
-        .where(eq(crmWorkOrders.id, quote.workOrderId));
+      // Update work order billing disposition (only if quote has a work order)
+      if (quote.workOrderId) {
+        await db.update(crmWorkOrders)
+          .set({ 
+            billingDisposition: "invoice_created" as const,
+            invoiceId: invoice.id,
+            updatedAt: new Date()
+          })
+          .where(eq(crmWorkOrders.id, quote.workOrderId));
+      }
 
       // Log audit
       await logCrmAudit(
