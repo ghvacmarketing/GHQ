@@ -2298,7 +2298,7 @@ export default function CrmDispatch() {
                 <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                   <PopoverTrigger asChild>
                     <button 
-                      className="text-slate-700 font-medium min-w-[160px] text-center hover:text-[#711419] transition-colors"
+                      className="text-sm text-slate-700 font-medium min-w-[160px] text-center hover:text-[#711419] transition-colors"
                       data-testid="button-date-picker"
                     >
                       {dateDisplay}
