@@ -10702,12 +10702,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Either customerId or newCustomer is required" });
       }
 
-      // Verify customer exists if using existing
-      if (customerId) {
-        const [existingCustomer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
-        if (!existingCustomer) {
-          return res.status(400).json({ message: "Customer not found" });
-        }
+      // Fetch customer data for the quote
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, targetCustomerId));
+      if (!customer) {
+        return res.status(400).json({ message: "Customer not found" });
       }
 
       // Generate quote number
@@ -10725,6 +10723,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [newQuote] = await db.insert(crmQuotes).values({
         quoteNumber,
         customerId: targetCustomerId,
+        customerName: customer.name,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        customerAddress: customer.fullAddress,
         scope: "project",
         status: "draft",
         title: `Install - ${installSubtype.charAt(0).toUpperCase() + installSubtype.slice(1)}`,
