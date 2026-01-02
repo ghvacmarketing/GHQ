@@ -64,6 +64,15 @@ Preferred communication style: Simple, everyday language.
   - **Smart form**: When contract date is set, auto-fills invoice date, appointment date (+1 month), start date, and end date (+1 year)
   - **Default pricing**: $229/year with auto-renew enabled
   - **Work order integration**: Visits can be linked to work orders for scheduling
+- **Service Call Checklists**: Dynamic intake questionnaires for service work orders with:
+  - **Database tables**: `serviceCallChecklists` (template per service type), `checklistQuestions` (questions with order/required flags), `workOrderChecklistResponses` (answers linked to work order)
+  - **Service type mapping**: Work subtypes map to checklist templates (NO_HEAT, NO_AC, WATER_LEAK, OTHER)
+  - **Dynamic form**: When creating SERVICE work order, checklist questions appear based on work subtype
+  - **AI summarization**: OpenAI GPT-3.5 generates technician-friendly summary from answers (with text fallback)
+  - **Required question enforcement**: Frontend validation (button disabled) + mutation guard + server-side rejection
+  - **Admin UI**: `/crm/checklists` page for managing templates and questions (admin-only CRUD, all CRM users can read)
+  - **Technician view**: Work order detail page shows AI summary and all checklist answers
+  - **Default checklists seeded**: NO_HEAT (9 questions), NO_AC (8 questions), WATER_LEAK (6 questions)
 
 ## External Dependencies
 - **Google Sheets API**: Parts pricing and application settings.
