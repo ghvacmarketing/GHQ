@@ -15,14 +15,21 @@ import {
   Camera,
   X,
   Image,
-  CloudOff
+  CloudOff,
+  CheckCircle2,
+  Car,
+  Wrench,
+  ClipboardCheck
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
@@ -95,6 +102,8 @@ export default function MobileJobDetail() {
   const pendingNotes = usePendingNotes(workOrderId);
 
   const [optimisticStatus, setOptimisticStatus] = useState<WorkOrderStatus | null>(null);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [completionSummary, setCompletionSummary] = useState("");
 
   const { data: workOrder, isLoading } = useQuery<WorkOrderDetail>({
     queryKey: ["/api/crm/work-orders", params.id],
@@ -107,19 +116,27 @@ export default function MobileJobDetail() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async (newStatus: WorkOrderStatus) => {
+    mutationFn: async ({ newStatus, summary }: { newStatus: WorkOrderStatus; summary?: string }) => {
       setOptimisticStatus(newStatus);
-      await apiRequest("PATCH", `/api/crm/work-orders/${params.id}`, { status: newStatus });
+      const payload: any = { status: newStatus };
+      if (summary) {
+        payload.completionSummary = summary;
+      }
+      await apiRequest("PATCH", `/api/crm/work-orders/${params.id}`, payload);
     },
     onSuccess: () => {
       setOptimisticStatus(null);
+      setShowCompletionModal(false);
+      setCompletionSummary("");
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
       toast({ title: "Status updated" });
     },
-    onError: (error, newStatus) => {
+    onError: (error, variables) => {
       if (isNetworkError(error)) {
-        queueMutation('status-update', workOrderId, { status: newStatus });
+        queueMutation('status-update', workOrderId, { status: variables.newStatus, summary: variables.summary });
+        setShowCompletionModal(false);
+        setCompletionSummary("");
         toast({ 
           title: "Saved offline", 
           description: "Status will sync when you're back online",
@@ -130,6 +147,22 @@ export default function MobileJobDetail() {
       }
     },
   });
+
+  const handleStatusChange = (newStatus: WorkOrderStatus) => {
+    if (newStatus === "completed") {
+      setShowCompletionModal(true);
+    } else {
+      updateStatusMutation.mutate({ newStatus });
+    }
+  };
+
+  const handleCompleteJob = () => {
+    if (!completionSummary.trim()) {
+      toast({ title: "Summary required", description: "Please enter a summary of the work completed", variant: "destructive" });
+      return;
+    }
+    updateStatusMutation.mutate({ newStatus: "completed", summary: completionSummary.trim() });
+  };
 
   const addNoteMutation = useMutation({
     mutationFn: async (note: string) => {
@@ -395,12 +428,53 @@ export default function MobileJobDetail() {
           </Button>
         </div>
 
-        {nextStatus && (
-          <Card data-testid="status-update-card">
-            <CardContent className="pt-4">
+        <Card data-testid="status-update-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Job Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between" data-testid="status-stepper">
+              {statusFlow.map((step, index) => {
+                const stepIndex = statusFlow.indexOf(displayStatus as WorkOrderStatus);
+                const isCompleted = index < stepIndex;
+                const isCurrent = index === stepIndex;
+                const isPending = index > stepIndex;
+                const stepIcons: Record<WorkOrderStatus, any> = {
+                  scheduled: Clock,
+                  dispatched: ClipboardCheck,
+                  en_route: Car,
+                  on_site: Wrench,
+                  completed: CheckCircle2,
+                };
+                const StepIcon = stepIcons[step];
+                
+                return (
+                  <div key={step} className="flex flex-col items-center" data-testid={`status-step-${step}`}>
+                    <div 
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                        isCompleted 
+                          ? 'bg-green-500 text-white' 
+                          : isCurrent 
+                            ? 'bg-[#711419] text-white ring-2 ring-offset-2 ring-[#711419]' 
+                            : 'bg-slate-200 text-slate-400'
+                      }`}
+                    >
+                      <StepIcon className="h-5 w-5" />
+                    </div>
+                    <span className={`text-xs mt-1 text-center ${
+                      isCurrent ? 'font-semibold text-[#711419]' : 'text-slate-500'
+                    }`}>
+                      {statusConfig[step]?.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {nextStatus && displayStatus !== "completed" && (
               <Button
                 className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
-                onClick={() => updateStatusMutation.mutate(nextStatus)}
+                onClick={() => handleStatusChange(nextStatus)}
                 disabled={updateStatusMutation.isPending}
                 data-testid={`button-status-${nextStatus}`}
               >
@@ -412,9 +486,18 @@ export default function MobileJobDetail() {
                 {nextStatus === "on_site" && "Arrive On Site"}
                 {nextStatus === "completed" && "Complete Job"}
               </Button>
-            </CardContent>
-          </Card>
-        )}
+            )}
+
+            {displayStatus === "completed" && (
+              <div className="text-center py-2">
+                <Badge className="bg-green-100 text-green-700 border-green-300">
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  Job Completed
+                </Badge>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card data-testid="notes-card">
           <CardHeader className="pb-2">
@@ -595,7 +678,73 @@ export default function MobileJobDetail() {
             </CardContent>
           </Card>
         )}
+
+        {workOrder.completionSummary && (
+          <Card data-testid="completion-summary-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                Completion Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-slate-600 whitespace-pre-wrap" data-testid="completion-summary-text">
+                {workOrder.completionSummary}
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      <Dialog open={showCompletionModal} onOpenChange={setShowCompletionModal}>
+        <DialogContent className="sm:max-w-md" data-testid="completion-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              Complete Job
+            </DialogTitle>
+            <DialogDescription>
+              Please provide a summary of the work completed before marking this job as done.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="completion-summary">Work Summary *</Label>
+              <Textarea
+                id="completion-summary"
+                placeholder="Describe what work was performed, parts used, and any follow-up needed..."
+                value={completionSummary}
+                onChange={(e) => setCompletionSummary(e.target.value)}
+                className="min-h-[120px]"
+                data-testid="input-completion-summary"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowCompletionModal(false)}
+              disabled={updateStatusMutation.isPending}
+              data-testid="button-cancel-completion"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCompleteJob}
+              disabled={!completionSummary.trim() || updateStatusMutation.isPending}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="button-confirm-completion"
+            >
+              {updateStatusMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+              )}
+              Complete Job
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MobileShell>
   );
 }
