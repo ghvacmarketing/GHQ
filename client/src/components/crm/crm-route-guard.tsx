@@ -53,7 +53,7 @@ export default function CrmRouteGuard({ children }: CrmRouteGuardProps) {
             Technicians should use the mobile app for daily work orders and job management.
           </p>
           <Button 
-            onClick={() => navigate("/mobile")}
+            onClick={() => window.location.href = "/mobile"}
             className="bg-[#711419] hover:bg-[#8a1a1f] text-white"
             data-testid="button-go-to-mobile"
           >
