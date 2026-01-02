@@ -1455,32 +1455,6 @@ export default function CrmWorkOrderDetail() {
                     Create Invoice
                   </Button>
                 </div>
-                {invoices && invoices.length > 0 && (
-                  <div className="flex gap-2 mt-4">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input
-                        placeholder="Search invoices..."
-                        value={invoiceSearch}
-                        onChange={(e) => setInvoiceSearch(e.target.value)}
-                        className="pl-9 h-9"
-                        data-testid="input-invoice-search"
-                      />
-                    </div>
-                    <Select value={invoiceStatusFilter} onValueChange={setInvoiceStatusFilter}>
-                      <SelectTrigger className="w-[140px] h-9" data-testid="select-invoice-status-filter">
-                        <SelectValue placeholder="All Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="sent">Sent</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="void">Void</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
               </CardHeader>
               <CardContent className="pt-4">
                 {invoicesLoading ? (
@@ -1490,126 +1464,110 @@ export default function CrmWorkOrderDetail() {
                     <Skeleton className="h-12 w-full" />
                   </div>
                 ) : invoices && invoices.length > 0 ? (
-                  (() => {
-                    const filteredInvoices = invoices.filter((invoice) => {
-                      const matchesSearch = invoiceSearch === "" || 
-                        invoice.invoiceNumber?.toLowerCase().includes(invoiceSearch.toLowerCase());
-                      const matchesStatus = invoiceStatusFilter === "all" || invoice.status === invoiceStatusFilter;
-                      return matchesSearch && matchesStatus;
-                    });
-                    return filteredInvoices.length > 0 ? (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Invoice Number</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Total</TableHead>
-                            <TableHead className="text-right">Balance Due</TableHead>
-                            <TableHead>Created Date</TableHead>
-                            <TableHead className="w-[50px]"></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredInvoices.map((invoice) => (
-                            <TableRow 
-                              key={invoice.id} 
-                              data-testid={`row-invoice-${invoice.id}`}
-                              className="cursor-pointer hover:bg-slate-50"
-                            >
-                              <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                              <TableCell>
-                                <Badge className={cn(
-                                  "text-xs",
-                                  invoice.status === "draft" && "bg-slate-100 text-slate-700",
-                                  invoice.status === "sent" && "bg-blue-100 text-blue-700",
-                                  invoice.status === "paid" && "bg-green-100 text-green-700",
-                                  invoice.status === "partial" && "bg-amber-100 text-amber-700",
-                                  invoice.status === "void" && "bg-red-100 text-red-700"
-                                )}>
-                                  {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {invoice.total ? `$${Number(invoice.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {invoice.balanceDue ? `$${Number(invoice.balanceDue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
-                              </TableCell>
-                              <TableCell>
-                                {invoice.createdAt ? format(new Date(invoice.createdAt), 'MMM d, yyyy') : '—'}
-                              </TableCell>
-                              <TableCell>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm"
-                                      data-testid={`button-invoice-actions-${invoice.id}`}
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem
-                                      onClick={() => navigate(`/crm/invoices/${invoice.id}`)}
-                                      data-testid={`menu-view-invoice-${invoice.id}`}
-                                    >
-                                      <Eye className="h-4 w-4 mr-2" />
-                                      View
-                                    </DropdownMenuItem>
-                                    {invoice.status === "draft" && (
-                                      <DropdownMenuItem
-                                        onClick={() => navigate(`/crm/invoices/${invoice.id}/edit`)}
-                                        data-testid={`menu-edit-invoice-${invoice.id}`}
-                                      >
-                                        <Edit className="h-4 w-4 mr-2" />
-                                        Edit
-                                      </DropdownMenuItem>
-                                    )}
-                                    {invoice.status !== "paid" && invoice.status !== "void" && (
-                                      <DropdownMenuItem
-                                        onClick={() => markInvoicePaidMutation.mutate(invoice.id)}
-                                        disabled={markInvoicePaidMutation.isPending}
-                                        data-testid={`menu-mark-paid-invoice-${invoice.id}`}
-                                      >
-                                        <CheckCircle className="h-4 w-4 mr-2" />
-                                        Mark Paid
-                                      </DropdownMenuItem>
-                                    )}
-                                    {invoice.status !== "void" && (
-                                      <DropdownMenuItem
-                                        onClick={() => voidInvoiceMutation.mutate(invoice.id)}
-                                        disabled={voidInvoiceMutation.isPending}
-                                        data-testid={`menu-void-invoice-${invoice.id}`}
-                                      >
-                                        <XCircle className="h-4 w-4 mr-2" />
-                                        Void
-                                      </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuItem
-                                      onClick={() => setDeleteInvoiceId(invoice.id)}
-                                      className="text-red-600"
-                                      data-testid={`menu-delete-invoice-${invoice.id}`}
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    ) : (
-                      <div className="text-center py-8">
-                        <DollarSign className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                        <p className="text-slate-500 mb-2">No invoices match your filters</p>
-                        <p className="text-sm text-slate-400">Try adjusting your search or status filter</p>
-                      </div>
-                    );
-                  })()
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Invoice Number</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Balance Due</TableHead>
+                        <TableHead>Created Date</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invoices.map((invoice) => (
+                        <TableRow 
+                          key={invoice.id} 
+                          data-testid={`row-invoice-${invoice.id}`}
+                          className="cursor-pointer hover:bg-slate-50"
+                        >
+                          <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                          <TableCell>
+                            <Badge className={cn(
+                              "text-xs",
+                              invoice.status === "draft" && "bg-slate-100 text-slate-700",
+                              invoice.status === "sent" && "bg-blue-100 text-blue-700",
+                              invoice.status === "paid" && "bg-green-100 text-green-700",
+                              invoice.status === "partial" && "bg-amber-100 text-amber-700",
+                              invoice.status === "void" && "bg-red-100 text-red-700"
+                            )}>
+                              {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {invoice.total ? `$${Number(invoice.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {invoice.balanceDue ? `$${Number(invoice.balanceDue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                          </TableCell>
+                          <TableCell>
+                            {invoice.createdAt ? format(new Date(invoice.createdAt), 'MMM d, yyyy') : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  data-testid={`button-invoice-actions-${invoice.id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => navigate(`/crm/invoices/${invoice.id}`)}
+                                  data-testid={`menu-view-invoice-${invoice.id}`}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View
+                                </DropdownMenuItem>
+                                {invoice.status === "draft" && (
+                                  <DropdownMenuItem
+                                    onClick={() => navigate(`/crm/invoices/${invoice.id}/edit`)}
+                                    data-testid={`menu-edit-invoice-${invoice.id}`}
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                )}
+                                {invoice.status !== "paid" && invoice.status !== "void" && (
+                                  <DropdownMenuItem
+                                    onClick={() => markInvoicePaidMutation.mutate(invoice.id)}
+                                    disabled={markInvoicePaidMutation.isPending}
+                                    data-testid={`menu-mark-paid-invoice-${invoice.id}`}
+                                  >
+                                    <CheckCircle className="h-4 w-4 mr-2" />
+                                    Mark Paid
+                                  </DropdownMenuItem>
+                                )}
+                                {invoice.status !== "void" && (
+                                  <DropdownMenuItem
+                                    onClick={() => voidInvoiceMutation.mutate(invoice.id)}
+                                    disabled={voidInvoiceMutation.isPending}
+                                    data-testid={`menu-void-invoice-${invoice.id}`}
+                                  >
+                                    <XCircle className="h-4 w-4 mr-2" />
+                                    Void
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem
+                                  onClick={() => setDeleteInvoiceId(invoice.id)}
+                                  className="text-red-600"
+                                  data-testid={`menu-delete-invoice-${invoice.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 ) : (
                   <div className="text-center py-8">
                     <DollarSign className="h-12 w-12 text-slate-300 mx-auto mb-3" />
