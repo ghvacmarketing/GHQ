@@ -1786,6 +1786,7 @@ export default function CrmDispatch() {
       return res.json();
     },
     enabled: !!currentUser,
+    refetchInterval: 10000,
   });
 
   useEffect(() => {
