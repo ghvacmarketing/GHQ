@@ -122,7 +122,7 @@ export default function CrmSettings() {
 
   const { data: users, isLoading: usersLoading } = useQuery<CrmUserListItem[]>({
     queryKey: ["/api/crm/users"],
-    enabled: !!currentUser && (currentUser.role === "owner" || currentUser.role === "admin"),
+    enabled: !!currentUser && (currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "sales"),
   });
 
   useEffect(() => {

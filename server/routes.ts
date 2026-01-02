@@ -5978,8 +5978,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/users - List users (ADMIN only)
-  app.get("/api/crm/users", requireCrmAdmin, async (req, res) => {
+  // GET /api/crm/users - List users (all CRM users can view, but only admins can modify)
+  app.get("/api/crm/users", requireCrmAuth, async (req, res) => {
     try {
       const users = await db.select({
         id: crmUsers.id,
