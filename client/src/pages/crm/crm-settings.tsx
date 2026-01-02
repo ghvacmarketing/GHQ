@@ -246,6 +246,16 @@ export default function CrmSettings() {
       <div className="p-6 max-w-6xl mx-auto">
         <h1 className="text-2xl font-bold text-slate-900 mb-6">Settings</h1>
 
+        {!isAdmin && (
+          <Card className="mb-6">
+            <CardContent className="py-6">
+              <p className="text-slate-600 text-center">
+                User management is only available to administrators.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {isAdmin && (
           <Card className="mb-6">
             <CardHeader>
