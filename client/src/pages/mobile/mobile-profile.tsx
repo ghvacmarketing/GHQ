@@ -3,17 +3,13 @@ import { User, LogOut, Mail, Shield, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import MobileShell from "./mobile-shell";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
 import type { CrmUser } from "@shared/schema";
 
 export default function MobileProfile() {
-  const { data: currentUser, isLoading } = useQuery<CrmUser>({
+  const { data: currentUser, isLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
-    queryFn: async () => {
-      const res = await fetch("/api/crm/auth/me", { credentials: "include" });
-      if (!res.ok) throw new Error("Not authenticated");
-      return res.json();
-    },
+    queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
   const logoutMutation = useMutation({
