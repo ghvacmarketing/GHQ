@@ -8640,6 +8640,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/crm/work-orders/:id/photos - Add photo to work order
+  app.post("/api/crm/work-orders/:id/photos", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const workOrder = await storage.getWorkOrder(req.params.id);
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+
+      const { id, url, objectPath, filename } = req.body;
+      if (!id || !url || !objectPath || !filename) {
+        return res.status(400).json({ message: "Missing required fields: id, url, objectPath, filename" });
+      }
+
+      const newPhoto = {
+        id,
+        url,
+        objectPath,
+        filename,
+        uploadedAt: new Date().toISOString(),
+      };
+
+      const existingPhotos = (workOrder.photos as any[]) || [];
+      const updatedPhotos = [...existingPhotos, newPhoto];
+
+      await db.update(crmWorkOrders)
+        .set({ photos: updatedPhotos })
+        .where(eq(crmWorkOrders.id, req.params.id));
+
+      await logCrmAudit(
+        user.id,
+        "work_order.photo_added",
+        "work_order",
+        req.params.id,
+        { photoId: id, filename },
+        req.ip
+      );
+
+      return res.status(201).json({ photo: newPhoto, photos: updatedPhotos });
+    } catch (error) {
+      console.error("Error adding photo to work order:", error);
+      return res.status(500).json({ message: "Failed to add photo" });
+    }
+  });
+
+  // DELETE /api/crm/work-orders/:id/photos/:photoId - Remove photo from work order
+  app.delete("/api/crm/work-orders/:id/photos/:photoId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const workOrder = await storage.getWorkOrder(req.params.id);
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+
+      const existingPhotos = (workOrder.photos as any[]) || [];
+      const updatedPhotos = existingPhotos.filter((p: any) => p.id !== req.params.photoId);
+
+      if (existingPhotos.length === updatedPhotos.length) {
+        return res.status(404).json({ message: "Photo not found" });
+      }
+
+      await db.update(crmWorkOrders)
+        .set({ photos: updatedPhotos })
+        .where(eq(crmWorkOrders.id, req.params.id));
+
+      await logCrmAudit(
+        user.id,
+        "work_order.photo_removed",
+        "work_order",
+        req.params.id,
+        { photoId: req.params.photoId },
+        req.ip
+      );
+
+      return res.json({ photos: updatedPhotos });
+    } catch (error) {
+      console.error("Error removing photo from work order:", error);
+      return res.status(500).json({ message: "Failed to remove photo" });
+    }
+  });
+
   // GET /api/crm/dispatch/work-orders - Get work orders for dispatch board
   app.get("/api/crm/dispatch/work-orders", requireCrmAuth, async (req, res) => {
     try {

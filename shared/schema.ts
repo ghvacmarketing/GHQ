@@ -1025,6 +1025,7 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   checklist: json("checklist").$type<{ item: string; completed: boolean }[]>(),
   partsUsed: json("parts_used").$type<{ partId: string; name: string; qty: number; price: number }[]>(),
   techNotes: text("tech_notes"),
+  photos: json("photos").$type<{ id: string; url: string; objectPath: string; filename: string; uploadedAt: string }[]>(),
   billingDisposition: text("billing_disposition").$type<BillingDisposition>(),
   billingNotes: text("billing_notes"),
   invoiceId: varchar("invoice_id"),

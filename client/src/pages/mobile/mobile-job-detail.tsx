@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { format } from "date-fns";
+import { nanoid } from "nanoid";
 import { 
   ArrowLeft, 
   Phone, 
@@ -10,7 +11,10 @@ import {
   MapPin, 
   Clock,
   Send,
-  Loader2
+  Loader2,
+  Camera,
+  X,
+  Image
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,9 +27,18 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import MobileShell from "./mobile-shell";
 import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus } from "@shared/schema";
 
-interface WorkOrderDetail extends CrmWorkOrder {
+interface WorkOrderPhoto {
+  id: string;
+  url: string;
+  objectPath: string;
+  filename: string;
+  uploadedAt: string;
+}
+
+interface WorkOrderDetail extends Omit<CrmWorkOrder, 'photos'> {
   customer: CrmCustomer | null;
   property: CrmProperty | null;
+  photos?: WorkOrderPhoto[] | null;
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -55,6 +68,9 @@ export default function MobileJobDetail() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [noteInput, setNoteInput] = useState("");
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<WorkOrderPhoto | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: workOrder, isLoading } = useQuery<WorkOrderDetail>({
     queryKey: ["/api/crm/work-orders", params.id],
@@ -99,6 +115,58 @@ export default function MobileJobDetail() {
       toast({ title: "Failed to add note", variant: "destructive" });
     },
   });
+
+  const handlePhotoCapture = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      const presignedResponse = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type,
+        }),
+      });
+
+      if (!presignedResponse.ok) {
+        throw new Error("Failed to get upload URL");
+      }
+
+      const { uploadURL, objectPath } = await presignedResponse.json();
+
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+
+      const photoId = nanoid();
+      const photoUrl = objectPath.startsWith("/") ? objectPath : `/${objectPath}`;
+
+      const addPhotoResponse = await apiRequest("POST", `/api/crm/work-orders/${params.id}/photos`, {
+        id: photoId,
+        url: photoUrl,
+        objectPath: objectPath,
+        filename: file.name,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
+      toast({ title: "Photo uploaded successfully" });
+    } catch (error) {
+      console.error("Photo upload error:", error);
+      toast({ title: "Failed to upload photo", variant: "destructive" });
+    } finally {
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   const handleCall = () => {
     const phone = workOrder?.customer?.phone;
@@ -328,6 +396,91 @@ export default function MobileJobDetail() {
             </div>
           </CardContent>
         </Card>
+
+        <Card data-testid="photos-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Image className="h-4 w-4" />
+              Photos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {workOrder.photos && workOrder.photos.length > 0 ? (
+              <div 
+                className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2"
+                data-testid="photo-thumbnails-container"
+              >
+                {workOrder.photos.map((photo) => (
+                  <button
+                    key={photo.id}
+                    onClick={() => setSelectedPhoto(photo)}
+                    className="relative shrink-0 w-20 h-20 rounded-md overflow-hidden border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#711419]"
+                    data-testid={`photo-thumbnail-${photo.id}`}
+                  >
+                    <img
+                      src={photo.url}
+                      alt={photo.filename}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400 italic" data-testid="no-photos">
+                No photos yet
+              </p>
+            )}
+            <Separator />
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handlePhotoCapture}
+                ref={fileInputRef}
+                className="hidden"
+                data-testid="input-photo-file"
+              />
+              <Button
+                variant="outline"
+                className="flex-1 min-h-[44px]"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingPhoto}
+                data-testid="button-add-photo"
+              >
+                {isUploadingPhoto ? (
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                ) : (
+                  <Camera className="h-5 w-5 mr-2" />
+                )}
+                {isUploadingPhoto ? "Uploading..." : "Add Photo"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {selectedPhoto && (
+          <div 
+            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+            onClick={() => setSelectedPhoto(null)}
+            data-testid="photo-viewer-overlay"
+          >
+            <button
+              onClick={() => setSelectedPhoto(null)}
+              className="absolute top-4 right-4 text-white p-2 hover:bg-white/20 rounded-full"
+              data-testid="button-close-photo-viewer"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <img
+              src={selectedPhoto.url}
+              alt={selectedPhoto.filename}
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+              data-testid="photo-viewer-image"
+            />
+          </div>
+        )}
 
         {(workOrder.workSubtype || workOrder.description) && (
           <Card data-testid="job-info-card">
