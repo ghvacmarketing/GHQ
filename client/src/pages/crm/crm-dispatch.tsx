@@ -1689,15 +1689,10 @@ export default function CrmDispatch() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
-  const { data: techniciansData } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
-    queryKey: ["/api/crm/users"],
+  const { data: techniciansList = [] } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
+    queryKey: ["/api/crm/technicians"],
     enabled: !!currentUser,
   });
-
-  const techniciansList = useMemo(() => 
-    (techniciansData || []).filter(u => u.role === "tech"),
-    [techniciansData]
-  );
 
   const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
     queryKey: ["/api/crm/customers", debouncedCustomerSearch],
@@ -1760,14 +1755,12 @@ export default function CrmDispatch() {
     }
   }, [workOrdersData]);
 
-  const technicians: Technician[] = (techniciansData || [])
-    .filter(u => u.role !== "owner")
-    .map((u, idx) => ({
-      id: u.id,
-      name: u.name,
-      initials: getInitials(u.name),
-      color: techColors[idx % techColors.length],
-    }));
+  const technicians: Technician[] = techniciansList.map((u, idx) => ({
+    id: u.id,
+    name: u.name,
+    initials: getInitials(u.name),
+    color: techColors[idx % techColors.length],
+  }));
 
   const updateWorkOrderMutation = useMutation({
     mutationFn: async (data: { workOrderId: string; updates: any }) => {

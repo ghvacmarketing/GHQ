@@ -28,6 +28,9 @@ import NotFound from "@/pages/not-found";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import GlobalPasswordGate from "@/components/GlobalPasswordGate";
 
+// CRM Route Guard (blocks tech users from desktop CRM)
+import CrmRouteGuard from "@/components/crm/crm-route-guard";
+
 // Lazy-load CRM pages to reduce initial bundle size
 const CrmLogin = lazy(() => import("@/pages/crm/crm-login"));
 const CrmDashboard = lazy(() => import("@/pages/crm/crm-dashboard"));
@@ -138,6 +141,15 @@ function CrmWrapper({ children }: { children: ReactNode }) {
   return <Suspense fallback={<CrmLoader />}>{children}</Suspense>;
 }
 
+// Wrapper for protected CRM pages (blocks tech users)
+function ProtectedCrmWrapper({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={<CrmLoader />}>
+      <CrmRouteGuard>{children}</CrmRouteGuard>
+    </Suspense>
+  );
+}
+
 // Mobile-specific loading placeholder
 function MobileLoader() {
   return (
@@ -187,33 +199,33 @@ function Router() {
       <Route path="/employee-portal/admin" component={EmployeePortalAdmin} />
       <Route path="/employee-portal" component={EmployeePortal} />
       <Route path="/crm/login">{() => <CrmWrapper><CrmLogin /></CrmWrapper>}</Route>
-      <Route path="/crm/dispatch">{() => <CrmWrapper><CrmDispatch /></CrmWrapper>}</Route>
-      <Route path="/crm/work-orders/:id">{() => <CrmWrapper><CrmWorkOrderDetail /></CrmWrapper>}</Route>
-      <Route path="/crm/work-orders">{() => <CrmWrapper><CrmWorkOrders /></CrmWrapper>}</Route>
-      <Route path="/crm/accounts/new">{() => <CrmWrapper><CrmAccountCreate /></CrmWrapper>}</Route>
-      <Route path="/crm/accounts/:id">{() => <CrmWrapper><CrmAccountDetail /></CrmWrapper>}</Route>
-      <Route path="/crm/customers/:id">{() => <CrmWrapper><CrmCustomerDetail /></CrmWrapper>}</Route>
-      <Route path="/crm/customers">{() => <CrmWrapper><CrmCustomers /></CrmWrapper>}</Route>
-      <Route path="/crm/invoices/new">{() => <CrmWrapper><CrmInvoiceCreate /></CrmWrapper>}</Route>
-      <Route path="/crm/invoices/:id">{() => <CrmWrapper><CrmInvoiceDetail /></CrmWrapper>}</Route>
-      <Route path="/crm/invoices">{() => <CrmWrapper><CrmInvoices /></CrmWrapper>}</Route>
-      <Route path="/crm/quotes/install-worksheet/:id">{() => <CrmWrapper><CrmInstallWorksheet /></CrmWrapper>}</Route>
-      <Route path="/crm/quotes/proposal/:customerId">{() => <CrmWrapper><CrmProposalBuilder /></CrmWrapper>}</Route>
-      <Route path="/crm/quotes/proposal">{() => <CrmWrapper><CrmProposalBuilder /></CrmWrapper>}</Route>
-      <Route path="/crm/quotes/new">{() => <CrmWrapper><CrmQuoteCreate /></CrmWrapper>}</Route>
-      <Route path="/crm/quotes/:id">{() => <CrmWrapper><CrmQuoteDetail /></CrmWrapper>}</Route>
-      <Route path="/crm/quotes">{() => <CrmWrapper><CrmQuotes /></CrmWrapper>}</Route>
-      <Route path="/crm/agreements/new">{() => <CrmWrapper><CrmAgreementCreate /></CrmWrapper>}</Route>
-      <Route path="/crm/agreements">{() => <CrmWrapper><CrmAgreements /></CrmWrapper>}</Route>
-      <Route path="/crm/projects/:id">{() => <CrmWrapper><CrmProjectDetail /></CrmWrapper>}</Route>
-      <Route path="/crm/projects">{() => <CrmWrapper><CrmProjects /></CrmWrapper>}</Route>
-      <Route path="/crm/prospect-funnel">{() => <CrmWrapper><CrmProspectFunnel /></CrmWrapper>}</Route>
-      <Route path="/crm/add-prospect">{() => <CrmWrapper><CrmAddProspect /></CrmWrapper>}</Route>
-      <Route path="/crm/marketing">{() => <CrmWrapper><CrmMarketing /></CrmWrapper>}</Route>
-      <Route path="/crm/items">{() => <CrmWrapper><CrmItems /></CrmWrapper>}</Route>
-      <Route path="/crm/phone">{() => <CrmWrapper><CrmPhone /></CrmWrapper>}</Route>
-      <Route path="/crm/checklists">{() => <CrmWrapper><CrmChecklists /></CrmWrapper>}</Route>
-      <Route path="/crm">{() => <CrmWrapper><CrmDashboard /></CrmWrapper>}</Route>
+      <Route path="/crm/dispatch">{() => <ProtectedCrmWrapper><CrmDispatch /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/work-orders/:id">{() => <ProtectedCrmWrapper><CrmWorkOrderDetail /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/work-orders">{() => <ProtectedCrmWrapper><CrmWorkOrders /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/accounts/new">{() => <ProtectedCrmWrapper><CrmAccountCreate /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/accounts/:id">{() => <ProtectedCrmWrapper><CrmAccountDetail /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/customers/:id">{() => <ProtectedCrmWrapper><CrmCustomerDetail /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/customers">{() => <ProtectedCrmWrapper><CrmCustomers /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/invoices/new">{() => <ProtectedCrmWrapper><CrmInvoiceCreate /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/invoices/:id">{() => <ProtectedCrmWrapper><CrmInvoiceDetail /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/invoices">{() => <ProtectedCrmWrapper><CrmInvoices /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/quotes/install-worksheet/:id">{() => <ProtectedCrmWrapper><CrmInstallWorksheet /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/quotes/proposal/:customerId">{() => <ProtectedCrmWrapper><CrmProposalBuilder /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/quotes/proposal">{() => <ProtectedCrmWrapper><CrmProposalBuilder /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/quotes/new">{() => <ProtectedCrmWrapper><CrmQuoteCreate /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/quotes/:id">{() => <ProtectedCrmWrapper><CrmQuoteDetail /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/quotes">{() => <ProtectedCrmWrapper><CrmQuotes /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/agreements/new">{() => <ProtectedCrmWrapper><CrmAgreementCreate /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/agreements">{() => <ProtectedCrmWrapper><CrmAgreements /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/projects/:id">{() => <ProtectedCrmWrapper><CrmProjectDetail /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/projects">{() => <ProtectedCrmWrapper><CrmProjects /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/prospect-funnel">{() => <ProtectedCrmWrapper><CrmProspectFunnel /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/add-prospect">{() => <ProtectedCrmWrapper><CrmAddProspect /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/marketing">{() => <ProtectedCrmWrapper><CrmMarketing /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/items">{() => <ProtectedCrmWrapper><CrmItems /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/phone">{() => <ProtectedCrmWrapper><CrmPhone /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/checklists">{() => <ProtectedCrmWrapper><CrmChecklists /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm">{() => <ProtectedCrmWrapper><CrmDashboard /></ProtectedCrmWrapper>}</Route>
       <Route path="/mobile/job/:id">{() => <MobileWrapper><MobileJobDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/time">{() => <MobileWrapper><MobileTime /></MobileWrapper>}</Route>
       <Route path="/mobile/profile">{() => <MobileWrapper><MobileProfile /></MobileWrapper>}</Route>
