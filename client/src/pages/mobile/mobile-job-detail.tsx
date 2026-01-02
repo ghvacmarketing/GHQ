@@ -571,6 +571,12 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   // Fetch CRM items (for both catalog and discounts)
   const { data: crmItemsData, isLoading: itemsLoading } = useQuery<CrmItem[]>({
     queryKey: ["/api/crm/items"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/items", { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.items || data || [];
+    },
     staleTime: 5 * 60 * 1000,
   });
 
@@ -2265,7 +2271,12 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
-            {acceptedQuotes.length === 0 ? (
+            {isLoadingQuote ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-green-600" />
+                <span className="ml-2 text-sm text-slate-600">Loading quote...</span>
+              </div>
+            ) : acceptedQuotes.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-4">
                 No accepted quotes available for this work order.
               </p>
@@ -2281,7 +2292,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">{quote.quoteNumber}</p>
                       <p className="text-xs text-slate-500">
-                        {quote.lineItems?.length || 0} line items
+                        Accepted: {quote.acceptedAt ? format(new Date(quote.acceptedAt), "MMM d, yyyy") : "Unknown"}
                       </p>
                     </div>
                     <span className="text-sm font-semibold text-green-700 ml-2">
