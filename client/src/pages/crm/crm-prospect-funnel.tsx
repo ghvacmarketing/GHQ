@@ -1395,10 +1395,9 @@ export default function CrmProspectFunnel() {
                 <div 
                   className="flex flex-row gap-4 px-4" 
                   style={{ 
-                    overflowX: 'auto', 
+                    overflowX: 'scroll', 
                     overflowY: 'hidden',
                     height: 'calc(100vh - 220px)',
-                    scrollbarWidth: 'thin',
                   }}
                   data-testid="kanban-board"
                 >
