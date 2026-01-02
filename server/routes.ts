@@ -6468,7 +6468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const projectCount = Number(jobsResult?.count || 0);
 
-      // Get job IDs to count work orders
+      // Get job IDs to count work orders through jobs
       const jobIds = await db
         .select({ id: crmJobs.id })
         .from(crmJobs)
@@ -6477,18 +6477,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(crmJobs.accountId, customerId)
         ));
 
-      let workOrderCount = 0;
-      if (jobIds.length > 0) {
-        const [workOrdersResult] = await db
-          .select({ count: sql<number>`count(*)` })
-          .from(crmWorkOrders)
-          .where(inArray(crmWorkOrders.jobId, jobIds.map(j => j.id)));
-        workOrderCount = Number(workOrdersResult?.count || 0);
-      }
+      // Count work orders - both directly linked to customer AND through jobs
+      const workOrdersResult = await db.execute(
+        sql`SELECT count(*) as count FROM crm_work_orders WHERE customer_id = ${customerId} OR job_id = ANY(${jobIds.length > 0 ? jobIds.map(j => j.id) : []}::uuid[])`
+      );
+      const workOrderCount = Number(workOrdersResult.rows?.[0]?.count || 0);
 
-      // Count quotes linked to this customer (using raw SQL since schema doesn't match database)
+      // Count quotes linked to this customer (check both account_id and customer_id)
       const quotesResult = await db.execute(
-        sql`SELECT count(*) as count FROM crm_quotes WHERE account_id = ${customerId}`
+        sql`SELECT count(*) as count FROM crm_quotes WHERE account_id = ${customerId} OR customer_id = ${customerId}`
       );
       const quoteCount = Number(quotesResult.rows?.[0]?.count || 0);
 
@@ -6547,7 +6544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const projectCount = Number(jobsResult?.count || 0);
 
-      // Get job IDs to count work orders
+      // Get job IDs to count work orders through jobs
       const jobIds = await db
         .select({ id: crmJobs.id })
         .from(crmJobs)
@@ -6556,18 +6553,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(crmJobs.accountId, customerId)
         ));
 
-      let workOrderCount = 0;
-      if (jobIds.length > 0) {
-        const [workOrdersResult] = await db
-          .select({ count: sql<number>`count(*)` })
-          .from(crmWorkOrders)
-          .where(inArray(crmWorkOrders.jobId, jobIds.map(j => j.id)));
-        workOrderCount = Number(workOrdersResult?.count || 0);
-      }
+      // Count work orders - both directly linked to customer AND through jobs
+      const workOrdersResult = await db.execute(
+        sql`SELECT count(*) as count FROM crm_work_orders WHERE customer_id = ${customerId} OR job_id = ANY(${jobIds.length > 0 ? jobIds.map(j => j.id) : []}::uuid[])`
+      );
+      const workOrderCount = Number(workOrdersResult.rows?.[0]?.count || 0);
 
-      // Count quotes using raw SQL (database uses account_id column)
+      // Count quotes linked to this customer (check both account_id and customer_id)
       const quotesResult = await db.execute(
-        sql`SELECT count(*) as count FROM crm_quotes WHERE account_id = ${customerId}`
+        sql`SELECT count(*) as count FROM crm_quotes WHERE account_id = ${customerId} OR customer_id = ${customerId}`
       );
       const quoteCount = Number(quotesResult.rows?.[0]?.count || 0);
 
