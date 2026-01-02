@@ -30,7 +30,7 @@ import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorSt
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
-import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureDefaultAdminExists, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, logCrmAudit, hashPassword as hashCrmPassword } from "./crm-auth";
+import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, logCrmAudit, hashPassword as hashCrmPassword } from "./crm-auth";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
@@ -296,10 +296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register object storage routes for App Storage file uploads
   registerObjectStorageRoutes(app);
 
-  // Ensure default CRM admin user exists
-  ensureDefaultAdminExists().catch(console.error);
-  
-  // Ensure default technician users exist
+  // Ensure CRM users exist with correct roles
   ensureTechniciansExist().catch(console.error);
 
   // Configure multer for file uploads
@@ -6099,7 +6096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfDay = new Date(targetDateStr + "T00:00:00.000Z");
       const endOfDay = new Date(targetDateStr + "T23:59:59.999Z");
 
-      // Get technicians (exclude owner role)
+      // Get field users (tech and sales only - owner and admin are office roles)
       const technicians = await db.select({
         id: crmUsers.id,
         name: crmUsers.name,
@@ -6107,7 +6104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: crmUsers.role,
       }).from(crmUsers).where(
         and(
-          sql`${crmUsers.role} != 'owner'`,
+          sql`${crmUsers.role} IN ('tech', 'sales')`,
           eq(crmUsers.isActive, true)
         )
       );
