@@ -8520,6 +8520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         checklist: true,
         partsUsed: true,
         techNotes: true,
+        completionSummary: true,
         projectId: true,
         title: true,
         description: true,
@@ -8546,7 +8547,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, checklist, partsUsed, startedAt, completedAt, projectId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer } = result.data;
+      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, completionSummary, checklist, partsUsed, startedAt, completedAt, projectId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer } = result.data;
 
       // If projectId is provided (not null), verify it exists
       if (projectId !== undefined && projectId !== null) {
@@ -8583,6 +8584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (scheduledStart !== undefined) updateData.scheduledStart = scheduledStart ? new Date(scheduledStart) : null;
       if (scheduledEnd !== undefined) updateData.scheduledEnd = scheduledEnd ? new Date(scheduledEnd) : null;
       if (techNotes !== undefined) updateData.techNotes = techNotes;
+      if (completionSummary !== undefined) updateData.completionSummary = completionSummary;
       if (checklist !== undefined) updateData.checklist = checklist;
       if (partsUsed !== undefined) updateData.partsUsed = partsUsed;
       if (startedAt !== undefined) updateData.startedAt = startedAt ? new Date(startedAt) : null;

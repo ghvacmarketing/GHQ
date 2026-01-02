@@ -1418,7 +1418,23 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
           onClick?.(workOrder.id);
         }}
       >
-        <p className="text-xs font-medium truncate">{workOrder.title || workOrder.description || workOrder.customerName}</p>
+        <div className="flex items-center gap-1">
+          <p className="text-xs font-medium truncate flex-1">{workOrder.title || workOrder.description || workOrder.customerName}</p>
+          {workOrder.status !== "scheduled" && (
+            <span 
+              className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
+                workOrder.status === 'dispatched' ? 'bg-purple-600 text-white' :
+                workOrder.status === 'en_route' ? 'bg-amber-500 text-white' :
+                workOrder.status === 'on_site' ? 'bg-orange-500 text-white' :
+                workOrder.status === 'completed' ? 'bg-green-600 text-white' :
+                'bg-gray-600 text-white'
+              }`}
+              data-testid={`status-badge-${workOrder.id}`}
+            >
+              {statusLabels[workOrder.status] || workOrder.status}
+            </span>
+          )}
+        </div>
         <p className="text-xs truncate opacity-70">{workOrder.customerName}</p>
       </div>
     </div>
@@ -1446,7 +1462,20 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
           {workOrder.priority.toUpperCase()}
         </div>
       )}
-      <p className="text-xs font-medium truncate">{workOrder.title || workOrder.description || workOrder.customerName}</p>
+      <div className="flex items-center gap-1">
+        <p className="text-xs font-medium truncate flex-1">{workOrder.title || workOrder.description || workOrder.customerName}</p>
+        {workOrder.status !== "scheduled" && (
+          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
+            workOrder.status === 'dispatched' ? 'bg-purple-600 text-white' :
+            workOrder.status === 'en_route' ? 'bg-amber-500 text-white' :
+            workOrder.status === 'on_site' ? 'bg-orange-500 text-white' :
+            workOrder.status === 'completed' ? 'bg-green-600 text-white' :
+            'bg-gray-600 text-white'
+          }`}>
+            {statusLabels[workOrder.status] || workOrder.status}
+          </span>
+        )}
+      </div>
       <p className="text-xs truncate opacity-70">{workOrder.customerName}</p>
     </div>
   );
@@ -1535,7 +1564,17 @@ function MobileWorkOrderCard({ workOrder, technician, onClick }: { workOrder: Di
             <p className={`font-semibold text-sm ${jobColors.text}`}>{workOrder.customerName}</p>
             <p className={`text-xs ${jobColors.text} opacity-80`}>{workOrder.jobType} #{workOrder.workOrderNumber}</p>
           </div>
-          <Badge variant="outline" className={`text-xs ${workOrder.priority && workOrder.priority !== "normal" ? 'mr-12' : ''}`}>
+          <Badge 
+            className={`text-xs font-bold ${workOrder.priority && workOrder.priority !== "normal" ? 'mr-12' : ''} ${
+              workOrder.status === 'scheduled' ? 'bg-blue-600 text-white' :
+              workOrder.status === 'dispatched' ? 'bg-purple-600 text-white' :
+              workOrder.status === 'en_route' ? 'bg-amber-500 text-white' :
+              workOrder.status === 'on_site' ? 'bg-orange-500 text-white' :
+              workOrder.status === 'completed' ? 'bg-green-600 text-white' :
+              'bg-gray-600 text-white'
+            }`}
+            data-testid={`mobile-status-badge-${workOrder.id}`}
+          >
             {statusLabels[workOrder.status] || workOrder.status}
           </Badge>
         </div>
