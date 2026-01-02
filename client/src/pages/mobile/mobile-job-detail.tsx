@@ -1129,16 +1129,125 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         </DialogContent>
       </Dialog>
 
-      {/* Add Discount Dialog */}
-      <Dialog open={showDiscount} onOpenChange={setShowDiscount}>
+      {/* Add Discount Catalogue Dialog */}
+      <Dialog open={showDiscount} onOpenChange={(open) => { setShowDiscount(open); if (!open) { setDiscountSearch(""); setDiscountCategoryFilter("all"); } }}>
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-5 w-5 text-amber-600" />
+              Select Discount
+            </DialogTitle>
+            <DialogDescription>
+              Choose a discount from the catalogue or add a custom one
+            </DialogDescription>
+          </DialogHeader>
+          
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search discounts..."
+              value={discountSearch}
+              onChange={(e) => setDiscountSearch(e.target.value)}
+              className="pl-10 min-h-[44px]"
+              data-testid="input-discount-search"
+            />
+          </div>
+
+          {/* Category Filter Tabs */}
+          <div className="flex gap-2 flex-wrap">
+            {[
+              { key: "all", label: "All Discounts" },
+              { key: "discount", label: "Discounts" },
+              { key: "service", label: "Service" },
+              { key: "maintenance", label: "Maintenance" },
+            ].map((cat) => (
+              <Button
+                key={cat.key}
+                variant={discountCategoryFilter === cat.key ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDiscountCategoryFilter(cat.key as typeof discountCategoryFilter)}
+                className="min-h-[36px]"
+                data-testid={`filter-discount-${cat.key}`}
+              >
+                {cat.label}
+              </Button>
+            ))}
+          </div>
+          
+          {/* Discount Items List */}
+          <div className="flex-1 overflow-y-auto max-h-[250px] space-y-2">
+            {filteredDiscountItems.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-slate-400 mb-3">
+                  {discountSearch ? "No discounts found" : "No discounts in catalogue"}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowDiscount(false); setShowManualDiscount(true); }}
+                  className="min-h-[44px]"
+                  data-testid="button-add-manual-discount"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Custom Discount
+                </Button>
+              </div>
+            ) : (
+              filteredDiscountItems.map((item, idx) => (
+                <div
+                  key={item.id || idx}
+                  className="border rounded-lg p-3 hover:bg-amber-50 cursor-pointer min-h-[44px] active:bg-amber-100"
+                  onClick={() => addCatalogDiscount(item)}
+                  data-testid={`discount-item-${item.id || idx}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{item.name}</p>
+                      {item.description && (
+                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
+                      )}
+                    </div>
+                    <span className="text-sm font-semibold text-amber-700 ml-2">
+                      -{formatCurrency(parseFloat(item.rate || "0") || 0)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          
+          <DialogFooter className="flex gap-2 border-t pt-3">
+            <Button 
+              variant="outline" 
+              onClick={() => { setShowDiscount(false); setShowManualDiscount(true); }}
+              className="min-h-[44px]"
+              data-testid="button-custom-discount"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Custom
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => { setShowDiscount(false); setDiscountSearch(""); setDiscountCategoryFilter("all"); }}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Discount Entry Dialog */}
+      <Dialog open={showManualDiscount} onOpenChange={setShowManualDiscount}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5 text-amber-600" />
-              Add Discount
+              Custom Discount
             </DialogTitle>
             <DialogDescription>
-              Enter discount details to apply to the quote
+              Enter a custom discount amount
             </DialogDescription>
           </DialogHeader>
           
@@ -1150,7 +1259,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                 value={discountDescription}
                 onChange={(e) => setDiscountDescription(e.target.value)}
                 className="min-h-[44px] mt-1"
-                data-testid="input-discount-description"
+                data-testid="input-manual-discount-description"
               />
             </div>
             <div>
@@ -1163,19 +1272,19 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                 value={discountAmount}
                 onChange={(e) => setDiscountAmount(e.target.value)}
                 className="min-h-[44px] mt-1"
-                data-testid="input-discount-amount"
+                data-testid="input-manual-discount-amount"
               />
             </div>
           </div>
           
           <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => { setShowDiscount(false); setDiscountDescription(""); setDiscountAmount(""); }}>
+            <Button variant="outline" onClick={() => { setShowManualDiscount(false); setDiscountDescription(""); setDiscountAmount(""); }}>
               Cancel
             </Button>
             <Button 
-              className="bg-amber-600 hover:bg-amber-700"
-              onClick={addDiscountItem}
-              data-testid="button-confirm-discount"
+              className="bg-amber-600 hover:bg-amber-700 min-h-[44px]"
+              onClick={addManualDiscountItem}
+              data-testid="button-confirm-manual-discount"
             >
               Add Discount
             </Button>
