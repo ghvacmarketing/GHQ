@@ -5911,6 +5911,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/technicians - List technicians for dispatch (all CRM users can access)
+  app.get("/api/crm/technicians", requireCrmAuth, async (req, res) => {
+    try {
+      const technicians = await db.select({
+        id: crmUsers.id,
+        name: crmUsers.name,
+        email: crmUsers.email,
+        role: crmUsers.role,
+      }).from(crmUsers)
+        .where(and(eq(crmUsers.role, "tech"), eq(crmUsers.isActive, true)))
+        .orderBy(crmUsers.name);
+      return res.json(technicians);
+    } catch (error) {
+      console.error("Error fetching technicians:", error);
+      return res.status(500).json({ message: "Failed to fetch technicians" });
+    }
+  });
+
   // GET /api/crm/users - List users (ADMIN only)
   app.get("/api/crm/users", requireCrmAdmin, async (req, res) => {
     try {
