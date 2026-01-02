@@ -73,7 +73,9 @@ export default function MobileJob() {
 
   const myWorkOrders = useMemo(() => {
     if (!currentUser) return [];
-    return workOrders.filter(wo => wo.assignedTechId === currentUser.id);
+    // Only include work orders that are both assigned to this tech AND have a scheduled time
+    // Work orders without scheduledStart are still in the "unassigned queue" on dispatch board
+    return workOrders.filter(wo => wo.assignedTechId === currentUser.id && wo.scheduledStart);
   }, [workOrders, currentUser]);
 
   const activeJob = useMemo(() => {
