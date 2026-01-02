@@ -70,6 +70,7 @@
     "cookie-parser": "^1.4.7",
     "csv-parse": "^6.1.0",
     "date-fns": "^3.6.0",
+    "date-fns-tz": "^3.2.0",
     "docx": "^9.5.1",
     "drizzle-orm": "^0.39.1",
     "drizzle-zod": "^0.7.1",

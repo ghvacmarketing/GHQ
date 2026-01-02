@@ -61,6 +61,7 @@ import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkOrderStatus, 
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, isToday, isThisWeek, addDays } from "date-fns";
+import { createLocalDateTime, formatLocalDateTime } from "@/lib/timezone";
 import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject } from "@shared/schema";
 
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
@@ -527,15 +528,13 @@ export default function CrmWorkOrders() {
       if (!woDescription.trim()) throw new Error("Description is required");
       if (!scheduledDate) throw new Error("Scheduled date is required");
 
-      // Parse start and end times
+      // Parse start and end times and convert to UTC for storage
       const [startHours, startMinutes] = startTime.split(":").map(Number);
       const [endHours, endMinutes] = endTime.split(":").map(Number);
       
-      const scheduledStart = new Date(scheduledDate);
-      scheduledStart.setHours(startHours, startMinutes, 0, 0);
-      
-      const scheduledEnd = new Date(scheduledDate);
-      scheduledEnd.setHours(endHours, endMinutes, 0, 0);
+      // Create dates in local timezone (EST) and convert to UTC for storage
+      const scheduledStartUTC = createLocalDateTime(scheduledDate, startHours, startMinutes);
+      const scheduledEndUTC = createLocalDateTime(scheduledDate, endHours, endMinutes);
 
       const res = await apiRequest("POST", "/api/crm/work-orders", {
         customerId: selectedCustomer.id,
@@ -545,8 +544,8 @@ export default function CrmWorkOrders() {
         description: woDescription.trim(),
         visitType,
         workSubtype,
-        scheduledStart: scheduledStart.toISOString(),
-        scheduledEnd: scheduledEnd.toISOString(),
+        scheduledStart: scheduledStartUTC.toISOString(),
+        scheduledEnd: scheduledEndUTC.toISOString(),
         assignedTechId: assignedTechId === "unassigned" ? null : assignedTechId,
         priority,
         status: "scheduled",

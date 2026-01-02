@@ -75,6 +75,8 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format, formatDistanceToNow } from "date-fns";
+import { createLocalDateTime, formatLocal, formatLocalDateTime, getLocalStartOfDay, getLocalEndOfDay, APP_TIMEZONE } from "@/lib/timezone";
+import { formatInTimeZone } from "date-fns-tz";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -1654,7 +1656,8 @@ export default function CrmDispatch() {
     })
   );
 
-  const dateString = selectedDate.toISOString().split("T")[0];
+  // Use local date format to ensure correct date is sent (not UTC which may shift days)
+  const dateString = format(selectedDate, "yyyy-MM-dd");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -1900,14 +1903,13 @@ export default function CrmDispatch() {
 
   const handleQuickAssign = useCallback((workOrderId: string, techId: string) => {
     const newTech = technicians.find(t => t.id === techId);
-    const startDate = new Date(selectedDate);
-    startDate.setHours(8, 0, 0, 0);
-    const endDate = new Date(selectedDate);
-    endDate.setHours(9, 0, 0, 0);
+    // Create dates in local timezone (EST) and convert to UTC for storage
+    const startDateUTC = createLocalDateTime(selectedDate, 8, 0);
+    const endDateUTC = createLocalDateTime(selectedDate, 9, 0);
     
     setLocalWorkOrders(prev => prev.map(wo => 
       wo.id === workOrderId 
-        ? { ...wo, assignedTechId: techId, techName: newTech?.name || null, scheduledStart: startDate.toISOString() as any, scheduledEnd: endDate.toISOString() as any } 
+        ? { ...wo, assignedTechId: techId, techName: newTech?.name || null, scheduledStart: startDateUTC.toISOString() as any, scheduledEnd: endDateUTC.toISOString() as any } 
         : wo
     ));
     
@@ -1915,8 +1917,8 @@ export default function CrmDispatch() {
       workOrderId,
       updates: { 
         assignedTechId: techId,
-        scheduledStart: startDate.toISOString(),
-        scheduledEnd: endDate.toISOString(),
+        scheduledStart: startDateUTC.toISOString(),
+        scheduledEnd: endDateUTC.toISOString(),
       },
     }, {
       onSuccess: () => {
@@ -1929,28 +1931,27 @@ export default function CrmDispatch() {
     const [startHours, startMinutes] = startTime.split(":").map(Number);
     const [endHours, endMinutes] = endTime.split(":").map(Number);
     
-    const startDate = new Date(date);
-    startDate.setHours(startHours, startMinutes, 0, 0);
-    const endDate = new Date(date);
-    endDate.setHours(endHours, endMinutes, 0, 0);
+    // Create dates in local timezone (EST) and convert to UTC for storage
+    const startDateUTC = createLocalDateTime(date, startHours, startMinutes);
+    const endDateUTC = createLocalDateTime(date, endHours, endMinutes);
     
     setLocalWorkOrders(prev => prev.map(wo => 
       wo.id === workOrderId 
-        ? { ...wo, scheduledStart: startDate.toISOString() as any, scheduledEnd: endDate.toISOString() as any } 
+        ? { ...wo, scheduledStart: startDateUTC.toISOString() as any, scheduledEnd: endDateUTC.toISOString() as any } 
         : wo
     ));
     
     updateWorkOrderMutation.mutate({
       workOrderId,
       updates: { 
-        scheduledStart: startDate.toISOString(),
-        scheduledEnd: endDate.toISOString(),
+        scheduledStart: startDateUTC.toISOString(),
+        scheduledEnd: endDateUTC.toISOString(),
       },
     }, {
       onSuccess: () => {
-        toast({ title: "Scheduled", description: `Work order scheduled for ${format(startDate, "PPp")}` });
+        toast({ title: "Scheduled", description: `Work order scheduled for ${formatLocalDateTime(startDateUTC)}` });
         // Navigate to the scheduled date so user can see the work order
-        setSelectedDate(startDate);
+        setSelectedDate(date);
       }
     });
   }, [updateWorkOrderMutation, toast]);

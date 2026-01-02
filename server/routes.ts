@@ -6,6 +6,9 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { z } from "zod";
+import { fromZonedTime } from "date-fns-tz";
+
+const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
 import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum } from "@shared/schema";
 import { nanoid } from "nanoid";
@@ -8648,18 +8651,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dateParam = req.query.date as string;
       const statusParam = req.query.status as string;
       
-      // Parse date in UTC to avoid timezone issues (same approach as /api/crm/dispatch)
+      // Parse date - expecting YYYY-MM-DD format in local timezone (America/New_York)
       let targetDateStr: string;
       if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
         targetDateStr = dateParam;
       } else {
+        // Default to today in EST
         const now = new Date();
-        targetDateStr = now.toISOString().split("T")[0];
+        const estNow = new Date(now.toLocaleString("en-US", { timeZone: APP_TIMEZONE }));
+        targetDateStr = estNow.toISOString().split("T")[0];
       }
 
-      // Use UTC-based date range for consistent querying
-      const startOfDay = new Date(targetDateStr + "T00:00:00.000Z");
-      const endOfDay = new Date(targetDateStr + "T23:59:59.999Z");
+      // Convert local timezone (EST) date boundaries to UTC for database queries
+      // Start of day in EST (e.g., Jan 1 00:00 EST = Jan 1 05:00 UTC)
+      const startOfDayLocal = new Date(`${targetDateStr}T00:00:00`);
+      const startOfDay = fromZonedTime(startOfDayLocal, APP_TIMEZONE);
+      // End of day in EST (e.g., Jan 1 23:59 EST = Jan 2 04:59 UTC)
+      const endOfDayLocal = new Date(`${targetDateStr}T23:59:59.999`);
+      const endOfDay = fromZonedTime(endOfDayLocal, APP_TIMEZONE);
 
       let workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);
       
