@@ -6073,6 +6073,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH /api/crm/users/:id/activate - Reactivate user (ADMIN only)
+  app.patch("/api/crm/users/:id/activate", requireCrmAdmin, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      const userId = req.params.id;
+
+      const [user] = await db.select().from(crmUsers).where(eq(crmUsers.id, userId));
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const [updatedUser] = await db.update(crmUsers).set({ isActive: true }).where(eq(crmUsers.id, userId)).returning();
+
+      await logCrmAudit(
+        currentUser?.id || null,
+        "user.activated",
+        "user",
+        userId,
+        { name: user.name, email: user.email },
+        req.ip
+      );
+
+      const { passwordHash: _, ...userWithoutPassword } = updatedUser;
+      return res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error activating CRM user:", error);
+      return res.status(500).json({ message: "Failed to activate user" });
+    }
+  });
+
+  // PATCH /api/crm/users/:id - Update user (ADMIN only)
+  app.patch("/api/crm/users/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      const userId = req.params.id;
+      const { name, email, phone, role } = req.body;
+
+      const [existingUser] = await db.select().from(crmUsers).where(eq(crmUsers.id, userId));
+      if (!existingUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Validate role if provided
+      const validRoles = ["owner", "admin", "sales", "tech"];
+      if (role && !validRoles.includes(role)) {
+        return res.status(400).json({ message: "Invalid role. Must be one of: owner, admin, sales, tech" });
+      }
+
+      // Prevent demoting the last owner
+      if (existingUser.role === "owner" && role && role !== "owner") {
+        const ownerCount = await db.select({ count: count() }).from(crmUsers).where(
+          and(eq(crmUsers.role, "owner"), eq(crmUsers.isActive, true))
+        );
+        if (ownerCount[0].count <= 1) {
+          return res.status(400).json({ message: "Cannot change role of the last owner" });
+        }
+      }
+
+      // Check if email is already taken by another user
+      if (email && email.toLowerCase() !== existingUser.email) {
+        const emailExists = await getCrmUserByEmail(email);
+        if (emailExists) {
+          return res.status(400).json({ message: "Email is already in use by another user" });
+        }
+      }
+
+      const updateData: { name?: string; email?: string; phone?: string | null; role?: string } = {};
+      if (name) updateData.name = name;
+      if (email) updateData.email = email.toLowerCase();
+      if (phone !== undefined) updateData.phone = phone || null;
+      if (role) updateData.role = role;
+
+      const [updatedUser] = await db.update(crmUsers).set(updateData).where(eq(crmUsers.id, userId)).returning();
+
+      await logCrmAudit(
+        currentUser?.id || null,
+        "user.updated",
+        "user",
+        userId,
+        { changes: updateData, previousRole: existingUser.role },
+        req.ip
+      );
+
+      const { passwordHash: _, ...userWithoutPassword } = updatedUser;
+      return res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error updating CRM user:", error);
+      return res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
   // GET /api/crm/dispatch - Get dispatch board data for a specific date
   app.get("/api/crm/dispatch", requireCrmAuth, async (req, res) => {
     try {
