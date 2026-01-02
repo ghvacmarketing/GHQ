@@ -25,7 +25,10 @@ import {
   Plus,
   Trash2,
   DollarSign,
-  Eye
+  Eye,
+  Search,
+  Tag,
+  Package
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -525,6 +528,15 @@ interface QuickQuoteLineItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  lineType: "service" | "discount" | "part";
+}
+
+interface CatalogPart {
+  id: string;
+  partNumber?: string;
+  description: string;
+  category?: string;
+  price: string;
 }
 
 const quoteStatusConfig: Record<string, { label: string; className: string }> = {
@@ -540,10 +552,13 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [showQuickQuote, setShowQuickQuote] = useState(false);
-  const [lineItems, setLineItems] = useState<QuickQuoteLineItem[]>([
-    { id: "1", description: "", quantity: 1, unitPrice: 0 }
-  ]);
+  const [lineItems, setLineItems] = useState<QuickQuoteLineItem[]>([]);
   const [quoteTitle, setQuoteTitle] = useState("");
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [showDiscount, setShowDiscount] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [discountDescription, setDiscountDescription] = useState("");
+  const [discountAmount, setDiscountAmount] = useState("");
 
   // Fetch existing quotes for this work order
   const { data: quotesData, isLoading: quotesLoading, error: quotesError } = useQuery<{ quotes: CrmQuote[] }>({
@@ -557,11 +572,30 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
 
   const quotes = quotesData?.quotes || [];
 
+  // Fetch parts catalog
+  const { data: partsData } = useQuery<CatalogPart[]>({
+    queryKey: ["/api/parts"],
+    queryFn: async () => {
+      const res = await fetch("/api/parts", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const parts = partsData || [];
+  const filteredParts = catalogSearch.trim()
+    ? parts.filter(p => 
+        p.description.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+        (p.partNumber && p.partNumber.toLowerCase().includes(catalogSearch.toLowerCase()))
+      )
+    : parts.slice(0, 20);
+
   // Create quote mutation
   const createQuoteMutation = useMutation({
     mutationFn: async (data: { 
       title: string; 
-      lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number }>; 
+      lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number; lineType: string }>; 
       subtotal: number;
       total: number;
     }) => {
@@ -577,8 +611,8 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         quantity: item.quantity.toFixed(2),
         unitPrice: item.unitPrice.toFixed(2),
         lineTotal: item.lineTotal.toFixed(2),
-        lineType: "service",
-        taxable: true,
+        lineType: item.lineType,
+        taxable: item.lineType !== "discount",
         sortOrder: index,
       }));
 
@@ -607,7 +641,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       toast({ title: "Quote Created", description: "Your quick quote has been created as a draft." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", { workOrderId: workOrder.id }] });
       setShowQuickQuote(false);
-      setLineItems([{ id: "1", description: "", quantity: 1, unitPrice: 0 }]);
+      setLineItems([]);
       setQuoteTitle("");
     },
     onError: (error: Error) => {
@@ -616,13 +650,43 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   });
 
   const addLineItem = () => {
-    setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0 }]);
+    setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service" }]);
+  };
+
+  const addCatalogItem = (part: CatalogPart) => {
+    const price = parseFloat(part.price) || 0;
+    setLineItems([...lineItems, { 
+      id: Date.now().toString(), 
+      description: part.description, 
+      quantity: 1, 
+      unitPrice: price,
+      lineType: "part"
+    }]);
+    setShowCatalog(false);
+    setCatalogSearch("");
+    toast({ title: "Item Added", description: part.description });
+  };
+
+  const addDiscountItem = () => {
+    const amount = parseFloat(discountAmount) || 0;
+    if (amount <= 0 || !discountDescription.trim()) {
+      toast({ title: "Error", description: "Please enter a discount description and amount.", variant: "destructive" });
+      return;
+    }
+    setLineItems([...lineItems, { 
+      id: Date.now().toString(), 
+      description: discountDescription.trim(), 
+      quantity: 1, 
+      unitPrice: -Math.abs(amount),
+      lineType: "discount"
+    }]);
+    setShowDiscount(false);
+    setDiscountDescription("");
+    setDiscountAmount("");
   };
 
   const removeLineItem = (id: string) => {
-    if (lineItems.length > 1) {
-      setLineItems(lineItems.filter(item => item.id !== id));
-    }
+    setLineItems(lineItems.filter(item => item.id !== id));
   };
 
   const updateLineItem = (id: string, field: keyof QuickQuoteLineItem, value: string | number) => {
@@ -635,9 +699,9 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const total = subtotal; // No tax for quick quote
 
   const handleCreateQuote = () => {
-    const validItems = lineItems.filter(item => item.description.trim() && item.unitPrice > 0);
+    const validItems = lineItems.filter(item => item.description.trim() && item.unitPrice !== 0);
     if (validItems.length === 0) {
-      toast({ title: "Error", description: "Please add at least one line item with a description and price.", variant: "destructive" });
+      toast({ title: "Error", description: "Please add at least one line item.", variant: "destructive" });
       return;
     }
 
@@ -648,6 +712,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         lineTotal: item.quantity * item.unitPrice,
+        lineType: item.lineType,
       })),
       subtotal,
       total,
@@ -745,25 +810,14 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
               <p className="text-sm text-slate-600">
                 Create a simple quote with line items directly from here.
               </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1 min-h-[48px]"
-                  onClick={() => setShowQuickQuote(true)}
-                  data-testid="button-start-quick-quote"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Quick Quote
-                </Button>
-                <Button
-                  className="flex-1 min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
-                  onClick={() => navigate(`/crm/quotes/new?workOrderId=${workOrder.id}&customerId=${workOrder.customerId || ''}&propertyId=${workOrder.propertyId || ''}`)}
-                  data-testid="button-full-quote-builder"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Full Builder
-                </Button>
-              </div>
+              <Button
+                className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
+                onClick={() => setShowQuickQuote(true)}
+                data-testid="button-start-quick-quote"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Quick Quote
+              </Button>
             </>
           ) : (
             <div className="space-y-4">
@@ -782,76 +836,138 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                 />
               </div>
 
-              {/* Line Items */}
+              {/* Line Items Section */}
               <div className="space-y-3">
-                <Label className="text-sm font-medium">Line Items</Label>
-                {lineItems.map((item, index) => (
-                  <div key={item.id} className="border rounded-lg p-3 space-y-2" data-testid={`line-item-${item.id}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-500 font-medium">Item {index + 1}</span>
-                      {lineItems.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => removeLineItem(item.id)}
-                          data-testid={`button-remove-item-${item.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    <Input
-                      placeholder="Description (e.g., Labor - AC Repair)"
-                      value={item.description}
-                      onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
-                      className="min-h-[44px]"
-                      data-testid={`input-description-${item.id}`}
-                    />
-                    <div className="flex gap-2">
-                      <div className="w-24">
-                        <Label className="text-xs text-slate-500">Qty</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => updateLineItem(item.id, "quantity", parseInt(e.target.value) || 1)}
-                          className="min-h-[44px]"
-                          data-testid={`input-quantity-${item.id}`}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <Label className="text-xs text-slate-500">Unit Price</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={item.unitPrice || ""}
-                          onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                          className="min-h-[44px]"
-                          data-testid={`input-unit-price-${item.id}`}
-                        />
-                      </div>
-                      <div className="w-24 text-right">
-                        <Label className="text-xs text-slate-500">Line Total</Label>
-                        <p className="min-h-[44px] flex items-center justify-end font-medium" data-testid={`line-total-${item.id}`}>
-                          {formatCurrency(item.quantity * item.unitPrice)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Line Items</Label>
+                  <span className="text-xs text-slate-500">{lineItems.length} item{lineItems.length !== 1 ? "s" : ""}</span>
+                </div>
+                
+                {/* Action Buttons - Mobile Friendly */}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-[44px] flex-1 min-w-[100px] border-blue-200 text-blue-700 hover:bg-blue-50"
+                    onClick={() => setShowCatalog(true)}
+                    data-testid="button-add-from-catalog"
+                  >
+                    <Package className="h-4 w-4 mr-1" />
+                    Catalog
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-[44px] flex-1 min-w-[100px] border-amber-200 text-amber-700 hover:bg-amber-50"
+                    onClick={() => setShowDiscount(true)}
+                    data-testid="button-add-discount"
+                  >
+                    <Tag className="h-4 w-4 mr-1" />
+                    Discount
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-[44px] flex-1 min-w-[100px]"
+                    onClick={addLineItem}
+                    data-testid="button-add-line-item"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Manual
+                  </Button>
+                </div>
 
-                <Button
-                  variant="outline"
-                  className="w-full min-h-[44px]"
-                  onClick={addLineItem}
-                  data-testid="button-add-line-item"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Line Item
-                </Button>
+                {/* Line Items List */}
+                {lineItems.length === 0 ? (
+                  <div className="border border-dashed rounded-lg p-6 text-center text-slate-400">
+                    <p className="text-sm">No items added yet.</p>
+                    <p className="text-xs mt-1">Use the buttons above to add items.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {lineItems.map((item, index) => (
+                      <div 
+                        key={item.id} 
+                        className={`border rounded-lg p-3 space-y-2 ${item.lineType === "discount" ? "bg-amber-50 border-amber-200" : item.lineType === "part" ? "bg-blue-50 border-blue-200" : ""}`}
+                        data-testid={`line-item-${item.id}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500 font-medium">
+                              {item.lineType === "discount" ? (
+                                <span className="text-amber-600 flex items-center gap-1"><Tag className="h-3 w-3" />Discount</span>
+                              ) : item.lineType === "part" ? (
+                                <span className="text-blue-600 flex items-center gap-1"><Package className="h-3 w-3" />Part</span>
+                              ) : (
+                                `Item ${index + 1}`
+                              )}
+                            </span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => removeLineItem(item.id)}
+                            data-testid={`button-remove-item-${item.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        
+                        {item.lineType === "discount" ? (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">{item.description}</span>
+                            <span className="font-medium text-red-600" data-testid={`line-total-${item.id}`}>
+                              {formatCurrency(item.unitPrice)}
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <Input
+                              placeholder="Description (e.g., Labor - AC Repair)"
+                              value={item.description}
+                              onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
+                              className="min-h-[44px]"
+                              data-testid={`input-description-${item.id}`}
+                            />
+                            <div className="flex gap-2">
+                              <div className="w-20">
+                                <Label className="text-xs text-slate-500">Qty</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity}
+                                  onChange={(e) => updateLineItem(item.id, "quantity", parseInt(e.target.value) || 1)}
+                                  className="min-h-[44px]"
+                                  data-testid={`input-quantity-${item.id}`}
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <Label className="text-xs text-slate-500">Price</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  value={item.unitPrice || ""}
+                                  onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
+                                  className="min-h-[44px]"
+                                  data-testid={`input-unit-price-${item.id}`}
+                                />
+                              </div>
+                              <div className="w-24 text-right">
+                                <Label className="text-xs text-slate-500">Total</Label>
+                                <p className="min-h-[44px] flex items-center justify-end font-medium" data-testid={`line-total-${item.id}`}>
+                                  {formatCurrency(item.quantity * item.unitPrice)}
+                                </p>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Totals */}
@@ -862,7 +978,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                 </div>
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Total</span>
-                  <span className="text-green-700" data-testid="quote-total">{formatCurrency(total)}</span>
+                  <span className={total >= 0 ? "text-green-700" : "text-red-600"} data-testid="quote-total">{formatCurrency(total)}</span>
                 </div>
               </div>
 
@@ -873,7 +989,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                   className="flex-1 min-h-[48px]"
                   onClick={() => {
                     setShowQuickQuote(false);
-                    setLineItems([{ id: "1", description: "", quantity: 1, unitPrice: 0 }]);
+                    setLineItems([]);
                     setQuoteTitle("");
                   }}
                   disabled={createQuoteMutation.isPending}
@@ -899,6 +1015,121 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Items Catalog Dialog */}
+      <Dialog open={showCatalog} onOpenChange={setShowCatalog}>
+        <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-blue-600" />
+              Items Catalog
+            </DialogTitle>
+            <DialogDescription>
+              Search and select items from the catalog
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search parts..."
+              value={catalogSearch}
+              onChange={(e) => setCatalogSearch(e.target.value)}
+              className="pl-10 min-h-[44px]"
+              data-testid="input-catalog-search"
+            />
+          </div>
+          
+          <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
+            {filteredParts.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-4">
+                {catalogSearch ? "No items found" : "Loading catalog..."}
+              </p>
+            ) : (
+              filteredParts.map((part, idx) => (
+                <div
+                  key={part.id || idx}
+                  className="border rounded-lg p-3 hover:bg-slate-50 cursor-pointer"
+                  onClick={() => addCatalogItem(part)}
+                  data-testid={`catalog-item-${part.id || idx}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{part.description}</p>
+                      {part.partNumber && (
+                        <p className="text-xs text-slate-500">{part.partNumber}</p>
+                      )}
+                    </div>
+                    <span className="text-sm font-semibold text-green-700 ml-2">
+                      {formatCurrency(parseFloat(part.price) || 0)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowCatalog(false); setCatalogSearch(""); }}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Discount Dialog */}
+      <Dialog open={showDiscount} onOpenChange={setShowDiscount}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-5 w-5 text-amber-600" />
+              Add Discount
+            </DialogTitle>
+            <DialogDescription>
+              Enter discount details to apply to the quote
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium">Discount Description</Label>
+              <Input
+                placeholder="e.g., Senior Discount, Loyalty Discount"
+                value={discountDescription}
+                onChange={(e) => setDiscountDescription(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-discount-description"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Amount ($)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-discount-amount"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => { setShowDiscount(false); setDiscountDescription(""); setDiscountAmount(""); }}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-amber-600 hover:bg-amber-700"
+              onClick={addDiscountItem}
+              data-testid="button-confirm-discount"
+            >
+              Add Discount
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
