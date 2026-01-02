@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -13,6 +13,25 @@ import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  closestCorners,
+  useDroppable,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -64,6 +83,8 @@ import {
   CalendarDays,
   DollarSign,
   BarChart3,
+  GripVertical,
+  LayoutGrid,
 } from "lucide-react";
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType } from "@shared/schema";
@@ -217,6 +238,269 @@ function FollowUpTypeIcon({ type }: { type: FollowUpType }) {
   }
 }
 
+const KANBAN_STAGES: SalesStage[] = ["new", "contacted", "quote_sent", "negotiating", "won", "lost"];
+const COLUMN_PREFIX = "column-";
+
+function getColumnId(stage: SalesStage): string {
+  return `${COLUMN_PREFIX}${stage}`;
+}
+
+function getStageFromColumnId(columnId: string): SalesStage | null {
+  if (columnId.startsWith(COLUMN_PREFIX)) {
+    const stage = columnId.slice(COLUMN_PREFIX.length) as SalesStage;
+    if (KANBAN_STAGES.includes(stage)) {
+      return stage;
+    }
+  }
+  return null;
+}
+
+interface HorizontalScrollContainerProps {
+  children: ReactNode;
+  className?: string;
+  isDraggingCard?: boolean;
+}
+
+function HorizontalScrollContainer({ children, className, isDraggingCard }: HorizontalScrollContainerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [showLeftFade, setShowLeftFade] = useState(false);
+  const [showRightFade, setShowRightFade] = useState(true);
+
+  const updateFades = useCallback(() => {
+    if (!containerRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = containerRef.current;
+    setShowLeftFade(scrollLeft > 10);
+    setShowRightFade(scrollLeft < scrollWidth - clientWidth - 10);
+  }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    updateFades();
+    container.addEventListener('scroll', updateFades);
+    window.addEventListener('resize', updateFades);
+    return () => {
+      container.removeEventListener('scroll', updateFades);
+      window.removeEventListener('resize', updateFades);
+    };
+  }, [updateFades]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isDraggingCard) return;
+    if ((e.target as HTMLElement).closest('[data-no-drag]')) return;
+    const container = containerRef.current;
+    if (!container) return;
+    setIsDragging(true);
+    setStartX(e.pageX - container.offsetLeft);
+    setScrollLeft(container.scrollLeft);
+    container.style.cursor = 'grabbing';
+    container.style.userSelect = 'none';
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || isDraggingCard) return;
+    e.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+    const x = e.pageX - container.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    container.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    const container = containerRef.current;
+    if (container) {
+      container.style.cursor = 'grab';
+      container.style.userSelect = '';
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (isDragging) {
+      handleMouseUp();
+    }
+  };
+
+  return (
+    <div className="relative">
+      {showLeftFade && (
+        <div className="absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+      )}
+      <div
+        ref={containerRef}
+        className={cn(
+          "flex gap-4 overflow-x-auto pb-4",
+          !isDraggingCard && "cursor-grab",
+          isDragging && "cursor-grabbing",
+          className
+        )}
+        style={{ scrollbarWidth: 'thin' }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        data-testid="kanban-board"
+      >
+        <div className="w-2 flex-shrink-0" aria-hidden="true" />
+        {children}
+        <div className="w-2 flex-shrink-0" aria-hidden="true" />
+      </div>
+      {showRightFade && (
+        <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+      )}
+    </div>
+  );
+}
+
+interface ProspectCardProps {
+  prospect: CrmCustomer;
+  onClick: () => void;
+  isDragging?: boolean;
+}
+
+function ProspectCard({ prospect, onClick, isDragging: isDraggingProp }: ProspectCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ 
+    id: prospect.id,
+    data: {
+      type: "card",
+      prospect,
+      stage: prospect.salesStage || "new",
+    }
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging || isDraggingProp ? 0.5 : 1,
+  };
+
+  const nextFollowUp = prospect.nextFollowUpAt
+    ? typeof prospect.nextFollowUpAt === "string"
+      ? parseISO(prospect.nextFollowUpAt)
+      : prospect.nextFollowUpAt
+    : null;
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      className="mb-2 cursor-pointer hover:shadow-md transition-shadow bg-white touch-manipulation"
+      onClick={onClick}
+      data-testid={`card-prospect-${prospect.id}`}
+      data-no-drag
+    >
+      <CardContent className="p-3">
+        <div className="flex items-start gap-2">
+          <div
+            {...attributes}
+            {...listeners}
+            className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+            data-testid={`drag-handle-${prospect.id}`}
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-semibold text-sm truncate" data-testid={`text-prospect-name-${prospect.id}`}>
+              {prospect.name}
+            </h4>
+            {prospect.phone && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                <Phone className="h-3 w-3 flex-shrink-0" />
+                <span>{prospect.phone}</span>
+              </div>
+            )}
+            {nextFollowUp && (
+              <div className={`flex items-center gap-1 text-xs mt-1 ${
+                isPast(nextFollowUp) && !isToday(nextFollowUp) 
+                  ? "text-red-600 font-medium" 
+                  : isToday(nextFollowUp) 
+                  ? "text-amber-600 font-medium"
+                  : "text-muted-foreground"
+              }`}>
+                <Calendar className="h-3 w-3 flex-shrink-0" />
+                <span>{format(nextFollowUp, "MMM d")}</span>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-1 mt-2">
+              <InterestBadge level={prospect.interestLevel as InterestLevel} />
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface ProspectKanbanColumnProps {
+  stage: SalesStage;
+  prospects: CrmCustomer[];
+  onCardClick: (prospect: CrmCustomer) => void;
+}
+
+function ProspectKanbanColumn({ stage, prospects, onCardClick }: ProspectKanbanColumnProps) {
+  const columnId = getColumnId(stage);
+  
+  const { setNodeRef, isOver } = useDroppable({
+    id: columnId,
+    data: {
+      type: "column",
+      stage,
+    }
+  });
+
+  return (
+    <div className="flex-shrink-0 w-72 sm:w-80 snap-start sm:snap-center">
+      <Card className={`h-full bg-gray-50 transition-colors ${isOver ? 'ring-2 ring-primary ring-opacity-50' : ''}`}>
+        <CardHeader className="pb-2 pt-3 px-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold truncate" data-testid={`column-title-${stage}`}>
+              {STAGE_LABELS[stage]}
+            </CardTitle>
+            <Badge variant="outline" className="ml-2 flex-shrink-0" data-testid={`column-count-${stage}`}>
+              {prospects.length}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="px-3 pb-3 pt-0">
+          <div
+            ref={setNodeRef}
+            className="min-h-[400px]"
+            data-testid={`kanban-column-${stage}`}
+          >
+            <SortableContext items={prospects.map(p => p.id)} strategy={verticalListSortingStrategy}>
+              {prospects.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No prospects
+                </div>
+              ) : (
+                prospects.map((prospect) => (
+                  <ProspectCard
+                    key={prospect.id}
+                    prospect={prospect}
+                    onClick={() => onCardClick(prospect)}
+                  />
+                ))
+              )}
+            </SortableContext>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function CrmProspectFunnel() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -240,6 +524,18 @@ export default function CrmProspectFunnel() {
   
   const [mainViewTab, setMainViewTab] = useState<string>("overview");
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  
+  const [activeProspectId, setActiveProspectId] = useState<string | null>(null);
+  const [isDraggingCard, setIsDraggingCard] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 8 },
+    })
+  );
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -445,6 +741,65 @@ export default function CrmProspectFunnel() {
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   }, [calendarMonth]);
 
+  const prospectsByStage = useMemo(() => {
+    const grouped: Record<SalesStage, CrmCustomer[]> = {
+      new: [],
+      contacted: [],
+      quote_sent: [],
+      negotiating: [],
+      won: [],
+      lost: [],
+    };
+    prospects.forEach((p) => {
+      const stage = (p.salesStage || "new") as SalesStage;
+      if (grouped[stage]) {
+        grouped[stage].push(p);
+      }
+    });
+    return grouped;
+  }, [prospects]);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveProspectId(event.active.id as string);
+    setIsDraggingCard(true);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveProspectId(null);
+    setIsDraggingCard(false);
+
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    let newStage: SalesStage | null = null;
+
+    if (over.data.current?.type === "column") {
+      newStage = over.data.current.stage as SalesStage;
+    } else if (over.data.current?.type === "card") {
+      newStage = over.data.current.stage as SalesStage;
+    } else {
+      newStage = getStageFromColumnId(overId);
+    }
+
+    if (newStage) {
+      const prospect = prospects.find((p) => p.id === activeId);
+      if (prospect && prospect.salesStage !== newStage) {
+        if (newStage === "won") {
+          setConfirmProspectId(activeId);
+          setWonConfirmOpen(true);
+        } else if (newStage === "lost") {
+          setConfirmProspectId(activeId);
+          setLostConfirmOpen(true);
+        } else {
+          updateStageMutation.mutate({ id: activeId, salesStage: newStage });
+        }
+      }
+    }
+  };
+
   const filteredProspectIds = useMemo(() => {
     return new Set(filteredProspects.map((p) => p.id));
   }, [filteredProspects]);
@@ -602,6 +957,18 @@ export default function CrmProspectFunnel() {
             >
               <CalendarDays className="h-4 w-4" />
               Calendar
+            </button>
+            <button
+              onClick={() => setMainViewTab("kanban")}
+              className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+                mainViewTab === "kanban"
+                  ? "border-[#711419] text-[#711419]"
+                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+              }`}
+              data-testid="tab-kanban"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Kanban
             </button>
           </div>
           
@@ -1007,6 +1374,43 @@ export default function CrmProspectFunnel() {
                 })}
               </div>
             </div>
+            </TabsContent>
+
+            <TabsContent value="kanban" className="mt-4">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCorners}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <HorizontalScrollContainer isDraggingCard={isDraggingCard}>
+                  {KANBAN_STAGES.map((stage) => (
+                    <ProspectKanbanColumn
+                      key={stage}
+                      stage={stage}
+                      prospects={prospectsByStage[stage]}
+                      onCardClick={(prospect) => {
+                        setExpandedProspectId(prospect.id);
+                        setActiveTab("details");
+                      }}
+                    />
+                  ))}
+                </HorizontalScrollContainer>
+                <DragOverlay>
+                  {activeProspectId ? (
+                    (() => {
+                      const prospect = prospects.find((p) => p.id === activeProspectId);
+                      return prospect ? (
+                        <ProspectCard
+                          prospect={prospect}
+                          onClick={() => {}}
+                          isDragging
+                        />
+                      ) : null;
+                    })()
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
             </TabsContent>
           </Tabs>
         </div>
