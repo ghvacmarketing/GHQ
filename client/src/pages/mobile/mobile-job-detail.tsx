@@ -1,8 +1,7 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { format } from "date-fns";
-import { nanoid } from "nanoid";
 import { 
   ArrowLeft, 
   Phone, 
@@ -12,17 +11,13 @@ import {
   Clock,
   Send,
   Loader2,
-  Camera,
   X,
-  Image,
   CloudOff,
   CheckCircle2,
   Car,
   Wrench,
   ClipboardCheck,
-  Package,
   History,
-  Plus,
   ChevronDown,
   ChevronUp,
   Check,
@@ -41,30 +36,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
-import { useOnlineStatus, usePendingChanges, OfflineIndicator } from "@/hooks/use-online-status";
+import { useOnlineStatus, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
 import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus } from "@shared/schema";
 
-interface WorkOrderPhoto {
-  id: string;
-  url: string;
-  objectPath: string;
-  filename: string;
-  uploadedAt: string;
-}
-
-interface PartUsed {
-  partId: string;
-  name: string;
-  qty: number;
-  price: number;
-}
-
-interface WorkOrderDetail extends Omit<CrmWorkOrder, 'photos' | 'partsUsed'> {
+interface WorkOrderDetail extends CrmWorkOrder {
   customer: CrmCustomer | null;
   property: CrmProperty | null;
-  photos?: WorkOrderPhoto[] | null;
-  partsUsed?: PartUsed[] | null;
 }
 
 type ChecklistQuestion = {
@@ -153,11 +131,7 @@ export default function MobileJobDetail() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [noteInput, setNoteInput] = useState("");
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<WorkOrderPhoto | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { isOnline } = useOnlineStatus();
-  const pendingChangesCount = usePendingChanges(workOrderId);
   const pendingNotes = usePendingNotes(workOrderId);
 
   const [optimisticStatus, setOptimisticStatus] = useState<WorkOrderStatus | null>(null);
@@ -165,10 +139,6 @@ export default function MobileJobDetail() {
   const [completionSummary, setCompletionSummary] = useState("");
   
   const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(false);
-  const [showAddPart, setShowAddPart] = useState(false);
-  const [newPartName, setNewPartName] = useState("");
-  const [newPartQty, setNewPartQty] = useState("1");
-  const [newPartPrice, setNewPartPrice] = useState("");
 
   const { data: workOrder, isLoading } = useQuery<WorkOrderDetail>({
     queryKey: ["/api/crm/work-orders", params.id],
@@ -236,25 +206,6 @@ export default function MobileJobDetail() {
     },
   });
 
-  const addPartMutation = useMutation({
-    mutationFn: async (newPart: PartUsed) => {
-      const existingParts = workOrder?.partsUsed || [];
-      const updatedParts = [...existingParts, newPart];
-      await apiRequest("PATCH", `/api/crm/work-orders/${params.id}`, { partsUsed: updatedParts });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
-      setNewPartName("");
-      setNewPartQty("1");
-      setNewPartPrice("");
-      setShowAddPart(false);
-      toast({ title: "Part added" });
-    },
-    onError: () => {
-      toast({ title: "Failed to add part", variant: "destructive" });
-    },
-  });
-
   const handleStatusChange = (newStatus: WorkOrderStatus) => {
     if (newStatus === "completed") {
       setShowCompletionModal(true);
@@ -302,58 +253,6 @@ export default function MobileJobDetail() {
     },
   });
 
-  const handlePhotoCapture = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingPhoto(true);
-    try {
-      const presignedResponse = await fetch("/api/uploads/request-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          name: file.name,
-          size: file.size,
-          contentType: file.type,
-        }),
-      });
-
-      if (!presignedResponse.ok) {
-        throw new Error("Failed to get upload URL");
-      }
-
-      const { uploadURL, objectPath } = await presignedResponse.json();
-
-      await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-
-      const photoId = nanoid();
-      const photoUrl = `/objects${objectPath.startsWith("/") ? objectPath : `/${objectPath}`}`;
-
-      await apiRequest("POST", `/api/crm/work-orders/${params.id}/photos`, {
-        id: photoId,
-        url: photoUrl,
-        objectPath: objectPath,
-        filename: file.name,
-      });
-
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
-      toast({ title: "Photo uploaded successfully" });
-    } catch (error) {
-      console.error("Photo upload error:", error);
-      toast({ title: "Failed to upload photo", variant: "destructive" });
-    } finally {
-      setIsUploadingPhoto(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
-  };
-
   const handleCall = () => {
     const phone = workOrder?.customer?.phone;
     if (phone) {
@@ -379,21 +278,6 @@ export default function MobileJobDetail() {
     if (noteInput.trim()) {
       addNoteMutation.mutate(noteInput.trim());
     }
-  };
-
-  const handleAddPart = () => {
-    if (!newPartName.trim()) {
-      toast({ title: "Part name required", variant: "destructive" });
-      return;
-    }
-    const qty = parseInt(newPartQty, 10) || 1;
-    const price = parseFloat(newPartPrice) || 0;
-    addPartMutation.mutate({
-      partId: nanoid(),
-      name: newPartName.trim(),
-      qty,
-      price,
-    });
   };
 
   const getNextStatus = (currentStatus: WorkOrderStatus): WorkOrderStatus | null => {
@@ -459,16 +343,6 @@ export default function MobileJobDetail() {
             <ArrowLeft className="h-5 w-5 mr-1" />
             <span>Back</span>
           </button>
-          
-          {pendingChangesCount > 0 && (
-            <div 
-              className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full"
-              data-testid="pending-changes-indicator"
-            >
-              <CloudOff className="h-3 w-3" />
-              {pendingChangesCount} pending
-            </div>
-          )}
         </div>
 
         <div className="text-center mb-4">
@@ -758,181 +632,6 @@ export default function MobileJobDetail() {
           </CardContent>
         </Card>
 
-        <Card data-testid="parts-used-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Parts Used
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {workOrder.partsUsed && workOrder.partsUsed.length > 0 ? (
-              <div className="space-y-2" data-testid="parts-list">
-                {workOrder.partsUsed.map((part) => (
-                  <div 
-                    key={part.partId} 
-                    className="flex items-center justify-between bg-slate-50 p-3 rounded-md"
-                    data-testid={`part-item-${part.partId}`}
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-slate-700">{part.name}</p>
-                      <p className="text-xs text-slate-500">Qty: {part.qty}</p>
-                    </div>
-                    {part.price > 0 && (
-                      <span className="text-sm font-medium text-slate-600">${part.price.toFixed(2)}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : !showAddPart ? (
-              <p className="text-sm text-slate-400 italic" data-testid="no-parts">
-                No parts logged yet
-              </p>
-            ) : null}
-            
-            {showAddPart ? (
-              <div className="space-y-3 bg-slate-50 p-3 rounded-md" data-testid="add-part-form">
-                <div>
-                  <Label htmlFor="part-name" className="text-sm">Part Name *</Label>
-                  <Input
-                    id="part-name"
-                    placeholder="e.g., Capacitor 45/5 MFD"
-                    value={newPartName}
-                    onChange={(e) => setNewPartName(e.target.value)}
-                    className="min-h-[44px] mt-1"
-                    data-testid="input-part-name"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="part-qty" className="text-sm">Quantity</Label>
-                    <Input
-                      id="part-qty"
-                      type="number"
-                      min="1"
-                      value={newPartQty}
-                      onChange={(e) => setNewPartQty(e.target.value)}
-                      className="min-h-[44px] mt-1"
-                      data-testid="input-part-qty"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="part-price" className="text-sm">Price (optional)</Label>
-                    <Input
-                      id="part-price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={newPartPrice}
-                      onChange={(e) => setNewPartPrice(e.target.value)}
-                      className="min-h-[44px] mt-1"
-                      data-testid="input-part-price"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1 min-h-[44px]"
-                    onClick={() => {
-                      setShowAddPart(false);
-                      setNewPartName("");
-                      setNewPartQty("1");
-                      setNewPartPrice("");
-                    }}
-                    data-testid="button-cancel-part"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="flex-1 min-h-[44px] bg-[#711419] hover:bg-[#5a1014]"
-                    onClick={handleAddPart}
-                    disabled={!newPartName.trim() || addPartMutation.isPending}
-                    data-testid="button-save-part"
-                  >
-                    {addPartMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : null}
-                    Save Part
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <Button
-                variant="outline"
-                className="w-full min-h-[44px]"
-                onClick={() => setShowAddPart(true)}
-                data-testid="button-add-part"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Part
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card data-testid="photos-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Image className="h-4 w-4" />
-              Photos
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {workOrder.photos && workOrder.photos.length > 0 ? (
-              <div 
-                className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2"
-                data-testid="photo-thumbnails-container"
-              >
-                {workOrder.photos.map((photo) => (
-                  <button
-                    key={photo.id}
-                    onClick={() => setSelectedPhoto(photo)}
-                    className="relative shrink-0 w-20 h-20 rounded-md overflow-hidden border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#711419]"
-                    data-testid={`photo-thumbnail-${photo.id}`}
-                  >
-                    <img
-                      src={photo.url}
-                      alt={photo.filename}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-slate-400 italic" data-testid="no-photos">
-                No photos yet
-              </p>
-            )}
-            <Separator />
-            <div className="flex items-center gap-2">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoCapture}
-                ref={fileInputRef}
-                className="hidden"
-                data-testid="input-photo-file"
-              />
-              <Button
-                variant="outline"
-                className="flex-1 min-h-[44px]"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploadingPhoto || !isOnline}
-                data-testid="button-add-photo"
-              >
-                {isUploadingPhoto ? (
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                ) : (
-                  <Camera className="h-5 w-5 mr-2" />
-                )}
-                {isUploadingPhoto ? "Uploading..." : !isOnline ? "Photos require connection" : "Add Photo"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {previousWorkOrders.length > 0 && (
           <Card data-testid="job-history-card">
@@ -979,29 +678,6 @@ export default function MobileJobDetail() {
               )}
             </CardContent>
           </Card>
-        )}
-
-        {selectedPhoto && (
-          <div 
-            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-            onClick={() => setSelectedPhoto(null)}
-            data-testid="photo-viewer-overlay"
-          >
-            <button
-              onClick={() => setSelectedPhoto(null)}
-              className="absolute top-4 right-4 text-white p-2 hover:bg-white/20 rounded-full"
-              data-testid="button-close-photo-viewer"
-            >
-              <X className="h-6 w-6" />
-            </button>
-            <img
-              src={selectedPhoto.url}
-              alt={selectedPhoto.filename}
-              className="max-w-full max-h-full object-contain"
-              onClick={(e) => e.stopPropagation()}
-              data-testid="photo-viewer-image"
-            />
-          </div>
         )}
 
         {(workOrder.workSubtype || workOrder.description) && (
@@ -1076,20 +752,6 @@ export default function MobileJobDetail() {
         >
           <Navigation className="h-5 w-5" />
           <span className="text-xs">Navigate</span>
-        </Button>
-        <Button
-          variant="ghost"
-          className="flex flex-col items-center gap-1 h-auto py-2 px-4 min-h-[56px] min-w-[56px]"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploadingPhoto || !isOnline}
-          data-testid="fab-photo"
-        >
-          {isUploadingPhoto ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <Camera className="h-5 w-5" />
-          )}
-          <span className="text-xs">Photo</span>
         </Button>
       </div>
 
