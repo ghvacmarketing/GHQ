@@ -326,19 +326,23 @@ function HorizontalScrollContainer({ children, className, isDraggingCard }: Hori
   };
 
   return (
-    <div className="relative">
+    <div className="relative" style={{ overflow: 'visible' }}>
       {showLeftFade && (
         <div className="absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
       )}
       <div
         ref={containerRef}
         className={cn(
-          "flex gap-4 overflow-x-auto pb-4 kanban-scroll-container",
+          "flex flex-row gap-4 pb-4 kanban-scroll-container",
           !isDraggingCard && "cursor-grab",
           isDragging && "cursor-grabbing",
           className
         )}
-        style={{ scrollbarWidth: 'thin' }}
+        style={{ 
+          scrollbarWidth: 'thin',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+        }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -461,7 +465,7 @@ function ProspectKanbanColumn({ stage, prospects, onCardClick }: ProspectKanbanC
   });
 
   return (
-    <div className="flex-shrink-0 w-72 sm:w-80 snap-start sm:snap-center">
+    <div className="flex-shrink-0 w-[360px] min-w-[360px]">
       <Card className={`h-full bg-gray-50 transition-colors ${isOver ? 'ring-2 ring-primary ring-opacity-50' : ''}`}>
         <CardHeader className="pb-2 pt-3 px-3">
           <div className="flex items-center justify-between">
