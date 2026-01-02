@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import MobileShell from "./mobile-shell";
-import { useOnlineStatus, OfflineIndicator, usePendingChanges, PendingChangesBadge } from "@/hooks/use-online-status";
+import { useOnlineStatus, OfflineIndicator, usePendingChanges } from "@/hooks/use-online-status";
 import type { CrmWorkOrder, CrmCustomer, CrmProperty, CrmUser } from "@shared/schema";
 
 interface WorkOrderWithDetails extends CrmWorkOrder {
