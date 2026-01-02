@@ -238,7 +238,7 @@ function FollowUpTypeIcon({ type }: { type: FollowUpType }) {
   }
 }
 
-const KANBAN_STAGES: SalesStage[] = ["new", "contacted", "quote_sent", "negotiating", "won", "lost"];
+const KANBAN_STAGES: SalesStage[] = ["new", "contacted", "quote_sent", "negotiating"];
 const COLUMN_PREFIX = "column-";
 
 function getColumnId(stage: SalesStage): string {
