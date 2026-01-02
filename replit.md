@@ -64,6 +64,13 @@ Preferred communication style: Simple, everyday language.
   - **Smart form**: When contract date is set, auto-fills invoice date, appointment date (+1 month), start date, and end date (+1 year)
   - **Default pricing**: $229/year with auto-renew enabled
   - **Work order integration**: Visits can be linked to work orders for scheduling
+  - **Flexible Task System** (new immersive UI at `/crm/agreements/new`):
+    - **Database tables**: `maintenance_agreement_tasks` (task per agreement), `maintenance_task_schedules` (frequency, day of month, active months), `maintenance_task_equipment` (equipment per task), `maintenance_task_parts` (billable/non-billable parts)
+    - **Task builder table**: Add multiple maintenance tasks per agreement (HVAC, Vehicle, etc.) with duration, amount, confirmation/upgrade toggles
+    - **Flexible scheduling**: Repeat frequency (weekly/monthly/quarterly/yearly/custom), day of month selection, month checkboxes (Jan-Dec) with Select All
+    - **Equipment tracking**: Link equipment items to each task with make, model, serial number, location
+    - **Parts management**: Add billable and non-billable parts to each task with quantity, cost, price
+    - **Summary sidebar**: Shows customer, total amount, task count, scheduled visits preview
 - **Service Call Checklists**: Dynamic intake questionnaires for service work orders with:
   - **Database tables**: `serviceCallChecklists` (template per service type), `checklistQuestions` (questions with order/required flags), `workOrderChecklistResponses` (answers linked to work order)
   - **Service type mapping**: Work subtypes map to checklist templates (NO_HEAT, NO_AC, WATER_LEAK, OTHER)
