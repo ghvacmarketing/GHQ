@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { format, isToday, startOfDay, endOfDay } from "date-fns";
+import { format, isToday } from "date-fns";
+import { getLocalStartOfDay, getLocalEndOfDay, formatLocal, toLocalTime } from "@/lib/timezone";
 import { MapPin, Clock, ClipboardList, WifiOff, CloudOff, LogIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,11 +27,9 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 
 function formatScheduledTime(start: string | Date | null, end: string | Date | null): string {
   if (!start) return "Not scheduled";
-  const startDate = new Date(start);
-  const startTime = format(startDate, "h:mm a");
+  const startTime = formatLocal(start, "h:mm a");
   if (!end) return startTime;
-  const endDate = new Date(end);
-  const endTime = format(endDate, "h:mm a");
+  const endTime = formatLocal(end, "h:mm a");
   return `${startTime} - ${endTime}`;
 }
 
@@ -129,8 +128,8 @@ function WorkOrderCard({ workOrder, showCacheWarning }: { workOrder: WorkOrderWi
 
 export default function MobileAgenda() {
   const today = new Date();
-  const todayStart = startOfDay(today).toISOString();
-  const todayEnd = endOfDay(today).toISOString();
+  const todayStart = getLocalStartOfDay(today).toISOString();
+  const todayEnd = getLocalEndOfDay(today).toISOString();
   const { isOnline } = useOnlineStatus();
   const [isFromCache, setIsFromCache] = useState(false);
 
@@ -147,11 +146,11 @@ export default function MobileAgenda() {
   });
 
   const { data: workOrders, isLoading: isLoadingOrders, error, isError } = useQuery<WorkOrderWithDetails[]>({
-    queryKey: ["/api/crm/work-orders", { start: todayStart, end: todayEnd, techId: currentUser?.role === 'tech' ? currentUser?.id : undefined }],
+    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: currentUser?.role === 'tech' ? currentUser?.id : undefined }],
     queryFn: async () => {
       const params = new URLSearchParams({
-        start: todayStart,
-        end: todayEnd,
+        dateFrom: todayStart,
+        dateTo: todayEnd,
       });
       if (currentUser?.role === 'tech' && currentUser?.id) {
         params.set('techId', currentUser.id);
@@ -184,7 +183,8 @@ export default function MobileAgenda() {
 
   const todaysOrders = workOrders?.filter((wo) => {
     if (!wo.scheduledStart) return false;
-    return isToday(new Date(wo.scheduledStart));
+    const localStart = toLocalTime(wo.scheduledStart);
+    return isToday(localStart);
   }) ?? [];
 
   const showCacheWarning = !isOnline || isFromCache;
@@ -196,10 +196,10 @@ export default function MobileAgenda() {
       <div className="p-4 space-y-4" data-testid="mobile-agenda">
         <div className="text-center mb-6" data-testid="agenda-date-header">
           <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
-            {format(today, "EEEE")}
+            {formatLocal(today, "EEEE")}
           </h2>
           <p className="text-slate-500 dark:text-slate-400">
-            {format(today, "MMMM d, yyyy")}
+            {formatLocal(today, "MMMM d, yyyy")}
           </p>
           
           {showCacheWarning && workOrders && workOrders.length > 0 && (
