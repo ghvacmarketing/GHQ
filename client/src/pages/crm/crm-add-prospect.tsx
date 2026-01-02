@@ -106,7 +106,8 @@ export default function CrmAddProspect() {
     return result;
   }, [customers, searchQuery]);
 
-  const isAlreadyProspect = selectedCustomer?.customerStatus === "prospect";
+  // Check if customer is already in the sales funnel (has a salesStage)
+  const isAlreadyProspect = !!selectedCustomer?.salesStage;
 
   const convertToProspectMutation = useMutation({
     mutationFn: async () => {
@@ -269,7 +270,8 @@ export default function CrmAddProspect() {
                         </CommandEmpty>
                         <CommandGroup>
                           {filteredCustomers.slice(0, 50).map((customer) => {
-                            const isProspect = customer.customerStatus === "prospect";
+                            // Check if customer is already in the sales funnel
+                            const isProspect = !!customer.salesStage;
                             return (
                               <CommandItem
                                 key={customer.id}
