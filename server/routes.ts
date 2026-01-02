@@ -8186,23 +8186,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(whereClause);
       const total = Number(countResult?.count) || 0;
 
-      // Get paginated work orders with customer names
+      // Get paginated work orders with customer and property data
       const workOrdersRaw = await db
         .select({
           workOrder: crmWorkOrders,
-          customerName: crmCustomers.name,
+          customer: crmCustomers,
+          property: crmProperties,
         })
         .from(crmWorkOrders)
         .leftJoin(crmCustomers, eq(crmWorkOrders.customerId, crmCustomers.id))
+        .leftJoin(crmProperties, eq(crmWorkOrders.propertyId, crmProperties.id))
         .where(whereClause)
         .orderBy(desc(crmWorkOrders.scheduledStart))
         .limit(limitNum)
         .offset(offset);
 
-      // Flatten the result to include customerName directly on work order
+      // Include customer and property objects on each work order
       const workOrders = workOrdersRaw.map(row => ({
         ...row.workOrder,
-        customerName: row.customerName || null,
+        customerName: row.customer?.name || null,
+        customer: row.customer || null,
+        property: row.property || null,
       }));
 
       return res.json({

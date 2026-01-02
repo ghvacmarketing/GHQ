@@ -133,13 +133,12 @@ export default function MobileAgenda() {
   const { isOnline } = useOnlineStatus();
   const [isFromCache, setIsFromCache] = useState(false);
 
-  const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser>({
+  const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: async () => {
       const res = await fetch("/api/crm/auth/me", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch user");
-      const data = await res.json();
-      return data.user;
+      if (!res.ok) return null;
+      return res.json();
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
