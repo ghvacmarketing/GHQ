@@ -112,7 +112,7 @@ export async function createCrmUser(data: {
   name: string;
   email: string;
   password: string;
-  role?: "owner" | "manager" | "dispatcher" | "sales" | "tech" | "viewer";
+  role?: "owner" | "admin" | "sales" | "tech";
   phone?: string;
 }): Promise<CrmUser> {
   const passwordHash = await hashPassword(data.password);
@@ -123,7 +123,7 @@ export async function createCrmUser(data: {
       name: data.name,
       email: data.email.toLowerCase(),
       passwordHash,
-      role: data.role || "viewer",
+      role: data.role || "tech",
       phone: data.phone || null,
     })
     .returning();
@@ -138,33 +138,45 @@ export async function ensureDefaultAdminExists(): Promise<void> {
       name: "Admin",
       email: "admin@ghvac.com",
       password: "Giesbrecht",
-      role: "owner",
+      role: "admin",
     });
     console.log("Created default CRM admin user: admin@ghvac.com");
   }
 }
 
-export async function ensureTechniciansExist(): Promise<void> {
-  const technicians = [
-    { name: "Chandler", email: "chandler@ghvacinc.com" },
-    { name: "Earnest", email: "earnest@ghvacinc.com" },
-    { name: "Tucker", email: "tucker@ghvacinc.com" },
-    { name: "Brian", email: "brian@ghvacinc.com" },
-    { name: "Christopher", email: "christopher@ghvacinc.com" },
+export async function ensureCrmUsersExist(): Promise<void> {
+  // Define all CRM users with their correct roles:
+  // - owner: Full access (desktop CRM + mobile)
+  // - admin: Desktop CRM only
+  // - sales: Desktop CRM + mobile (manager-level access)
+  // - tech: Mobile only
+  const crmUsers = [
+    { name: "Ryo", email: "ghvacmarketing@gmail.com", role: "owner" as const },
+    { name: "Kylee", email: "kylee@ghvacinc.com", role: "admin" as const },
+    { name: "Chandler", email: "chandler@ghvacinc.com", role: "sales" as const },
+    { name: "Earnest", email: "earnest@ghvacinc.com", role: "sales" as const },
+    { name: "Tucker", email: "tucker@ghvacinc.com", role: "tech" as const },
+    { name: "Brian", email: "brian@ghvacinc.com", role: "tech" as const },
+    { name: "Christopher", email: "christopher@ghvacinc.com", role: "tech" as const },
   ];
 
-  for (const tech of technicians) {
-    const existingUser = await getCrmUserByEmail(tech.email);
+  for (const user of crmUsers) {
+    const existingUser = await getCrmUserByEmail(user.email);
     if (!existingUser) {
       await createCrmUser({
-        name: tech.name,
-        email: tech.email,
+        name: user.name,
+        email: user.email,
         password: "Giesbrecht",
-        role: "tech",
+        role: user.role,
       });
-      console.log(`Created technician user: ${tech.email}`);
+      console.log(`Created CRM user: ${user.email} (${user.role})`);
     }
   }
+}
+
+// Keep for backward compatibility
+export async function ensureTechniciansExist(): Promise<void> {
+  await ensureCrmUsersExist();
 }
 
 declare global {
@@ -230,9 +242,13 @@ export function requireCrmRole(...allowedRoles: string[]) {
   };
 }
 
-const ADMIN_ROLES = ["owner", "manager"];
-const SALES_ROLES = ["owner", "manager", "dispatcher", "sales"];
-const TECH_ROLES = ["owner", "manager", "dispatcher", "sales", "tech"];
+// Role access groups
+// Admin roles have full CRM management access
+const ADMIN_ROLES = ["owner", "admin"];
+// Sales roles have manager-level features (desktop + mobile)
+const SALES_ROLES = ["owner", "admin", "sales"];
+// Mobile roles can access the mobile app
+const MOBILE_ROLES = ["owner", "sales", "tech"];
 
 export function isAdmin(role: string): boolean {
   return ADMIN_ROLES.includes(role);
@@ -242,8 +258,8 @@ export function isSalesOrAbove(role: string): boolean {
   return SALES_ROLES.includes(role);
 }
 
-export function isTechOrAbove(role: string): boolean {
-  return TECH_ROLES.includes(role);
+export function canAccessMobile(role: string): boolean {
+  return MOBILE_ROLES.includes(role);
 }
 
 export function requireCrmAdmin(req: Request, res: Response, next: NextFunction) {

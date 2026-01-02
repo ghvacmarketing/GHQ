@@ -448,7 +448,7 @@ const createUserSchema = z.object({
   email: z.string().email(),
   phone: z.string().optional(),
   password: z.string().min(8),
-  role: z.enum(["owner", "manager", "dispatcher", "sales", "tech", "viewer"]),
+  role: z.enum(["owner", "admin", "sales", "tech"]),
 });
 
 router.post("/users", requireCrmAuth, requireCrmAdmin, async (req: Request, res: Response) => {

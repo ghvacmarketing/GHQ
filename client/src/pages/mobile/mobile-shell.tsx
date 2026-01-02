@@ -1,8 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ClipboardList, Wrench, Clock, User, Monitor } from "lucide-react";
+import { ClipboardList, Wrench, Clock, User, Monitor, ShieldX } from "lucide-react";
 import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
+import { Button } from "@/components/ui/button";
 
 interface MobileShellProps {
   children: ReactNode;
@@ -14,6 +15,10 @@ const navTabs = [
   { path: "/mobile/time", label: "Time", icon: Clock },
   { path: "/mobile/profile", label: "Profile", icon: User },
 ];
+
+// Roles that can access mobile app: owner, sales, tech
+// Admin role is desktop-only
+const MOBILE_ALLOWED_ROLES = ["owner", "sales", "tech"];
 
 export default function MobileShell({ children }: MobileShellProps) {
   const [location] = useLocation();
@@ -28,7 +33,33 @@ export default function MobileShell({ children }: MobileShellProps) {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Check if user can access mobile app
+  const canAccessMobile = currentUser && MOBILE_ALLOWED_ROLES.includes(currentUser.role);
   const showDesktopLink = currentUser && currentUser.role !== "tech";
+
+  // Block admin users from mobile app
+  if (currentUser && !canAccessMobile) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4" data-testid="mobile-access-denied">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ShieldX className="h-8 w-8 text-red-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">Mobile Access Not Available</h1>
+          <p className="text-slate-600 mb-6">
+            Your role has access to the desktop CRM system only.
+          </p>
+          <Button 
+            onClick={() => window.location.href = "/crm"}
+            className="bg-[#711419] hover:bg-[#8a1a1f] text-white"
+            data-testid="button-go-to-desktop"
+          >
+            Go to Desktop CRM
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const isActive = (path: string) => {
     if (path === "/mobile") {

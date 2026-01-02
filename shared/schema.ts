@@ -760,7 +760,11 @@ export type EmployeeDocument = typeof employeeDocuments.$inferSelect;
 // ============================================
 
 // CRM User Roles
-export const crmUserRoleEnum = ["owner", "manager", "dispatcher", "sales", "tech", "viewer"] as const;
+// owner: Full access to everything (desktop CRM + mobile)
+// admin: Desktop CRM access only
+// sales: Desktop CRM + mobile access (manager-level features)
+// tech: Mobile access only
+export const crmUserRoleEnum = ["owner", "admin", "sales", "tech"] as const;
 export type CrmUserRole = typeof crmUserRoleEnum[number];
 
 // CRM Users
@@ -769,7 +773,7 @@ export const crmUsers = pgTable("crm_users", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   phone: text("phone"),
-  role: text("role").$type<CrmUserRole>().notNull().default("viewer"),
+  role: text("role").$type<CrmUserRole>().notNull().default("tech"),
   passwordHash: text("password_hash").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),

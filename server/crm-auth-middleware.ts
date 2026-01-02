@@ -36,16 +36,25 @@ export function generateSessionToken(): string {
 
 const ROLE_HIERARCHY: Record<CrmUserRole, number> = {
   owner: 100,
-  manager: 80,
-  dispatcher: 60,
-  sales: 40,
-  tech: 20,
-  viewer: 10,
+  admin: 80,
+  sales: 60,
+  tech: 40,
 };
 
-const ADMIN_ROLES: CrmUserRole[] = ["owner", "manager"];
-const SALES_ROLES: CrmUserRole[] = ["owner", "manager", "dispatcher", "sales"];
-const TECH_ROLES: CrmUserRole[] = ["owner", "manager", "dispatcher", "sales", "tech"];
+// Roles that can access desktop CRM
+const DESKTOP_ROLES: CrmUserRole[] = ["owner", "admin", "sales"];
+
+// Roles that can access mobile app
+const MOBILE_ROLES: CrmUserRole[] = ["owner", "sales", "tech"];
+
+// Admin-level roles (owner and admin)
+const ADMIN_ROLES: CrmUserRole[] = ["owner", "admin"];
+
+// Sales-level and above (for manager-level features)
+const SALES_ROLES: CrmUserRole[] = ["owner", "admin", "sales"];
+
+// All authenticated roles (for basic access)
+const ALL_ROLES: CrmUserRole[] = ["owner", "admin", "sales", "tech"];
 
 export function isAdmin(role: CrmUserRole): boolean {
   return ADMIN_ROLES.includes(role);
@@ -55,8 +64,12 @@ export function isSalesOrAbove(role: CrmUserRole): boolean {
   return SALES_ROLES.includes(role);
 }
 
-export function isTechOrAbove(role: CrmUserRole): boolean {
-  return TECH_ROLES.includes(role);
+export function canAccessDesktop(role: CrmUserRole): boolean {
+  return DESKTOP_ROLES.includes(role);
+}
+
+export function canAccessMobile(role: CrmUserRole): boolean {
+  return MOBILE_ROLES.includes(role);
 }
 
 // Throttle lastSeenAt updates to reduce DB writes
@@ -150,6 +163,30 @@ export function requireCrmSalesOrAbove(req: Request, res: Response, next: NextFu
 
   if (!isSalesOrAbove(req.crmUser.role)) {
     return res.status(403).json({ message: "Forbidden - Sales role or above required" });
+  }
+
+  next();
+}
+
+export function requireDesktopAccess(req: Request, res: Response, next: NextFunction) {
+  if (!req.crmUser) {
+    return res.status(401).json({ message: "Unauthorized - Not authenticated" });
+  }
+
+  if (!canAccessDesktop(req.crmUser.role)) {
+    return res.status(403).json({ message: "Forbidden - Desktop CRM access required" });
+  }
+
+  next();
+}
+
+export function requireMobileAccess(req: Request, res: Response, next: NextFunction) {
+  if (!req.crmUser) {
+    return res.status(401).json({ message: "Unauthorized - Not authenticated" });
+  }
+
+  if (!canAccessMobile(req.crmUser.role)) {
+    return res.status(403).json({ message: "Forbidden - Mobile app access required" });
   }
 
   next();

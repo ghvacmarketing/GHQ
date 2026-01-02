@@ -5959,11 +5959,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/technicians - List field workers for dispatch (techs, managers, sales who do field work)
+  // GET /api/crm/technicians - List field workers for dispatch (techs and sales who do field work)
   app.get("/api/crm/technicians", requireCrmAuth, async (req, res) => {
     try {
-      // Include tech, manager, and sales roles - anyone who might be assigned field work
-      const fieldRoles = ["tech", "manager", "sales"];
+      // Include tech and sales roles - anyone who might be assigned field work (owner also has mobile access)
+      const fieldRoles = ["tech", "sales", "owner"];
       const technicians = await db.select({
         id: crmUsers.id,
         name: crmUsers.name,
@@ -5971,7 +5971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: crmUsers.role,
       }).from(crmUsers)
         .where(and(
-          sql`${crmUsers.role} IN ('tech', 'manager', 'sales')`,
+          sql`${crmUsers.role} IN ('tech', 'sales', 'owner')`,
           eq(crmUsers.isActive, true)
         ))
         .orderBy(crmUsers.name);
@@ -6021,7 +6021,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name,
         email: email.toLowerCase(),
         passwordHash,
-        role: role || "viewer",
+        role: role || "tech",
         phone: phone || null,
       }).returning();
 
@@ -6590,9 +6590,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // Check if user has admin/owner/manager role
-      if (!["admin", "owner", "manager"].includes(user.role)) {
-        return res.status(403).json({ message: "Forbidden - Admin, owner, or manager role required" });
+      // Check if user has owner/admin/sales role (sales has manager-level access)
+      if (!["owner", "admin", "sales"].includes(user.role)) {
+        return res.status(403).json({ message: "Forbidden - Owner, admin, or sales role required" });
       }
 
       const customerId = req.params.id;

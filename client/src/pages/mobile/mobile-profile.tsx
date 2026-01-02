@@ -28,13 +28,10 @@ export default function MobileProfile() {
 
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
-      tech: "Technician",
-      manager: "Manager",
-      sales: "Sales",
-      admin: "Administrator",
       owner: "Owner",
-      dispatcher: "Dispatcher",
-      viewer: "Viewer",
+      admin: "Administrator",
+      sales: "Sales",
+      tech: "Technician",
     };
     return labels[role] || role;
   };

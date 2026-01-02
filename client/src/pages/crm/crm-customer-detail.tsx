@@ -2333,7 +2333,7 @@ export default function CrmCustomerDetail() {
 
   const technicians = dispatchData?.technicians?.filter((t) => t.role === "tech") || [];
 
-  const canDeleteCustomer = currentUser && ["admin", "owner", "manager"].includes(currentUser.role);
+  const canDeleteCustomer = currentUser && ["owner", "admin", "sales"].includes(currentUser.role);
 
   const validateForm = (): boolean => {
     let isValid = true;

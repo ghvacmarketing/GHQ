@@ -55,6 +55,12 @@ Preferred communication style: Simple, everyday language.
 - **AI Quote Generation**: Uses OpenAI GPT-5.2 with structured outputs (strict json_schema) for consistent, sales-ready quotes. Features conversation memory with rolling summaries (last 10 messages stored in database), and optional knowledge base integration via vector store file_search to enhance product descriptions from uploaded sales PDFs.
 - **Vector Store Knowledge Base**: Optional feature that uploads sales books and product documentation to OpenAI vector stores for enhanced quote generation. Gracefully degrades when API is not available. Admin endpoints for file management.
 - **Security**: Requires `SESSION_SECRET` and `ADMIN_API_KEY` environment variables. Implements a `GLOBAL_PASSWORD` gate for application-wide access control, configurable via environment variables.
+- **CRM User Roles**: Four distinct roles with different access levels:
+  - **Owner**: Full access to everything (desktop CRM + mobile app). Current user: Ryo.
+  - **Admin**: Desktop CRM access only. Current user: Kylee.
+  - **Sales**: Desktop CRM + mobile access with manager-level features (can delete customers, access discounts). Current users: Chandler, Ernest.
+  - **Tech**: Mobile app access only. Current users: Brian, Christopher, Tucker.
+  - Route guards enforce access: `crm-route-guard.tsx` blocks tech from desktop, `mobile-shell.tsx` blocks admin from mobile.
 - **Employee Portal**: Separate authentication system with username/password login (scrypt-hashed passwords). Supports Employee and Admin roles with server-side permission enforcement. Employees can only view their own data (profile, compensation, paystubs, documents). Admins can create/deactivate users, set pay rates with effective dates, upload paystubs, and view audit logs. Features 8-hour session timeout and PostgreSQL-backed sessions.
 - **Maintenance Agreements System**: Comprehensive maintenance contract management with:
   - **Three key dates**: Contract date (signing), Invoice date (same as contract), Appointment date (1 month after contract for payment grace period)
