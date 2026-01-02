@@ -12,7 +12,7 @@ interface CrmRouteGuardProps {
 export default function CrmRouteGuard({ children }: CrmRouteGuardProps) {
   const [, navigate] = useLocation();
 
-  const { data: authData, isLoading } = useQuery<{ user: CrmUser } | null>({
+  const { data: currentUser, isLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: async () => {
       const res = await fetch("/api/crm/auth/me", { credentials: "include" });
@@ -21,8 +21,6 @@ export default function CrmRouteGuard({ children }: CrmRouteGuardProps) {
     },
     staleTime: 5 * 60 * 1000,
   });
-
-  const currentUser = authData?.user;
 
   useEffect(() => {
     if (!isLoading && !currentUser) {
