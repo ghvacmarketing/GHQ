@@ -146,7 +146,7 @@ export default function MobileJobDetail() {
       });
 
       const photoId = nanoid();
-      const photoUrl = objectPath.startsWith("/") ? objectPath : `/${objectPath}`;
+      const photoUrl = `/objects${objectPath.startsWith("/") ? objectPath : `/${objectPath}`}`;
 
       const addPhotoResponse = await apiRequest("POST", `/api/crm/work-orders/${params.id}/photos`, {
         id: photoId,
