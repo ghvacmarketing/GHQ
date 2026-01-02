@@ -316,6 +316,11 @@ export default function CrmWorkOrderDetail() {
   const [quoteDescription, setQuoteDescription] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
+  const [createInvoiceDialogOpen, setCreateInvoiceDialogOpen] = useState(false);
+  const [invoiceDescription, setInvoiceDescription] = useState("");
+  const [invoiceSubtotal, setInvoiceSubtotal] = useState("");
+  const [invoiceTaxAmount, setInvoiceTaxAmount] = useState("");
+
   const [quoteSearch, setQuoteSearch] = useState("");
   const [quoteStatusFilter, setQuoteStatusFilter] = useState("all");
   const [invoiceSearch, setInvoiceSearch] = useState("");
@@ -499,16 +504,29 @@ export default function CrmWorkOrderDetail() {
 
   const createInvoiceMutation = useMutation({
     mutationFn: async () => {
+      const subtotal = parseFloat(invoiceSubtotal) || 0;
+      const tax = parseFloat(invoiceTaxAmount) || 0;
+      const total = subtotal + tax;
+      
       const res = await apiRequest("POST", "/api/crm/invoices", {
         workOrderId: workOrderId,
         customerId: workOrder?.customerId || workOrder?.customer?.id,
         propertyId: workOrder?.propertyId || workOrder?.property?.id,
+        description: invoiceDescription || undefined,
+        subtotal: subtotal.toFixed(2),
+        tax: tax.toFixed(2),
+        total: total.toFixed(2),
+        balanceDue: total.toFixed(2),
       });
       return res.json();
     },
     onSuccess: () => {
       toast({ title: "Invoice created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", workOrderId, "invoices"] });
+      setCreateInvoiceDialogOpen(false);
+      setInvoiceDescription("");
+      setInvoiceSubtotal("");
+      setInvoiceTaxAmount("");
     },
     onError: (error: Error) => {
       toast({
@@ -1470,12 +1488,11 @@ export default function CrmWorkOrderDetail() {
                   <Button
                     size="sm"
                     className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                    onClick={() => createInvoiceMutation.mutate()}
-                    disabled={createInvoiceMutation.isPending}
+                    onClick={() => setCreateInvoiceDialogOpen(true)}
                     data-testid="button-create-invoice"
                   >
                     <Plus className="h-4 w-4 mr-1" />
-                    {createInvoiceMutation.isPending ? "Creating..." : "Create Invoice"}
+                    Create Invoice
                   </Button>
                 </div>
                 {invoices && invoices.length > 0 && (
@@ -1648,8 +1665,7 @@ export default function CrmWorkOrderDetail() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => createInvoiceMutation.mutate()}
-                      disabled={createInvoiceMutation.isPending}
+                      onClick={() => setCreateInvoiceDialogOpen(true)}
                       data-testid="button-create-invoice-empty"
                     >
                       <Plus className="h-4 w-4 mr-1" />
@@ -2176,6 +2192,91 @@ export default function CrmWorkOrderDetail() {
                 data-testid="button-submit-quote"
               >
                 {createQuoteMutation.isPending ? "Creating..." : "Create Quote"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={createInvoiceDialogOpen} onOpenChange={setCreateInvoiceDialogOpen}>
+          <DialogContent data-testid="dialog-create-invoice">
+            <DialogHeader>
+              <DialogTitle data-testid="dialog-title-create-invoice">Create Invoice</DialogTitle>
+              <DialogDescription>
+                Create an invoice for this work order. Enter the subtotal and optional tax amount.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="invoice-description">Description (optional)</Label>
+                <Textarea
+                  id="invoice-description"
+                  value={invoiceDescription}
+                  onChange={(e) => setInvoiceDescription(e.target.value)}
+                  placeholder="Invoice description or notes"
+                  rows={2}
+                  data-testid="input-invoice-description"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invoice-subtotal">Subtotal <span className="text-red-500">*</span></Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                  <Input
+                    id="invoice-subtotal"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={invoiceSubtotal}
+                    onChange={(e) => setInvoiceSubtotal(e.target.value)}
+                    placeholder="0.00"
+                    className="pl-7"
+                    data-testid="input-invoice-subtotal"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invoice-tax">Tax Amount (optional)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                  <Input
+                    id="invoice-tax"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={invoiceTaxAmount}
+                    onChange={(e) => setInvoiceTaxAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="pl-7"
+                    data-testid="input-invoice-tax"
+                  />
+                </div>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center py-2 bg-slate-50 px-3 rounded-md">
+                <span className="font-medium text-slate-700">Total</span>
+                <span className="text-lg font-semibold text-slate-900" data-testid="text-invoice-total">
+                  {formatCurrency((parseFloat(invoiceSubtotal) || 0) + (parseFloat(invoiceTaxAmount) || 0))}
+                </span>
+              </div>
+              <div className="text-sm text-slate-500">
+                <p>Work Order ID: {workOrderId?.slice(-8)}</p>
+                {workOrder?.customer?.name && <p>Customer: {workOrder.customer.name}</p>}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setCreateInvoiceDialogOpen(false)}
+                data-testid="button-cancel-create-invoice"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => createInvoiceMutation.mutate()}
+                disabled={!invoiceSubtotal || parseFloat(invoiceSubtotal) <= 0 || createInvoiceMutation.isPending}
+                data-testid="button-submit-invoice"
+              >
+                {createInvoiceMutation.isPending ? "Creating..." : "Create Invoice"}
               </Button>
             </DialogFooter>
           </DialogContent>
