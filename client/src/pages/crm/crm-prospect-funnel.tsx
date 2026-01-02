@@ -1139,89 +1139,103 @@ export default function CrmProspectFunnel() {
               const nextStage = prospect.salesStage ? NEXT_STAGE[prospect.salesStage] : null;
               const isActive = prospect.salesStage !== "won" && prospect.salesStage !== "lost";
               
+              const nextFollowUpDate = prospect.nextFollowUpAt
+                ? typeof prospect.nextFollowUpAt === "string"
+                  ? parseISO(prospect.nextFollowUpAt)
+                  : prospect.nextFollowUpAt
+                : null;
+              const isOverdue = nextFollowUpDate && isPast(nextFollowUpDate) && !isToday(nextFollowUpDate);
+              const isDueToday = nextFollowUpDate && isToday(nextFollowUpDate);
+
               return (
                 <Card
                   key={prospect.id}
-                  className={searchTerm && "ring-2 ring-primary/30 bg-primary/5 transition-all duration-200" ? "" : ""}
+                  className="hover:shadow-sm transition-shadow"
                   data-testid={`card-prospect-${prospect.id}`}
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start gap-3">
-                      <InitialsAvatar name={prospect.name} size="md" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-3">
-                          <CardTitle className="break-words text-base leading-tight flex-1 min-w-0" data-testid={`text-prospect-name-${prospect.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <InitialsAvatar name={prospect.name} size="md" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-base truncate" data-testid={`text-prospect-name-${prospect.id}`}>
                             {prospect.name}
-                          </CardTitle>
-                          <div className="flex items-center gap-2 flex-shrink-0">
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
+                            {prospect.phone && (
+                              <a href={`tel:${prospect.phone}`} className="flex items-center gap-1 hover:underline" data-testid={`link-phone-${prospect.id}`}>
+                                <Phone className="h-3.5 w-3.5" />
+                                <span>{prospect.phone}</span>
+                              </a>
+                            )}
+                            {prospect.email && (
+                              <a href={`mailto:${prospect.email}`} className="flex items-center gap-1 hover:underline truncate max-w-[200px]" data-testid={`link-email-${prospect.id}`}>
+                                <Mail className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span className="truncate">{prospect.email}</span>
+                              </a>
+                            )}
+                            {nextFollowUpDate && (
+                              <span className={`flex items-center gap-1 ${
+                                isOverdue ? "text-red-600 font-medium" : isDueToday ? "text-amber-600 font-medium" : ""
+                              }`}>
+                                Next: {format(nextFollowUpDate, "MMM d")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {isActive ? (
+                          <div className="flex items-center gap-1.5">
+                            <Select
+                              value={prospect.salesStage || "new"}
+                              onValueChange={(value) => updateStageMutation.mutate({ id: prospect.id, salesStage: value as SalesStage })}
+                            >
+                              <SelectTrigger className="h-7 min-w-[90px] text-xs border-slate-200" data-testid={`select-stage-${prospect.id}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="new">New</SelectItem>
+                                <SelectItem value="contacted">Contacted</SelectItem>
+                                <SelectItem value="quote_sent">Quote Sent</SelectItem>
+                                <SelectItem value="negotiating">Negotiating</SelectItem>
+                                <SelectItem value="won">Won</SelectItem>
+                                <SelectItem value="lost">Lost</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <InterestBadge level={prospect.interestLevel as InterestLevel} />
-                            {isActive ? (
-                              <Select
-                                value={prospect.salesStage || "new"}
-                                onValueChange={(value) => updateStageMutation.mutate({ id: prospect.id, salesStage: value as SalesStage })}
-                              >
-                                <SelectTrigger className="h-8 min-w-[100px] text-xs" data-testid={`select-stage-${prospect.id}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="new">New</SelectItem>
-                                  <SelectItem value="contacted">Contacted</SelectItem>
-                                  <SelectItem value="quote_sent">Quote Sent</SelectItem>
-                                  <SelectItem value="negotiating">Negotiating</SelectItem>
-                                  <SelectItem value="won">Won</SelectItem>
-                                  <SelectItem value="lost">Lost</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Badge variant={prospect.salesStage === "won" ? "default" : "destructive"} className="text-xs">
-                                {STAGE_LABELS[prospect.salesStage as SalesStage] || prospect.salesStage}
-                              </Badge>
-                            )}
                           </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2">
-                          {prospect.phone && (
-                            <a href={`tel:${prospect.phone}`} className="flex items-center gap-1 hover:underline" data-testid={`link-phone-${prospect.id}`}>
-                              <Phone className="h-3 w-3" />
-                              <span>{prospect.phone}</span>
-                            </a>
-                          )}
-                          {prospect.email && (
-                            <a href={`mailto:${prospect.email}`} className="flex items-center gap-1 hover:underline truncate max-w-[180px]" data-testid={`link-email-${prospect.id}`}>
-                              <Mail className="h-3 w-3 flex-shrink-0" />
-                              <span className="truncate">{prospect.email}</span>
-                            </a>
-                          )}
-                        </div>
-
-                        {(prospect.nextFollowUpAt || prospect.companyName) && (
-                          <div className="flex flex-wrap items-center gap-2 mt-3">
-                            {prospect.nextFollowUpAt && (
-                              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200">
-                                <FollowUpBadge nextFollowUpAt={prospect.nextFollowUpAt} />
-                              </div>
-                            )}
-                            {prospect.companyName && (
-                              <Badge variant="secondary" className="text-xs">
-                                {prospect.companyName}
-                              </Badge>
-                            )}
-                          </div>
+                        ) : (
+                          <Badge variant={prospect.salesStage === "won" ? "default" : "destructive"} className="text-xs">
+                            {STAGE_LABELS[prospect.salesStage as SalesStage] || prospect.salesStage}
+                          </Badge>
                         )}
                       </div>
                     </div>
-                  </CardHeader>
 
-                  <CardContent className="pt-0">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-slate-100">
                       <div className="flex items-center gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-8 px-3 touch-manipulation text-xs"
+                          onClick={() => handleAddFollowUp(prospect.id)}
+                          data-testid={`button-add-followup-${prospect.id}`}
+                        >
+                          <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                          Follow-up
+                          {nextFollowUpDate && (
+                            <span className="ml-1 text-muted-foreground">· {format(nextFollowUpDate, "MMM d")}</span>
+                          )}
+                        </Button>
                         {isActive && (
                           <>
                             <Button 
                               size="icon" 
-                              variant="outline" 
-                              className="h-8 w-8 touch-manipulation border-green-200 bg-green-50 hover:bg-green-100" 
+                              variant="ghost" 
+                              className="h-8 w-8 touch-manipulation text-green-600 hover:bg-green-50" 
                               onClick={() => {
                                 setConfirmProspectId(prospect.id);
                                 setWonConfirmOpen(true);
@@ -1229,12 +1243,12 @@ export default function CrmProspectFunnel() {
                               title="Mark Won"
                               data-testid={`button-mark-won-${prospect.id}`}
                             >
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <CheckCircle2 className="h-4 w-4" />
                             </Button>
                             <Button 
                               size="icon" 
-                              variant="outline" 
-                              className="h-8 w-8 touch-manipulation border-red-200 bg-red-50 hover:bg-red-100" 
+                              variant="ghost" 
+                              className="h-8 w-8 touch-manipulation text-red-600 hover:bg-red-50" 
                               onClick={() => {
                                 setConfirmProspectId(prospect.id);
                                 setLostConfirmOpen(true);
@@ -1242,20 +1256,10 @@ export default function CrmProspectFunnel() {
                               title="Mark Lost"
                               data-testid={`button-mark-lost-${prospect.id}`}
                             >
-                              <X className="h-4 w-4 text-red-600" />
+                              <X className="h-4 w-4" />
                             </Button>
                           </>
                         )}
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="h-8 px-3 touch-manipulation border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700" 
-                          onClick={() => handleAddFollowUp(prospect.id)}
-                          data-testid={`button-add-followup-${prospect.id}`}
-                        >
-                          <Calendar className="h-4 w-4 mr-1" />
-                          Follow-up
-                        </Button>
                       </div>
 
                       <Button 
