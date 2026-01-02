@@ -333,7 +333,7 @@ function HorizontalScrollContainer({ children, className, isDraggingCard }: Hori
       <div
         ref={containerRef}
         className={cn(
-          "flex gap-4 overflow-x-auto pb-4",
+          "flex gap-4 overflow-x-auto pb-4 kanban-scroll-container",
           !isDraggingCard && "cursor-grab",
           isDragging && "cursor-grabbing",
           className
@@ -345,9 +345,9 @@ function HorizontalScrollContainer({ children, className, isDraggingCard }: Hori
         onMouseLeave={handleMouseLeave}
         data-testid="kanban-board"
       >
-        <div className="w-2 flex-shrink-0" aria-hidden="true" />
+        <div className="kanban-spacer" aria-hidden="true" />
         {children}
-        <div className="w-2 flex-shrink-0" aria-hidden="true" />
+        <div className="kanban-spacer" aria-hidden="true" />
       </div>
       {showRightFade && (
         <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
