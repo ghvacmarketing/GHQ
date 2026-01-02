@@ -5,23 +5,27 @@ import { format } from "date-fns";
 import { 
   ArrowLeft, 
   Phone, 
-  MessageSquare, 
-  Navigation, 
   MapPin, 
   Clock,
   Send,
   Loader2,
   X,
-  CloudOff,
   CheckCircle2,
   Car,
   Wrench,
   ClipboardCheck,
-  History,
   ChevronDown,
   ChevronUp,
   Check,
-  Clipboard
+  Clipboard,
+  FileText,
+  Receipt,
+  LayoutDashboard,
+  ClipboardList,
+  Plus,
+  Trash2,
+  DollarSign,
+  Eye
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,7 +42,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
 import { useOnlineStatus, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
-import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus } from "@shared/schema";
+import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus, CrmQuote, CrmInvoice, CrmInvoiceLineItem } from "@shared/schema";
 
 interface WorkOrderDetail extends CrmWorkOrder {
   customer: CrmCustomer | null;
@@ -70,23 +74,7 @@ type ChecklistResponseData = {
   } | null;
 };
 
-interface WorkOrderSummary {
-  id: string;
-  visitType: string;
-  status: string;
-  scheduledStart: string | null;
-  description: string | null;
-}
-
-interface WorkOrdersResponse {
-  workOrders: WorkOrderSummary[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-}
+type TabType = "overview" | "work" | "quote" | "invoice";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   scheduled: { label: "Scheduled", className: "bg-slate-100 text-slate-700 border-slate-300" },
@@ -125,6 +113,1245 @@ function isNetworkError(error: unknown): boolean {
   return !navigator.onLine;
 }
 
+function OverviewTab({ 
+  workOrder, 
+  checklistResponse,
+  optimisticStatus,
+  updateStatusMutation,
+  handleStatusChange,
+  noteInput,
+  setNoteInput,
+  handleAddNote,
+  addNoteMutation,
+  pendingNotes
+}: {
+  workOrder: WorkOrderDetail;
+  checklistResponse: ChecklistResponseData | null | undefined;
+  optimisticStatus: WorkOrderStatus | null;
+  updateStatusMutation: any;
+  handleStatusChange: (status: WorkOrderStatus) => void;
+  noteInput: string;
+  setNoteInput: (val: string) => void;
+  handleAddNote: () => void;
+  addNoteMutation: any;
+  pendingNotes: any[];
+}) {
+  const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(false);
+  const displayStatus = optimisticStatus || workOrder.status;
+  const status = statusConfig[displayStatus] || statusConfig.scheduled;
+  const customerName = workOrder.customer?.name || "Unknown Customer";
+  const customerPhone = workOrder.customer?.phone;
+  const address = getPropertyAddress(workOrder.property);
+
+  const getNextStatus = (currentStatus: WorkOrderStatus): WorkOrderStatus | null => {
+    const currentIndex = statusFlow.indexOf(currentStatus);
+    if (currentIndex < statusFlow.length - 1) {
+      return statusFlow[currentIndex + 1];
+    }
+    return null;
+  };
+
+  const nextStatus = getNextStatus(displayStatus as WorkOrderStatus);
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center mb-4">
+        <Badge 
+          variant="outline" 
+          className={`text-lg px-4 py-1 ${status.className} ${optimisticStatus ? 'opacity-70' : ''}`}
+          data-testid="job-status-badge"
+        >
+          {status.label}
+          {optimisticStatus && " (saving...)"}
+        </Badge>
+      </div>
+
+      <Card data-testid="customer-info-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg" data-testid="customer-name">
+            {customerName}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {customerPhone && (
+            <a 
+              href={`tel:${customerPhone}`}
+              className="flex items-center text-blue-600 hover:underline min-h-[44px]"
+              data-testid="customer-phone"
+            >
+              <Phone className="h-4 w-4 mr-2" />
+              {customerPhone}
+            </a>
+          )}
+          <a 
+            href={getGoogleMapsUrl(workOrder.property)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start text-slate-600 hover:text-blue-600 min-h-[44px]"
+            data-testid="customer-address"
+          >
+            <MapPin className="h-4 w-4 mr-2 mt-0.5 shrink-0" />
+            <span>{address}</span>
+          </a>
+          {workOrder.scheduledStart && (
+            <div className="flex items-center text-slate-500">
+              <Clock className="h-4 w-4 mr-2" />
+              <span data-testid="scheduled-time">
+                {format(new Date(workOrder.scheduledStart), "h:mm a")}
+                {workOrder.scheduledEnd && ` - ${format(new Date(workOrder.scheduledEnd), "h:mm a")}`}
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {checklistResponse && checklistResponse.checklist && checklistResponse.summary && (
+        <Card className="border-amber-200 bg-amber-50/30" data-testid="card-checklist-summary">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Clipboard className="h-4 w-4 text-amber-600" />
+              Checklist Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-checklist-summary">
+              {checklistResponse.summary}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card data-testid="status-update-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Job Status</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between" data-testid="status-stepper">
+            {statusFlow.map((step, index) => {
+              const stepIndex = statusFlow.indexOf(displayStatus as WorkOrderStatus);
+              const isCompleted = index < stepIndex;
+              const isCurrent = index === stepIndex;
+              const stepIcons: Record<WorkOrderStatus, any> = {
+                scheduled: Clock,
+                dispatched: ClipboardCheck,
+                en_route: Car,
+                on_site: Wrench,
+                completed: CheckCircle2,
+                cancelled: X,
+              };
+              const StepIcon = stepIcons[step];
+              
+              return (
+                <div key={step} className="flex flex-col items-center" data-testid={`status-step-${step}`}>
+                  <div 
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                      isCompleted 
+                        ? 'bg-green-500 text-white' 
+                        : isCurrent 
+                          ? 'bg-[#711419] text-white ring-2 ring-offset-2 ring-[#711419]' 
+                          : 'bg-slate-200 text-slate-400'
+                    }`}
+                  >
+                    <StepIcon className="h-5 w-5" />
+                  </div>
+                  <span className={`text-xs mt-1 text-center ${
+                    isCurrent ? 'font-semibold text-[#711419]' : 'text-slate-500'
+                  }`}>
+                    {statusConfig[step]?.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          
+          {nextStatus && displayStatus !== "completed" && (
+            <Button
+              className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
+              onClick={() => handleStatusChange(nextStatus)}
+              disabled={updateStatusMutation.isPending}
+              data-testid={`button-status-${nextStatus}`}
+            >
+              {updateStatusMutation.isPending ? (
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              ) : null}
+              {nextStatus === "dispatched" && "Mark Dispatched"}
+              {nextStatus === "en_route" && "Start Driving"}
+              {nextStatus === "on_site" && "Arrive On Site"}
+              {nextStatus === "completed" && "Complete Job"}
+            </Button>
+          )}
+
+          {displayStatus === "completed" && (
+            <div className="text-center py-2">
+              <Badge className="bg-green-100 text-green-700 border-green-300">
+                <CheckCircle2 className="h-4 w-4 mr-1" />
+                Job Completed
+              </Badge>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card data-testid="notes-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Notes</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {workOrder.techNotes ? (
+            <div 
+              className="text-sm text-slate-600 whitespace-pre-wrap bg-slate-50 p-3 rounded-md max-h-40 overflow-auto"
+              data-testid="existing-notes"
+            >
+              {workOrder.techNotes}
+            </div>
+          ) : pendingNotes.length === 0 ? (
+            <p className="text-sm text-slate-400 italic" data-testid="no-notes">
+              No notes yet
+            </p>
+          ) : null}
+          
+          {pendingNotes.length > 0 && (
+            <div className="space-y-2" data-testid="pending-notes-container">
+              {pendingNotes.map((pendingNote: any) => (
+                <div 
+                  key={pendingNote.id}
+                  className="text-sm text-slate-600 whitespace-pre-wrap bg-amber-50 border border-amber-200 p-3 rounded-md"
+                >
+                  <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300 mb-1">
+                    Pending sync
+                  </Badge>
+                  <p>{pendingNote.noteText}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <Separator />
+          <div className="flex gap-2">
+            <Input
+              placeholder="Add a note..."
+              value={noteInput}
+              onChange={(e) => setNoteInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
+              className="flex-1 min-h-[44px]"
+              data-testid="input-note"
+            />
+            <Button
+              size="icon"
+              className="min-h-[44px] min-w-[44px] bg-[#711419] hover:bg-[#5a1014]"
+              onClick={handleAddNote}
+              disabled={!noteInput.trim() || addNoteMutation.isPending}
+              data-testid="button-add-note"
+            >
+              {addNoteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {(workOrder.workSubtype || workOrder.description) && (
+        <Card data-testid="job-info-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Job Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {workOrder.workSubtype && (
+              <div data-testid="work-type-info">
+                <span className="text-sm text-slate-500">Work Type: </span>
+                <Badge variant="secondary" data-testid="work-type-badge">
+                  {workOrder.visitType} - {workOrder.workSubtype}
+                </Badge>
+              </div>
+            )}
+            {workOrder.description && (
+              <p className="text-sm text-slate-600" data-testid="job-description">
+                {workOrder.description}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {workOrder.completionSummary && (
+        <Card data-testid="completion-summary-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              Completion Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-slate-600 whitespace-pre-wrap" data-testid="completion-summary-text">
+              {workOrder.completionSummary}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function WorkTab({ 
+  workOrder, 
+  checklistResponse 
+}: { 
+  workOrder: WorkOrderDetail;
+  checklistResponse: ChecklistResponseData | null | undefined;
+}) {
+  const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(true);
+  const { toast } = useToast();
+
+  if (!checklistResponse || !checklistResponse.checklist) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardContent className="py-8 text-center">
+            <ClipboardList className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-600 font-medium">No checklist for this job type</p>
+            <p className="text-sm text-slate-500 mt-1">
+              {workOrder.visitType === "SERVICE" 
+                ? "This service type doesn't have a checklist defined" 
+                : "Checklists are only available for service calls"}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-amber-200 bg-amber-50/30" data-testid="card-work-checklist">
+        <CardHeader className="pb-3 border-b border-amber-200 bg-amber-50/50">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Clipboard className="h-4 w-4 text-amber-600" />
+            {checklistResponse.checklist.name || "Service Checklist"}
+          </CardTitle>
+          {checklistResponse.checklist.description && (
+            <p className="text-sm text-amber-700 mt-1">{checklistResponse.checklist.description}</p>
+          )}
+        </CardHeader>
+        <CardContent className="pt-4 space-y-4">
+          {checklistResponse.summary && (
+            <div className="bg-white rounded-lg p-4 border border-amber-200">
+              <p className="text-xs text-amber-700 mb-2 uppercase tracking-wide font-medium">AI Summary</p>
+              <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-work-summary">
+                {checklistResponse.summary}
+              </p>
+            </div>
+          )}
+
+          <Collapsible open={checklistAnswersOpen} onOpenChange={setChecklistAnswersOpen}>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full flex items-center justify-between p-3 text-sm font-medium text-amber-700 hover:bg-amber-100 rounded-lg border border-amber-200 bg-white min-h-[44px]"
+                data-testid="button-toggle-work-answers"
+              >
+                <span>Checklist Answers ({checklistResponse.checklist.questions.length})</span>
+                {checklistAnswersOpen ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              <div className="space-y-3 bg-white rounded-lg p-4 border border-amber-200">
+                {checklistResponse.checklist.questions.map((question) => {
+                  const answer = checklistResponse.answers[question.id];
+                  return (
+                    <div key={question.id} className="border-b border-slate-100 last:border-0 pb-3 last:pb-0" data-testid={`work-answer-${question.id}`}>
+                      <p className="text-sm font-medium text-slate-700 mb-1">{question.question}</p>
+                      <div className="flex items-center gap-2">
+                        {question.questionType === "yes_no" && (
+                          <>
+                            {answer === true || answer === "true" || answer === "yes" ? (
+                              <>
+                                <Check className="h-4 w-4 text-green-500" />
+                                <span className="text-sm text-green-700">Yes</span>
+                              </>
+                            ) : answer === false || answer === "false" || answer === "no" ? (
+                              <>
+                                <X className="h-4 w-4 text-red-500" />
+                                <span className="text-sm text-red-700">No</span>
+                              </>
+                            ) : (
+                              <span className="text-sm text-slate-400 italic">Not answered</span>
+                            )}
+                          </>
+                        )}
+                        {question.questionType === "text" && (
+                          <span className="text-sm text-slate-600">
+                            {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic">Not answered</span>}
+                          </span>
+                        )}
+                        {question.questionType === "number" && (
+                          <span className="text-sm text-slate-600 font-medium">
+                            {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic font-normal">Not answered</span>}
+                          </span>
+                        )}
+                        {question.questionType === "select" && (
+                          <span className="text-sm text-slate-600">
+                            {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic">Not answered</span>}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {checklistResponse.completedAt && (
+            <p className="text-xs text-amber-600 text-right">
+              Completed {format(new Date(checklistResponse.completedAt), "MMM d, h:mm a")}
+              {checklistResponse.completedBy && ` by ${checklistResponse.completedBy}`}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface QuickQuoteLineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+const quoteStatusConfig: Record<string, { label: string; className: string }> = {
+  draft: { label: "Draft", className: "bg-slate-100 text-slate-700 border-slate-300" },
+  sent: { label: "Sent", className: "bg-blue-100 text-blue-700 border-blue-300" },
+  accepted: { label: "Accepted", className: "bg-green-100 text-green-700 border-green-300" },
+  declined: { label: "Declined", className: "bg-red-100 text-red-700 border-red-300" },
+  expired: { label: "Expired", className: "bg-orange-100 text-orange-700 border-orange-300" },
+  converted: { label: "Converted", className: "bg-purple-100 text-purple-700 border-purple-300" },
+};
+
+function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [showQuickQuote, setShowQuickQuote] = useState(false);
+  const [lineItems, setLineItems] = useState<QuickQuoteLineItem[]>([
+    { id: "1", description: "", quantity: 1, unitPrice: 0 }
+  ]);
+  const [quoteTitle, setQuoteTitle] = useState("");
+
+  // Fetch existing quotes for this work order
+  const { data: quotesData, isLoading: quotesLoading, error: quotesError } = useQuery<{ quotes: CrmQuote[] }>({
+    queryKey: ["/api/crm/quotes", { workOrderId: workOrder.id }],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/quotes?workOrderId=${workOrder.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch quotes");
+      return res.json();
+    },
+  });
+
+  const quotes = quotesData?.quotes || [];
+
+  // Create quote mutation
+  const createQuoteMutation = useMutation({
+    mutationFn: async (data: { 
+      title: string; 
+      lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number }>; 
+      subtotal: number;
+      total: number;
+    }) => {
+      const customerName = workOrder.customer?.name || "Unknown Customer";
+      const customerEmail = workOrder.customer?.email || "";
+      const customerPhone = workOrder.customer?.phone || "";
+      const serviceAddress = workOrder.property 
+        ? [workOrder.property.address1, workOrder.property.city, workOrder.property.state, workOrder.property.zip].filter(Boolean).join(", ")
+        : "";
+
+      const formattedLineItems = data.lineItems.map((item, index) => ({
+        description: item.description,
+        quantity: item.quantity.toFixed(2),
+        unitPrice: item.unitPrice.toFixed(2),
+        lineTotal: item.lineTotal.toFixed(2),
+        lineType: "service",
+        taxable: true,
+        sortOrder: index,
+      }));
+
+      const response = await apiRequest("POST", "/api/crm/quotes", {
+        scope: "work_order",
+        workOrderId: workOrder.id,
+        customerId: workOrder.customerId,
+        propertyId: workOrder.propertyId,
+        customerName,
+        customerEmail,
+        customerPhone,
+        serviceAddress,
+        title: data.title || `Quick Quote for WO-${workOrder.id.slice(-6)}`,
+        lineItems: formattedLineItems,
+        subtotal: data.subtotal.toFixed(2),
+        laborTotal: "0",
+        taxRate: "0.0825",
+        taxAmount: "0",
+        taxTotal: "0",
+        total: data.total.toFixed(2),
+        status: "draft",
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Quote Created", description: "Your quick quote has been created as a draft." });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", { workOrderId: workOrder.id }] });
+      setShowQuickQuote(false);
+      setLineItems([{ id: "1", description: "", quantity: 1, unitPrice: 0 }]);
+      setQuoteTitle("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to create quote", variant: "destructive" });
+    },
+  });
+
+  const addLineItem = () => {
+    setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0 }]);
+  };
+
+  const removeLineItem = (id: string) => {
+    if (lineItems.length > 1) {
+      setLineItems(lineItems.filter(item => item.id !== id));
+    }
+  };
+
+  const updateLineItem = (id: string, field: keyof QuickQuoteLineItem, value: string | number) => {
+    setLineItems(lineItems.map(item => 
+      item.id === id ? { ...item, [field]: value } : item
+    ));
+  };
+
+  const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+  const total = subtotal; // No tax for quick quote
+
+  const handleCreateQuote = () => {
+    const validItems = lineItems.filter(item => item.description.trim() && item.unitPrice > 0);
+    if (validItems.length === 0) {
+      toast({ title: "Error", description: "Please add at least one line item with a description and price.", variant: "destructive" });
+      return;
+    }
+
+    createQuoteMutation.mutate({
+      title: quoteTitle,
+      lineItems: validItems.map(item => ({
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        lineTotal: item.quantity * item.unitPrice,
+      })),
+      subtotal,
+      total,
+    });
+  };
+
+  const formatCurrency = (amount: number | string) => {
+    const num = typeof amount === "string" ? parseFloat(amount) : amount;
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num || 0);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Existing Quotes Section */}
+      <Card data-testid="existing-quotes-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Existing Quotes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {quotesLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          ) : quotesError ? (
+            <p className="text-sm text-red-500" data-testid="quotes-error">
+              Failed to load quotes. Please try again.
+            </p>
+          ) : quotes.length === 0 ? (
+            <p className="text-sm text-slate-400 italic" data-testid="no-quotes-message">
+              No quotes linked to this work order yet.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {quotes.map((quote) => {
+                const statusInfo = quoteStatusConfig[quote.status] || quoteStatusConfig.draft;
+                return (
+                  <div
+                    key={quote.id}
+                    className="border rounded-lg p-3 space-y-2"
+                    data-testid={`quote-item-${quote.id}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm" data-testid={`quote-number-${quote.id}`}>
+                        {quote.quoteNumber || `Quote`}
+                      </span>
+                      <Badge variant="outline" className={statusInfo.className} data-testid={`quote-status-${quote.id}`}>
+                        {statusInfo.label}
+                      </Badge>
+                    </div>
+                    {quote.title && (
+                      <p className="text-sm text-slate-600 truncate" data-testid={`quote-title-${quote.id}`}>
+                        {quote.title}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-semibold text-green-700" data-testid={`quote-total-${quote.id}`}>
+                        {formatCurrency(quote.total)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-[44px]"
+                        onClick={() => navigate(`/crm/quotes/${quote.id}`)}
+                        data-testid={`button-view-quote-${quote.id}`}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                    </div>
+                    {quote.createdAt && (
+                      <p className="text-xs text-slate-400">
+                        Created {format(new Date(quote.createdAt), "MMM d, yyyy")}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Quick Quote Creation */}
+      <Card data-testid="quick-quote-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <DollarSign className="h-4 w-4 text-green-600" />
+            Quick Quote
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!showQuickQuote ? (
+            <>
+              <p className="text-sm text-slate-600">
+                Create a simple quote with line items directly from here.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 min-h-[48px]"
+                  onClick={() => setShowQuickQuote(true)}
+                  data-testid="button-start-quick-quote"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Quick Quote
+                </Button>
+                <Button
+                  className="flex-1 min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
+                  onClick={() => navigate(`/crm/quotes/new?workOrderId=${workOrder.id}&customerId=${workOrder.customerId || ''}&propertyId=${workOrder.propertyId || ''}`)}
+                  data-testid="button-full-quote-builder"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Full Builder
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-4">
+              {/* Quote Title */}
+              <div>
+                <Label htmlFor="quote-title" className="text-sm font-medium">
+                  Quote Title (optional)
+                </Label>
+                <Input
+                  id="quote-title"
+                  placeholder="e.g., AC Repair Quote"
+                  value={quoteTitle}
+                  onChange={(e) => setQuoteTitle(e.target.value)}
+                  className="min-h-[44px] mt-1"
+                  data-testid="input-quote-title"
+                />
+              </div>
+
+              {/* Line Items */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Line Items</Label>
+                {lineItems.map((item, index) => (
+                  <div key={item.id} className="border rounded-lg p-3 space-y-2" data-testid={`line-item-${item.id}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-500 font-medium">Item {index + 1}</span>
+                      {lineItems.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => removeLineItem(item.id)}
+                          data-testid={`button-remove-item-${item.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <Input
+                      placeholder="Description (e.g., Labor - AC Repair)"
+                      value={item.description}
+                      onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
+                      className="min-h-[44px]"
+                      data-testid={`input-description-${item.id}`}
+                    />
+                    <div className="flex gap-2">
+                      <div className="w-24">
+                        <Label className="text-xs text-slate-500">Qty</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => updateLineItem(item.id, "quantity", parseInt(e.target.value) || 1)}
+                          className="min-h-[44px]"
+                          data-testid={`input-quantity-${item.id}`}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Label className="text-xs text-slate-500">Unit Price</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={item.unitPrice || ""}
+                          onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
+                          className="min-h-[44px]"
+                          data-testid={`input-unit-price-${item.id}`}
+                        />
+                      </div>
+                      <div className="w-24 text-right">
+                        <Label className="text-xs text-slate-500">Line Total</Label>
+                        <p className="min-h-[44px] flex items-center justify-end font-medium" data-testid={`line-total-${item.id}`}>
+                          {formatCurrency(item.quantity * item.unitPrice)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <Button
+                  variant="outline"
+                  className="w-full min-h-[44px]"
+                  onClick={addLineItem}
+                  data-testid="button-add-line-item"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Line Item
+                </Button>
+              </div>
+
+              {/* Totals */}
+              <div className="border-t pt-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Subtotal</span>
+                  <span className="font-medium" data-testid="quote-subtotal">{formatCurrency(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-semibold">
+                  <span>Total</span>
+                  <span className="text-green-700" data-testid="quote-total">{formatCurrency(total)}</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 min-h-[48px]"
+                  onClick={() => {
+                    setShowQuickQuote(false);
+                    setLineItems([{ id: "1", description: "", quantity: 1, unitPrice: 0 }]);
+                    setQuoteTitle("");
+                  }}
+                  disabled={createQuoteMutation.isPending}
+                  data-testid="button-cancel-quote"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
+                  onClick={handleCreateQuote}
+                  disabled={createQuoteMutation.isPending}
+                  data-testid="button-create-quote"
+                >
+                  {createQuoteMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Check className="h-4 w-4 mr-2" />
+                  )}
+                  Create Quote
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface InvoiceLineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+interface InvoiceWithLineItems extends CrmInvoice {
+  lineItems?: CrmInvoiceLineItem[];
+}
+
+const invoiceStatusConfig: Record<string, { label: string; className: string }> = {
+  draft: { label: "Draft", className: "bg-slate-100 text-slate-700 border-slate-300" },
+  sent: { label: "Sent", className: "bg-blue-100 text-blue-700 border-blue-300" },
+  paid: { label: "Paid", className: "bg-green-100 text-green-700 border-green-300" },
+  void: { label: "Void", className: "bg-red-100 text-red-700 border-red-300" },
+  partial: { label: "Partial", className: "bg-amber-100 text-amber-700 border-amber-300" },
+};
+
+function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([
+    { id: "1", description: "", quantity: 1, unitPrice: 0 }
+  ]);
+  const [taxRate, setTaxRate] = useState(8.25);
+
+  const { data: invoicesData, isLoading: invoicesLoading, error: invoicesError } = useQuery<{ invoices: CrmInvoice[] }>({
+    queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/invoices?workOrderId=${workOrder.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch invoices");
+      return res.json();
+    },
+  });
+
+  const invoices = invoicesData?.invoices || [];
+  const existingInvoice = invoices.length > 0 ? invoices[0] : null;
+
+  const { data: invoiceDetailData } = useQuery<InvoiceWithLineItems>({
+    queryKey: ["/api/crm/invoices", existingInvoice?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/invoices/${existingInvoice!.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch invoice details");
+      return res.json();
+    },
+    enabled: !!existingInvoice?.id,
+  });
+
+  const createInvoiceMutation = useMutation({
+    mutationFn: async (data: {
+      lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number; lineType: string }>;
+      subtotal: number;
+      taxTotal: number;
+      total: number;
+    }) => {
+      const formattedLineItems = data.lineItems.map((item, index) => ({
+        description: item.description,
+        quantity: item.quantity.toFixed(2),
+        unitPrice: item.unitPrice.toFixed(2),
+        lineTotal: item.lineTotal.toFixed(2),
+        lineType: item.lineType,
+        taxable: true,
+        sortOrder: index,
+      }));
+
+      const response = await apiRequest("POST", "/api/crm/invoices", {
+        workOrderId: workOrder.id,
+        customerId: workOrder.customerId,
+        propertyId: workOrder.propertyId,
+        lineItems: formattedLineItems,
+        subtotal: data.subtotal.toFixed(2),
+        laborTotal: "0.00",
+        taxTotal: data.taxTotal.toFixed(2),
+        total: data.total.toFixed(2),
+        amountPaid: "0.00",
+        balanceDue: data.total.toFixed(2),
+        status: "draft",
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invoice Created", description: "Your invoice has been created as a draft." });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
+      setShowCreateForm(false);
+      setLineItems([{ id: "1", description: "", quantity: 1, unitPrice: 0 }]);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to create invoice", variant: "destructive" });
+    },
+  });
+
+  const addLineItem = () => {
+    setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0 }]);
+  };
+
+  const removeLineItem = (id: string) => {
+    if (lineItems.length > 1) {
+      setLineItems(lineItems.filter(item => item.id !== id));
+    }
+  };
+
+  const updateLineItem = (id: string, field: keyof InvoiceLineItem, value: string | number) => {
+    setLineItems(lineItems.map(item =>
+      item.id === id ? { ...item, [field]: value } : item
+    ));
+  };
+
+  const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+  const taxAmount = subtotal * (taxRate / 100);
+  const total = subtotal + taxAmount;
+
+  const handleCreateInvoice = () => {
+    const validItems = lineItems.filter(item => item.description.trim() && item.unitPrice > 0);
+    if (validItems.length === 0) {
+      toast({ title: "Error", description: "Please add at least one line item with a description and price.", variant: "destructive" });
+      return;
+    }
+
+    createInvoiceMutation.mutate({
+      lineItems: validItems.map(item => ({
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        lineTotal: item.quantity * item.unitPrice,
+        lineType: "service",
+      })),
+      subtotal,
+      taxTotal: taxAmount,
+      total,
+    });
+  };
+
+  const formatCurrency = (amount: number | string) => {
+    const num = typeof amount === "string" ? parseFloat(amount) : amount;
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num || 0);
+  };
+
+  if (existingInvoice) {
+    const invoiceDetail = invoiceDetailData || existingInvoice;
+    const statusInfo = invoiceStatusConfig[invoiceDetail.status] || invoiceStatusConfig.draft;
+    const isPaid = invoiceDetail.status === "paid";
+    const isPartial = invoiceDetail.status === "partial";
+
+    return (
+      <div className="space-y-4">
+        <Card data-testid="invoice-detail-card">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Receipt className="h-4 w-4 text-green-600" />
+                {invoiceDetail.invoiceNumber}
+              </CardTitle>
+              <Badge variant="outline" className={statusInfo.className} data-testid="invoice-status-badge">
+                {statusInfo.label}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-600">Subtotal</span>
+                <span className="text-sm font-medium" data-testid="invoice-subtotal">
+                  {formatCurrency(invoiceDetail.subtotal || "0")}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-600">Tax</span>
+                <span className="text-sm font-medium" data-testid="invoice-tax">
+                  {formatCurrency(invoiceDetail.taxTotal || "0")}
+                </span>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center">
+                <span className="text-base font-semibold">Total</span>
+                <span className="text-lg font-bold text-green-700" data-testid="invoice-total">
+                  {formatCurrency(invoiceDetail.total || "0")}
+                </span>
+              </div>
+            </div>
+
+            {(isPaid || isPartial) && (
+              <div className={`rounded-lg p-3 ${isPaid ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className={`h-4 w-4 ${isPaid ? 'text-green-600' : 'text-amber-600'}`} />
+                  <span className={`text-sm font-medium ${isPaid ? 'text-green-700' : 'text-amber-700'}`}>
+                    Payment Status
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Amount Paid</span>
+                    <span className="font-medium text-green-700" data-testid="invoice-amount-paid">
+                      {formatCurrency(invoiceDetail.amountPaid || "0")}
+                    </span>
+                  </div>
+                  {!isPaid && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Balance Due</span>
+                      <span className="font-medium text-red-600" data-testid="invoice-balance-due">
+                        {formatCurrency(invoiceDetail.balanceDue || "0")}
+                      </span>
+                    </div>
+                  )}
+                  {invoiceDetail.paidAt && (
+                    <p className="text-xs text-slate-500 mt-1" data-testid="invoice-paid-date">
+                      Paid on {format(new Date(invoiceDetail.paidAt), "MMM d, yyyy")}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!isPaid && !isPartial && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-amber-700">Balance Due</span>
+                  <span className="font-semibold text-amber-800" data-testid="invoice-balance-due">
+                    {formatCurrency(invoiceDetail.balanceDue || invoiceDetail.total || "0")}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {invoiceDetailData?.lineItems && invoiceDetailData.lineItems.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-slate-700">Line Items</p>
+                <div className="space-y-2">
+                  {invoiceDetailData.lineItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="bg-white border rounded-lg p-3"
+                      data-testid={`invoice-line-item-${item.id}`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-800">{item.description}</p>
+                          <p className="text-xs text-slate-500">
+                            {item.quantity} × {formatCurrency(item.unitPrice)}
+                          </p>
+                        </div>
+                        <span className="text-sm font-medium text-slate-700">
+                          {formatCurrency(item.lineTotal)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button
+              variant="outline"
+              className="w-full min-h-[48px]"
+              onClick={() => navigate(`/crm/invoices/${invoiceDetail.id}`)}
+              data-testid="button-view-invoice-detail"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              View Full Invoice
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card data-testid="existing-invoices-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Invoices</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {invoicesLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-16 w-full" />
+            </div>
+          ) : invoicesError ? (
+            <p className="text-sm text-red-500" data-testid="invoices-error">
+              Failed to load invoices. Please try again.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-400 italic" data-testid="no-invoices-message">
+              No invoices linked to this work order yet.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card data-testid="create-invoice-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Receipt className="h-4 w-4 text-green-600" />
+            Create Invoice
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!showCreateForm ? (
+            <>
+              <p className="text-sm text-slate-600">
+                Create an invoice for work completed on this job.
+              </p>
+              <Button
+                className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
+                onClick={() => setShowCreateForm(true)}
+                data-testid="button-show-create-invoice-form"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Invoice
+              </Button>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {lineItems.map((item, index) => (
+                  <div key={item.id} className="bg-slate-50 rounded-lg p-3 space-y-3" data-testid={`line-item-${item.id}`}>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium text-slate-500">Line Item {index + 1}</Label>
+                      {lineItems.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => removeLineItem(item.id)}
+                          data-testid={`button-remove-line-${item.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <Input
+                      placeholder="Description"
+                      value={item.description}
+                      onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
+                      className="min-h-[44px]"
+                      data-testid={`input-line-description-${item.id}`}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs text-slate-500">Qty</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => updateLineItem(item.id, "quantity", parseInt(e.target.value) || 1)}
+                          className="min-h-[44px]"
+                          data-testid={`input-line-quantity-${item.id}`}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-slate-500">Unit Price</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.unitPrice}
+                          onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
+                          className="min-h-[44px]"
+                          data-testid={`input-line-unitprice-${item.id}`}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-right text-sm font-medium text-slate-700">
+                      Line Total: {formatCurrency(item.quantity * item.unitPrice)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full min-h-[44px]"
+                onClick={addLineItem}
+                data-testid="button-add-line-item"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Line Item
+              </Button>
+
+              <div className="bg-slate-100 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-600">Subtotal</span>
+                  <span className="text-sm font-medium" data-testid="invoice-form-subtotal">
+                    {formatCurrency(subtotal)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-600">Tax</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={taxRate}
+                      onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                      className="w-16 h-7 text-xs p-1"
+                      data-testid="input-tax-rate"
+                    />
+                    <span className="text-xs text-slate-500">%</span>
+                  </div>
+                  <span className="text-sm font-medium" data-testid="invoice-form-tax">
+                    {formatCurrency(taxAmount)}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <span className="text-base font-semibold">Total</span>
+                  <span className="text-lg font-bold text-green-700" data-testid="invoice-form-total">
+                    {formatCurrency(total)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 min-h-[48px]"
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setLineItems([{ id: "1", description: "", quantity: 1, unitPrice: 0 }]);
+                  }}
+                  disabled={createInvoiceMutation.isPending}
+                  data-testid="button-cancel-invoice"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
+                  onClick={handleCreateInvoice}
+                  disabled={createInvoiceMutation.isPending}
+                  data-testid="button-create-invoice"
+                >
+                  {createInvoiceMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Check className="h-4 w-4 mr-2" />
+                  )}
+                  Create Invoice
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function MobileJobDetail() {
   const params = useParams<{ id: string }>();
   const workOrderId = parseInt(params.id || "0", 10);
@@ -134,11 +1361,10 @@ export default function MobileJobDetail() {
   const { isOnline } = useOnlineStatus();
   const pendingNotes = usePendingNotes(workOrderId);
 
+  const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [optimisticStatus, setOptimisticStatus] = useState<WorkOrderStatus | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionSummary, setCompletionSummary] = useState("");
-  
-  const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(false);
 
   const { data: workOrder, isLoading } = useQuery<WorkOrderDetail>({
     queryKey: ["/api/crm/work-orders", params.id],
@@ -161,16 +1387,6 @@ export default function MobileJobDetail() {
       return res.json();
     },
     enabled: !!params.id,
-  });
-
-  const { data: jobHistory } = useQuery<WorkOrdersResponse>({
-    queryKey: ["/api/crm/work-orders", "customer-history", workOrder?.customerId],
-    queryFn: async () => {
-      const res = await fetch(`/api/crm/work-orders?customerId=${workOrder?.customerId}&limit=6`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch job history");
-      return res.json();
-    },
-    enabled: !!workOrder?.customerId,
   });
 
   const updateStatusMutation = useMutation({
@@ -253,43 +1469,11 @@ export default function MobileJobDetail() {
     },
   });
 
-  const handleCall = () => {
-    const phone = workOrder?.customer?.phone;
-    if (phone) {
-      window.location.href = `tel:${phone}`;
-    }
-  };
-
-  const handleText = () => {
-    const phone = workOrder?.customer?.phone;
-    if (phone) {
-      window.location.href = `sms:${phone}`;
-    }
-  };
-
-  const handleNavigate = () => {
-    const url = getGoogleMapsUrl(workOrder?.property || null);
-    if (url) {
-      window.open(url, "_blank");
-    }
-  };
-
   const handleAddNote = () => {
     if (noteInput.trim()) {
       addNoteMutation.mutate(noteInput.trim());
     }
   };
-
-  const getNextStatus = (currentStatus: WorkOrderStatus): WorkOrderStatus | null => {
-    const currentIndex = statusFlow.indexOf(currentStatus);
-    if (currentIndex < statusFlow.length - 1) {
-      return statusFlow[currentIndex + 1];
-    }
-    return null;
-  };
-
-  const previousWorkOrders = jobHistory?.workOrders.filter(wo => wo.id !== params.id).slice(0, 5) || [];
-  const hasMoreHistory = (jobHistory?.pagination.total || 0) > 6;
 
   if (isLoading) {
     return (
@@ -323,18 +1507,18 @@ export default function MobileJobDetail() {
     );
   }
 
-  const displayStatus = optimisticStatus || workOrder.status;
-  const status = statusConfig[displayStatus] || statusConfig.scheduled;
-  const customerName = workOrder.customer?.name || "Unknown Customer";
-  const customerPhone = workOrder.customer?.phone;
-  const address = getPropertyAddress(workOrder.property);
-  const nextStatus = getNextStatus(displayStatus as WorkOrderStatus);
+  const tabs = [
+    { id: "overview" as const, label: "Overview", icon: LayoutDashboard },
+    { id: "work" as const, label: "Work", icon: ClipboardList },
+    { id: "quote" as const, label: "Quote", icon: FileText },
+    { id: "invoice" as const, label: "Invoice", icon: Receipt },
+  ];
 
   return (
     <MobileShell>
       <OfflineIndicator />
-      <div className="p-4 space-y-4 pb-24" data-testid="mobile-job-detail">
-        <div className="flex items-center justify-between">
+      <div className="flex flex-col h-full">
+        <div className="flex-shrink-0 p-4 pb-2">
           <button
             onClick={() => navigate("/mobile")}
             className="flex items-center text-slate-600 hover:text-slate-800 min-h-[44px] min-w-[44px]"
@@ -345,414 +1529,59 @@ export default function MobileJobDetail() {
           </button>
         </div>
 
-        <div className="text-center mb-4">
-          <Badge 
-            variant="outline" 
-            className={`text-lg px-4 py-1 ${status.className} ${optimisticStatus ? 'opacity-70' : ''}`}
-            data-testid="job-status-badge"
-          >
-            {status.label}
-            {optimisticStatus && " (saving...)"}
-          </Badge>
+        <div className="flex-1 overflow-auto px-4 pb-24" data-testid="mobile-job-detail">
+          {activeTab === "overview" && (
+            <OverviewTab
+              workOrder={workOrder}
+              checklistResponse={checklistResponse}
+              optimisticStatus={optimisticStatus}
+              updateStatusMutation={updateStatusMutation}
+              handleStatusChange={handleStatusChange}
+              noteInput={noteInput}
+              setNoteInput={setNoteInput}
+              handleAddNote={handleAddNote}
+              addNoteMutation={addNoteMutation}
+              pendingNotes={pendingNotes}
+            />
+          )}
+          {activeTab === "work" && (
+            <WorkTab workOrder={workOrder} checklistResponse={checklistResponse} />
+          )}
+          {activeTab === "quote" && (
+            <QuoteTab workOrder={workOrder} />
+          )}
+          {activeTab === "invoice" && (
+            <InvoiceTab workOrder={workOrder} />
+          )}
         </div>
 
-        <Card data-testid="customer-info-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg" data-testid="customer-name">
-              {customerName}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {customerPhone && (
-              <a 
-                href={`tel:${customerPhone}`}
-                className="flex items-center text-blue-600 hover:underline min-h-[44px]"
-                data-testid="customer-phone"
-              >
-                <Phone className="h-4 w-4 mr-2" />
-                {customerPhone}
-              </a>
-            )}
-            <a 
-              href={getGoogleMapsUrl(workOrder.property)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-start text-slate-600 hover:text-blue-600 min-h-[44px]"
-              data-testid="customer-address"
-            >
-              <MapPin className="h-4 w-4 mr-2 mt-0.5 shrink-0" />
-              <span>{address}</span>
-            </a>
-            {workOrder.scheduledStart && (
-              <div className="flex items-center text-slate-500">
-                <Clock className="h-4 w-4 mr-2" />
-                <span data-testid="scheduled-time">
-                  {format(new Date(workOrder.scheduledStart), "h:mm a")}
-                  {workOrder.scheduledEnd && ` - ${format(new Date(workOrder.scheduledEnd), "h:mm a")}`}
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {checklistResponse && checklistResponse.checklist && (
-          <Card className="border-amber-200 bg-amber-50/30" data-testid="card-service-checklist">
-            <CardHeader className="pb-3 border-b border-amber-200 bg-amber-50/50">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <Clipboard className="h-4 w-4 text-amber-600" />
-                Service Checklist
-              </CardTitle>
-              {checklistResponse.checklist.name && (
-                <p className="text-sm text-amber-700 mt-1">{checklistResponse.checklist.name}</p>
-              )}
-            </CardHeader>
-            <CardContent className="pt-4 space-y-4">
-              {checklistResponse.summary && (
-                <div className="bg-white rounded-lg p-4 border border-amber-200">
-                  <p className="text-xs text-amber-700 mb-2 uppercase tracking-wide font-medium">AI Summary</p>
-                  <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-checklist-summary">
-                    {checklistResponse.summary}
-                  </p>
-                </div>
-              )}
-
-              <Collapsible open={checklistAnswersOpen} onOpenChange={setChecklistAnswersOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="w-full flex items-center justify-between p-3 text-sm font-medium text-amber-700 hover:bg-amber-100 rounded-lg border border-amber-200 bg-white min-h-[44px]"
-                    data-testid="button-toggle-checklist-answers"
-                  >
-                    <span>View All Answers ({checklistResponse.checklist.questions.length})</span>
-                    {checklistAnswersOpen ? (
-                      <ChevronUp className="h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4" />
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-3">
-                  <div className="space-y-3 bg-white rounded-lg p-4 border border-amber-200">
-                    {checklistResponse.checklist.questions.map((question) => {
-                      const answer = checklistResponse.answers[question.id];
-                      return (
-                        <div key={question.id} className="border-b border-slate-100 last:border-0 pb-3 last:pb-0" data-testid={`checklist-answer-${question.id}`}>
-                          <p className="text-sm font-medium text-slate-700 mb-1">{question.question}</p>
-                          <div className="flex items-center gap-2">
-                            {question.questionType === "yes_no" && (
-                              <>
-                                {answer === true || answer === "true" || answer === "yes" ? (
-                                  <>
-                                    <Check className="h-4 w-4 text-green-500" />
-                                    <span className="text-sm text-green-700">Yes</span>
-                                  </>
-                                ) : answer === false || answer === "false" || answer === "no" ? (
-                                  <>
-                                    <X className="h-4 w-4 text-red-500" />
-                                    <span className="text-sm text-red-700">No</span>
-                                  </>
-                                ) : (
-                                  <span className="text-sm text-slate-400 italic">Not answered</span>
-                                )}
-                              </>
-                            )}
-                            {question.questionType === "text" && (
-                              <span className="text-sm text-slate-600">
-                                {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic">Not answered</span>}
-                              </span>
-                            )}
-                            {question.questionType === "number" && (
-                              <span className="text-sm text-slate-600 font-medium">
-                                {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic font-normal">Not answered</span>}
-                              </span>
-                            )}
-                            {question.questionType === "select" && (
-                              <span className="text-sm text-slate-600">
-                                {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic">Not answered</span>}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {checklistResponse.completedAt && (
-                <p className="text-xs text-amber-600 text-right">
-                  Completed {format(new Date(checklistResponse.completedAt), "MMM d, h:mm a")}
-                  {checklistResponse.completedBy && ` by ${checklistResponse.completedBy}`}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        <Card data-testid="status-update-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Job Status</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between" data-testid="status-stepper">
-              {statusFlow.map((step, index) => {
-                const stepIndex = statusFlow.indexOf(displayStatus as WorkOrderStatus);
-                const isCompleted = index < stepIndex;
-                const isCurrent = index === stepIndex;
-                const stepIcons: Record<WorkOrderStatus, any> = {
-                  scheduled: Clock,
-                  dispatched: ClipboardCheck,
-                  en_route: Car,
-                  on_site: Wrench,
-                  completed: CheckCircle2,
-                  cancelled: X,
-                };
-                const StepIcon = stepIcons[step];
-                
-                return (
-                  <div key={step} className="flex flex-col items-center" data-testid={`status-step-${step}`}>
-                    <div 
-                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                        isCompleted 
-                          ? 'bg-green-500 text-white' 
-                          : isCurrent 
-                            ? 'bg-[#711419] text-white ring-2 ring-offset-2 ring-[#711419]' 
-                            : 'bg-slate-200 text-slate-400'
-                      }`}
-                    >
-                      <StepIcon className="h-5 w-5" />
-                    </div>
-                    <span className={`text-xs mt-1 text-center ${
-                      isCurrent ? 'font-semibold text-[#711419]' : 'text-slate-500'
-                    }`}>
-                      {statusConfig[step]?.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            
-            {nextStatus && displayStatus !== "completed" && (
-              <Button
-                className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
-                onClick={() => handleStatusChange(nextStatus)}
-                disabled={updateStatusMutation.isPending}
-                data-testid={`button-status-${nextStatus}`}
-              >
-                {updateStatusMutation.isPending ? (
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                ) : null}
-                {nextStatus === "dispatched" && "Mark Dispatched"}
-                {nextStatus === "en_route" && "Start Driving"}
-                {nextStatus === "on_site" && "Arrive On Site"}
-                {nextStatus === "completed" && "Complete Job"}
-              </Button>
-            )}
-
-            {displayStatus === "completed" && (
-              <div className="text-center py-2">
-                <Badge className="bg-green-100 text-green-700 border-green-300">
-                  <CheckCircle2 className="h-4 w-4 mr-1" />
-                  Job Completed
-                </Badge>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card data-testid="notes-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Notes</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {workOrder.techNotes ? (
-              <div 
-                className="text-sm text-slate-600 whitespace-pre-wrap bg-slate-50 p-3 rounded-md max-h-40 overflow-auto"
-                data-testid="existing-notes"
-              >
-                {workOrder.techNotes}
-              </div>
-            ) : pendingNotes.length === 0 ? (
-              <p className="text-sm text-slate-400 italic" data-testid="no-notes">
-                No notes yet
-              </p>
-            ) : null}
-            
-            {pendingNotes.length > 0 && (
-              <div className="space-y-2" data-testid="pending-notes-container">
-                {pendingNotes.map((pendingNote) => (
-                  <div 
-                    key={pendingNote.id}
-                    className="text-sm text-slate-600 whitespace-pre-wrap bg-amber-50 border border-amber-200 p-3 rounded-md"
-                    data-testid={`pending-note-${pendingNote.id}`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge 
-                        variant="outline" 
-                        className="text-xs bg-amber-100 text-amber-700 border-amber-300"
-                        data-testid="pending-sync-badge"
-                      >
-                        <CloudOff className="h-3 w-3 mr-1" />
-                        Pending sync
-                      </Badge>
-                      <span className="text-xs text-amber-600">
-                        {format(new Date(pendingNote.timestamp), "MMM d, h:mm a")}
-                      </span>
-                    </div>
-                    {pendingNote.noteText}
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            <Separator />
-            <div className="flex gap-2">
-              <Input
-                placeholder="Add a note..."
-                value={noteInput}
-                onChange={(e) => setNoteInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
-                className="flex-1 min-h-[44px]"
-                data-testid="input-note"
-              />
-              <Button
-                size="icon"
-                className="min-h-[44px] min-w-[44px] bg-[#711419] hover:bg-[#5a1014]"
-                onClick={handleAddNote}
-                disabled={!noteInput.trim() || addNoteMutation.isPending}
-                data-testid="button-add-note"
-              >
-                {addNoteMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-
-        {previousWorkOrders.length > 0 && (
-          <Card data-testid="job-history-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <History className="h-4 w-4" />
-                Previous Visits
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {previousWorkOrders.map((wo) => (
+        <div 
+          className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+          data-testid="job-tab-nav"
+        >
+          <div className="flex justify-around items-center">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
                 <button
-                  key={wo.id}
-                  onClick={() => navigate(`/mobile/job/${wo.id}`)}
-                  className="w-full text-left bg-slate-50 p-3 rounded-md hover:bg-slate-100 transition-colors min-h-[44px]"
-                  data-testid={`history-item-${wo.id}`}
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex flex-col items-center gap-1 py-3 px-4 min-h-[60px] min-w-[60px] transition-colors ${
+                    isActive 
+                      ? 'text-[#711419]' 
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  data-testid={`tab-${tab.id}`}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-slate-700">
-                      {wo.scheduledStart ? format(new Date(wo.scheduledStart), "MMM d, yyyy") : "Unscheduled"}
-                    </span>
-                    <Badge 
-                      variant="outline" 
-                      className={`text-xs ${statusConfig[wo.status]?.className || ''}`}
-                    >
-                      {statusConfig[wo.status]?.label || wo.status}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-slate-500">{wo.visitType}</p>
-                  {wo.description && (
-                    <p className="text-xs text-slate-400 mt-1 truncate">{wo.description}</p>
-                  )}
+                  <Icon className={`h-5 w-5 ${isActive ? 'stroke-2' : ''}`} />
+                  <span className={`text-xs ${isActive ? 'font-semibold' : ''}`}>{tab.label}</span>
                 </button>
-              ))}
-              {hasMoreHistory && (
-                <Button
-                  variant="link"
-                  className="w-full text-sm text-[#711419]"
-                  onClick={() => navigate(`/crm/customers/${workOrder.customerId}`)}
-                  data-testid="button-view-all-history"
-                >
-                  View All History →
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {(workOrder.workSubtype || workOrder.description) && (
-          <Card data-testid="job-info-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Job Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {workOrder.workSubtype && (
-                <div data-testid="work-type-info">
-                  <span className="text-sm text-slate-500">Work Type: </span>
-                  <Badge variant="secondary" data-testid="work-type-badge">
-                    {workOrder.visitType} - {workOrder.workSubtype}
-                  </Badge>
-                </div>
-              )}
-              {workOrder.description && (
-                <p className="text-sm text-slate-600" data-testid="job-description">
-                  {workOrder.description}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {workOrder.completionSummary && (
-          <Card data-testid="completion-summary-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Completion Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600 whitespace-pre-wrap" data-testid="completion-summary-text">
-                {workOrder.completionSummary}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      <div 
-        className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3 flex justify-around items-center z-50 shadow-lg safe-area-pb"
-        data-testid="floating-action-bar"
-      >
-        <Button
-          variant="ghost"
-          className="flex flex-col items-center gap-1 h-auto py-2 px-4 min-h-[56px] min-w-[56px]"
-          onClick={handleCall}
-          disabled={!customerPhone}
-          data-testid="fab-call"
-        >
-          <Phone className="h-5 w-5" />
-          <span className="text-xs">Call</span>
-        </Button>
-        <Button
-          variant="ghost"
-          className="flex flex-col items-center gap-1 h-auto py-2 px-4 min-h-[56px] min-w-[56px]"
-          onClick={handleText}
-          disabled={!customerPhone}
-          data-testid="fab-text"
-        >
-          <MessageSquare className="h-5 w-5" />
-          <span className="text-xs">Text</span>
-        </Button>
-        <Button
-          variant="ghost"
-          className="flex flex-col items-center gap-1 h-auto py-2 px-4 min-h-[56px] min-w-[56px]"
-          onClick={handleNavigate}
-          data-testid="fab-navigate"
-        >
-          <Navigation className="h-5 w-5" />
-          <span className="text-xs">Navigate</span>
-        </Button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <Dialog open={showCompletionModal} onOpenChange={setShowCompletionModal}>
