@@ -1441,6 +1441,82 @@ export const insertMaintenanceVisitSchema = createInsertSchema(maintenanceVisits
 export type InsertMaintenanceVisit = z.infer<typeof insertMaintenanceVisitSchema>;
 export type MaintenanceVisit = typeof maintenanceVisits.$inferSelect;
 
+// =============================================
+// SERVICE CALL CHECKLISTS
+// =============================================
+
+// Service types for checklists
+export const serviceCallTypeEnum = [
+  "NO_HEAT", "NO_AC", "WATER_LEAK", "STRANGE_NOISE", "THERMOSTAT_ISSUE",
+  "MAINTENANCE", "INSTALL", "DUCT_WORK", "OTHER"
+] as const;
+export type ServiceCallType = typeof serviceCallTypeEnum[number];
+
+// Question types for checklist questions
+export const checklistQuestionTypeEnum = ["yes_no", "text", "number", "select"] as const;
+export type ChecklistQuestionType = typeof checklistQuestionTypeEnum[number];
+
+// Service Call Checklist Templates
+export const serviceCallChecklists = pgTable("service_call_checklists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serviceType: text("service_type").$type<ServiceCallType>().notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertServiceCallChecklistSchema = createInsertSchema(serviceCallChecklists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertServiceCallChecklist = z.infer<typeof insertServiceCallChecklistSchema>;
+export type ServiceCallChecklist = typeof serviceCallChecklists.$inferSelect;
+
+// Checklist Questions (linked to checklist templates)
+export const checklistQuestions = pgTable("checklist_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  checklistId: varchar("checklist_id").notNull().references(() => serviceCallChecklists.id, { onDelete: "cascade" }),
+  question: text("question").notNull(),
+  questionType: text("question_type").$type<ChecklistQuestionType>().notNull().default("text"),
+  options: json("options").$type<string[]>(),
+  isRequired: boolean("is_required").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  helpText: text("help_text"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertChecklistQuestionSchema = createInsertSchema(checklistQuestions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertChecklistQuestion = z.infer<typeof insertChecklistQuestionSchema>;
+export type ChecklistQuestion = typeof checklistQuestions.$inferSelect;
+
+// Work Order Checklist Responses (completed checklists linked to work orders)
+export const workOrderChecklistResponses = pgTable("work_order_checklist_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workOrderId: varchar("work_order_id").notNull().references(() => crmWorkOrders.id, { onDelete: "cascade" }),
+  checklistId: varchar("checklist_id").notNull().references(() => serviceCallChecklists.id),
+  answers: json("answers").$type<Record<string, string | boolean | number>>().notNull(),
+  summary: text("summary"),
+  completedBy: varchar("completed_by").references(() => crmUsers.id),
+  completedAt: timestamp("completed_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWorkOrderChecklistResponseSchema = createInsertSchema(workOrderChecklistResponses).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertWorkOrderChecklistResponse = z.infer<typeof insertWorkOrderChecklistResponseSchema>;
+export type WorkOrderChecklistResponse = typeof workOrderChecklistResponses.$inferSelect;
+
 // CRM Payments (references crmInvoices from above)
 export const crmPayments = pgTable("crm_payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
