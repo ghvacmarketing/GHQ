@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
@@ -9173,6 +9173,338 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating maintenance visit:", error);
       return res.status(500).json({ message: "Failed to update maintenance visit" });
+    }
+  });
+
+  // ============================================
+  // MAINTENANCE AGREEMENT TASKS ROUTES
+  // ============================================
+
+  // GET /api/crm/agreements/:agreementId/tasks - Get all tasks for an agreement with schedules, equipment, and parts
+  app.get("/api/crm/agreements/:agreementId/tasks", requireCrmAuth, async (req, res) => {
+    try {
+      const { agreementId } = req.params;
+      
+      // Get all tasks for this agreement
+      const tasks = await db
+        .select()
+        .from(maintenanceAgreementTasks)
+        .where(eq(maintenanceAgreementTasks.agreementId, agreementId))
+        .orderBy(maintenanceAgreementTasks.sortOrder, maintenanceAgreementTasks.createdAt);
+
+      if (tasks.length === 0) {
+        return res.json([]);
+      }
+
+      const taskIds = tasks.map(t => t.id);
+
+      // Batch load schedules, equipment, and parts
+      const [schedules, equipment, parts] = await Promise.all([
+        db.select().from(maintenanceTaskSchedules).where(inArray(maintenanceTaskSchedules.taskId, taskIds)),
+        db.select().from(maintenanceTaskEquipment).where(inArray(maintenanceTaskEquipment.taskId, taskIds)),
+        db.select().from(maintenanceTaskParts).where(inArray(maintenanceTaskParts.taskId, taskIds)),
+      ]);
+
+      // Build maps for quick lookup
+      const scheduleMap = new Map<string, typeof maintenanceTaskSchedules.$inferSelect>();
+      schedules.forEach(s => scheduleMap.set(s.taskId, s));
+
+      const equipmentMap = new Map<string, (typeof maintenanceTaskEquipment.$inferSelect)[]>();
+      equipment.forEach(e => {
+        if (!equipmentMap.has(e.taskId)) equipmentMap.set(e.taskId, []);
+        equipmentMap.get(e.taskId)!.push(e);
+      });
+
+      const partsMap = new Map<string, (typeof maintenanceTaskParts.$inferSelect)[]>();
+      parts.forEach(p => {
+        if (!partsMap.has(p.taskId)) partsMap.set(p.taskId, []);
+        partsMap.get(p.taskId)!.push(p);
+      });
+
+      // Enrich tasks with nested data
+      const enrichedTasks = tasks.map(task => ({
+        ...task,
+        schedule: scheduleMap.get(task.id) || null,
+        equipment: equipmentMap.get(task.id) || [],
+        parts: partsMap.get(task.id) || [],
+      }));
+
+      return res.json(enrichedTasks);
+    } catch (error) {
+      console.error("Error fetching maintenance agreement tasks:", error);
+      return res.status(500).json({ message: "Failed to fetch maintenance agreement tasks" });
+    }
+  });
+
+  // POST /api/crm/agreements/:agreementId/tasks - Create a new task for an agreement
+  app.post("/api/crm/agreements/:agreementId/tasks", requireCrmAuth, async (req, res) => {
+    try {
+      const { agreementId } = req.params;
+      const parsed = insertMaintenanceAgreementTaskSchema.safeParse({ ...req.body, agreementId });
+      
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid task data", errors: parsed.error.flatten() });
+      }
+
+      const [task] = await db
+        .insert(maintenanceAgreementTasks)
+        .values(parsed.data)
+        .returning();
+
+      return res.status(201).json(task);
+    } catch (error) {
+      console.error("Error creating maintenance agreement task:", error);
+      return res.status(500).json({ message: "Failed to create maintenance agreement task" });
+    }
+  });
+
+  // PUT /api/crm/agreements/:agreementId/tasks/:taskId - Update a task
+  app.put("/api/crm/agreements/:agreementId/tasks/:taskId", requireCrmAuth, async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      const parsed = insertMaintenanceAgreementTaskSchema.partial().safeParse(req.body);
+      
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid task data", errors: parsed.error.flatten() });
+      }
+
+      const [task] = await db
+        .update(maintenanceAgreementTasks)
+        .set({ ...parsed.data, updatedAt: new Date() })
+        .where(eq(maintenanceAgreementTasks.id, taskId))
+        .returning();
+
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      return res.json(task);
+    } catch (error) {
+      console.error("Error updating maintenance agreement task:", error);
+      return res.status(500).json({ message: "Failed to update maintenance agreement task" });
+    }
+  });
+
+  // DELETE /api/crm/agreements/:agreementId/tasks/:taskId - Delete a task (cascades to schedule, equipment, parts)
+  app.delete("/api/crm/agreements/:agreementId/tasks/:taskId", requireCrmAuth, async (req, res) => {
+    try {
+      const { taskId } = req.params;
+
+      const [deleted] = await db
+        .delete(maintenanceAgreementTasks)
+        .where(eq(maintenanceAgreementTasks.id, taskId))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      return res.json({ message: "Task deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting maintenance agreement task:", error);
+      return res.status(500).json({ message: "Failed to delete maintenance agreement task" });
+    }
+  });
+
+  // POST /api/crm/agreements/:agreementId/tasks/:taskId/schedule - Create/update schedule for a task (upsert)
+  app.post("/api/crm/agreements/:agreementId/tasks/:taskId/schedule", requireCrmAuth, async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      const parsed = insertMaintenanceTaskScheduleSchema.safeParse({ ...req.body, taskId });
+      
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid schedule data", errors: parsed.error.flatten() });
+      }
+
+      // Delete existing schedule for this task (upsert behavior)
+      await db.delete(maintenanceTaskSchedules).where(eq(maintenanceTaskSchedules.taskId, taskId));
+
+      // Insert new schedule
+      const [schedule] = await db
+        .insert(maintenanceTaskSchedules)
+        .values(parsed.data)
+        .returning();
+
+      return res.status(201).json(schedule);
+    } catch (error) {
+      console.error("Error creating/updating maintenance task schedule:", error);
+      return res.status(500).json({ message: "Failed to create/update maintenance task schedule" });
+    }
+  });
+
+  // POST /api/crm/agreements/:agreementId/tasks/:taskId/equipment - Add equipment to a task
+  app.post("/api/crm/agreements/:agreementId/tasks/:taskId/equipment", requireCrmAuth, async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      const parsed = insertMaintenanceTaskEquipmentSchema.safeParse({ ...req.body, taskId });
+      
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid equipment data", errors: parsed.error.flatten() });
+      }
+
+      const [equipment] = await db
+        .insert(maintenanceTaskEquipment)
+        .values(parsed.data)
+        .returning();
+
+      return res.status(201).json(equipment);
+    } catch (error) {
+      console.error("Error adding maintenance task equipment:", error);
+      return res.status(500).json({ message: "Failed to add maintenance task equipment" });
+    }
+  });
+
+  // DELETE /api/crm/agreements/:agreementId/tasks/:taskId/equipment/:equipmentId - Remove equipment
+  app.delete("/api/crm/agreements/:agreementId/tasks/:taskId/equipment/:equipmentId", requireCrmAuth, async (req, res) => {
+    try {
+      const { equipmentId } = req.params;
+
+      const [deleted] = await db
+        .delete(maintenanceTaskEquipment)
+        .where(eq(maintenanceTaskEquipment.id, equipmentId))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Equipment not found" });
+      }
+
+      return res.json({ message: "Equipment removed successfully" });
+    } catch (error) {
+      console.error("Error removing maintenance task equipment:", error);
+      return res.status(500).json({ message: "Failed to remove maintenance task equipment" });
+    }
+  });
+
+  // POST /api/crm/agreements/:agreementId/tasks/:taskId/parts - Add a part to a task
+  app.post("/api/crm/agreements/:agreementId/tasks/:taskId/parts", requireCrmAuth, async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      const parsed = insertMaintenanceTaskPartSchema.safeParse({ ...req.body, taskId });
+      
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid part data", errors: parsed.error.flatten() });
+      }
+
+      const [part] = await db
+        .insert(maintenanceTaskParts)
+        .values(parsed.data)
+        .returning();
+
+      return res.status(201).json(part);
+    } catch (error) {
+      console.error("Error adding maintenance task part:", error);
+      return res.status(500).json({ message: "Failed to add maintenance task part" });
+    }
+  });
+
+  // DELETE /api/crm/agreements/:agreementId/tasks/:taskId/parts/:partId - Remove a part
+  app.delete("/api/crm/agreements/:agreementId/tasks/:taskId/parts/:partId", requireCrmAuth, async (req, res) => {
+    try {
+      const { partId } = req.params;
+
+      const [deleted] = await db
+        .delete(maintenanceTaskParts)
+        .where(eq(maintenanceTaskParts.id, partId))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Part not found" });
+      }
+
+      return res.json({ message: "Part removed successfully" });
+    } catch (error) {
+      console.error("Error removing maintenance task part:", error);
+      return res.status(500).json({ message: "Failed to remove maintenance task part" });
+    }
+  });
+
+  // POST /api/crm/agreements/:agreementId/tasks/batch - Batch create/update tasks with nested schedule, equipment, parts
+  app.post("/api/crm/agreements/:agreementId/tasks/batch", requireCrmAuth, async (req, res) => {
+    try {
+      const { agreementId } = req.params;
+      const { tasks } = req.body;
+
+      if (!Array.isArray(tasks)) {
+        return res.status(400).json({ message: "tasks must be an array" });
+      }
+
+      const results: any[] = [];
+
+      // Use a transaction for atomicity
+      await db.transaction(async (tx) => {
+        for (const taskData of tasks) {
+          const { schedule, equipment, parts, ...taskFields } = taskData;
+
+          // Validate and create/update task
+          const taskParsed = insertMaintenanceAgreementTaskSchema.safeParse({ ...taskFields, agreementId });
+          if (!taskParsed.success) {
+            throw new Error(`Invalid task data: ${JSON.stringify(taskParsed.error.flatten())}`);
+          }
+
+          let task;
+          if (taskFields.id) {
+            // Update existing task
+            const [updated] = await tx
+              .update(maintenanceAgreementTasks)
+              .set({ ...taskParsed.data, updatedAt: new Date() })
+              .where(eq(maintenanceAgreementTasks.id, taskFields.id))
+              .returning();
+            task = updated;
+          } else {
+            // Create new task
+            const [created] = await tx
+              .insert(maintenanceAgreementTasks)
+              .values(taskParsed.data)
+              .returning();
+            task = created;
+          }
+
+          if (!task) {
+            throw new Error("Failed to create/update task");
+          }
+
+          // Handle schedule (upsert)
+          if (schedule) {
+            const scheduleParsed = insertMaintenanceTaskScheduleSchema.safeParse({ ...schedule, taskId: task.id });
+            if (!scheduleParsed.success) {
+              throw new Error(`Invalid schedule data: ${JSON.stringify(scheduleParsed.error.flatten())}`);
+            }
+            await tx.delete(maintenanceTaskSchedules).where(eq(maintenanceTaskSchedules.taskId, task.id));
+            await tx.insert(maintenanceTaskSchedules).values(scheduleParsed.data);
+          }
+
+          // Handle equipment (delete existing and insert new)
+          if (Array.isArray(equipment)) {
+            await tx.delete(maintenanceTaskEquipment).where(eq(maintenanceTaskEquipment.taskId, task.id));
+            for (const eq_item of equipment) {
+              const eqParsed = insertMaintenanceTaskEquipmentSchema.safeParse({ ...eq_item, taskId: task.id });
+              if (!eqParsed.success) {
+                throw new Error(`Invalid equipment data: ${JSON.stringify(eqParsed.error.flatten())}`);
+              }
+              await tx.insert(maintenanceTaskEquipment).values(eqParsed.data);
+            }
+          }
+
+          // Handle parts (delete existing and insert new)
+          if (Array.isArray(parts)) {
+            await tx.delete(maintenanceTaskParts).where(eq(maintenanceTaskParts.taskId, task.id));
+            for (const part of parts) {
+              const partParsed = insertMaintenanceTaskPartSchema.safeParse({ ...part, taskId: task.id });
+              if (!partParsed.success) {
+                throw new Error(`Invalid part data: ${JSON.stringify(partParsed.error.flatten())}`);
+              }
+              await tx.insert(maintenanceTaskParts).values(partParsed.data);
+            }
+          }
+
+          results.push(task);
+        }
+      });
+
+      return res.status(201).json({ message: "Batch operation completed", tasks: results });
+    } catch (error: any) {
+      console.error("Error in batch maintenance task operation:", error);
+      return res.status(500).json({ message: error.message || "Failed to complete batch operation" });
     }
   });
 

@@ -529,7 +529,7 @@ export default function CrmAgreements() {
             <Button
               size="sm"
               className="bg-[#711419] hover:bg-[#5a1014]"
-              onClick={() => setShowCreateDialog(true)}
+              onClick={() => navigate("/crm/agreements/new")}
               data-testid="button-create-agreement"
             >
               <Plus className="h-4 w-4 mr-1" />

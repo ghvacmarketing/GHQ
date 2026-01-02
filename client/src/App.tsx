@@ -45,6 +45,7 @@ const CrmQuotes = lazy(() => import("@/pages/crm/crm-quotes"));
 const CrmQuoteCreate = lazy(() => import("@/pages/crm/crm-quote-create"));
 const CrmQuoteDetail = lazy(() => import("@/pages/crm/crm-quote-detail"));
 const CrmAgreements = lazy(() => import("@/pages/crm/crm-agreements"));
+const CrmAgreementCreate = lazy(() => import("@/pages/crm/crm-agreement-create"));
 const CrmProjects = lazy(() => import("@/pages/crm/crm-projects"));
 const CrmProjectDetail = lazy(() => import("@/pages/crm/crm-project-detail"));
 const CrmProspectFunnel = lazy(() => import("@/pages/crm/crm-prospect-funnel"));
@@ -181,6 +182,7 @@ function Router() {
       <Route path="/crm/quotes/new">{() => <CrmWrapper><CrmQuoteCreate /></CrmWrapper>}</Route>
       <Route path="/crm/quotes/:id">{() => <CrmWrapper><CrmQuoteDetail /></CrmWrapper>}</Route>
       <Route path="/crm/quotes">{() => <CrmWrapper><CrmQuotes /></CrmWrapper>}</Route>
+      <Route path="/crm/agreements/new">{() => <CrmWrapper><CrmAgreementCreate /></CrmWrapper>}</Route>
       <Route path="/crm/agreements">{() => <CrmWrapper><CrmAgreements /></CrmWrapper>}</Route>
       <Route path="/crm/projects/:id">{() => <CrmWrapper><CrmProjectDetail /></CrmWrapper>}</Route>
       <Route path="/crm/projects">{() => <CrmWrapper><CrmProjects /></CrmWrapper>}</Route>

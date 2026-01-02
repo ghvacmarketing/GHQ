@@ -1442,6 +1442,103 @@ export type InsertMaintenanceVisit = z.infer<typeof insertMaintenanceVisitSchema
 export type MaintenanceVisit = typeof maintenanceVisits.$inferSelect;
 
 // =============================================
+// FLEXIBLE MAINTENANCE AGREEMENT TASKS
+// =============================================
+
+// Maintenance Frequency Enum
+export const maintenanceFrequencyEnum = ["weekly", "monthly", "quarterly", "yearly", "custom"] as const;
+export type MaintenanceFrequency = typeof maintenanceFrequencyEnum[number];
+
+// Maintenance Agreement Tasks - Individual tasks within an agreement
+export const maintenanceAgreementTasks = pgTable("maintenance_agreement_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agreementId: varchar("agreement_id").notNull().references(() => crmAgreements.id, { onDelete: "cascade" }),
+  taskName: text("task_name").notNull(),
+  duration: integer("duration").default(60),
+  amount: decimal("amount", { precision: 10, scale: 2 }).default("0.00"),
+  requiresConfirmation: boolean("requires_confirmation").default(true),
+  allowUpgrade: boolean("allow_upgrade").default(false),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMaintenanceAgreementTaskSchema = createInsertSchema(maintenanceAgreementTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMaintenanceAgreementTask = z.infer<typeof insertMaintenanceAgreementTaskSchema>;
+export type MaintenanceAgreementTask = typeof maintenanceAgreementTasks.$inferSelect;
+
+// Maintenance Task Schedules - Flexible scheduling rules per task
+export const maintenanceTaskSchedules = pgTable("maintenance_task_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => maintenanceAgreementTasks.id, { onDelete: "cascade" }),
+  frequency: text("frequency").$type<MaintenanceFrequency>().notNull(),
+  intervalValue: integer("interval_value").default(1),
+  dayOfMonth: integer("day_of_month"),
+  dayOfWeek: integer("day_of_week"),
+  activeMonths: integer("active_months").array(),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMaintenanceTaskScheduleSchema = createInsertSchema(maintenanceTaskSchedules).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMaintenanceTaskSchedule = z.infer<typeof insertMaintenanceTaskScheduleSchema>;
+export type MaintenanceTaskSchedule = typeof maintenanceTaskSchedules.$inferSelect;
+
+// Maintenance Task Equipment - Equipment linked to tasks
+export const maintenanceTaskEquipment = pgTable("maintenance_task_equipment", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => maintenanceAgreementTasks.id, { onDelete: "cascade" }),
+  equipmentName: text("equipment_name").notNull(),
+  make: text("make"),
+  model: text("model"),
+  serialNumber: text("serial_number"),
+  location: text("location"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMaintenanceTaskEquipmentSchema = createInsertSchema(maintenanceTaskEquipment).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMaintenanceTaskEquipment = z.infer<typeof insertMaintenanceTaskEquipmentSchema>;
+export type MaintenanceTaskEquipment = typeof maintenanceTaskEquipment.$inferSelect;
+
+// Maintenance Task Parts - Parts (billable and non-billable) per task
+export const maintenanceTaskParts = pgTable("maintenance_task_parts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => maintenanceAgreementTasks.id, { onDelete: "cascade" }),
+  partName: text("part_name").notNull(),
+  partNumber: text("part_number"),
+  quantity: integer("quantity").default(1),
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }).default("0.00"),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).default("0.00"),
+  isBillable: boolean("is_billable").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMaintenanceTaskPartSchema = createInsertSchema(maintenanceTaskParts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMaintenanceTaskPart = z.infer<typeof insertMaintenanceTaskPartSchema>;
+export type MaintenanceTaskPart = typeof maintenanceTaskParts.$inferSelect;
+
+// =============================================
 // SERVICE CALL CHECKLISTS
 // =============================================
 
