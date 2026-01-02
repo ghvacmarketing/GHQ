@@ -1139,6 +1139,7 @@ interface InvoiceLineItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  lineType: "service" | "discount" | "part";
 }
 
 interface InvoiceWithLineItems extends CrmInvoice {
@@ -1157,10 +1158,13 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([
-    { id: "1", description: "", quantity: 1, unitPrice: 0 }
-  ]);
+  const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([]);
   const [taxRate, setTaxRate] = useState(8.25);
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [showDiscount, setShowDiscount] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [discountDescription, setDiscountDescription] = useState("");
+  const [discountAmount, setDiscountAmount] = useState("");
 
   const { data: invoicesData, isLoading: invoicesLoading, error: invoicesError } = useQuery<{ invoices: CrmInvoice[] }>({
     queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }],
@@ -1184,6 +1188,25 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     enabled: !!existingInvoice?.id,
   });
 
+  // Fetch parts catalog
+  const { data: partsData } = useQuery<CatalogPart[]>({
+    queryKey: ["/api/parts"],
+    queryFn: async () => {
+      const res = await fetch("/api/parts", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const parts = partsData || [];
+  const filteredParts = catalogSearch.trim()
+    ? parts.filter(p => 
+        p.description.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+        (p.partNumber && p.partNumber.toLowerCase().includes(catalogSearch.toLowerCase()))
+      )
+    : parts.slice(0, 20);
+
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: {
       lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number; lineType: string }>;
@@ -1197,7 +1220,8 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         unitPrice: item.unitPrice.toFixed(2),
         lineTotal: item.lineTotal.toFixed(2),
         lineType: item.lineType,
-        taxable: true,
+        taxable: item.lineType !== "discount",
+        isDiscountLine: item.lineType === "discount",
         sortOrder: index,
       }));
 
@@ -1220,7 +1244,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       toast({ title: "Invoice Created", description: "Your invoice has been created as a draft." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
       setShowCreateForm(false);
-      setLineItems([{ id: "1", description: "", quantity: 1, unitPrice: 0 }]);
+      setLineItems([]);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to create invoice", variant: "destructive" });
@@ -1228,13 +1252,43 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   });
 
   const addLineItem = () => {
-    setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0 }]);
+    setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service" }]);
+  };
+
+  const addCatalogItem = (part: CatalogPart) => {
+    const price = parseFloat(part.price) || 0;
+    setLineItems([...lineItems, { 
+      id: Date.now().toString(), 
+      description: part.description, 
+      quantity: 1, 
+      unitPrice: price,
+      lineType: "part"
+    }]);
+    setShowCatalog(false);
+    setCatalogSearch("");
+    toast({ title: "Item Added", description: part.description });
+  };
+
+  const addDiscountItem = () => {
+    const amount = parseFloat(discountAmount) || 0;
+    if (amount <= 0 || !discountDescription.trim()) {
+      toast({ title: "Error", description: "Please enter a discount description and amount.", variant: "destructive" });
+      return;
+    }
+    setLineItems([...lineItems, { 
+      id: Date.now().toString(), 
+      description: discountDescription.trim(), 
+      quantity: 1, 
+      unitPrice: -Math.abs(amount),
+      lineType: "discount"
+    }]);
+    setShowDiscount(false);
+    setDiscountDescription("");
+    setDiscountAmount("");
   };
 
   const removeLineItem = (id: string) => {
-    if (lineItems.length > 1) {
-      setLineItems(lineItems.filter(item => item.id !== id));
-    }
+    setLineItems(lineItems.filter(item => item.id !== id));
   };
 
   const updateLineItem = (id: string, field: keyof InvoiceLineItem, value: string | number) => {
@@ -1243,14 +1297,19 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     ));
   };
 
+  // Calculate subtotal (all items including discounts)
   const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-  const taxAmount = subtotal * (taxRate / 100);
+  // Tax only on taxable items (not discounts)
+  const taxableAmount = lineItems
+    .filter(item => item.lineType !== "discount")
+    .reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+  const taxAmount = taxableAmount * (taxRate / 100);
   const total = subtotal + taxAmount;
 
   const handleCreateInvoice = () => {
-    const validItems = lineItems.filter(item => item.description.trim() && item.unitPrice > 0);
+    const validItems = lineItems.filter(item => item.description.trim() && item.unitPrice !== 0);
     if (validItems.length === 0) {
-      toast({ title: "Error", description: "Please add at least one line item with a description and price.", variant: "destructive" });
+      toast({ title: "Error", description: "Please add at least one line item.", variant: "destructive" });
       return;
     }
 
@@ -1260,7 +1319,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         lineTotal: item.quantity * item.unitPrice,
-        lineType: "service",
+        lineType: item.lineType,
       })),
       subtotal,
       taxTotal: taxAmount,
@@ -1448,72 +1507,141 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
             </>
           ) : (
             <div className="space-y-4">
+              {/* Line Items Section */}
               <div className="space-y-3">
-                {lineItems.map((item, index) => (
-                  <div key={item.id} className="bg-slate-50 rounded-lg p-3 space-y-3" data-testid={`line-item-${item.id}`}>
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-medium text-slate-500">Line Item {index + 1}</Label>
-                      {lineItems.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => removeLineItem(item.id)}
-                          data-testid={`button-remove-line-${item.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    <Input
-                      placeholder="Description"
-                      value={item.description}
-                      onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
-                      className="min-h-[44px]"
-                      data-testid={`input-line-description-${item.id}`}
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-xs text-slate-500">Qty</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => updateLineItem(item.id, "quantity", parseInt(e.target.value) || 1)}
-                          className="min-h-[44px]"
-                          data-testid={`input-line-quantity-${item.id}`}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-slate-500">Unit Price</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.unitPrice}
-                          onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                          className="min-h-[44px]"
-                          data-testid={`input-line-unitprice-${item.id}`}
-                        />
-                      </div>
-                    </div>
-                    <div className="text-right text-sm font-medium text-slate-700">
-                      Line Total: {formatCurrency(item.quantity * item.unitPrice)}
-                    </div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Line Items</Label>
+                  <span className="text-xs text-slate-500">{lineItems.length} item{lineItems.length !== 1 ? "s" : ""}</span>
+                </div>
+                
+                {/* Action Buttons - Mobile Friendly */}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-[44px] flex-1 min-w-[100px] border-blue-200 text-blue-700 hover:bg-blue-50"
+                    onClick={() => setShowCatalog(true)}
+                    data-testid="button-invoice-add-from-catalog"
+                  >
+                    <Package className="h-4 w-4 mr-1" />
+                    Catalog
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-[44px] flex-1 min-w-[100px] border-amber-200 text-amber-700 hover:bg-amber-50"
+                    onClick={() => setShowDiscount(true)}
+                    data-testid="button-invoice-add-discount"
+                  >
+                    <Tag className="h-4 w-4 mr-1" />
+                    Discount
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-[44px] flex-1 min-w-[100px]"
+                    onClick={addLineItem}
+                    data-testid="button-invoice-add-line-item"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Manual
+                  </Button>
+                </div>
+
+                {/* Line Items List */}
+                {lineItems.length === 0 ? (
+                  <div className="border border-dashed rounded-lg p-6 text-center text-slate-400">
+                    <p className="text-sm">No items added yet.</p>
+                    <p className="text-xs mt-1">Use the buttons above to add items.</p>
                   </div>
-                ))}
+                ) : (
+                  <div className="space-y-2">
+                    {lineItems.map((item, index) => (
+                      <div 
+                        key={item.id} 
+                        className={`border rounded-lg p-3 space-y-2 ${item.lineType === "discount" ? "bg-amber-50 border-amber-200" : item.lineType === "part" ? "bg-blue-50 border-blue-200" : ""}`}
+                        data-testid={`invoice-line-item-${item.id}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500 font-medium">
+                              {item.lineType === "discount" ? (
+                                <span className="text-amber-600 flex items-center gap-1"><Tag className="h-3 w-3" />Discount</span>
+                              ) : item.lineType === "part" ? (
+                                <span className="text-blue-600 flex items-center gap-1"><Package className="h-3 w-3" />Part</span>
+                              ) : (
+                                `Item ${index + 1}`
+                              )}
+                            </span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => removeLineItem(item.id)}
+                            data-testid={`button-remove-invoice-line-${item.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        
+                        {item.lineType === "discount" ? (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">{item.description}</span>
+                            <span className="font-medium text-red-600" data-testid={`invoice-line-total-${item.id}`}>
+                              {formatCurrency(item.unitPrice)}
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <Input
+                              placeholder="Description (e.g., Labor - AC Repair)"
+                              value={item.description}
+                              onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
+                              className="min-h-[44px]"
+                              data-testid={`input-invoice-description-${item.id}`}
+                            />
+                            <div className="flex gap-2">
+                              <div className="w-20">
+                                <Label className="text-xs text-slate-500">Qty</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity}
+                                  onChange={(e) => updateLineItem(item.id, "quantity", parseInt(e.target.value) || 1)}
+                                  className="min-h-[44px]"
+                                  data-testid={`input-invoice-quantity-${item.id}`}
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <Label className="text-xs text-slate-500">Price</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  value={item.unitPrice || ""}
+                                  onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
+                                  className="min-h-[44px]"
+                                  data-testid={`input-invoice-unit-price-${item.id}`}
+                                />
+                              </div>
+                              <div className="w-24 text-right">
+                                <Label className="text-xs text-slate-500">Total</Label>
+                                <p className="min-h-[44px] flex items-center justify-end font-medium" data-testid={`invoice-line-total-${item.id}`}>
+                                  {formatCurrency(item.quantity * item.unitPrice)}
+                                </p>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <Button
-                variant="outline"
-                className="w-full min-h-[44px]"
-                onClick={addLineItem}
-                data-testid="button-add-line-item"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Line Item
-              </Button>
-
+              {/* Totals */}
               <div className="bg-slate-100 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-600">Subtotal</span>
@@ -1531,7 +1659,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                       value={taxRate}
                       onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
                       className="w-16 h-7 text-xs p-1"
-                      data-testid="input-tax-rate"
+                      data-testid="input-invoice-tax-rate"
                     />
                     <span className="text-xs text-slate-500">%</span>
                   </div>
@@ -1542,19 +1670,20 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                 <Separator />
                 <div className="flex justify-between items-center">
                   <span className="text-base font-semibold">Total</span>
-                  <span className="text-lg font-bold text-green-700" data-testid="invoice-form-total">
+                  <span className={`text-lg font-bold ${total >= 0 ? "text-green-700" : "text-red-600"}`} data-testid="invoice-form-total">
                     {formatCurrency(total)}
                   </span>
                 </div>
               </div>
 
+              {/* Actions */}
               <div className="flex gap-3">
                 <Button
                   variant="outline"
                   className="flex-1 min-h-[48px]"
                   onClick={() => {
                     setShowCreateForm(false);
-                    setLineItems([{ id: "1", description: "", quantity: 1, unitPrice: 0 }]);
+                    setLineItems([]);
                   }}
                   disabled={createInvoiceMutation.isPending}
                   data-testid="button-cancel-invoice"
@@ -1579,6 +1708,121 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Items Catalog Dialog */}
+      <Dialog open={showCatalog} onOpenChange={setShowCatalog}>
+        <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-blue-600" />
+              Items Catalog
+            </DialogTitle>
+            <DialogDescription>
+              Search and select items from the catalog
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search parts..."
+              value={catalogSearch}
+              onChange={(e) => setCatalogSearch(e.target.value)}
+              className="pl-10 min-h-[44px]"
+              data-testid="input-invoice-catalog-search"
+            />
+          </div>
+          
+          <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
+            {filteredParts.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-4">
+                {catalogSearch ? "No items found" : "Loading catalog..."}
+              </p>
+            ) : (
+              filteredParts.map((part, idx) => (
+                <div
+                  key={part.id || idx}
+                  className="border rounded-lg p-3 hover:bg-slate-50 cursor-pointer"
+                  onClick={() => addCatalogItem(part)}
+                  data-testid={`invoice-catalog-item-${part.id || idx}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{part.description}</p>
+                      {part.partNumber && (
+                        <p className="text-xs text-slate-500">{part.partNumber}</p>
+                      )}
+                    </div>
+                    <span className="text-sm font-semibold text-green-700 ml-2">
+                      {formatCurrency(parseFloat(part.price) || 0)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowCatalog(false); setCatalogSearch(""); }}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Discount Dialog */}
+      <Dialog open={showDiscount} onOpenChange={setShowDiscount}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-5 w-5 text-amber-600" />
+              Add Discount
+            </DialogTitle>
+            <DialogDescription>
+              Enter discount details to apply to the invoice
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium">Discount Description</Label>
+              <Input
+                placeholder="e.g., Senior Discount, Loyalty Discount"
+                value={discountDescription}
+                onChange={(e) => setDiscountDescription(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-invoice-discount-description"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Amount ($)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-invoice-discount-amount"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => { setShowDiscount(false); setDiscountDescription(""); setDiscountAmount(""); }}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-amber-600 hover:bg-amber-700"
+              onClick={addDiscountItem}
+              data-testid="button-confirm-invoice-discount"
+            >
+              Add Discount
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
