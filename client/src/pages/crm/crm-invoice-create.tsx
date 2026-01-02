@@ -236,14 +236,12 @@ export default function CrmInvoiceCreate() {
       setSelectedWorkOrder(wo);
       setFormData(prev => ({
         ...prev,
-        mode: "manual",
         workOrderId: wo.id,
         customerName: wo.customerName || wo.customer?.name || "",
         customerEmail: wo.customer?.email || "",
         customerPhone: wo.customer?.phone || "",
         serviceAddress: wo.customer?.fullAddress || "",
       }));
-      setCurrentStep(3);
     }
   }, [workOrderIdFromUrl, preselectedWorkOrder]);
 
@@ -677,112 +675,156 @@ export default function CrmInvoiceCreate() {
 
               {currentStep === 2 && (
                 <div className="space-y-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-base font-semibold mb-1">Select Work Order</h3>
-                      <p className="text-sm text-slate-500">
-                        Invoices must be tied to a work order
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => setShowCreateWODialog(true)}
-                      className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                      data-testid="button-create-work-order"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Create New
-                    </Button>
-                  </div>
-
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input
-                      placeholder="Search by title, number, or customer..."
-                      value={workOrderSearch}
-                      onChange={(e) => setWorkOrderSearch(e.target.value)}
-                      className="pl-9"
-                      data-testid="input-work-order-search"
-                    />
-                  </div>
-
-                  <div className="max-h-80 overflow-y-auto border rounded-lg">
-                    {workOrdersLoading ? (
-                      <div className="p-4 space-y-2">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Skeleton key={i} className="h-16 w-full" />
-                        ))}
+                  {workOrderIdFromUrl && selectedWorkOrder ? (
+                    <>
+                      <div>
+                        <h3 className="text-base font-semibold mb-1">Work Order</h3>
+                        <p className="text-sm text-slate-500">
+                          Invoice will be created for this work order
+                        </p>
                       </div>
-                    ) : filteredWorkOrders.length === 0 ? (
-                      <div className="p-8 text-center text-slate-500">
-                        <ClipboardList className="h-8 w-8 mx-auto mb-2 text-slate-400" />
-                        No work orders found
-                      </div>
-                    ) : (
-                      <div className="divide-y">
-                        {filteredWorkOrders.map((wo) => (
-                          <button
-                            key={wo.id}
-                            onClick={() => {
-                              if (formData.workOrderId === wo.id) {
-                                setSelectedWorkOrder(null);
-                                updateField("workOrderId", null);
-                                setFormData(prev => ({
-                                  ...prev,
-                                  customerName: "",
-                                  customerEmail: "",
-                                  customerPhone: "",
-                                  serviceAddress: "",
-                                }));
-                              } else {
-                                setSelectedWorkOrder(wo);
-                                updateField("workOrderId", wo.id);
-                                setFormData(prev => ({
-                                  ...prev,
-                                  customerName: wo.customerName || wo.customer?.name || "",
-                                  customerEmail: wo.customer?.email || "",
-                                  customerPhone: wo.customer?.phone || "",
-                                  serviceAddress: wo.customer?.fullAddress || "",
-                                }));
-                              }
-                            }}
-                            className={cn(
-                              "w-full p-4 text-left hover:bg-slate-50 transition-colors",
-                              formData.workOrderId === wo.id && "bg-red-50"
-                            )}
-                            data-testid={`work-order-${wo.id}`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="font-medium">
-                                  WO #{wo.workOrderNumber} - {wo.title || "Untitled"}
-                                </div>
-                                <div className="text-sm text-slate-500">
-                                  {wo.customerName || wo.customer?.name || "No customer"}
-                                </div>
+                      <div className="border-2 border-[#711419] bg-red-50/50 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">
+                              WO #{selectedWorkOrder.workOrderNumber} - {selectedWorkOrder.title || "Untitled"}
+                            </div>
+                            <div className="text-sm text-slate-500">
+                              {selectedWorkOrder.customerName || selectedWorkOrder.customer?.name || "No customer"}
+                            </div>
+                            {selectedWorkOrder.customer?.fullAddress && (
+                              <div className="text-sm text-slate-400 mt-1">
+                                {selectedWorkOrder.customer.fullAddress}
                               </div>
-                              <div className="text-right">
-                                <Badge variant="outline" className="text-xs">
-                                  {wo.visitType || wo.workSubtype}
-                                </Badge>
-                                {wo.scheduledStart && (
-                                  <div className="text-xs text-slate-400 mt-1">
-                                    {format(new Date(wo.scheduledStart), "MMM d, yyyy")}
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <Badge variant="outline" className="text-xs">
+                              {selectedWorkOrder.visitType || selectedWorkOrder.workSubtype}
+                            </Badge>
+                            {selectedWorkOrder.scheduledStart && (
+                              <div className="text-xs text-slate-400 mt-1">
+                                {format(new Date(selectedWorkOrder.scheduledStart), "MMM d, yyyy")}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-3 flex items-center text-[#711419] text-sm font-medium">
+                          <Check className="h-4 w-4 mr-1" />
+                          Linked from Work Order
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-base font-semibold mb-1">Select Work Order</h3>
+                          <p className="text-sm text-slate-500">
+                            Invoices must be tied to a work order
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => setShowCreateWODialog(true)}
+                          className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                          data-testid="button-create-work-order"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Create New
+                        </Button>
+                      </div>
+
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Input
+                          placeholder="Search by title, number, or customer..."
+                          value={workOrderSearch}
+                          onChange={(e) => setWorkOrderSearch(e.target.value)}
+                          className="pl-9"
+                          data-testid="input-work-order-search"
+                        />
+                      </div>
+
+                      <div className="max-h-80 overflow-y-auto border rounded-lg">
+                        {workOrdersLoading ? (
+                          <div className="p-4 space-y-2">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Skeleton key={i} className="h-16 w-full" />
+                            ))}
+                          </div>
+                        ) : filteredWorkOrders.length === 0 ? (
+                          <div className="p-8 text-center text-slate-500">
+                            <ClipboardList className="h-8 w-8 mx-auto mb-2 text-slate-400" />
+                            No work orders found
+                          </div>
+                        ) : (
+                          <div className="divide-y">
+                            {filteredWorkOrders.map((wo) => (
+                              <button
+                                key={wo.id}
+                                onClick={() => {
+                                  if (formData.workOrderId === wo.id) {
+                                    setSelectedWorkOrder(null);
+                                    updateField("workOrderId", null);
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      customerName: "",
+                                      customerEmail: "",
+                                      customerPhone: "",
+                                      serviceAddress: "",
+                                    }));
+                                  } else {
+                                    setSelectedWorkOrder(wo);
+                                    updateField("workOrderId", wo.id);
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      customerName: wo.customerName || wo.customer?.name || "",
+                                      customerEmail: wo.customer?.email || "",
+                                      customerPhone: wo.customer?.phone || "",
+                                      serviceAddress: wo.customer?.fullAddress || "",
+                                    }));
+                                  }
+                                }}
+                                className={cn(
+                                  "w-full p-4 text-left hover:bg-slate-50 transition-colors",
+                                  formData.workOrderId === wo.id && "bg-red-50"
+                                )}
+                                data-testid={`work-order-${wo.id}`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="font-medium">
+                                      WO #{wo.workOrderNumber} - {wo.title || "Untitled"}
+                                    </div>
+                                    <div className="text-sm text-slate-500">
+                                      {wo.customerName || wo.customer?.name || "No customer"}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <Badge variant="outline" className="text-xs">
+                                      {wo.visitType || wo.workSubtype}
+                                    </Badge>
+                                    {wo.scheduledStart && (
+                                      <div className="text-xs text-slate-400 mt-1">
+                                        {format(new Date(wo.scheduledStart), "MMM d, yyyy")}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                {formData.workOrderId === wo.id && (
+                                  <div className="mt-2 flex items-center text-[#711419] text-sm">
+                                    <Check className="h-4 w-4 mr-1" />
+                                    Selected
                                   </div>
                                 )}
-                              </div>
-                            </div>
-                            {formData.workOrderId === wo.id && (
-                              <div className="mt-2 flex items-center text-[#711419] text-sm">
-                                <Check className="h-4 w-4 mr-1" />
-                                Selected
-                              </div>
-                            )}
-                          </button>
-                        ))}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
               )}
 
