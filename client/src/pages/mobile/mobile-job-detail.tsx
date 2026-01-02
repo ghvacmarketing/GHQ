@@ -1222,13 +1222,25 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         lineType: item.lineType,
         taxable: item.lineType !== "discount",
         isDiscountLine: item.lineType === "discount",
+        discountKind: item.lineType === "discount" ? "fixed" : undefined,
         sortOrder: index,
       }));
+
+      const customerName = workOrder.customer?.name || "Unknown Customer";
+      const customerEmail = workOrder.customer?.email || "";
+      const customerPhone = workOrder.customer?.phone || "";
+      const serviceAddress = workOrder.property 
+        ? [workOrder.property.address1, workOrder.property.city, workOrder.property.state, workOrder.property.zip].filter(Boolean).join(", ")
+        : "";
 
       const response = await apiRequest("POST", "/api/crm/invoices", {
         workOrderId: workOrder.id,
         customerId: workOrder.customerId,
         propertyId: workOrder.propertyId,
+        customerName,
+        customerEmail,
+        customerPhone,
+        serviceAddress,
         lineItems: formattedLineItems,
         subtotal: data.subtotal.toFixed(2),
         laborTotal: "0.00",
