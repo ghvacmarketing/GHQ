@@ -4192,8 +4192,8 @@ export default function CrmCustomerDetail() {
 
         {/* Quote Detail Dialog */}
         <Dialog open={!!selectedQuoteId} onOpenChange={(open) => !open && setSelectedQuoteId(null)}>
-          <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] p-0 overflow-hidden" data-testid="dialog-quote-detail">
-            <div className="sticky top-0 z-10 bg-white border-b px-6 py-4 flex items-center justify-between">
+          <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] p-0 overflow-hidden flex flex-col" data-testid="dialog-quote-detail">
+            <div className="shrink-0 bg-white border-b px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <FileText className="h-5 w-5 text-[#711419]" />
                 <div>
@@ -4220,7 +4220,7 @@ export default function CrmCustomerDetail() {
               </div>
             </div>
             
-            <ScrollArea className="flex-1 max-h-[calc(90vh-180px)]">
+            <ScrollArea className="flex-1 overflow-auto">
               {selectedQuoteLoading ? (
                 <div className="space-y-4 p-6">
                   <Skeleton className="h-6 w-48" />
@@ -4449,7 +4449,7 @@ export default function CrmCustomerDetail() {
             </ScrollArea>
             
             {/* Footer Actions */}
-            <div className="shrink-0 px-6 py-4 border-t bg-slate-50 flex items-center justify-between gap-3">
+            <div className="shrink-0 px-6 py-4 border-t bg-slate-50 flex items-center justify-between gap-3 rounded-b-lg">
               <Button
                 variant="outline"
                 onClick={() => setSelectedQuoteId(null)}
