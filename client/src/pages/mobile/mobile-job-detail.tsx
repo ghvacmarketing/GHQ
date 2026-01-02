@@ -40,6 +40,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
@@ -1140,6 +1141,7 @@ interface InvoiceLineItem {
   quantity: number;
   unitPrice: number;
   lineType: "service" | "discount" | "part";
+  taxable: boolean;
 }
 
 interface InvoiceWithLineItems extends CrmInvoice {
@@ -1209,7 +1211,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
 
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: {
-      lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number; lineType: string }>;
+      lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number; lineType: string; taxable: boolean }>;
       subtotal: number;
       taxTotal: number;
       total: number;
@@ -1220,7 +1222,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         unitPrice: item.unitPrice.toFixed(2),
         lineTotal: item.lineTotal.toFixed(2),
         lineType: item.lineType,
-        taxable: item.lineType !== "discount",
+        taxable: item.taxable,
         isDiscountLine: item.lineType === "discount",
         discountKind: item.lineType === "discount" ? "fixed" : undefined,
         sortOrder: index,
@@ -1264,7 +1266,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   });
 
   const addLineItem = () => {
-    setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service" }]);
+    setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service", taxable: true }]);
   };
 
   const addCatalogItem = (part: CatalogPart) => {
@@ -1274,7 +1276,8 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       description: part.description, 
       quantity: 1, 
       unitPrice: price,
-      lineType: "part"
+      lineType: "part",
+      taxable: true
     }]);
     setShowCatalog(false);
     setCatalogSearch("");
@@ -1292,7 +1295,8 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       description: discountDescription.trim(), 
       quantity: 1, 
       unitPrice: -Math.abs(amount),
-      lineType: "discount"
+      lineType: "discount",
+      taxable: false
     }]);
     setShowDiscount(false);
     setDiscountDescription("");
@@ -1303,7 +1307,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     setLineItems(lineItems.filter(item => item.id !== id));
   };
 
-  const updateLineItem = (id: string, field: keyof InvoiceLineItem, value: string | number) => {
+  const updateLineItem = (id: string, field: keyof InvoiceLineItem, value: string | number | boolean) => {
     setLineItems(lineItems.map(item =>
       item.id === id ? { ...item, [field]: value } : item
     ));
@@ -1311,17 +1315,24 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
 
   // Calculate subtotal (all items including discounts)
   const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-  // Tax only on taxable items (not discounts)
+  // Tax only on taxable items (never discounts, never negative amounts)
   const taxableAmount = lineItems
-    .filter(item => item.lineType !== "discount")
+    .filter(item => item.taxable && item.lineType !== "discount" && (item.quantity * item.unitPrice) > 0)
     .reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
   const taxAmount = taxableAmount * (taxRate / 100);
   const total = subtotal + taxAmount;
 
   const handleCreateInvoice = () => {
-    const validItems = lineItems.filter(item => item.description.trim() && item.unitPrice !== 0);
+    // Allow $0 items if they have a description (free services), but filter items with no description
+    const validItems = lineItems.filter(item => item.description.trim());
     if (validItems.length === 0) {
-      toast({ title: "Error", description: "Please add at least one line item.", variant: "destructive" });
+      toast({ title: "Error", description: "Please add at least one line item with a description.", variant: "destructive" });
+      return;
+    }
+    // Check if all items have $0 or negative totals (would create useless invoice)
+    const hasPositiveTotal = validItems.some(item => (item.quantity * item.unitPrice) > 0);
+    if (!hasPositiveTotal) {
+      toast({ title: "Error", description: "Invoice must have at least one item with a positive amount.", variant: "destructive" });
       return;
     }
 
@@ -1332,6 +1343,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         unitPrice: item.unitPrice,
         lineTotal: item.quantity * item.unitPrice,
         lineType: item.lineType,
+        taxable: item.lineType === "discount" ? false : item.taxable,
       })),
       subtotal,
       taxTotal: taxAmount,
@@ -1644,6 +1656,15 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                                   {formatCurrency(item.quantity * item.unitPrice)}
                                 </p>
                               </div>
+                            </div>
+                            <div className="flex items-center justify-end gap-2 pt-1">
+                              <Label className="text-xs text-slate-500">Taxable</Label>
+                              <Checkbox
+                                checked={item.taxable}
+                                onCheckedChange={(checked) => updateLineItem(item.id, "taxable", !!checked)}
+                                className="h-5 w-5"
+                                data-testid={`checkbox-invoice-taxable-${item.id}`}
+                              />
                             </div>
                           </>
                         )}
