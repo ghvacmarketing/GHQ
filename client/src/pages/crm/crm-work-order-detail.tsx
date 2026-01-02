@@ -1154,15 +1154,25 @@ export default function CrmWorkOrderDetail() {
                       </p>
                     </div>
                   )}
+                  {workOrder.completionSummary && (
+                    <div className="pt-3 border-t">
+                      <p className="text-xs text-green-600 mb-1 uppercase tracking-wide font-semibold">Completion Summary</p>
+                      <div className="bg-green-50 border border-green-200 rounded p-3">
+                        <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-completion-summary">
+                          {workOrder.completionSummary}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {workOrder.techNotes && (
                     <div className="pt-3 border-t">
-                      <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Tech Notes</p>
+                      <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Work Order Notes</p>
                       <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-tech-notes">
                         {workOrder.techNotes}
                       </p>
                     </div>
                   )}
-                  {!workOrder.description && !workOrder.techNotes && (
+                  {!workOrder.description && !workOrder.techNotes && !workOrder.completionSummary && (
                     <p className="text-sm text-slate-500 italic">No description or notes available</p>
                   )}
                 </CardContent>
@@ -1937,7 +1947,7 @@ export default function CrmWorkOrderDetail() {
                   <Separator />
 
                   <div className="space-y-2">
-                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Tech Notes</Label>
+                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Work Order Summary</Label>
                     <Textarea
                       value={editingTechNotes}
                       onChange={(e) => setEditingTechNotes(e.target.value)}

@@ -2900,9 +2900,18 @@ export default function CrmDispatch() {
                 <Separator />
 
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Tech Notes</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Work Order Summary</h3>
+                  {selectedWorkOrder.completionSummary && (
+                    <div className="bg-green-50 border border-green-200 rounded p-3 text-sm" data-testid="completion-summary">
+                      <div className="flex items-center gap-2 text-green-700 font-medium mb-1">
+                        <CheckSquare className="h-4 w-4" />
+                        Completion Summary
+                      </div>
+                      <p className="text-slate-700 whitespace-pre-wrap">{selectedWorkOrder.completionSummary}</p>
+                    </div>
+                  )}
                   {selectedWorkOrder.techNotes && (
-                    <div className="bg-slate-50 rounded p-3 text-sm whitespace-pre-wrap">
+                    <div className="bg-slate-50 rounded p-3 text-sm whitespace-pre-wrap" data-testid="tech-notes">
                       {selectedWorkOrder.techNotes}
                     </div>
                   )}
