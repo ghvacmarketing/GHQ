@@ -25,6 +25,7 @@ import {
   Megaphone,
   Package,
   Phone,
+  Smartphone,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
@@ -200,6 +201,17 @@ function SidebarContent({
       </ScrollArea>
 
       <div className="p-3 border-t border-slate-700">
+        {currentUser?.role !== "tech" && (
+          <Link href="/mobile" onClick={onItemClick}>
+            <div
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all text-slate-300 hover:bg-slate-800 hover:text-white mb-2"
+              data-testid="nav-item-mobile-view"
+            >
+              <Smartphone className="h-5 w-5" />
+              <span className="text-sm font-medium">Mobile View</span>
+            </div>
+          </Link>
+        )}
         <Link href="/" onClick={onItemClick}>
           <div
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all text-slate-300 hover:bg-slate-800 hover:text-white mb-2"

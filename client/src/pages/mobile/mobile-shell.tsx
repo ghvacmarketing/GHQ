@@ -1,6 +1,8 @@
 import { Link, useLocation } from "wouter";
-import { ClipboardList, Wrench, Clock, User } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ClipboardList, Wrench, Clock, User, Monitor } from "lucide-react";
 import type { ReactNode } from "react";
+import type { CrmUser } from "@shared/schema";
 
 interface MobileShellProps {
   children: ReactNode;
@@ -15,6 +17,19 @@ const navTabs = [
 
 export default function MobileShell({ children }: MobileShellProps) {
   const [location] = useLocation();
+
+  const { data: currentUser } = useQuery<CrmUser>({
+    queryKey: ["/api/crm/auth/me"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/auth/me", { credentials: "include" });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.user;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const showDesktopLink = currentUser && currentUser.role !== "tech";
 
   const isActive = (path: string) => {
     if (path === "/mobile") {
@@ -36,7 +51,22 @@ export default function MobileShell({ children }: MobileShellProps) {
         className="flex-shrink-0 bg-[#711419] text-white px-4 py-3 shadow-md"
         data-testid="mobile-header"
       >
-        <h1 className="text-lg font-semibold text-center">GHVAC Tech</h1>
+        <div className="flex items-center justify-between">
+          <div className="w-20">
+            {showDesktopLink && (
+              <Link 
+                href="/crm" 
+                className="flex items-center gap-1 text-white/80 hover:text-white text-xs"
+                data-testid="link-desktop-crm"
+              >
+                <Monitor className="h-4 w-4" />
+                Desktop
+              </Link>
+            )}
+          </div>
+          <h1 className="text-lg font-semibold">GHVAC Tech</h1>
+          <div className="w-20"></div>
+        </div>
       </header>
 
       <main className="flex-1 overflow-auto" data-testid="mobile-main">

@@ -32,7 +32,12 @@ export default function CrmLogin() {
 
   useEffect(() => {
     if (!authLoading && currentUser) {
-      window.location.href = "/crm";
+      // Technicians go to mobile app, others go to CRM
+      if (currentUser.role === "tech") {
+        window.location.href = "/mobile";
+      } else {
+        window.location.href = "/crm";
+      }
     }
   }, [authLoading, currentUser]);
 
@@ -50,9 +55,14 @@ export default function CrmLogin() {
       if (!res.ok) throw new Error("Invalid credentials");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/auth/me"] });
-      window.location.href = "/crm";
+      // Technicians go directly to mobile app, others go to CRM
+      if (data.user?.role === "tech") {
+        window.location.href = "/mobile";
+      } else {
+        window.location.href = "/crm";
+      }
     },
     onError: () => {
       toast({
