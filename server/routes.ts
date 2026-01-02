@@ -8207,7 +8207,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (dateFrom) {
         startDate = new Date(dateFrom as string);
       } else {
+        // Default to 30 days ago to include recent past work orders
         startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
         startDate.setHours(0, 0, 0, 0);
       }
 
