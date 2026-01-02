@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
@@ -12590,6 +12590,310 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating customer interest level:", error);
       return res.status(500).json({ message: "Failed to update interest level" });
+    }
+  });
+
+  // ============================================
+  // SERVICE CALL CHECKLISTS API
+  // ============================================
+
+  // GET /api/crm/checklists - List all checklist templates with their questions
+  app.get("/api/crm/checklists", requireCrmAuth, async (req, res) => {
+    try {
+      const checklists = await db.select().from(serviceCallChecklists).orderBy(asc(serviceCallChecklists.serviceType), asc(serviceCallChecklists.name));
+      
+      const checklistsWithQuestions = await Promise.all(
+        checklists.map(async (checklist) => {
+          const questions = await db.select()
+            .from(checklistQuestions)
+            .where(eq(checklistQuestions.checklistId, checklist.id))
+            .orderBy(asc(checklistQuestions.sortOrder));
+          return { ...checklist, questions };
+        })
+      );
+      
+      res.json(checklistsWithQuestions);
+    } catch (error) {
+      console.error("Error fetching checklists:", error);
+      res.status(500).json({ message: "Failed to fetch checklists" });
+    }
+  });
+
+  // GET /api/crm/checklists/:serviceType - Get checklist by service type
+  app.get("/api/crm/checklists/:serviceType", requireCrmAuth, async (req, res) => {
+    try {
+      const { serviceType } = req.params;
+      
+      if (!serviceCallTypeEnum.includes(serviceType as any)) {
+        return res.status(400).json({ message: "Invalid service type" });
+      }
+      
+      const [checklist] = await db.select()
+        .from(serviceCallChecklists)
+        .where(and(
+          eq(serviceCallChecklists.serviceType, serviceType),
+          eq(serviceCallChecklists.isActive, true)
+        ))
+        .limit(1);
+      
+      if (!checklist) {
+        return res.status(404).json({ message: "Checklist not found for this service type" });
+      }
+      
+      const questions = await db.select()
+        .from(checklistQuestions)
+        .where(eq(checklistQuestions.checklistId, checklist.id))
+        .orderBy(asc(checklistQuestions.sortOrder));
+      
+      res.json({ ...checklist, questions });
+    } catch (error) {
+      console.error("Error fetching checklist by service type:", error);
+      res.status(500).json({ message: "Failed to fetch checklist" });
+    }
+  });
+
+  // POST /api/crm/checklists - Create new checklist template
+  app.post("/api/crm/checklists", requireCrmAuth, async (req, res) => {
+    try {
+      const parsed = insertServiceCallChecklistSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid checklist data", errors: parsed.error.errors });
+      }
+      
+      const [newChecklist] = await db.insert(serviceCallChecklists)
+        .values(parsed.data)
+        .returning();
+      
+      res.status(201).json(newChecklist);
+    } catch (error) {
+      console.error("Error creating checklist:", error);
+      res.status(500).json({ message: "Failed to create checklist" });
+    }
+  });
+
+  // PUT /api/crm/checklists/:id - Update checklist template
+  app.put("/api/crm/checklists/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const [existing] = await db.select().from(serviceCallChecklists).where(eq(serviceCallChecklists.id, id)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Checklist not found" });
+      }
+      
+      const updateSchema = insertServiceCallChecklistSchema.partial();
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid checklist data", errors: parsed.error.errors });
+      }
+      
+      const [updated] = await db.update(serviceCallChecklists)
+        .set({ ...parsed.data, updatedAt: new Date() })
+        .where(eq(serviceCallChecklists.id, id))
+        .returning();
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating checklist:", error);
+      res.status(500).json({ message: "Failed to update checklist" });
+    }
+  });
+
+  // DELETE /api/crm/checklists/:id - Delete checklist template
+  app.delete("/api/crm/checklists/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const [existing] = await db.select().from(serviceCallChecklists).where(eq(serviceCallChecklists.id, id)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Checklist not found" });
+      }
+      
+      await db.delete(serviceCallChecklists).where(eq(serviceCallChecklists.id, id));
+      
+      res.json({ message: "Checklist deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting checklist:", error);
+      res.status(500).json({ message: "Failed to delete checklist" });
+    }
+  });
+
+  // GET /api/crm/checklists/:checklistId/questions - Get questions for a checklist
+  app.get("/api/crm/checklists/:checklistId/questions", requireCrmAuth, async (req, res) => {
+    try {
+      const { checklistId } = req.params;
+      
+      const [checklist] = await db.select().from(serviceCallChecklists).where(eq(serviceCallChecklists.id, checklistId)).limit(1);
+      if (!checklist) {
+        return res.status(404).json({ message: "Checklist not found" });
+      }
+      
+      const questions = await db.select()
+        .from(checklistQuestions)
+        .where(eq(checklistQuestions.checklistId, checklistId))
+        .orderBy(asc(checklistQuestions.sortOrder));
+      
+      res.json(questions);
+    } catch (error) {
+      console.error("Error fetching checklist questions:", error);
+      res.status(500).json({ message: "Failed to fetch questions" });
+    }
+  });
+
+  // POST /api/crm/checklists/:checklistId/questions - Add question to checklist
+  app.post("/api/crm/checklists/:checklistId/questions", requireCrmAuth, async (req, res) => {
+    try {
+      const { checklistId } = req.params;
+      
+      const [checklist] = await db.select().from(serviceCallChecklists).where(eq(serviceCallChecklists.id, checklistId)).limit(1);
+      if (!checklist) {
+        return res.status(404).json({ message: "Checklist not found" });
+      }
+      
+      const parsed = insertChecklistQuestionSchema.safeParse({ ...req.body, checklistId });
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid question data", errors: parsed.error.errors });
+      }
+      
+      const [newQuestion] = await db.insert(checklistQuestions)
+        .values(parsed.data)
+        .returning();
+      
+      res.status(201).json(newQuestion);
+    } catch (error) {
+      console.error("Error creating checklist question:", error);
+      res.status(500).json({ message: "Failed to create question" });
+    }
+  });
+
+  // PUT /api/crm/checklists/questions/:questionId - Update question
+  app.put("/api/crm/checklists/questions/:questionId", requireCrmAuth, async (req, res) => {
+    try {
+      const { questionId } = req.params;
+      
+      const [existing] = await db.select().from(checklistQuestions).where(eq(checklistQuestions.id, questionId)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Question not found" });
+      }
+      
+      const updateSchema = insertChecklistQuestionSchema.partial().omit({ checklistId: true });
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid question data", errors: parsed.error.errors });
+      }
+      
+      const [updated] = await db.update(checklistQuestions)
+        .set(parsed.data)
+        .where(eq(checklistQuestions.id, questionId))
+        .returning();
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating question:", error);
+      res.status(500).json({ message: "Failed to update question" });
+    }
+  });
+
+  // DELETE /api/crm/checklists/questions/:questionId - Delete question
+  app.delete("/api/crm/checklists/questions/:questionId", requireCrmAuth, async (req, res) => {
+    try {
+      const { questionId } = req.params;
+      
+      const [existing] = await db.select().from(checklistQuestions).where(eq(checklistQuestions.id, questionId)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Question not found" });
+      }
+      
+      await db.delete(checklistQuestions).where(eq(checklistQuestions.id, questionId));
+      
+      res.json({ message: "Question deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting question:", error);
+      res.status(500).json({ message: "Failed to delete question" });
+    }
+  });
+
+  // POST /api/crm/work-orders/:workOrderId/checklist-response - Save checklist response for a work order
+  app.post("/api/crm/work-orders/:workOrderId/checklist-response", requireCrmAuth, async (req, res) => {
+    try {
+      const { workOrderId } = req.params;
+      
+      const [workOrder] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, workOrderId)).limit(1);
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+      
+      const parsed = insertWorkOrderChecklistResponseSchema.safeParse({ ...req.body, workOrderId });
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid response data", errors: parsed.error.errors });
+      }
+      
+      const [existingResponse] = await db.select()
+        .from(workOrderChecklistResponses)
+        .where(eq(workOrderChecklistResponses.workOrderId, workOrderId))
+        .limit(1);
+      
+      if (existingResponse) {
+        const [updated] = await db.update(workOrderChecklistResponses)
+          .set({
+            ...parsed.data,
+            completedAt: new Date(),
+          })
+          .where(eq(workOrderChecklistResponses.id, existingResponse.id))
+          .returning();
+        return res.json(updated);
+      }
+      
+      const [newResponse] = await db.insert(workOrderChecklistResponses)
+        .values({
+          ...parsed.data,
+          completedAt: new Date(),
+        })
+        .returning();
+      
+      res.status(201).json(newResponse);
+    } catch (error) {
+      console.error("Error saving checklist response:", error);
+      res.status(500).json({ message: "Failed to save checklist response" });
+    }
+  });
+
+  // GET /api/crm/work-orders/:workOrderId/checklist-response - Get checklist response for a work order
+  app.get("/api/crm/work-orders/:workOrderId/checklist-response", requireCrmAuth, async (req, res) => {
+    try {
+      const { workOrderId } = req.params;
+      
+      const [workOrder] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, workOrderId)).limit(1);
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+      
+      const [response] = await db.select()
+        .from(workOrderChecklistResponses)
+        .where(eq(workOrderChecklistResponses.workOrderId, workOrderId))
+        .limit(1);
+      
+      if (!response) {
+        return res.status(404).json({ message: "No checklist response found for this work order" });
+      }
+      
+      const [checklist] = await db.select()
+        .from(serviceCallChecklists)
+        .where(eq(serviceCallChecklists.id, response.checklistId))
+        .limit(1);
+      
+      const questions = checklist ? await db.select()
+        .from(checklistQuestions)
+        .where(eq(checklistQuestions.checklistId, checklist.id))
+        .orderBy(asc(checklistQuestions.sortOrder)) : [];
+      
+      res.json({
+        ...response,
+        checklist: checklist ? { ...checklist, questions } : null,
+      });
+    } catch (error) {
+      console.error("Error fetching checklist response:", error);
+      res.status(500).json({ message: "Failed to fetch checklist response" });
     }
   });
 
