@@ -5009,6 +5009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: c.email,
         leadSource: c.leadSource,
         createdAt: c.createdAt,
+        salesStage: c.salesStage,
       }));
 
       return res.json({
