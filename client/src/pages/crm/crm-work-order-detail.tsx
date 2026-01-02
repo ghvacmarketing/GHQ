@@ -1248,33 +1248,6 @@ export default function CrmWorkOrderDetail() {
                     Create Quote
                   </Button>
                 </div>
-                {quotes && quotes.length > 0 && (
-                  <div className="flex gap-2 mt-4">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input
-                        placeholder="Search quotes..."
-                        value={quoteSearch}
-                        onChange={(e) => setQuoteSearch(e.target.value)}
-                        className="pl-9 h-9"
-                        data-testid="input-quote-search"
-                      />
-                    </div>
-                    <Select value={quoteStatusFilter} onValueChange={setQuoteStatusFilter}>
-                      <SelectTrigger className="w-[140px] h-9" data-testid="select-quote-status-filter">
-                        <SelectValue placeholder="All Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="sent">Sent</SelectItem>
-                        <SelectItem value="accepted">Accepted</SelectItem>
-                        <SelectItem value="declined">Declined</SelectItem>
-                        <SelectItem value="expired">Expired</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
               </CardHeader>
               <CardContent className="pt-4">
                 {quotesLoading ? (
@@ -1284,16 +1257,7 @@ export default function CrmWorkOrderDetail() {
                     <Skeleton className="h-12 w-full" />
                   </div>
                 ) : quotes && quotes.length > 0 ? (
-                  (() => {
-                    const filteredQuotes = quotes.filter((quote) => {
-                      const matchesSearch = quoteSearch === "" || 
-                        quote.title?.toLowerCase().includes(quoteSearch.toLowerCase()) ||
-                        quote.quoteNumber?.toLowerCase().includes(quoteSearch.toLowerCase());
-                      const matchesStatus = quoteStatusFilter === "all" || quote.status === quoteStatusFilter;
-                      return matchesSearch && matchesStatus;
-                    });
-                    return filteredQuotes.length > 0 ? (
-                      <Table>
+                  <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead>Quote Number</TableHead>
@@ -1304,8 +1268,8 @@ export default function CrmWorkOrderDetail() {
                             <TableHead className="w-[50px]"></TableHead>
                           </TableRow>
                         </TableHeader>
-                        <TableBody>
-                          {filteredQuotes.map((quote) => (
+                    <TableBody>
+                      {quotes.map((quote) => (
                             <TableRow 
                               key={quote.id} 
                               data-testid={`row-quote-${quote.id}`}
@@ -1382,15 +1346,7 @@ export default function CrmWorkOrderDetail() {
                             </TableRow>
                           ))}
                         </TableBody>
-                      </Table>
-                    ) : (
-                      <div className="text-center py-8">
-                        <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                        <p className="text-slate-500 mb-2">No quotes match your filters</p>
-                        <p className="text-sm text-slate-400">Try adjusting your search or status filter</p>
-                      </div>
-                    );
-                  })()
+                  </Table>
                 ) : (
                   <div className="text-center py-8">
                     <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
