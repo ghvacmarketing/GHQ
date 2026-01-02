@@ -10457,7 +10457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If no work order is linked, require one for invoice creation
       if (!workOrderIdToUse) {
-        // Get available work orders if this quote is tied to a project
+        // Get available work orders - first try project, then fall back to customer
         let availableWorkOrders: Array<{ id: string; title: string | null; workOrderNumber: number | null; visitType: string | null; scheduledStart: Date | null }> = [];
         
         if (quote.projectId) {
@@ -10468,6 +10468,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             visitType: crmWorkOrders.visitType,
             scheduledStart: crmWorkOrders.scheduledStart,
           }).from(crmWorkOrders).where(eq(crmWorkOrders.projectId, quote.projectId));
+        } else if (quote.customerId) {
+          // Fall back to customer's work orders if no project
+          availableWorkOrders = await db.select({
+            id: crmWorkOrders.id,
+            title: crmWorkOrders.title,
+            workOrderNumber: crmWorkOrders.workOrderNumber,
+            visitType: crmWorkOrders.visitType,
+            scheduledStart: crmWorkOrders.scheduledStart,
+          }).from(crmWorkOrders)
+            .where(eq(crmWorkOrders.customerId, quote.customerId))
+            .orderBy(desc(crmWorkOrders.createdAt))
+            .limit(20);
         }
         
         return res.status(400).json({ 
