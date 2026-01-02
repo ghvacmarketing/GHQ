@@ -465,7 +465,7 @@ function ProspectKanbanColumn({ stage, prospects, onCardClick }: ProspectKanbanC
   });
 
   return (
-    <div className="flex-shrink-0 w-[360px] min-w-[360px] h-full flex flex-col">
+    <div className="flex-1 min-w-0 h-full flex flex-col">
       <Card className={`h-full bg-gray-50 transition-colors flex flex-col ${isOver ? 'ring-2 ring-primary ring-opacity-50' : ''}`}>
         <CardHeader className="pb-2 pt-3 px-3 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -1397,11 +1397,9 @@ export default function CrmProspectFunnel() {
                   style={{ 
                     display: 'flex',
                     flexDirection: 'row',
-                    gap: '1rem',
-                    overflowX: 'scroll',
-                    overflowY: 'hidden',
+                    gap: '0.5rem',
+                    overflow: 'hidden',
                     height: 'calc(100vh - 220px)',
-                    WebkitOverflowScrolling: 'touch',
                   }}
                   data-testid="kanban-board"
                 >
