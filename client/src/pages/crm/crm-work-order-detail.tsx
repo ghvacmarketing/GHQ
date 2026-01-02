@@ -79,6 +79,11 @@ import {
   Send,
   Eye,
   Loader2,
+  Clipboard,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -87,6 +92,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
 import type { CrmUser, CrmJob, CrmProperty, CrmWorkOrder, CrmInvoice, CrmQuote, CrmCustomer, CrmProject, WorkOrderStatus } from "@shared/schema";
@@ -114,6 +120,31 @@ type CustomersResponse = {
     total: number;
     totalPages: number;
   };
+};
+
+type ChecklistQuestion = {
+  id: string;
+  question: string;
+  questionType: "yes_no" | "text" | "number" | "select";
+  options: string[] | null;
+  isRequired: boolean;
+};
+
+type ChecklistResponseData = {
+  id: string;
+  workOrderId: string;
+  checklistId: string;
+  answers: Record<string, string | boolean | number>;
+  summary: string | null;
+  completedBy: string | null;
+  completedAt: Date | null;
+  checklist: {
+    id: string;
+    serviceType: string;
+    name: string;
+    description: string | null;
+    questions: ChecklistQuestion[];
+  } | null;
 };
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -307,6 +338,7 @@ export default function CrmWorkOrderDetail() {
 
   const [reassignCustomerSearch, setReassignCustomerSearch] = useState("");
   const [reassignCustomerSearchOpen, setReassignCustomerSearchOpen] = useState(false);
+  const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(false);
   const debouncedReassignCustomerSearch = useDebounce(reassignCustomerSearch, 300);
   const debouncedProjectSearch = useDebounce(projectSearch, 300);
 
@@ -365,6 +397,19 @@ export default function CrmWorkOrderDetail() {
     queryFn: async () => {
       const res = await fetch(`/api/crm/work-orders/${workOrderId}/invoices`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch invoices");
+      return res.json();
+    },
+    enabled: !!currentUser && !!workOrderId,
+  });
+
+  const { data: checklistResponse } = useQuery<ChecklistResponseData>({
+    queryKey: ["/api/crm/work-orders", workOrderId, "checklist-response"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/work-orders/${workOrderId}/checklist-response`, { credentials: "include" });
+      if (!res.ok) {
+        if (res.status === 404) return null;
+        throw new Error("Failed to fetch checklist response");
+      }
       return res.json();
     },
     enabled: !!currentUser && !!workOrderId,
@@ -646,8 +691,8 @@ export default function CrmWorkOrderDetail() {
       
       updateWorkOrderMutation.mutate({
         updates: {
-          scheduledStart: scheduledStart.toISOString(),
-          scheduledEnd: scheduledEnd.toISOString(),
+          scheduledStart: scheduledStart.toISOString() as any,
+          scheduledEnd: scheduledEnd.toISOString() as any,
         },
       });
     }
@@ -1011,6 +1056,100 @@ export default function CrmWorkOrderDetail() {
                 </CardContent>
               </Card>
             </div>
+
+            {checklistResponse && checklistResponse.checklist && (
+              <Card className="shadow-sm mb-6 border-amber-200 bg-amber-50/30" data-testid="card-service-checklist">
+                <CardHeader className="pb-3 border-b border-amber-200 bg-amber-50/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <Clipboard className="h-4 w-4 text-amber-600" />
+                    Service Call Checklist
+                  </CardTitle>
+                  {checklistResponse.checklist.name && (
+                    <p className="text-sm text-amber-700 mt-1">{checklistResponse.checklist.name}</p>
+                  )}
+                </CardHeader>
+                <CardContent className="pt-4 space-y-4">
+                  {checklistResponse.summary && (
+                    <div className="bg-white rounded-lg p-4 border border-amber-200">
+                      <p className="text-xs text-amber-700 mb-2 uppercase tracking-wide font-medium">AI Summary</p>
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-checklist-summary">
+                        {checklistResponse.summary}
+                      </p>
+                    </div>
+                  )}
+
+                  <Collapsible open={checklistAnswersOpen} onOpenChange={setChecklistAnswersOpen}>
+                    <CollapsibleTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className="w-full flex items-center justify-between p-3 text-sm font-medium text-amber-700 hover:bg-amber-100 rounded-lg border border-amber-200 bg-white"
+                        data-testid="button-toggle-checklist-answers"
+                      >
+                        <span>View All Answers ({checklistResponse.checklist.questions.length})</span>
+                        {checklistAnswersOpen ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-3">
+                      <div className="space-y-3 bg-white rounded-lg p-4 border border-amber-200">
+                        {checklistResponse.checklist.questions.map((question) => {
+                          const answer = checklistResponse.answers[question.id];
+                          return (
+                            <div key={question.id} className="border-b border-slate-100 last:border-0 pb-3 last:pb-0" data-testid={`checklist-answer-${question.id}`}>
+                              <p className="text-sm font-medium text-slate-700 mb-1">{question.question}</p>
+                              <div className="flex items-center gap-2">
+                                {question.questionType === "yes_no" && (
+                                  <>
+                                    {answer === true || answer === "true" || answer === "yes" ? (
+                                      <>
+                                        <Check className="h-4 w-4 text-green-500" />
+                                        <span className="text-sm text-green-700">Yes</span>
+                                      </>
+                                    ) : answer === false || answer === "false" || answer === "no" ? (
+                                      <>
+                                        <X className="h-4 w-4 text-red-500" />
+                                        <span className="text-sm text-red-700">No</span>
+                                      </>
+                                    ) : (
+                                      <span className="text-sm text-slate-400 italic">Not answered</span>
+                                    )}
+                                  </>
+                                )}
+                                {question.questionType === "text" && (
+                                  <span className="text-sm text-slate-600">
+                                    {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic">Not answered</span>}
+                                  </span>
+                                )}
+                                {question.questionType === "number" && (
+                                  <span className="text-sm text-slate-600 font-medium">
+                                    {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic font-normal">Not answered</span>}
+                                  </span>
+                                )}
+                                {question.questionType === "select" && (
+                                  <span className="text-sm text-slate-600">
+                                    {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic">Not answered</span>}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  {checklistResponse.completedAt && (
+                    <p className="text-xs text-amber-600 text-right">
+                      Completed {formatDateTime(checklistResponse.completedAt)}
+                      {checklistResponse.completedBy && ` by ${checklistResponse.completedBy}`}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="shadow-sm">
