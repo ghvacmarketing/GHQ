@@ -151,7 +151,9 @@ export default function MobileAgenda() {
         throw new Error("AUTH_REQUIRED");
       }
       if (!res.ok) throw new Error("Failed to fetch work orders");
-      return res.json();
+      const data = await res.json();
+      // API returns { workOrders: [...], pagination: {...} }
+      return data.workOrders || [];
     },
     staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
     gcTime: 24 * 60 * 60 * 1000, // Keep in cache for 24 hours
