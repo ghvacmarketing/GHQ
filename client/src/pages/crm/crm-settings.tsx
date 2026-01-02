@@ -55,6 +55,7 @@ import {
   BadgeDollarSign,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { ChecklistsSection } from "@/components/crm/checklists-section";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser } from "@shared/schema";
 
@@ -365,6 +366,10 @@ export default function CrmSettings() {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {canViewSettings && (
+          <ChecklistsSection currentUser={currentUser} isAdmin={isAdmin} />
         )}
 
         {!canViewSettings && (
