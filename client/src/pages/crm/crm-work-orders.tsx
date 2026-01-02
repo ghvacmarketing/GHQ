@@ -720,8 +720,21 @@ export default function CrmWorkOrders() {
       setCreateDialogOpen(false);
       resetCreateForm();
     },
-    onError: (error: Error) => {
-      toast({ title: "Creation failed", description: error.message, variant: "destructive" });
+    onError: (error: Error & { error?: string; conflictingOrder?: { title?: string; scheduledStart?: string } }) => {
+      // Handle scheduling conflict errors specifically
+      if (error?.error === 'SCHEDULING_CONFLICT' || error?.message === 'Scheduling conflict') {
+        const conflictInfo = error?.conflictingOrder;
+        const startTime = conflictInfo?.scheduledStart 
+          ? format(new Date(conflictInfo.scheduledStart), "h:mm a")
+          : "unknown time";
+        toast({ 
+          title: "Scheduling Conflict",
+          description: `This technician already has "${conflictInfo?.title || 'a work order'}" scheduled at ${startTime}. You cannot schedule overlapping appointments.`,
+          variant: "destructive" 
+        });
+      } else {
+        toast({ title: "Creation failed", description: error.message, variant: "destructive" });
+      }
     },
   });
 

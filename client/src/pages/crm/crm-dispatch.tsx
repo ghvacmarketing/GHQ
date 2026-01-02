@@ -2021,6 +2021,17 @@ export default function CrmDispatch() {
       const scheduledStartUTC = createLocalDateTime(scheduledDate, startHours, startMinutes);
       const scheduledEndUTC = createLocalDateTime(scheduledDate, endHours, endMinutes);
 
+      // Frontend pre-check for scheduling conflicts (if a technician is assigned)
+      const effectiveTechId = assignedTechId === "unassigned" ? null : assignedTechId;
+      if (effectiveTechId) {
+        const conflict = checkSchedulingConflict(localWorkOrders, effectiveTechId, scheduledStartUTC, scheduledEndUTC);
+        if (conflict) {
+          const techName = technicians.find(t => t.id === effectiveTechId)?.name || "This technician";
+          const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+          throw new Error(`${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`);
+        }
+      }
+
       // Generate checklist summary (tries AI, falls back to local) and prepend to description
       const checklistSummary = await generateChecklistSummary();
       const finalDescription = checklistSummary + woDescription.trim();
@@ -2056,15 +2067,38 @@ export default function CrmDispatch() {
 
       return workOrder;
     },
-    onSuccess: () => {
+    onSuccess: (workOrder) => {
+      // Add the new work order to localWorkOrders immediately to prevent stale data conflicts
+      const newTech = technicians.find(t => t.id === workOrder.assignedTechId);
+      const enrichedWorkOrder: DispatchWorkOrder = {
+        ...workOrder,
+        techName: newTech?.name || null,
+        customerName: selectedCustomer?.name || null,
+        propertyAddress: null,
+      };
+      setLocalWorkOrders(prev => [...prev, enrichedWorkOrder]);
+      
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders", dateString] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
       toast({ title: "Work order created", description: "New work order has been scheduled." });
       setCreateDialogOpen(false);
       resetCreateForm();
     },
-    onError: (error: Error) => {
-      toast({ title: "Creation failed", description: error.message, variant: "destructive" });
+    onError: (error: Error & { error?: string; conflictingOrder?: { title?: string; scheduledStart?: string } }) => {
+      // Handle scheduling conflict errors specifically
+      if (error?.error === 'SCHEDULING_CONFLICT' || error?.message === 'Scheduling conflict') {
+        const conflictInfo = error?.conflictingOrder;
+        const startTime = conflictInfo?.scheduledStart 
+          ? format(new Date(conflictInfo.scheduledStart), "h:mm a")
+          : "unknown time";
+        toast({ 
+          title: "Scheduling Conflict",
+          description: `This technician already has "${conflictInfo?.title || 'a work order'}" scheduled at ${startTime}. You cannot schedule overlapping appointments.`,
+          variant: "destructive" 
+        });
+      } else {
+        toast({ title: "Creation failed", description: error.message, variant: "destructive" });
+      }
     },
   });
 
