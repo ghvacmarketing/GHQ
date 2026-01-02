@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { format, isToday, startOfDay, endOfDay } from "date-fns";
-import { MapPin, Clock, ClipboardList, WifiOff, CloudOff } from "lucide-react";
+import { MapPin, Clock, ClipboardList, WifiOff, CloudOff, LogIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import MobileShell from "./mobile-shell";
@@ -133,7 +134,7 @@ export default function MobileAgenda() {
   const { isOnline } = useOnlineStatus();
   const [isFromCache, setIsFromCache] = useState(false);
 
-  const { data: workOrders, isLoading } = useQuery<WorkOrderWithDetails[]>({
+  const { data: workOrders, isLoading, error, isError } = useQuery<WorkOrderWithDetails[]>({
     queryKey: ["/api/crm/work-orders", { start: todayStart, end: todayEnd }],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -146,13 +147,24 @@ export default function MobileAgenda() {
       const fromCache = res.headers.get('X-From-Cache') === 'true';
       setIsFromCache(fromCache);
       
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("AUTH_REQUIRED");
+      }
       if (!res.ok) throw new Error("Failed to fetch work orders");
       return res.json();
     },
     staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
     gcTime: 24 * 60 * 60 * 1000, // Keep in cache for 24 hours
-    retry: isOnline ? 3 : 0, // Don't retry when offline
+    retry: (failureCount, error) => {
+      // Don't retry auth errors
+      if (error instanceof Error && error.message === "AUTH_REQUIRED") return false;
+      // Don't retry when offline
+      if (!isOnline) return false;
+      return failureCount < 3;
+    },
   });
+
+  const isAuthError = isError && error instanceof Error && error.message === "AUTH_REQUIRED";
 
   const todaysOrders = workOrders?.filter((wo) => {
     if (!wo.scheduledStart) return false;
@@ -186,7 +198,19 @@ export default function MobileAgenda() {
           <GlobalPendingChangesIndicator />
         </div>
 
-        {isLoading ? (
+        {isAuthError ? (
+          <div 
+            className="flex flex-col items-center justify-center py-16 text-center"
+            data-testid="agenda-auth-required"
+          >
+            <LogIn className="h-16 w-16 text-slate-300 mb-4" />
+            <h3 className="text-lg font-medium text-slate-600 mb-1">Login Required</h3>
+            <p className="text-slate-400 text-sm mb-4">Please log in to the CRM to view your work orders.</p>
+            <Button asChild data-testid="button-login">
+              <Link href="/crm/login">Go to Login</Link>
+            </Button>
+          </div>
+        ) : isLoading ? (
           <div className="space-y-3" data-testid="agenda-loading">
             {[1, 2, 3].map((i) => (
               <Card key={i}>

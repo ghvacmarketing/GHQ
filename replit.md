@@ -92,3 +92,11 @@ Preferred communication style: Simple, everyday language.
 - **react-pdf**: PDF viewing.
 - **jsPDF**: PDF export generation.
 - **Replit App Storage**: Cloud file storage with presigned URL uploads via `@google-cloud/storage`. Attachments table tracks file metadata with references to projects, activities, and work orders.
+- **Mobile Technician PWA**: Progressive Web App for field technicians at `/mobile` routes with:
+  - **Offline-first architecture**: Service worker caches work orders, customer data, and UI for offline access
+  - **Daily agenda**: Shows technician's scheduled work orders for today with status badges and customer info
+  - **Job detail**: Full work order view with status updates, quick actions (call, text, navigate), notes, and photo capture
+  - **Background sync**: Queues changes made offline (status updates, notes) and syncs when back online with conflict-safe merge logic
+  - **Pending changes indicator**: Shows amber badges for work orders with unsynced changes
+  - **Optimistic updates**: UI updates immediately when making changes, with "Pending sync" badges for offline content
+  - **Key files**: `client/src/pages/mobile/`, `client/src/lib/offline-queue.ts`, `client/src/hooks/use-online-status.tsx`, `client/public/service-worker.js`
