@@ -5911,16 +5911,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/technicians - List technicians for dispatch (all CRM users can access)
+  // GET /api/crm/technicians - List field workers for dispatch (techs, managers, sales who do field work)
   app.get("/api/crm/technicians", requireCrmAuth, async (req, res) => {
     try {
+      // Include tech, manager, and sales roles - anyone who might be assigned field work
+      const fieldRoles = ["tech", "manager", "sales"];
       const technicians = await db.select({
         id: crmUsers.id,
         name: crmUsers.name,
         email: crmUsers.email,
         role: crmUsers.role,
       }).from(crmUsers)
-        .where(and(eq(crmUsers.role, "tech"), eq(crmUsers.isActive, true)))
+        .where(and(
+          sql`${crmUsers.role} IN ('tech', 'manager', 'sales')`,
+          eq(crmUsers.isActive, true)
+        ))
         .orderBy(crmUsers.name);
       return res.json(technicians);
     } catch (error) {
