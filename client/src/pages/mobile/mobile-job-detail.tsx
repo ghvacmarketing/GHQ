@@ -46,7 +46,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
 import { useOnlineStatus, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
-import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus, CrmQuote, CrmInvoice, CrmInvoiceLineItem, CrmItem } from "@shared/schema";
+import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus, CrmQuote, CrmInvoice, CrmInvoiceLineItem, CrmItem, CrmQuoteLineItem } from "@shared/schema";
 
 interface WorkOrderDetail extends CrmWorkOrder {
   customer: CrmCustomer | null;
@@ -558,6 +558,9 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
+  const [discountSearch, setDiscountSearch] = useState("");
+  const [discountCategoryFilter, setDiscountCategoryFilter] = useState<"all" | "discount" | "service" | "maintenance">("all");
+  const [showManualDiscount, setShowManualDiscount] = useState(false);
   const [discountDescription, setDiscountDescription] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
 
@@ -582,6 +585,36 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       return res.json();
     },
     staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch CRM items (includes discounts from catalogue)
+  const { data: crmItemsData } = useQuery<CrmItem[]>({
+    queryKey: ["/api/crm/items"],
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const crmItems = crmItemsData || [];
+  
+  // Filter discounts from CRM items
+  const filteredDiscountItems = crmItems.filter(item => {
+    // Filter by category - include items where category is "discount" or filter matches
+    if (discountCategoryFilter !== "all" && item.category !== discountCategoryFilter) {
+      return false;
+    }
+    // For "all" filter, only show items that are marked as discounts
+    if (discountCategoryFilter === "all" && item.category !== "discount") {
+      return false;
+    }
+    // Apply search filter
+    if (discountSearch.trim()) {
+      const search = discountSearch.toLowerCase();
+      return (
+        item.name?.toLowerCase().includes(search) ||
+        item.description?.toLowerCase().includes(search) ||
+        item.partNumber?.toLowerCase().includes(search)
+      );
+    }
+    return true;
   });
 
   const parts = partsData || [];
@@ -668,7 +701,24 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     toast({ title: "Item Added", description: part.description });
   };
 
-  const addDiscountItem = () => {
+  // Add discount from catalogue
+  const addCatalogDiscount = (item: CrmItem) => {
+    const rate = parseFloat(item.rate || "0") || 0;
+    setLineItems([...lineItems, { 
+      id: Date.now().toString(), 
+      description: item.name + (item.description ? ` - ${item.description}` : ""), 
+      quantity: 1, 
+      unitPrice: -Math.abs(rate),
+      lineType: "discount"
+    }]);
+    setShowDiscount(false);
+    setDiscountSearch("");
+    setDiscountCategoryFilter("all");
+    toast({ title: "Discount Added", description: item.name });
+  };
+
+  // Add manual discount entry
+  const addManualDiscountItem = () => {
     const amount = parseFloat(discountAmount) || 0;
     if (amount <= 0 || !discountDescription.trim()) {
       toast({ title: "Error", description: "Please enter a discount description and amount.", variant: "destructive" });
@@ -681,9 +731,10 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       unitPrice: -Math.abs(amount),
       lineType: "discount"
     }]);
-    setShowDiscount(false);
+    setShowManualDiscount(false);
     setDiscountDescription("");
     setDiscountAmount("");
+    toast({ title: "Discount Added", description: discountDescription.trim() });
   };
 
   const removeLineItem = (id: string) => {
