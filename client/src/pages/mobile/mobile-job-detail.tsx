@@ -46,7 +46,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
 import { useOnlineStatus, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
-import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus, CrmQuote, CrmInvoice, CrmInvoiceLineItem } from "@shared/schema";
+import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus, CrmQuote, CrmInvoice, CrmInvoiceLineItem, CrmItem } from "@shared/schema";
 
 interface WorkOrderDetail extends CrmWorkOrder {
   customer: CrmCustomer | null;
