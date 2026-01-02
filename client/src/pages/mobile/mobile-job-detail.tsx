@@ -19,7 +19,14 @@ import {
   CheckCircle2,
   Car,
   Wrench,
-  ClipboardCheck
+  ClipboardCheck,
+  Package,
+  History,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  Clipboard
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +37,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
@@ -45,10 +53,61 @@ interface WorkOrderPhoto {
   uploadedAt: string;
 }
 
-interface WorkOrderDetail extends Omit<CrmWorkOrder, 'photos'> {
+interface PartUsed {
+  partId: string;
+  name: string;
+  qty: number;
+  price: number;
+}
+
+interface WorkOrderDetail extends Omit<CrmWorkOrder, 'photos' | 'partsUsed'> {
   customer: CrmCustomer | null;
   property: CrmProperty | null;
   photos?: WorkOrderPhoto[] | null;
+  partsUsed?: PartUsed[] | null;
+}
+
+type ChecklistQuestion = {
+  id: string;
+  question: string;
+  questionType: "yes_no" | "text" | "number" | "select";
+  options: string[] | null;
+  isRequired: boolean;
+};
+
+type ChecklistResponseData = {
+  id: string;
+  workOrderId: string;
+  checklistId: string;
+  answers: Record<string, string | boolean | number>;
+  summary: string | null;
+  completedBy: string | null;
+  completedAt: Date | null;
+  checklist: {
+    id: string;
+    serviceType: string;
+    name: string;
+    description: string | null;
+    questions: ChecklistQuestion[];
+  } | null;
+};
+
+interface WorkOrderSummary {
+  id: string;
+  visitType: string;
+  status: string;
+  scheduledStart: string | null;
+  description: string | null;
+}
+
+interface WorkOrdersResponse {
+  workOrders: WorkOrderSummary[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -104,6 +163,12 @@ export default function MobileJobDetail() {
   const [optimisticStatus, setOptimisticStatus] = useState<WorkOrderStatus | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionSummary, setCompletionSummary] = useState("");
+  
+  const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(false);
+  const [showAddPart, setShowAddPart] = useState(false);
+  const [newPartName, setNewPartName] = useState("");
+  const [newPartQty, setNewPartQty] = useState("1");
+  const [newPartPrice, setNewPartPrice] = useState("");
 
   const { data: workOrder, isLoading } = useQuery<WorkOrderDetail>({
     queryKey: ["/api/crm/work-orders", params.id],
@@ -113,6 +178,29 @@ export default function MobileJobDetail() {
       return res.json();
     },
     enabled: !!params.id,
+  });
+
+  const { data: checklistResponse } = useQuery<ChecklistResponseData>({
+    queryKey: ["/api/crm/work-orders", params.id, "checklist-response"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/work-orders/${params.id}/checklist-response`, { credentials: "include" });
+      if (!res.ok) {
+        if (res.status === 404) return null;
+        throw new Error("Failed to fetch checklist");
+      }
+      return res.json();
+    },
+    enabled: !!params.id,
+  });
+
+  const { data: jobHistory } = useQuery<WorkOrdersResponse>({
+    queryKey: ["/api/crm/work-orders", "customer-history", workOrder?.customerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/work-orders?customerId=${workOrder?.customerId}&limit=6`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch job history");
+      return res.json();
+    },
+    enabled: !!workOrder?.customerId,
   });
 
   const updateStatusMutation = useMutation({
@@ -145,6 +233,25 @@ export default function MobileJobDetail() {
         setOptimisticStatus(null);
         toast({ title: "Failed to update status", variant: "destructive" });
       }
+    },
+  });
+
+  const addPartMutation = useMutation({
+    mutationFn: async (newPart: PartUsed) => {
+      const existingParts = workOrder?.partsUsed || [];
+      const updatedParts = [...existingParts, newPart];
+      await apiRequest("PATCH", `/api/crm/work-orders/${params.id}`, { partsUsed: updatedParts });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
+      setNewPartName("");
+      setNewPartQty("1");
+      setNewPartPrice("");
+      setShowAddPart(false);
+      toast({ title: "Part added" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add part", variant: "destructive" });
     },
   });
 
@@ -274,6 +381,21 @@ export default function MobileJobDetail() {
     }
   };
 
+  const handleAddPart = () => {
+    if (!newPartName.trim()) {
+      toast({ title: "Part name required", variant: "destructive" });
+      return;
+    }
+    const qty = parseInt(newPartQty, 10) || 1;
+    const price = parseFloat(newPartPrice) || 0;
+    addPartMutation.mutate({
+      partId: nanoid(),
+      name: newPartName.trim(),
+      qty,
+      price,
+    });
+  };
+
   const getNextStatus = (currentStatus: WorkOrderStatus): WorkOrderStatus | null => {
     const currentIndex = statusFlow.indexOf(currentStatus);
     if (currentIndex < statusFlow.length - 1) {
@@ -281,6 +403,9 @@ export default function MobileJobDetail() {
     }
     return null;
   };
+
+  const previousWorkOrders = jobHistory?.workOrders.filter(wo => wo.id !== params.id).slice(0, 5) || [];
+  const hasMoreHistory = (jobHistory?.pagination.total || 0) > 6;
 
   if (isLoading) {
     return (
@@ -324,7 +449,7 @@ export default function MobileJobDetail() {
   return (
     <MobileShell>
       <OfflineIndicator />
-      <div className="p-4 space-y-4" data-testid="mobile-job-detail">
+      <div className="p-4 space-y-4 pb-24" data-testid="mobile-job-detail">
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigate("/mobile")}
@@ -396,37 +521,99 @@ export default function MobileJobDetail() {
           </CardContent>
         </Card>
 
-        <div className="flex gap-3" data-testid="quick-actions">
-          <Button
-            variant="outline"
-            className="flex-1 min-h-[48px]"
-            onClick={handleCall}
-            disabled={!customerPhone}
-            data-testid="button-call"
-          >
-            <Phone className="h-5 w-5 mr-2" />
-            Call
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1 min-h-[48px]"
-            onClick={handleText}
-            disabled={!customerPhone}
-            data-testid="button-text"
-          >
-            <MessageSquare className="h-5 w-5 mr-2" />
-            Text
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1 min-h-[48px]"
-            onClick={handleNavigate}
-            data-testid="button-navigate"
-          >
-            <Navigation className="h-5 w-5 mr-2" />
-            Navigate
-          </Button>
-        </div>
+        {checklistResponse && checklistResponse.checklist && (
+          <Card className="border-amber-200 bg-amber-50/30" data-testid="card-service-checklist">
+            <CardHeader className="pb-3 border-b border-amber-200 bg-amber-50/50">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Clipboard className="h-4 w-4 text-amber-600" />
+                Service Checklist
+              </CardTitle>
+              {checklistResponse.checklist.name && (
+                <p className="text-sm text-amber-700 mt-1">{checklistResponse.checklist.name}</p>
+              )}
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              {checklistResponse.summary && (
+                <div className="bg-white rounded-lg p-4 border border-amber-200">
+                  <p className="text-xs text-amber-700 mb-2 uppercase tracking-wide font-medium">AI Summary</p>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-checklist-summary">
+                    {checklistResponse.summary}
+                  </p>
+                </div>
+              )}
+
+              <Collapsible open={checklistAnswersOpen} onOpenChange={setChecklistAnswersOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full flex items-center justify-between p-3 text-sm font-medium text-amber-700 hover:bg-amber-100 rounded-lg border border-amber-200 bg-white min-h-[44px]"
+                    data-testid="button-toggle-checklist-answers"
+                  >
+                    <span>View All Answers ({checklistResponse.checklist.questions.length})</span>
+                    {checklistAnswersOpen ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-3">
+                  <div className="space-y-3 bg-white rounded-lg p-4 border border-amber-200">
+                    {checklistResponse.checklist.questions.map((question) => {
+                      const answer = checklistResponse.answers[question.id];
+                      return (
+                        <div key={question.id} className="border-b border-slate-100 last:border-0 pb-3 last:pb-0" data-testid={`checklist-answer-${question.id}`}>
+                          <p className="text-sm font-medium text-slate-700 mb-1">{question.question}</p>
+                          <div className="flex items-center gap-2">
+                            {question.questionType === "yes_no" && (
+                              <>
+                                {answer === true || answer === "true" || answer === "yes" ? (
+                                  <>
+                                    <Check className="h-4 w-4 text-green-500" />
+                                    <span className="text-sm text-green-700">Yes</span>
+                                  </>
+                                ) : answer === false || answer === "false" || answer === "no" ? (
+                                  <>
+                                    <X className="h-4 w-4 text-red-500" />
+                                    <span className="text-sm text-red-700">No</span>
+                                  </>
+                                ) : (
+                                  <span className="text-sm text-slate-400 italic">Not answered</span>
+                                )}
+                              </>
+                            )}
+                            {question.questionType === "text" && (
+                              <span className="text-sm text-slate-600">
+                                {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic">Not answered</span>}
+                              </span>
+                            )}
+                            {question.questionType === "number" && (
+                              <span className="text-sm text-slate-600 font-medium">
+                                {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic font-normal">Not answered</span>}
+                              </span>
+                            )}
+                            {question.questionType === "select" && (
+                              <span className="text-sm text-slate-600">
+                                {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic">Not answered</span>}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {checklistResponse.completedAt && (
+                <p className="text-xs text-amber-600 text-right">
+                  Completed {format(new Date(checklistResponse.completedAt), "MMM d, h:mm a")}
+                  {checklistResponse.completedBy && ` by ${checklistResponse.completedBy}`}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card data-testid="status-update-card">
           <CardHeader className="pb-2">
@@ -438,13 +625,13 @@ export default function MobileJobDetail() {
                 const stepIndex = statusFlow.indexOf(displayStatus as WorkOrderStatus);
                 const isCompleted = index < stepIndex;
                 const isCurrent = index === stepIndex;
-                const isPending = index > stepIndex;
                 const stepIcons: Record<WorkOrderStatus, any> = {
                   scheduled: Clock,
                   dispatched: ClipboardCheck,
                   en_route: Car,
                   on_site: Wrench,
                   completed: CheckCircle2,
+                  cancelled: X,
                 };
                 const StepIcon = stepIcons[step];
                 
@@ -571,6 +758,120 @@ export default function MobileJobDetail() {
           </CardContent>
         </Card>
 
+        <Card data-testid="parts-used-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Parts Used
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {workOrder.partsUsed && workOrder.partsUsed.length > 0 ? (
+              <div className="space-y-2" data-testid="parts-list">
+                {workOrder.partsUsed.map((part) => (
+                  <div 
+                    key={part.partId} 
+                    className="flex items-center justify-between bg-slate-50 p-3 rounded-md"
+                    data-testid={`part-item-${part.partId}`}
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">{part.name}</p>
+                      <p className="text-xs text-slate-500">Qty: {part.qty}</p>
+                    </div>
+                    {part.price > 0 && (
+                      <span className="text-sm font-medium text-slate-600">${part.price.toFixed(2)}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : !showAddPart ? (
+              <p className="text-sm text-slate-400 italic" data-testid="no-parts">
+                No parts logged yet
+              </p>
+            ) : null}
+            
+            {showAddPart ? (
+              <div className="space-y-3 bg-slate-50 p-3 rounded-md" data-testid="add-part-form">
+                <div>
+                  <Label htmlFor="part-name" className="text-sm">Part Name *</Label>
+                  <Input
+                    id="part-name"
+                    placeholder="e.g., Capacitor 45/5 MFD"
+                    value={newPartName}
+                    onChange={(e) => setNewPartName(e.target.value)}
+                    className="min-h-[44px] mt-1"
+                    data-testid="input-part-name"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="part-qty" className="text-sm">Quantity</Label>
+                    <Input
+                      id="part-qty"
+                      type="number"
+                      min="1"
+                      value={newPartQty}
+                      onChange={(e) => setNewPartQty(e.target.value)}
+                      className="min-h-[44px] mt-1"
+                      data-testid="input-part-qty"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="part-price" className="text-sm">Price (optional)</Label>
+                    <Input
+                      id="part-price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={newPartPrice}
+                      onChange={(e) => setNewPartPrice(e.target.value)}
+                      className="min-h-[44px] mt-1"
+                      data-testid="input-part-price"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 min-h-[44px]"
+                    onClick={() => {
+                      setShowAddPart(false);
+                      setNewPartName("");
+                      setNewPartQty("1");
+                      setNewPartPrice("");
+                    }}
+                    data-testid="button-cancel-part"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1 min-h-[44px] bg-[#711419] hover:bg-[#5a1014]"
+                    onClick={handleAddPart}
+                    disabled={!newPartName.trim() || addPartMutation.isPending}
+                    data-testid="button-save-part"
+                  >
+                    {addPartMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    Save Part
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full min-h-[44px]"
+                onClick={() => setShowAddPart(true)}
+                data-testid="button-add-part"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Part
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
         <Card data-testid="photos-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
@@ -633,6 +934,53 @@ export default function MobileJobDetail() {
           </CardContent>
         </Card>
 
+        {previousWorkOrders.length > 0 && (
+          <Card data-testid="job-history-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <History className="h-4 w-4" />
+                Previous Visits
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {previousWorkOrders.map((wo) => (
+                <button
+                  key={wo.id}
+                  onClick={() => navigate(`/mobile/job/${wo.id}`)}
+                  className="w-full text-left bg-slate-50 p-3 rounded-md hover:bg-slate-100 transition-colors min-h-[44px]"
+                  data-testid={`history-item-${wo.id}`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-slate-700">
+                      {wo.scheduledStart ? format(new Date(wo.scheduledStart), "MMM d, yyyy") : "Unscheduled"}
+                    </span>
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${statusConfig[wo.status]?.className || ''}`}
+                    >
+                      {statusConfig[wo.status]?.label || wo.status}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-500">{wo.visitType}</p>
+                  {wo.description && (
+                    <p className="text-xs text-slate-400 mt-1 truncate">{wo.description}</p>
+                  )}
+                </button>
+              ))}
+              {hasMoreHistory && (
+                <Button
+                  variant="link"
+                  className="w-full text-sm text-[#711419]"
+                  onClick={() => navigate(`/crm/customers/${workOrder.customerId}`)}
+                  data-testid="button-view-all-history"
+                >
+                  View All History →
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {selectedPhoto && (
           <div 
             className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
@@ -694,6 +1042,55 @@ export default function MobileJobDetail() {
             </CardContent>
           </Card>
         )}
+      </div>
+
+      <div 
+        className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3 flex justify-around items-center z-50 shadow-lg safe-area-pb"
+        data-testid="floating-action-bar"
+      >
+        <Button
+          variant="ghost"
+          className="flex flex-col items-center gap-1 h-auto py-2 px-4 min-h-[56px] min-w-[56px]"
+          onClick={handleCall}
+          disabled={!customerPhone}
+          data-testid="fab-call"
+        >
+          <Phone className="h-5 w-5" />
+          <span className="text-xs">Call</span>
+        </Button>
+        <Button
+          variant="ghost"
+          className="flex flex-col items-center gap-1 h-auto py-2 px-4 min-h-[56px] min-w-[56px]"
+          onClick={handleText}
+          disabled={!customerPhone}
+          data-testid="fab-text"
+        >
+          <MessageSquare className="h-5 w-5" />
+          <span className="text-xs">Text</span>
+        </Button>
+        <Button
+          variant="ghost"
+          className="flex flex-col items-center gap-1 h-auto py-2 px-4 min-h-[56px] min-w-[56px]"
+          onClick={handleNavigate}
+          data-testid="fab-navigate"
+        >
+          <Navigation className="h-5 w-5" />
+          <span className="text-xs">Navigate</span>
+        </Button>
+        <Button
+          variant="ghost"
+          className="flex flex-col items-center gap-1 h-auto py-2 px-4 min-h-[56px] min-w-[56px]"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploadingPhoto || !isOnline}
+          data-testid="fab-photo"
+        >
+          {isUploadingPhoto ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <Camera className="h-5 w-5" />
+          )}
+          <span className="text-xs">Photo</span>
+        </Button>
       </div>
 
       <Dialog open={showCompletionModal} onOpenChange={setShowCompletionModal}>
