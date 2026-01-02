@@ -64,6 +64,7 @@ const CrmChecklists = lazy(() => import("@/pages/crm/crm-checklists"));
 const MobileAgenda = lazy(() => import("@/pages/mobile/mobile-agenda"));
 const MobileJobDetail = lazy(() => import("@/pages/mobile/mobile-job-detail"));
 const MobileTime = lazy(() => import("@/pages/mobile/mobile-time"));
+const MobileJob = lazy(() => import("@/pages/mobile/mobile-job"));
 const MobileProfile = lazy(() => import("@/pages/mobile/mobile-profile"));
 
 // Global Error Boundary to prevent blank screens
@@ -227,6 +228,7 @@ function Router() {
       <Route path="/crm/checklists">{() => <ProtectedCrmWrapper><CrmChecklists /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm">{() => <ProtectedCrmWrapper><CrmDashboard /></ProtectedCrmWrapper>}</Route>
       <Route path="/mobile/job/:id">{() => <MobileWrapper><MobileJobDetail /></MobileWrapper>}</Route>
+      <Route path="/mobile/job">{() => <MobileWrapper><MobileJob /></MobileWrapper>}</Route>
       <Route path="/mobile/time">{() => <MobileWrapper><MobileTime /></MobileWrapper>}</Route>
       <Route path="/mobile/profile">{() => <MobileWrapper><MobileProfile /></MobileWrapper>}</Route>
       <Route path="/mobile">{() => <MobileWrapper><MobileAgenda /></MobileWrapper>}</Route>
