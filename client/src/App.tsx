@@ -57,6 +57,12 @@ const CrmProposalBuilder = lazy(() => import("@/pages/crm/crm-proposal-builder")
 const CrmPhone = lazy(() => import("@/pages/crm/crm-phone"));
 const CrmChecklists = lazy(() => import("@/pages/crm/crm-checklists"));
 
+// Lazy-load Mobile pages to reduce initial bundle size
+const MobileAgenda = lazy(() => import("@/pages/mobile/mobile-agenda"));
+const MobileJobDetail = lazy(() => import("@/pages/mobile/mobile-job-detail"));
+const MobileTime = lazy(() => import("@/pages/mobile/mobile-time"));
+const MobileProfile = lazy(() => import("@/pages/mobile/mobile-profile"));
+
 // Global Error Boundary to prevent blank screens
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -132,6 +138,21 @@ function CrmWrapper({ children }: { children: ReactNode }) {
   return <Suspense fallback={<CrmLoader />}>{children}</Suspense>;
 }
 
+// Mobile-specific loading placeholder
+function MobileLoader() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50" data-testid="mobile-loader">
+      <Loader2 className="h-8 w-8 animate-spin text-[#711419] mb-4" />
+      <p className="text-slate-500">Loading...</p>
+    </div>
+  );
+}
+
+// Wrapper for lazy-loaded Mobile pages
+function MobileWrapper({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<MobileLoader />}>{children}</Suspense>;
+}
+
 // Lazy load admin settings to reduce initial bundle size
 const AdminSettings = lazy(() => import("@/pages/admin-settings"));
 
@@ -193,6 +214,10 @@ function Router() {
       <Route path="/crm/phone">{() => <CrmWrapper><CrmPhone /></CrmWrapper>}</Route>
       <Route path="/crm/checklists">{() => <CrmWrapper><CrmChecklists /></CrmWrapper>}</Route>
       <Route path="/crm">{() => <CrmWrapper><CrmDashboard /></CrmWrapper>}</Route>
+      <Route path="/mobile/job/:id">{() => <MobileWrapper><MobileJobDetail /></MobileWrapper>}</Route>
+      <Route path="/mobile/time">{() => <MobileWrapper><MobileTime /></MobileWrapper>}</Route>
+      <Route path="/mobile/profile">{() => <MobileWrapper><MobileProfile /></MobileWrapper>}</Route>
+      <Route path="/mobile">{() => <MobileWrapper><MobileAgenda /></MobileWrapper>}</Route>
       <Route component={NotFound} />
     </Switch>
   );
