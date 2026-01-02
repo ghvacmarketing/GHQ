@@ -56,6 +56,14 @@ Preferred communication style: Simple, everyday language.
 - **Vector Store Knowledge Base**: Optional feature that uploads sales books and product documentation to OpenAI vector stores for enhanced quote generation. Gracefully degrades when API is not available. Admin endpoints for file management.
 - **Security**: Requires `SESSION_SECRET` and `ADMIN_API_KEY` environment variables. Implements a `GLOBAL_PASSWORD` gate for application-wide access control, configurable via environment variables.
 - **Employee Portal**: Separate authentication system with username/password login (scrypt-hashed passwords). Supports Employee and Admin roles with server-side permission enforcement. Employees can only view their own data (profile, compensation, paystubs, documents). Admins can create/deactivate users, set pay rates with effective dates, upload paystubs, and view audit logs. Features 8-hour session timeout and PostgreSQL-backed sessions.
+- **Maintenance Agreements System**: Comprehensive maintenance contract management with:
+  - **Three key dates**: Contract date (signing), Invoice date (same as contract), Appointment date (1 month after contract for payment grace period)
+  - **Regional reminders**: Configurable reminder days per region/county (e.g., Jefferson County on 1st, Richmond County on 15th)
+  - **Visit tracking**: Auto-generates 2 visits per year, 6 months apart from appointment date
+  - **Database tables**: `maintenance_regions` (county name, reminder day), `maintenance_visits` (agreement ID, visit number, target date, work order link, status)
+  - **Smart form**: When contract date is set, auto-fills invoice date, appointment date (+1 month), start date, and end date (+1 year)
+  - **Default pricing**: $229/year with auto-renew enabled
+  - **Work order integration**: Visits can be linked to work orders for scheduling
 
 ## External Dependencies
 - **Google Sheets API**: Parts pricing and application settings.
