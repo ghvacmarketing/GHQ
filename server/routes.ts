@@ -10353,6 +10353,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         propertyId: invoiceData.propertyId || workOrder.propertyId,
         projectId: invoiceData.projectId || workOrder.projectId,
         createdBy: user.id,
+        subtotal: invoiceData.subtotal ?? "0",
+        tax: invoiceData.tax ?? "0",
+        total: invoiceData.total ?? "0",
+        amountPaid: invoiceData.amountPaid ?? "0",
+        balanceDue: invoiceData.balanceDue ?? "0",
       };
       
       const parseResult = insertCrmInvoiceSchema.safeParse(invoiceToCreate);
