@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -14,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,6 +74,8 @@ import {
   Timer,
   Wrench,
   Phone,
+  Clipboard,
+  ClipboardCheck,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format, formatDistanceToNow } from "date-fns";
@@ -87,10 +91,24 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 import { CrmLayout } from "@/components/crm/crm-layout";
-import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject, WorkOrderStatus } from "@shared/schema";
+import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject, WorkOrderStatus, ChecklistQuestion } from "@shared/schema";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, workSubtypeByVisitType, type WorkSubtype, dispatchQueueStageEnum, type DispatchQueueStage } from "@shared/schema";
 
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+
+const WORK_SUBTYPE_TO_SERVICE_TYPE: Record<string, string> = {
+  "No Heat": "NO_HEAT",
+  "No Cool": "NO_AC",
+  "Water Leak": "WATER_LEAK",
+  "Strange Noise": "STRANGE_NOISE",
+  "Thermostat Issue": "THERMOSTAT_ISSUE",
+  "Electrical": "OTHER",
+  "Thermostat": "THERMOSTAT_ISSUE",
+  "Airflow": "OTHER",
+  "Noise": "STRANGE_NOISE",
+  "IAQ": "OTHER",
+  "Other": "OTHER",
+};
 
 type CustomerWithInfo = {
   id: string;
@@ -1637,6 +1655,13 @@ export default function CrmDispatch() {
     return options;
   }, []);
   const [priority, setPriority] = useState<string>("normal");
+  
+  // Service call checklist state
+  const [checklistQuestions, setChecklistQuestions] = useState<ChecklistQuestion[]>([]);
+  const [checklistAnswers, setChecklistAnswers] = useState<Record<string, string | boolean | number>>({});
+  const [showChecklist, setShowChecklist] = useState(true);
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  const [checklistId, setChecklistId] = useState<string | null>(null);
 
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
   
@@ -1787,6 +1812,115 @@ export default function CrmDispatch() {
     setPriority("normal");
     setCustomerSearch("");
     setCustomerSearchOpen(false);
+    // Reset checklist state
+    setChecklistQuestions([]);
+    setChecklistAnswers({});
+    setShowChecklist(true);
+    setChecklistId(null);
+  };
+
+  // Fetch checklist questions when SERVICE is selected and workSubtype changes
+  useEffect(() => {
+    if (!createDialogOpen) return;
+    if (visitType !== "SERVICE") {
+      setChecklistQuestions([]);
+      setChecklistAnswers({});
+      setChecklistId(null);
+      return;
+    }
+
+    const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[workSubtype];
+    if (!serviceType) {
+      setChecklistQuestions([]);
+      setChecklistAnswers({});
+      setChecklistId(null);
+      return;
+    }
+
+    setChecklistLoading(true);
+    fetch(`/api/crm/checklists/${serviceType}`, { credentials: "include" })
+      .then(res => {
+        if (!res.ok) {
+          setChecklistQuestions([]);
+          setChecklistId(null);
+          return null;
+        }
+        return res.json();
+      })
+      .then(data => {
+        if (data && data.questions) {
+          setChecklistQuestions(data.questions);
+          setChecklistId(data.id);
+          setChecklistAnswers({});
+        } else {
+          setChecklistQuestions([]);
+          setChecklistId(null);
+        }
+      })
+      .catch(() => {
+        setChecklistQuestions([]);
+        setChecklistId(null);
+      })
+      .finally(() => {
+        setChecklistLoading(false);
+      });
+  }, [visitType, workSubtype, createDialogOpen]);
+
+  // Generate checklist summary from questions and answers (local fallback)
+  const generateLocalChecklistSummary = (): string => {
+    if (checklistQuestions.length === 0) return "";
+    
+    const summaryParts: string[] = [];
+    checklistQuestions.forEach(q => {
+      const answer = checklistAnswers[q.id];
+      if (answer !== undefined && answer !== "") {
+        let answerText = String(answer);
+        if (q.questionType === "yes_no") {
+          answerText = answer === "yes" || answer === true ? "Yes" : "No";
+        }
+        summaryParts.push(`${q.question}: ${answerText}`);
+      }
+    });
+    
+    if (summaryParts.length === 0) return "";
+    return "--- Service Call Checklist ---\n" + summaryParts.join("\n") + "\n---\n\n";
+  };
+
+  // Check if all required checklist questions are answered
+  const areRequiredQuestionsAnswered = (): boolean => {
+    if (visitType !== "SERVICE" || checklistQuestions.length === 0) return true;
+    
+    const requiredQuestions = checklistQuestions.filter(q => q.isRequired);
+    for (const q of requiredQuestions) {
+      const answer = checklistAnswers[q.id];
+      if (answer === undefined || answer === "" || answer === null) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Try AI summarization, fall back to local summary
+  const generateChecklistSummary = async (): Promise<string> => {
+    if (checklistQuestions.length === 0 || Object.keys(checklistAnswers).length === 0) return "";
+    
+    try {
+      const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[workSubtype] || "OTHER";
+      const res = await apiRequest("POST", "/api/ai/summarize-checklist", {
+        questions: checklistQuestions,
+        answers: checklistAnswers,
+        serviceType,
+      });
+      const data = await res.json();
+      if (data.summary) {
+        return "--- Service Call Summary ---\n" + data.summary + "\n---\n\n";
+      }
+    } catch (err) {
+      console.error("AI summarization failed, using local fallback:", err);
+    }
+    
+    // Fallback to local summary
+    return generateLocalChecklistSummary();
   };
 
   const createWorkOrderMutation = useMutation({
@@ -1796,31 +1930,58 @@ export default function CrmDispatch() {
       if (!woTitle.trim()) throw new Error("Title is required");
       if (!woDescription.trim()) throw new Error("Description is required");
       if (!scheduledDate) throw new Error("Scheduled date is required");
+      
+      // Validate required checklist questions are answered
+      if (!areRequiredQuestionsAnswered()) {
+        const requiredQuestions = checklistQuestions.filter(q => q.isRequired);
+        const missingQuestions = requiredQuestions.filter(q => {
+          const answer = checklistAnswers[q.id];
+          return answer === undefined || answer === "" || answer === null;
+        });
+        throw new Error(`Please answer required checklist questions: ${missingQuestions.map(q => q.question).join(", ")}`);
+      }
 
       const [startHours, startMinutes] = startTime.split(":").map(Number);
       const [endHours, endMinutes] = endTime.split(":").map(Number);
       
-      const scheduledStart = new Date(scheduledDate);
-      scheduledStart.setHours(startHours, startMinutes, 0, 0);
-      
-      const scheduledEnd = new Date(scheduledDate);
-      scheduledEnd.setHours(endHours, endMinutes, 0, 0);
+      // Create dates in local timezone and convert to UTC for storage
+      const scheduledStartUTC = createLocalDateTime(scheduledDate, startHours, startMinutes);
+      const scheduledEndUTC = createLocalDateTime(scheduledDate, endHours, endMinutes);
+
+      // Generate checklist summary (tries AI, falls back to local) and prepend to description
+      const checklistSummary = await generateChecklistSummary();
+      const finalDescription = checklistSummary + woDescription.trim();
 
       const res = await apiRequest("POST", "/api/crm/work-orders", {
         customerId: selectedCustomer.id,
         propertyId: selectedPropertyId || null,
         projectId: selectedProjectId || null,
         title: woTitle.trim(),
-        description: woDescription.trim(),
+        description: finalDescription,
         visitType,
         workSubtype,
-        scheduledStart: scheduledStart.toISOString(),
-        scheduledEnd: scheduledEnd.toISOString(),
+        scheduledStart: scheduledStartUTC.toISOString(),
+        scheduledEnd: scheduledEndUTC.toISOString(),
         assignedTechId: assignedTechId === "unassigned" ? null : assignedTechId,
         priority,
         status: "scheduled",
       });
-      return res.json();
+      const workOrder = await res.json();
+
+      // Save checklist response if we have answers
+      if (checklistId && Object.keys(checklistAnswers).length > 0) {
+        try {
+          await apiRequest("POST", `/api/crm/work-orders/${workOrder.id}/checklist-response`, {
+            checklistId,
+            answers: checklistAnswers,
+            summary: checklistSummary,
+          });
+        } catch (err) {
+          console.error("Failed to save checklist response:", err);
+        }
+      }
+
+      return workOrder;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders", dateString] });
@@ -2927,6 +3088,118 @@ export default function CrmDispatch() {
               </Select>
             </div>
 
+            {/* Service Call Checklist Section */}
+            {visitType === "SERVICE" && (checklistLoading || checklistQuestions.length > 0) && (
+              <Collapsible open={showChecklist} onOpenChange={setShowChecklist} className="space-y-2">
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="flex w-full justify-between p-3 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg"
+                    data-testid="toggle-checklist"
+                  >
+                    <div className="flex items-center gap-2">
+                      {Object.keys(checklistAnswers).length === checklistQuestions.length && checklistQuestions.length > 0 ? (
+                        <ClipboardCheck className="h-5 w-5 text-amber-700" />
+                      ) : (
+                        <Clipboard className="h-5 w-5 text-amber-700" />
+                      )}
+                      <span className="font-medium text-amber-900">Service Call Checklist</span>
+                      {checklistQuestions.length > 0 && (
+                        <span className="text-sm text-amber-600">
+                          ({Object.keys(checklistAnswers).filter(k => checklistAnswers[k] !== undefined && checklistAnswers[k] !== "").length}/{checklistQuestions.length} answered)
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown className={cn(
+                      "h-4 w-4 text-amber-700 transition-transform",
+                      showChecklist && "rotate-180"
+                    )} />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="bg-amber-50/50 border border-amber-200 rounded-lg p-4 space-y-4">
+                  {checklistLoading ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-6 w-3/4" />
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-6 w-2/3" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  ) : checklistQuestions.length === 0 ? (
+                    <p className="text-sm text-amber-700">No checklist questions available for this service type.</p>
+                  ) : (
+                    checklistQuestions.map((question) => (
+                      <div key={question.id} className="space-y-2">
+                        <Label className="text-sm font-medium text-amber-900">
+                          {question.question}
+                          {question.isRequired && <span className="text-red-500 ml-1">*</span>}
+                        </Label>
+                        {question.helpText && (
+                          <p className="text-xs text-amber-600">{question.helpText}</p>
+                        )}
+                        
+                        {question.questionType === "yes_no" && (
+                          <RadioGroup
+                            value={checklistAnswers[question.id] as string || ""}
+                            onValueChange={(value) => setChecklistAnswers(prev => ({ ...prev, [question.id]: value }))}
+                            className="flex gap-4"
+                            data-testid={`radio-${question.id}`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <RadioGroupItem value="yes" id={`${question.id}-yes`} />
+                              <Label htmlFor={`${question.id}-yes`} className="font-normal cursor-pointer">Yes</Label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <RadioGroupItem value="no" id={`${question.id}-no`} />
+                              <Label htmlFor={`${question.id}-no`} className="font-normal cursor-pointer">No</Label>
+                            </div>
+                          </RadioGroup>
+                        )}
+                        
+                        {question.questionType === "text" && (
+                          <Input
+                            value={checklistAnswers[question.id] as string || ""}
+                            onChange={(e) => setChecklistAnswers(prev => ({ ...prev, [question.id]: e.target.value }))}
+                            placeholder="Enter response..."
+                            className="bg-white"
+                            data-testid={`input-${question.id}`}
+                          />
+                        )}
+                        
+                        {question.questionType === "number" && (
+                          <Input
+                            type="number"
+                            value={checklistAnswers[question.id] as number || ""}
+                            onChange={(e) => setChecklistAnswers(prev => ({ ...prev, [question.id]: e.target.value ? Number(e.target.value) : "" }))}
+                            placeholder="Enter number..."
+                            className="bg-white"
+                            data-testid={`input-${question.id}`}
+                          />
+                        )}
+                        
+                        {question.questionType === "select" && question.options && (
+                          <Select
+                            value={checklistAnswers[question.id] as string || ""}
+                            onValueChange={(value) => setChecklistAnswers(prev => ({ ...prev, [question.id]: value }))}
+                          >
+                            <SelectTrigger className="bg-white" data-testid={`select-${question.id}`}>
+                              <SelectValue placeholder="Select an option..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {question.options.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {option}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
             <div className="space-y-2">
               <Label>Scheduled Date</Label>
               <Popover>
@@ -3020,7 +3293,7 @@ export default function CrmDispatch() {
             </Button>
             <Button 
               onClick={() => createWorkOrderMutation.mutate()}
-              disabled={!selectedCustomer || !selectedPropertyId || !woTitle.trim() || !woDescription.trim() || createWorkOrderMutation.isPending}
+              disabled={!selectedCustomer || !selectedPropertyId || !woTitle.trim() || !woDescription.trim() || createWorkOrderMutation.isPending || !areRequiredQuestionsAnswered()}
               className="bg-[#711419] hover:bg-[#5a1014]"
             >
               {createWorkOrderMutation.isPending ? (
