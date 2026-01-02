@@ -46,7 +46,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
 import { useOnlineStatus, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
-import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus, CrmQuote, CrmInvoice, CrmInvoiceLineItem, CrmItem } from "@shared/schema";
+import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus, CrmQuote, CrmInvoice, CrmInvoiceLineItem } from "@shared/schema";
 
 interface WorkOrderDetail extends CrmWorkOrder {
   customer: CrmCustomer | null;
@@ -558,8 +558,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
-  const [discountSearch, setDiscountSearch] = useState("");
-  const [selectedDiscountItem, setSelectedDiscountItem] = useState<CrmItem | null>(null);
+  const [discountDescription, setDiscountDescription] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
 
   // Fetch existing quotes for this work order
@@ -584,24 +583,6 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     },
     staleTime: 5 * 60 * 1000,
   });
-
-  // Fetch discount items from CRM items catalog
-  const { data: discountItems = [] } = useQuery<CrmItem[]>({
-    queryKey: ["/api/crm/items", { itemType: "discount" }],
-    queryFn: async () => {
-      const res = await fetch("/api/crm/items?itemType=discount", { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const filteredDiscountItems = discountSearch.trim()
-    ? discountItems.filter(d =>
-        d.name.toLowerCase().includes(discountSearch.toLowerCase()) ||
-        (d.description && d.description.toLowerCase().includes(discountSearch.toLowerCase()))
-      )
-    : discountItems;
 
   const parts = partsData || [];
   const filteredParts = catalogSearch.trim()
@@ -687,40 +668,22 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     toast({ title: "Item Added", description: part.description });
   };
 
-  const selectDiscountFromCatalog = (item: CrmItem) => {
-    setSelectedDiscountItem(item);
-    // Pre-fill amount if item has a rate
-    if (item.rate && parseFloat(item.rate) > 0) {
-      setDiscountAmount(item.rate);
-    }
-  };
-
   const addDiscountItem = () => {
     const amount = parseFloat(discountAmount) || 0;
-    if (amount <= 0) {
-      toast({ title: "Error", description: "Please enter a discount amount.", variant: "destructive" });
+    if (amount <= 0 || !discountDescription.trim()) {
+      toast({ title: "Error", description: "Please enter a discount description and amount.", variant: "destructive" });
       return;
     }
-    const description = selectedDiscountItem?.name || "Discount";
     setLineItems([...lineItems, { 
       id: Date.now().toString(), 
-      description: description, 
+      description: discountDescription.trim(), 
       quantity: 1, 
       unitPrice: -Math.abs(amount),
       lineType: "discount"
     }]);
     setShowDiscount(false);
-    setSelectedDiscountItem(null);
+    setDiscountDescription("");
     setDiscountAmount("");
-    setDiscountSearch("");
-    toast({ title: "Discount Added", description: `${description}: -$${amount.toFixed(2)}` });
-  };
-
-  const closeDiscountDialog = () => {
-    setShowDiscount(false);
-    setSelectedDiscountItem(null);
-    setDiscountAmount("");
-    setDiscountSearch("");
   };
 
   const removeLineItem = (id: string) => {
@@ -1115,112 +1078,57 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         </DialogContent>
       </Dialog>
 
-      {/* Add Discount Dialog - Catalog-based picker */}
-      <Dialog open={showDiscount} onOpenChange={(open) => !open && closeDiscountDialog()}>
-        <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+      {/* Add Discount Dialog */}
+      <Dialog open={showDiscount} onOpenChange={setShowDiscount}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5 text-amber-600" />
-              {selectedDiscountItem ? "Set Discount Amount" : "Select Discount"}
+              Add Discount
             </DialogTitle>
             <DialogDescription>
-              {selectedDiscountItem 
-                ? `Enter the amount for "${selectedDiscountItem.name}"` 
-                : "Choose a discount from the catalog"}
+              Enter discount details to apply to the quote
             </DialogDescription>
           </DialogHeader>
           
-          {!selectedDiscountItem ? (
-            <>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search discounts..."
-                  value={discountSearch}
-                  onChange={(e) => setDiscountSearch(e.target.value)}
-                  className="pl-10 min-h-[44px]"
-                  data-testid="input-discount-search"
-                />
-              </div>
-              
-              <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
-                {filteredDiscountItems.length === 0 ? (
-                  <p className="text-sm text-slate-400 text-center py-4">
-                    {discountSearch ? "No discounts found" : "No discount items in catalog"}
-                  </p>
-                ) : (
-                  filteredDiscountItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="border rounded-lg p-3 hover:bg-amber-50 cursor-pointer border-amber-200"
-                      onClick={() => selectDiscountFromCatalog(item)}
-                      data-testid={`discount-item-${item.id}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{item.name}</p>
-                          {item.description && (
-                            <p className="text-xs text-slate-500 truncate">{item.description}</p>
-                          )}
-                        </div>
-                        {item.rate && parseFloat(item.rate) > 0 ? (
-                          <span className="text-sm font-semibold text-amber-700 ml-2">
-                            ${parseFloat(item.rate).toFixed(2)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-slate-400 ml-2">Variable</span>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-              
-              <DialogFooter>
-                <Button variant="outline" onClick={closeDiscountDialog}>
-                  Cancel
-                </Button>
-              </DialogFooter>
-            </>
-          ) : (
-            <div className="space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <p className="text-sm font-medium text-amber-800">{selectedDiscountItem.name}</p>
-                {selectedDiscountItem.description && (
-                  <p className="text-xs text-amber-600 mt-1">{selectedDiscountItem.description}</p>
-                )}
-              </div>
-              
-              <div>
-                <Label className="text-sm font-medium">Discount Amount ($)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={discountAmount}
-                  onChange={(e) => setDiscountAmount(e.target.value)}
-                  className="min-h-[44px] mt-1"
-                  data-testid="input-discount-amount"
-                  autoFocus
-                />
-              </div>
-              
-              <DialogFooter className="flex gap-2">
-                <Button variant="outline" onClick={() => setSelectedDiscountItem(null)}>
-                  Back
-                </Button>
-                <Button 
-                  className="bg-amber-600 hover:bg-amber-700"
-                  onClick={addDiscountItem}
-                  disabled={!discountAmount || parseFloat(discountAmount) <= 0}
-                  data-testid="button-confirm-discount"
-                >
-                  Add Discount
-                </Button>
-              </DialogFooter>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium">Discount Description</Label>
+              <Input
+                placeholder="e.g., Senior Discount, Loyalty Discount"
+                value={discountDescription}
+                onChange={(e) => setDiscountDescription(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-discount-description"
+              />
             </div>
-          )}
+            <div>
+              <Label className="text-sm font-medium">Amount ($)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-discount-amount"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => { setShowDiscount(false); setDiscountDescription(""); setDiscountAmount(""); }}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-amber-600 hover:bg-amber-700"
+              onClick={addDiscountItem}
+              data-testid="button-confirm-discount"
+            >
+              Add Discount
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -1257,8 +1165,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
-  const [discountSearch, setDiscountSearch] = useState("");
-  const [selectedDiscountItem, setSelectedDiscountItem] = useState<CrmItem | null>(null);
+  const [discountDescription, setDiscountDescription] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
 
   const { data: invoicesData, isLoading: invoicesLoading, error: invoicesError } = useQuery<{ invoices: CrmInvoice[] }>({
@@ -1293,24 +1200,6 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     },
     staleTime: 5 * 60 * 1000,
   });
-
-  // Fetch discount items from CRM items catalog
-  const { data: discountItems = [] } = useQuery<CrmItem[]>({
-    queryKey: ["/api/crm/items", { itemType: "discount" }],
-    queryFn: async () => {
-      const res = await fetch("/api/crm/items?itemType=discount", { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const filteredDiscountItems = discountSearch.trim()
-    ? discountItems.filter(d =>
-        d.name.toLowerCase().includes(discountSearch.toLowerCase()) ||
-        (d.description && d.description.toLowerCase().includes(discountSearch.toLowerCase()))
-      )
-    : discountItems;
 
   const parts = partsData || [];
   const filteredParts = catalogSearch.trim()
@@ -1395,40 +1284,23 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     toast({ title: "Item Added", description: part.description });
   };
 
-  const selectDiscountFromCatalog = (item: CrmItem) => {
-    setSelectedDiscountItem(item);
-    if (item.rate && parseFloat(item.rate) > 0) {
-      setDiscountAmount(item.rate);
-    }
-  };
-
   const addDiscountItem = () => {
     const amount = parseFloat(discountAmount) || 0;
-    if (amount <= 0) {
-      toast({ title: "Error", description: "Please enter a discount amount.", variant: "destructive" });
+    if (amount <= 0 || !discountDescription.trim()) {
+      toast({ title: "Error", description: "Please enter a discount description and amount.", variant: "destructive" });
       return;
     }
-    const description = selectedDiscountItem?.name || "Discount";
     setLineItems([...lineItems, { 
       id: Date.now().toString(), 
-      description: description, 
+      description: discountDescription.trim(), 
       quantity: 1, 
       unitPrice: -Math.abs(amount),
       lineType: "discount",
       taxable: false
     }]);
     setShowDiscount(false);
-    setSelectedDiscountItem(null);
+    setDiscountDescription("");
     setDiscountAmount("");
-    setDiscountSearch("");
-    toast({ title: "Discount Added", description: `${description}: -$${amount.toFixed(2)}` });
-  };
-
-  const closeDiscountDialog = () => {
-    setShowDiscount(false);
-    setSelectedDiscountItem(null);
-    setDiscountAmount("");
-    setDiscountSearch("");
   };
 
   const removeLineItem = (id: string) => {
@@ -1931,112 +1803,57 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         </DialogContent>
       </Dialog>
 
-      {/* Add Discount Dialog - Catalog-based picker */}
-      <Dialog open={showDiscount} onOpenChange={(open) => !open && closeDiscountDialog()}>
-        <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+      {/* Add Discount Dialog */}
+      <Dialog open={showDiscount} onOpenChange={setShowDiscount}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5 text-amber-600" />
-              {selectedDiscountItem ? "Set Discount Amount" : "Select Discount"}
+              Add Discount
             </DialogTitle>
             <DialogDescription>
-              {selectedDiscountItem 
-                ? `Enter the amount for "${selectedDiscountItem.name}"` 
-                : "Choose a discount from the catalog"}
+              Enter discount details to apply to the invoice
             </DialogDescription>
           </DialogHeader>
           
-          {!selectedDiscountItem ? (
-            <>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search discounts..."
-                  value={discountSearch}
-                  onChange={(e) => setDiscountSearch(e.target.value)}
-                  className="pl-10 min-h-[44px]"
-                  data-testid="input-invoice-discount-search"
-                />
-              </div>
-              
-              <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
-                {filteredDiscountItems.length === 0 ? (
-                  <p className="text-sm text-slate-400 text-center py-4">
-                    {discountSearch ? "No discounts found" : "No discount items in catalog"}
-                  </p>
-                ) : (
-                  filteredDiscountItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="border rounded-lg p-3 hover:bg-amber-50 cursor-pointer border-amber-200"
-                      onClick={() => selectDiscountFromCatalog(item)}
-                      data-testid={`invoice-discount-item-${item.id}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{item.name}</p>
-                          {item.description && (
-                            <p className="text-xs text-slate-500 truncate">{item.description}</p>
-                          )}
-                        </div>
-                        {item.rate && parseFloat(item.rate) > 0 ? (
-                          <span className="text-sm font-semibold text-amber-700 ml-2">
-                            ${parseFloat(item.rate).toFixed(2)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-slate-400 ml-2">Variable</span>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-              
-              <DialogFooter>
-                <Button variant="outline" onClick={closeDiscountDialog}>
-                  Cancel
-                </Button>
-              </DialogFooter>
-            </>
-          ) : (
-            <div className="space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <p className="text-sm font-medium text-amber-800">{selectedDiscountItem.name}</p>
-                {selectedDiscountItem.description && (
-                  <p className="text-xs text-amber-600 mt-1">{selectedDiscountItem.description}</p>
-                )}
-              </div>
-              
-              <div>
-                <Label className="text-sm font-medium">Discount Amount ($)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={discountAmount}
-                  onChange={(e) => setDiscountAmount(e.target.value)}
-                  className="min-h-[44px] mt-1"
-                  data-testid="input-invoice-discount-amount"
-                  autoFocus
-                />
-              </div>
-              
-              <DialogFooter className="flex gap-2">
-                <Button variant="outline" onClick={() => setSelectedDiscountItem(null)}>
-                  Back
-                </Button>
-                <Button 
-                  className="bg-amber-600 hover:bg-amber-700"
-                  onClick={addDiscountItem}
-                  disabled={!discountAmount || parseFloat(discountAmount) <= 0}
-                  data-testid="button-confirm-invoice-discount"
-                >
-                  Add Discount
-                </Button>
-              </DialogFooter>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium">Discount Description</Label>
+              <Input
+                placeholder="e.g., Senior Discount, Loyalty Discount"
+                value={discountDescription}
+                onChange={(e) => setDiscountDescription(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-invoice-discount-description"
+              />
             </div>
-          )}
+            <div>
+              <Label className="text-sm font-medium">Amount ($)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-invoice-discount-amount"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => { setShowDiscount(false); setDiscountDescription(""); setDiscountAmount(""); }}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-amber-600 hover:bg-amber-700"
+              onClick={addDiscountItem}
+              data-testid="button-confirm-invoice-discount"
+            >
+              Add Discount
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

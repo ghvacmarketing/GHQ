@@ -11364,21 +11364,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CRM ITEMS ROUTES
   // =============================================
 
-  // GET /api/crm/items - List all items (with optional search query and itemType filter)
+  // GET /api/crm/items - List all items (with optional search query)
   app.get("/api/crm/items", requireCrmAuth, async (req, res) => {
     try {
-      const { search, itemType } = req.query;
+      const { search } = req.query;
       
       let items: CrmItem[];
       if (search && typeof search === 'string' && search.trim()) {
         items = await storage.searchCrmItems(search.trim());
       } else {
         items = await storage.getAllCrmItems();
-      }
-      
-      // Filter by itemType if specified
-      if (itemType && typeof itemType === 'string') {
-        items = items.filter(item => item.itemType === itemType);
       }
       
       return res.json(items);
