@@ -1385,7 +1385,7 @@ export default function CrmProspectFunnel() {
             </div>
             </TabsContent>
 
-            <TabsContent value="kanban" className="mt-4 -mx-4 px-0">
+            <TabsContent value="kanban" className="mt-4 -mx-4 px-0" style={{ overflow: 'visible' }}>
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCorners}
@@ -1393,11 +1393,15 @@ export default function CrmProspectFunnel() {
                 onDragEnd={handleDragEnd}
               >
                 <div 
-                  className="flex flex-row gap-4 px-4" 
+                  className="kanban-board-scroll px-4" 
                   style={{ 
-                    overflowX: 'scroll', 
+                    display: 'flex',
+                    flexDirection: 'row',
+                    gap: '1rem',
+                    overflowX: 'scroll',
                     overflowY: 'hidden',
                     height: 'calc(100vh - 220px)',
+                    WebkitOverflowScrolling: 'touch',
                   }}
                   data-testid="kanban-board"
                 >
