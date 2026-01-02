@@ -369,7 +369,7 @@ export default function CrmSettings() {
         )}
 
         {canViewSettings && (
-          <ChecklistsSection currentUser={currentUser} isAdmin={isAdmin} />
+          <ChecklistsSection currentUser={currentUser} isAdmin={isAdmin || currentUser.role === "sales"} />
         )}
 
         {!canViewSettings && (

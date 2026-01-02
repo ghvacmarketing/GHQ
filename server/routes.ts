@@ -13331,8 +13331,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/crm/checklists - Create new checklist template (admin only)
-  app.post("/api/crm/checklists", requireCrmAdmin, async (req, res) => {
+  // POST /api/crm/checklists - Create new checklist template (admin and sales)
+  app.post("/api/crm/checklists", requireCrmAuth, async (req, res) => {
     try {
       const parsed = insertServiceCallChecklistSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -13350,8 +13350,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PUT /api/crm/checklists/:id - Update checklist template (admin only)
-  app.put("/api/crm/checklists/:id", requireCrmAdmin, async (req, res) => {
+  // PUT /api/crm/checklists/:id - Update checklist template (admin and sales)
+  app.put("/api/crm/checklists/:id", requireCrmAuth, async (req, res) => {
     try {
       const { id } = req.params;
       
@@ -13378,8 +13378,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/crm/checklists/:id - Delete checklist template (admin only)
-  app.delete("/api/crm/checklists/:id", requireCrmAdmin, async (req, res) => {
+  // DELETE /api/crm/checklists/:id - Delete checklist template (admin and sales)
+  app.delete("/api/crm/checklists/:id", requireCrmAuth, async (req, res) => {
     try {
       const { id } = req.params;
       
@@ -13419,8 +13419,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/crm/checklists/:checklistId/questions - Add question to checklist
-  app.post("/api/crm/checklists/:checklistId/questions", requireCrmAdmin, async (req, res) => {
+  // POST /api/crm/checklists/:checklistId/questions - Add question to checklist (admin and sales)
+  app.post("/api/crm/checklists/:checklistId/questions", requireCrmAuth, async (req, res) => {
     try {
       const { checklistId } = req.params;
       
@@ -13445,8 +13445,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PUT /api/crm/checklists/questions/:questionId - Update question
-  app.put("/api/crm/checklists/questions/:questionId", requireCrmAdmin, async (req, res) => {
+  // PUT /api/crm/checklists/questions/:questionId - Update question (admin and sales)
+  app.put("/api/crm/checklists/questions/:questionId", requireCrmAuth, async (req, res) => {
     try {
       const { questionId } = req.params;
       
@@ -13473,8 +13473,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/crm/checklists/questions/:questionId - Delete question
-  app.delete("/api/crm/checklists/questions/:questionId", requireCrmAdmin, async (req, res) => {
+  // DELETE /api/crm/checklists/questions/:questionId - Delete question (admin and sales)
+  app.delete("/api/crm/checklists/questions/:questionId", requireCrmAuth, async (req, res) => {
     try {
       const { questionId } = req.params;
       
