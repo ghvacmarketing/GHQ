@@ -617,6 +617,20 @@ export default function CrmWorkOrders() {
     return "--- Service Call Checklist ---\n" + summaryParts.join("\n") + "\n---\n\n";
   };
 
+  // Check if all required checklist questions are answered
+  const areRequiredQuestionsAnswered = (): boolean => {
+    if (visitType !== "SERVICE" || checklistQuestions.length === 0) return true;
+    
+    const requiredQuestions = checklistQuestions.filter(q => q.isRequired);
+    for (const q of requiredQuestions) {
+      const answer = checklistAnswers[q.id];
+      if (answer === undefined || answer === "" || answer === null) {
+        return false;
+      }
+    }
+    return true;
+  };
+
   // Try AI summarization, fall back to local summary
   const generateChecklistSummary = async (): Promise<string> => {
     if (checklistQuestions.length === 0 || Object.keys(checklistAnswers).length === 0) return "";
@@ -646,6 +660,16 @@ export default function CrmWorkOrders() {
       if (!woTitle.trim()) throw new Error("Title is required");
       if (!woDescription.trim()) throw new Error("Description is required");
       if (!scheduledDate) throw new Error("Scheduled date is required");
+      
+      // Validate required checklist questions are answered
+      if (!areRequiredQuestionsAnswered()) {
+        const requiredQuestions = checklistQuestions.filter(q => q.isRequired);
+        const missingQuestions = requiredQuestions.filter(q => {
+          const answer = checklistAnswers[q.id];
+          return answer === undefined || answer === "" || answer === null;
+        });
+        throw new Error(`Please answer required checklist questions: ${missingQuestions.map(q => q.question).join(", ")}`);
+      }
 
       // Parse start and end times and convert to UTC for storage
       const [startHours, startMinutes] = startTime.split(":").map(Number);
@@ -1971,7 +1995,7 @@ export default function CrmWorkOrders() {
               </Button>
               <Button
                 onClick={() => createWorkOrderMutation.mutate()}
-                disabled={createWorkOrderMutation.isPending || !selectedCustomer || !scheduledDate || !woTitle.trim() || !woDescription.trim()}
+                disabled={createWorkOrderMutation.isPending || !selectedCustomer || !scheduledDate || !woTitle.trim() || !woDescription.trim() || !areRequiredQuestionsAnswered()}
                 className="bg-[#711419] hover:bg-[#5a1014]"
                 data-testid="button-submit-create"
               >

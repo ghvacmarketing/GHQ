@@ -12652,8 +12652,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/crm/checklists - Create new checklist template
-  app.post("/api/crm/checklists", requireCrmAuth, async (req, res) => {
+  // POST /api/crm/checklists - Create new checklist template (admin only)
+  app.post("/api/crm/checklists", requireCrmAdmin, async (req, res) => {
     try {
       const parsed = insertServiceCallChecklistSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -12671,8 +12671,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PUT /api/crm/checklists/:id - Update checklist template
-  app.put("/api/crm/checklists/:id", requireCrmAuth, async (req, res) => {
+  // PUT /api/crm/checklists/:id - Update checklist template (admin only)
+  app.put("/api/crm/checklists/:id", requireCrmAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       
@@ -12699,8 +12699,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/crm/checklists/:id - Delete checklist template
-  app.delete("/api/crm/checklists/:id", requireCrmAuth, async (req, res) => {
+  // DELETE /api/crm/checklists/:id - Delete checklist template (admin only)
+  app.delete("/api/crm/checklists/:id", requireCrmAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       
@@ -12741,7 +12741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/checklists/:checklistId/questions - Add question to checklist
-  app.post("/api/crm/checklists/:checklistId/questions", requireCrmAuth, async (req, res) => {
+  app.post("/api/crm/checklists/:checklistId/questions", requireCrmAdmin, async (req, res) => {
     try {
       const { checklistId } = req.params;
       
@@ -12767,7 +12767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PUT /api/crm/checklists/questions/:questionId - Update question
-  app.put("/api/crm/checklists/questions/:questionId", requireCrmAuth, async (req, res) => {
+  app.put("/api/crm/checklists/questions/:questionId", requireCrmAdmin, async (req, res) => {
     try {
       const { questionId } = req.params;
       
@@ -12795,7 +12795,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/checklists/questions/:questionId - Delete question
-  app.delete("/api/crm/checklists/questions/:questionId", requireCrmAuth, async (req, res) => {
+  app.delete("/api/crm/checklists/questions/:questionId", requireCrmAdmin, async (req, res) => {
     try {
       const { questionId } = req.params;
       
@@ -12826,6 +12826,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsed = insertWorkOrderChecklistResponseSchema.safeParse({ ...req.body, workOrderId });
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid response data", errors: parsed.error.errors });
+      }
+      
+      // Validate required questions are answered
+      const { checklistId, answers } = parsed.data;
+      const requiredQuestions = await db.select()
+        .from(checklistQuestions)
+        .where(and(
+          eq(checklistQuestions.checklistId, checklistId),
+          eq(checklistQuestions.isRequired, true)
+        ));
+      
+      const missingRequired: string[] = [];
+      for (const q of requiredQuestions) {
+        const answer = answers[q.id];
+        if (answer === undefined || answer === null || answer === "") {
+          missingRequired.push(q.question);
+        }
+      }
+      
+      if (missingRequired.length > 0) {
+        return res.status(400).json({ 
+          message: "Required checklist questions not answered",
+          missingQuestions: missingRequired
+        });
       }
       
       const [existingResponse] = await db.select()
