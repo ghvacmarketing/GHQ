@@ -247,17 +247,7 @@ export default function CrmSettings() {
       <div className="p-6 max-w-6xl mx-auto">
         <h1 className="text-2xl font-bold text-slate-900 mb-6">Settings</h1>
 
-        {!isAdmin && canViewSettings && (
-          <Card className="mb-6">
-            <CardContent className="py-6">
-              <p className="text-slate-600 text-center">
-                User management is only available to owners and administrators.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {isAdmin && (
+        {canViewSettings && (
           <Card className="mb-6">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -266,14 +256,18 @@ export default function CrmSettings() {
                   <div>
                     <CardTitle>User Management</CardTitle>
                     <CardDescription>
-                      Add, edit, or remove users. Technicians and sales appear on the dispatch board.
+                      {isAdmin 
+                        ? "Add, edit, or remove users. Technicians and sales appear on the dispatch board."
+                        : "View team members. Technicians and sales appear on the dispatch board."}
                     </CardDescription>
                   </div>
                 </div>
-                <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-user">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add User
-                </Button>
+                {isAdmin && (
+                  <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-user">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add User
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -291,7 +285,7 @@ export default function CrmSettings() {
                       <TableHead>Email</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -321,46 +315,48 @@ export default function CrmSettings() {
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openEditDialog(user)}
-                                data-testid={`button-edit-user-${user.id}`}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              {!isCurrentUser && (
-                                user.isActive ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-red-600 hover:text-red-700"
-                                    onClick={() => setConfirmDeactivate(user)}
-                                    data-testid={`button-deactivate-user-${user.id}`}
-                                  >
-                                    <UserX className="h-4 w-4" />
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-green-600 hover:text-green-700"
-                                    onClick={() => activateUserMutation.mutate(user.id)}
-                                    disabled={activateUserMutation.isPending}
-                                    data-testid={`button-activate-user-${user.id}`}
-                                  >
-                                    {activateUserMutation.isPending ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <UserCheck className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                )
-                              )}
-                            </div>
-                          </TableCell>
+                          {isAdmin && (
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditDialog(user)}
+                                  data-testid={`button-edit-user-${user.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                {!isCurrentUser && (
+                                  user.isActive ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-red-600 hover:text-red-700"
+                                      onClick={() => setConfirmDeactivate(user)}
+                                      data-testid={`button-deactivate-user-${user.id}`}
+                                    >
+                                      <UserX className="h-4 w-4" />
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-green-600 hover:text-green-700"
+                                      onClick={() => activateUserMutation.mutate(user.id)}
+                                      disabled={activateUserMutation.isPending}
+                                      data-testid={`button-activate-user-${user.id}`}
+                                    >
+                                      {activateUserMutation.isPending ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <UserCheck className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  )
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
                         </TableRow>
                       );
                     })}
@@ -371,11 +367,11 @@ export default function CrmSettings() {
           </Card>
         )}
 
-        {!isAdmin && (
+        {!canViewSettings && (
           <Card>
             <CardContent className="py-12 text-center text-slate-500">
               <Shield className="h-12 w-12 mx-auto mb-4 text-slate-300" />
-              <p>Settings are only available to administrators.</p>
+              <p>Settings are only available to managers.</p>
             </CardContent>
           </Card>
         )}

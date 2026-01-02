@@ -6138,11 +6138,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const updateData: { name?: string; email?: string; phone?: string | null; role?: string } = {};
+      const updateData: { name?: string; email?: string; phone?: string | null; role?: "owner" | "admin" | "sales" | "tech" } = {};
       if (name) updateData.name = name;
       if (email) updateData.email = email.toLowerCase();
       if (phone !== undefined) updateData.phone = phone || null;
-      if (role) updateData.role = role;
+      if (role) updateData.role = role as "owner" | "admin" | "sales" | "tech";
 
       const [updatedUser] = await db.update(crmUsers).set(updateData).where(eq(crmUsers.id, userId)).returning();
 
