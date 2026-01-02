@@ -168,11 +168,22 @@ export default function CrmInvoiceCreate() {
   const { data: workOrders, isLoading: workOrdersLoading } = useQuery<{ workOrders: WorkOrderWithCustomer[] }>({
     queryKey: ["/api/crm/work-orders", "for-invoice"],
     queryFn: async () => {
-      const res = await fetch("/api/crm/work-orders?limit=100", { credentials: "include" });
+      const res = await fetch("/api/crm/work-orders/list?limit=100", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch work orders");
-      return res.json();
+      const list = await res.json();
+      return { workOrders: list };
     },
     enabled: !!currentUser,
+  });
+
+  const { data: preselectedWorkOrder } = useQuery<WorkOrderWithCustomer>({
+    queryKey: ["/api/crm/work-orders", workOrderIdFromUrl],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/work-orders/${workOrderIdFromUrl}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch work order");
+      return res.json();
+    },
+    enabled: !!currentUser && !!workOrderIdFromUrl,
   });
 
   const { data: quotes, isLoading: quotesLoading } = useQuery<{ quotes: QuoteWithItems[] }>({
@@ -220,21 +231,21 @@ export default function CrmInvoiceCreate() {
   const newWOProperties = propertiesData || [];
 
   useEffect(() => {
-    if (workOrderIdFromUrl && workOrders?.workOrders) {
-      const wo = workOrders.workOrders.find(w => w.id === workOrderIdFromUrl);
-      if (wo) {
-        setSelectedWorkOrder(wo);
-        setFormData(prev => ({
-          ...prev,
-          workOrderId: wo.id,
-          customerName: wo.customerName || wo.customer?.name || "",
-          customerEmail: wo.customer?.email || "",
-          customerPhone: wo.customer?.phone || "",
-          serviceAddress: wo.customer?.fullAddress || "",
-        }));
-      }
+    if (workOrderIdFromUrl && preselectedWorkOrder) {
+      const wo = preselectedWorkOrder;
+      setSelectedWorkOrder(wo);
+      setFormData(prev => ({
+        ...prev,
+        mode: "manual",
+        workOrderId: wo.id,
+        customerName: wo.customerName || wo.customer?.name || "",
+        customerEmail: wo.customer?.email || "",
+        customerPhone: wo.customer?.phone || "",
+        serviceAddress: wo.customer?.fullAddress || "",
+      }));
+      setCurrentStep(3);
     }
-  }, [workOrderIdFromUrl, workOrders]);
+  }, [workOrderIdFromUrl, preselectedWorkOrder]);
 
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: {
