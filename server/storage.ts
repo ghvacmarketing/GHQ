@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc, isNull } from "drizzle-orm";
@@ -157,6 +157,13 @@ export interface IStorage {
   updateCallLog(id: string, data: Partial<InsertCallLog>): Promise<CallLog | undefined>;
   deleteCallLog(id: string): Promise<boolean>;
   searchCallLogs(query: string): Promise<(CallLog & { date: string })[]>;
+
+  // Call Log Task operations
+  getTasksByCallLog(callLogId: string): Promise<CallLogTask[]>;
+  createCallLogTask(data: InsertCallLogTask): Promise<CallLogTask>;
+  updateCallLogTask(id: string, data: Partial<InsertCallLogTask>): Promise<CallLogTask | undefined>;
+  deleteCallLogTask(id: string): Promise<boolean>;
+  getTasksByDay(date: string): Promise<(CallLogTask & { callLogId: string })[]>;
 
   // Portal Users operations
   getPortalUser(id: string): Promise<PortalUser | undefined>;
@@ -1256,6 +1263,7 @@ export class DatabaseStorage implements IStorage {
         description: callLogs.description,
         phone: callLogs.phone,
         tag: callLogs.tag,
+        billable: callLogs.billable,
         createdByUserId: callLogs.createdByUserId,
         createdByName: callLogs.createdByName,
         createdAt: callLogs.createdAt,
@@ -1273,6 +1281,54 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(desc(callLogs.createdAt));
     return logs;
+  }
+
+  // Call Log Task operations
+  async getTasksByCallLog(callLogId: string): Promise<CallLogTask[]> {
+    return await db
+      .select()
+      .from(callLogTasks)
+      .where(eq(callLogTasks.callLogId, callLogId))
+      .orderBy(asc(callLogTasks.createdAt));
+  }
+
+  async createCallLogTask(data: InsertCallLogTask): Promise<CallLogTask> {
+    const [task] = await db.insert(callLogTasks).values(data).returning();
+    return task;
+  }
+
+  async updateCallLogTask(id: string, data: Partial<InsertCallLogTask>): Promise<CallLogTask | undefined> {
+    const updateData: any = { ...data };
+    if (data.isCompleted !== undefined) {
+      updateData.completedAt = data.isCompleted ? new Date() : null;
+    }
+    const [task] = await db
+      .update(callLogTasks)
+      .set(updateData)
+      .where(eq(callLogTasks.id, id))
+      .returning();
+    return task || undefined;
+  }
+
+  async deleteCallLogTask(id: string): Promise<boolean> {
+    const result = await db.delete(callLogTasks).where(eq(callLogTasks.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getTasksByDay(date: string): Promise<(CallLogTask & { callLogId: string })[]> {
+    const [day] = await db.select().from(callLogDays).where(eq(callLogDays.date, date));
+    if (!day) return [];
+    
+    const logs = await db.select().from(callLogs).where(eq(callLogs.dayId, day.id));
+    if (logs.length === 0) return [];
+    
+    const logIds = logs.map(l => l.id);
+    const tasks = await db
+      .select()
+      .from(callLogTasks)
+      .where(sql`${callLogTasks.callLogId} = ANY(${logIds})`)
+      .orderBy(asc(callLogTasks.createdAt));
+    return tasks;
   }
 
   // Portal Users operations

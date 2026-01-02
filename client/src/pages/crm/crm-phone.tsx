@@ -45,7 +45,8 @@ import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, formatDistanceToNow, subDays } from "date-fns";
 import { formatLocal, toLocalTime } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
-import type { Voicemail, CallLog, CrmUser } from "@shared/schema";
+import type { Voicemail, CallLog, CallLogTask, CrmUser } from "@shared/schema";
+import { Switch } from "@/components/ui/switch";
 
 const VOICEMAIL_STATUSES = ["NEW", "UNRESOLVED", "RESOLVED"] as const;
 type VoicemailStatus = typeof VOICEMAIL_STATUSES[number];
@@ -372,6 +373,7 @@ const callLogFormSchema = z.object({
   description: z.string().min(1, "Description is required"),
   phone: z.string().optional(),
   tag: z.string().optional(),
+  billable: z.boolean().optional(),
 });
 
 type CallLogFormData = z.infer<typeof callLogFormSchema>;
@@ -385,9 +387,63 @@ interface CallLogEntryProps {
 }
 
 function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLogEntryProps) {
+  const { toast } = useToast();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [newTaskText, setNewTaskText] = useState("");
+  
   const createdAt = log.createdAt ? (typeof log.createdAt === "string" ? parseISO(log.createdAt) : log.createdAt) : new Date();
   const relativeTime = formatDistanceToNow(createdAt, { addSuffix: true });
   const exactTime = format(createdAt, "MMM d, yyyy 'at' h:mm a");
+
+  const { data: tasks = [], isLoading: tasksLoading } = useQuery<CallLogTask[]>({
+    queryKey: [`/api/call-logs/${log.id}/tasks`],
+    enabled: isExpanded,
+  });
+
+  const createTaskMutation = useMutation({
+    mutationFn: async (description: string) => {
+      const res = await apiRequest("POST", `/api/call-logs/${log.id}/tasks`, { description });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/call-logs/${log.id}/tasks`] });
+      setNewTaskText("");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create task", variant: "destructive" });
+    },
+  });
+
+  const toggleTaskMutation = useMutation({
+    mutationFn: async ({ taskId, isCompleted }: { taskId: string; isCompleted: boolean }) => {
+      const res = await apiRequest("PUT", `/api/call-log-tasks/${taskId}`, { isCompleted });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/call-logs/${log.id}/tasks`] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update task", variant: "destructive" });
+    },
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      await apiRequest("DELETE", `/api/call-log-tasks/${taskId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/call-logs/${log.id}/tasks`] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete task", variant: "destructive" });
+    },
+  });
+
+  const handleAddTask = () => {
+    if (newTaskText.trim()) {
+      createTaskMutation.mutate(newTaskText.trim());
+    }
+  };
 
   const tagBorderColors: Record<string, string> = {
     Service: "border-l-blue-500",
@@ -418,7 +474,18 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-medium text-sm">{log.clientName}</span>
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="flex items-center gap-1"
+              data-testid={`crm-phone-expand-log-${log.id}`}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-3 w-3 text-muted-foreground" />
+              )}
+              <span className="font-medium text-sm">{log.clientName}</span>
+            </button>
             {log.phone && (
               <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
                 <Phone className="h-2.5 w-2.5" />
@@ -428,6 +495,11 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
             {log.tag && (
               <Badge variant="secondary" className={cn("text-[10px] h-4 px-1", tagBadgeColors[log.tag] || "")}>
                 {log.tag}
+              </Badge>
+            )}
+            {log.billable && (
+              <Badge className="text-[10px] h-4 px-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                Billable
               </Badge>
             )}
           </div>
@@ -472,6 +544,79 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
           </AlertDialog>
         </div>
       </div>
+
+      {isExpanded && (
+        <div className="mt-2 pt-2 border-t border-border/30">
+          <div className="flex items-center gap-2 mb-2">
+            <Input
+              placeholder="Add a task..."
+              value={newTaskText}
+              onChange={(e) => setNewTaskText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddTask();
+                }
+              }}
+              className="h-7 text-xs flex-1"
+              data-testid={`crm-phone-input-task-${log.id}`}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs px-2"
+              onClick={handleAddTask}
+              disabled={!newTaskText.trim() || createTaskMutation.isPending}
+              data-testid={`crm-phone-button-add-task-${log.id}`}
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Add
+            </Button>
+          </div>
+
+          {tasksLoading ? (
+            <div className="text-xs text-muted-foreground py-1">Loading tasks...</div>
+          ) : tasks.length === 0 ? (
+            <div className="text-xs text-muted-foreground py-1">No tasks yet</div>
+          ) : (
+            <div className="space-y-1">
+              {tasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="flex items-center gap-2 group/task"
+                  data-testid={`crm-phone-task-${task.id}`}
+                >
+                  <Checkbox
+                    checked={task.isCompleted}
+                    onCheckedChange={(checked) =>
+                      toggleTaskMutation.mutate({ taskId: task.id, isCompleted: !!checked })
+                    }
+                    className="h-3.5 w-3.5"
+                    data-testid={`crm-phone-task-checkbox-${task.id}`}
+                  />
+                  <span
+                    className={cn(
+                      "text-xs flex-1",
+                      task.isCompleted && "line-through text-muted-foreground"
+                    )}
+                  >
+                    {task.description}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 opacity-0 group-hover/task:opacity-100 transition-opacity"
+                    onClick={() => deleteTaskMutation.mutate(task.id)}
+                    data-testid={`crm-phone-delete-task-${task.id}`}
+                  >
+                    <X className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -492,6 +637,7 @@ function CallLogForm({ date, editingLog, onCancel, onSuccess }: CallLogFormProps
       description: editingLog?.description || "",
       phone: editingLog?.phone || "",
       tag: editingLog?.tag || "",
+      billable: editingLog?.billable || false,
     },
   });
 
@@ -502,6 +648,7 @@ function CallLogForm({ date, editingLog, onCancel, onSuccess }: CallLogFormProps
         description: editingLog.description || "",
         phone: editingLog.phone || "",
         tag: editingLog.tag || "",
+        billable: editingLog.billable || false,
       });
     } else {
       form.reset({
@@ -509,6 +656,7 @@ function CallLogForm({ date, editingLog, onCancel, onSuccess }: CallLogFormProps
         description: "",
         phone: "",
         tag: "",
+        billable: false,
       });
     }
   }, [editingLog, form]);
@@ -600,12 +748,12 @@ function CallLogForm({ date, editingLog, onCancel, onSuccess }: CallLogFormProps
             </FormItem>
           )}
         />
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <FormField
             control={form.control}
             name="tag"
             render={({ field }) => (
-              <FormItem className="flex-1">
+              <FormItem className="flex-1 min-w-[120px]">
                 <FormLabel>Tag</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value || ""}>
                   <FormControl>
@@ -621,6 +769,22 @@ function CallLogForm({ date, editingLog, onCancel, onSuccess }: CallLogFormProps
                   </SelectContent>
                 </Select>
                 <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="billable"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center gap-2 pt-6">
+                <FormControl>
+                  <Switch
+                    checked={field.value || false}
+                    onCheckedChange={field.onChange}
+                    data-testid="crm-phone-switch-billable"
+                  />
+                </FormControl>
+                <FormLabel className="!mt-0 cursor-pointer">Billable</FormLabel>
               </FormItem>
             )}
           />

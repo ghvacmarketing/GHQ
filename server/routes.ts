@@ -810,7 +810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/call-logs - Create a new call log entry
   app.post("/api/call-logs", async (req, res) => {
     try {
-      const { clientName, description, phone, tag, createdByName, date } = req.body;
+      const { clientName, description, phone, tag, createdByName, date, billable } = req.body;
       
       if (!clientName || !description) {
         return res.status(400).json({ message: "clientName and description are required" });
@@ -825,6 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description,
         phone: phone || null,
         tag: tag || null,
+        billable: billable || false,
         createdByName: createdByName || null,
         createdByUserId: null,
       });
@@ -839,7 +840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PUT /api/call-logs/:id - Update a call log entry
   app.put("/api/call-logs/:id", async (req, res) => {
     try {
-      const { clientName, description, phone, tag, createdByName } = req.body;
+      const { clientName, description, phone, tag, createdByName, billable } = req.body;
       const updates: any = {};
       
       if (clientName !== undefined) updates.clientName = clientName;
@@ -847,6 +848,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (phone !== undefined) updates.phone = phone;
       if (tag !== undefined) updates.tag = tag;
       if (createdByName !== undefined) updates.createdByName = createdByName;
+      if (billable !== undefined) updates.billable = billable;
       
       const callLog = await storage.updateCallLog(req.params.id, updates);
       if (!callLog) {
@@ -870,6 +872,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting call log:", error);
       res.status(500).json({ message: "Error deleting call log" });
+    }
+  });
+
+  // GET /api/call-logs/:callLogId/tasks - Get tasks for a call log
+  app.get("/api/call-logs/:callLogId/tasks", async (req, res) => {
+    try {
+      const tasks = await storage.getTasksByCallLog(req.params.callLogId);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching call log tasks:", error);
+      res.status(500).json({ message: "Error fetching call log tasks" });
+    }
+  });
+
+  // POST /api/call-logs/:callLogId/tasks - Create task for a call log
+  app.post("/api/call-logs/:callLogId/tasks", async (req, res) => {
+    try {
+      const { description, dueDate } = req.body;
+      if (!description) {
+        return res.status(400).json({ message: "description is required" });
+      }
+      const task = await storage.createCallLogTask({
+        callLogId: req.params.callLogId,
+        description,
+        dueDate: dueDate || null,
+        isCompleted: false,
+      });
+      res.json(task);
+    } catch (error) {
+      console.error("Error creating call log task:", error);
+      res.status(500).json({ message: "Error creating call log task" });
+    }
+  });
+
+  // PUT /api/call-log-tasks/:id - Update task (toggle complete, update description)
+  app.put("/api/call-log-tasks/:id", async (req, res) => {
+    try {
+      const { description, isCompleted, dueDate } = req.body;
+      const updates: any = {};
+      if (description !== undefined) updates.description = description;
+      if (isCompleted !== undefined) updates.isCompleted = isCompleted;
+      if (dueDate !== undefined) updates.dueDate = dueDate;
+      
+      const task = await storage.updateCallLogTask(req.params.id, updates);
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      res.json(task);
+    } catch (error) {
+      console.error("Error updating call log task:", error);
+      res.status(500).json({ message: "Error updating call log task" });
+    }
+  });
+
+  // DELETE /api/call-log-tasks/:id - Delete task
+  app.delete("/api/call-log-tasks/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteCallLogTask(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting call log task:", error);
+      res.status(500).json({ message: "Error deleting call log task" });
+    }
+  });
+
+  // GET /api/call-logs/days/:date/tasks - Get all tasks for a day
+  app.get("/api/call-logs/days/:date/tasks", async (req, res) => {
+    try {
+      const tasks = await storage.getTasksByDay(req.params.date);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching tasks for day:", error);
+      res.status(500).json({ message: "Error fetching tasks for day" });
     }
   });
 

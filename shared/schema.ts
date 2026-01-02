@@ -614,10 +614,21 @@ export const callLogs = pgTable("call_logs", {
   description: text("description").notNull(),
   phone: text("phone"),
   tag: text("tag"), // service, install, sales, etc.
+  billable: boolean("billable").notNull().default(false),
   createdByUserId: text("created_by_user_id"),
   createdByName: text("created_by_name"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at"),
+});
+
+export const callLogTasks = pgTable("call_log_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  callLogId: varchar("call_log_id").notNull().references(() => callLogs.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  isCompleted: boolean("is_completed").notNull().default(false),
+  dueDate: text("due_date"), // YYYY-MM-DD format, optional
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
 });
 
 export const insertCallLogDaySchema = createInsertSchema(callLogDays).omit({
@@ -631,10 +642,18 @@ export const insertCallLogSchema = createInsertSchema(callLogs).omit({
   updatedAt: true,
 });
 
+export const insertCallLogTaskSchema = createInsertSchema(callLogTasks).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
 export type InsertCallLogDay = z.infer<typeof insertCallLogDaySchema>;
 export type CallLogDay = typeof callLogDays.$inferSelect;
 export type InsertCallLog = z.infer<typeof insertCallLogSchema>;
 export type CallLog = typeof callLogs.$inferSelect;
+export type InsertCallLogTask = z.infer<typeof insertCallLogTaskSchema>;
+export type CallLogTask = typeof callLogTasks.$inferSelect;
 
 // Employee Portal Tables
 export const portalUsers = pgTable("portal_users", {
