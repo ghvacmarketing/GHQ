@@ -465,9 +465,9 @@ function ProspectKanbanColumn({ stage, prospects, onCardClick }: ProspectKanbanC
   });
 
   return (
-    <div className="flex-shrink-0 w-[360px] min-w-[360px]">
-      <Card className={`h-full bg-gray-50 transition-colors ${isOver ? 'ring-2 ring-primary ring-opacity-50' : ''}`}>
-        <CardHeader className="pb-2 pt-3 px-3">
+    <div className="flex-shrink-0 w-[360px] min-w-[360px] h-full flex flex-col">
+      <Card className={`h-full bg-gray-50 transition-colors flex flex-col ${isOver ? 'ring-2 ring-primary ring-opacity-50' : ''}`}>
+        <CardHeader className="pb-2 pt-3 px-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold truncate" data-testid={`column-title-${stage}`}>
               {STAGE_LABELS[stage]}
@@ -477,10 +477,11 @@ function ProspectKanbanColumn({ stage, prospects, onCardClick }: ProspectKanbanC
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="px-3 pb-3 pt-0">
+        <CardContent className="px-3 pb-3 pt-0 flex-1 overflow-hidden">
           <div
             ref={setNodeRef}
-            className="min-h-[400px]"
+            className="h-full overflow-y-auto"
+            style={{ scrollbarWidth: 'thin' }}
             data-testid={`kanban-column-${stage}`}
           >
             <SortableContext items={prospects.map(p => p.id)} strategy={verticalListSortingStrategy}>
@@ -1384,14 +1385,23 @@ export default function CrmProspectFunnel() {
             </div>
             </TabsContent>
 
-            <TabsContent value="kanban" className="mt-4">
+            <TabsContent value="kanban" className="mt-4 -mx-4 px-0">
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCorners}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
               >
-                <HorizontalScrollContainer isDraggingCard={isDraggingCard}>
+                <div 
+                  className="flex flex-row gap-4 px-4" 
+                  style={{ 
+                    overflowX: 'auto', 
+                    overflowY: 'hidden',
+                    height: 'calc(100vh - 220px)',
+                    scrollbarWidth: 'thin',
+                  }}
+                  data-testid="kanban-board"
+                >
                   {KANBAN_STAGES.map((stage) => (
                     <ProspectKanbanColumn
                       key={stage}
@@ -1403,7 +1413,7 @@ export default function CrmProspectFunnel() {
                       }}
                     />
                   ))}
-                </HorizontalScrollContainer>
+                </div>
                 <DragOverlay>
                   {activeProspectId ? (
                     (() => {
