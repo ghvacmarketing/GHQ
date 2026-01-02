@@ -556,9 +556,20 @@ export default function CrmWorkOrderDetail() {
       navigate("/crm/work-orders");
     },
     onError: (error: Error) => {
+      const hasLinkedQuotes = error.message.toLowerCase().includes("linked quotes");
+      const hasLinkedInvoices = error.message.toLowerCase().includes("linked invoices");
+      
+      let description = error.message;
+      if (hasLinkedQuotes || hasLinkedInvoices) {
+        const items = [];
+        if (hasLinkedQuotes) items.push("quotes");
+        if (hasLinkedInvoices) items.push("invoices");
+        description = `This work order has ${items.join(" and ")} attached. Please delete the ${items.join(" and ")} first before deleting the work order.`;
+      }
+      
       toast({
-        title: "Failed to delete work order",
-        description: error.message,
+        title: hasLinkedQuotes || hasLinkedInvoices ? "Cannot delete work order" : "Failed to delete work order",
+        description,
         variant: "destructive",
       });
     },
