@@ -532,14 +532,6 @@ interface QuickQuoteLineItem {
   lineType: "service" | "discount" | "part";
 }
 
-interface CatalogPart {
-  id: string;
-  partNumber?: string;
-  description: string;
-  category?: string;
-  price: string;
-}
-
 const quoteStatusConfig: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-slate-100 text-slate-700 border-slate-300" },
   sent: { label: "Sent", className: "bg-blue-100 text-blue-700 border-blue-300" },
@@ -558,8 +550,8 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "install" | "service" | "maintenance">("all");
   const [discountSearch, setDiscountSearch] = useState("");
-  const [discountCategoryFilter, setDiscountCategoryFilter] = useState<"all" | "discount" | "service" | "maintenance">("all");
   const [showManualDiscount, setShowManualDiscount] = useState(false);
   const [discountDescription, setDiscountDescription] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
@@ -576,33 +568,40 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
 
   const quotes = quotesData?.quotes || [];
 
-  // Fetch parts catalog
-  const { data: partsData } = useQuery<CatalogPart[]>({
-    queryKey: ["/api/parts"],
-    queryFn: async () => {
-      const res = await fetch("/api/parts", { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  // Fetch CRM items (includes discounts from catalogue)
-  const { data: crmItemsData } = useQuery<CrmItem[]>({
+  // Fetch CRM items (for both catalog and discounts)
+  const { data: crmItemsData, isLoading: itemsLoading } = useQuery<CrmItem[]>({
     queryKey: ["/api/crm/items"],
     staleTime: 5 * 60 * 1000,
   });
 
   const crmItems = crmItemsData || [];
   
-  // Filter discounts from CRM items
-  const filteredDiscountItems = crmItems.filter(item => {
-    // Filter by category - include items where category is "discount" or filter matches
-    if (discountCategoryFilter !== "all" && item.category !== discountCategoryFilter) {
+  // Filter CRM items for catalog (exclude discount category)
+  const filteredCatalogItems = crmItems.filter(item => {
+    // Exclude items in the discount category from catalog
+    if (item.category === "discount") {
       return false;
     }
-    // For "all" filter, only show items that are marked as discounts
-    if (discountCategoryFilter === "all" && item.category !== "discount") {
+    // Apply category filter
+    if (catalogCategoryFilter !== "all" && item.category !== catalogCategoryFilter) {
+      return false;
+    }
+    // Apply search filter
+    if (catalogSearch.trim()) {
+      const search = catalogSearch.toLowerCase();
+      return (
+        item.name?.toLowerCase().includes(search) ||
+        item.description?.toLowerCase().includes(search) ||
+        item.partNumber?.toLowerCase().includes(search)
+      );
+    }
+    return true;
+  });
+  
+  // Filter discount items from CRM items (only discount category)
+  const filteredDiscountItems = crmItems.filter(item => {
+    // Only show items in the discount category
+    if (item.category !== "discount") {
       return false;
     }
     // Apply search filter
@@ -616,14 +615,6 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     }
     return true;
   });
-
-  const parts = partsData || [];
-  const filteredParts = catalogSearch.trim()
-    ? parts.filter(p => 
-        p.description.toLowerCase().includes(catalogSearch.toLowerCase()) ||
-        (p.partNumber && p.partNumber.toLowerCase().includes(catalogSearch.toLowerCase()))
-      )
-    : parts.slice(0, 20);
 
   // Create quote mutation
   const createQuoteMutation = useMutation({
@@ -687,18 +678,19 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service" }]);
   };
 
-  const addCatalogItem = (part: CatalogPart) => {
-    const price = parseFloat(part.price) || 0;
+  const addCatalogItem = (item: CrmItem) => {
+    const price = parseFloat(item.rate || "0") || 0;
     setLineItems([...lineItems, { 
       id: Date.now().toString(), 
-      description: part.description, 
+      description: item.name, 
       quantity: 1, 
       unitPrice: price,
-      lineType: "part"
+      lineType: item.category === "service" ? "service" : "part"
     }]);
     setShowCatalog(false);
     setCatalogSearch("");
-    toast({ title: "Item Added", description: part.description });
+    setCatalogCategoryFilter("all");
+    toast({ title: "Item Added", description: item.name });
   };
 
   // Add discount from catalogue
@@ -713,7 +705,6 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     }]);
     setShowDiscount(false);
     setDiscountSearch("");
-    setDiscountCategoryFilter("all");
     toast({ title: "Discount Added", description: item.name });
   };
 
@@ -1069,8 +1060,8 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       </Card>
 
       {/* Items Catalog Dialog */}
-      <Dialog open={showCatalog} onOpenChange={setShowCatalog}>
-        <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+      <Dialog open={showCatalog} onOpenChange={(open) => { setShowCatalog(open); if (!open) { setCatalogSearch(""); setCatalogCategoryFilter("all"); } }}>
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5 text-blue-600" />
@@ -1081,39 +1072,67 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
             </DialogDescription>
           </DialogHeader>
           
+          {/* Search Input */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Search parts..."
+              placeholder="Search items..."
               value={catalogSearch}
               onChange={(e) => setCatalogSearch(e.target.value)}
               className="pl-10 min-h-[44px]"
               data-testid="input-catalog-search"
             />
           </div>
+
+          {/* Category Filter Tabs */}
+          <div className="flex gap-2 flex-wrap">
+            {[
+              { key: "all", label: "All" },
+              { key: "install", label: "Install" },
+              { key: "service", label: "Service" },
+              { key: "maintenance", label: "Maintenance" },
+            ].map((cat) => (
+              <Button
+                key={cat.key}
+                variant={catalogCategoryFilter === cat.key ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCatalogCategoryFilter(cat.key as typeof catalogCategoryFilter)}
+                className="min-h-[36px]"
+                data-testid={`filter-catalog-${cat.key}`}
+              >
+                {cat.label}
+              </Button>
+            ))}
+          </div>
           
-          <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
-            {filteredParts.length === 0 ? (
+          {/* Items List */}
+          <div className="flex-1 overflow-y-auto max-h-[250px] space-y-2">
+            {itemsLoading ? (
+              <p className="text-sm text-slate-400 text-center py-4">Loading items...</p>
+            ) : filteredCatalogItems.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-4">
-                {catalogSearch ? "No items found" : "Loading catalog..."}
+                {catalogSearch ? "No items found" : "No items in this category"}
               </p>
             ) : (
-              filteredParts.map((part, idx) => (
+              filteredCatalogItems.map((item, idx) => (
                 <div
-                  key={part.id || idx}
-                  className="border rounded-lg p-3 hover:bg-slate-50 cursor-pointer"
-                  onClick={() => addCatalogItem(part)}
-                  data-testid={`catalog-item-${part.id || idx}`}
+                  key={item.id || idx}
+                  className="border rounded-lg p-3 hover:bg-blue-50 cursor-pointer min-h-[44px] active:bg-blue-100"
+                  onClick={() => addCatalogItem(item)}
+                  data-testid={`catalog-item-${item.id || idx}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{part.description}</p>
-                      {part.partNumber && (
-                        <p className="text-xs text-slate-500">{part.partNumber}</p>
+                      <p className="text-sm font-medium truncate">{item.name}</p>
+                      {item.description && (
+                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
+                      )}
+                      {item.category && (
+                        <span className="text-xs text-blue-600 capitalize">{item.category}</span>
                       )}
                     </div>
                     <span className="text-sm font-semibold text-green-700 ml-2">
-                      {formatCurrency(parseFloat(part.price) || 0)}
+                      {formatCurrency(parseFloat(item.rate || "0") || 0)}
                     </span>
                   </div>
                 </div>
@@ -1122,7 +1141,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCatalog(false); setCatalogSearch(""); }}>
+            <Button variant="outline" onClick={() => { setShowCatalog(false); setCatalogSearch(""); setCatalogCategoryFilter("all"); }}>
               Cancel
             </Button>
           </DialogFooter>
@@ -1130,7 +1149,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       </Dialog>
 
       {/* Add Discount Catalogue Dialog */}
-      <Dialog open={showDiscount} onOpenChange={(open) => { setShowDiscount(open); if (!open) { setDiscountSearch(""); setDiscountCategoryFilter("all"); } }}>
+      <Dialog open={showDiscount} onOpenChange={(open) => { setShowDiscount(open); if (!open) { setDiscountSearch(""); } }}>
         <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1153,31 +1172,12 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
               data-testid="input-discount-search"
             />
           </div>
-
-          {/* Category Filter Tabs */}
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { key: "all", label: "All Discounts" },
-              { key: "discount", label: "Discounts" },
-              { key: "service", label: "Service" },
-              { key: "maintenance", label: "Maintenance" },
-            ].map((cat) => (
-              <Button
-                key={cat.key}
-                variant={discountCategoryFilter === cat.key ? "default" : "outline"}
-                size="sm"
-                onClick={() => setDiscountCategoryFilter(cat.key as typeof discountCategoryFilter)}
-                className="min-h-[36px]"
-                data-testid={`filter-discount-${cat.key}`}
-              >
-                {cat.label}
-              </Button>
-            ))}
-          </div>
           
           {/* Discount Items List */}
-          <div className="flex-1 overflow-y-auto max-h-[250px] space-y-2">
-            {filteredDiscountItems.length === 0 ? (
+          <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
+            {itemsLoading ? (
+              <p className="text-sm text-slate-400 text-center py-4">Loading discounts...</p>
+            ) : filteredDiscountItems.length === 0 ? (
               <div className="text-center py-6">
                 <p className="text-sm text-slate-400 mb-3">
                   {discountSearch ? "No discounts found" : "No discounts in catalogue"}
@@ -1229,7 +1229,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
             </Button>
             <Button 
               variant="outline" 
-              onClick={() => { setShowDiscount(false); setDiscountSearch(""); setDiscountCategoryFilter("all"); }}
+              onClick={() => { setShowDiscount(false); setDiscountSearch(""); }}
               className="min-h-[44px]"
             >
               Cancel
@@ -1325,8 +1325,12 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "install" | "service" | "maintenance">("all");
+  const [discountSearch, setDiscountSearch] = useState("");
+  const [showManualDiscount, setShowManualDiscount] = useState(false);
   const [discountDescription, setDiscountDescription] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
+  const [showQuoteSelection, setShowQuoteSelection] = useState(false);
 
   const { data: invoicesData, isLoading: invoicesLoading, error: invoicesError } = useQuery<{ invoices: CrmInvoice[] }>({
     queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }],
@@ -1350,24 +1354,66 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     enabled: !!existingInvoice?.id,
   });
 
-  // Fetch parts catalog
-  const { data: partsData } = useQuery<CatalogPart[]>({
-    queryKey: ["/api/parts"],
+  // Fetch quotes for this work order to enable "Create from Quote" feature  
+  const { data: quotesData } = useQuery<{ quotes: (CrmQuote & { lineItems?: CrmQuoteLineItem[] })[] }>({
+    queryKey: ["/api/crm/quotes", { workOrderId: workOrder.id }],
     queryFn: async () => {
-      const res = await fetch("/api/parts", { credentials: "include" });
-      if (!res.ok) return [];
+      const res = await fetch(`/api/crm/quotes?workOrderId=${workOrder.id}`, { credentials: "include" });
+      if (!res.ok) return { quotes: [] };
       return res.json();
     },
+  });
+
+  const quotes = quotesData?.quotes || [];
+  const acceptedQuotes = quotes.filter(q => q.status === "accepted");
+
+  // Fetch CRM items (for both catalog and discounts)
+  const { data: crmItemsData, isLoading: itemsLoading } = useQuery<CrmItem[]>({
+    queryKey: ["/api/crm/items"],
     staleTime: 5 * 60 * 1000,
   });
 
-  const parts = partsData || [];
-  const filteredParts = catalogSearch.trim()
-    ? parts.filter(p => 
-        p.description.toLowerCase().includes(catalogSearch.toLowerCase()) ||
-        (p.partNumber && p.partNumber.toLowerCase().includes(catalogSearch.toLowerCase()))
-      )
-    : parts.slice(0, 20);
+  const crmItems = crmItemsData || [];
+  
+  // Filter CRM items for catalog (exclude discount category)
+  const filteredCatalogItems = crmItems.filter(item => {
+    // Exclude items in the discount category from catalog
+    if (item.category === "discount") {
+      return false;
+    }
+    // Apply category filter
+    if (catalogCategoryFilter !== "all" && item.category !== catalogCategoryFilter) {
+      return false;
+    }
+    // Apply search filter
+    if (catalogSearch.trim()) {
+      const search = catalogSearch.toLowerCase();
+      return (
+        item.name?.toLowerCase().includes(search) ||
+        item.description?.toLowerCase().includes(search) ||
+        item.partNumber?.toLowerCase().includes(search)
+      );
+    }
+    return true;
+  });
+  
+  // Filter discount items from CRM items (only discount category)
+  const filteredDiscountItems = crmItems.filter(item => {
+    // Only show items in the discount category
+    if (item.category !== "discount") {
+      return false;
+    }
+    // Apply search filter
+    if (discountSearch.trim()) {
+      const search = discountSearch.toLowerCase();
+      return (
+        item.name?.toLowerCase().includes(search) ||
+        item.description?.toLowerCase().includes(search) ||
+        item.partNumber?.toLowerCase().includes(search)
+      );
+    }
+    return true;
+  });
 
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: {
@@ -1429,22 +1475,78 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service", taxable: true }]);
   };
 
-  const addCatalogItem = (part: CatalogPart) => {
-    const price = parseFloat(part.price) || 0;
+  const addCatalogItem = (item: CrmItem) => {
+    const price = parseFloat(item.rate || "0") || 0;
     setLineItems([...lineItems, { 
       id: Date.now().toString(), 
-      description: part.description, 
+      description: item.name, 
       quantity: 1, 
       unitPrice: price,
-      lineType: "part",
-      taxable: true
+      lineType: item.category === "service" ? "service" : "part",
+      taxable: item.taxable ?? true
     }]);
     setShowCatalog(false);
     setCatalogSearch("");
-    toast({ title: "Item Added", description: part.description });
+    setCatalogCategoryFilter("all");
+    toast({ title: "Item Added", description: item.name });
   };
 
-  const addDiscountItem = () => {
+  // Add discount from catalogue
+  const addCatalogDiscount = (item: CrmItem) => {
+    const rate = parseFloat(item.rate || "0") || 0;
+    setLineItems([...lineItems, { 
+      id: Date.now().toString(), 
+      description: item.name + (item.description ? ` - ${item.description}` : ""), 
+      quantity: 1, 
+      unitPrice: -Math.abs(rate),
+      lineType: "discount",
+      taxable: false
+    }]);
+    setShowDiscount(false);
+    setDiscountSearch("");
+    toast({ title: "Discount Added", description: item.name });
+  };
+
+  // Create invoice from quote - fetch full quote details and populate line items
+  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+  
+  const createFromQuote = async (quote: CrmQuote & { lineItems?: CrmQuoteLineItem[] }) => {
+    setIsLoadingQuote(true);
+    try {
+      // Fetch full quote details including line items
+      const res = await fetch(`/api/crm/quotes/${quote.id}`, { credentials: "include" });
+      if (!res.ok) {
+        throw new Error("Failed to fetch quote details");
+      }
+      const fullQuote = await res.json();
+      
+      if (!fullQuote.lineItems || fullQuote.lineItems.length === 0) {
+        toast({ title: "No Line Items", description: "This quote has no line items to convert.", variant: "destructive" });
+        return;
+      }
+      
+      const convertedItems: InvoiceLineItem[] = fullQuote.lineItems.map((item: CrmQuoteLineItem) => ({
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        description: item.description,
+        quantity: parseFloat(item.quantity || "1"),
+        unitPrice: parseFloat(item.unitPrice || "0"),
+        lineType: (item.lineType === "discount" ? "discount" : item.lineType === "part" ? "part" : "service") as "service" | "discount" | "part",
+        taxable: item.taxable ?? (item.lineType !== "discount"),
+      }));
+      
+      setLineItems(convertedItems);
+      setShowQuoteSelection(false);
+      setShowCreateForm(true);
+      toast({ title: "Quote Imported", description: `${convertedItems.length} line items imported from quote.` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to load quote details. Please try again.", variant: "destructive" });
+    } finally {
+      setIsLoadingQuote(false);
+    }
+  };
+
+  // Add manual discount entry
+  const addManualDiscountItem = () => {
     const amount = parseFloat(discountAmount) || 0;
     if (amount <= 0 || !discountDescription.trim()) {
       toast({ title: "Error", description: "Please enter a discount description and amount.", variant: "destructive" });
@@ -1458,9 +1560,10 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       lineType: "discount",
       taxable: false
     }]);
-    setShowDiscount(false);
+    setShowManualDiscount(false);
     setDiscountDescription("");
     setDiscountAmount("");
+    toast({ title: "Discount Added", description: discountDescription.trim() });
   };
 
   const removeLineItem = (id: string) => {
@@ -1680,14 +1783,27 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
               <p className="text-sm text-slate-600">
                 Create an invoice for work completed on this job.
               </p>
-              <Button
-                className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
-                onClick={() => setShowCreateForm(true)}
-                data-testid="button-show-create-invoice-form"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Invoice
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button
+                  className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
+                  onClick={() => setShowCreateForm(true)}
+                  data-testid="button-show-create-invoice-form"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Invoice
+                </Button>
+                {acceptedQuotes.length > 0 && (
+                  <Button
+                    variant="outline"
+                    className="w-full min-h-[48px] border-green-200 text-green-700 hover:bg-green-50"
+                    onClick={() => setShowQuoteSelection(true)}
+                    data-testid="button-create-invoice-from-quote"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Create from Quote ({acceptedQuotes.length})
+                  </Button>
+                )}
+              </div>
             </>
           ) : (
             <div className="space-y-4">
@@ -1903,8 +2019,8 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       </Card>
 
       {/* Items Catalog Dialog */}
-      <Dialog open={showCatalog} onOpenChange={setShowCatalog}>
-        <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+      <Dialog open={showCatalog} onOpenChange={(open) => { setShowCatalog(open); if (!open) { setCatalogSearch(""); setCatalogCategoryFilter("all"); } }}>
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5 text-blue-600" />
@@ -1915,39 +2031,67 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
             </DialogDescription>
           </DialogHeader>
           
+          {/* Search Input */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Search parts..."
+              placeholder="Search items..."
               value={catalogSearch}
               onChange={(e) => setCatalogSearch(e.target.value)}
               className="pl-10 min-h-[44px]"
               data-testid="input-invoice-catalog-search"
             />
           </div>
+
+          {/* Category Filter Tabs */}
+          <div className="flex gap-2 flex-wrap">
+            {[
+              { key: "all", label: "All" },
+              { key: "install", label: "Install" },
+              { key: "service", label: "Service" },
+              { key: "maintenance", label: "Maintenance" },
+            ].map((cat) => (
+              <Button
+                key={cat.key}
+                variant={catalogCategoryFilter === cat.key ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCatalogCategoryFilter(cat.key as typeof catalogCategoryFilter)}
+                className="min-h-[36px]"
+                data-testid={`filter-invoice-catalog-${cat.key}`}
+              >
+                {cat.label}
+              </Button>
+            ))}
+          </div>
           
-          <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
-            {filteredParts.length === 0 ? (
+          {/* Items List */}
+          <div className="flex-1 overflow-y-auto max-h-[250px] space-y-2">
+            {itemsLoading ? (
+              <p className="text-sm text-slate-400 text-center py-4">Loading items...</p>
+            ) : filteredCatalogItems.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-4">
-                {catalogSearch ? "No items found" : "Loading catalog..."}
+                {catalogSearch ? "No items found" : "No items in this category"}
               </p>
             ) : (
-              filteredParts.map((part, idx) => (
+              filteredCatalogItems.map((item, idx) => (
                 <div
-                  key={part.id || idx}
-                  className="border rounded-lg p-3 hover:bg-slate-50 cursor-pointer"
-                  onClick={() => addCatalogItem(part)}
-                  data-testid={`invoice-catalog-item-${part.id || idx}`}
+                  key={item.id || idx}
+                  className="border rounded-lg p-3 hover:bg-blue-50 cursor-pointer min-h-[44px] active:bg-blue-100"
+                  onClick={() => addCatalogItem(item)}
+                  data-testid={`invoice-catalog-item-${item.id || idx}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{part.description}</p>
-                      {part.partNumber && (
-                        <p className="text-xs text-slate-500">{part.partNumber}</p>
+                      <p className="text-sm font-medium truncate">{item.name}</p>
+                      {item.description && (
+                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
+                      )}
+                      {item.category && (
+                        <span className="text-xs text-blue-600 capitalize">{item.category}</span>
                       )}
                     </div>
                     <span className="text-sm font-semibold text-green-700 ml-2">
-                      {formatCurrency(parseFloat(part.price) || 0)}
+                      {formatCurrency(parseFloat(item.rate || "0") || 0)}
                     </span>
                   </div>
                 </div>
@@ -1956,23 +2100,113 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCatalog(false); setCatalogSearch(""); }}>
+            <Button variant="outline" onClick={() => { setShowCatalog(false); setCatalogSearch(""); setCatalogCategoryFilter("all"); }}>
               Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Add Discount Dialog */}
-      <Dialog open={showDiscount} onOpenChange={setShowDiscount}>
+      {/* Add Discount Catalogue Dialog */}
+      <Dialog open={showDiscount} onOpenChange={(open) => { setShowDiscount(open); if (!open) { setDiscountSearch(""); } }}>
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-5 w-5 text-amber-600" />
+              Select Discount
+            </DialogTitle>
+            <DialogDescription>
+              Choose a discount from the catalogue or add a custom one
+            </DialogDescription>
+          </DialogHeader>
+          
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search discounts..."
+              value={discountSearch}
+              onChange={(e) => setDiscountSearch(e.target.value)}
+              className="pl-10 min-h-[44px]"
+              data-testid="input-invoice-discount-search"
+            />
+          </div>
+          
+          {/* Discount Items List */}
+          <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
+            {itemsLoading ? (
+              <p className="text-sm text-slate-400 text-center py-4">Loading discounts...</p>
+            ) : filteredDiscountItems.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-slate-400 mb-3">
+                  {discountSearch ? "No discounts found" : "No discounts in catalogue"}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowDiscount(false); setShowManualDiscount(true); }}
+                  className="min-h-[44px]"
+                  data-testid="button-invoice-add-manual-discount"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Custom Discount
+                </Button>
+              </div>
+            ) : (
+              filteredDiscountItems.map((item, idx) => (
+                <div
+                  key={item.id || idx}
+                  className="border rounded-lg p-3 hover:bg-amber-50 cursor-pointer min-h-[44px] active:bg-amber-100"
+                  onClick={() => addCatalogDiscount(item)}
+                  data-testid={`invoice-discount-item-${item.id || idx}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{item.name}</p>
+                      {item.description && (
+                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
+                      )}
+                    </div>
+                    <span className="text-sm font-semibold text-amber-700 ml-2">
+                      -{formatCurrency(parseFloat(item.rate || "0") || 0)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          
+          <DialogFooter className="flex gap-2 border-t pt-3">
+            <Button 
+              variant="outline" 
+              onClick={() => { setShowDiscount(false); setShowManualDiscount(true); }}
+              className="min-h-[44px]"
+              data-testid="button-invoice-custom-discount"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Custom
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => { setShowDiscount(false); setDiscountSearch(""); }}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Discount Entry Dialog */}
+      <Dialog open={showManualDiscount} onOpenChange={setShowManualDiscount}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5 text-amber-600" />
-              Add Discount
+              Custom Discount
             </DialogTitle>
             <DialogDescription>
-              Enter discount details to apply to the invoice
+              Enter a custom discount amount
             </DialogDescription>
           </DialogHeader>
           
@@ -1984,7 +2218,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                 value={discountDescription}
                 onChange={(e) => setDiscountDescription(e.target.value)}
                 className="min-h-[44px] mt-1"
-                data-testid="input-invoice-discount-description"
+                data-testid="input-invoice-manual-discount-description"
               />
             </div>
             <div>
@@ -1997,21 +2231,71 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                 value={discountAmount}
                 onChange={(e) => setDiscountAmount(e.target.value)}
                 className="min-h-[44px] mt-1"
-                data-testid="input-invoice-discount-amount"
+                data-testid="input-invoice-manual-discount-amount"
               />
             </div>
           </div>
           
           <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => { setShowDiscount(false); setDiscountDescription(""); setDiscountAmount(""); }}>
+            <Button variant="outline" onClick={() => { setShowManualDiscount(false); setDiscountDescription(""); setDiscountAmount(""); }}>
               Cancel
             </Button>
             <Button 
-              className="bg-amber-600 hover:bg-amber-700"
-              onClick={addDiscountItem}
-              data-testid="button-confirm-invoice-discount"
+              className="bg-amber-600 hover:bg-amber-700 min-h-[44px]"
+              onClick={addManualDiscountItem}
+              data-testid="button-confirm-invoice-manual-discount"
             >
               Add Discount
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quote Selection Dialog for Create Invoice from Quote */}
+      <Dialog open={showQuoteSelection} onOpenChange={setShowQuoteSelection}>
+        <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-green-600" />
+              Select Quote
+            </DialogTitle>
+            <DialogDescription>
+              Choose an accepted quote to create an invoice from
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
+            {acceptedQuotes.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-4">
+                No accepted quotes available for this work order.
+              </p>
+            ) : (
+              acceptedQuotes.map((quote) => (
+                <div
+                  key={quote.id}
+                  className="border rounded-lg p-3 hover:bg-green-50 cursor-pointer transition-colors"
+                  onClick={() => createFromQuote(quote)}
+                  data-testid={`quote-selection-${quote.id}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{quote.quoteNumber}</p>
+                      <p className="text-xs text-slate-500">
+                        {quote.lineItems?.length || 0} line items
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold text-green-700 ml-2">
+                      {formatCurrency(parseFloat(quote.total || "0"))}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowQuoteSelection(false)} className="min-h-[44px]">
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
