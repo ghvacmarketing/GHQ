@@ -1376,6 +1376,12 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   // Fetch CRM items (for both catalog and discounts)
   const { data: crmItemsData, isLoading: itemsLoading } = useQuery<CrmItem[]>({
     queryKey: ["/api/crm/items"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/items", { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.items || data || [];
+    },
     staleTime: 5 * 60 * 1000,
   });
 
