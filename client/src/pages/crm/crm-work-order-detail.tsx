@@ -1232,39 +1232,21 @@ export default function CrmWorkOrderDetail() {
                     <FileText className="h-4 w-4 text-[#711419]" />
                     Quotes ({quotes?.length || 0})
                   </CardTitle>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const params = new URLSearchParams();
-                        params.set("workOrderId", workOrder.id);
-                        if (workOrder.customerId) params.set("customerId", workOrder.customerId);
-                        if (workOrder.projectId) params.set("projectId", workOrder.projectId);
-                        if (workOrder.propertyId) params.set("propertyId", workOrder.propertyId);
-                        navigate(`/crm/proposal-builder?${params.toString()}`);
-                      }}
-                      data-testid="button-generate-proposal"
-                    >
-                      <Wand2 className="h-4 w-4 mr-1" />
-                      Generate Proposal
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                      onClick={() => {
-                        const params = new URLSearchParams();
-                        params.set("workOrderId", workOrder.id);
-                        if (workOrder.customerId) params.set("customerId", workOrder.customerId);
-                        if (workOrder.propertyId) params.set("propertyId", workOrder.propertyId);
-                        navigate(`/crm/quotes/new?${params.toString()}`);
-                      }}
-                      data-testid="button-create-quote"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Create Quote
-                    </Button>
-                  </div>
+                  <Button
+                    size="sm"
+                    className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                    onClick={() => {
+                      const params = new URLSearchParams();
+                      params.set("workOrderId", workOrder.id);
+                      if (workOrder.customerId) params.set("customerId", workOrder.customerId);
+                      if (workOrder.propertyId) params.set("propertyId", workOrder.propertyId);
+                      navigate(`/crm/quotes/new?${params.toString()}`);
+                    }}
+                    data-testid="button-create-quote"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Create Quote
+                  </Button>
                 </div>
                 {quotes && quotes.length > 0 && (
                   <div className="flex gap-2 mt-4">
