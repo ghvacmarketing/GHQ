@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
@@ -8840,6 +8840,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!normalizedBody.nextInvoiceDate) delete normalizedBody.nextInvoiceDate;
       if (!normalizedBody.startDate) delete normalizedBody.startDate;
       if (!normalizedBody.endDate) delete normalizedBody.endDate;
+      if (!normalizedBody.contractDate) delete normalizedBody.contractDate;
+      if (!normalizedBody.appointmentDate) delete normalizedBody.appointmentDate;
+      if (!normalizedBody.regionId) delete normalizedBody.regionId;
 
       const result = insertCrmAgreementSchema.safeParse(normalizedBody);
       if (!result.success) {
@@ -8853,6 +8856,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .insert(crmAgreements)
         .values(result.data)
         .returning();
+
+      // Auto-generate maintenance visits if appointmentDate is provided
+      if (agreement.appointmentDate) {
+        const appointmentDate = new Date(agreement.appointmentDate);
+        const cycleYear = appointmentDate.getFullYear();
+        const visitsPerYear = agreement.visitsPerYear || 2;
+        
+        // Calculate visit target dates (evenly spaced throughout the year)
+        const monthsApart = Math.floor(12 / visitsPerYear);
+        const visits = [];
+        
+        for (let i = 0; i < visitsPerYear; i++) {
+          const visitDate = new Date(appointmentDate);
+          visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
+          
+          visits.push({
+            agreementId: agreement.id,
+            visitNumber: i + 1,
+            cycleYear,
+            targetDate: visitDate.toISOString().split('T')[0],
+            status: "pending" as const,
+          });
+        }
+        
+        if (visits.length > 0) {
+          await db.insert(maintenanceVisits).values(visits);
+        }
+      }
 
       await logCrmAudit(
         user.id,
@@ -9029,6 +9060,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error importing agreements:", error);
       return res.status(500).json({ message: "Failed to import agreements" });
+    }
+  });
+
+  // ============================================
+  // MAINTENANCE REGIONS ROUTES
+  // ============================================
+
+  // GET /api/crm/maintenance-regions - List all maintenance regions
+  app.get("/api/crm/maintenance-regions", requireCrmAuth, async (req, res) => {
+    try {
+      const regions = await db
+        .select()
+        .from(maintenanceRegions)
+        .where(eq(maintenanceRegions.isActive, true))
+        .orderBy(maintenanceRegions.name);
+      return res.json(regions);
+    } catch (error) {
+      console.error("Error fetching maintenance regions:", error);
+      return res.status(500).json({ message: "Failed to fetch maintenance regions" });
+    }
+  });
+
+  // POST /api/crm/maintenance-regions - Create a new maintenance region
+  app.post("/api/crm/maintenance-regions", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const { name, reminderDayOfMonth } = req.body;
+      if (!name) {
+        return res.status(400).json({ message: "Region name is required" });
+      }
+      const [region] = await db
+        .insert(maintenanceRegions)
+        .values({
+          name,
+          reminderDayOfMonth: reminderDayOfMonth || 1,
+        })
+        .returning();
+      return res.json(region);
+    } catch (error: any) {
+      console.error("Error creating maintenance region:", error);
+      if (error.code === "23505") {
+        return res.status(400).json({ message: "A region with this name already exists" });
+      }
+      return res.status(500).json({ message: "Failed to create maintenance region" });
+    }
+  });
+
+  // PATCH /api/crm/maintenance-regions/:id - Update a maintenance region
+  app.patch("/api/crm/maintenance-regions/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const { name, reminderDayOfMonth, isActive } = req.body;
+      const updates: any = { updatedAt: new Date() };
+      if (name !== undefined) updates.name = name;
+      if (reminderDayOfMonth !== undefined) updates.reminderDayOfMonth = reminderDayOfMonth;
+      if (isActive !== undefined) updates.isActive = isActive;
+
+      const [region] = await db
+        .update(maintenanceRegions)
+        .set(updates)
+        .where(eq(maintenanceRegions.id, req.params.id))
+        .returning();
+
+      if (!region) {
+        return res.status(404).json({ message: "Region not found" });
+      }
+      return res.json(region);
+    } catch (error) {
+      console.error("Error updating maintenance region:", error);
+      return res.status(500).json({ message: "Failed to update maintenance region" });
+    }
+  });
+
+  // ============================================
+  // MAINTENANCE VISITS ROUTES
+  // ============================================
+
+  // GET /api/crm/agreements/:agreementId/visits - Get visits for an agreement
+  app.get("/api/crm/agreements/:agreementId/visits", requireCrmAuth, async (req, res) => {
+    try {
+      const visits = await db
+        .select()
+        .from(maintenanceVisits)
+        .where(eq(maintenanceVisits.agreementId, req.params.agreementId))
+        .orderBy(maintenanceVisits.cycleYear, maintenanceVisits.visitNumber);
+      return res.json(visits);
+    } catch (error) {
+      console.error("Error fetching maintenance visits:", error);
+      return res.status(500).json({ message: "Failed to fetch maintenance visits" });
+    }
+  });
+
+  // PATCH /api/crm/maintenance-visits/:id - Update a maintenance visit (link work order, mark complete, etc.)
+  app.patch("/api/crm/maintenance-visits/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const { workOrderId, status, completedAt, notes } = req.body;
+      const updates: any = { updatedAt: new Date() };
+      if (workOrderId !== undefined) updates.workOrderId = workOrderId;
+      if (status !== undefined) updates.status = status;
+      if (completedAt !== undefined) updates.completedAt = completedAt;
+      if (notes !== undefined) updates.notes = notes;
+
+      const [visit] = await db
+        .update(maintenanceVisits)
+        .set(updates)
+        .where(eq(maintenanceVisits.id, req.params.id))
+        .returning();
+
+      if (!visit) {
+        return res.status(404).json({ message: "Visit not found" });
+      }
+      return res.json(visit);
+    } catch (error) {
+      console.error("Error updating maintenance visit:", error);
+      return res.status(500).json({ message: "Failed to update maintenance visit" });
     }
   });
 
