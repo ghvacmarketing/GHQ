@@ -276,6 +276,9 @@ export default function CrmInvoiceCreate() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      if (formData.workOrderId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", formData.workOrderId, "invoices"] });
+      }
       toast({ title: "Invoice created successfully" });
       navigate(`/crm/invoices/${data.id}`);
     },
@@ -299,6 +302,9 @@ export default function CrmInvoiceCreate() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      if (formData.workOrderId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", formData.workOrderId, "invoices"] });
+      }
       toast({ title: "Invoice created from quote successfully" });
       navigate(`/crm/invoices/${data.id}`);
     },
