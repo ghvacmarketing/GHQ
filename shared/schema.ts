@@ -1366,6 +1366,25 @@ export type ApprovalMetadata = z.infer<typeof approvalMetadataSchema>;
 export const crmAgreementStatusEnum = ["active", "expiring", "expired", "cancelled"] as const;
 export type CrmAgreementStatus = typeof crmAgreementStatusEnum[number];
 
+// Maintenance Regions (for reminder scheduling by county)
+export const maintenanceRegions = pgTable("maintenance_regions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  reminderDayOfMonth: integer("reminder_day_of_month").notNull().default(1),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMaintenanceRegionSchema = createInsertSchema(maintenanceRegions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMaintenanceRegion = z.infer<typeof insertMaintenanceRegionSchema>;
+export type MaintenanceRegion = typeof maintenanceRegions.$inferSelect;
+
 // CRM Agreements (service/maintenance agreements with customers)
 export const crmAgreements = pgTable("crm_agreements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1381,6 +1400,12 @@ export const crmAgreements = pgTable("crm_agreements", {
   notes: text("notes"),
   startDate: date("start_date"),
   endDate: date("end_date"),
+  contractDate: date("contract_date"),
+  appointmentDate: date("appointment_date"),
+  price: decimal("price", { precision: 10, scale: 2 }).default("229.00"),
+  visitsPerYear: integer("visits_per_year").notNull().default(2),
+  autoRenew: boolean("auto_renew").notNull().default(true),
+  regionId: varchar("region_id").references(() => maintenanceRegions.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1390,6 +1415,31 @@ export const insertCrmAgreementSchema = createInsertSchema(crmAgreements).omit({
   createdAt: true,
   updatedAt: true,
 });
+
+// Maintenance Visits (track the 2 visits per year for each agreement)
+export const maintenanceVisits = pgTable("maintenance_visits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agreementId: varchar("agreement_id").notNull().references(() => crmAgreements.id, { onDelete: "cascade" }),
+  visitNumber: integer("visit_number").notNull(),
+  cycleYear: integer("cycle_year").notNull(),
+  targetDate: date("target_date").notNull(),
+  reminderSentAt: timestamp("reminder_sent_at"),
+  workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id),
+  completedAt: timestamp("completed_at"),
+  status: text("status").$type<"pending" | "scheduled" | "completed" | "cancelled">().notNull().default("pending"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMaintenanceVisitSchema = createInsertSchema(maintenanceVisits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMaintenanceVisit = z.infer<typeof insertMaintenanceVisitSchema>;
+export type MaintenanceVisit = typeof maintenanceVisits.$inferSelect;
 
 // CRM Payments (references crmInvoices from above)
 export const crmPayments = pgTable("crm_payments", {
