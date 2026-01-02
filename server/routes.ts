@@ -8126,12 +8126,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(eq(crmWorkOrders.status, status as string));
       }
 
-      // Date range filtering
+      // Date range filtering - respect ISO timestamps if provided, otherwise default to server local time
       let startDate: Date;
       let endDate: Date;
       if (dateFrom) {
+        // If dateFrom is an ISO string with time, use it directly
         startDate = new Date(dateFrom as string);
-        startDate.setHours(0, 0, 0, 0);
       } else if (date) {
         startDate = new Date(date as string);
         startDate.setHours(0, 0, 0, 0);
@@ -8140,8 +8140,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate.setHours(0, 0, 0, 0);
       }
       if (dateTo) {
+        // If dateTo is an ISO string with time, use it directly
         endDate = new Date(dateTo as string);
-        endDate.setHours(23, 59, 59, 999);
       } else if (date) {
         endDate = new Date(date as string);
         endDate.setHours(23, 59, 59, 999);
