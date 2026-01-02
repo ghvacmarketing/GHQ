@@ -1337,6 +1337,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [discountDescription, setDiscountDescription] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
   const [showQuoteSelection, setShowQuoteSelection] = useState(false);
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
 
   const { data: invoicesData, isLoading: invoicesLoading, error: invoicesError } = useQuery<{ invoices: CrmInvoice[] }>({
     queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }],
@@ -1348,16 +1349,16 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   });
 
   const invoices = invoicesData?.invoices || [];
-  const existingInvoice = invoices.length > 0 ? invoices[0] : null;
 
-  const { data: invoiceDetailData } = useQuery<InvoiceWithLineItems>({
-    queryKey: ["/api/crm/invoices", existingInvoice?.id],
+  // Fetch details for expanded invoice
+  const { data: expandedInvoiceData } = useQuery<InvoiceWithLineItems>({
+    queryKey: ["/api/crm/invoices", expandedInvoiceId],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/invoices/${existingInvoice!.id}`, { credentials: "include" });
+      const res = await fetch(`/api/crm/invoices/${expandedInvoiceId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch invoice details");
       return res.json();
     },
-    enabled: !!existingInvoice?.id,
+    enabled: !!expandedInvoiceId,
   });
 
   // Fetch quotes for this work order to enable "Create from Quote" feature  
@@ -1631,139 +1632,14 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num || 0);
   };
 
-  if (existingInvoice) {
-    const invoiceDetail = invoiceDetailData || existingInvoice;
-    const statusInfo = invoiceStatusConfig[invoiceDetail.status] || invoiceStatusConfig.draft;
-    const isPaid = invoiceDetail.status === "paid";
-    const isPartial = invoiceDetail.status === "partial";
-
-    return (
-      <div className="space-y-4">
-        <Card data-testid="invoice-detail-card">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Receipt className="h-4 w-4 text-green-600" />
-                {invoiceDetail.invoiceNumber}
-              </CardTitle>
-              <Badge variant="outline" className={statusInfo.className} data-testid="invoice-status-badge">
-                {statusInfo.label}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-slate-50 rounded-lg p-4 space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600">Subtotal</span>
-                <span className="text-sm font-medium" data-testid="invoice-subtotal">
-                  {formatCurrency(invoiceDetail.subtotal || "0")}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600">Tax</span>
-                <span className="text-sm font-medium" data-testid="invoice-tax">
-                  {formatCurrency(invoiceDetail.taxTotal || "0")}
-                </span>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center">
-                <span className="text-base font-semibold">Total</span>
-                <span className="text-lg font-bold text-green-700" data-testid="invoice-total">
-                  {formatCurrency(invoiceDetail.total || "0")}
-                </span>
-              </div>
-            </div>
-
-            {(isPaid || isPartial) && (
-              <div className={`rounded-lg p-3 ${isPaid ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className={`h-4 w-4 ${isPaid ? 'text-green-600' : 'text-amber-600'}`} />
-                  <span className={`text-sm font-medium ${isPaid ? 'text-green-700' : 'text-amber-700'}`}>
-                    Payment Status
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Amount Paid</span>
-                    <span className="font-medium text-green-700" data-testid="invoice-amount-paid">
-                      {formatCurrency(invoiceDetail.amountPaid || "0")}
-                    </span>
-                  </div>
-                  {!isPaid && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600">Balance Due</span>
-                      <span className="font-medium text-red-600" data-testid="invoice-balance-due">
-                        {formatCurrency(invoiceDetail.balanceDue || "0")}
-                      </span>
-                    </div>
-                  )}
-                  {invoiceDetail.paidAt && (
-                    <p className="text-xs text-slate-500 mt-1" data-testid="invoice-paid-date">
-                      Paid on {format(new Date(invoiceDetail.paidAt), "MMM d, yyyy")}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {!isPaid && !isPartial && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-amber-700">Balance Due</span>
-                  <span className="font-semibold text-amber-800" data-testid="invoice-balance-due">
-                    {formatCurrency(invoiceDetail.balanceDue || invoiceDetail.total || "0")}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {invoiceDetailData?.lineItems && invoiceDetailData.lineItems.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-slate-700">Line Items</p>
-                <div className="space-y-2">
-                  {invoiceDetailData.lineItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="bg-white border rounded-lg p-3"
-                      data-testid={`invoice-line-item-${item.id}`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-slate-800">{item.description}</p>
-                          <p className="text-xs text-slate-500">
-                            {item.quantity} × {formatCurrency(item.unitPrice)}
-                          </p>
-                        </div>
-                        <span className="text-sm font-medium text-slate-700">
-                          {formatCurrency(item.lineTotal)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <Button
-              variant="outline"
-              className="w-full min-h-[48px]"
-              onClick={() => navigate(`/crm/invoices/${invoiceDetail.id}`)}
-              data-testid="button-view-invoice-detail"
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              View Full Invoice
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
+      {/* Existing Invoices List */}
       <Card data-testid="existing-invoices-card">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Invoices</CardTitle>
+          <CardTitle className="text-base flex items-center justify-between">
+            <span>Invoices ({invoices.length})</span>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {invoicesLoading ? (
@@ -1774,14 +1650,158 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
             <p className="text-sm text-red-500" data-testid="invoices-error">
               Failed to load invoices. Please try again.
             </p>
-          ) : (
+          ) : invoices.length === 0 ? (
             <p className="text-sm text-slate-400 italic" data-testid="no-invoices-message">
               No invoices linked to this work order yet.
             </p>
+          ) : (
+            <div className="space-y-3">
+              {invoices.map((invoice) => {
+                const statusInfo = invoiceStatusConfig[invoice.status] || invoiceStatusConfig.draft;
+                const isExpanded = expandedInvoiceId === invoice.id;
+                const invoiceDetail = isExpanded && expandedInvoiceData ? expandedInvoiceData : invoice;
+                const isPaid = invoiceDetail.status === "paid";
+                const isPartial = invoiceDetail.status === "partial";
+                
+                return (
+                  <div
+                    key={invoice.id}
+                    className="border rounded-lg overflow-hidden"
+                    data-testid={`invoice-card-${invoice.id}`}
+                  >
+                    {/* Invoice Header - Click to expand/collapse */}
+                    <div
+                      className="p-3 hover:bg-slate-50 cursor-pointer"
+                      onClick={() => setExpandedInvoiceId(isExpanded ? null : invoice.id)}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          <Receipt className="h-4 w-4 text-green-600" />
+                          <span className="font-medium text-sm">{invoice.invoiceNumber}</span>
+                        </div>
+                        <Badge variant="outline" className={statusInfo.className}>
+                          {statusInfo.label}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center pl-8">
+                        <span className="text-xs text-slate-500">
+                          {invoice.createdAt ? format(new Date(invoice.createdAt), "MMM d, yyyy") : ""}
+                        </span>
+                        <span className="font-semibold text-green-700">
+                          {formatCurrency(invoice.total || "0")}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Expanded Invoice Details */}
+                    {isExpanded && (
+                      <div className="border-t bg-slate-50 p-3 space-y-3">
+                        {/* Financial Summary */}
+                        <div className="bg-white rounded-lg p-3 space-y-2">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-slate-600">Subtotal</span>
+                            <span className="font-medium">{formatCurrency(invoiceDetail.subtotal || "0")}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-slate-600">Tax</span>
+                            <span className="font-medium">{formatCurrency(invoiceDetail.taxTotal || "0")}</span>
+                          </div>
+                          <Separator />
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold">Total</span>
+                            <span className="font-bold text-green-700">{formatCurrency(invoiceDetail.total || "0")}</span>
+                          </div>
+                        </div>
+
+                        {/* Payment Status */}
+                        {(isPaid || isPartial) && (
+                          <div className={`rounded-lg p-3 ${isPaid ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <DollarSign className={`h-4 w-4 ${isPaid ? 'text-green-600' : 'text-amber-600'}`} />
+                              <span className={`text-sm font-medium ${isPaid ? 'text-green-700' : 'text-amber-700'}`}>
+                                Payment Status
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-slate-600">Amount Paid</span>
+                                <span className="font-medium text-green-700">{formatCurrency(invoiceDetail.amountPaid || "0")}</span>
+                              </div>
+                              {!isPaid && (
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-600">Balance Due</span>
+                                  <span className="font-medium text-red-600">{formatCurrency(invoiceDetail.balanceDue || "0")}</span>
+                                </div>
+                              )}
+                              {invoiceDetail.paidAt && (
+                                <p className="text-xs text-slate-500 mt-1">
+                                  Paid on {format(new Date(invoiceDetail.paidAt), "MMM d, yyyy")}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {!isPaid && !isPartial && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-amber-700">Balance Due</span>
+                              <span className="font-semibold text-amber-800">
+                                {formatCurrency(invoiceDetail.balanceDue || invoiceDetail.total || "0")}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Line Items */}
+                        {expandedInvoiceData?.lineItems && expandedInvoiceData.lineItems.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-slate-700">Line Items</p>
+                            <div className="space-y-2">
+                              {expandedInvoiceData.lineItems.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="bg-white border rounded-lg p-2"
+                                >
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium text-slate-800">{item.description}</p>
+                                      <p className="text-xs text-slate-500">
+                                        {item.quantity} × {formatCurrency(item.unitPrice)}
+                                      </p>
+                                    </div>
+                                    <span className="text-sm font-medium text-slate-700">
+                                      {formatCurrency(item.lineTotal)}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* View Full Invoice Button */}
+                        <Button
+                          variant="outline"
+                          className="w-full min-h-[44px]"
+                          onClick={() => navigate(`/crm/invoices/${invoice.id}`)}
+                          data-testid="button-view-invoice-detail"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Full Invoice
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Create New Invoice */}
       <Card data-testid="create-invoice-card">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
