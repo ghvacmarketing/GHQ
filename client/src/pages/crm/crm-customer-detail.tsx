@@ -1326,6 +1326,7 @@ function CustomerTabbedView({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Invoice Number</TableHead>
+                    <TableHead>Work Order</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-right">Balance Due</TableHead>
@@ -1342,6 +1343,19 @@ function CustomerTabbedView({
                       onClick={() => onViewInvoice(invoice.id)}
                     >
                       <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                      <TableCell>
+                        {invoice.workOrder ? (
+                          <Link 
+                            href={`/crm/work-orders/${invoice.workOrder.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[#711419] hover:underline text-sm"
+                          >
+                            WO-{invoice.workOrder.workOrderNumber}
+                          </Link>
+                        ) : (
+                          <span className="text-slate-400 text-sm">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge className={cn(
                           "text-xs",
@@ -1712,6 +1726,8 @@ export default function CrmCustomerDetail() {
     invoiceNumber: string;
     customerId: string | null;
     customerName?: string | null;
+    workOrderId?: string | null;
+    workOrder?: { id: string; workOrderNumber: number | null; title: string | null } | null;
     status: string;
     total: string;
     balanceDue: string;

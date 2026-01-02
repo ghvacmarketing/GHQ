@@ -10248,8 +10248,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(limitNum)
         .offset(offset);
       
-      // BATCH LOAD: Get unique IDs for customers only (minimal data for list view)
+      // BATCH LOAD: Get unique IDs for customers and work orders (minimal data for list view)
       const customerIds = [...new Set(invoices.map(i => i.customerId).filter(Boolean))] as string[];
+      const workOrderIds = [...new Set(invoices.map(i => i.workOrderId).filter(Boolean))] as string[];
       
       const customersMap = new Map<string, { id: string; name: string | null }>();
       if (customerIds.length > 0) {
@@ -10260,10 +10261,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customersList.forEach(c => customersMap.set(c.id, c));
       }
       
-      // Enrich with minimal customer data for list view
+      const workOrdersMap = new Map<string, { id: string; workOrderNumber: number | null; title: string | null }>();
+      if (workOrderIds.length > 0) {
+        const workOrdersList = await db
+          .select({ id: crmWorkOrders.id, workOrderNumber: crmWorkOrders.workOrderNumber, title: crmWorkOrders.title })
+          .from(crmWorkOrders)
+          .where(inArray(crmWorkOrders.id, workOrderIds));
+        workOrdersList.forEach(wo => workOrdersMap.set(wo.id, wo));
+      }
+      
+      // Enrich with minimal customer and work order data for list view
       const enrichedInvoices = invoices.map((invoice) => ({
         ...invoice,
         customerName: invoice.customerId ? customersMap.get(invoice.customerId)?.name || null : null,
+        workOrder: invoice.workOrderId ? workOrdersMap.get(invoice.workOrderId) || null : null,
       }));
       
       return res.json({
