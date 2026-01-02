@@ -56,6 +56,7 @@ import {
   Loader2,
   XCircle,
   Navigation,
+  AlertTriangle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -541,6 +542,308 @@ function NotesSection({ notes, notesLoading, noteBody, setNoteBody, handleAddNot
   );
 }
 
+// Types for agreements with visits
+interface MaintenanceVisitWithWorkOrder {
+  id: string;
+  agreementId: string;
+  visitNumber: number;
+  cycleYear: number;
+  targetDate: string;
+  reminderSentAt: string | null;
+  workOrderId: string | null;
+  completedAt: string | null;
+  status: "pending" | "scheduled" | "completed" | "cancelled";
+  notes: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  workOrder: {
+    id: string;
+    workOrderNumber: string;
+    title: string | null;
+    status: string;
+  } | null;
+}
+
+interface AgreementWithVisits {
+  id: string;
+  agreementNumber: string;
+  customerId: string | null;
+  customerName: string;
+  agreementPlan: string;
+  nextServiceDate: string | null;
+  nextInvoiceDate: string | null;
+  address: string | null;
+  status: "active" | "expiring" | "expired" | "cancelled";
+  isActive: boolean;
+  notes: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  contractDate: string | null;
+  appointmentDate: string | null;
+  price: string | null;
+  visitsPerYear: number;
+  autoRenew: boolean;
+  regionId: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  maintenanceVisits: MaintenanceVisitWithWorkOrder[];
+}
+
+const agreementStatusColors: Record<string, { bg: string; text: string }> = {
+  active: { bg: "bg-green-100", text: "text-green-700" },
+  expiring: { bg: "bg-amber-100", text: "text-amber-700" },
+  expired: { bg: "bg-red-100", text: "text-red-700" },
+  cancelled: { bg: "bg-slate-100", text: "text-slate-700" },
+};
+
+const visitStatusColors: Record<string, { bg: string; text: string }> = {
+  pending: { bg: "bg-slate-100", text: "text-slate-700" },
+  scheduled: { bg: "bg-blue-100", text: "text-blue-700" },
+  completed: { bg: "bg-green-100", text: "text-green-700" },
+  cancelled: { bg: "bg-red-100", text: "text-red-700" },
+};
+
+function AgreementsTabContent({ customerId }: { customerId: string }) {
+  const { data: agreements, isLoading, isError, error } = useQuery<AgreementWithVisits[]>({
+    queryKey: [`/api/crm/customers/${customerId}/agreements`],
+  });
+
+  if (isLoading) {
+    return (
+      <Card data-testid="card-agreements-loading">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-[#711419]" />
+            Maintenance Agreements
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card data-testid="card-agreements-error">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-[#711419]" />
+            Maintenance Agreements
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-3" />
+            <p className="text-red-500 mb-2">Failed to load agreements</p>
+            <p className="text-sm text-slate-400">
+              {(error as Error)?.message || 'An error occurred while loading maintenance agreements.'}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!agreements || agreements.length === 0) {
+    return (
+      <Card data-testid="card-agreements-empty">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-[#711419]" />
+            Maintenance Agreements
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 mb-2">No maintenance agreements</p>
+            <p className="text-sm text-slate-400">
+              This customer doesn't have any maintenance agreements.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card data-testid="card-agreements">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="h-5 w-5 text-[#711419]" />
+          Maintenance Agreements ({agreements.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {agreements.map((agreement) => {
+          const currentYear = new Date().getFullYear();
+          const currentYearVisits = agreement.maintenanceVisits.filter(
+            (v) => v.cycleYear === currentYear
+          );
+          const completedCount = currentYearVisits.filter(
+            (v) => v.status === "completed"
+          ).length;
+          const scheduledCount = currentYearVisits.filter(
+            (v) => v.status === "scheduled"
+          ).length;
+          const totalProgress = completedCount + scheduledCount;
+          const progressPercent = Math.min(
+            (completedCount / agreement.visitsPerYear) * 100,
+            100
+          );
+
+          return (
+            <div
+              key={agreement.id}
+              className="border rounded-lg p-4 space-y-4"
+              data-testid={`card-agreement-${agreement.id}`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="font-semibold text-slate-900">
+                      {agreement.agreementNumber}
+                    </h4>
+                    <Badge
+                      className={`text-xs ${
+                        agreementStatusColors[agreement.status]?.bg || "bg-slate-100"
+                      } ${
+                        agreementStatusColors[agreement.status]?.text || "text-slate-700"
+                      }`}
+                    >
+                      {agreement.status.charAt(0).toUpperCase() +
+                        agreement.status.slice(1)}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-slate-600">{agreement.agreementPlan}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">
+                    Start Date
+                  </p>
+                  <p className="font-medium text-slate-700">
+                    {agreement.startDate
+                      ? format(new Date(agreement.startDate), "MMM d, yyyy")
+                      : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">
+                    End Date
+                  </p>
+                  <p className="font-medium text-slate-700">
+                    {agreement.endDate
+                      ? format(new Date(agreement.endDate), "MMM d, yyyy")
+                      : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">
+                    Next Service
+                  </p>
+                  <p className="font-medium text-slate-700">
+                    {agreement.nextServiceDate
+                      ? format(new Date(agreement.nextServiceDate), "MMM d, yyyy")
+                      : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">
+                    Visits/Year
+                  </p>
+                  <p className="font-medium text-slate-700">
+                    {agreement.visitsPerYear}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-600">
+                    Visit Progress ({currentYear})
+                  </span>
+                  <span className="font-medium text-slate-700">
+                    {completedCount} of {agreement.visitsPerYear} completed
+                    {scheduledCount > 0 && `, ${scheduledCount} scheduled`}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div
+                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              {agreement.maintenanceVisits.length > 0 && (
+                <div className="border-t pt-4 mt-4">
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">
+                    Scheduled Visits
+                  </p>
+                  <div className="space-y-2">
+                    {agreement.maintenanceVisits.map((visit) => (
+                      <div
+                        key={visit.id}
+                        className="flex items-center justify-between p-2 bg-slate-50 rounded-lg text-sm"
+                        data-testid={`row-visit-${visit.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium text-slate-700">
+                            Visit {visit.visitNumber}
+                          </span>
+                          <Badge
+                            className={`text-xs ${
+                              visitStatusColors[visit.status]?.bg || "bg-slate-100"
+                            } ${
+                              visitStatusColors[visit.status]?.text ||
+                              "text-slate-700"
+                            }`}
+                          >
+                            {visit.status.charAt(0).toUpperCase() +
+                              visit.status.slice(1)}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-slate-600">
+                            Target: {format(new Date(visit.targetDate), "MMM d, yyyy")}
+                          </span>
+                          {visit.completedAt && (
+                            <span className="text-green-600">
+                              Completed: {format(new Date(visit.completedAt), "MMM d, yyyy")}
+                            </span>
+                          )}
+                          {visit.workOrder && (
+                            <Link
+                              href={`/crm/work-orders/${visit.workOrder.id}`}
+                              className="text-[#711419] hover:underline font-medium"
+                              onClick={(e) => e.stopPropagation()}
+                              data-testid={`link-work-order-${visit.workOrder.id}`}
+                            >
+                              WO-{visit.workOrder.workOrderNumber}
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
 // CustomerTabbedView component for ALL customer types
 interface CustomerTabbedViewProps {
   customer: CrmCustomer;
@@ -707,6 +1010,14 @@ function CustomerTabbedView({
         >
           <FileText className="h-4 w-4 mr-2" />
           Files / Photos
+        </TabsTrigger>
+        <TabsTrigger 
+          value="agreements" 
+          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          data-testid="tab-agreements"
+        >
+          <FileText className="h-4 w-4 mr-2" />
+          Agreements
         </TabsTrigger>
         <TabsTrigger 
           value="settings" 
@@ -1426,6 +1737,11 @@ function CustomerTabbedView({
             </div>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      {/* Agreements Tab */}
+      <TabsContent value="agreements" className="space-y-6" data-testid="tab-content-agreements">
+        <AgreementsTabContent customerId={customer.id} />
       </TabsContent>
 
       {/* Settings Tab - Placeholder */}

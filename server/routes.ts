@@ -8210,6 +8210,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/customers/:id/agreements - Get agreements with maintenance visits for a customer
+  app.get("/api/crm/customers/:id/agreements", requireCrmAuth, async (req, res) => {
+    try {
+      const customerId = req.params.id;
+      
+      // Get all agreements for this customer
+      const agreements = await db.select().from(crmAgreements).where(eq(crmAgreements.customerId, customerId)).orderBy(desc(crmAgreements.createdAt));
+      
+      // For each agreement, get related maintenance visits with their work orders
+      const agreementsWithVisits = await Promise.all(
+        agreements.map(async (agreement) => {
+          // Get maintenance visits for this agreement
+          const visits = await db.select().from(maintenanceVisits)
+            .where(eq(maintenanceVisits.agreementId, agreement.id))
+            .orderBy(asc(maintenanceVisits.cycleYear), asc(maintenanceVisits.visitNumber));
+          
+          // For visits that have a work order, fetch work order details
+          const visitsWithWorkOrders = await Promise.all(
+            visits.map(async (visit) => {
+              if (visit.workOrderId) {
+                const [workOrder] = await db.select({
+                  id: crmWorkOrders.id,
+                  workOrderNumber: crmWorkOrders.workOrderNumber,
+                  title: crmWorkOrders.title,
+                  status: crmWorkOrders.status,
+                }).from(crmWorkOrders).where(eq(crmWorkOrders.id, visit.workOrderId));
+                return { ...visit, workOrder: workOrder || null };
+              }
+              return { ...visit, workOrder: null };
+            })
+          );
+          
+          return { ...agreement, maintenanceVisits: visitsWithWorkOrders };
+        })
+      );
+      
+      return res.json(agreementsWithVisits);
+    } catch (error) {
+      console.error("Error fetching customer agreements:", error);
+      return res.status(500).json({ message: "Failed to fetch agreements" });
+    }
+  });
+
   // POST /api/crm/customers/:id/properties - Create a property for a customer
   app.post("/api/crm/customers/:id/properties", requireCrmAuth, async (req, res) => {
     try {
