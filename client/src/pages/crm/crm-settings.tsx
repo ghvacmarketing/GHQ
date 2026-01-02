@@ -240,17 +240,18 @@ export default function CrmSettings() {
   }
 
   const isAdmin = currentUser.role === "owner" || currentUser.role === "admin";
+  const canViewSettings = isAdmin || currentUser.role === "sales";
 
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="p-6 max-w-6xl mx-auto">
         <h1 className="text-2xl font-bold text-slate-900 mb-6">Settings</h1>
 
-        {!isAdmin && (
+        {!isAdmin && canViewSettings && (
           <Card className="mb-6">
             <CardContent className="py-6">
               <p className="text-slate-600 text-center">
-                User management is only available to administrators.
+                User management is only available to owners and administrators.
               </p>
             </CardContent>
           </Card>

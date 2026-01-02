@@ -5959,8 +5959,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/technicians - List field workers for dispatch (techs and sales who do field work)
   app.get("/api/crm/technicians", requireCrmAuth, async (req, res) => {
     try {
-      // Include tech and sales roles - anyone who might be assigned field work (owner also has mobile access)
-      const fieldRoles = ["tech", "sales", "owner"];
+      // Include tech and sales roles only - owner and admin are office roles
       const technicians = await db.select({
         id: crmUsers.id,
         name: crmUsers.name,
@@ -5968,7 +5967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: crmUsers.role,
       }).from(crmUsers)
         .where(and(
-          sql`${crmUsers.role} IN ('tech', 'sales', 'owner')`,
+          sql`${crmUsers.role} IN ('tech', 'sales')`,
           eq(crmUsers.isActive, true)
         ))
         .orderBy(crmUsers.name);
