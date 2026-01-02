@@ -364,6 +364,29 @@ function getEffectiveQueueStage(workOrder: DispatchWorkOrder): DispatchQueueStag
   return "NeedsScheduling";
 }
 
+function checkSchedulingConflict(
+  workOrders: DispatchWorkOrder[],
+  techId: string,
+  newStart: Date,
+  newEnd: Date,
+  excludeWorkOrderId?: string
+): DispatchWorkOrder | null {
+  for (const wo of workOrders) {
+    if (wo.id === excludeWorkOrderId) continue;
+    if (wo.assignedTechId !== techId) continue;
+    if (!wo.scheduledStart || !wo.scheduledEnd) continue;
+    if (["cancelled", "completed"].includes(wo.status)) continue;
+    
+    const existingStart = new Date(wo.scheduledStart);
+    const existingEnd = new Date(wo.scheduledEnd);
+    
+    if (existingStart < newEnd && existingEnd > newStart) {
+      return wo;
+    }
+  }
+  return null;
+}
+
 interface DraggableQueueCardProps {
   workOrder: DispatchWorkOrder;
   onClick?: (workOrderId: string) => void;
@@ -2118,6 +2141,18 @@ export default function CrmDispatch() {
     const startDateUTC = createLocalDateTime(selectedDate, 8, 0);
     const endDateUTC = createLocalDateTime(selectedDate, 9, 0);
     
+    // Check for scheduling conflict before assigning
+    const conflict = checkSchedulingConflict(localWorkOrders, techId, startDateUTC, endDateUTC, workOrderId);
+    if (conflict) {
+      const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+      toast({
+        title: "Scheduling Conflict",
+        description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLocalWorkOrders(prev => prev.map(wo => 
       wo.id === workOrderId 
         ? { ...wo, assignedTechId: techId, techName: newTech?.name || null, scheduledStart: startDateUTC.toISOString() as any, scheduledEnd: endDateUTC.toISOString() as any } 
@@ -2136,7 +2171,7 @@ export default function CrmDispatch() {
         toast({ title: "Technician assigned", description: `Assigned to ${newTech?.name || 'technician'}` });
       }
     });
-  }, [technicians, selectedDate, updateWorkOrderMutation, toast]);
+  }, [technicians, selectedDate, localWorkOrders, updateWorkOrderMutation, toast]);
 
   const handleQuickSchedule = useCallback((workOrderId: string, date: Date, startTime: string, endTime: string) => {
     const [startHours, startMinutes] = startTime.split(":").map(Number);
@@ -2145,6 +2180,22 @@ export default function CrmDispatch() {
     // Create dates in local timezone (EST) and convert to UTC for storage
     const startDateUTC = createLocalDateTime(date, startHours, startMinutes);
     const endDateUTC = createLocalDateTime(date, endHours, endMinutes);
+    
+    // Check for scheduling conflict if work order has an assigned tech
+    const wo = localWorkOrders.find(w => w.id === workOrderId);
+    if (wo?.assignedTechId) {
+      const conflict = checkSchedulingConflict(localWorkOrders, wo.assignedTechId, startDateUTC, endDateUTC, workOrderId);
+      if (conflict) {
+        const techName = wo.techName || technicians.find(t => t.id === wo.assignedTechId)?.name || "This technician";
+        const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+        toast({
+          title: "Scheduling Conflict",
+          description: `${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     
     setLocalWorkOrders(prev => prev.map(wo => 
       wo.id === workOrderId 
@@ -2165,7 +2216,7 @@ export default function CrmDispatch() {
         setSelectedDate(date);
       }
     });
-  }, [updateWorkOrderMutation, toast]);
+  }, [localWorkOrders, technicians, updateWorkOrderMutation, toast]);
 
   const handleQuickStageChange = useCallback((workOrderId: string, stage: DispatchQueueStage) => {
     setLocalWorkOrders(prev => prev.map(wo => 
@@ -2224,6 +2275,21 @@ export default function CrmDispatch() {
     const endDate = new Date(selectedDate);
     endDate.setHours(endHourInt, endMinutes, 0, 0);
     
+    // Check for scheduling conflict when resizing
+    if (wo.assignedTechId) {
+      const conflict = checkSchedulingConflict(localWorkOrders, wo.assignedTechId, startDate, endDate, workOrderId);
+      if (conflict) {
+        const techName = wo.techName || technicians.find(t => t.id === wo.assignedTechId)?.name || "This technician";
+        const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+        toast({
+          title: "Scheduling Conflict",
+          description: `${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     const scheduledStartISO = startDate.toISOString();
     const scheduledEndISO = endDate.toISOString();
 
@@ -2238,7 +2304,7 @@ export default function CrmDispatch() {
         scheduledEnd: scheduledEndISO,
       },
     });
-  }, [localWorkOrders, selectedDate, updateWorkOrderMutation]);
+  }, [localWorkOrders, selectedDate, technicians, updateWorkOrderMutation, toast]);
 
   const handleResizeComplete = useCallback((workOrderId: string, deltaStartMinutes: number, deltaEndMinutes: number) => {
     const wo = localWorkOrders.find(w => w.id === workOrderId);
@@ -2258,6 +2324,21 @@ export default function CrmDispatch() {
       newEnd.setHours(SCHEDULE_END_HOUR, 0, 0, 0);
     }
     
+    // Check for scheduling conflict when resizing
+    if (wo.assignedTechId) {
+      const conflict = checkSchedulingConflict(localWorkOrders, wo.assignedTechId, newStart, newEnd, workOrderId);
+      if (conflict) {
+        const techName = wo.techName || technicians.find(t => t.id === wo.assignedTechId)?.name || "This technician";
+        const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+        toast({
+          title: "Scheduling Conflict",
+          description: `${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     const scheduledStartISO = newStart.toISOString();
     const scheduledEndISO = newEnd.toISOString();
 
@@ -2272,7 +2353,7 @@ export default function CrmDispatch() {
         scheduledEnd: scheduledEndISO,
       },
     });
-  }, [localWorkOrders, updateWorkOrderMutation]);
+  }, [localWorkOrders, technicians, updateWorkOrderMutation, toast]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const id = event.active.id as string;
@@ -2324,6 +2405,20 @@ export default function CrmDispatch() {
         
         // Preserve existing scheduled time if available, otherwise use defaults
         if (wo.scheduledStart && wo.scheduledEnd) {
+          // Check for conflict with existing scheduled time
+          const existingStart = new Date(wo.scheduledStart);
+          const existingEnd = new Date(wo.scheduledEnd);
+          const conflict = checkSchedulingConflict(localWorkOrders, newTechId, existingStart, existingEnd, workOrderId);
+          if (conflict) {
+            const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+            toast({
+              title: "Scheduling Conflict",
+              description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
+              variant: "destructive",
+            });
+            return;
+          }
+          
           // Keep the existing scheduled time, just assign the tech
           setLocalWorkOrders(prev => prev.map(w => 
             w.id === workOrderId 
@@ -2338,7 +2433,6 @@ export default function CrmDispatch() {
             },
           });
 
-          const existingStart = new Date(wo.scheduledStart);
           toast({
             title: "Work order assigned",
             description: `Assigned to ${newTech?.name || 'technician'} at ${format(existingStart, "h:mm a")}`,
@@ -2358,6 +2452,18 @@ export default function CrmDispatch() {
           startDate.setHours(startHourInt, startMinutes, 0, 0);
           const endDate = new Date(selectedDate);
           endDate.setHours(endHourInt, endMinutes, 0, 0);
+          
+          // Check for conflict with default time slot
+          const conflict = checkSchedulingConflict(localWorkOrders, newTechId, startDate, endDate, workOrderId);
+          if (conflict) {
+            const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+            toast({
+              title: "Scheduling Conflict",
+              description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
+              variant: "destructive",
+            });
+            return;
+          }
           
           const scheduledStartISO = startDate.toISOString();
           const scheduledEndISO = endDate.toISOString();
@@ -2404,10 +2510,22 @@ export default function CrmDispatch() {
         const endDate = new Date(selectedDate);
         endDate.setHours(endHourInt, endMinutes, 0, 0);
         
+        const newTech = technicians.find(t => t.id === newTechId);
+        
+        // Check for conflict when moving between technicians
+        const conflict = checkSchedulingConflict(localWorkOrders, newTechId, startDate, endDate, workOrderId);
+        if (conflict) {
+          const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+          toast({
+            title: "Scheduling Conflict",
+            description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
         const scheduledStartISO = startDate.toISOString();
         const scheduledEndISO = endDate.toISOString();
-
-        const newTech = technicians.find(t => t.id === newTechId);
 
         setLocalWorkOrders(prev => prev.map(w => 
           w.id === workOrderId 
@@ -2435,10 +2553,22 @@ export default function CrmDispatch() {
       const endDate = new Date(dropDate);
       endDate.setHours(10, 0, 0, 0);
       
+      const newTech = technicians.find(t => t.id === techId);
+      
+      // Check for conflict when dropping in week view
+      const conflict = checkSchedulingConflict(localWorkOrders, techId, startDate, endDate, workOrderId);
+      if (conflict) {
+        const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+        toast({
+          title: "Scheduling Conflict",
+          description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
       const scheduledStartISO = startDate.toISOString();
       const scheduledEndISO = endDate.toISOString();
-      
-      const newTech = technicians.find(t => t.id === techId);
       
       setLocalWorkOrders(prev => prev.map(w => 
         w.id === workOrderId 
