@@ -597,8 +597,8 @@ export default function CrmWorkOrders() {
     setChecklistId(null);
   };
 
-  // Generate checklist summary from questions and answers
-  const generateChecklistSummary = (): string => {
+  // Generate checklist summary from questions and answers (local fallback)
+  const generateLocalChecklistSummary = (): string => {
     if (checklistQuestions.length === 0) return "";
     
     const summaryParts: string[] = [];
@@ -617,6 +617,29 @@ export default function CrmWorkOrders() {
     return "--- Service Call Checklist ---\n" + summaryParts.join("\n") + "\n---\n\n";
   };
 
+  // Try AI summarization, fall back to local summary
+  const generateChecklistSummary = async (): Promise<string> => {
+    if (checklistQuestions.length === 0 || Object.keys(checklistAnswers).length === 0) return "";
+    
+    try {
+      const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[workSubtype] || "OTHER";
+      const res = await apiRequest("POST", "/api/ai/summarize-checklist", {
+        questions: checklistQuestions,
+        answers: checklistAnswers,
+        serviceType,
+      });
+      const data = await res.json();
+      if (data.summary) {
+        return "--- Service Call Summary ---\n" + data.summary + "\n---\n\n";
+      }
+    } catch (err) {
+      console.error("AI summarization failed, using local fallback:", err);
+    }
+    
+    // Fallback to local summary
+    return generateLocalChecklistSummary();
+  };
+
   const createWorkOrderMutation = useMutation({
     mutationFn: async () => {
       if (!selectedCustomer) throw new Error("Customer is required");
@@ -632,8 +655,8 @@ export default function CrmWorkOrders() {
       const scheduledStartUTC = createLocalDateTime(scheduledDate, startHours, startMinutes);
       const scheduledEndUTC = createLocalDateTime(scheduledDate, endHours, endMinutes);
 
-      // Generate checklist summary and prepend to description
-      const checklistSummary = generateChecklistSummary();
+      // Generate checklist summary (tries AI, falls back to local) and prepend to description
+      const checklistSummary = await generateChecklistSummary();
       const finalDescription = checklistSummary + woDescription.trim();
 
       const res = await apiRequest("POST", "/api/crm/work-orders", {

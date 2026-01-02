@@ -12897,6 +12897,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/ai/summarize-checklist - Generate AI summary of checklist answers
+  app.post("/api/ai/summarize-checklist", requireCrmAuth, async (req, res) => {
+    try {
+      const { questions, answers, serviceType } = req.body;
+      
+      if (!questions || !answers) {
+        return res.status(400).json({ message: "Questions and answers are required" });
+      }
+      
+      // Build a text representation of the checklist answers
+      const questionAnswerPairs: string[] = [];
+      for (const q of questions) {
+        const answer = answers[q.id];
+        if (answer !== undefined && answer !== "") {
+          let answerText = String(answer);
+          if (q.questionType === "yes_no") {
+            answerText = answer === true || answer === "true" ? "Yes" : "No";
+          }
+          questionAnswerPairs.push(`${q.question}: ${answerText}`);
+        }
+      }
+      
+      // Try AI summarization with fallback to text concatenation
+      try {
+        const OpenAI = (await import("openai")).default;
+        const openai = new OpenAI({
+          apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+          baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        });
+        
+        const serviceTypeDisplay = serviceType?.replace(/_/g, " ").toLowerCase() || "service call";
+        
+        const completion = await openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content: `You are helping format service call intake information for HVAC technicians. 
+Summarize the checklist answers into a clear, concise paragraph for technicians to read quickly.
+Focus on key diagnostic details. Write in third person (e.g., "Customer reports..." not "I").
+Keep it under 100 words. No bullet points - just a flowing summary.`
+            },
+            {
+              role: "user",
+              content: `Service type: ${serviceTypeDisplay}\n\nChecklist answers:\n${questionAnswerPairs.join("\n")}`
+            }
+          ],
+          max_tokens: 200,
+          temperature: 0.3,
+        });
+        
+        const summary = completion.choices[0]?.message?.content?.trim() || questionAnswerPairs.join(". ") + ".";
+        res.json({ summary });
+        
+      } catch (aiError) {
+        console.error("AI summarization failed, using fallback:", aiError);
+        // Fallback: simple text concatenation
+        const fallbackSummary = questionAnswerPairs.join(". ") + ".";
+        res.json({ summary: fallbackSummary, fallback: true });
+      }
+      
+    } catch (error) {
+      console.error("Error summarizing checklist:", error);
+      res.status(500).json({ message: "Failed to summarize checklist" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)
