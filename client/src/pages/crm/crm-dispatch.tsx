@@ -1949,6 +1949,8 @@ export default function CrmDispatch() {
     }, {
       onSuccess: () => {
         toast({ title: "Scheduled", description: `Work order scheduled for ${format(startDate, "PPp")}` });
+        // Navigate to the scheduled date so user can see the work order
+        setSelectedDate(startDate);
       }
     });
   }, [updateWorkOrderMutation, toast]);
