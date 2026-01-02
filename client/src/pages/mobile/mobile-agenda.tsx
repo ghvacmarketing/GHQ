@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format, isToday, startOfDay, endOfDay } from "date-fns";
-import { MapPin, Clock, ClipboardList } from "lucide-react";
+import { MapPin, Clock, ClipboardList, WifiOff, CloudOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import MobileShell from "./mobile-shell";
+import { useOnlineStatus, OfflineIndicator, usePendingChanges, PendingChangesBadge } from "@/hooks/use-online-status";
 import type { CrmWorkOrder, CrmCustomer, CrmProperty } from "@shared/schema";
 
 interface WorkOrderWithDetails extends CrmWorkOrder {
@@ -37,10 +39,99 @@ function getPropertyAddress(property: CrmProperty | null): string {
   return parts.join(", ") || "No address";
 }
 
+function GlobalPendingChangesIndicator() {
+  const pendingCount = usePendingChanges();
+  
+  if (pendingCount === 0) return null;
+  
+  return (
+    <div 
+      className="mt-2 inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-full"
+      data-testid="global-pending-changes"
+    >
+      <CloudOff className="h-3 w-3" />
+      {pendingCount} change{pendingCount !== 1 ? 's' : ''} pending sync
+    </div>
+  );
+}
+
+function WorkOrderCard({ workOrder, showCacheWarning }: { workOrder: WorkOrderWithDetails; showCacheWarning: boolean }) {
+  const status = statusConfig[workOrder.status] || statusConfig.scheduled;
+  const customerName = workOrder.customer?.name || "Unknown Customer";
+  const address = getPropertyAddress(workOrder.property);
+  const pendingCount = usePendingChanges(workOrder.id);
+  
+  return (
+    <Link
+      href={`/mobile/job/${workOrder.id}`}
+      data-testid={`work-order-card-${workOrder.id}`}
+    >
+      <Card 
+        className={`cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98] ${
+          showCacheWarning ? 'border-l-4 border-l-amber-400' : ''
+        } ${pendingCount > 0 ? 'border-l-4 border-l-amber-500' : ''}`}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-2 flex-1 mr-2">
+              <h3 
+                className="font-semibold text-slate-800 dark:text-slate-200 truncate"
+                data-testid={`customer-name-${workOrder.id}`}
+              >
+                {customerName}
+              </h3>
+              {pendingCount > 0 && (
+                <span 
+                  className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0"
+                  data-testid={`pending-badge-${workOrder.id}`}
+                >
+                  <CloudOff className="h-2.5 w-2.5" />
+                  {pendingCount}
+                </span>
+              )}
+            </div>
+            <Badge 
+              variant="outline" 
+              className={`shrink-0 ${status.className}`}
+              data-testid={`status-badge-${workOrder.id}`}
+            >
+              {status.label}
+            </Badge>
+          </div>
+
+          <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mb-1.5">
+            <MapPin className="h-4 w-4 mr-1.5 text-slate-400 shrink-0" />
+            <span className="truncate" data-testid={`address-${workOrder.id}`}>
+              {address}
+            </span>
+          </div>
+
+          <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mb-1.5">
+            <Clock className="h-4 w-4 mr-1.5 text-slate-400 shrink-0" />
+            <span data-testid={`time-${workOrder.id}`}>
+              {formatScheduledTime(workOrder.scheduledStart, workOrder.scheduledEnd)}
+            </span>
+          </div>
+
+          {workOrder.workSubtype && (
+            <div className="mt-2">
+              <Badge variant="secondary" className="text-xs">
+                {workOrder.visitType} - {workOrder.workSubtype}
+              </Badge>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
 export default function MobileAgenda() {
   const today = new Date();
   const todayStart = startOfDay(today).toISOString();
   const todayEnd = endOfDay(today).toISOString();
+  const { isOnline } = useOnlineStatus();
+  const [isFromCache, setIsFromCache] = useState(false);
 
   const { data: workOrders, isLoading } = useQuery<WorkOrderWithDetails[]>({
     queryKey: ["/api/crm/work-orders", { start: todayStart, end: todayEnd }],
@@ -50,9 +141,17 @@ export default function MobileAgenda() {
         end: todayEnd,
       });
       const res = await fetch(`/api/crm/work-orders?${params}`);
+      
+      // Check if response is from cache (service worker adds this header)
+      const fromCache = res.headers.get('X-From-Cache') === 'true';
+      setIsFromCache(fromCache);
+      
       if (!res.ok) throw new Error("Failed to fetch work orders");
       return res.json();
     },
+    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
+    gcTime: 24 * 60 * 60 * 1000, // Keep in cache for 24 hours
+    retry: isOnline ? 3 : 0, // Don't retry when offline
   });
 
   const todaysOrders = workOrders?.filter((wo) => {
@@ -60,16 +159,31 @@ export default function MobileAgenda() {
     return isToday(new Date(wo.scheduledStart));
   }) ?? [];
 
+  const showCacheWarning = !isOnline || isFromCache;
+
   return (
     <MobileShell>
+      <OfflineIndicator />
+      
       <div className="p-4 space-y-4" data-testid="mobile-agenda">
         <div className="text-center mb-6" data-testid="agenda-date-header">
-          <h2 className="text-2xl font-bold text-slate-800">
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
             {format(today, "EEEE")}
           </h2>
-          <p className="text-slate-500">
+          <p className="text-slate-500 dark:text-slate-400">
             {format(today, "MMMM d, yyyy")}
           </p>
+          
+          {showCacheWarning && workOrders && workOrders.length > 0 && (
+            <div 
+              className="mt-2 inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-full"
+              data-testid="cache-warning"
+            >
+              <WifiOff className="h-3 w-3" />
+              Showing cached data
+            </div>
+          )}
+          <GlobalPendingChangesIndicator />
         </div>
 
         {isLoading ? (
@@ -95,61 +209,13 @@ export default function MobileAgenda() {
           </div>
         ) : (
           <div className="space-y-3" data-testid="agenda-list">
-            {todaysOrders.map((workOrder) => {
-              const status = statusConfig[workOrder.status] || statusConfig.scheduled;
-              const customerName = workOrder.customer?.name || "Unknown Customer";
-              const address = getPropertyAddress(workOrder.property);
-
-              return (
-                <Link
-                  key={workOrder.id}
-                  href={`/mobile/job/${workOrder.id}`}
-                  data-testid={`work-order-card-${workOrder.id}`}
-                >
-                  <Card className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 
-                          className="font-semibold text-slate-800 truncate flex-1 mr-2"
-                          data-testid={`customer-name-${workOrder.id}`}
-                        >
-                          {customerName}
-                        </h3>
-                        <Badge 
-                          variant="outline" 
-                          className={`shrink-0 ${status.className}`}
-                          data-testid={`status-badge-${workOrder.id}`}
-                        >
-                          {status.label}
-                        </Badge>
-                      </div>
-
-                      <div className="flex items-center text-sm text-slate-500 mb-1.5">
-                        <MapPin className="h-4 w-4 mr-1.5 text-slate-400 shrink-0" />
-                        <span className="truncate" data-testid={`address-${workOrder.id}`}>
-                          {address}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center text-sm text-slate-500 mb-1.5">
-                        <Clock className="h-4 w-4 mr-1.5 text-slate-400 shrink-0" />
-                        <span data-testid={`time-${workOrder.id}`}>
-                          {formatScheduledTime(workOrder.scheduledStart, workOrder.scheduledEnd)}
-                        </span>
-                      </div>
-
-                      {workOrder.workSubtype && (
-                        <div className="mt-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {workOrder.visitType} - {workOrder.workSubtype}
-                          </Badge>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
+            {todaysOrders.map((workOrder) => (
+              <WorkOrderCard 
+                key={workOrder.id} 
+                workOrder={workOrder} 
+                showCacheWarning={showCacheWarning} 
+              />
+            ))}
           </div>
         )}
       </div>

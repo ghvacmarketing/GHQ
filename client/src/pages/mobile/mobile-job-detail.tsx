@@ -14,7 +14,8 @@ import {
   Loader2,
   Camera,
   X,
-  Image
+  Image,
+  CloudOff
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
+import { useOnlineStatus, usePendingChanges, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
 import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus } from "@shared/schema";
 
@@ -63,14 +66,35 @@ function getGoogleMapsUrl(property: CrmProperty | null): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
+function isNetworkError(error: unknown): boolean {
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    return true;
+  }
+  if (error instanceof Error && (
+    error.message.includes('network') ||
+    error.message.includes('Network') ||
+    error.message.includes('offline') ||
+    error.message.includes('Failed to fetch')
+  )) {
+    return true;
+  }
+  return !navigator.onLine;
+}
+
 export default function MobileJobDetail() {
   const params = useParams<{ id: string }>();
+  const workOrderId = parseInt(params.id || "0", 10);
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [noteInput, setNoteInput] = useState("");
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<WorkOrderPhoto | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { isOnline } = useOnlineStatus();
+  const pendingChangesCount = usePendingChanges(workOrderId);
+  const pendingNotes = usePendingNotes(workOrderId);
+
+  const [optimisticStatus, setOptimisticStatus] = useState<WorkOrderStatus | null>(null);
 
   const { data: workOrder, isLoading } = useQuery<WorkOrderDetail>({
     queryKey: ["/api/crm/work-orders", params.id],
@@ -84,26 +108,39 @@ export default function MobileJobDetail() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async (newStatus: WorkOrderStatus) => {
+      setOptimisticStatus(newStatus);
       await apiRequest("PATCH", `/api/crm/work-orders/${params.id}`, { status: newStatus });
     },
     onSuccess: () => {
+      setOptimisticStatus(null);
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
       toast({ title: "Status updated" });
     },
-    onError: () => {
-      toast({ title: "Failed to update status", variant: "destructive" });
+    onError: (error, newStatus) => {
+      if (isNetworkError(error)) {
+        queueMutation('status-update', workOrderId, { status: newStatus });
+        toast({ 
+          title: "Saved offline", 
+          description: "Status will sync when you're back online",
+        });
+      } else {
+        setOptimisticStatus(null);
+        toast({ title: "Failed to update status", variant: "destructive" });
+      }
     },
   });
 
   const addNoteMutation = useMutation({
     mutationFn: async (note: string) => {
-      const existingNotes = workOrder?.techNotes || "";
+      const existingNotes = workOrder?.techNotes ?? "";
       const timestamp = format(new Date(), "MMM d, h:mm a");
       const newNotes = existingNotes 
         ? `${existingNotes}\n\n[${timestamp}] ${note}`
         : `[${timestamp}] ${note}`;
+      
       await apiRequest("PATCH", `/api/crm/work-orders/${params.id}`, { techNotes: newNotes });
+      return newNotes;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
@@ -111,8 +148,17 @@ export default function MobileJobDetail() {
       setNoteInput("");
       toast({ title: "Note added" });
     },
-    onError: () => {
-      toast({ title: "Failed to add note", variant: "destructive" });
+    onError: (error, note) => {
+      if (isNetworkError(error)) {
+        queueMutation('add-note', workOrderId, { noteText: note });
+        setNoteInput("");
+        toast({ 
+          title: "Saved offline", 
+          description: "Note will sync when you're back online",
+        });
+      } else {
+        toast({ title: "Failed to add note", variant: "destructive" });
+      }
     },
   });
 
@@ -148,7 +194,7 @@ export default function MobileJobDetail() {
       const photoId = nanoid();
       const photoUrl = `/objects${objectPath.startsWith("/") ? objectPath : `/${objectPath}`}`;
 
-      const addPhotoResponse = await apiRequest("POST", `/api/crm/work-orders/${params.id}/photos`, {
+      await apiRequest("POST", `/api/crm/work-orders/${params.id}/photos`, {
         id: photoId,
         url: photoUrl,
         objectPath: objectPath,
@@ -206,6 +252,7 @@ export default function MobileJobDetail() {
   if (isLoading) {
     return (
       <MobileShell>
+        <OfflineIndicator />
         <div className="p-4 space-y-4" data-testid="job-detail-loading">
           <Skeleton className="h-8 w-40" />
           <Skeleton className="h-24 w-full" />
@@ -219,6 +266,7 @@ export default function MobileJobDetail() {
   if (!workOrder) {
     return (
       <MobileShell>
+        <OfflineIndicator />
         <div className="p-4 text-center" data-testid="job-not-found">
           <p className="text-slate-500">Work order not found</p>
           <Button 
@@ -233,31 +281,46 @@ export default function MobileJobDetail() {
     );
   }
 
-  const status = statusConfig[workOrder.status] || statusConfig.scheduled;
+  const displayStatus = optimisticStatus || workOrder.status;
+  const status = statusConfig[displayStatus] || statusConfig.scheduled;
   const customerName = workOrder.customer?.name || "Unknown Customer";
   const customerPhone = workOrder.customer?.phone;
   const address = getPropertyAddress(workOrder.property);
-  const nextStatus = getNextStatus(workOrder.status as WorkOrderStatus);
+  const nextStatus = getNextStatus(displayStatus as WorkOrderStatus);
 
   return (
     <MobileShell>
+      <OfflineIndicator />
       <div className="p-4 space-y-4" data-testid="mobile-job-detail">
-        <button
-          onClick={() => navigate("/mobile")}
-          className="flex items-center text-slate-600 hover:text-slate-800 min-h-[44px] min-w-[44px]"
-          data-testid="button-back"
-        >
-          <ArrowLeft className="h-5 w-5 mr-1" />
-          <span>Back</span>
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate("/mobile")}
+            className="flex items-center text-slate-600 hover:text-slate-800 min-h-[44px] min-w-[44px]"
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-5 w-5 mr-1" />
+            <span>Back</span>
+          </button>
+          
+          {pendingChangesCount > 0 && (
+            <div 
+              className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full"
+              data-testid="pending-changes-indicator"
+            >
+              <CloudOff className="h-3 w-3" />
+              {pendingChangesCount} pending
+            </div>
+          )}
+        </div>
 
         <div className="text-center mb-4">
           <Badge 
             variant="outline" 
-            className={`text-lg px-4 py-1 ${status.className}`}
+            className={`text-lg px-4 py-1 ${status.className} ${optimisticStatus ? 'opacity-70' : ''}`}
             data-testid="job-status-badge"
           >
             {status.label}
+            {optimisticStatus && " (saving...)"}
           </Badge>
         </div>
 
@@ -300,7 +363,7 @@ export default function MobileJobDetail() {
           </CardContent>
         </Card>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3" data-testid="quick-actions">
           <Button
             variant="outline"
             className="flex-1 min-h-[48px]"
@@ -339,7 +402,7 @@ export default function MobileJobDetail() {
                 className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
                 onClick={() => updateStatusMutation.mutate(nextStatus)}
                 disabled={updateStatusMutation.isPending}
-                data-testid="button-update-status"
+                data-testid={`button-status-${nextStatus}`}
               >
                 {updateStatusMutation.isPending ? (
                   <Loader2 className="h-5 w-5 animate-spin mr-2" />
@@ -365,11 +428,39 @@ export default function MobileJobDetail() {
               >
                 {workOrder.techNotes}
               </div>
-            ) : (
+            ) : pendingNotes.length === 0 ? (
               <p className="text-sm text-slate-400 italic" data-testid="no-notes">
                 No notes yet
               </p>
+            ) : null}
+            
+            {pendingNotes.length > 0 && (
+              <div className="space-y-2" data-testid="pending-notes-container">
+                {pendingNotes.map((pendingNote) => (
+                  <div 
+                    key={pendingNote.id}
+                    className="text-sm text-slate-600 whitespace-pre-wrap bg-amber-50 border border-amber-200 p-3 rounded-md"
+                    data-testid={`pending-note-${pendingNote.id}`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs bg-amber-100 text-amber-700 border-amber-300"
+                        data-testid="pending-sync-badge"
+                      >
+                        <CloudOff className="h-3 w-3 mr-1" />
+                        Pending sync
+                      </Badge>
+                      <span className="text-xs text-amber-600">
+                        {format(new Date(pendingNote.timestamp), "MMM d, h:mm a")}
+                      </span>
+                    </div>
+                    {pendingNote.noteText}
+                  </div>
+                ))}
+              </div>
             )}
+            
             <Separator />
             <div className="flex gap-2">
               <Input
@@ -445,7 +536,7 @@ export default function MobileJobDetail() {
                 variant="outline"
                 className="flex-1 min-h-[44px]"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isUploadingPhoto}
+                disabled={isUploadingPhoto || !isOnline}
                 data-testid="button-add-photo"
               >
                 {isUploadingPhoto ? (
@@ -453,7 +544,7 @@ export default function MobileJobDetail() {
                 ) : (
                   <Camera className="h-5 w-5 mr-2" />
                 )}
-                {isUploadingPhoto ? "Uploading..." : "Add Photo"}
+                {isUploadingPhoto ? "Uploading..." : !isOnline ? "Photos require connection" : "Add Photo"}
               </Button>
             </div>
           </CardContent>
@@ -489,9 +580,9 @@ export default function MobileJobDetail() {
             </CardHeader>
             <CardContent className="space-y-2">
               {workOrder.workSubtype && (
-                <div>
+                <div data-testid="work-type-info">
                   <span className="text-sm text-slate-500">Work Type: </span>
-                  <Badge variant="secondary">
+                  <Badge variant="secondary" data-testid="work-type-badge">
                     {workOrder.visitType} - {workOrder.workSubtype}
                   </Badge>
                 </div>
