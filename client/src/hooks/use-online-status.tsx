@@ -96,13 +96,14 @@ export function useOnlineStatus() {
   return { isOnline, isFromCache, setIsFromCache, isSyncing, processQueue };
 }
 
-export function usePendingChanges(workOrderId?: number) {
+export function usePendingChanges(workOrderId?: number | string) {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
     const updateCount = () => {
       if (workOrderId) {
-        setCount(getPendingMutationsForWorkOrder(workOrderId).length);
+        const numericId = typeof workOrderId === 'string' ? parseInt(workOrderId, 10) : workOrderId;
+        setCount(getPendingMutationsForWorkOrder(numericId).length);
       } else {
         setCount(getPendingMutationCount());
       }
@@ -168,7 +169,7 @@ export function OfflineIndicator() {
   return null;
 }
 
-export function PendingChangesBadge({ workOrderId }: { workOrderId?: number }) {
+export function PendingChangesBadge({ workOrderId }: { workOrderId?: number | string }) {
   const count = usePendingChanges(workOrderId);
 
   if (count === 0) return null;
