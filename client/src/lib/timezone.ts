@@ -46,3 +46,11 @@ export function formatLocalTime(date: Date | string): string {
 export function formatLocalDateTime(date: Date | string): string {
   return formatLocal(date, "PPp");
 }
+
+export function getLocalDateString(date: Date | string): string {
+  return formatLocal(date, "yyyy-MM-dd");
+}
+
+export function getTodayLocalDateString(): string {
+  return getLocalDateString(new Date());
+}

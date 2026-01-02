@@ -79,7 +79,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format, formatDistanceToNow } from "date-fns";
-import { createLocalDateTime, formatLocal, formatLocalDateTime, getLocalStartOfDay, getLocalEndOfDay, APP_TIMEZONE } from "@/lib/timezone";
+import { createLocalDateTime, formatLocal, formatLocalDateTime, getLocalStartOfDay, getLocalEndOfDay, getLocalDateString, getTodayLocalDateString, APP_TIMEZONE } from "@/lib/timezone";
 import { formatInTimeZone } from "date-fns-tz";
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -761,27 +761,27 @@ function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClic
   const { setNodeRef } = useDroppable({ id: "week-board" });
   
   const getWorkOrdersForTechAndDay = (techId: string, date: Date) => {
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = getLocalDateString(date);
     return workOrders.filter(wo => {
       if (wo.assignedTechId !== techId) return false;
       if (!wo.scheduledStart) return false;
-      const woDate = new Date(wo.scheduledStart).toISOString().split("T")[0];
+      const woDate = getLocalDateString(wo.scheduledStart);
       return woDate === dateStr;
     });
   };
   
   const getUnassignedForDay = (date: Date) => {
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = getLocalDateString(date);
     return workOrders.filter(wo => {
       if (wo.assignedTechId) return false;
       if (!wo.scheduledStart) return false;
-      const woDate = new Date(wo.scheduledStart).toISOString().split("T")[0];
+      const woDate = getLocalDateString(wo.scheduledStart);
       return woDate === dateStr;
     });
   };
   
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const today = new Date().toISOString().split("T")[0];
+  const today = getTodayLocalDateString();
   
   return (
     <Card className="bg-white border overflow-hidden" ref={setNodeRef}>
@@ -793,7 +793,7 @@ function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClic
                 Technicians
               </th>
               {weekDates.map((date, i) => {
-                const dateStr = date.toISOString().split("T")[0];
+                const dateStr = getLocalDateString(date);
                 const isToday = dateStr === today;
                 return (
                   <th 
@@ -825,7 +825,7 @@ function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClic
                 </td>
                 {weekDates.map((date, dayIdx) => {
                   const dayWOs = getWorkOrdersForTechAndDay(tech.id, date);
-                  const dateStr = date.toISOString().split("T")[0];
+                  const dateStr = getLocalDateString(date);
                   const isToday = dateStr === today;
                   const totalHours = dayWOs.reduce((sum, wo) => {
                     if (!wo.scheduledStart || !wo.scheduledEnd) return sum;
