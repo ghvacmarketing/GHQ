@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import MobileShell from "./mobile-shell";
 import { useOnlineStatus, OfflineIndicator, usePendingChanges, PendingChangesBadge } from "@/hooks/use-online-status";
-import type { CrmWorkOrder, CrmCustomer, CrmProperty } from "@shared/schema";
+import type { CrmWorkOrder, CrmCustomer, CrmProperty, CrmUser } from "@shared/schema";
 
 interface WorkOrderWithDetails extends CrmWorkOrder {
   customer: CrmCustomer | null;
@@ -134,16 +134,30 @@ export default function MobileAgenda() {
   const { isOnline } = useOnlineStatus();
   const [isFromCache, setIsFromCache] = useState(false);
 
-  const { data: workOrders, isLoading, error, isError } = useQuery<WorkOrderWithDetails[]>({
-    queryKey: ["/api/crm/work-orders", { start: todayStart, end: todayEnd }],
+  const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser>({
+    queryKey: ["/api/crm/auth/me"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/auth/me", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch user");
+      const data = await res.json();
+      return data.user;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+  });
+
+  const { data: workOrders, isLoading: isLoadingOrders, error, isError } = useQuery<WorkOrderWithDetails[]>({
+    queryKey: ["/api/crm/work-orders", { start: todayStart, end: todayEnd, techId: currentUser?.role === 'tech' ? currentUser?.id : undefined }],
     queryFn: async () => {
       const params = new URLSearchParams({
         start: todayStart,
         end: todayEnd,
       });
+      if (currentUser?.role === 'tech' && currentUser?.id) {
+        params.set('techId', currentUser.id);
+      }
       const res = await fetch(`/api/crm/work-orders?${params}`);
       
-      // Check if response is from cache (service worker adds this header)
       const fromCache = res.headers.get('X-From-Cache') === 'true';
       setIsFromCache(fromCache);
       
@@ -152,19 +166,19 @@ export default function MobileAgenda() {
       }
       if (!res.ok) throw new Error("Failed to fetch work orders");
       const data = await res.json();
-      // API returns { workOrders: [...], pagination: {...} }
       return data.workOrders || [];
     },
-    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
-    gcTime: 24 * 60 * 60 * 1000, // Keep in cache for 24 hours
+    enabled: !!currentUser,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
     retry: (failureCount, error) => {
-      // Don't retry auth errors
       if (error instanceof Error && error.message === "AUTH_REQUIRED") return false;
-      // Don't retry when offline
       if (!isOnline) return false;
       return failureCount < 3;
     },
   });
+
+  const isLoading = isLoadingUser || isLoadingOrders;
 
   const isAuthError = isError && error instanceof Error && error.message === "AUTH_REQUIRED";
 

@@ -30,7 +30,7 @@ import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorSt
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
-import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureDefaultAdminExists, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, logCrmAudit, hashPassword as hashCrmPassword } from "./crm-auth";
+import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureDefaultAdminExists, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, logCrmAudit, hashPassword as hashCrmPassword } from "./crm-auth";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
@@ -250,6 +250,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Ensure default CRM admin user exists
   ensureDefaultAdminExists().catch(console.error);
+  
+  // Ensure default technician users exist
+  ensureTechniciansExist().catch(console.error);
 
   // Configure multer for file uploads
   const upload = multer({
@@ -8302,9 +8305,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/work-orders/:id - Get single work order with related details
   app.get("/api/crm/work-orders/:id", requireCrmAuth, async (req, res) => {
     try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
       const workOrder = await storage.getWorkOrder(req.params.id);
       if (!workOrder) {
         return res.status(404).json({ message: "Work order not found" });
+      }
+
+      if (user.role === 'tech' && workOrder.assignedTechId !== user.id) {
+        return res.status(403).json({ message: "Access denied - work order not assigned to you" });
       }
 
       let job = null;
@@ -8469,6 +8481,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingWorkOrder = await storage.getWorkOrder(req.params.id);
       if (!existingWorkOrder) {
         return res.status(404).json({ message: "Work order not found" });
+      }
+
+      if (user.role === 'tech' && existingWorkOrder.assignedTechId !== user.id) {
+        return res.status(403).json({ message: "Access denied - work order not assigned to you" });
       }
 
       const allowedFields = insertCrmWorkOrderSchema.partial().pick({

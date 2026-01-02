@@ -144,6 +144,29 @@ export async function ensureDefaultAdminExists(): Promise<void> {
   }
 }
 
+export async function ensureTechniciansExist(): Promise<void> {
+  const technicians = [
+    { name: "Chandler", email: "chandler@ghvacinc.com" },
+    { name: "Earnest", email: "earnest@ghvacinc.com" },
+    { name: "Tucker", email: "tucker@ghvacinc.com" },
+    { name: "Brian", email: "brian@ghvacinc.com" },
+    { name: "Christopher", email: "christopher@ghvacinc.com" },
+  ];
+
+  for (const tech of technicians) {
+    const existingUser = await getCrmUserByEmail(tech.email);
+    if (!existingUser) {
+      await createCrmUser({
+        name: tech.name,
+        email: tech.email,
+        password: "Giesbrecht",
+        role: "tech",
+      });
+      console.log(`Created technician user: ${tech.email}`);
+    }
+  }
+}
+
 declare global {
   namespace Express {
     interface Request {
