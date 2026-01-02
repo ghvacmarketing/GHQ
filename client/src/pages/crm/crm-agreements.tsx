@@ -47,9 +47,9 @@ import {
   Edit,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { format, addDays, isAfter, isBefore, startOfDay } from "date-fns";
+import { format, addDays, addMonths, addYears, isAfter, isBefore, startOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import type { CrmUser, CrmAgreement } from "@shared/schema";
+import type { CrmUser, CrmAgreement, MaintenanceRegion } from "@shared/schema";
 
 type AgreementsResponse = {
   agreements: CrmAgreement[];
@@ -124,6 +124,10 @@ export default function CrmAgreements() {
     endDate: "",
     notes: "",
     status: "active" as const,
+    contractDate: "",
+    appointmentDate: "",
+    price: "229.00",
+    regionId: "",
   });
 
   const debouncedSearch = useDebounce(searchInput, 300);
@@ -162,6 +166,18 @@ export default function CrmAgreements() {
     enabled: !!currentUser,
   });
 
+  const { data: regions = [] } = useQuery<MaintenanceRegion[]>({
+    queryKey: ["/api/crm/maintenance-regions"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/maintenance-regions", {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch regions");
+      return res.json();
+    },
+    enabled: !!currentUser,
+  });
+
   const createAgreementMutation = useMutation({
     mutationFn: async (data: typeof createForm) => {
       const res = await apiRequest("POST", "/api/crm/agreements", data);
@@ -181,6 +197,10 @@ export default function CrmAgreements() {
         endDate: "",
         notes: "",
         status: "active",
+        contractDate: "",
+        appointmentDate: "",
+        price: "229.00",
+        regionId: "",
       });
       toast({ title: "Agreement created successfully" });
     },
@@ -384,9 +404,54 @@ export default function CrmAgreements() {
         endDate: selectedAgreement.endDate || "",
         notes: selectedAgreement.notes || "",
         status: selectedAgreement.status as typeof createForm.status,
+        contractDate: selectedAgreement.contractDate || "",
+        appointmentDate: selectedAgreement.appointmentDate || "",
+        price: selectedAgreement.price || "229.00",
+        regionId: selectedAgreement.regionId || "",
       });
       setIsEditing(true);
     }
+  };
+
+  const handleContractDateChange = (contractDate: string, isEdit = false) => {
+    if (!contractDate) return;
+    
+    const contractDateObj = new Date(contractDate);
+    const appointmentDate = format(addMonths(contractDateObj, 1), "yyyy-MM-dd");
+    const endDate = format(addYears(contractDateObj, 1), "yyyy-MM-dd");
+    
+    const updates = {
+      contractDate,
+      nextInvoiceDate: contractDate,
+      appointmentDate,
+      startDate: contractDate,
+      endDate,
+      nextServiceDate: appointmentDate,
+    };
+    
+    if (isEdit && editForm) {
+      setEditForm({ ...editForm, ...updates });
+    } else {
+      setCreateForm({ ...createForm, ...updates });
+    }
+  };
+
+  const getVisitSummary = (appointmentDateStr: string) => {
+    if (!appointmentDateStr) return null;
+    try {
+      const appointmentDate = new Date(appointmentDateStr);
+      const secondVisit = addMonths(appointmentDate, 6);
+      return {
+        firstVisit: format(appointmentDate, "MMM d, yyyy"),
+        secondVisit: format(secondVisit, "MMM d, yyyy"),
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const getSelectedRegion = (regionId: string) => {
+    return regions.find((r) => r.id === regionId);
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
@@ -749,13 +814,60 @@ export default function CrmAgreements() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="nextServiceDate">Next Service Date</Label>
+                  <Label htmlFor="contractDate">Contract Date</Label>
                   <Input
-                    id="nextServiceDate"
+                    id="contractDate"
                     type="date"
-                    value={createForm.nextServiceDate}
-                    onChange={(e) => setCreateForm({ ...createForm, nextServiceDate: e.target.value })}
-                    data-testid="input-next-service-date"
+                    value={createForm.contractDate}
+                    onChange={(e) => handleContractDateChange(e.target.value)}
+                    data-testid="input-contract-date"
+                  />
+                  <p className="text-xs text-slate-500">Sets start, end, invoice & appointment dates automatically</p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="price">Price ($)</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    value={createForm.price}
+                    onChange={(e) => setCreateForm({ ...createForm, price: e.target.value })}
+                    data-testid="input-price"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="regionId">Region</Label>
+                <Select
+                  value={createForm.regionId}
+                  onValueChange={(value) => setCreateForm({ ...createForm, regionId: value })}
+                >
+                  <SelectTrigger data-testid="select-region">
+                    <SelectValue placeholder="Select a region" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {regions.map((region) => (
+                      <SelectItem key={region.id} value={region.id}>
+                        {region.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {createForm.regionId && getSelectedRegion(createForm.regionId) && (
+                  <p className="text-xs text-slate-500">
+                    Reminders sent on the {getSelectedRegion(createForm.regionId)?.reminderDayOfMonth}{getSelectedRegion(createForm.regionId)?.reminderDayOfMonth === 1 ? 'st' : getSelectedRegion(createForm.regionId)?.reminderDayOfMonth === 2 ? 'nd' : getSelectedRegion(createForm.regionId)?.reminderDayOfMonth === 3 ? 'rd' : 'th'} of appointment month
+                  </p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="appointmentDate">First Appointment Date</Label>
+                  <Input
+                    id="appointmentDate"
+                    type="date"
+                    value={createForm.appointmentDate}
+                    onChange={(e) => setCreateForm({ ...createForm, appointmentDate: e.target.value, nextServiceDate: e.target.value })}
+                    data-testid="input-appointment-date"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -769,6 +881,13 @@ export default function CrmAgreements() {
                   />
                 </div>
               </div>
+              {createForm.appointmentDate && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-sm text-blue-700">
+                    <strong>Visit Schedule:</strong> First visit: {getVisitSummary(createForm.appointmentDate)?.firstVisit}, Second visit: {getVisitSummary(createForm.appointmentDate)?.secondVisit}
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="startDate">Start Date</Label>
@@ -905,13 +1024,60 @@ export default function CrmAgreements() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-2">
-                        <Label htmlFor="edit-nextServiceDate">Next Service Date</Label>
+                        <Label htmlFor="edit-contractDate">Contract Date</Label>
                         <Input
-                          id="edit-nextServiceDate"
+                          id="edit-contractDate"
                           type="date"
-                          value={editForm.nextServiceDate}
-                          onChange={(e) => setEditForm({ ...editForm, nextServiceDate: e.target.value })}
-                          data-testid="input-edit-next-service-date"
+                          value={editForm.contractDate}
+                          onChange={(e) => handleContractDateChange(e.target.value, true)}
+                          data-testid="input-edit-contract-date"
+                        />
+                        <p className="text-xs text-slate-500">Sets start, end, invoice & appointment dates automatically</p>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-price">Price ($)</Label>
+                        <Input
+                          id="edit-price"
+                          type="number"
+                          step="0.01"
+                          value={editForm.price}
+                          onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                          data-testid="input-edit-price"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-regionId">Region</Label>
+                      <Select
+                        value={editForm.regionId}
+                        onValueChange={(value) => setEditForm({ ...editForm, regionId: value })}
+                      >
+                        <SelectTrigger data-testid="select-edit-region">
+                          <SelectValue placeholder="Select a region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {regions.map((region) => (
+                            <SelectItem key={region.id} value={region.id}>
+                              {region.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {editForm.regionId && getSelectedRegion(editForm.regionId) && (
+                        <p className="text-xs text-slate-500">
+                          Reminders sent on the {getSelectedRegion(editForm.regionId)?.reminderDayOfMonth}{getSelectedRegion(editForm.regionId)?.reminderDayOfMonth === 1 ? 'st' : getSelectedRegion(editForm.regionId)?.reminderDayOfMonth === 2 ? 'nd' : getSelectedRegion(editForm.regionId)?.reminderDayOfMonth === 3 ? 'rd' : 'th'} of appointment month
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-appointmentDate">First Appointment Date</Label>
+                        <Input
+                          id="edit-appointmentDate"
+                          type="date"
+                          value={editForm.appointmentDate}
+                          onChange={(e) => setEditForm({ ...editForm, appointmentDate: e.target.value, nextServiceDate: e.target.value })}
+                          data-testid="input-edit-appointment-date"
                         />
                       </div>
                       <div className="grid gap-2">
@@ -925,6 +1091,13 @@ export default function CrmAgreements() {
                         />
                       </div>
                     </div>
+                    {editForm.appointmentDate && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <p className="text-sm text-blue-700">
+                          <strong>Visit Schedule:</strong> First visit: {getVisitSummary(editForm.appointmentDate)?.firstVisit}, Second visit: {getVisitSummary(editForm.appointmentDate)?.secondVisit}
+                        </p>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <Label htmlFor="edit-startDate">Start Date</Label>
@@ -1023,6 +1196,40 @@ export default function CrmAgreements() {
                       <p className="font-medium">{selectedAgreement.address || "—"}</p>
                     </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-slate-500 text-xs">Contract Date</Label>
+                      <p className="font-medium">{formatDate(selectedAgreement.contractDate)}</p>
+                    </div>
+                    <div>
+                      <Label className="text-slate-500 text-xs">Price</Label>
+                      <p className="font-medium">${selectedAgreement.price || "229.00"}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-slate-500 text-xs">Region</Label>
+                      <p className="font-medium">
+                        {selectedAgreement.regionId ? getSelectedRegion(selectedAgreement.regionId)?.name || "—" : "—"}
+                      </p>
+                      {selectedAgreement.regionId && getSelectedRegion(selectedAgreement.regionId) && (
+                        <p className="text-xs text-slate-500">
+                          Reminders on the {getSelectedRegion(selectedAgreement.regionId)?.reminderDayOfMonth}{getSelectedRegion(selectedAgreement.regionId)?.reminderDayOfMonth === 1 ? 'st' : getSelectedRegion(selectedAgreement.regionId)?.reminderDayOfMonth === 2 ? 'nd' : getSelectedRegion(selectedAgreement.regionId)?.reminderDayOfMonth === 3 ? 'rd' : 'th'}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-slate-500 text-xs">First Appointment</Label>
+                      <p className="font-medium">{formatDate(selectedAgreement.appointmentDate)}</p>
+                    </div>
+                  </div>
+                  {selectedAgreement.appointmentDate && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <p className="text-sm text-blue-700">
+                        <strong>Visit Schedule:</strong> First visit: {getVisitSummary(selectedAgreement.appointmentDate)?.firstVisit}, Second visit: {getVisitSummary(selectedAgreement.appointmentDate)?.secondVisit}
+                      </p>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-slate-500 text-xs">Next Service Date</Label>
