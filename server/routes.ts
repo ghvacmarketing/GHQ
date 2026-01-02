@@ -20,7 +20,7 @@ import { voiceService } from "./services/voice";
 import { sendCrmQuoteEmail } from "./services/crmQuoteEmail";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
-import { eq, inArray, desc, sql, and, or, ilike, asc, count, isNull } from "drizzle-orm";
+import { eq, inArray, desc, sql, and, or, ilike, asc, count, isNull, lt, gt, ne, isNotNull } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -195,6 +195,54 @@ function validateDiscountLineItems(
   }
 
   return { valid: true };
+}
+
+// Helper function to check for scheduling conflicts
+async function checkSchedulingConflict(
+  techId: string | null | undefined,
+  scheduledStart: Date | string | null | undefined,
+  scheduledEnd: Date | string | null | undefined,
+  excludeWorkOrderId?: string
+): Promise<{ hasConflict: boolean; conflictingOrder?: { id: string; title: string | null; scheduledStart: Date | null; scheduledEnd: Date | null } }> {
+  if (!techId || !scheduledStart || !scheduledEnd) {
+    return { hasConflict: false };
+  }
+  
+  const start = new Date(scheduledStart);
+  const end = new Date(scheduledEnd);
+  
+  // Build conditions for overlap detection using Drizzle's typed helpers
+  // Overlap condition: existingStart < newEnd AND existingEnd > newStart
+  const conditions = [
+    eq(crmWorkOrders.assignedTechId, techId),
+    isNotNull(crmWorkOrders.scheduledStart),
+    isNotNull(crmWorkOrders.scheduledEnd),
+    lt(crmWorkOrders.scheduledStart, end),
+    gt(crmWorkOrders.scheduledEnd, start),
+    // Only check non-cancelled and non-completed orders
+    sql`${crmWorkOrders.status} NOT IN ('cancelled', 'completed')`
+  ];
+  
+  // Exclude current work order if updating
+  if (excludeWorkOrderId) {
+    conditions.push(ne(crmWorkOrders.id, excludeWorkOrderId));
+  }
+  
+  const conflicts = await db.select({
+    id: crmWorkOrders.id,
+    title: crmWorkOrders.title,
+    scheduledStart: crmWorkOrders.scheduledStart,
+    scheduledEnd: crmWorkOrders.scheduledEnd,
+  })
+  .from(crmWorkOrders)
+  .where(and(...conditions))
+  .limit(1);
+  
+  if (conflicts.length > 0) {
+    return { hasConflict: true, conflictingOrder: conflicts[0] };
+  }
+  
+  return { hasConflict: false };
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -8459,6 +8507,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid work order data", errors: result.error.flatten() });
       }
 
+      // Check for scheduling conflicts
+      const { assignedTechId, scheduledStart, scheduledEnd } = result.data;
+      if (assignedTechId && scheduledStart && scheduledEnd) {
+        const { hasConflict, conflictingOrder } = await checkSchedulingConflict(
+          assignedTechId,
+          scheduledStart,
+          scheduledEnd
+        );
+        if (hasConflict) {
+          return res.status(409).json({ 
+            message: "Scheduling conflict",
+            error: "SCHEDULING_CONFLICT",
+            conflictingOrder: {
+              id: conflictingOrder?.id,
+              title: conflictingOrder?.title || 'Untitled',
+              scheduledStart: conflictingOrder?.scheduledStart,
+              scheduledEnd: conflictingOrder?.scheduledEnd,
+            }
+          });
+        }
+      }
+
       // Calculate work order number based on customer's existing work orders
       let workOrderNumber = 1;
       if (jobId) {
@@ -8575,6 +8645,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!property) {
             return res.status(400).json({ message: "Property does not belong to the selected customer" });
           }
+        }
+      }
+
+      // Check for scheduling conflicts
+      const effectiveTechId = assignedTechId !== undefined ? assignedTechId : existingWorkOrder.assignedTechId;
+      const effectiveStart = scheduledStart !== undefined ? scheduledStart : existingWorkOrder.scheduledStart;
+      const effectiveEnd = scheduledEnd !== undefined ? scheduledEnd : existingWorkOrder.scheduledEnd;
+
+      if (effectiveTechId && effectiveStart && effectiveEnd) {
+        const { hasConflict, conflictingOrder } = await checkSchedulingConflict(
+          effectiveTechId,
+          effectiveStart,
+          effectiveEnd,
+          req.params.id // Exclude current work order
+        );
+        if (hasConflict) {
+          return res.status(409).json({ 
+            message: "Scheduling conflict",
+            error: "SCHEDULING_CONFLICT",
+            conflictingOrder: {
+              id: conflictingOrder?.id,
+              title: conflictingOrder?.title || 'Untitled',
+              scheduledStart: conflictingOrder?.scheduledStart,
+              scheduledEnd: conflictingOrder?.scheduledEnd,
+            }
+          });
         }
       }
 

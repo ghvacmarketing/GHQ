@@ -1817,12 +1817,29 @@ export default function CrmDispatch() {
         }
       });
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to update work order",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      // Revert optimistic update
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders"] });
+      
+      // Check if it's a scheduling conflict error
+      if (error?.error === 'SCHEDULING_CONFLICT' || error?.message === 'Scheduling conflict') {
+        const conflictInfo = error?.conflictingOrder;
+        const startTime = conflictInfo?.scheduledStart 
+          ? format(new Date(conflictInfo.scheduledStart), "h:mm a")
+          : 'unknown time';
+        toast({
+          title: "Scheduling Conflict",
+          description: `This tech already has "${conflictInfo?.title || 'a work order'}" scheduled at ${startTime}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Failed to update work order",
+          description: error?.message || "An error occurred",
+          variant: "destructive",
+        });
+      }
+      
       if (workOrdersData) {
         setLocalWorkOrders(workOrdersData.map(enrichWorkOrder));
       }
