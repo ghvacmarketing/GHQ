@@ -8667,13 +8667,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);
       
-      // Also fetch unassigned work orders that need to be scheduled
+      // Also fetch unassigned work orders that have NO scheduled date (ready to be scheduled)
+      // Work orders with a scheduled date will appear on their scheduled date via getWorkOrdersByDateRange
       const unassignedWorkOrders = await storage.getUnassignedWorkOrders();
       
-      // Merge work orders, avoiding duplicates (unassigned WO might already be in date range)
+      // Only add unassigned work orders that don't have a scheduled date
+      // (ones with scheduled dates are already in the date-filtered results)
       const allWorkOrderIds = new Set(workOrders.map(wo => wo.id));
       for (const uwo of unassignedWorkOrders) {
-        if (!allWorkOrderIds.has(uwo.id)) {
+        if (!allWorkOrderIds.has(uwo.id) && !uwo.scheduledStart) {
           workOrders.push(uwo);
         }
       }
