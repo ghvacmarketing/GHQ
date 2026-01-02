@@ -880,7 +880,7 @@ export default function CrmProposalBuilder() {
   }, [customerSearchTerm]);
 
   // Customer search query (uses CRM customers endpoint)
-  const { data: customerSearchResults = [], isFetching: isSearchingCustomers } = useQuery<CrmCustomerForProposal[]>({
+  const { data: customerSearchData, isFetching: isSearchingCustomers } = useQuery<CrmCustomerForProposal[]>({
     queryKey: ["/api/crm/customers", debouncedCustomerSearch],
     queryFn: async () => {
       if (debouncedCustomerSearch.length < 2) return [];
@@ -896,6 +896,7 @@ export default function CrmProposalBuilder() {
     enabled: debouncedCustomerSearch.length >= 2,
     refetchOnWindowFocus: false,
   });
+  const customerSearchResults = Array.isArray(customerSearchData) ? customerSearchData : [];
 
   // Accept quote mutation
   const acceptQuoteMutation = useMutation({
