@@ -42,7 +42,8 @@ import { ScatterChart, Scatter, XAxis, YAxis, Tooltip as RechartsTooltip, Respon
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO, formatDistanceToNow, subDays, startOfDay } from "date-fns";
+import { format, parseISO, formatDistanceToNow, subDays } from "date-fns";
+import { formatLocal, toLocalTime } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import type { Voicemail, CallLog, CrmUser } from "@shared/schema";
 
@@ -773,11 +774,11 @@ interface WeeklyStatsProps {
 
 function WeeklyStats({ days }: WeeklyStatsProps) {
   const weeklyData = useMemo(() => {
-    const today = startOfDay(new Date());
+    const todayLocal = toLocalTime(new Date());
     const last7Days: { date: string; dayName: string; count: number }[] = [];
 
     for (let i = 6; i >= 0; i--) {
-      const date = subDays(today, i);
+      const date = subDays(todayLocal, i);
       const dateStr = format(date, "yyyy-MM-dd");
       const dayName = format(date, "EEE").charAt(0);
       const dayData = days.find((d) => d.date === dateStr);
@@ -796,7 +797,7 @@ function WeeklyStats({ days }: WeeklyStatsProps) {
   return (
     <div className="flex items-center gap-1.5 mb-3 py-2 px-3 bg-muted/20 dark:bg-muted/10 rounded-md border border-border/50" data-testid="crm-phone-weekly-stats">
       {weeklyData.last7Days.map((day) => {
-        const isToday = day.date === format(new Date(), "yyyy-MM-dd");
+        const isToday = day.date === formatLocal(new Date(), "yyyy-MM-dd");
         return (
           <div
             key={day.date}
@@ -830,7 +831,7 @@ function DailyCallLog() {
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  const todayDate = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayDate = useMemo(() => formatLocal(new Date(), "yyyy-MM-dd"), []);
 
   const { data: days = [], isLoading: isDaysLoading } = useQuery<{ id: string; date: string; count: number }[]>({
     queryKey: ["/api/call-logs/days"],
@@ -1022,7 +1023,7 @@ function DailyCallLog() {
                         </div>
                         <div>
                           <CardTitle className="text-base font-semibold">Today</CardTitle>
-                          <p className="text-xs text-muted-foreground">{format(new Date(), "EEEE, MMMM d")}</p>
+                          <p className="text-xs text-muted-foreground">{formatLocal(new Date(), "EEEE, MMMM d")}</p>
                         </div>
                       </div>
                       <Badge className="bg-primary/10 text-primary border-primary/20 text-sm">
@@ -1602,7 +1603,7 @@ function PhoneScreeningForm() {
   const form = useForm<PhoneScreeningFormData>({
     resolver: zodResolver(phoneScreeningSchema),
     defaultValues: {
-      dateOfCall: format(new Date(), "yyyy-MM-dd"),
+      dateOfCall: formatLocal(new Date(), "yyyy-MM-dd"),
       screenedBy: "",
       candidateName: "",
       phone: "",
