@@ -18,13 +18,12 @@ const navTabs = [
 export default function MobileShell({ children }: MobileShellProps) {
   const [location] = useLocation();
 
-  const { data: currentUser } = useQuery<CrmUser>({
+  const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: async () => {
       const res = await fetch("/api/crm/auth/me", { credentials: "include" });
       if (!res.ok) return null;
-      const data = await res.json();
-      return data.user;
+      return res.json();
     },
     staleTime: 5 * 60 * 1000,
   });
