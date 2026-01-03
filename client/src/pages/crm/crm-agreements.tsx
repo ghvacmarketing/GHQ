@@ -552,7 +552,7 @@ export default function CrmAgreements() {
               Service Agreements
             </h1>
             <p className="text-sm text-slate-500">
-              {filteredAndSortedAgreements.length} agreement{filteredAndSortedAgreements.length !== 1 ? "s" : ""}
+              {agreementsData?.pagination?.total ?? 0} agreement{(agreementsData?.pagination?.total ?? 0) !== 1 ? "s" : ""}
             </p>
           </div>
           <div className="flex items-center gap-2">
