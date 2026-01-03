@@ -312,8 +312,8 @@ export default function CrmProjects() {
     // If customer has sites, require site selection
     if (sites.length > 0 && !selectedSite) {
       toast({
-        title: "Site required",
-        description: "Please select a site for this customer.",
+        title: "Location required",
+        description: "Please select a location for this customer.",
         variant: "destructive",
       });
       return;
@@ -638,16 +638,16 @@ export default function CrmProjects() {
               </Popover>
             </div>
 
-            {/* Site selection - shown only when customer is selected */}
+            {/* Location selection - shown only when customer is selected */}
             {selectedCustomer && (
               <div className="space-y-2">
-                <Label htmlFor="site">
-                  Site {sites.length > 0 && <span className="text-red-500">*</span>}
+                <Label htmlFor="location">
+                  Location {sites.length > 0 && <span className="text-red-500">*</span>}
                 </Label>
                 {sitesLoading ? (
                   <div className="flex items-center gap-2 p-3 border rounded-md bg-slate-50">
                     <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-                    <span className="text-sm text-slate-500">Loading sites...</span>
+                    <span className="text-sm text-slate-500">Loading locations...</span>
                   </div>
                 ) : sites.length > 0 ? (
                   <Select 
@@ -657,11 +657,11 @@ export default function CrmProjects() {
                       setSelectedSite(site || null);
                     }}
                   >
-                    <SelectTrigger data-testid="select-site">
-                      <SelectValue placeholder="Select a site">
+                    <SelectTrigger data-testid="select-location">
+                      <SelectValue placeholder="Select a location">
                         {selectedSite 
                           ? `${selectedSite.address1}${selectedSite.city ? `, ${selectedSite.city}` : ""}`
-                          : "Select a site"}
+                          : "Select a location"}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
@@ -674,7 +674,7 @@ export default function CrmProjects() {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <p className="text-sm text-slate-500 p-2">No sites for this customer</p>
+                  <p className="text-sm text-slate-500 p-2">No locations for this customer</p>
                 )}
               </div>
             )}

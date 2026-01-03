@@ -919,7 +919,7 @@ export default function CrmWorkOrderDetail() {
                 <CardHeader className="pb-3 border-b bg-slate-50/50">
                   <CardTitle className="flex items-center gap-2 text-base font-semibold">
                     <User className="h-4 w-4 text-[#711419]" />
-                    Customer & Site
+                    Customer & Location
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4 space-y-3">
@@ -1611,17 +1611,17 @@ export default function CrmWorkOrderDetail() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Site <span className="text-red-500">*</span></Label>
+                    <Label className="text-xs text-slate-500 uppercase tracking-wide">Location <span className="text-red-500">*</span></Label>
                     {properties.length > 0 ? (
                       <Select 
                         value={workOrder.propertyId || ""} 
                         onValueChange={handleUpdateProperty}
                       >
-                        <SelectTrigger className="w-full" data-testid="select-edit-site">
-                          <SelectValue placeholder="Select a site">
+                        <SelectTrigger className="w-full" data-testid="select-edit-location">
+                          <SelectValue placeholder="Select a location">
                             {workOrder.property 
                               ? getPropertyAddress(workOrder.property) 
-                              : "Select a site"}
+                              : "Select a location"}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
@@ -1634,17 +1634,17 @@ export default function CrmWorkOrderDetail() {
                       </Select>
                     ) : (
                       <div className="space-y-2">
-                        <p className="text-sm text-slate-500">No sites for this customer</p>
+                        <p className="text-sm text-slate-500">No locations for this customer</p>
                         {workOrder.customerId && (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => navigate(`/crm/customers/${workOrder.customerId}`)}
                             className="w-full"
-                            data-testid="button-add-site"
+                            data-testid="button-add-location"
                           >
                             <Plus className="h-4 w-4 mr-2" />
-                            Add Site
+                            Add Location
                           </Button>
                         )}
                       </div>

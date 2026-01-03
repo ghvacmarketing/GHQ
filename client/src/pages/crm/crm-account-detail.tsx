@@ -141,7 +141,7 @@ export default function CrmAccountDetail() {
   const accountId = params.id;
   const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = useState("sites");
+  const [activeTab, setActiveTab] = useState("locations");
   const [siteDialogOpen, setSiteDialogOpen] = useState(false);
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
@@ -327,13 +327,13 @@ export default function CrmAccountDetail() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Site created successfully" });
+      toast({ title: "Location created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/accounts", accountId] });
       setSiteDialogOpen(false);
       resetSiteForm();
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to create site", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to create location", description: error.message, variant: "destructive" });
     },
   });
 
@@ -344,13 +344,13 @@ export default function CrmAccountDetail() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Site updated successfully" });
+      toast({ title: "Location updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/accounts", accountId] });
       setSiteDialogOpen(false);
       resetSiteForm();
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to update site", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to update location", description: error.message, variant: "destructive" });
     },
   });
 
@@ -360,12 +360,12 @@ export default function CrmAccountDetail() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Site deleted successfully" });
+      toast({ title: "Location deleted successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/accounts", accountId] });
       setDeleteSiteId(null);
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to delete site", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to delete location", description: error.message, variant: "destructive" });
     },
   });
 
@@ -576,9 +576,9 @@ export default function CrmAccountDetail() {
                 Overview
               </TabsTrigger>
             )}
-            <TabsTrigger value="sites" data-testid="tab-sites" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
+            <TabsTrigger value="locations" data-testid="tab-locations" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
               <MapPin className="h-4 w-4 mr-2" />
-              Sites ({displaySites.length})
+              Locations ({displaySites.length})
             </TabsTrigger>
             <TabsTrigger value="contacts" data-testid="tab-contacts" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
               <User className="h-4 w-4 mr-2" />
@@ -685,14 +685,14 @@ export default function CrmAccountDetail() {
 
                       const checklistItems = [
                         {
-                          id: "site",
-                          label: "Add at least 1 Site/Property",
+                          id: "location",
+                          label: "Add at least 1 Location/Property",
                           completed: hasSite,
                           action: () => {
                             resetSiteForm();
                             setSiteDialogOpen(true);
                           },
-                          buttonLabel: "Add Site",
+                          buttonLabel: "Add Location",
                         },
                         {
                           id: "ops-contact",
@@ -766,27 +766,27 @@ export default function CrmAccountDetail() {
             )}
           </TabsContent>
 
-          <TabsContent value="sites" className="space-y-4">
+          <TabsContent value="locations" className="space-y-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-4">
-                <CardTitle className="text-lg">Sites</CardTitle>
+                <CardTitle className="text-lg">Locations</CardTitle>
                 <Button
                   size="sm"
                   onClick={() => {
                     resetSiteForm();
                     setSiteDialogOpen(true);
                   }}
-                  data-testid="button-add-site"
+                  data-testid="button-add-location"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Site
+                  Add Location
                 </Button>
               </CardHeader>
               <CardContent>
                 {displaySites.length === 0 ? (
                   <div className="text-center py-8 text-slate-500">
                     <MapPin className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>No sites added yet</p>
+                    <p>No locations added yet</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -794,7 +794,7 @@ export default function CrmAccountDetail() {
                       <div
                         key={site.id}
                         className="flex items-start justify-between p-4 border rounded-lg hover:bg-slate-50"
-                        data-testid={`site-card-${site.id}`}
+                        data-testid={`location-card-${site.id}`}
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
@@ -847,7 +847,7 @@ export default function CrmAccountDetail() {
                             variant="ghost"
                             size="icon"
                             onClick={() => openEditSite(site)}
-                            data-testid={`button-edit-site-${site.id}`}
+                            data-testid={`button-edit-location-${site.id}`}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -856,7 +856,7 @@ export default function CrmAccountDetail() {
                             size="icon"
                             onClick={() => setDeleteSiteId(site.id)}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            data-testid={`button-delete-site-${site.id}`}
+                            data-testid={`button-delete-location-${site.id}`}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -1176,21 +1176,21 @@ export default function CrmAccountDetail() {
         <Dialog open={siteDialogOpen} onOpenChange={(open) => { if (!open) { setSiteDialogOpen(false); resetSiteForm(); } else setSiteDialogOpen(true); }}>
           <DialogContent className="sm:max-w-[520px] p-0 gap-0 overflow-hidden">
             <DialogHeader className="px-6 pt-6 pb-4 border-b bg-slate-50 dark:bg-slate-900">
-              <DialogTitle className="text-xl font-semibold">{editingSite ? "Edit Site" : "Add Site"}</DialogTitle>
+              <DialogTitle className="text-xl font-semibold">{editingSite ? "Edit Location" : "Add Location"}</DialogTitle>
               <DialogDescription className="text-slate-500">
-                {editingSite ? "Update the site information" : "Add a new site to this account"}
+                {editingSite ? "Update the location information" : "Add a new location to this account"}
               </DialogDescription>
             </DialogHeader>
             
             <div className="px-6 py-5 space-y-5 max-h-[65vh] overflow-y-auto">
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Site Name <span className="text-slate-400 font-normal">(optional)</span></Label>
+                <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Location Name <span className="text-slate-400 font-normal">(optional)</span></Label>
                 <Input
                   placeholder="e.g., Main Office, Unit A"
                   value={siteForm.siteName}
                   onChange={(e) => setSiteForm({ ...siteForm, siteName: e.target.value })}
                   className="h-11"
-                  data-testid="input-site-name"
+                  data-testid="input-location-name"
                 />
               </div>
 
@@ -1256,7 +1256,7 @@ export default function CrmAccountDetail() {
                   className="h-5 w-5"
                   data-testid="checkbox-is-primary"
                 />
-                <Label htmlFor="isPrimary" className="text-sm font-medium cursor-pointer">Set as Primary Site</Label>
+                <Label htmlFor="isPrimary" className="text-sm font-medium cursor-pointer">Set as Primary Location</Label>
               </div>
 
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 space-y-4">
@@ -1341,11 +1341,11 @@ export default function CrmAccountDetail() {
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium text-slate-600">Notes <span className="text-slate-400 font-normal">(optional)</span></Label>
                 <Textarea
-                  placeholder="Any additional notes about this site..."
+                  placeholder="Any additional notes about this location..."
                   value={siteForm.notes}
                   onChange={(e) => setSiteForm({ ...siteForm, notes: e.target.value })}
                   className="min-h-[80px] resize-none"
-                  data-testid="input-site-notes"
+                  data-testid="input-location-notes"
                 />
               </div>
             </div>
@@ -1370,9 +1370,9 @@ export default function CrmAccountDetail() {
                 }}
                 disabled={!siteForm.address1 || !siteForm.city || !siteForm.state || !siteForm.zip || createSiteMutation.isPending || updateSiteMutation.isPending || !!tenantEmailError || !!tenantPhoneError}
                 className="px-6 bg-[#711419] hover:bg-[#5a1014]"
-                data-testid="button-save-site"
+                data-testid="button-save-location"
               >
-                {createSiteMutation.isPending || updateSiteMutation.isPending ? "Saving..." : editingSite ? "Update Site" : "Add Site"}
+                {createSiteMutation.isPending || updateSiteMutation.isPending ? "Saving..." : editingSite ? "Update Location" : "Add Location"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1461,13 +1461,13 @@ export default function CrmAccountDetail() {
               </div>
               {sites.length > 0 && (
                 <div className="space-y-2">
-                  <Label>Associated Site (optional)</Label>
+                  <Label>Associated Location (optional)</Label>
                   <Select value={contactForm.siteId || "none"} onValueChange={(value) => setContactForm({ ...contactForm, siteId: value === "none" ? "" : value })}>
-                    <SelectTrigger data-testid="select-contact-site">
-                      <SelectValue placeholder="No specific site" />
+                    <SelectTrigger data-testid="select-contact-location">
+                      <SelectValue placeholder="No specific location" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">No specific site</SelectItem>
+                      <SelectItem value="none">No specific location</SelectItem>
                       {sites.map((site) => (
                         <SelectItem key={site.id} value={site.id}>
                           {site.siteName || `${site.address1}, ${site.city}`}

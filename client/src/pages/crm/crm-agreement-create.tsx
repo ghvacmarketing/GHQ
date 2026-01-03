@@ -406,7 +406,7 @@ export default function CrmAgreementCreate() {
                     {selectedCustomerId && customerProperties.length > 0 && (
                       <div className="col-span-2">
                         <Label htmlFor="property" className="text-sm font-medium">
-                          Property/Site {requiresPropertySelection && <span className="text-red-500">*</span>}
+                          Property/Location {requiresPropertySelection && <span className="text-red-500">*</span>}
                         </Label>
                         <Select
                           value={propertyId}

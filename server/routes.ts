@@ -6397,7 +6397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             )
           );
           if (!site) {
-            return res.status(400).json({ message: "Site not found or doesn't belong to account" });
+            return res.status(400).json({ message: "Location not found or doesn't belong to account" });
           }
         }
       } else if (parsed.data.customerId) {
@@ -7426,7 +7426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     switch (accountType) {
       case "RESIDENTIAL":
         if (sites.length === 0) {
-          errors.push("Residential accounts must have at least 1 site");
+          errors.push("Residential accounts must have at least 1 location");
         }
         if (contacts.length === 0) {
           errors.push("Residential accounts must have at least 1 contact");
@@ -7904,7 +7904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(sites);
     } catch (error) {
       console.error("Error fetching sites:", error);
-      return res.status(500).json({ message: "Failed to fetch sites" });
+      return res.status(500).json({ message: "Failed to fetch locations" });
     }
   });
 
@@ -7928,7 +7928,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const siteResult = insertCrmSiteSchema.safeParse(siteData);
       if (!siteResult.success) {
         return res.status(400).json({
-          message: "Invalid site data",
+          message: "Invalid location data",
           errors: siteResult.error.flatten(),
         });
       }
@@ -7955,7 +7955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(201).json(site);
     } catch (error) {
       console.error("Error creating site:", error);
-      return res.status(500).json({ message: "Failed to create site" });
+      return res.status(500).json({ message: "Failed to create location" });
     }
   });
 
@@ -7973,7 +7973,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [existingSite] = await db.select().from(crmSites)
         .where(and(eq(crmSites.id, siteId), eq(crmSites.accountId, accountId)));
       if (!existingSite) {
-        return res.status(404).json({ message: "Site not found" });
+        return res.status(404).json({ message: "Location not found" });
       }
 
       // If setting as primary, unset other primary sites
@@ -8001,7 +8001,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(updatedSite);
     } catch (error) {
       console.error("Error updating site:", error);
-      return res.status(500).json({ message: "Failed to update site" });
+      return res.status(500).json({ message: "Failed to update location" });
     }
   });
 
@@ -8019,7 +8019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [site] = await db.select().from(crmSites)
         .where(and(eq(crmSites.id, siteId), eq(crmSites.accountId, accountId)));
       if (!site) {
-        return res.status(404).json({ message: "Site not found" });
+        return res.status(404).json({ message: "Location not found" });
       }
 
       await db.delete(crmSites).where(eq(crmSites.id, siteId));
@@ -8034,10 +8034,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.ip
       );
 
-      return res.json({ message: "Site deleted successfully" });
+      return res.json({ message: "Location deleted successfully" });
     } catch (error) {
       console.error("Error deleting site:", error);
-      return res.status(500).json({ message: "Failed to delete site" });
+      return res.status(500).json({ message: "Failed to delete location" });
     }
   });
 
@@ -8426,7 +8426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       return res.json({
         success: true,
-        message: `Migration complete: ${results.accountsCreated} accounts, ${results.sitesCreated} sites, ${results.contactsCreated} contacts created`,
+        message: `Migration complete: ${results.accountsCreated} accounts, ${results.sitesCreated} locations, ${results.contactsCreated} contacts created`,
         ...results,
       });
     } catch (error) {
@@ -8605,7 +8605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       return res.json({
         success: true,
-        message: `Import complete: ${results.accountsCreated} accounts, ${results.sitesCreated} sites, ${results.contactsCreated} contacts created (${results.skipped} skipped)`,
+        message: `Import complete: ${results.accountsCreated} accounts, ${results.sitesCreated} locations, ${results.contactsCreated} contacts created (${results.skipped} skipped)`,
         ...results,
       });
     } catch (error) {

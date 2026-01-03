@@ -738,10 +738,10 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
               <p className="font-semibold">{agreement.customerName || 'Not selected'}</p>
             </div>
 
-            {/* Site/Property Address - helps differentiate multi-site agreements */}
+            {/* Location/Property Address - helps differentiate multi-location agreements */}
             {agreement.address && (
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Site / Property</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Location / Property</p>
                 <p className="font-medium text-slate-700">{agreement.address}</p>
               </div>
             )}
@@ -1143,12 +1143,12 @@ function CustomerTabbedView({
           Overview
         </TabsTrigger>
         <TabsTrigger 
-          value="sites" 
+          value="locations" 
           className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
-          data-testid="tab-sites"
+          data-testid="tab-locations"
         >
           <MapPin className="h-4 w-4 mr-2" />
-          Sites
+          Locations
         </TabsTrigger>
         <TabsTrigger 
           value="work-orders" 
@@ -1328,7 +1328,7 @@ function CustomerTabbedView({
                     <Circle className="h-5 w-5 text-slate-300" />
                   )}
                   <span className={hasAtLeastOneSite ? "text-slate-700" : "text-slate-500"}>
-                    Step 1: Add at least 1 Site/Property
+                    Step 1: Add at least 1 Location/Property
                   </span>
                   {hasAtLeastOneSite && (
                     <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
@@ -1367,10 +1367,10 @@ function CustomerTabbedView({
                   size="sm"
                   className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
                   onClick={() => setPropertyDialogOpen(true)}
-                  data-testid="button-add-site-checklist"
+                  data-testid="button-add-location-checklist"
                 >
                   <Plus className="h-4 w-4 mr-1" />
-                  Add Site
+                  Add Location
                 </Button>
               </div>
             </CardContent>
@@ -1422,22 +1422,22 @@ function CustomerTabbedView({
         )}
       </TabsContent>
 
-      {/* Sites Tab */}
-      <TabsContent value="sites" className="space-y-6" data-testid="tab-content-sites">
-        <Card data-testid="card-sites">
+      {/* Locations Tab */}
+      <TabsContent value="locations" className="space-y-6" data-testid="tab-content-locations">
+        <Card data-testid="card-locations">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5 text-[#711419]" />
-              Sites/Properties ({customerProperties?.length || 0})
+              Locations/Properties ({customerProperties?.length || 0})
             </CardTitle>
             <Button 
               size="sm"
               className="bg-[#711419] hover:bg-[#5a1014] text-white"
               onClick={() => setPropertyDialogOpen(true)}
-              data-testid="button-add-site"
+              data-testid="button-add-location"
             >
               <Plus className="h-4 w-4 mr-1" />
-              Add Site
+              Add Location
             </Button>
           </CardHeader>
           <CardContent>
@@ -1449,14 +1449,14 @@ function CustomerTabbedView({
             ) : !customerProperties || customerProperties.length === 0 ? (
               <div className="text-center py-8">
                 <MapPin className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500 mb-4">No sites/properties added yet</p>
+                <p className="text-slate-500 mb-4">No locations/properties added yet</p>
                 <Button 
                   className="bg-[#711419] hover:bg-[#5a1014] text-white"
                   onClick={() => setPropertyDialogOpen(true)}
-                  data-testid="button-add-first-site"
+                  data-testid="button-add-first-location"
                 >
                   <Plus className="h-4 w-4 mr-1" />
-                  Add First Site
+                  Add First Location
                 </Button>
               </div>
             ) : (
@@ -3432,13 +3432,13 @@ export default function CrmCustomerDetail() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Site added successfully" });
+      toast({ title: "Location added successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "properties"] });
       handleClosePropertyDialog();
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to add site",
+        title: "Failed to add location",
         description: error.message,
         variant: "destructive",
       });
@@ -3476,13 +3476,13 @@ export default function CrmCustomerDetail() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Site updated successfully" });
+      toast({ title: "Location updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "properties"] });
       handleClosePropertyDialog();
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to update site",
+        title: "Failed to update location",
         description: error.message,
         variant: "destructive",
       });
@@ -4418,9 +4418,9 @@ export default function CrmCustomerDetail() {
             <div className="p-4 pb-0 shrink-0">
               <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-5">
                 <DialogHeader className="p-0">
-                  <DialogTitle className="text-xl font-semibold">{editingProperty ? "Edit Site" : "Add Site"}</DialogTitle>
+                  <DialogTitle className="text-xl font-semibold">{editingProperty ? "Edit Location" : "Add Location"}</DialogTitle>
                   <DialogDescription className="text-slate-500">
-                    {editingProperty ? "Update site/property details" : "Add a new site/property to this customer"}
+                    {editingProperty ? "Update location/property details" : "Add a new location/property to this customer"}
                   </DialogDescription>
                 </DialogHeader>
               </div>
@@ -4486,7 +4486,7 @@ export default function CrmCustomerDetail() {
                 <div className="space-y-1.5">
                   <Label className="text-sm font-medium text-slate-600">Notes <span className="text-slate-400 font-normal">(optional)</span></Label>
                   <Textarea
-                    placeholder="Any additional notes about this site..."
+                    placeholder="Any additional notes about this location..."
                     value={propNotes}
                     onChange={(e) => setPropNotes(e.target.value)}
                     className="min-h-[80px] resize-none"
@@ -4495,7 +4495,7 @@ export default function CrmCustomerDetail() {
                 </div>
               )}
 
-              {/* Tenant Contact & Site Details - Only for Property Manager customers */}
+              {/* Tenant Contact & Location Details - Only for Property Manager customers */}
               {isPropertyManager && (
                 <div className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-xl p-4 space-y-4 border border-violet-200/60 dark:border-violet-700/40 shadow-sm">
                   <p className="text-xs font-semibold text-violet-600 uppercase tracking-wider flex items-center gap-2">
@@ -4540,7 +4540,7 @@ export default function CrmCustomerDetail() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium text-slate-600">Site Notes</Label>
+                    <Label className="text-sm font-medium text-slate-600">Location Notes</Label>
                     <Textarea
                       placeholder="Gate code, access notes, special instructions..."
                       value={propNotes}
@@ -4558,7 +4558,7 @@ export default function CrmCustomerDetail() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Billing Override</p>
-                      <p className="text-xs text-slate-500 mt-1">Enable to set custom billing for this site</p>
+                      <p className="text-xs text-slate-500 mt-1">Enable to set custom billing for this location</p>
                     </div>
                     <Switch
                       checked={propBillingOverride}
@@ -4714,7 +4714,7 @@ export default function CrmCustomerDetail() {
                 className="px-6 bg-[#711419] hover:bg-[#5a1014]"
                 data-testid="button-save-property"
               >
-                {(createPropertyMutation.isPending || updatePropertyMutation.isPending) ? "Saving..." : (editingProperty ? "Save Changes" : "Add Site")}
+                {(createPropertyMutation.isPending || updatePropertyMutation.isPending) ? "Saving..." : (editingProperty ? "Save Changes" : "Add Location")}
               </Button>
             </DialogFooter>
           </DialogContent>

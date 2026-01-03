@@ -1302,19 +1302,19 @@ export default function CrmWorkOrders() {
                   </div>
                 </div>
 
-                {/* Site Section with Selector */}
+                {/* Location Section with Selector */}
                 <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Site <span className="text-red-500">*</span></h4>
+                  <h4 className="font-medium text-sm text-slate-700">Location <span className="text-red-500">*</span></h4>
                   {woProperties.length > 0 ? (
                     <Select 
                       value={selectedWorkOrder.propertyId || ""} 
                       onValueChange={handleUpdateProperty}
                     >
-                      <SelectTrigger className="w-full" data-testid="select-site">
-                        <SelectValue placeholder="Select a site">
+                      <SelectTrigger className="w-full" data-testid="select-location">
+                        <SelectValue placeholder="Select a location">
                           {selectedWorkOrder.property 
                             ? getPropertyAddress(selectedWorkOrder.property) 
-                            : "Select a site"}
+                            : "Select a location"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -1327,7 +1327,7 @@ export default function CrmWorkOrders() {
                     </Select>
                   ) : (
                     <div className="space-y-2">
-                      <p className="text-sm text-slate-500">No sites for this customer</p>
+                      <p className="text-sm text-slate-500">No locations for this customer</p>
                       {selectedWorkOrder.customerId && (
                         <Button
                           variant="outline"
@@ -1337,10 +1337,10 @@ export default function CrmWorkOrders() {
                             navigate(`/crm/customers/${selectedWorkOrder.customerId}`);
                           }}
                           className="w-full"
-                          data-testid="button-add-site"
+                          data-testid="button-add-location"
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Add Site
+                          Add Location
                         </Button>
                       )}
                     </div>
@@ -1704,11 +1704,11 @@ export default function CrmWorkOrders() {
 
               {selectedCustomer && (
                 <div className="space-y-2">
-                  <Label>Site <span className="text-red-500">*</span></Label>
+                  <Label>Location <span className="text-red-500">*</span></Label>
                   {properties.length > 0 ? (
                     <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
-                      <SelectTrigger data-testid="select-site">
-                        <SelectValue placeholder="Select a site" />
+                      <SelectTrigger data-testid="select-location">
+                        <SelectValue placeholder="Select a location" />
                       </SelectTrigger>
                       <SelectContent>
                         {properties.map((prop) => (
@@ -1720,7 +1720,7 @@ export default function CrmWorkOrders() {
                     </Select>
                   ) : (
                     <div className="space-y-2">
-                      <p className="text-sm text-slate-500">No sites for this customer</p>
+                      <p className="text-sm text-slate-500">No locations for this customer</p>
                       <Button
                         type="button"
                         variant="outline"
@@ -1730,10 +1730,10 @@ export default function CrmWorkOrders() {
                           navigate(`/crm/customers/${selectedCustomer.id}`);
                         }}
                         className="w-full"
-                        data-testid="button-add-site-create"
+                        data-testid="button-add-location-create"
                       >
                         <Plus className="h-4 w-4 mr-2" />
-                        Add Site First
+                        Add Location First
                       </Button>
                     </div>
                   )}
