@@ -62,17 +62,19 @@ Preferred communication style: Simple, everyday language.
   - **Tech**: Mobile app access only. Current users: Brian, Christopher, Tucker.
   - Route guards enforce access: `crm-route-guard.tsx` blocks tech from desktop, `mobile-shell.tsx` blocks admin from mobile.
 - **Employee Portal**: Separate authentication system with username/password login (scrypt-hashed passwords). Supports Employee and Admin roles with server-side permission enforcement. Employees can only view their own data (profile, compensation, paystubs, documents). Admins can create/deactivate users, set pay rates with effective dates, upload paystubs, and view audit logs. Features 8-hour session timeout and PostgreSQL-backed sessions.
-- **Maintenance Agreements System**: Comprehensive maintenance contract management with:
+- **Maintenance Agreements System**: Comprehensive maintenance contract management with flexible billing frequencies:
+  - **Flexible Frequencies**: Supports weekly, monthly, and annual billing cycles with configurable visits per period
+  - **Visit Generation**: Visits are spaced based on frequency (weekly=7 days apart, monthly=30 days apart, annual=evenly distributed across year)
   - **Three key dates**: Contract date (signing), Invoice date (same as contract), Appointment date (1 month after contract for payment grace period)
   - **Regional reminders**: Configurable reminder days per region/county (e.g., Jefferson County on 1st, Richmond County on 15th)
-  - **Visit tracking**: Auto-generates 2 visits per year, 6 months apart from appointment date
-  - **Database tables**: `maintenance_regions` (county name, reminder day), `maintenance_visits` (agreement ID, visit number, target date, work order link, status), `customAgreementTypes` (reusable templates)
+  - **Database tables**: `maintenance_regions` (county name, reminder day), `maintenance_visits` (agreement ID, visit number, target date, work order link, status), `customAgreementTypes` (reusable templates with frequency and visitsPerPeriod)
   - **Smart form**: When contract date is set, auto-fills invoice date, appointment date (+1 month), start date, and end date (+1 year)
   - **Default pricing**: $229/year with auto-renew enabled
-  - **Work order integration**: Visits can be linked to work orders for scheduling. Work order completion auto-syncs to maintenance visits (marks complete, updates nextServiceDate)
-  - **Custom Agreement Types**: Admin-configurable templates for non-HVAC services (crawlspace inspections, plumbing checks, etc.). Auto-creates billable items in Maintenance category. Dynamic work subtypes under MAINTENANCE include "Preventative Maintenance" + all active custom agreement types.
-  - **Customer Profile Maintenance Status**: Shows "X of Y visits complete" summary with pending visit details via `/api/crm/customers/:id/agreements` endpoint
-  - **Auto-Agreement from Invoice**: When an invoice containing maintenance items is marked as paid, automatically creates a maintenance agreement in the customer's profile with proper dates, visits, and pricing
+  - **Work order integration**: Visits can be linked to work orders via explicit `agreementId` field. When creating MAINTENANCE work orders, users must select which active agreement the visit is for. Work order completion auto-syncs to the linked agreement's maintenance visits (marks complete, updates nextServiceDate)
+  - **Custom Agreement Types**: Admin-configurable templates for non-HVAC services (crawlspace inspections, plumbing checks, etc.). Each type includes frequency (weekly/monthly/annual) and visitsPerPeriod settings. Auto-creates billable items in Maintenance category. Dynamic work subtypes under MAINTENANCE include "Preventative Maintenance" + all active custom agreement types.
+  - **Customer Profile Maintenance Status**: Shows agreement cards with frequency badges (Weekly/Monthly/Annual) and visit progress (X of Y complete). Visit list shows status badges for each visit. Fetched via `/api/crm/customers/:id/agreements` endpoint
+  - **Active Agreements API**: `/api/crm/customers/:id/active-agreements` returns only active agreements for work order agreement selection dropdown
+  - **Auto-Agreement from Invoice**: When an invoice containing maintenance items is marked as paid, automatically creates a maintenance agreement in the customer's profile. Looks up the custom agreement type matching the maintenance item name to inherit its frequency and visitsPerPeriod settings. All auto-created agreements span 1 year regardless of frequency.
 - **Service Call Checklists**: Dynamic intake questionnaires for service work orders with:
   - **Database tables**: `serviceCallChecklists` (template per service type), `checklistQuestions` (questions with order/required flags), `workOrderChecklistResponses` (answers linked to work order)
   - **Service type mapping**: Work subtypes map to checklist templates (NO_HEAT, NO_AC, WATER_LEAK, OTHER)
