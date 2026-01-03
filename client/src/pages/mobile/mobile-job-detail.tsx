@@ -1089,6 +1089,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                                   min="1"
                                   value={item.quantity}
                                   onChange={(e) => updateLineItem(item.id, "quantity", parseInt(e.target.value) || 1)}
+                                  onFocus={(e) => e.target.select()}
                                   className="min-h-[44px]"
                                   data-testid={`input-quantity-${item.id}`}
                                 />
@@ -1102,6 +1103,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                                   placeholder="0.00"
                                   value={item.unitPrice || ""}
                                   onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
+                                  onFocus={(e) => e.target.select()}
                                   className={`min-h-[44px] ${item.fromCatalog ? "bg-slate-100 cursor-not-allowed" : ""}`}
                                   readOnly={item.fromCatalog}
                                   data-testid={`input-unit-price-${item.id}`}
@@ -2171,6 +2173,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                                   min="1"
                                   value={item.quantity}
                                   onChange={(e) => updateLineItem(item.id, "quantity", parseInt(e.target.value) || 1)}
+                                  onFocus={(e) => e.target.select()}
                                   className="min-h-[44px]"
                                   data-testid={`input-invoice-quantity-${item.id}`}
                                 />
@@ -2184,6 +2187,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                                   placeholder="0.00"
                                   value={item.unitPrice || ""}
                                   onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
+                                  onFocus={(e) => e.target.select()}
                                   className={`min-h-[44px] ${item.fromCatalog ? "bg-slate-100 cursor-not-allowed" : ""}`}
                                   readOnly={item.fromCatalog}
                                   data-testid={`input-invoice-unit-price-${item.id}`}
