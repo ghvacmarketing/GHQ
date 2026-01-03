@@ -1006,7 +1006,8 @@ export default function CrmInvoiceCreate() {
                                   step="0.01"
                                   value={item.unitPrice}
                                   onChange={(e) => updateLineItem(item.id, { unitPrice: parseFloat(e.target.value) || 0 })}
-                                  className="h-8 text-right"
+                                  className={`h-8 text-right ${item.crmItemId ? "bg-slate-100 cursor-not-allowed" : ""}`}
+                                  readOnly={!!item.crmItemId}
                                   data-testid={`input-price-${item.id}`}
                                 />
                               </TableCell>

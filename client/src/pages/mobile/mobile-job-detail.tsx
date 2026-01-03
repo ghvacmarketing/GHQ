@@ -532,6 +532,7 @@ interface QuickQuoteLineItem {
   quantity: number;
   unitPrice: number;
   lineType: "service" | "discount" | "part";
+  fromCatalog?: boolean;
 }
 
 const quoteStatusConfig: Record<string, { label: string; className: string }> = {
@@ -715,7 +716,8 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       description: item.name, 
       quantity: 1, 
       unitPrice: price,
-      lineType: item.category === "service" ? "service" : "part"
+      lineType: item.category === "service" ? "service" : "part",
+      fromCatalog: true
     }]);
     setShowCatalog(false);
     setCatalogSearch("");
@@ -731,7 +733,8 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       description: item.name + (item.description ? ` - ${item.description}` : ""), 
       quantity: 1, 
       unitPrice: -Math.abs(rate),
-      lineType: "discount"
+      lineType: "discount",
+      fromCatalog: true
     }]);
     setShowDiscount(false);
     setDiscountSearch("");
@@ -750,7 +753,8 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       description: discountDescription.trim(), 
       quantity: 1, 
       unitPrice: -Math.abs(amount),
-      lineType: "discount"
+      lineType: "discount",
+      fromCatalog: false
     }]);
     setShowManualDiscount(false);
     setDiscountDescription("");
@@ -1043,7 +1047,8 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                                   placeholder="0.00"
                                   value={item.unitPrice || ""}
                                   onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                                  className="min-h-[44px]"
+                                  className={`min-h-[44px] ${item.fromCatalog ? "bg-slate-100 cursor-not-allowed" : ""}`}
+                                  readOnly={item.fromCatalog}
                                   data-testid={`input-unit-price-${item.id}`}
                                 />
                               </div>
@@ -1349,6 +1354,7 @@ interface InvoiceLineItem {
   quantity: number;
   unitPrice: number;
   lineType: "service" | "discount" | "part";
+  fromCatalog?: boolean;
 }
 
 interface InvoiceWithLineItems extends CrmInvoice {
@@ -1615,7 +1621,8 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       description: item.name, 
       quantity: 1, 
       unitPrice: price,
-      lineType: item.category === "service" ? "service" : "part"
+      lineType: item.category === "service" ? "service" : "part",
+      fromCatalog: true
     }]);
     setShowCatalog(false);
     setCatalogSearch("");
@@ -1631,7 +1638,8 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       description: item.name + (item.description ? ` - ${item.description}` : ""), 
       quantity: 1, 
       unitPrice: -Math.abs(rate),
-      lineType: "discount"
+      lineType: "discount",
+      fromCatalog: true
     }]);
     setShowDiscount(false);
     setDiscountSearch("");
@@ -2086,7 +2094,8 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                                   placeholder="0.00"
                                   value={item.unitPrice || ""}
                                   onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                                  className="min-h-[44px]"
+                                  className={`min-h-[44px] ${item.fromCatalog ? "bg-slate-100 cursor-not-allowed" : ""}`}
+                                  readOnly={item.fromCatalog}
                                   data-testid={`input-invoice-unit-price-${item.id}`}
                                 />
                               </div>

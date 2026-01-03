@@ -825,6 +825,8 @@ export default function CrmQuoteCreate() {
                           step="0.01"
                           value={item.unitPrice}
                           onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
+                          className={item.crmItemId ? "bg-slate-100 cursor-not-allowed" : ""}
+                          readOnly={!!item.crmItemId}
                           data-testid={`input-line-item-price-${index}`}
                         />
                       </div>
