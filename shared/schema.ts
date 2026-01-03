@@ -2113,6 +2113,7 @@ export const monthlyGoals = pgTable("monthly_goals", {
   monthlyInstallGoal: decimal("monthly_install_goal", { precision: 10, scale: 2 }).notNull().default("0"),
   monthlyMaintenanceGoal: decimal("monthly_maintenance_goal", { precision: 10, scale: 2 }).notNull().default("0"),
   monthlySalesGoal: decimal("monthly_sales_goal", { precision: 10, scale: 2 }).notNull().default("0"),
+  budgetedMonthlySalesGoal: decimal("budgeted_monthly_sales_goal", { precision: 12, scale: 2 }).notNull().default("0"),
   serviceWorkDays: integer("service_work_days").notNull().default(22),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
