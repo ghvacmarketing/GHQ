@@ -738,6 +738,14 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
               <p className="font-semibold">{agreement.customerName || 'Not selected'}</p>
             </div>
 
+            {/* Site/Property Address - helps differentiate multi-site agreements */}
+            {agreement.address && (
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Site / Property</p>
+                <p className="font-medium text-slate-700">{agreement.address}</p>
+              </div>
+            )}
+
             {/* Plan Name with Frequency Badge */}
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Plan</p>
@@ -888,6 +896,9 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
                     </Badge>
                   </div>
                   <p className="text-sm text-slate-600">{agreement.agreementPlan}</p>
+                  {agreement.address && (
+                    <p className="text-sm text-slate-500 mt-0.5">{agreement.address}</p>
+                  )}
                 </div>
               </div>
 
