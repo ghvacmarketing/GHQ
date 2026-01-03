@@ -131,7 +131,8 @@ export default function CrmAgreements() {
   const [typeForm, setTypeForm] = useState({
     name: "",
     description: "",
-    visitsPerYear: 1,
+    frequency: "annual" as "weekly" | "monthly" | "annual",
+    visitsPerPeriod: 2,
     defaultPrice: "0.00",
     isActive: true,
   });
@@ -226,7 +227,7 @@ export default function CrmAgreements() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/custom-agreement-types"] });
       setShowCreateTypeDialog(false);
-      setTypeForm({ name: "", description: "", visitsPerYear: 1, defaultPrice: "0.00", isActive: true });
+      setTypeForm({ name: "", description: "", frequency: "annual", visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
       toast({ title: "Custom agreement type created successfully" });
     },
     onError: () => {
@@ -242,7 +243,7 @@ export default function CrmAgreements() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/custom-agreement-types"] });
       setEditingType(null);
-      setTypeForm({ name: "", description: "", visitsPerYear: 1, defaultPrice: "0.00", isActive: true });
+      setTypeForm({ name: "", description: "", frequency: "annual", visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
       toast({ title: "Custom agreement type updated successfully" });
     },
     onError: () => {
@@ -1398,7 +1399,7 @@ export default function CrmAgreements() {
                 size="sm"
                 className="bg-[#711419] hover:bg-[#5a1014]"
                 onClick={() => {
-                  setTypeForm({ name: "", description: "", visitsPerYear: 1, defaultPrice: "0.00", isActive: true });
+                  setTypeForm({ name: "", description: "", frequency: "annual", visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
                   setShowCreateTypeDialog(true);
                 }}
                 data-testid="button-create-type"
@@ -1426,7 +1427,8 @@ export default function CrmAgreements() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead className="text-center">Visits/Year</TableHead>
+                    <TableHead className="text-center">Frequency</TableHead>
+                    <TableHead className="text-center">Visits/Period</TableHead>
                     <TableHead className="text-right">Default Price</TableHead>
                     <TableHead className="text-center">Active</TableHead>
                     <TableHead>Actions</TableHead>
@@ -1439,7 +1441,8 @@ export default function CrmAgreements() {
                       <TableCell className="text-slate-600 max-w-[200px] truncate">
                         {type.description || "—"}
                       </TableCell>
-                      <TableCell className="text-center">{type.visitsPerYear}</TableCell>
+                      <TableCell className="text-center capitalize">{type.frequency || "annual"}</TableCell>
+                      <TableCell className="text-center">{type.visitsPerPeriod}</TableCell>
                       <TableCell className="text-right">${type.defaultPrice || "0.00"}</TableCell>
                       <TableCell className="text-center">
                         {type.isActive ? (
@@ -1459,7 +1462,8 @@ export default function CrmAgreements() {
                               setTypeForm({
                                 name: type.name,
                                 description: type.description || "",
-                                visitsPerYear: type.visitsPerYear,
+                                frequency: type.frequency || "annual",
+                                visitsPerPeriod: type.visitsPerPeriod,
                                 defaultPrice: type.defaultPrice || "0.00",
                                 isActive: type.isActive,
                               });
@@ -1500,7 +1504,7 @@ export default function CrmAgreements() {
           if (!open) {
             setShowCreateTypeDialog(false);
             setEditingType(null);
-            setTypeForm({ name: "", description: "", visitsPerYear: 1, defaultPrice: "0.00", isActive: true });
+            setTypeForm({ name: "", description: "", frequency: "annual", visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
           }
         }}
       >
@@ -1548,15 +1552,31 @@ export default function CrmAgreements() {
                   data-testid="input-type-description"
                 />
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="type-frequency">Frequency *</Label>
+                <Select
+                  value={typeForm.frequency}
+                  onValueChange={(value: "weekly" | "monthly" | "annual") => setTypeForm({ ...typeForm, frequency: value })}
+                >
+                  <SelectTrigger id="type-frequency" data-testid="select-type-frequency">
+                    <SelectValue placeholder="Select frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="annual">Annual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="type-visits">Visits Per Year *</Label>
+                  <Label htmlFor="type-visits">Visits Per Period *</Label>
                   <Input
                     id="type-visits"
                     type="number"
                     min="1"
-                    value={typeForm.visitsPerYear}
-                    onChange={(e) => setTypeForm({ ...typeForm, visitsPerYear: parseInt(e.target.value) || 1 })}
+                    value={typeForm.visitsPerPeriod}
+                    onChange={(e) => setTypeForm({ ...typeForm, visitsPerPeriod: parseInt(e.target.value) || 1 })}
                     data-testid="input-type-visits"
                   />
                 </div>
@@ -1590,7 +1610,7 @@ export default function CrmAgreements() {
                 onClick={() => {
                   setShowCreateTypeDialog(false);
                   setEditingType(null);
-                  setTypeForm({ name: "", description: "", visitsPerYear: 1, defaultPrice: "0.00", isActive: true });
+                  setTypeForm({ name: "", description: "", frequency: "annual", visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
                 }}
                 data-testid="button-cancel-type"
               >

@@ -59,6 +59,8 @@ export default function CrmAgreementCreate() {
   const [autoRenew, setAutoRenew] = useState(true);
   const [notes, setNotes] = useState("");
   const [price, setPrice] = useState("229.00");
+  const [frequency, setFrequency] = useState<"weekly" | "monthly" | "annual">("annual");
+  const [visitsPerPeriod, setVisitsPerPeriod] = useState(2);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -147,6 +149,8 @@ export default function CrmAgreementCreate() {
         autoRenew,
         notes,
         status: "active" as const,
+        frequency,
+        visitsPerPeriod,
       };
 
       const res = await apiRequest("POST", "/api/crm/agreements", agreementData);
@@ -288,6 +292,33 @@ export default function CrmAgreementCreate() {
                         className="mt-1"
                         placeholder="e.g., Annual Maintenance Agreement"
                         data-testid="input-agreement-plan"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="frequency" className="text-sm font-medium">Service Frequency</Label>
+                      <Select value={frequency} onValueChange={(value: "weekly" | "monthly" | "annual") => setFrequency(value)}>
+                        <SelectTrigger className="mt-1" data-testid="select-frequency">
+                          <SelectValue placeholder="Select frequency..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="annual">Annual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="visitsPerPeriod" className="text-sm font-medium">Visits Per Period</Label>
+                      <Input
+                        id="visitsPerPeriod"
+                        type="number"
+                        min="1"
+                        value={visitsPerPeriod}
+                        onChange={(e) => setVisitsPerPeriod(parseInt(e.target.value) || 1)}
+                        className="mt-1"
+                        data-testid="input-visits-per-period"
                       />
                     </div>
 

@@ -581,7 +581,8 @@ interface AgreementWithVisits {
   contractDate: string | null;
   appointmentDate: string | null;
   price: string | null;
-  visitsPerYear: number;
+  visitsPerPeriod: number;
+  frequency?: string;
   autoRenew: boolean;
   regionId: string | null;
   createdAt: string | null;
@@ -689,17 +690,39 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
               <p className="font-semibold">{agreement.customerName || 'Not selected'}</p>
             </div>
 
-            {/* Plan Name */}
+            {/* Plan Name with Frequency Badge */}
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Plan</p>
-              <p className="font-semibold">{agreement.agreementPlan || 'Annual Maintenance Agreement'}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold">{agreement.agreementPlan || 'Maintenance Agreement'}</p>
+                <Badge 
+                  variant="outline" 
+                  className={
+                    agreement.frequency === "weekly" ? "bg-purple-100 text-purple-700 border-purple-200" :
+                    agreement.frequency === "monthly" ? "bg-blue-100 text-blue-700 border-blue-200" :
+                    "bg-amber-100 text-amber-700 border-amber-200"
+                  }
+                >
+                  {agreement.frequency === "weekly" ? "Weekly" : 
+                   agreement.frequency === "monthly" ? "Monthly" : "Annual"}
+                </Badge>
+              </div>
             </div>
 
-            {/* Tasks and Total Amount - side by side */}
+            {/* Visit Progress and Total Amount - side by side */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Tasks</p>
-                <p className="text-xl font-bold">{agreement.visitsPerYear || 0}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Visit Progress</p>
+                {(() => {
+                  const completed = agreement.maintenanceVisits?.filter(v => v.status === "completed").length || 0;
+                  const total = agreement.visitsPerPeriod || 0;
+                  return (
+                    <div className="flex items-center gap-2">
+                      <p className="text-xl font-bold">{completed} of {total}</p>
+                      <span className="text-sm text-muted-foreground">complete</span>
+                    </div>
+                  );
+                })()}
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Amount</p>
@@ -711,15 +734,28 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
             {agreement.maintenanceVisits && agreement.maintenanceVisits.length > 0 && (
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Scheduled Visits</p>
-                <div className="space-y-1">
-                  {agreement.maintenanceVisits.map((visit, index) => (
-                    <div key={visit.id} className="flex items-center gap-2">
-                      <span className="bg-slate-200 text-slate-700 rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium">
-                        {index + 1}
-                      </span>
-                      <span className="text-sm">{format(new Date(visit.targetDate), 'MMM d, yyyy')}</span>
-                    </div>
-                  ))}
+                <div className="space-y-2">
+                  {agreement.maintenanceVisits.map((visit, index) => {
+                    const statusColor = visitStatusColors[visit.status] || visitStatusColors.pending;
+                    return (
+                      <div key={visit.id} className="flex items-center gap-2">
+                        <span className={`rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium ${
+                          visit.status === "completed" ? "bg-green-200 text-green-700" :
+                          visit.status === "scheduled" ? "bg-blue-200 text-blue-700" :
+                          "bg-slate-200 text-slate-700"
+                        }`}>
+                          {visit.status === "completed" ? <CheckCircle className="h-3 w-3" /> : index + 1}
+                        </span>
+                        <span className="text-sm">{format(new Date(visit.targetDate), 'MMM d, yyyy')}</span>
+                        <Badge 
+                          variant="outline" 
+                          className={`${statusColor.bg} ${statusColor.text} text-xs`}
+                        >
+                          {visit.status}
+                        </Badge>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -775,7 +811,7 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
           ).length;
           const totalProgress = completedCount + scheduledCount;
           const progressPercent = Math.min(
-            (completedCount / agreement.visitsPerYear) * 100,
+            (completedCount / agreement.visitsPerPeriod) * 100,
             100
           );
 
@@ -839,10 +875,10 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">
-                    Visits/Year
+                    Visits/Period
                   </p>
                   <p className="font-medium text-slate-700">
-                    {agreement.visitsPerYear}
+                    {agreement.visitsPerPeriod}
                   </p>
                 </div>
               </div>
@@ -853,7 +889,7 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
                     Visit Progress ({currentYear})
                   </span>
                   <span className="font-medium text-slate-700">
-                    {completedCount} of {agreement.visitsPerYear} completed
+                    {completedCount} of {agreement.visitsPerPeriod} completed
                     {scheduledCount > 0 && `, ${scheduledCount} scheduled`}
                   </span>
                 </div>
@@ -1907,6 +1943,7 @@ export default function CrmCustomerDetail() {
   const [woTechId, setWoTechId] = useState<string>("unassigned");
   const [woDescription, setWoDescription] = useState<string>("");
   const [woPriority, setWoPriority] = useState<string>("normal");
+  const [woAgreementId, setWoAgreementId] = useState<string>("");
   
   // Time slot options (2-hour blocks from 8am to 5pm)
   const timeSlots = [
@@ -1944,6 +1981,7 @@ export default function CrmCustomerDetail() {
     setWoTechId("unassigned");
     setWoDescription("");
     setWoPriority("normal");
+    setWoAgreementId("");
   };
 
   const resetProjForm = () => {
@@ -2712,6 +2750,28 @@ export default function CrmCustomerDetail() {
     enabled: !!currentUser && !!customerId,
   });
 
+  // Fetch active agreements for MAINTENANCE work order selection
+  interface ActiveAgreement {
+    id: string;
+    agreementType: string | null;
+    displayName: string;
+    status: string;
+    startDate: string | null;
+    endDate: string | null;
+    visitsPerPeriod: number | null;
+    nextServiceDate: string | null;
+  }
+  
+  const { data: activeAgreements } = useQuery<ActiveAgreement[]>({
+    queryKey: ["/api/crm/customers", customerId, "active-agreements"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${customerId}/active-agreements`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentUser && !!customerId,
+  });
+
   interface CustomerImpact {
     projects: number;
     workOrders: number;
@@ -2942,6 +3002,9 @@ export default function CrmCustomerDetail() {
       if (!woTitle.trim()) throw new Error("Title is required");
       if (!woDescription.trim()) throw new Error("Description is required");
       if (!woDate) throw new Error("Date is required");
+      if (woVisitType === "MAINTENANCE" && !woAgreementId) {
+        throw new Error("Agreement is required for maintenance work orders");
+      }
 
       const [startTimeStr, endTimeStr] = woTimeSlot.split("-");
       const [hours, minutes] = startTimeStr.split(":").map(Number);
@@ -2956,6 +3019,7 @@ export default function CrmCustomerDetail() {
         customerId,
         propertyId: woPropertyId || null,
         projectId: woProjectId || null,
+        agreementId: woVisitType === "MAINTENANCE" ? woAgreementId : null,
         title: woTitle.trim(),
         visitType: woVisitType,
         description: woDescription.trim(),
@@ -2990,6 +3054,14 @@ export default function CrmCustomerDetail() {
 
   const handleSubmitWorkOrder = () => {
     if (woDate && woPropertyId) {
+      if (woVisitType === "MAINTENANCE" && !woAgreementId) {
+        toast({
+          title: "Agreement required",
+          description: "Please select an agreement for maintenance work orders",
+          variant: "destructive",
+        });
+        return;
+      }
       createWorkOrderMutation.mutate();
     } else if (!woPropertyId) {
       toast({
@@ -3005,7 +3077,7 @@ export default function CrmCustomerDetail() {
     resetWoForm();
   };
 
-  const isWoFormValid = woDate && woPropertyId;
+  const isWoFormValid = woDate && woPropertyId && (woVisitType !== "MAINTENANCE" || woAgreementId);
 
   const woUpdateStatusMutation = useMutation({
     mutationFn: async ({ workOrderId, status }: { workOrderId: string; status: string }) => {
@@ -3748,7 +3820,12 @@ export default function CrmCustomerDetail() {
               {/* Visit Type */}
               <div className="space-y-2">
                 <Label>Visit Type *</Label>
-                <Select value={woVisitType} onValueChange={(v) => setWoVisitType(v as WorkOrderVisitType)}>
+                <Select value={woVisitType} onValueChange={(v) => {
+                  setWoVisitType(v as WorkOrderVisitType);
+                  if (v !== "MAINTENANCE") {
+                    setWoAgreementId("");
+                  }
+                }}>
                   <SelectTrigger data-testid="select-wo-visit-type">
                     <SelectValue placeholder="Select visit type" />
                   </SelectTrigger>
@@ -3761,6 +3838,33 @@ export default function CrmCustomerDetail() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Agreement Selection - Only for MAINTENANCE work orders */}
+              {woVisitType === "MAINTENANCE" && (
+                <div className="space-y-2">
+                  <Label>Agreement *</Label>
+                  <Select value={woAgreementId} onValueChange={setWoAgreementId}>
+                    <SelectTrigger data-testid="select-wo-agreement">
+                      <SelectValue placeholder="Select agreement" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeAgreements && activeAgreements.length > 0 ? (
+                        activeAgreements.map((agreement) => (
+                          <SelectItem key={agreement.id} value={agreement.id} data-testid={`wo-agreement-${agreement.id}`}>
+                            {agreement.displayName}
+                            {agreement.nextServiceDate && ` (Next: ${format(new Date(agreement.nextServiceDate), "MMM d, yyyy")})`}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-1 text-sm text-slate-500">No active agreements found</div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {(!activeAgreements || activeAgreements.length === 0) && (
+                    <p className="text-xs text-amber-600">⚠ This customer has no active agreements. Create an agreement first.</p>
+                  )}
+                </div>
+              )}
 
               {/* Priority */}
               <div className="space-y-2">

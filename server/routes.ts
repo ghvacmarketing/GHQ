@@ -8785,7 +8785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const currentYear = new Date().getFullYear();
           const currentYearVisits = visitsWithWorkOrders.filter(v => v.cycleYear === currentYear);
           const completedVisits = currentYearVisits.filter(v => v.status === "completed").length;
-          const totalVisits = agreement.visitsPerYear || 2;
+          const totalVisits = agreement.visitsPerPeriod || 2;
           
           const maintenanceStatus = {
             completedThisYear: completedVisits,
@@ -8802,6 +8802,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching customer agreements:", error);
       return res.status(500).json({ message: "Failed to fetch agreements" });
+    }
+  });
+
+  // GET /api/crm/customers/:id/active-agreements - Get only active agreements for dropdown selection
+  app.get("/api/crm/customers/:id/active-agreements", requireCrmAuth, async (req, res) => {
+    try {
+      const customerId = req.params.id;
+      
+      // Get only active agreements for this customer
+      const agreements = await db.select({
+        id: crmAgreements.id,
+        agreementType: crmAgreements.agreementType,
+        customAgreementTypeId: crmAgreements.customAgreementTypeId,
+        status: crmAgreements.status,
+        startDate: crmAgreements.startDate,
+        endDate: crmAgreements.endDate,
+        price: crmAgreements.price,
+        billingFrequency: crmAgreements.billingFrequency,
+        visitsPerPeriod: crmAgreements.visitsPerPeriod,
+        nextServiceDate: crmAgreements.nextServiceDate,
+      })
+        .from(crmAgreements)
+        .where(and(
+          eq(crmAgreements.customerId, customerId),
+          eq(crmAgreements.status, "active")
+        ))
+        .orderBy(desc(crmAgreements.createdAt));
+      
+      // For each agreement, get custom agreement type name if applicable
+      const agreementsWithNames = await Promise.all(
+        agreements.map(async (agreement) => {
+          let displayName = agreement.agreementType || "Agreement";
+          
+          if (agreement.customAgreementTypeId) {
+            const [customType] = await db.select({ name: customAgreementTypes.name })
+              .from(customAgreementTypes)
+              .where(eq(customAgreementTypes.id, agreement.customAgreementTypeId));
+            if (customType) {
+              displayName = customType.name;
+            }
+          }
+          
+          return {
+            ...agreement,
+            displayName,
+          };
+        })
+      );
+      
+      return res.json(agreementsWithNames);
+    } catch (error) {
+      console.error("Error fetching customer active agreements:", error);
+      return res.status(500).json({ message: "Failed to fetch active agreements" });
     }
   });
 
@@ -9210,7 +9263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate required fields for standalone work orders
-      const { customerId, propertyId, jobId, projectId, title, description } = req.body;
+      const { customerId, propertyId, jobId, projectId, title, description, agreementId } = req.body;
       
       if (!customerId) {
         return res.status(400).json({ message: "customerId is required" });
@@ -9305,6 +9358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         propertyId,
         jobId: jobId || null,
         projectId: projectId || null,
+        agreementId: agreementId || null,
         title: typeof title === 'string' ? title.trim() : title,
         description: typeof description === 'string' ? description.trim() : description,
         workOrderNumber,
@@ -9352,6 +9406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         techNotes: true,
         completionSummary: true,
         projectId: true,
+        agreementId: true,
         title: true,
         description: true,
         priority: true,
@@ -9377,7 +9432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, completionSummary, checklist, partsUsed, startedAt, completedAt, projectId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer } = result.data;
+      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, completionSummary, checklist, partsUsed, startedAt, completedAt, projectId, agreementId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer } = result.data;
 
       // If projectId is provided (not null), verify it exists
       if (projectId !== undefined && projectId !== null) {
@@ -9446,6 +9501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (startedAt !== undefined) updateData.startedAt = startedAt ? new Date(startedAt) : null;
       if (completedAt !== undefined) updateData.completedAt = completedAt ? new Date(completedAt) : null;
       if (projectId !== undefined) updateData.projectId = projectId;
+      if (agreementId !== undefined) updateData.agreementId = agreementId;
       if (title !== undefined) updateData.title = title;
       if (description !== undefined) updateData.description = description;
       if (priority !== undefined) updateData.priority = priority;
@@ -9470,26 +9526,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If work order status changed to "completed" and it's a MAINTENANCE visit,
       // update any linked maintenance visit to completed
       if (status === "completed" && workOrder?.visitType === "MAINTENANCE") {
-        const linkedVisits = await db.select()
-          .from(maintenanceVisits)
-          .where(eq(maintenanceVisits.workOrderId, req.params.id));
+        // Use the work order's agreementId to find the first pending visit for that agreement
+        const effectiveAgreementId = workOrder.agreementId;
         
-        for (const visit of linkedVisits) {
-          await db.update(maintenanceVisits)
-            .set({ 
-              status: "completed", 
-              completedAt: new Date(),
-              updatedAt: new Date() 
-            })
-            .where(eq(maintenanceVisits.id, visit.id));
+        if (effectiveAgreementId) {
+          // Find the first pending visit for this agreement (by target date)
+          const [pendingVisit] = await db.select()
+            .from(maintenanceVisits)
+            .where(and(
+              eq(maintenanceVisits.agreementId, effectiveAgreementId),
+              eq(maintenanceVisits.status, "pending")
+            ))
+            .orderBy(asc(maintenanceVisits.targetDate))
+            .limit(1);
           
-          // Update the agreement's next service date if this was the most recent visit
-          if (visit.agreementId) {
-            const [agreement] = await db.select().from(crmAgreements)
-              .where(eq(crmAgreements.id, visit.agreementId));
+          if (pendingVisit) {
+            // Mark the pending visit as completed and link it to this work order
+            await db.update(maintenanceVisits)
+              .set({ 
+                status: "completed", 
+                completedAt: new Date(),
+                workOrderId: req.params.id,
+                updatedAt: new Date() 
+              })
+              .where(eq(maintenanceVisits.id, pendingVisit.id));
             
-            if (agreement) {
-              // Find the next pending visit for this agreement
+            // Find the next pending visit for this agreement
+            const [nextVisit] = await db.select()
+              .from(maintenanceVisits)
+              .where(and(
+                eq(maintenanceVisits.agreementId, effectiveAgreementId),
+                eq(maintenanceVisits.status, "pending")
+              ))
+              .orderBy(asc(maintenanceVisits.targetDate))
+              .limit(1);
+            
+            // Update the agreement's next service date
+            await db.update(crmAgreements)
+              .set({ 
+                nextServiceDate: nextVisit ? nextVisit.targetDate : null, 
+                updatedAt: new Date() 
+              })
+              .where(eq(crmAgreements.id, effectiveAgreementId));
+          }
+        } else {
+          // Fallback: If no agreementId on work order, try to find by workOrderId (legacy behavior)
+          const linkedVisits = await db.select()
+            .from(maintenanceVisits)
+            .where(eq(maintenanceVisits.workOrderId, req.params.id));
+          
+          for (const visit of linkedVisits) {
+            await db.update(maintenanceVisits)
+              .set({ 
+                status: "completed", 
+                completedAt: new Date(),
+                updatedAt: new Date() 
+              })
+              .where(eq(maintenanceVisits.id, visit.id));
+            
+            if (visit.agreementId) {
               const [nextVisit] = await db.select()
                 .from(maintenanceVisits)
                 .where(and(
@@ -9499,7 +9594,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 .orderBy(asc(maintenanceVisits.targetDate))
                 .limit(1);
               
-              // Update to next pending visit date, or clear if no more pending
               await db.update(crmAgreements)
                 .set({ 
                   nextServiceDate: nextVisit ? nextVisit.targetDate : null, 
@@ -10020,15 +10114,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (agreement.appointmentDate) {
         const appointmentDate = new Date(agreement.appointmentDate);
         const cycleYear = appointmentDate.getFullYear();
-        const visitsPerYear = agreement.visitsPerYear || 2;
+        const visitsPerPeriod = agreement.visitsPerPeriod || 2;
+        const frequency = agreement.frequency || "annual";
         
-        // Calculate visit target dates (evenly spaced throughout the year)
-        const monthsApart = Math.floor(12 / visitsPerYear);
+        // Calculate visit target dates based on frequency
+        // weekly=7 days apart, monthly=30 days apart, annual=12/visits months apart
         const visits = [];
         
-        for (let i = 0; i < visitsPerYear; i++) {
+        for (let i = 0; i < visitsPerPeriod; i++) {
           const visitDate = new Date(appointmentDate);
-          visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
+          if (frequency === "weekly") {
+            visitDate.setDate(visitDate.getDate() + (i * 7));
+          } else if (frequency === "monthly") {
+            visitDate.setDate(visitDate.getDate() + (i * 30));
+          } else {
+            // annual - evenly spaced throughout the year
+            const monthsApart = Math.floor(12 / visitsPerPeriod);
+            visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
+          }
           
           visits.push({
             agreementId: agreement.id,
@@ -12054,6 +12157,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Get the first maintenance item name for the agreement plan
             const maintenanceItemName = maintenanceLineItems[0].name || "Maintenance Agreement";
             
+            // Look up the custom agreement type to get frequency and visits per period
+            const [customType] = await db.select()
+              .from(customAgreementTypes)
+              .where(and(
+                eq(customAgreementTypes.name, maintenanceItemName),
+                eq(customAgreementTypes.isActive, true)
+              ))
+              .limit(1);
+            
+            // Use custom type settings or defaults
+            const agreementFrequency = (customType?.frequency as "weekly" | "monthly" | "annual") || "annual";
+            const agreementVisitsPerPeriod = customType?.visitsPerPeriod || 2;
+            
             // Get customer info for the agreement
             const [customer] = await db.select().from(crmCustomers)
               .where(eq(crmCustomers.id, invoice.customerId));
@@ -12062,6 +12178,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const today = new Date();
               const appointmentDate = new Date(today);
               appointmentDate.setMonth(appointmentDate.getMonth() + 1);
+              
+              // All agreements span 1 year by default, regardless of frequency
               const endDate = new Date(today);
               endDate.setFullYear(endDate.getFullYear() + 1);
               
@@ -12099,18 +12217,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 nextInvoiceDate: format(today, "yyyy-MM-dd"),
                 status: "active",
                 autoRenew: true,
-                visitsPerYear: 2,
+                visitsPerPeriod: agreementVisitsPerPeriod,
+                frequency: agreementFrequency,
+                customAgreementTypeId: customType?.id || null,
                 notes: `Auto-created from Invoice ${invoice.invoiceNumber}`,
               }).returning();
               
-              // Generate maintenance visits for the new agreement
+              // Generate maintenance visits for the new agreement based on frequency
+              // Visits are spaced based on the cadence (weekly=7 days, monthly=30 days, annual=spread across year)
               if (newAgreement) {
-                const visitsPerYear = 2;
-                const currentYear = today.getFullYear();
-                
-                for (let i = 0; i < visitsPerYear; i++) {
+                for (let i = 0; i < agreementVisitsPerPeriod; i++) {
                   const visitDate = new Date(appointmentDate);
-                  visitDate.setMonth(visitDate.getMonth() + (i * 6));
+                  
+                  // Calculate visit dates: each visit is spaced by the full cadence interval
+                  if (agreementFrequency === "weekly") {
+                    // Weekly: visits are 7 days apart
+                    visitDate.setDate(visitDate.getDate() + (i * 7));
+                  } else if (agreementFrequency === "monthly") {
+                    // Monthly: visits are 30 days apart
+                    visitDate.setDate(visitDate.getDate() + (i * 30));
+                  } else {
+                    // Annual: spread evenly across the year
+                    const monthsApart = Math.max(1, Math.floor(12 / agreementVisitsPerPeriod));
+                    visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
+                  }
                   
                   await db.insert(maintenanceVisits).values({
                     agreementId: newAgreement.id,
@@ -12121,7 +12251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   });
                 }
                 
-                console.log(`[Invoice] Auto-created maintenance agreement ${agreementNumber} for customer ${customer.name} from invoice ${invoice.invoiceNumber}`);
+                console.log(`[Invoice] Auto-created ${agreementFrequency} maintenance agreement ${agreementNumber} for customer ${customer.name} from invoice ${invoice.invoiceNumber} (${agreementVisitsPerPeriod} visits)`);
               }
             }
           }

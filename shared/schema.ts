@@ -1037,6 +1037,7 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   propertyId: varchar("property_id").references(() => crmProperties.id),
   projectId: varchar("project_id").references(() => crmProjects.id, { onDelete: "set null" }),
   jobId: varchar("job_id").references(() => crmJobs.id, { onDelete: "set null" }),
+  agreementId: varchar("agreement_id"),
   workOrderNumber: integer("work_order_number").notNull().default(1),
   assignedTechId: varchar("assigned_tech_id").references(() => crmUsers.id),
   visitType: text("visit_type").$type<WorkOrderVisitType>().default("SERVICE"),
@@ -1399,6 +1400,10 @@ export type CrmAgreementStatus = typeof crmAgreementStatusEnum[number];
 export const agreementTypeEnum = ["standard", "custom"] as const;
 export type AgreementType = typeof agreementTypeEnum[number];
 
+// Agreement Frequency Enum (billing/service period)
+export const agreementFrequencyEnum = ["weekly", "monthly", "annual"] as const;
+export type AgreementFrequency = typeof agreementFrequencyEnum[number];
+
 // Maintenance Regions (for reminder scheduling by county)
 export const maintenanceRegions = pgTable("maintenance_regions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1423,7 +1428,8 @@ export const customAgreementTypes = pgTable("custom_agreement_types", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(),
   description: text("description"),
-  visitsPerYear: integer("visits_per_year").notNull().default(1),
+  frequency: text("frequency").$type<AgreementFrequency>().notNull().default("annual"),
+  visitsPerPeriod: integer("visits_per_period").notNull().default(2),
   defaultPrice: decimal("default_price", { precision: 10, scale: 2 }).default("0.00"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -1457,7 +1463,8 @@ export const crmAgreements = pgTable("crm_agreements", {
   contractDate: date("contract_date"),
   appointmentDate: date("appointment_date"),
   price: decimal("price", { precision: 10, scale: 2 }).default("229.00"),
-  visitsPerYear: integer("visits_per_year").notNull().default(2),
+  frequency: text("frequency").$type<AgreementFrequency>().notNull().default("annual"),
+  visitsPerPeriod: integer("visits_per_period").notNull().default(2),
   autoRenew: boolean("auto_renew").notNull().default(true),
   regionId: varchar("region_id").references(() => maintenanceRegions.id),
   agreementType: text("agreement_type").$type<AgreementType>().notNull().default("standard"),
