@@ -248,15 +248,15 @@ export default function CrmBusinessDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl p-5 text-white">
+                  <div className="bg-cyan-50 border-2 border-cyan-200 rounded-xl p-5">
                     <div className="flex items-center gap-2 mb-3">
-                      <Wrench className="h-5 w-5" />
-                      <span className="text-lg font-bold">Service</span>
+                      <Wrench className="h-5 w-5 text-cyan-600" />
+                      <span className="text-lg font-bold text-cyan-800">Service</span>
                     </div>
-                    <p className="text-3xl font-bold mb-3" data-testid="value-service-mtd">
+                    <p className="text-3xl font-bold mb-3 text-cyan-900" data-testid="value-service-mtd">
                       {formatCurrency(analytics.revenueByDepartment.SERVICE.mtd)}
                     </p>
-                    <div className="text-sm opacity-90 space-y-1">
+                    <div className="text-sm text-cyan-700 space-y-1">
                       <p>Today: {formatCurrency(analytics.revenueByDepartment.SERVICE.today)}</p>
                       <p>MTD: {formatCurrency(analytics.revenueByDepartment.SERVICE.mtd)}</p>
                       <p>YTD: {formatCurrency(analytics.revenueByDepartment.SERVICE.ytd)}</p>
@@ -264,15 +264,15 @@ export default function CrmBusinessDashboard() {
                     </div>
                   </div>
 
-                  <div className="bg-gradient-to-br from-green-500 to-emerald-400 rounded-xl p-5 text-white">
+                  <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-5">
                     <div className="flex items-center gap-2 mb-3">
-                      <HardHat className="h-5 w-5" />
-                      <span className="text-lg font-bold">Install</span>
+                      <HardHat className="h-5 w-5 text-yellow-600" />
+                      <span className="text-lg font-bold text-yellow-800">Install</span>
                     </div>
-                    <p className="text-3xl font-bold mb-3" data-testid="value-install-mtd">
+                    <p className="text-3xl font-bold mb-3 text-yellow-900" data-testid="value-install-mtd">
                       {formatCurrency(analytics.revenueByDepartment.INSTALL.mtd)}
                     </p>
-                    <div className="text-sm opacity-90 space-y-1">
+                    <div className="text-sm text-yellow-700 space-y-1">
                       <p>Today: {formatCurrency(analytics.revenueByDepartment.INSTALL.today)}</p>
                       <p>MTD: {formatCurrency(analytics.revenueByDepartment.INSTALL.mtd)}</p>
                       <p>YTD: {formatCurrency(analytics.revenueByDepartment.INSTALL.ytd)}</p>
@@ -280,15 +280,15 @@ export default function CrmBusinessDashboard() {
                     </div>
                   </div>
 
-                  <div className="bg-gradient-to-br from-amber-500 to-orange-400 rounded-xl p-5 text-white">
+                  <div className="bg-green-50 border-2 border-green-200 rounded-xl p-5">
                     <div className="flex items-center gap-2 mb-3">
-                      <Settings2 className="h-5 w-5" />
-                      <span className="text-lg font-bold">Maintenance</span>
+                      <Settings2 className="h-5 w-5 text-green-600" />
+                      <span className="text-lg font-bold text-green-800">Maintenance</span>
                     </div>
-                    <p className="text-3xl font-bold mb-3" data-testid="value-maintenance-mtd">
+                    <p className="text-3xl font-bold mb-3 text-green-900" data-testid="value-maintenance-mtd">
                       {formatCurrency(analytics.revenueByDepartment.MAINTENANCE.mtd)}
                     </p>
-                    <div className="text-sm opacity-90 space-y-1">
+                    <div className="text-sm text-green-700 space-y-1">
                       <p>Today: {formatCurrency(analytics.revenueByDepartment.MAINTENANCE.today)}</p>
                       <p>MTD: {formatCurrency(analytics.revenueByDepartment.MAINTENANCE.mtd)}</p>
                       <p>YTD: {formatCurrency(analytics.revenueByDepartment.MAINTENANCE.ytd)}</p>

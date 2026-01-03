@@ -81,17 +81,19 @@ function GoalCard({
   title,
   icon: Icon,
   iconBg,
+  cardBg,
   data,
 }: {
   title: string;
   icon: typeof Wrench;
   iconBg: string;
+  cardBg: string;
   data: CategoryData;
 }) {
   const isAhead = data.difference >= 0;
   
   return (
-    <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+    <Card className={`border-2 shadow-sm hover:shadow-md transition-shadow ${cardBg}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-semibold text-slate-600">{title}</CardTitle>
@@ -203,25 +205,29 @@ export default function CrmGoalsTracker() {
     {
       title: "Service",
       icon: Wrench,
-      iconBg: "bg-blue-500",
+      iconBg: "bg-cyan-500",
+      cardBg: "bg-cyan-50 border-cyan-200",
       data: trackerData?.service,
     },
     {
       title: "Install",
       icon: HardHat,
-      iconBg: "bg-amber-500",
+      iconBg: "bg-yellow-500",
+      cardBg: "bg-yellow-50 border-yellow-200",
       data: trackerData?.install,
     },
     {
       title: "Maintenance",
       icon: Settings2,
-      iconBg: "bg-emerald-500",
+      iconBg: "bg-green-500",
+      cardBg: "bg-green-50 border-green-200",
       data: trackerData?.maintenance,
     },
     {
       title: "Total",
       icon: Target,
       iconBg: "bg-[#711419]",
+      cardBg: "bg-slate-50 border-slate-200",
       data: trackerData?.total,
     },
   ];
@@ -268,20 +274,21 @@ export default function CrmGoalsTracker() {
               title={cat.title}
               icon={cat.icon}
               iconBg={cat.iconBg}
+              cardBg={cat.cardBg}
               data={cat.data || defaultData}
             />
           ))}
         </div>
 
-        <Card className="border-slate-200 shadow-sm">
+        <Card className="border-2 border-red-200 bg-red-50 shadow-sm">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#711419] rounded-lg">
+              <div className="p-2 bg-red-500 rounded-lg">
                 <DollarSign className="h-5 w-5 text-white" />
               </div>
               <div>
-                <CardTitle className="text-lg">Sales Performance</CardTitle>
-                <p className="text-sm text-slate-500">Monthly sales team performance vs goal</p>
+                <CardTitle className="text-lg text-red-900">Sales Performance</CardTitle>
+                <p className="text-sm text-red-600">Monthly sales team performance vs goal</p>
               </div>
             </div>
           </CardHeader>
