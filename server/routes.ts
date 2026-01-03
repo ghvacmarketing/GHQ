@@ -5205,15 +5205,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const maintenanceRevenue = await getDepartmentRevenue("MAINTENANCE");
 
       const departmentGoals = {
-        SERVICE: 95000,
-        INSTALL: 100000,
-        MAINTENANCE: 25000,
+        SERVICE: currentMonthlyGoals ? parseFloat(currentMonthlyGoals.monthlyServiceGoal || "0") : 0,
+        INSTALL: currentMonthlyGoals ? parseFloat(currentMonthlyGoals.monthlyInstallGoal || "0") : 0,
+        MAINTENANCE: currentMonthlyGoals ? parseFloat(currentMonthlyGoals.monthlyMaintenanceGoal || "0") : 0,
       };
 
       const revenueByDepartment = {
-        SERVICE: { ...serviceRevenue, goal: departmentGoals.SERVICE, goalProgress: (serviceRevenue.mtd / departmentGoals.SERVICE) * 100 },
-        INSTALL: { ...installRevenue, goal: departmentGoals.INSTALL, goalProgress: (installRevenue.mtd / departmentGoals.INSTALL) * 100 },
-        MAINTENANCE: { ...maintenanceRevenue, goal: departmentGoals.MAINTENANCE, goalProgress: (maintenanceRevenue.mtd / departmentGoals.MAINTENANCE) * 100 },
+        SERVICE: { ...serviceRevenue, goal: departmentGoals.SERVICE, goalProgress: departmentGoals.SERVICE > 0 ? (serviceRevenue.mtd / departmentGoals.SERVICE) * 100 : 0 },
+        INSTALL: { ...installRevenue, goal: departmentGoals.INSTALL, goalProgress: departmentGoals.INSTALL > 0 ? (installRevenue.mtd / departmentGoals.INSTALL) * 100 : 0 },
+        MAINTENANCE: { ...maintenanceRevenue, goal: departmentGoals.MAINTENANCE, goalProgress: departmentGoals.MAINTENANCE > 0 ? (maintenanceRevenue.mtd / departmentGoals.MAINTENANCE) * 100 : 0 },
       };
 
       // 3. Technician Performance
@@ -5254,7 +5254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const dailyServiceGoal = currentMonthlyGoals ? parseFloat(currentMonthlyGoals.dailyServiceGoal || "0") : 0;
           const totalMonthlyServiceGoal = dailyServiceGoal * daysInMonth;
-          const techGoal = techs.length > 0 ? totalMonthlyServiceGoal / techs.length : 12000;
+          const techGoal = techs.length > 0 && totalMonthlyServiceGoal > 0 ? totalMonthlyServiceGoal / techs.length : 0;
           const goalMet = serviceRevenue >= techGoal;
 
           const maintenanceAgreementsCount = await db
