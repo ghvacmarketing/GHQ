@@ -1374,7 +1374,7 @@ export default function CrmAgreements() {
                   data-testid="input-type-description"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 items-end">
                 <div className="grid gap-2">
                   <Label htmlFor="type-frequency">Billing Cycle *</Label>
                   <Select
@@ -1401,9 +1401,9 @@ export default function CrmAgreements() {
                 <div className="grid gap-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="type-visits">Visits *</Label>
-                    <Badge variant="outline" className="text-xs font-normal">
-                      max {typeForm.frequency === "weekly" ? "7" : typeForm.frequency === "monthly" ? "30" : "365"}
-                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      (max {typeForm.frequency === "weekly" ? "7" : typeForm.frequency === "monthly" ? "30" : "365"})
+                    </span>
                   </div>
                   <Input
                     id="type-visits"
@@ -1412,9 +1412,15 @@ export default function CrmAgreements() {
                     max={typeForm.frequency === "weekly" ? 7 : typeForm.frequency === "monthly" ? 30 : 365}
                     value={typeForm.visitsPerPeriod}
                     onChange={(e) => {
-                      const val = parseInt(e.target.value) || 1;
+                      const rawValue = e.target.value;
+                      if (rawValue === "") {
+                        setTypeForm({ ...typeForm, visitsPerPeriod: 1 });
+                        return;
+                      }
+                      const val = parseInt(rawValue);
+                      if (isNaN(val)) return;
                       const max = typeForm.frequency === "weekly" ? 7 : typeForm.frequency === "monthly" ? 30 : 365;
-                      setTypeForm({ ...typeForm, visitsPerPeriod: Math.min(val, max) });
+                      setTypeForm({ ...typeForm, visitsPerPeriod: Math.max(1, Math.min(val, max)) });
                     }}
                     data-testid="input-type-visits"
                   />
