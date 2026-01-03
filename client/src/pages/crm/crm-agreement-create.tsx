@@ -30,7 +30,7 @@ import {
   Building2,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { format, addMonths, addYears, addWeeks } from "date-fns";
+import { format, addMonths, addYears, addWeeks, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser, MaintenanceRegion, CrmCustomer, CrmProperty, CustomAgreementType } from "@shared/schema";
 
@@ -293,7 +293,8 @@ export default function CrmAgreementCreate() {
   const getVisitSummary = () => {
     if (!appointmentDate) return null;
     try {
-      const firstVisit = new Date(appointmentDate);
+      // Use parseISO to correctly parse the date string without timezone shift
+      const firstVisit = parseISO(appointmentDate);
       const secondVisit = addMonths(firstVisit, 6);
       return {
         firstVisit: format(firstVisit, "MMM d, yyyy"),
