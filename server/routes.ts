@@ -5240,8 +5240,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const maintenanceAgreementsCount = await db
             .select({ count: sql<number>`COUNT(*)` })
-            .from(crmAgreements)
-            .where(eq(crmAgreements.soldByUserId, tech.id));
+            .from(maintenanceVisits)
+            .innerJoin(crmWorkOrders, eq(maintenanceVisits.workOrderId, crmWorkOrders.id))
+            .where(and(
+              eq(crmWorkOrders.assignedTechId, tech.id),
+              eq(maintenanceVisits.status, "completed"),
+              sql`${maintenanceVisits.completedAt} >= ${startOfMonth}`
+            ));
 
           return {
             id: tech.id,
