@@ -73,7 +73,7 @@ import { Switch } from "@/components/ui/switch";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty, CrmQuote } from "@shared/schema";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus } from "@shared/schema";
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, differenceInCalendarDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
 const JOB_TYPES = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
@@ -592,10 +592,47 @@ interface AgreementWithVisits {
 
 const agreementStatusColors: Record<string, { bg: string; text: string }> = {
   active: { bg: "bg-green-100", text: "text-green-700" },
+  grace_period: { bg: "bg-amber-100", text: "text-amber-700" },
   expiring: { bg: "bg-amber-100", text: "text-amber-700" },
   expired: { bg: "bg-red-100", text: "text-red-700" },
   cancelled: { bg: "bg-slate-100", text: "text-slate-700" },
 };
+
+const agreementStatusLabels: Record<string, string> = {
+  active: "Active",
+  grace_period: "Grace Period",
+  expired: "Expired",
+  expiring: "Expiring",
+  cancelled: "Cancelled",
+};
+
+function getAgreementStatus(endDate: string | null, storedStatus?: string): "active" | "grace_period" | "expired" | "cancelled" {
+  // Honor any explicit non-active status before applying date-based logic
+  if (storedStatus && storedStatus !== "active") {
+    return storedStatus as "cancelled" | "expired" | "grace_period";
+  }
+  
+  if (!endDate) return "active";
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+  
+  const daysSinceEnd = differenceInCalendarDays(today, end);
+  
+  // daysSinceEnd < 0: Active (end date is in the future)
+  // daysSinceEnd >= 0 && daysSinceEnd <= 30: Grace Period (0-30 days since expiration)
+  // daysSinceEnd > 30: Expired (more than 30 days since expiration)
+  if (daysSinceEnd < 0) {
+    return "active";
+  } else if (daysSinceEnd <= 30) {
+    return "grace_period";
+  } else {
+    return "expired";
+  }
+}
 
 const visitStatusColors: Record<string, { bg: string; text: string }> = {
   pending: { bg: "bg-slate-100", text: "text-slate-700" },
@@ -675,12 +712,23 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
   return (
     <div className="space-y-4">
       {/* Agreement Summary Cards */}
-      {agreements.map((agreement) => (
+      {agreements.map((agreement) => {
+        const summaryStatus = getAgreementStatus(agreement.endDate, agreement.status);
+        return (
         <Card key={`summary-${agreement.id}`} className="bg-green-50/50 border-green-100" data-testid={`agreement-summary-${agreement.id}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <FileText className="h-5 w-5" />
               Agreement Summary
+              <Badge
+                className={`text-xs ml-auto ${
+                  agreementStatusColors[summaryStatus]?.bg || "bg-slate-100"
+                } ${
+                  agreementStatusColors[summaryStatus]?.text || "text-slate-700"
+                }`}
+              >
+                {agreementStatusLabels[summaryStatus] || summaryStatus}
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -787,7 +835,8 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
             </div>
           </CardContent>
         </Card>
-      ))}
+        );
+      })}
 
       {/* Detailed Agreements Card */}
       <Card data-testid="card-agreements">
@@ -814,6 +863,7 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
             (completedCount / agreement.visitsPerPeriod) * 100,
             100
           );
+          const calculatedStatus = getAgreementStatus(agreement.endDate, agreement.status);
 
           return (
             <div
@@ -829,13 +879,12 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
                     </h4>
                     <Badge
                       className={`text-xs ${
-                        agreementStatusColors[agreement.status]?.bg || "bg-slate-100"
+                        agreementStatusColors[calculatedStatus]?.bg || "bg-slate-100"
                       } ${
-                        agreementStatusColors[agreement.status]?.text || "text-slate-700"
+                        agreementStatusColors[calculatedStatus]?.text || "text-slate-700"
                       }`}
                     >
-                      {agreement.status.charAt(0).toUpperCase() +
-                        agreement.status.slice(1)}
+                      {agreementStatusLabels[calculatedStatus] || calculatedStatus}
                     </Badge>
                   </div>
                   <p className="text-sm text-slate-600">{agreement.agreementPlan}</p>

@@ -30,7 +30,7 @@ import {
   Building2,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { format, addMonths, addYears } from "date-fns";
+import { format, addMonths, addYears, addWeeks } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser, MaintenanceRegion, CrmCustomer, CrmProperty, CustomAgreementType } from "@shared/schema";
 
@@ -184,6 +184,23 @@ export default function CrmAgreementCreate() {
     enabled: !!currentUser,
   });
 
+  const calculateEndDate = (startDateStr: string, freq: "weekly" | "monthly" | "annual") => {
+    if (!startDateStr) return "";
+    const startDateObj = new Date(startDateStr);
+    if (isPreventativeMaintenance) {
+      return format(addYears(startDateObj, 1), "yyyy-MM-dd");
+    }
+    switch (freq) {
+      case "weekly":
+        return format(addWeeks(startDateObj, 1), "yyyy-MM-dd");
+      case "monthly":
+        return format(addMonths(startDateObj, 1), "yyyy-MM-dd");
+      case "annual":
+      default:
+        return format(addYears(startDateObj, 1), "yyyy-MM-dd");
+    }
+  };
+
   const handleContractDateChange = (newContractDate: string) => {
     setContractDate(newContractDate);
     setInvoiceDate(newContractDate);
@@ -191,9 +208,15 @@ export default function CrmAgreementCreate() {
     if (newContractDate) {
       const contractDateObj = new Date(newContractDate);
       setAppointmentDate(format(addMonths(contractDateObj, 1), "yyyy-MM-dd"));
-      setEndDate(format(addYears(contractDateObj, 1), "yyyy-MM-dd"));
+      setEndDate(calculateEndDate(newContractDate, frequency));
     }
   };
+
+  useEffect(() => {
+    if (contractDate) {
+      setEndDate(calculateEndDate(contractDate, frequency));
+    }
+  }, [frequency, isPreventativeMaintenance]);
 
   const handleCustomerSelect = (customerId: string) => {
     setSelectedCustomerId(customerId);
@@ -511,7 +534,7 @@ export default function CrmAgreementCreate() {
                     </div>
 
                     <div>
-                      <Label htmlFor="invoiceDate" className="text-sm font-medium">Invoice Date</Label>
+                      <Label htmlFor="invoiceDate" className="text-sm font-medium">Payment Date</Label>
                       <Input
                         id="invoiceDate"
                         type="date"
@@ -548,30 +571,6 @@ export default function CrmAgreementCreate() {
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="startDate" className="text-sm font-medium">Start Date</Label>
-                      <Input
-                        id="startDate"
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="mt-1"
-                        data-testid="input-start-date"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="endDate" className="text-sm font-medium">End Date</Label>
-                      <Input
-                        id="endDate"
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="mt-1"
-                        data-testid="input-end-date"
-                      />
                     </div>
 
                     <div>
@@ -721,15 +720,11 @@ export default function CrmAgreementCreate() {
 
                     <div className="h-px bg-slate-100" />
 
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="text-xs text-slate-500">Start</p>
-                        <p className="font-medium">{startDate ? format(new Date(startDate), "MMM d, yyyy") : "—"}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500">End</p>
-                        <p className="font-medium">{endDate ? format(new Date(endDate), "MMM d, yyyy") : "—"}</p>
-                      </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase tracking-wide">Expires On</p>
+                      <p className="font-medium text-slate-900" data-testid="text-summary-expires">
+                        {endDate ? format(new Date(endDate), "MMM d, yyyy") : "—"}
+                      </p>
                     </div>
 
                     {autoRenew && (

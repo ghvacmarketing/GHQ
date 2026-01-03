@@ -61,7 +61,7 @@ import {
   FileText,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { format, addDays, addMonths, addYears, isAfter, isBefore, startOfDay } from "date-fns";
+import { format, addDays, subDays, addMonths, addYears, isAfter, isBefore, startOfDay, differenceInCalendarDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser, CrmAgreement, MaintenanceRegion, CustomAgreementType } from "@shared/schema";
 import { Switch } from "@/components/ui/switch";
@@ -94,21 +94,21 @@ function useDebounce<T>(value: T, delay: number): T {
 
 const statusLabels: Record<string, string> = {
   active: "Active",
-  expiring: "Expiring",
+  grace_period: "Grace Period",
   expired: "Expired",
   cancelled: "Cancelled",
 };
 
 const statusColors: Record<string, string> = {
   active: "bg-green-100 text-green-700 border-green-200",
-  expiring: "bg-amber-100 text-amber-700 border-amber-200",
+  grace_period: "bg-amber-100 text-amber-700 border-amber-200",
   expired: "bg-red-100 text-red-700 border-red-200",
   cancelled: "bg-slate-100 text-slate-700 border-slate-200",
 };
 
 const tabFilters = [
   { key: "all", label: "All" },
-  { key: "expiring", label: "Expiring (30 Days)" },
+  { key: "grace_period", label: "Grace Period" },
   { key: "upcoming", label: "Upcoming Service" },
   { key: "active", label: "Active" },
   { key: "expired", label: "Expired" },
@@ -338,21 +338,39 @@ export default function CrmAgreements() {
     },
   });
 
-  const statusCounts = useMemo(() => {
-    if (!agreementsData?.agreements) return { active: 0, expiring: 0, expired: 0 };
-    const counts = { active: 0, expiring: 0, expired: 0 };
+  const getAgreementStatus = (agreement: CrmAgreement): string => {
+    // Honor any explicit non-active status before applying date-based logic
+    if (agreement.status && agreement.status !== "active") {
+      return agreement.status;
+    }
+    
+    if (!agreement.endDate) return "active";
+    
     const today = startOfDay(new Date());
-    const thirtyDaysFromNow = addDays(today, 30);
+    const endDate = startOfDay(new Date(agreement.endDate));
+    const daysSinceEnd = differenceInCalendarDays(today, endDate);
+    
+    // daysSinceEnd < 0: Active (end date is in the future)
+    // daysSinceEnd >= 0 && daysSinceEnd <= 30: Grace Period (0-30 days since expiration)
+    // daysSinceEnd > 30: Expired (more than 30 days since expiration)
+    if (daysSinceEnd < 0) {
+      return "active";
+    } else if (daysSinceEnd <= 30) {
+      return "grace_period";
+    } else {
+      return "expired";
+    }
+  };
+
+  const statusCounts = useMemo(() => {
+    if (!agreementsData?.agreements) return { active: 0, grace_period: 0, expired: 0 };
+    const counts = { active: 0, grace_period: 0, expired: 0 };
 
     agreementsData.agreements.forEach((agreement) => {
-      if (agreement.status === "active") counts.active++;
-      if (agreement.status === "expired") counts.expired++;
-      if (agreement.endDate) {
-        const endDate = new Date(agreement.endDate);
-        if (isAfter(endDate, today) && isBefore(endDate, thirtyDaysFromNow)) {
-          counts.expiring++;
-        }
-      }
+      const status = getAgreementStatus(agreement);
+      if (status === "active") counts.active++;
+      else if (status === "grace_period") counts.grace_period++;
+      else if (status === "expired") counts.expired++;
     });
     return counts;
   }, [agreementsData?.agreements]);
@@ -362,13 +380,10 @@ export default function CrmAgreements() {
     let filtered = [...agreementsData.agreements];
 
     const today = startOfDay(new Date());
-    const thirtyDaysFromNow = addDays(today, 30);
 
-    if (activeTab === "expiring") {
+    if (activeTab === "grace_period") {
       filtered = filtered.filter((agreement) => {
-        if (!agreement.endDate) return false;
-        const endDate = new Date(agreement.endDate);
-        return isAfter(endDate, today) && isBefore(endDate, thirtyDaysFromNow);
+        return getAgreementStatus(agreement) === "grace_period";
       });
     } else if (activeTab === "upcoming") {
       filtered = filtered.filter((agreement) => {
@@ -376,9 +391,9 @@ export default function CrmAgreements() {
         return isAfter(new Date(agreement.nextServiceDate), today);
       });
     } else if (activeTab === "active") {
-      filtered = filtered.filter((agreement) => agreement.status === "active");
+      filtered = filtered.filter((agreement) => getAgreementStatus(agreement) === "active");
     } else if (activeTab === "expired") {
-      filtered = filtered.filter((agreement) => agreement.status === "expired");
+      filtered = filtered.filter((agreement) => getAgreementStatus(agreement) === "expired");
     }
 
     filtered.sort((a, b) => {
@@ -697,7 +712,7 @@ export default function CrmAgreements() {
             {tabFilters.map((tab) => {
               const count = tab.key === "all" ? agreementsData?.pagination?.total
                 : tab.key === "active" ? statusCounts.active
-                : tab.key === "expiring" ? statusCounts.expiring
+                : tab.key === "grace_period" ? statusCounts.grace_period
                 : tab.key === "expired" ? statusCounts.expired
                 : null;
 
@@ -858,9 +873,14 @@ export default function CrmAgreements() {
                         {agreement.address || "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge className={`border ${statusColors[agreement.status] || statusColors.active}`}>
-                          {statusLabels[agreement.status] || agreement.status}
-                        </Badge>
+                        {(() => {
+                          const calculatedStatus = getAgreementStatus(agreement);
+                          return (
+                            <Badge className={`border ${statusColors[calculatedStatus] || statusColors.active}`}>
+                              {statusLabels[calculatedStatus] || calculatedStatus}
+                            </Badge>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
