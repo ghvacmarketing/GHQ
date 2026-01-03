@@ -18,11 +18,21 @@ function formatCurrency(value: number): string {
 
 export function PerformanceGauge({ sold, quoted, goal, goalTarget, size = 180 }: PerformanceGaugeProps) {
   const actualGoal = goalTarget ?? goal;
-  const potential = Math.max(actualGoal, sold + quoted, goal);
-  const missed = Math.max(0, potential - sold - quoted);
   
-  const soldPercent = potential > 0 ? Math.min((sold / potential) * 100, 100) : 0;
-  const quotedPercent = potential > 0 ? Math.min((quoted / potential) * 100, 100 - soldPercent) : 0;
+  // Potential is the outstanding quoted amount that hasn't converted to sales yet
+  // max(quoted - sold, 0) ensures it never goes negative
+  const potential = Math.max(quoted - sold, 0);
+  
+  // Check if pipeline is empty (no quotes and no sales)
+  const isPipelineEmpty = quoted === 0 && sold === 0;
+  
+  // Scale is the max value for the arc - use goal or sold+quoted, whichever is larger
+  const scale = Math.max(actualGoal, sold + quoted, 1);
+  
+  const missed = Math.max(0, scale - sold - quoted);
+  
+  const soldPercent = scale > 0 ? Math.min((sold / scale) * 100, 100) : 0;
+  const quotedPercent = scale > 0 ? Math.min((quoted / scale) * 100, 100 - soldPercent) : 0;
   
   const soldAngle = Math.min((soldPercent / 100) * 180, 180);
   const quotedAngle = Math.min((quotedPercent / 100) * 180, 180 - soldAngle);
@@ -54,8 +64,12 @@ export function PerformanceGauge({ sold, quoted, goal, goalTarget, size = 180 }:
   const needleX = centerX + needleLength * Math.cos(needleRadians);
   const needleY = centerY - needleLength * Math.sin(needleRadians);
 
-  const showGoalMarker = actualGoal > 0 && potential > 0;
-  const goalMarkerPercent = showGoalMarker ? Math.min((actualGoal / potential) * 100, 100) : 0;
+  // When pipeline is empty (no quotes and no sales), show goal marker in the center of the arc (50% = 90 degrees)
+  // Otherwise, position it based on actual goal vs scale
+  const showGoalMarker = actualGoal > 0;
+  const goalMarkerPercent = isPipelineEmpty 
+    ? 50 // Center when pipeline is empty
+    : Math.min((actualGoal / scale) * 100, 100);
   const goalMarkerAngle = (goalMarkerPercent / 100) * 180;
   const goalMarkerRadians = ((180 - goalMarkerAngle) * Math.PI) / 180;
   const goalMarkerInnerX = centerX + (radius - strokeWidth/2 - 2) * Math.cos(goalMarkerRadians);
