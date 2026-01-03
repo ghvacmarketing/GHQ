@@ -531,7 +531,7 @@ interface QuickQuoteLineItem {
   description: string;
   quantity: number;
   unitPrice: number;
-  lineType: "service" | "discount" | "part";
+  lineType: "service" | "discount" | "part" | "maintenance";
   fromCatalog?: boolean;
   isMaintenanceItem?: boolean;
 }
@@ -742,12 +742,19 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       if (price < 0) price = 0;
     }
     
+    // Map category to lineType
+    const getLineType = (): QuickQuoteLineItem["lineType"] => {
+      if (isMaintenance) return "maintenance";
+      if (item.category === "service") return "service";
+      return "part";
+    };
+    
     setLineItems([...lineItems, { 
       id: Date.now().toString(), 
       description: item.name, 
       quantity: 1, 
       unitPrice: price,
-      lineType: item.category === "service" ? "service" : "part",
+      lineType: getLineType(),
       fromCatalog: true,
       isMaintenanceItem: isMaintenance
     }]);
@@ -1016,7 +1023,12 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                     {lineItems.map((item, index) => (
                       <div 
                         key={item.id} 
-                        className={`border rounded-lg p-3 space-y-2 ${item.lineType === "discount" ? "bg-amber-50 border-amber-200" : item.lineType === "part" ? "bg-blue-50 border-blue-200" : ""}`}
+                        className={`border rounded-lg p-3 space-y-2 ${
+                          item.lineType === "discount" ? "bg-amber-50 border-amber-200" : 
+                          item.lineType === "part" ? "bg-blue-50 border-blue-200" : 
+                          item.lineType === "maintenance" ? "bg-green-50 border-green-200" :
+                          item.lineType === "service" ? "bg-slate-50 border-slate-200" : ""
+                        }`}
                         data-testid={`line-item-${item.id}`}
                       >
                         <div className="flex items-center justify-between">
@@ -1026,6 +1038,10 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                                 <span className="text-amber-600 flex items-center gap-1"><Tag className="h-3 w-3" />Discount</span>
                               ) : item.lineType === "part" ? (
                                 <span className="text-blue-600 flex items-center gap-1"><Package className="h-3 w-3" />Part</span>
+                              ) : item.lineType === "maintenance" ? (
+                                <span className="text-green-600 flex items-center gap-1"><Wrench className="h-3 w-3" />Maintenance</span>
+                              ) : item.lineType === "service" ? (
+                                <span className="text-slate-600 flex items-center gap-1"><Wrench className="h-3 w-3" />Service</span>
                               ) : (
                                 `Item ${index + 1}`
                               )}
@@ -1385,7 +1401,7 @@ interface InvoiceLineItem {
   description: string;
   quantity: number;
   unitPrice: number;
-  lineType: "service" | "discount" | "part";
+  lineType: "service" | "discount" | "part" | "maintenance";
   fromCatalog?: boolean;
   isMaintenanceItem?: boolean;
 }
@@ -1659,12 +1675,19 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       if (price < 0) price = 0;
     }
     
+    // Map category to lineType
+    const getLineType = (): InvoiceLineItem["lineType"] => {
+      if (isMaintenance) return "maintenance";
+      if (item.category === "service") return "service";
+      return "part";
+    };
+    
     setLineItems([...lineItems, { 
       id: Date.now().toString(), 
       description: item.name, 
       quantity: 1, 
       unitPrice: price,
-      lineType: item.category === "service" ? "service" : "part",
+      lineType: getLineType(),
       fromCatalog: true,
       isMaintenanceItem: isMaintenance
     }]);
@@ -2075,7 +2098,12 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                     {lineItems.map((item, index) => (
                       <div 
                         key={item.id} 
-                        className={`border rounded-lg p-3 space-y-2 ${item.lineType === "discount" ? "bg-amber-50 border-amber-200" : item.lineType === "part" ? "bg-blue-50 border-blue-200" : ""}`}
+                        className={`border rounded-lg p-3 space-y-2 ${
+                          item.lineType === "discount" ? "bg-amber-50 border-amber-200" : 
+                          item.lineType === "part" ? "bg-blue-50 border-blue-200" : 
+                          item.lineType === "maintenance" ? "bg-green-50 border-green-200" :
+                          item.lineType === "service" ? "bg-slate-50 border-slate-200" : ""
+                        }`}
                         data-testid={`invoice-line-item-${item.id}`}
                       >
                         <div className="flex items-center justify-between">
@@ -2085,6 +2113,10 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                                 <span className="text-amber-600 flex items-center gap-1"><Tag className="h-3 w-3" />Discount</span>
                               ) : item.lineType === "part" ? (
                                 <span className="text-blue-600 flex items-center gap-1"><Package className="h-3 w-3" />Part</span>
+                              ) : item.lineType === "maintenance" ? (
+                                <span className="text-green-600 flex items-center gap-1"><Wrench className="h-3 w-3" />Maintenance</span>
+                              ) : item.lineType === "service" ? (
+                                <span className="text-slate-600 flex items-center gap-1"><Wrench className="h-3 w-3" />Service</span>
                               ) : (
                                 `Item ${index + 1}`
                               )}

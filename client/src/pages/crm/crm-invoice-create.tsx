@@ -76,7 +76,7 @@ interface LineItem {
   description: string;
   quantity: number;
   unitPrice: number;
-  lineType: "part" | "labor" | "service" | "other" | "discount";
+  lineType: "part" | "labor" | "service" | "maintenance" | "other" | "discount";
   taxable: boolean;
   isDiscountLine?: boolean;
   discountKind?: "promotion" | "maintenance";
@@ -404,13 +404,24 @@ export default function CrmInvoiceCreate() {
   };
 
   const addFromCatalog = (item: CrmItem) => {
+    // Map item category/type to lineType
+    const getLineType = (): LineItem["lineType"] => {
+      const category = (item.category || "").toLowerCase();
+      const itemType = (item.itemType || "").toLowerCase();
+      if (category === "maintenance" || itemType === "maintenance") return "maintenance";
+      if (category === "service" || itemType === "service") return "service";
+      if (category === "labor" || itemType === "labor") return "labor";
+      if (category === "part" || category === "parts" || itemType === "part") return "part";
+      return "service"; // Default to service
+    };
+    
     const newItem: LineItem = {
       id: crypto.randomUUID(),
       description: item.name || item.description || "",
       quantity: 1,
       unitPrice: parseFloat(item.rate || "0"),
-      lineType: item.itemType === "service" ? "service" : "part",
-      taxable: item.taxable ?? true,
+      lineType: getLineType(),
+      taxable: true,
       crmItemId: item.id,
     };
     setFormData(prev => ({
@@ -983,9 +994,10 @@ export default function CrmInvoiceCreate() {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value="service">Service</SelectItem>
+                                    <SelectItem value="maintenance">Maintenance</SelectItem>
                                     <SelectItem value="part">Part</SelectItem>
                                     <SelectItem value="labor">Labor</SelectItem>
-                                    <SelectItem value="service">Service</SelectItem>
                                     <SelectItem value="other">Other</SelectItem>
                                   </SelectContent>
                                 </Select>
