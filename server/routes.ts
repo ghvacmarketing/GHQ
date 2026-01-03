@@ -15324,13 +15324,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             gt(crmWorkOrders.scheduledStart, startOfMonth)
           ));
 
-        // Get maintenance agreements sold by this tech
+        // Get maintenance agreements created this month (currently no soldBy tracking)
+        // For now, count all agreements created this month as a team metric
         const agreementsSold = await db.select({ count: count() })
           .from(crmAgreements)
-          .where(and(
-            eq(crmAgreements.soldBy, user.id),
-            gt(crmAgreements.createdAt, startOfMonth)
-          ));
+          .where(gt(crmAgreements.createdAt, startOfMonth));
 
         // Calculate per-ticket average
         const perTicketAvg = techInvoices.length > 0 ? serviceRevenue / techInvoices.length : 0;
