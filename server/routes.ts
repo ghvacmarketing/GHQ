@@ -9981,15 +9981,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/agreements - List all agreements with search/filter
   app.get("/api/crm/agreements", requireCrmAuth, async (req, res) => {
     try {
-      const { search, status, page = "1", limit = "25" } = req.query;
+      const { search, status, page = "1", limit = "25", tab = "all" } = req.query;
       const pageNum = parseInt(page as string, 10) || 1;
       const limitNum = parseInt(limit as string, 10) || 25;
       const offset = (pageNum - 1) * limitNum;
+
+      // Date calculations for tab filtering
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayStr = today.toISOString().split('T')[0];
+      const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+      const fifteenDaysFromNow = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000);
+      const fifteenDaysFromNowStr = fifteenDaysFromNow.toISOString().split('T')[0];
 
       let query = db.select().from(crmAgreements);
       let countQuery = db.select({ count: count() }).from(crmAgreements);
 
       const conditions = [];
+
+      // Apply tab-based filtering (server-side filtering before pagination)
+      if (tab === "all") {
+        // All Active = active + grace_period (excludes expired and cancelled)
+        conditions.push(
+          and(
+            eq(crmAgreements.status, "active"),
+            or(
+              isNull(crmAgreements.endDate),
+              sql`${crmAgreements.endDate} > ${thirtyDaysAgoStr}`
+            )
+          )
+        );
+      } else if (tab === "active") {
+        // Active only = status='active' AND (endDate is null OR endDate > today)
+        conditions.push(
+          and(
+            eq(crmAgreements.status, "active"),
+            or(
+              isNull(crmAgreements.endDate),
+              sql`${crmAgreements.endDate} > ${todayStr}`
+            )
+          )
+        );
+      } else if (tab === "grace_period") {
+        // Grace Period = status='active' AND endDate between (today-30) and today
+        conditions.push(
+          and(
+            eq(crmAgreements.status, "active"),
+            sql`${crmAgreements.endDate} IS NOT NULL`,
+            sql`${crmAgreements.endDate} <= ${todayStr}`,
+            sql`${crmAgreements.endDate} > ${thirtyDaysAgoStr}`
+          )
+        );
+      } else if (tab === "expired") {
+        // Expired = status='expired' OR (status='active' AND endDate <= today-30)
+        conditions.push(
+          or(
+            eq(crmAgreements.status, "expired"),
+            and(
+              eq(crmAgreements.status, "active"),
+              sql`${crmAgreements.endDate} IS NOT NULL`,
+              sql`${crmAgreements.endDate} <= ${thirtyDaysAgoStr}`
+            )
+          )
+        );
+      } else if (tab === "upcoming_service") {
+        // Upcoming Service = nextServiceDate between today and today+15
+        conditions.push(
+          and(
+            sql`${crmAgreements.nextServiceDate} IS NOT NULL`,
+            sql`${crmAgreements.nextServiceDate} >= ${todayStr}`,
+            sql`${crmAgreements.nextServiceDate} <= ${fifteenDaysFromNowStr}`
+          )
+        );
+      }
 
       if (status && status !== "all") {
         conditions.push(eq(crmAgreements.status, status as string));
@@ -10025,10 +10090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // - active: endDate is in the future or null
       // - grace_period: 0-30 days after endDate
       // - expired: more than 30 days after endDate
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const fifteenDaysFromNow = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000);
+      // (Reusing todayStr, thirtyDaysAgoStr, fifteenDaysFromNowStr from above)
 
       // Count active: status='active' AND (end_date IS NULL OR end_date > today)
       const [activeCount] = await db
@@ -10038,7 +10100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(crmAgreements.status, "active"),
           or(
             isNull(crmAgreements.endDate),
-            sql`${crmAgreements.endDate} > ${today.toISOString().split('T')[0]}`
+            sql`${crmAgreements.endDate} > ${todayStr}`
           )
         ));
 
@@ -10049,8 +10111,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(crmAgreements.status, "active"),
           sql`${crmAgreements.endDate} IS NOT NULL`,
-          sql`${crmAgreements.endDate} <= ${today.toISOString().split('T')[0]}`,
-          sql`${crmAgreements.endDate} > ${thirtyDaysAgo.toISOString().split('T')[0]}`
+          sql`${crmAgreements.endDate} <= ${todayStr}`,
+          sql`${crmAgreements.endDate} > ${thirtyDaysAgoStr}`
         ));
 
       // Count expired: status='active' AND end_date <= (today - 30 days), OR status='expired'
@@ -10062,7 +10124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(crmAgreements.status, "active"),
             sql`${crmAgreements.endDate} IS NOT NULL`,
-            sql`${crmAgreements.endDate} <= ${thirtyDaysAgo.toISOString().split('T')[0]}`
+            sql`${crmAgreements.endDate} <= ${thirtyDaysAgoStr}`
           )
         ));
 
@@ -10072,8 +10134,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(crmAgreements)
         .where(and(
           sql`${crmAgreements.nextServiceDate} IS NOT NULL`,
-          sql`${crmAgreements.nextServiceDate} >= ${today.toISOString().split('T')[0]}`,
-          sql`${crmAgreements.nextServiceDate} <= ${fifteenDaysFromNow.toISOString().split('T')[0]}`
+          sql`${crmAgreements.nextServiceDate} >= ${todayStr}`,
+          sql`${crmAgreements.nextServiceDate} <= ${fifteenDaysFromNowStr}`
         ));
 
       const statusCounts = {

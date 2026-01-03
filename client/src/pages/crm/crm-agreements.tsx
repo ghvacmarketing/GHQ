@@ -190,11 +190,12 @@ export default function CrmAgreements() {
   }, [debouncedSearch, activeTab]);
 
   const { data: agreementsData, isLoading: agreementsLoading } = useQuery<AgreementsResponse>({
-    queryKey: ["/api/crm/agreements", page, debouncedSearch],
+    queryKey: ["/api/crm/agreements", page, debouncedSearch, activeTab],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
         limit: String(ITEMS_PER_PAGE),
+        tab: activeTab,
       });
       if (debouncedSearch) {
         params.set("search", debouncedSearch);
@@ -358,32 +359,8 @@ export default function CrmAgreements() {
 
   const filteredAndSortedAgreements = useMemo(() => {
     if (!agreementsData?.agreements) return [];
+    // Server now handles tab-based filtering, so we just apply agreement type filter and sorting
     let filtered = [...agreementsData.agreements];
-
-    const today = startOfDay(new Date());
-    const fifteenDaysFromNow = addDays(today, 15);
-
-    if (activeTab === "all") {
-      filtered = filtered.filter((agreement) => {
-        const status = getAgreementStatus(agreement);
-        return status !== "expired" && status !== "cancelled";
-      });
-    } else if (activeTab === "grace_period") {
-      filtered = filtered.filter((agreement) => {
-        return getAgreementStatus(agreement) === "grace_period";
-      });
-    } else if (activeTab === "upcoming_service") {
-      filtered = filtered.filter((agreement) => {
-        if (!agreement.nextServiceDate) return false;
-        const nextServiceDate = startOfDay(new Date(agreement.nextServiceDate));
-        const daysUntilService = differenceInCalendarDays(nextServiceDate, today);
-        return daysUntilService >= 0 && daysUntilService <= 15;
-      });
-    } else if (activeTab === "active") {
-      filtered = filtered.filter((agreement) => getAgreementStatus(agreement) === "active");
-    } else if (activeTab === "expired") {
-      filtered = filtered.filter((agreement) => getAgreementStatus(agreement) === "expired");
-    }
     
     if (agreementTypeFilter !== "all") {
       filtered = filtered.filter((agreement) => agreement.agreementPlan === agreementTypeFilter);
