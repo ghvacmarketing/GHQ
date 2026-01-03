@@ -233,6 +233,9 @@ export default function CrmWorkOrders() {
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistId, setChecklistId] = useState<string | null>(null);
   
+  // Dynamic maintenance subtypes (includes custom agreement types)
+  const [maintenanceSubtypes, setMaintenanceSubtypes] = useState<string[]>(["Preventative Maintenance"]);
+  
   // Generate 30-minute interval time options from 8 AM to 8 PM
   const timeOptions = (() => {
     const options: { value: string; label: string }[] = [];
@@ -283,6 +286,23 @@ export default function CrmWorkOrders() {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
+
+  // Fetch maintenance subtypes (includes custom agreement types) when MAINTENANCE is selected
+  useEffect(() => {
+    if (visitType !== "MAINTENANCE") return;
+    
+    fetch("/api/crm/work-subtypes/MAINTENANCE", { credentials: "include" })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setMaintenanceSubtypes(data);
+        }
+      })
+      .catch(() => {
+        // Fall back to default if API fails
+        setMaintenanceSubtypes(["Preventative Maintenance"]);
+      });
+  }, [visitType]);
 
   // Fetch checklist questions when SERVICE is selected and workSubtype changes
   useEffect(() => {
@@ -1721,7 +1741,8 @@ export default function CrmWorkOrders() {
                     onValueChange={(v) => {
                       const vt = v as WorkOrderVisitType;
                       setVisitType(vt);
-                      setWorkSubtype(workSubtypeByVisitType[vt][0]);
+                      // For MAINTENANCE, default to "Preventative Maintenance" (dynamic subtypes load via useEffect)
+                      setWorkSubtype(vt === "MAINTENANCE" ? "Preventative Maintenance" : workSubtypeByVisitType[vt][0]);
                     }}
                   >
                     <SelectTrigger data-testid="select-visit-type">
@@ -1760,7 +1781,7 @@ export default function CrmWorkOrders() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {workSubtypeByVisitType[visitType].map((sub) => (
+                    {(visitType === "MAINTENANCE" ? maintenanceSubtypes : workSubtypeByVisitType[visitType]).map((sub) => (
                       <SelectItem key={sub} value={sub}>
                         {sub}
                       </SelectItem>

@@ -9931,7 +9931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/crm/custom-agreement-types/:id - Hard delete the agreement type
+  // DELETE /api/crm/custom-agreement-types/:id - Hard delete the agreement type and corresponding item
   app.delete("/api/crm/custom-agreement-types/:id", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const [deleted] = await db
@@ -9942,6 +9942,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!deleted) {
         return res.status(404).json({ message: "Custom agreement type not found" });
       }
+      
+      // Also delete the corresponding item in the Maintenance category
+      await db.delete(crmItems)
+        .where(and(
+          eq(crmItems.name, deleted.name),
+          eq(crmItems.category, "maintenance")
+        ));
       
       return res.json({ message: "Custom agreement type deleted" });
     } catch (error) {
