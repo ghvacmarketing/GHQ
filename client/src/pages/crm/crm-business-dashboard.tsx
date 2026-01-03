@@ -17,7 +17,21 @@ import {
   Settings2,
   CheckCircle,
   AlertTriangle,
+  FolderOpen,
+  ClipboardList,
+  FileText,
+  Calendar,
+  Clock,
 } from "lucide-react";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { PerformanceGauge } from "@/components/ui/performance-gauge";
 import type { CrmUser } from "@shared/schema";
@@ -38,6 +52,34 @@ interface DashboardAnalytics {
     SERVICE: { today: number; mtd: number; ytd: number; goal: number; goalProgress: number };
     INSTALL: { today: number; mtd: number; ytd: number; goal: number; goalProgress: number };
     MAINTENANCE: { today: number; mtd: number; ytd: number; goal: number; goalProgress: number };
+  };
+  monthlyRevenue: Array<{ month: string; revenue: number }>;
+  projectsOverview: {
+    open: number;
+    completed: number;
+    recent: Array<{
+      id: string;
+      name: string;
+      status: string;
+      projectType: string;
+      createdAt: string;
+    }>;
+  };
+  workOrdersOverview: {
+    scheduled: number;
+    completed: number;
+    recent: Array<{
+      id: string;
+      visitType: string;
+      status: string;
+      scheduledStart: string | null;
+      createdAt: string;
+    }>;
+  };
+  invoicesOverview: {
+    created: number;
+    sent: number;
+    pending: number;
   };
   techPerformance: Array<{
     id: string;
@@ -300,6 +342,153 @@ export default function CrmBusinessDashboard() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl font-bold text-slate-800 border-b-2 border-[#711419] pb-2">
+                  Monthly Revenue Trend
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={analytics.monthlyRevenue}>
+                      <defs>
+                        <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#711419" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#711419" stopOpacity={0.05}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 12 }} />
+                      <YAxis 
+                        tickFormatter={(value) => formatCurrency(value)}
+                        tick={{ fill: '#64748b', fontSize: 12 }}
+                      />
+                      <Tooltip 
+                        formatter={(value: number) => [formatCurrencyFull(value), "Revenue"]}
+                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="#711419" 
+                        strokeWidth={2}
+                        fill="url(#revenueGradient)"
+                        dot={{ fill: '#711419', strokeWidth: 2, r: 4 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="border-0 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <FolderOpen className="h-5 w-5 text-[#711419]" />
+                    Projects
+                  </CardTitle>
+                  <p className="text-xs text-slate-500">Last 30 days</p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-blue-800">{analytics.projectsOverview.open}</p>
+                      <p className="text-xs text-blue-600">Open</p>
+                    </div>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-green-800">{analytics.projectsOverview.completed}</p>
+                      <p className="text-xs text-green-600">Completed</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Recent Projects</p>
+                    {analytics.projectsOverview.recent.length > 0 ? (
+                      analytics.projectsOverview.recent.map((project) => (
+                        <div key={project.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                          <div className="truncate flex-1">
+                            <p className="text-sm font-medium text-slate-800 truncate">{project.name}</p>
+                            <p className="text-xs text-slate-500">{project.projectType}</p>
+                          </div>
+                          <Badge className="text-xs ml-2" variant="outline">{project.status}</Badge>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500 text-center py-2">No recent projects</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5 text-[#711419]" />
+                    Work Orders
+                  </CardTitle>
+                  <p className="text-xs text-slate-500">Last 30 days</p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-amber-800">{analytics.workOrdersOverview.scheduled}</p>
+                      <p className="text-xs text-amber-600">Scheduled</p>
+                    </div>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-green-800">{analytics.workOrdersOverview.completed}</p>
+                      <p className="text-xs text-green-600">Completed</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Recent Work Orders</p>
+                    {analytics.workOrdersOverview.recent.length > 0 ? (
+                      analytics.workOrdersOverview.recent.map((wo) => (
+                        <div key={wo.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                          <div className="truncate flex-1">
+                            <p className="text-sm font-medium text-slate-800">{wo.visitType}</p>
+                            <p className="text-xs text-slate-500 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {wo.scheduledStart ? new Date(wo.scheduledStart).toLocaleDateString() : "Not scheduled"}
+                            </p>
+                          </div>
+                          <Badge className="text-xs ml-2" variant="outline">{wo.status}</Badge>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500 text-center py-2">No recent work orders</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-[#711419]" />
+                    Invoices
+                  </CardTitle>
+                  <p className="text-xs text-slate-500">Last 30 days</p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-slate-800">{analytics.invoicesOverview.created}</p>
+                      <p className="text-xs text-slate-600">Created</p>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-blue-800">{analytics.invoicesOverview.sent}</p>
+                      <p className="text-xs text-blue-600">Sent</p>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-amber-800">{analytics.invoicesOverview.pending}</p>
+                      <p className="text-xs text-amber-600">Pending</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
             {analytics.techPerformance.length > 0 && (
               <Card className="border-0 shadow-sm">

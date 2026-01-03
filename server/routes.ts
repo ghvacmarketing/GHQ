@@ -5280,7 +5280,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      // 4. Sales Team Performance
+      // 4. Monthly Revenue for Area Chart (last 12 months)
+      const monthlyRevenue: Array<{ month: string; revenue: number }> = [];
+      for (let i = 11; i >= 0; i--) {
+        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+        const monthName = monthStart.toLocaleDateString("en-US", { month: "short" });
+        
+        const monthRevenue = await db
+          .select({
+            total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+          })
+          .from(crmInvoices)
+          .where(and(
+            eq(crmInvoices.status, "paid"),
+            sql`${crmInvoices.paidAt} >= ${monthStart}`,
+            sql`${crmInvoices.paidAt} <= ${monthEnd}`
+          ));
+        
+        monthlyRevenue.push({
+          month: monthName,
+          revenue: parseFloat(monthRevenue[0]?.total || "0"),
+        });
+      }
+
+      // 5. Projects Overview (last 30 days)
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      
+      const openProjectsCount = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(crmProjects)
+        .where(inArray(crmProjects.status, ["lead", "proposal_sent", "approved", "in_progress"]));
+      
+      const completedProjectsCount = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(crmProjects)
+        .where(and(
+          eq(crmProjects.status, "completed"),
+          sql`${crmProjects.updatedAt} >= ${thirtyDaysAgo}`
+        ));
+      
+      const recentProjects = await db
+        .select({
+          id: crmProjects.id,
+          name: crmProjects.name,
+          status: crmProjects.status,
+          projectType: crmProjects.projectType,
+          createdAt: crmProjects.createdAt,
+        })
+        .from(crmProjects)
+        .orderBy(desc(crmProjects.createdAt))
+        .limit(5);
+
+      // 6. Work Orders Overview (last 30 days)
+      const scheduledWoCount = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(crmWorkOrders)
+        .where(inArray(crmWorkOrders.status, ["scheduled", "dispatched"]));
+      
+      const completedWoCount = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(crmWorkOrders)
+        .where(and(
+          eq(crmWorkOrders.status, "completed"),
+          sql`${crmWorkOrders.completedAt} >= ${thirtyDaysAgo}`
+        ));
+      
+      const recentWorkOrders = await db
+        .select({
+          id: crmWorkOrders.id,
+          visitType: crmWorkOrders.visitType,
+          status: crmWorkOrders.status,
+          scheduledStart: crmWorkOrders.scheduledStart,
+          createdAt: crmWorkOrders.createdAt,
+        })
+        .from(crmWorkOrders)
+        .orderBy(desc(crmWorkOrders.createdAt))
+        .limit(5);
+
+      // 7. Invoices Overview (last 30 days)
+      const createdInvoicesCount = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(crmInvoices)
+        .where(sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`);
+      
+      const sentInvoicesCount = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(crmInvoices)
+        .where(and(
+          eq(crmInvoices.status, "sent"),
+          sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`
+        ));
+      
+      const pendingInvoicesCount = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(crmInvoices)
+        .where(and(
+          eq(crmInvoices.status, "draft"),
+          sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`
+        ));
+
+      // 8. Sales Team Performance
       const salesUsers = await db
         .select()
         .from(crmUsers)
@@ -5382,6 +5482,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           rolling12Month,
         },
         revenueByDepartment,
+        monthlyRevenue,
+        projectsOverview: {
+          open: openProjectsCount[0]?.count || 0,
+          completed: completedProjectsCount[0]?.count || 0,
+          recent: recentProjects,
+        },
+        workOrdersOverview: {
+          scheduled: scheduledWoCount[0]?.count || 0,
+          completed: completedWoCount[0]?.count || 0,
+          recent: recentWorkOrders,
+        },
+        invoicesOverview: {
+          created: createdInvoicesCount[0]?.count || 0,
+          sent: sentInvoicesCount[0]?.count || 0,
+          pending: pendingInvoicesCount[0]?.count || 0,
+        },
         techPerformance,
         salesPerformance,
       });
