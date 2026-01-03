@@ -5167,7 +5167,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalQuotesCount = quotesInRange[0]?.count || 0;
       const acceptedQuotesCount = acceptedQuotesInRange[0]?.count || 0;
       const closeRate = totalQuotesCount > 0 ? (acceptedQuotesCount / totalQuotesCount) * 100 : 0;
-      const companyGoal = 250000;
+      
+      // Calculate dynamic company goal based on range and budgeted monthly sales from Excel
+      let companyGoal = 0;
+      const monthlyBudget = currentMonthlyGoals ? parseFloat(currentMonthlyGoals.budgetedMonthlySalesGoal || "0") : 0;
+      const workDays = currentMonthlyGoals?.serviceWorkDays || 22;
+      
+      if (range === "day") {
+        // Daily goal = monthly budget / work days
+        companyGoal = workDays > 0 ? monthlyBudget / workDays : 0;
+      } else if (range === "week") {
+        // Weekly goal = monthly budget / 4 weeks
+        companyGoal = monthlyBudget / 4;
+      } else if (range === "rolling12") {
+        // Sum last 12 months of budgeted goals (spanning year boundaries)
+        const priorYear = currentYear - 1;
+        const allMonthlyGoals = await db.select().from(monthlyGoals)
+          .where(sql`(${monthlyGoals.year} = ${currentYear} AND ${monthlyGoals.month} <= ${currentMonth}) 
+                  OR (${monthlyGoals.year} = ${priorYear} AND ${monthlyGoals.month} > ${currentMonth})`);
+        companyGoal = allMonthlyGoals.reduce((sum, g) => sum + parseFloat(g.budgetedMonthlySalesGoal || "0"), 0);
+      } else {
+        // Month - use the monthly budget directly
+        companyGoal = monthlyBudget;
+      }
+      
       const goalProgress = companyGoal > 0 ? (totalSold / companyGoal) * 100 : 0;
       const rolling12Month = parseFloat(rolling12Invoices[0]?.total || "0");
 
@@ -14334,6 +14357,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       let dailyMaintenanceGoal = 0;
       let daysCount = 0;
       
+      // Row 2 (index 2) contains "Budgeted Monthly Sales Volume for Break-Even Plus Profit Goal + OH Adjustments"
+      // Value is in Column B (index 1)
+      const row2 = data[2] as any[];
+      const budgetedMonthlySalesGoal = row2 && row2[1] ? parseFloat(row2[1]) || 0 : 0;
+      
       for (let i = 18; i < data.length; i++) {
         const row = data[i] as any[];
         if (!row || !row[0] || !String(row[0]).startsWith("Day")) break;
@@ -14371,6 +14399,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
               monthlyInstallGoal: monthlyInstallGoal.toFixed(2),
               monthlyMaintenanceGoal: monthlyMaintenanceGoal.toFixed(2),
               monthlySalesGoal: monthlySalesGoal.toFixed(2),
+              budgetedMonthlySalesGoal: budgetedMonthlySalesGoal.toFixed(2),
               serviceWorkDays: daysCount,
               updatedAt: new Date(),
             })
@@ -14386,6 +14415,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             monthlyInstallGoal: monthlyInstallGoal.toFixed(2),
             monthlyMaintenanceGoal: monthlyMaintenanceGoal.toFixed(2),
             monthlySalesGoal: monthlySalesGoal.toFixed(2),
+            budgetedMonthlySalesGoal: budgetedMonthlySalesGoal.toFixed(2),
             serviceWorkDays: daysCount,
           });
         }
