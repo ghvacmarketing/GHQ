@@ -12357,7 +12357,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 numberOfSystems: 1, // Default to 1 system for auto-created agreements
                 price: maintenanceTotal.toFixed(2),
                 contractDate: format(today, "yyyy-MM-dd"),
-                invoiceDate: format(today, "yyyy-MM-dd"),
                 appointmentDate: format(appointmentDate, "yyyy-MM-dd"),
                 startDate: format(today, "yyyy-MM-dd"),
                 endDate: format(endDate, "yyyy-MM-dd"),
