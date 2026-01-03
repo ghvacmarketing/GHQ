@@ -1378,7 +1378,14 @@ export default function CrmAgreements() {
                 <Label htmlFor="type-frequency">Frequency *</Label>
                 <Select
                   value={typeForm.frequency}
-                  onValueChange={(value: "weekly" | "monthly" | "annual") => setTypeForm({ ...typeForm, frequency: value })}
+                  onValueChange={(value: "weekly" | "monthly" | "annual") => {
+                    const max = value === "weekly" ? 7 : value === "monthly" ? 30 : 365;
+                    setTypeForm({ 
+                      ...typeForm, 
+                      frequency: value,
+                      visitsPerPeriod: Math.min(typeForm.visitsPerPeriod, max)
+                    });
+                  }}
                 >
                   <SelectTrigger id="type-frequency" data-testid="select-type-frequency">
                     <SelectValue placeholder="Select frequency" />
@@ -1397,10 +1404,18 @@ export default function CrmAgreements() {
                     id="type-visits"
                     type="number"
                     min="1"
+                    max={typeForm.frequency === "weekly" ? 7 : typeForm.frequency === "monthly" ? 30 : 365}
                     value={typeForm.visitsPerPeriod}
-                    onChange={(e) => setTypeForm({ ...typeForm, visitsPerPeriod: parseInt(e.target.value) || 1 })}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 1;
+                      const max = typeForm.frequency === "weekly" ? 7 : typeForm.frequency === "monthly" ? 30 : 365;
+                      setTypeForm({ ...typeForm, visitsPerPeriod: Math.min(val, max) });
+                    }}
                     data-testid="input-type-visits"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Max: {typeForm.frequency === "weekly" ? "7 (days in week)" : typeForm.frequency === "monthly" ? "30 (days in month)" : "365 (days in year)"}
+                  </p>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="type-price">Default Price ($) *</Label>

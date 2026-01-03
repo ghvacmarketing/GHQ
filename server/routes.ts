@@ -9878,6 +9878,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validated = insertCustomAgreementTypeSchema.parse(req.body);
       
+      // Validate visits per period cannot exceed days in the period
+      const frequency = validated.frequency || "annual";
+      const visitsPerPeriod = validated.visitsPerPeriod || 2;
+      const maxVisits = frequency === "weekly" ? 7 : frequency === "monthly" ? 30 : 365;
+      
+      if (visitsPerPeriod > maxVisits) {
+        return res.status(400).json({ 
+          message: `Visits per period cannot exceed ${maxVisits} for ${frequency} frequency` 
+        });
+      }
+      
       const [created] = await db
         .insert(customAgreementTypes)
         .values(validated)
@@ -9920,20 +9931,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/crm/custom-agreement-types/:id - Soft delete (set isActive = false)
+  // DELETE /api/crm/custom-agreement-types/:id - Hard delete the agreement type
   app.delete("/api/crm/custom-agreement-types/:id", requireCrmSalesOrAbove, async (req, res) => {
     try {
-      const [updated] = await db
-        .update(customAgreementTypes)
-        .set({ isActive: false, updatedAt: new Date() })
+      const [deleted] = await db
+        .delete(customAgreementTypes)
         .where(eq(customAgreementTypes.id, req.params.id))
         .returning();
       
-      if (!updated) {
+      if (!deleted) {
         return res.status(404).json({ message: "Custom agreement type not found" });
       }
       
-      return res.json({ message: "Custom agreement type deactivated" });
+      return res.json({ message: "Custom agreement type deleted" });
     } catch (error) {
       console.error("Error deleting custom agreement type:", error);
       return res.status(500).json({ message: "Failed to delete custom agreement type" });
