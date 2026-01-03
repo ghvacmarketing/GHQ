@@ -57,6 +57,7 @@ import {
   ChevronDown,
   Wrench,
   FileText,
+  Pencil as Edit,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format, addDays, subDays, addMonths, addYears, isAfter, isBefore, startOfDay, differenceInCalendarDays, parseISO } from "date-fns";
