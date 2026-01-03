@@ -525,6 +525,7 @@ export default function CrmProspectFunnel() {
   
   const [wonConfirmOpen, setWonConfirmOpen] = useState(false);
   const [lostConfirmOpen, setLostConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [confirmProspectId, setConfirmProspectId] = useState<string | null>(null);
   
   const [mainViewTab, setMainViewTab] = useState<string>("overview");
@@ -641,6 +642,30 @@ export default function CrmProspectFunnel() {
       toast({ title: "Failed to update salesperson", description: error.message, variant: "destructive" });
     },
   });
+
+  const deleteProspectMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/crm/customers/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects/metrics"] });
+      toast({ title: "Prospect deleted successfully" });
+      setExpandedProspectId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete prospect", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleDeleteProspect = () => {
+    if (confirmProspectId) {
+      deleteProspectMutation.mutate(confirmProspectId);
+      setDeleteConfirmOpen(false);
+      setConfirmProspectId(null);
+    }
+  };
 
   const fuzzyMatch = (text: string, search: string): number => {
     if (!text || !search) return 0;
@@ -1592,6 +1617,21 @@ export default function CrmProspectFunnel() {
                           View Full Profile
                         </Button>
                       </div>
+
+                      <div className="pt-4 border-t">
+                        <Button 
+                          variant="destructive"
+                          className="w-full"
+                          onClick={() => {
+                            setConfirmProspectId(expandedProspect.id);
+                            setDeleteConfirmOpen(true);
+                          }}
+                          data-testid="button-delete-prospect"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Delete Prospect
+                        </Button>
+                      </div>
                     </TabsContent>
 
                     <TabsContent value="followups" className="space-y-4">
@@ -1775,6 +1815,23 @@ export default function CrmProspectFunnel() {
               <AlertDialogCancel onClick={() => setConfirmProspectId(null)}>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleMarkLost} className="bg-red-600 hover:bg-red-700">
                 Mark Lost
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Prospect?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to permanently delete this prospect? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setConfirmProspectId(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteProspect} className="bg-red-600 hover:bg-red-700">
+                Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
