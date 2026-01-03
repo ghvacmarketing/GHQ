@@ -9793,7 +9793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // POST /api/crm/custom-agreement-types - Create a new custom agreement type
   // Also auto-creates a corresponding item in the Maintenance category
-  app.post("/api/crm/custom-agreement-types", requireCrmAdmin, async (req, res) => {
+  app.post("/api/crm/custom-agreement-types", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const validated = insertCustomAgreementTypeSchema.parse(req.body);
       
@@ -9821,7 +9821,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/custom-agreement-types/:id - Update a custom agreement type
-  app.patch("/api/crm/custom-agreement-types/:id", requireCrmAdmin, async (req, res) => {
+  app.patch("/api/crm/custom-agreement-types/:id", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const [updated] = await db
         .update(customAgreementTypes)
@@ -9841,7 +9841,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/custom-agreement-types/:id - Soft delete (set isActive = false)
-  app.delete("/api/crm/custom-agreement-types/:id", requireCrmAdmin, async (req, res) => {
+  app.delete("/api/crm/custom-agreement-types/:id", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const [updated] = await db
         .update(customAgreementTypes)

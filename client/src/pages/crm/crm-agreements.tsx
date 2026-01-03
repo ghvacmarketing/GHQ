@@ -204,7 +204,7 @@ export default function CrmAgreements() {
     enabled: !!currentUser,
   });
 
-  const isAdmin = currentUser?.role === "admin" || currentUser?.role === "owner";
+  const canManageTypes = currentUser?.role === "admin" || currentUser?.role === "owner" || currentUser?.role === "sales";
 
   const { data: customAgreementTypes = [], isLoading: typesLoading } = useQuery<CustomAgreementType[]>({
     queryKey: ["/api/crm/custom-agreement-types"],
@@ -215,7 +215,7 @@ export default function CrmAgreements() {
       if (!res.ok) throw new Error("Failed to fetch custom agreement types");
       return res.json();
     },
-    enabled: !!currentUser && isAdmin,
+    enabled: !!currentUser && canManageTypes,
   });
 
   const createTypeMutation = useMutation({
@@ -611,7 +611,7 @@ export default function CrmAgreements() {
                 Reset
               </Button>
             )}
-            {isAdmin && (
+            {canManageTypes && (
               <Button
                 variant="outline"
                 size="sm"
