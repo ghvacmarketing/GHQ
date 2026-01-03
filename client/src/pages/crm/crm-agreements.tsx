@@ -665,85 +665,87 @@ export default function CrmAgreements() {
                 Reset
               </Button>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  className="bg-[#711419] hover:bg-[#5a1014]"
-                  data-testid="button-create-agreement"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  New Agreement
-                  <ChevronDown className="h-4 w-4 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel>Select Agreement Type</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => navigate("/crm/agreements/new?type=preventative")}
-                  className="cursor-pointer"
-                  data-testid="menu-item-preventative"
-                >
-                  <Wrench className="h-4 w-4 mr-2 text-[#711419]" />
-                  <div>
-                    <div className="font-medium">Preventative Maintenance</div>
-                    <div className="text-xs text-slate-500">Standard annual maintenance agreement</div>
-                  </div>
-                </DropdownMenuItem>
-                
-                {customAgreementTypes.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="text-xs text-slate-500">Custom Agreement Types</DropdownMenuLabel>
-                    {customAgreementTypes.filter(t => t.isActive).map((type) => (
+            <div className="flex flex-col items-end">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="bg-[#711419] hover:bg-[#5a1014]"
+                    data-testid="button-create-agreement"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    New Agreement
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel>Select Agreement Type</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => navigate("/crm/agreements/new?type=preventative")}
+                    className="cursor-pointer"
+                    data-testid="menu-item-preventative"
+                  >
+                    <Wrench className="h-4 w-4 mr-2 text-[#711419]" />
+                    <div>
+                      <div className="font-medium">Preventative Maintenance</div>
+                      <div className="text-xs text-slate-500">Standard annual maintenance agreement</div>
+                    </div>
+                  </DropdownMenuItem>
+                  
+                  {customAgreementTypes.length > 0 && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-xs text-slate-500">Custom Agreement Types</DropdownMenuLabel>
+                      {customAgreementTypes.filter(t => t.isActive).map((type) => (
+                        <DropdownMenuItem
+                          key={type.id}
+                          onClick={() => navigate(`/crm/agreements/new?type=custom&typeId=${type.id}`)}
+                          className="cursor-pointer"
+                          data-testid={`menu-item-custom-${type.id}`}
+                        >
+                          <FileText className="h-4 w-4 mr-2 text-slate-500" />
+                          <div>
+                            <div className="font-medium">{type.name}</div>
+                            {type.description && (
+                              <div className="text-xs text-slate-500 truncate max-w-[180px]">{type.description}</div>
+                            )}
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                  
+                  {canManageTypes && (
+                    <>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        key={type.id}
-                        onClick={() => navigate(`/crm/agreements/new?type=custom&typeId=${type.id}`)}
-                        className="cursor-pointer"
-                        data-testid={`menu-item-custom-${type.id}`}
+                        onClick={() => setShowSettingsDialog(true)}
+                        className="cursor-pointer text-slate-600"
+                        data-testid="menu-item-manage-types"
                       >
-                        <FileText className="h-4 w-4 mr-2 text-slate-500" />
-                        <div>
-                          <div className="font-medium">{type.name}</div>
-                          {type.description && (
-                            <div className="text-xs text-slate-500 truncate max-w-[180px]">{type.description}</div>
-                          )}
-                        </div>
+                        <Settings className="h-4 w-4 mr-2" />
+                        Manage Custom Types
                       </DropdownMenuItem>
-                    ))}
-                  </>
-                )}
-                
-                {canManageTypes && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => setShowSettingsDialog(true)}
-                      className="cursor-pointer text-slate-600"
-                      data-testid="menu-item-manage-types"
-                    >
-                      <Settings className="h-4 w-4 mr-2" />
-                      Manage Custom Types
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Select value={agreementTypeFilter} onValueChange={setAgreementTypeFilter}>
-              <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-agreement-type-filter">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent className="bg-white">
-                <SelectItem value="all" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">All Types</SelectItem>
-                <SelectItem value="Preventative Maintenance" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">Preventative Maintenance</SelectItem>
-                {customAgreementTypes.filter(t => t.isActive).map((type) => (
-                  <SelectItem key={type.id} value={type.name} className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">
-                    {type.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Select value={agreementTypeFilter} onValueChange={setAgreementTypeFilter}>
+                <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-agreement-type-filter">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="all" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">All Types</SelectItem>
+                  <SelectItem value="Preventative Maintenance" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">Preventative Maintenance</SelectItem>
+                  {customAgreementTypes.filter(t => t.isActive).map((type) => (
+                    <SelectItem key={type.id} value={type.name} className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
