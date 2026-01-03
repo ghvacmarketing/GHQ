@@ -45,11 +45,15 @@ import {
   Trash2,
   Eye,
   Edit,
+  Settings,
+  Check,
+  X,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format, addDays, addMonths, addYears, isAfter, isBefore, startOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import type { CrmUser, CrmAgreement, MaintenanceRegion } from "@shared/schema";
+import type { CrmUser, CrmAgreement, MaintenanceRegion, CustomAgreementType } from "@shared/schema";
+import { Switch } from "@/components/ui/switch";
 
 type AgreementsResponse = {
   agreements: CrmAgreement[];
@@ -120,6 +124,17 @@ export default function CrmAgreements() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<typeof createForm | null>(null);
+  
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [showCreateTypeDialog, setShowCreateTypeDialog] = useState(false);
+  const [editingType, setEditingType] = useState<CustomAgreementType | null>(null);
+  const [typeForm, setTypeForm] = useState({
+    name: "",
+    description: "",
+    visitsPerYear: 1,
+    defaultPrice: "0.00",
+    isActive: true,
+  });
 
   const [sortField, setSortField] = useState<SortField>("customerName");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -187,6 +202,65 @@ export default function CrmAgreements() {
       return res.json();
     },
     enabled: !!currentUser,
+  });
+
+  const isAdmin = currentUser?.role === "admin" || currentUser?.role === "owner";
+
+  const { data: customAgreementTypes = [], isLoading: typesLoading } = useQuery<CustomAgreementType[]>({
+    queryKey: ["/api/crm/custom-agreement-types"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/custom-agreement-types", {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch custom agreement types");
+      return res.json();
+    },
+    enabled: !!currentUser && isAdmin,
+  });
+
+  const createTypeMutation = useMutation({
+    mutationFn: async (data: typeof typeForm) => {
+      const res = await apiRequest("POST", "/api/crm/custom-agreement-types", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/custom-agreement-types"] });
+      setShowCreateTypeDialog(false);
+      setTypeForm({ name: "", description: "", visitsPerYear: 1, defaultPrice: "0.00", isActive: true });
+      toast({ title: "Custom agreement type created successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create custom agreement type", variant: "destructive" });
+    },
+  });
+
+  const updateTypeMutation = useMutation({
+    mutationFn: async (data: { id: string; updates: Partial<typeof typeForm> }) => {
+      const res = await apiRequest("PATCH", `/api/crm/custom-agreement-types/${data.id}`, data.updates);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/custom-agreement-types"] });
+      setEditingType(null);
+      setTypeForm({ name: "", description: "", visitsPerYear: 1, defaultPrice: "0.00", isActive: true });
+      toast({ title: "Custom agreement type updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update custom agreement type", variant: "destructive" });
+    },
+  });
+
+  const deleteTypeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/crm/custom-agreement-types/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/custom-agreement-types"] });
+      toast({ title: "Custom agreement type deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete custom agreement type", variant: "destructive" });
+    },
   });
 
   const createAgreementMutation = useMutation({
@@ -537,6 +611,16 @@ export default function CrmAgreements() {
                 Reset
               </Button>
             )}
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSettingsDialog(true)}
+                data-testid="button-agreement-settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               size="sm"
               className="bg-[#711419] hover:bg-[#5a1014]"
@@ -571,7 +655,7 @@ export default function CrmAgreements() {
                   data-testid={`tab-${tab.key}`}
                 >
                 {tab.label}
-                {count !== null && count > 0 && (
+                {count != null && count > 0 && (
                   <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded ${
                     activeTab === tab.key ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"
                   }`}>
@@ -1296,6 +1380,234 @@ export default function CrmAgreements() {
               )}
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Agreement Types Settings Dialog */}
+      <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Custom Agreement Types</DialogTitle>
+            <DialogDescription>
+              Manage reusable templates for custom service agreements. These types appear as work subtypes under MAINTENANCE visits.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            <div className="mb-4">
+              <Button
+                size="sm"
+                className="bg-[#711419] hover:bg-[#5a1014]"
+                onClick={() => {
+                  setTypeForm({ name: "", description: "", visitsPerYear: 1, defaultPrice: "0.00", isActive: true });
+                  setShowCreateTypeDialog(true);
+                }}
+                data-testid="button-create-type"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                New Agreement Type
+              </Button>
+            </div>
+
+            {typesLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : customAgreementTypes.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                <Settings className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+                <p>No custom agreement types yet</p>
+                <p className="text-sm">Create one to get started</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-center">Visits/Year</TableHead>
+                    <TableHead className="text-right">Default Price</TableHead>
+                    <TableHead className="text-center">Active</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {customAgreementTypes.map((type) => (
+                    <TableRow key={type.id} data-testid={`row-type-${type.id}`}>
+                      <TableCell className="font-medium">{type.name}</TableCell>
+                      <TableCell className="text-slate-600 max-w-[200px] truncate">
+                        {type.description || "—"}
+                      </TableCell>
+                      <TableCell className="text-center">{type.visitsPerYear}</TableCell>
+                      <TableCell className="text-right">${type.defaultPrice || "0.00"}</TableCell>
+                      <TableCell className="text-center">
+                        {type.isActive ? (
+                          <Check className="h-4 w-4 text-green-600 mx-auto" />
+                        ) : (
+                          <X className="h-4 w-4 text-slate-400 mx-auto" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() => {
+                              setEditingType(type);
+                              setTypeForm({
+                                name: type.name,
+                                description: type.description || "",
+                                visitsPerYear: type.visitsPerYear,
+                                defaultPrice: type.defaultPrice || "0.00",
+                                isActive: type.isActive,
+                              });
+                            }}
+                            data-testid={`button-edit-type-${type.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete "${type.name}"?`)) {
+                                deleteTypeMutation.mutate(type.id);
+                              }
+                            }}
+                            disabled={deleteTypeMutation.isPending}
+                            data-testid={`button-delete-type-${type.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create/Edit Custom Agreement Type Dialog */}
+      <Dialog 
+        open={showCreateTypeDialog || !!editingType} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowCreateTypeDialog(false);
+            setEditingType(null);
+            setTypeForm({ name: "", description: "", visitsPerYear: 1, defaultPrice: "0.00", isActive: true });
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingType ? "Edit Agreement Type" : "Create Agreement Type"}</DialogTitle>
+            <DialogDescription>
+              {editingType 
+                ? "Update the custom agreement type details." 
+                : "Create a new reusable agreement type template."}
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!typeForm.name.trim()) {
+                toast({ title: "Name is required", variant: "destructive" });
+                return;
+              }
+              if (editingType) {
+                updateTypeMutation.mutate({ id: editingType.id, updates: typeForm });
+              } else {
+                createTypeMutation.mutate(typeForm);
+              }
+            }}
+          >
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="type-name">Name *</Label>
+                <Input
+                  id="type-name"
+                  value={typeForm.name}
+                  onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })}
+                  placeholder="e.g., Annual Crawlspace Inspection"
+                  data-testid="input-type-name"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="type-description">Description</Label>
+                <Textarea
+                  id="type-description"
+                  value={typeForm.description}
+                  onChange={(e) => setTypeForm({ ...typeForm, description: e.target.value })}
+                  placeholder="Optional description of the service"
+                  data-testid="input-type-description"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="type-visits">Visits Per Year *</Label>
+                  <Input
+                    id="type-visits"
+                    type="number"
+                    min="1"
+                    value={typeForm.visitsPerYear}
+                    onChange={(e) => setTypeForm({ ...typeForm, visitsPerYear: parseInt(e.target.value) || 1 })}
+                    data-testid="input-type-visits"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="type-price">Default Price ($) *</Label>
+                  <Input
+                    id="type-price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={typeForm.defaultPrice}
+                    onChange={(e) => setTypeForm({ ...typeForm, defaultPrice: e.target.value })}
+                    data-testid="input-type-price"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="type-active"
+                  checked={typeForm.isActive}
+                  onCheckedChange={(checked) => setTypeForm({ ...typeForm, isActive: checked })}
+                  data-testid="switch-type-active"
+                />
+                <Label htmlFor="type-active">Active</Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowCreateTypeDialog(false);
+                  setEditingType(null);
+                  setTypeForm({ name: "", description: "", visitsPerYear: 1, defaultPrice: "0.00", isActive: true });
+                }}
+                data-testid="button-cancel-type"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-[#711419] hover:bg-[#5a1014]"
+                disabled={createTypeMutation.isPending || updateTypeMutation.isPending}
+                data-testid="button-save-type"
+              >
+                {(createTypeMutation.isPending || updateTypeMutation.isPending) 
+                  ? "Saving..." 
+                  : editingType ? "Save Changes" : "Create Type"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </CrmLayout>
