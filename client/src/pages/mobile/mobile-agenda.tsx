@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, formatLocal, toLocalTime } from "@/lib/timezone";
-import { MapPin, Clock, ClipboardList, WifiOff, CloudOff, LogIn, User, DollarSign, TrendingUp, Wrench, FileText, Users, Target, CheckCircle, XCircle, MessageSquare } from "lucide-react";
+import { MapPin, Clock, ClipboardList, WifiOff, CloudOff, LogIn, User, DollarSign, TrendingUp, Wrench, FileText, Users, Target, CheckCircle, XCircle, MessageSquare, Phone, Navigation, ChevronRight, Thermometer, Droplets, Wind, Settings, AlertTriangle, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -286,11 +286,54 @@ function SalesPerformanceSection({ performance }: { performance: SalesPerformanc
   );
 }
 
+// Get icon for work type
+function getWorkTypeIcon(visitType: string | null, workSubtype: string | null) {
+  const subtype = (workSubtype || "").toLowerCase();
+  if (subtype.includes("heat") || subtype.includes("furnace")) return Thermometer;
+  if (subtype.includes("cool") || subtype.includes("ac") || subtype.includes("air")) return Wind;
+  if (subtype.includes("water") || subtype.includes("leak") || subtype.includes("plumb")) return Droplets;
+  if (subtype.includes("maintenance") || subtype.includes("pm")) return Settings;
+  if (visitType === "SALES") return Users;
+  if (visitType === "INSTALL") return Wrench;
+  return Wrench;
+}
+
+// Get status accent color
+function getStatusAccentColor(status: string): string {
+  switch (status) {
+    case "on_site": return "border-l-green-500 bg-green-50/50 dark:bg-green-900/10";
+    case "en_route": return "border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/10";
+    case "dispatched": return "border-l-blue-500 bg-blue-50/50 dark:bg-blue-900/10";
+    case "completed": return "border-l-slate-400 bg-slate-50/50 dark:bg-slate-800/50";
+    default: return "border-l-slate-300";
+  }
+}
+
 function WorkOrderCard({ workOrder, showCacheWarning }: { workOrder: WorkOrderWithDetails; showCacheWarning: boolean }) {
   const status = statusConfig[workOrder.status] || statusConfig.scheduled;
   const customerName = workOrder.customer?.name || "Unknown Customer";
+  const customerPhone = workOrder.customer?.phone;
   const address = getPropertyAddress(workOrder.property);
   const pendingCount = usePendingChanges(workOrder.id);
+  const WorkTypeIcon = getWorkTypeIcon(workOrder.visitType, workOrder.workSubtype);
+  const accentColor = getStatusAccentColor(workOrder.status);
+  
+  const handleCall = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (customerPhone) {
+      window.location.href = `tel:${customerPhone}`;
+    }
+  };
+
+  const handleNavigate = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const fullAddress = [workOrder.property?.address1, workOrder.property?.city, workOrder.property?.state, workOrder.property?.zip].filter(Boolean).join(", ");
+    if (fullAddress) {
+      window.open(`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`, '_blank');
+    }
+  };
   
   return (
     <Link
@@ -298,59 +341,100 @@ function WorkOrderCard({ workOrder, showCacheWarning }: { workOrder: WorkOrderWi
       data-testid={`work-order-card-${workOrder.id}`}
     >
       <Card 
-        className={`cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98] ${
-          showCacheWarning ? 'border-l-4 border-l-amber-400' : ''
-        } ${pendingCount > 0 ? 'border-l-4 border-l-amber-500' : ''}`}
+        className={`cursor-pointer hover:shadow-lg transition-all active:scale-[0.98] border-l-4 overflow-hidden ${accentColor} ${
+          pendingCount > 0 ? 'ring-2 ring-amber-400/50' : ''
+        }`}
       >
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex items-center gap-2 flex-1 mr-2">
-              <h3 
-                className="font-semibold text-slate-800 dark:text-slate-200 truncate"
-                data-testid={`customer-name-${workOrder.id}`}
-              >
-                {customerName}
-              </h3>
-              {pendingCount > 0 && (
-                <span 
-                  className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0"
-                  data-testid={`pending-badge-${workOrder.id}`}
+        <CardContent className="p-0">
+          {/* Main content area */}
+          <div className="p-4">
+            {/* Header row: Customer name + Status */}
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                  workOrder.status === 'on_site' ? 'bg-green-100 text-green-600' :
+                  workOrder.status === 'en_route' ? 'bg-yellow-100 text-yellow-600' :
+                  workOrder.status === 'dispatched' ? 'bg-blue-100 text-blue-600' :
+                  'bg-slate-100 text-slate-600'
+                }`}>
+                  <WorkTypeIcon className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 
+                    className="font-semibold text-slate-800 dark:text-slate-200 text-base truncate"
+                    data-testid={`customer-name-${workOrder.id}`}
+                  >
+                    {customerName}
+                  </h3>
+                  {workOrder.workSubtype && (
+                    <p className="text-xs text-slate-500 truncate">
+                      {workOrder.visitType} • {workOrder.workSubtype}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {pendingCount > 0 && (
+                  <span 
+                    className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-100 px-2 py-1 rounded-full"
+                    data-testid={`pending-badge-${workOrder.id}`}
+                  >
+                    <CloudOff className="h-3 w-3" />
+                    {pendingCount}
+                  </span>
+                )}
+                <Badge 
+                  variant="outline" 
+                  className={`font-medium ${status.className}`}
+                  data-testid={`status-badge-${workOrder.id}`}
                 >
-                  <CloudOff className="h-2.5 w-2.5" />
-                  {pendingCount}
-                </span>
-              )}
+                  {status.label}
+                </Badge>
+              </div>
             </div>
-            <Badge 
-              variant="outline" 
-              className={`shrink-0 ${status.className}`}
-              data-testid={`status-badge-${workOrder.id}`}
+
+            {/* Time row - prominent display */}
+            <div className="flex items-center gap-2 mb-2 p-2 bg-slate-100/80 dark:bg-slate-700/50 rounded-lg">
+              <Clock className="h-4 w-4 text-slate-500 shrink-0" />
+              <span className="font-medium text-slate-700 dark:text-slate-300" data-testid={`time-${workOrder.id}`}>
+                {formatScheduledTime(workOrder.scheduledStart, workOrder.scheduledEnd)}
+              </span>
+            </div>
+
+            {/* Address row */}
+            <div className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
+              <MapPin className="h-4 w-4 mt-0.5 text-slate-400 shrink-0" />
+              <span className="line-clamp-2" data-testid={`address-${workOrder.id}`}>
+                {address}
+              </span>
+            </div>
+          </div>
+
+          {/* Quick action buttons */}
+          <div className="flex border-t border-slate-200 dark:border-slate-700 divide-x divide-slate-200 dark:divide-slate-700">
+            {customerPhone && (
+              <button
+                onClick={handleCall}
+                className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors active:bg-blue-100"
+                data-testid={`call-button-${workOrder.id}`}
+              >
+                <Phone className="h-4 w-4" />
+                Call
+              </button>
+            )}
+            <button
+              onClick={handleNavigate}
+              className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors active:bg-green-100"
+              data-testid={`navigate-button-${workOrder.id}`}
             >
-              {status.label}
-            </Badge>
-          </div>
-
-          <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mb-1.5">
-            <MapPin className="h-4 w-4 mr-1.5 text-slate-400 shrink-0" />
-            <span className="truncate" data-testid={`address-${workOrder.id}`}>
-              {address}
-            </span>
-          </div>
-
-          <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mb-1.5">
-            <Clock className="h-4 w-4 mr-1.5 text-slate-400 shrink-0" />
-            <span data-testid={`time-${workOrder.id}`}>
-              {formatScheduledTime(workOrder.scheduledStart, workOrder.scheduledEnd)}
-            </span>
-          </div>
-
-          {workOrder.workSubtype && (
-            <div className="mt-2">
-              <Badge variant="secondary" className="text-xs">
-                {workOrder.visitType} - {workOrder.workSubtype}
-              </Badge>
+              <Navigation className="h-4 w-4" />
+              Navigate
+            </button>
+            <div className="flex-1 flex items-center justify-center gap-1 py-3 text-sm font-medium text-slate-500">
+              <span>Details</span>
+              <ChevronRight className="h-4 w-4" />
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
     </Link>
@@ -443,17 +527,20 @@ export default function MobileAgenda() {
       <div className="p-4 space-y-4 pb-24" data-testid="mobile-agenda">
         {currentUser && <ProfileHeader user={currentUser} />}
         
-        <div className="text-center" data-testid="agenda-date-header">
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">
-            {formatLocal(today, "EEEE")}
-          </h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">
+        <div className="text-center bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-800/50 rounded-xl p-4 shadow-sm" data-testid="agenda-date-header">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <Calendar className="w-5 h-5 text-slate-500" />
+            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">
+              {formatLocal(today, "EEEE")}
+            </h2>
+          </div>
+          <p className="text-slate-500 dark:text-slate-400">
             {formatLocal(today, "MMMM d, yyyy")}
           </p>
           
           {showCacheWarning && workOrders && workOrders.length > 0 && (
             <div 
-              className="mt-2 inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-full"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-3 py-1.5 rounded-full font-medium"
               data-testid="cache-warning"
             >
               <WifiOff className="h-3 w-3" />
@@ -489,10 +576,15 @@ export default function MobileAgenda() {
           </div>
         ) : (
           <>
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                Today's Jobs ({todaysOrders.length})
-              </h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                  Today's Jobs
+                </h3>
+                <Badge variant="secondary" className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold">
+                  {todaysOrders.length}
+                </Badge>
+              </div>
               {todaysOrders.length === 0 ? (
                 <div 
                   className="flex flex-col items-center justify-center py-8 text-center bg-slate-50 dark:bg-slate-800/50 rounded-lg"
