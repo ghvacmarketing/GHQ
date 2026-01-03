@@ -550,7 +550,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
-  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "install" | "service" | "maintenance">("all");
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "service" | "maintenance">("service");
   const [discountSearch, setDiscountSearch] = useState("");
   const [showManualDiscount, setShowManualDiscount] = useState(false);
   const [discountDescription, setDiscountDescription] = useState("");
@@ -582,27 +582,35 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
 
   const crmItems = crmItemsData || [];
   
-  // Filter CRM items for catalog (exclude discount category)
-  const filteredCatalogItems = crmItems.filter(item => {
-    // Exclude items in the discount category from catalog
-    if (item.category === "discount") {
-      return false;
-    }
-    // Apply category filter
-    if (catalogCategoryFilter !== "all" && item.category !== catalogCategoryFilter) {
-      return false;
-    }
-    // Apply search filter
-    if (catalogSearch.trim()) {
-      const search = catalogSearch.toLowerCase();
-      return (
-        item.name?.toLowerCase().includes(search) ||
-        item.description?.toLowerCase().includes(search) ||
-        item.partNumber?.toLowerCase().includes(search)
-      );
-    }
-    return true;
-  });
+  // Filter CRM items for catalog (only service and maintenance for mobile techs)
+  const filteredCatalogItems = crmItems
+    .filter(item => {
+      // Only show service and maintenance categories for mobile techs
+      if (item.category !== "service" && item.category !== "maintenance") {
+        return false;
+      }
+      // Apply category filter
+      if (catalogCategoryFilter !== "all" && item.category !== catalogCategoryFilter) {
+        return false;
+      }
+      // Apply search filter
+      if (catalogSearch.trim()) {
+        const search = catalogSearch.toLowerCase();
+        return (
+          item.name?.toLowerCase().includes(search) ||
+          item.description?.toLowerCase().includes(search) ||
+          item.partNumber?.toLowerCase().includes(search)
+        );
+      }
+      return true;
+    })
+    // Sort to put "Service Call" at the top
+    .sort((a, b) => {
+      const aIsServiceCall = a.name?.toLowerCase().includes("service call") ? 0 : 1;
+      const bIsServiceCall = b.name?.toLowerCase().includes("service call") ? 0 : 1;
+      if (aIsServiceCall !== bIsServiceCall) return aIsServiceCall - bIsServiceCall;
+      return (a.name || "").localeCompare(b.name || "");
+    });
   
   // Filter discount items from CRM items (only discount category)
   const filteredDiscountItems = crmItems.filter(item => {
@@ -1089,11 +1097,10 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
             />
           </div>
 
-          {/* Category Filter Tabs */}
+          {/* Category Filter Tabs - Service & Maintenance only for mobile techs */}
           <div className="flex gap-2 flex-wrap">
             {[
               { key: "all", label: "All" },
-              { key: "install", label: "Install" },
               { key: "service", label: "Service" },
               { key: "maintenance", label: "Maintenance" },
             ].map((cat) => (
@@ -1146,7 +1153,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCatalog(false); setCatalogSearch(""); setCatalogCategoryFilter("all"); }}>
+            <Button variant="outline" onClick={() => { setShowCatalog(false); setCatalogSearch(""); setCatalogCategoryFilter("service"); }}>
               Cancel
             </Button>
           </DialogFooter>
@@ -1328,7 +1335,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
-  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "install" | "service" | "maintenance">("all");
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "service" | "maintenance">("service");
   const [discountSearch, setDiscountSearch] = useState("");
   const [showManualDiscount, setShowManualDiscount] = useState(false);
   const [discountDescription, setDiscountDescription] = useState("");
@@ -1385,27 +1392,35 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
 
   const crmItems = crmItemsData || [];
   
-  // Filter CRM items for catalog (exclude discount category)
-  const filteredCatalogItems = crmItems.filter(item => {
-    // Exclude items in the discount category from catalog
-    if (item.category === "discount") {
-      return false;
-    }
-    // Apply category filter
-    if (catalogCategoryFilter !== "all" && item.category !== catalogCategoryFilter) {
-      return false;
-    }
-    // Apply search filter
-    if (catalogSearch.trim()) {
-      const search = catalogSearch.toLowerCase();
-      return (
-        item.name?.toLowerCase().includes(search) ||
-        item.description?.toLowerCase().includes(search) ||
-        item.partNumber?.toLowerCase().includes(search)
-      );
-    }
-    return true;
-  });
+  // Filter CRM items for catalog (only service and maintenance for mobile techs)
+  const filteredCatalogItems = crmItems
+    .filter(item => {
+      // Only show service and maintenance categories for mobile techs
+      if (item.category !== "service" && item.category !== "maintenance") {
+        return false;
+      }
+      // Apply category filter
+      if (catalogCategoryFilter !== "all" && item.category !== catalogCategoryFilter) {
+        return false;
+      }
+      // Apply search filter
+      if (catalogSearch.trim()) {
+        const search = catalogSearch.toLowerCase();
+        return (
+          item.name?.toLowerCase().includes(search) ||
+          item.description?.toLowerCase().includes(search) ||
+          item.partNumber?.toLowerCase().includes(search)
+        );
+      }
+      return true;
+    })
+    // Sort to put "Service Call" at the top
+    .sort((a, b) => {
+      const aIsServiceCall = a.name?.toLowerCase().includes("service call") ? 0 : 1;
+      const bIsServiceCall = b.name?.toLowerCase().includes("service call") ? 0 : 1;
+      if (aIsServiceCall !== bIsServiceCall) return aIsServiceCall - bIsServiceCall;
+      return (a.name || "").localeCompare(b.name || "");
+    });
   
   // Filter discount items from CRM items (only discount category)
   const filteredDiscountItems = crmItems.filter(item => {
@@ -2085,7 +2100,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCatalog(false); setCatalogSearch(""); setCatalogCategoryFilter("all"); }}>
+            <Button variant="outline" onClick={() => { setShowCatalog(false); setCatalogSearch(""); setCatalogCategoryFilter("service"); }}>
               Cancel
             </Button>
           </DialogFooter>
