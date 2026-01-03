@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, useSearch } from "wouter";
 import { format } from "date-fns";
 import { 
   ArrowLeft, 
@@ -2594,12 +2594,23 @@ export default function MobileJobDetail() {
   const params = useParams<{ id: string }>();
   const workOrderId = parseInt(params.id || "0", 10);
   const [, navigate] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
   const [noteInput, setNoteInput] = useState("");
   const { isOnline } = useOnlineStatus();
   const pendingNotes = usePendingNotes(workOrderId);
 
-  const [activeTab, setActiveTab] = useState<TabType>("overview");
+  // Parse tab from query string
+  const initialTab = (): TabType => {
+    const params = new URLSearchParams(searchString);
+    const tab = params.get("tab");
+    if (tab === "work" || tab === "quote" || tab === "invoice") {
+      return tab;
+    }
+    return "overview";
+  };
+
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [optimisticStatus, setOptimisticStatus] = useState<WorkOrderStatus | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionSummary, setCompletionSummary] = useState("");
@@ -2761,7 +2772,13 @@ export default function MobileJobDetail() {
       <div className="flex flex-col h-full">
         <div className="flex-shrink-0 p-4 pb-2">
           <button
-            onClick={() => navigate("/mobile")}
+            onClick={() => {
+              if (activeTab !== "overview") {
+                setActiveTab("overview");
+              } else {
+                navigate("/mobile");
+              }
+            }}
             className="flex items-center text-slate-600 hover:text-slate-800 min-h-[44px] min-w-[44px]"
             data-testid="button-back"
           >

@@ -170,7 +170,11 @@ export default function MobileInvoiceDetail() {
   });
 
   const handleBack = () => {
-    window.history.back();
+    if (invoice?.workOrderId) {
+      navigate(`/mobile/job/${invoice.workOrderId}?tab=invoice`);
+    } else {
+      navigate("/mobile");
+    }
   };
 
   const openPaymentDialog = () => {

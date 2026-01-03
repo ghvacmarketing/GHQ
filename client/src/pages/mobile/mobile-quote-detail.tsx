@@ -130,7 +130,11 @@ export default function MobileQuoteDetail() {
   });
 
   const handleBack = () => {
-    window.history.back();
+    if (quote?.workOrderId) {
+      navigate(`/mobile/job/${quote.workOrderId}?tab=quote`);
+    } else {
+      navigate("/mobile");
+    }
   };
 
   const handleDownloadPDF = () => {
