@@ -19,6 +19,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { PerformanceGauge } from "@/components/ui/performance-gauge";
 import type { CrmUser } from "@shared/schema";
 
 type TimeRange = "day" | "week" | "month" | "rolling12";
@@ -42,6 +43,7 @@ interface DashboardAnalytics {
     id: string;
     name: string;
     serviceRevenue: number;
+    quotedAmount: number;
     serviceJobs: number;
     perTicketAvg: number;
     maintenanceAgreements: number;
@@ -325,26 +327,36 @@ export default function CrmBusinessDashboard() {
                           )}
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                        <div className="bg-slate-50 border-l-4 border-blue-500 p-3 rounded">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Service Revenue</p>
-                          <p className="text-xl font-bold text-slate-800">{formatCurrencyFull(tech.serviceRevenue)}</p>
-                          <p className={`text-xs ${tech.goalMet ? "text-green-600" : "text-slate-500"}`}>
-                            Goal: {formatCurrency(tech.goal)} ({tech.goalProgress.toFixed(0)}%)
-                          </p>
+                      <div className="flex flex-col lg:flex-row gap-6">
+                        <div className="flex-shrink-0 flex justify-center">
+                          <PerformanceGauge
+                            sold={tech.serviceRevenue}
+                            quoted={tech.quotedAmount}
+                            goal={tech.goal}
+                            size={200}
+                          />
                         </div>
-                        <div className="bg-slate-50 border-l-4 border-green-500 p-3 rounded">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Per Ticket Avg</p>
-                          <p className="text-xl font-bold text-slate-800">{formatCurrencyFull(tech.perTicketAvg)}</p>
-                        </div>
-                        <div className="bg-slate-50 border-l-4 border-purple-500 p-3 rounded">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Service Jobs</p>
-                          <p className="text-xl font-bold text-slate-800">{tech.serviceJobs}</p>
-                          <p className="text-xs text-slate-500">MTD</p>
-                        </div>
-                        <div className="bg-slate-50 border-l-4 border-amber-500 p-3 rounded">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Maint. Agreements</p>
-                          <p className="text-xl font-bold text-slate-800">{tech.maintenanceAgreements}</p>
+                        <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="bg-slate-50 border-l-4 border-blue-500 p-3 rounded">
+                            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Service Revenue</p>
+                            <p className="text-xl font-bold text-slate-800">{formatCurrencyFull(tech.serviceRevenue)}</p>
+                            <p className={`text-xs ${tech.goalMet ? "text-green-600" : "text-slate-500"}`}>
+                              Goal: {formatCurrency(tech.goal)} ({tech.goalProgress.toFixed(0)}%)
+                            </p>
+                          </div>
+                          <div className="bg-slate-50 border-l-4 border-green-500 p-3 rounded">
+                            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Per Ticket Avg</p>
+                            <p className="text-xl font-bold text-slate-800">{formatCurrencyFull(tech.perTicketAvg)}</p>
+                          </div>
+                          <div className="bg-slate-50 border-l-4 border-purple-500 p-3 rounded">
+                            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Service Jobs</p>
+                            <p className="text-xl font-bold text-slate-800">{tech.serviceJobs}</p>
+                            <p className="text-xs text-slate-500">MTD</p>
+                          </div>
+                          <div className="bg-slate-50 border-l-4 border-amber-500 p-3 rounded">
+                            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Maint. Agreements</p>
+                            <p className="text-xl font-bold text-slate-800">{tech.maintenanceAgreements}</p>
+                          </div>
                         </div>
                       </div>
                     </div>

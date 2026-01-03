@@ -39,6 +39,7 @@ type SalesData = {
 };
 
 type TechMetric = {
+  dailyGoal: number;
   mtdGoal: number;
   mtdActual: number;
   difference: number;
@@ -360,10 +361,11 @@ export default function CrmGoalsTracker() {
                   <thead>
                     <tr className="border-b border-slate-200">
                       <th className="text-left py-3 px-2 font-semibold text-slate-600">Technician</th>
+                      <th className="text-right py-3 px-2 font-semibold text-slate-600">Daily Goal</th>
                       <th className="text-right py-3 px-2 font-semibold text-slate-600">Service</th>
                       <th className="text-right py-3 px-2 font-semibold text-slate-600">Install</th>
                       <th className="text-right py-3 px-2 font-semibold text-slate-600">Maintenance</th>
-                      <th className="text-right py-3 px-2 font-semibold text-slate-600">Total</th>
+                      <th className="text-right py-3 px-2 font-semibold text-slate-600">Total MTD</th>
                       <th className="text-right py-3 px-2 font-semibold text-slate-600">% Goal</th>
                     </tr>
                   </thead>
@@ -380,20 +382,26 @@ export default function CrmGoalsTracker() {
                         </td>
                         <td className="text-right py-3 px-2">
                           <div className="flex flex-col items-end">
+                            <span className="font-semibold text-slate-900">{formatCurrency(tech.total.dailyGoal)}</span>
+                            <span className="text-xs text-slate-400">per day</span>
+                          </div>
+                        </td>
+                        <td className="text-right py-3 px-2">
+                          <div className="flex flex-col items-end">
                             <span className="font-semibold text-slate-900">{formatCurrency(tech.service.mtdActual)}</span>
-                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.service.mtdGoal)}</span>
+                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.service.mtdGoal)} ({formatCurrency(tech.service.dailyGoal)}/d)</span>
                           </div>
                         </td>
                         <td className="text-right py-3 px-2">
                           <div className="flex flex-col items-end">
                             <span className="font-semibold text-slate-900">{formatCurrency(tech.install.mtdActual)}</span>
-                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.install.mtdGoal)}</span>
+                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.install.mtdGoal)} ({formatCurrency(tech.install.dailyGoal)}/d)</span>
                           </div>
                         </td>
                         <td className="text-right py-3 px-2">
                           <div className="flex flex-col items-end">
                             <span className="font-semibold text-slate-900">{formatCurrency(tech.maintenance.mtdActual)}</span>
-                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.maintenance.mtdGoal)}</span>
+                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.maintenance.mtdGoal)} ({formatCurrency(tech.maintenance.dailyGoal)}/d)</span>
                           </div>
                         </td>
                         <td className="text-right py-3 px-2">

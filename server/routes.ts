@@ -5249,10 +5249,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
               sql`${maintenanceVisits.completedAt} >= ${startOfMonth}`
             ));
 
+          // Get quoted amounts (sent but not accepted/paid) for current month
+          let quotedAmount = 0;
+          if (workOrderIds.length > 0) {
+            const quotedResult = await db
+              .select({
+                total: sql<string>`COALESCE(SUM(CAST(${crmQuotes.total} AS DECIMAL(10,2))), 0)`,
+              })
+              .from(crmQuotes)
+              .where(and(
+                inArray(crmQuotes.workOrderId, workOrderIds),
+                eq(crmQuotes.status, "sent"),
+                sql`${crmQuotes.createdAt} >= ${startOfMonth}`
+              ));
+            quotedAmount = parseFloat(quotedResult[0]?.total || "0");
+          }
+
           return {
             id: tech.id,
             name: tech.name,
             serviceRevenue,
+            quotedAmount,
             serviceJobs,
             perTicketAvg,
             maintenanceAgreements: maintenanceAgreementsCount[0]?.count || 0,
@@ -14353,6 +14370,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const techCount = techs.length || 1; // Avoid division by zero
       
       // Calculate individual tech goals (total goal / number of techs)
+      const techDailyServiceGoal = dailyServiceGoal / techCount;
+      const techDailyInstallGoal = dailyInstallGoal / techCount;
+      const techDailyMaintenanceGoal = dailyMaintenanceGoal / techCount;
+      const techDailyTotalGoal = dailyTotalGoal / techCount;
+      
       const techMtdServiceGoal = mtdServiceGoal / techCount;
       const techMtdInstallGoal = mtdInstallGoal / techCount;
       const techMtdMaintenanceGoal = mtdMaintenanceGoal / techCount;
@@ -14404,24 +14426,28 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           id: tech.id,
           name: tech.name,
           service: {
+            dailyGoal: techDailyServiceGoal,
             mtdGoal: techMtdServiceGoal,
             mtdActual: serviceMTD,
             difference: serviceMTD - techMtdServiceGoal,
             percentComplete: techMtdServiceGoal > 0 ? Math.round((serviceMTD / techMtdServiceGoal) * 100) : 0,
           },
           install: {
+            dailyGoal: techDailyInstallGoal,
             mtdGoal: techMtdInstallGoal,
             mtdActual: installMTD,
             difference: installMTD - techMtdInstallGoal,
             percentComplete: techMtdInstallGoal > 0 ? Math.round((installMTD / techMtdInstallGoal) * 100) : 0,
           },
           maintenance: {
+            dailyGoal: techDailyMaintenanceGoal,
             mtdGoal: techMtdMaintenanceGoal,
             mtdActual: maintenanceMTD,
             difference: maintenanceMTD - techMtdMaintenanceGoal,
             percentComplete: techMtdMaintenanceGoal > 0 ? Math.round((maintenanceMTD / techMtdMaintenanceGoal) * 100) : 0,
           },
           total: {
+            dailyGoal: techDailyTotalGoal,
             mtdGoal: techMtdTotalGoal,
             mtdActual: totalMTD,
             difference: totalMTD - techMtdTotalGoal,
