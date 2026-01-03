@@ -584,7 +584,7 @@ export default function CrmProspectFunnel() {
   });
 
   const salesUsers = useMemo(() => {
-    return (users || []).filter(u => u.role === 'sales' || u.role === 'owner');
+    return (users || []).filter(u => u.role === 'sales');
   }, [users]);
 
   useEffect(() => {
@@ -746,14 +746,11 @@ export default function CrmProspectFunnel() {
       .sort((a, b) => new Date(b.dueAt).getTime() - new Date(a.dueAt).getTime());
   };
 
-  const SALES_PEOPLE: Record<string, string> = {
-    chandler: "Chandler",
-    earnest: "Earnest",
-  };
-  
-  const selectedEmployeeName = selectedEmployeeId === "all" 
-    ? null 
-    : SALES_PEOPLE[selectedEmployeeId] || "Unknown";
+  const selectedEmployeeName = useMemo(() => {
+    if (selectedEmployeeId === "all") return null;
+    const user = salesUsers.find(u => u.id === selectedEmployeeId);
+    return user?.name || null;
+  }, [selectedEmployeeId, salesUsers]);
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(calendarMonth);
@@ -910,8 +907,11 @@ export default function CrmProspectFunnel() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Sales People</SelectItem>
-            <SelectItem value="chandler">Chandler</SelectItem>
-            <SelectItem value="earnest">Earnest</SelectItem>
+            {salesUsers.map((user) => (
+              <SelectItem key={user.id} value={user.id}>
+                {user.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
