@@ -12250,21 +12250,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Auto-create maintenance agreement if invoice is fully paid and contains maintenance items
       if (newStatus === "paid" && invoice.customerId) {
         try {
-          const maintenanceLineItems = await db.select()
+          // Find maintenance line items by joining with crmItems catalog or checking description
+          const lineItemsWithCatalog = await db.select({
+            lineItem: crmInvoiceLineItems,
+            catalogItem: crmItems,
+          })
             .from(crmInvoiceLineItems)
-            .where(and(
-              eq(crmInvoiceLineItems.invoiceId, req.params.id),
-              eq(crmInvoiceLineItems.category, "maintenance")
-            ));
+            .leftJoin(crmItems, eq(crmInvoiceLineItems.itemId, crmItems.id))
+            .where(eq(crmInvoiceLineItems.invoiceId, req.params.id));
+          
+          // Filter for maintenance items: either catalog item has category "maintenance" OR description contains "maintenance"
+          const maintenanceLineItems = lineItemsWithCatalog.filter(row => 
+            row.catalogItem?.category === "maintenance" || 
+            row.lineItem.description?.toLowerCase().includes("maintenance") ||
+            row.lineItem.description?.toLowerCase().includes("preventative")
+          );
           
           if (maintenanceLineItems.length > 0) {
-            // Calculate total maintenance amount from line items
-            const maintenanceTotal = maintenanceLineItems.reduce((sum, item) => {
-              return sum + parseFloat(item.total || "0");
+            // Calculate total maintenance amount from line items (use lineTotal, not total)
+            const maintenanceTotal = maintenanceLineItems.reduce((sum, row) => {
+              return sum + parseFloat(row.lineItem.lineTotal || "0");
             }, 0);
             
-            // Get the first maintenance item name for the agreement plan
-            const maintenanceItemName = maintenanceLineItems[0].name || "Preventative Maintenance";
+            // Get the maintenance item name for the agreement plan (use description or catalog name)
+            const maintenanceItemName = maintenanceLineItems[0].catalogItem?.name || 
+              maintenanceLineItems[0].lineItem.description || 
+              "Preventative Maintenance";
             
             // Look up the custom agreement type to get frequency and visits per period
             const [customType] = await db.select()
@@ -12313,14 +12324,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               const agreementNumber = `MA-${dateStr}-${String(sequence).padStart(3, '0')}`;
               
+              // Get the property address - use invoice's property or fall back to customer's default property
+              let propertyId = invoice.propertyId;
+              let propertyAddress = customer.fullAddress || "";
+              
+              if (propertyId) {
+                // Get the property address for the agreement
+                const [property] = await db.select().from(crmProperties)
+                  .where(eq(crmProperties.id, propertyId));
+                if (property) {
+                  propertyAddress = `${property.address1}${property.address2 ? ' ' + property.address2 : ''}, ${property.city}, ${property.state} ${property.zip}`;
+                }
+              } else {
+                // If no property on invoice, try to find customer's default property
+                const [defaultProperty] = await db.select().from(crmProperties)
+                  .where(eq(crmProperties.customerId, invoice.customerId))
+                  .limit(1);
+                if (defaultProperty) {
+                  propertyId = defaultProperty.id;
+                  propertyAddress = `${defaultProperty.address1}${defaultProperty.address2 ? ' ' + defaultProperty.address2 : ''}, ${defaultProperty.city}, ${defaultProperty.state} ${defaultProperty.zip}`;
+                }
+              }
+              
               // Create the maintenance agreement
               const [newAgreement] = await db.insert(crmAgreements).values({
                 customerId: invoice.customerId,
-                propertyId: null, // Auto-created agreements don't have a specific property
+                propertyId: propertyId || null,
                 agreementNumber,
                 customerName: customer.name,
                 agreementPlan: agreementPlanName,
-                address: customer.fullAddress || "",
+                address: propertyAddress,
                 numberOfSystems: 1, // Default to 1 system for auto-created agreements
                 price: maintenanceTotal.toFixed(2),
                 contractDate: format(today, "yyyy-MM-dd"),
