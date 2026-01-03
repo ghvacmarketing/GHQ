@@ -12155,7 +12155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }, 0);
             
             // Get the first maintenance item name for the agreement plan
-            const maintenanceItemName = maintenanceLineItems[0].name || "Maintenance Agreement";
+            const maintenanceItemName = maintenanceLineItems[0].name || "Preventative Maintenance";
             
             // Look up the custom agreement type to get frequency and visits per period
             const [customType] = await db.select()
@@ -12166,9 +12166,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ))
               .limit(1);
             
-            // Use custom type settings or defaults
-            const agreementFrequency = (customType?.frequency as "weekly" | "monthly" | "annual") || "annual";
+            // Standard Preventative Maintenance is ALWAYS annual with 2 visits
+            // Only use custom type settings if explicitly matching a custom agreement type
+            const agreementFrequency = customType ? (customType.frequency as "weekly" | "monthly" | "annual") : "annual";
             const agreementVisitsPerPeriod = customType?.visitsPerPeriod || 2;
+            
+            // Use "Preventative Maintenance" as default plan name if no custom type found
+            const agreementPlanName = customType ? maintenanceItemName : "Preventative Maintenance";
             
             // Get customer info for the agreement
             const [customer] = await db.select().from(crmCustomers)
@@ -12203,10 +12207,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Create the maintenance agreement
               const [newAgreement] = await db.insert(crmAgreements).values({
                 customerId: invoice.customerId,
+                propertyId: null, // Auto-created agreements don't have a specific property
                 agreementNumber,
                 customerName: customer.name,
-                agreementPlan: maintenanceItemName,
+                agreementPlan: agreementPlanName,
                 address: customer.fullAddress || "",
+                numberOfSystems: 1, // Default to 1 system for auto-created agreements
                 price: maintenanceTotal.toFixed(2),
                 contractDate: format(today, "yyyy-MM-dd"),
                 invoiceDate: format(today, "yyyy-MM-dd"),

@@ -33,6 +33,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Search,
   FileCheck,
   ChevronLeft,
@@ -48,6 +56,9 @@ import {
   Settings,
   Check,
   X,
+  ChevronDown,
+  Wrench,
+  FileText,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format, addDays, addMonths, addYears, isAfter, isBefore, startOfDay } from "date-fns";
@@ -216,7 +227,7 @@ export default function CrmAgreements() {
       if (!res.ok) throw new Error("Failed to fetch custom agreement types");
       return res.json();
     },
-    enabled: !!currentUser && canManageTypes,
+    enabled: !!currentUser,
   });
 
   const createTypeMutation = useMutation({
@@ -612,25 +623,71 @@ export default function CrmAgreements() {
                 Reset
               </Button>
             )}
-            {canManageTypes && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowSettingsDialog(true)}
-                data-testid="button-agreement-settings"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            )}
-            <Button
-              size="sm"
-              className="bg-[#711419] hover:bg-[#5a1014]"
-              onClick={() => navigate("/crm/agreements/new")}
-              data-testid="button-create-agreement"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              New Agreement
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  className="bg-[#711419] hover:bg-[#5a1014]"
+                  data-testid="button-create-agreement"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  New Agreement
+                  <ChevronDown className="h-4 w-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>Select Agreement Type</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => navigate("/crm/agreements/create?type=preventative")}
+                  className="cursor-pointer"
+                  data-testid="menu-item-preventative"
+                >
+                  <Wrench className="h-4 w-4 mr-2 text-[#711419]" />
+                  <div>
+                    <div className="font-medium">Preventative Maintenance</div>
+                    <div className="text-xs text-slate-500">Standard annual maintenance agreement</div>
+                  </div>
+                </DropdownMenuItem>
+                
+                {customAgreementTypes.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-xs text-slate-500">Custom Agreement Types</DropdownMenuLabel>
+                    {customAgreementTypes.filter(t => t.isActive).map((type) => (
+                      <DropdownMenuItem
+                        key={type.id}
+                        onClick={() => navigate(`/crm/agreements/create?type=custom&typeId=${type.id}`)}
+                        className="cursor-pointer"
+                        data-testid={`menu-item-custom-${type.id}`}
+                      >
+                        <FileText className="h-4 w-4 mr-2 text-slate-500" />
+                        <div>
+                          <div className="font-medium">{type.name}</div>
+                          {type.description && (
+                            <div className="text-xs text-slate-500 truncate max-w-[180px]">{type.description}</div>
+                          )}
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+                
+                {canManageTypes && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setShowSettingsDialog(true)}
+                      className="cursor-pointer text-slate-600"
+                      data-testid="menu-item-manage-types"
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Manage Custom Types
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

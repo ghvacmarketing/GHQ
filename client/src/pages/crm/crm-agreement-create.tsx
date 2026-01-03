@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useEffect, useState, useMemo } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,11 +25,14 @@ import {
   FileCheck,
   DollarSign,
   Loader2,
+  Plus,
+  Minus,
+  Building2,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format, addMonths, addYears } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import type { CrmUser, MaintenanceRegion, CrmCustomer } from "@shared/schema";
+import type { CrmUser, MaintenanceRegion, CrmCustomer, CrmProperty, CustomAgreementType } from "@shared/schema";
 
 type CustomersResponse = {
   customers: CrmCustomer[];
@@ -41,15 +44,45 @@ type CustomersResponse = {
   };
 };
 
+function calculateMaintenancePrice(numSystems: number): number {
+  let total = 0;
+  for (let i = 0; i < numSystems; i++) {
+    total += 229 - (10 * i);
+  }
+  return total;
+}
+
+function getPriceBreakdown(numSystems: number): { index: number; price: number }[] {
+  const breakdown: { index: number; price: number }[] = [];
+  for (let i = 0; i < numSystems; i++) {
+    breakdown.push({ index: i + 1, price: 229 - (10 * i) });
+  }
+  return breakdown;
+}
+
+function formatPropertyAddress(property: CrmProperty): string {
+  const parts = [property.address1];
+  if (property.address2) parts.push(property.address2);
+  parts.push(`${property.city}, ${property.state} ${property.zip}`);
+  return parts.join(", ");
+}
+
 export default function CrmAgreementCreate() {
   const [, navigate] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
+
+  const queryParams = useMemo(() => new URLSearchParams(searchString), [searchString]);
+  const agreementType = queryParams.get("type") || "preventative";
+  const customTypeId = queryParams.get("typeId");
 
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomer | null>(null);
+  const [propertyId, setPropertyId] = useState<string>("");
+  const [numberOfSystems, setNumberOfSystems] = useState(1);
 
-  const [agreementPlan, setAgreementPlan] = useState("Annual Maintenance Agreement");
+  const [agreementPlan, setAgreementPlan] = useState("Preventative Maintenance");
   const [contractDate, setContractDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [invoiceDate, setInvoiceDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [appointmentDate, setAppointmentDate] = useState(format(addMonths(new Date(), 1), "yyyy-MM-dd"));
@@ -61,6 +94,41 @@ export default function CrmAgreementCreate() {
   const [price, setPrice] = useState("229.00");
   const [frequency, setFrequency] = useState<"weekly" | "monthly" | "annual">("annual");
   const [visitsPerPeriod, setVisitsPerPeriod] = useState(2);
+  const [customTypeApplied, setCustomTypeApplied] = useState(false);
+
+  const isPreventativeMaintenance = agreementType === "preventative";
+
+  useEffect(() => {
+    if (isPreventativeMaintenance) {
+      const calculatedPrice = calculateMaintenancePrice(numberOfSystems);
+      setPrice(calculatedPrice.toFixed(2));
+    }
+  }, [numberOfSystems, isPreventativeMaintenance]);
+
+  const { data: customAgreementTypes = [] } = useQuery<CustomAgreementType[]>({
+    queryKey: ["/api/crm/custom-agreement-types"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/custom-agreement-types", {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch custom agreement types");
+      return res.json();
+    },
+    enabled: agreementType === "custom" && !!customTypeId,
+  });
+
+  useEffect(() => {
+    if (agreementType === "custom" && customTypeId && customAgreementTypes.length > 0 && !customTypeApplied) {
+      const selectedType = customAgreementTypes.find(t => t.id === customTypeId);
+      if (selectedType) {
+        setAgreementPlan(selectedType.name);
+        setFrequency(selectedType.frequency || "annual");
+        setVisitsPerPeriod(selectedType.visitsPerPeriod);
+        setPrice(selectedType.defaultPrice || "0.00");
+        setCustomTypeApplied(true);
+      }
+    }
+  }, [agreementType, customTypeId, customAgreementTypes, customTypeApplied]);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -92,6 +160,18 @@ export default function CrmAgreementCreate() {
     enabled: !!currentUser,
   });
 
+  const { data: customerProperties = [], isLoading: propertiesLoading } = useQuery<CrmProperty[]>({
+    queryKey: ["/api/crm/customers", selectedCustomerId, "properties"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${selectedCustomerId}/properties`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch properties");
+      return res.json();
+    },
+    enabled: !!selectedCustomerId,
+  });
+
   const { data: regions = [] } = useQuery<MaintenanceRegion[]>({
     queryKey: ["/api/crm/maintenance-regions"],
     queryFn: async () => {
@@ -119,7 +199,15 @@ export default function CrmAgreementCreate() {
     setSelectedCustomerId(customerId);
     const customer = customersData?.customers.find(c => c.id === customerId);
     setSelectedCustomer(customer || null);
+    setPropertyId("");
   };
+
+  const handleNumberOfSystemsChange = (delta: number) => {
+    setNumberOfSystems(prev => Math.max(1, prev + delta));
+  };
+
+  const selectedProperty = customerProperties.find(p => p.id === propertyId);
+  const requiresPropertySelection = customerProperties.length > 1;
 
   const createAgreementMutation = useMutation({
     mutationFn: async () => {
@@ -129,6 +217,9 @@ export default function CrmAgreementCreate() {
       if (!agreementPlan.trim()) {
         throw new Error("Agreement plan name is required");
       }
+      if (requiresPropertySelection && !propertyId) {
+        throw new Error("Please select a property for this customer");
+      }
 
       const agreementNumber = `AGR-${Date.now().toString(36).toUpperCase()}`;
 
@@ -137,7 +228,9 @@ export default function CrmAgreementCreate() {
         customerId: selectedCustomerId,
         customerName: selectedCustomer.name,
         agreementPlan,
-        address: selectedCustomer.fullAddress || "",
+        address: selectedProperty 
+          ? formatPropertyAddress(selectedProperty)
+          : selectedCustomer.fullAddress || "",
         contractDate,
         appointmentDate,
         startDate,
@@ -146,6 +239,8 @@ export default function CrmAgreementCreate() {
         nextInvoiceDate: invoiceDate,
         price: parseFloat(price).toFixed(2),
         regionId: regionId || null,
+        propertyId: propertyId || null,
+        numberOfSystems,
         autoRenew,
         notes,
         status: "active" as const,
@@ -187,6 +282,7 @@ export default function CrmAgreementCreate() {
   };
 
   const visitSummary = getVisitSummary();
+  const priceBreakdown = getPriceBreakdown(numberOfSystems);
 
   if (authLoading) {
     return (
@@ -221,7 +317,7 @@ export default function CrmAgreementCreate() {
               </Button>
               <div className="h-6 w-px bg-slate-200" />
               <h1 className="text-lg font-semibold text-slate-900" data-testid="text-page-title">
-                New Maintenance Agreement
+                New {isPreventativeMaintenance ? "Maintenance" : agreementPlan} Agreement
               </h1>
             </div>
             <div className="flex items-center gap-2">
@@ -283,6 +379,34 @@ export default function CrmAgreementCreate() {
                       </Select>
                     </div>
 
+                    {selectedCustomerId && customerProperties.length > 0 && (
+                      <div className="col-span-2">
+                        <Label htmlFor="property" className="text-sm font-medium">
+                          Property/Site {requiresPropertySelection && <span className="text-red-500">*</span>}
+                        </Label>
+                        <Select
+                          value={propertyId}
+                          onValueChange={setPropertyId}
+                        >
+                          <SelectTrigger className="mt-1" data-testid="select-property">
+                            <SelectValue placeholder="Select a property..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {customerProperties.map((property) => (
+                              <SelectItem key={property.id} value={property.id}>
+                                {formatPropertyAddress(property)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {requiresPropertySelection && !propertyId && (
+                          <p className="text-xs text-amber-600 mt-1">
+                            This customer has multiple properties. Please select one.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     <div className="col-span-2">
                       <Label htmlFor="agreementPlan" className="text-sm font-medium">Agreement Plan Name</Label>
                       <Input
@@ -290,24 +414,74 @@ export default function CrmAgreementCreate() {
                         value={agreementPlan}
                         onChange={(e) => setAgreementPlan(e.target.value)}
                         className="mt-1"
-                        placeholder="e.g., Annual Maintenance Agreement"
+                        placeholder="e.g., Preventative Maintenance"
                         data-testid="input-agreement-plan"
                       />
                     </div>
 
-                    <div>
-                      <Label htmlFor="frequency" className="text-sm font-medium">Service Frequency</Label>
-                      <Select value={frequency} onValueChange={(value: "weekly" | "monthly" | "annual") => setFrequency(value)}>
-                        <SelectTrigger className="mt-1" data-testid="select-frequency">
-                          <SelectValue placeholder="Select frequency..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                          <SelectItem value="annual">Annual</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {isPreventativeMaintenance && (
+                      <div className="col-span-2">
+                        <Label htmlFor="numberOfSystems" className="text-sm font-medium">Number of Systems</Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9"
+                            onClick={() => handleNumberOfSystemsChange(-1)}
+                            disabled={numberOfSystems <= 1}
+                            data-testid="button-decrease-systems"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <Input
+                            id="numberOfSystems"
+                            type="number"
+                            min="1"
+                            value={numberOfSystems}
+                            onChange={(e) => setNumberOfSystems(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-20 text-center"
+                            data-testid="input-number-of-systems"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9"
+                            onClick={() => handleNumberOfSystemsChange(1)}
+                            data-testid="button-increase-systems"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                          <span className="text-sm text-slate-500 ml-2">
+                            (${229} first, ${10} discount per additional)
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {isPreventativeMaintenance ? (
+                      <div>
+                        <Label htmlFor="frequency" className="text-sm font-medium">Service Frequency</Label>
+                        <div className="mt-1 px-3 py-2 bg-slate-100 rounded-md text-sm text-slate-700">
+                          Annual (locked for Preventative Maintenance)
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <Label htmlFor="frequency" className="text-sm font-medium">Service Frequency</Label>
+                        <Select value={frequency} onValueChange={(value: "weekly" | "monthly" | "annual") => setFrequency(value)}>
+                          <SelectTrigger className="mt-1" data-testid="select-frequency">
+                            <SelectValue placeholder="Select frequency..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                            <SelectItem value="annual">Annual</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
 
                     <div>
                       <Label htmlFor="visitsPerPeriod" className="text-sm font-medium">Visits Per Period</Label>
@@ -458,10 +632,25 @@ export default function CrmAgreementCreate() {
                       <p className="font-medium text-slate-900" data-testid="text-summary-customer">
                         {selectedCustomer?.name || "Not selected"}
                       </p>
-                      {selectedCustomer?.fullAddress && (
+                      {selectedCustomer?.fullAddress && !selectedProperty && (
                         <p className="text-xs text-slate-500 mt-0.5">{selectedCustomer.fullAddress}</p>
                       )}
                     </div>
+
+                    {selectedProperty && (
+                      <>
+                        <div className="h-px bg-slate-100" />
+                        <div>
+                          <p className="text-xs text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                            <Building2 className="h-3 w-3" />
+                            Property
+                          </p>
+                          <p className="text-sm text-slate-700 mt-0.5" data-testid="text-summary-property">
+                            {formatPropertyAddress(selectedProperty)}
+                          </p>
+                        </div>
+                      </>
+                    )}
 
                     <div className="h-px bg-slate-100" />
 
@@ -475,11 +664,30 @@ export default function CrmAgreementCreate() {
                     <div className="h-px bg-slate-100" />
 
                     <div>
+                      <p className="text-xs text-slate-500 uppercase tracking-wide">Number of Systems</p>
+                      <p className="font-medium text-slate-900" data-testid="text-summary-systems">
+                        {numberOfSystems} system{numberOfSystems > 1 ? "s" : ""}
+                      </p>
+                    </div>
+
+                    <div className="h-px bg-slate-100" />
+
+                    <div>
                       <p className="text-xs text-slate-500 uppercase tracking-wide">Price</p>
                       <p className="text-xl font-bold text-[#711419]" data-testid="text-summary-total">
                         <DollarSign className="h-4 w-4 inline" />
                         {parseFloat(price || "0").toFixed(2)}
                       </p>
+                      {numberOfSystems > 1 && (
+                        <div className="mt-2 space-y-1" data-testid="text-price-breakdown">
+                          {priceBreakdown.map((item) => (
+                            <div key={item.index} className="flex justify-between text-xs text-slate-500">
+                              <span>System {item.index}</span>
+                              <span>${item.price.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="h-px bg-slate-100" />
