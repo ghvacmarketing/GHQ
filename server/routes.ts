@@ -5323,7 +5323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const recentProjects = await db
         .select({
           id: crmProjects.id,
-          name: crmProjects.name,
+          name: crmProjects.title,
           status: crmProjects.status,
           projectType: crmProjects.projectType,
           createdAt: crmProjects.createdAt,
