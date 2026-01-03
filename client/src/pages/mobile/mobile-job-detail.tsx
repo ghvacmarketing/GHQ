@@ -643,7 +643,6 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         unitPrice: item.unitPrice.toFixed(2),
         lineTotal: item.lineTotal.toFixed(2),
         lineType: item.lineType,
-        taxable: item.lineType !== "discount",
         sortOrder: index,
       }));
 
@@ -1307,7 +1306,6 @@ interface InvoiceLineItem {
   quantity: number;
   unitPrice: number;
   lineType: "service" | "discount" | "part";
-  taxable: boolean;
 }
 
 interface InvoiceWithLineItems extends CrmInvoice {
@@ -1327,7 +1325,6 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [, navigate] = useLocation();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([]);
-  const [taxRate, setTaxRate] = useState(8.25);
   const [showCatalog, setShowCatalog] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
@@ -1430,9 +1427,8 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
 
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: {
-      lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number; lineType: string; taxable: boolean }>;
+      lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number; lineType: string }>;
       subtotal: number;
-      taxTotal: number;
       total: number;
     }) => {
       const formattedLineItems = data.lineItems.map((item, index) => ({
@@ -1441,7 +1437,6 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         unitPrice: item.unitPrice.toFixed(2),
         lineTotal: item.lineTotal.toFixed(2),
         lineType: item.lineType,
-        taxable: item.taxable,
         isDiscountLine: item.lineType === "discount",
         discountKind: item.lineType === "discount" ? "fixed" : undefined,
         sortOrder: index,
@@ -1465,7 +1460,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         lineItems: formattedLineItems,
         subtotal: data.subtotal.toFixed(2),
         laborTotal: "0.00",
-        taxTotal: data.taxTotal.toFixed(2),
+        taxTotal: "0.00",
         total: data.total.toFixed(2),
         amountPaid: "0.00",
         balanceDue: data.total.toFixed(2),
@@ -1485,7 +1480,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   });
 
   const addLineItem = () => {
-    setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service", taxable: true }]);
+    setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service" }]);
   };
 
   const addCatalogItem = (item: CrmItem) => {
@@ -1495,8 +1490,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       description: item.name, 
       quantity: 1, 
       unitPrice: price,
-      lineType: item.category === "service" ? "service" : "part",
-      taxable: item.taxable ?? true
+      lineType: item.category === "service" ? "service" : "part"
     }]);
     setShowCatalog(false);
     setCatalogSearch("");
@@ -1512,8 +1506,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       description: item.name + (item.description ? ` - ${item.description}` : ""), 
       quantity: 1, 
       unitPrice: -Math.abs(rate),
-      lineType: "discount",
-      taxable: false
+      lineType: "discount"
     }]);
     setShowDiscount(false);
     setDiscountSearch("");
@@ -1544,7 +1537,6 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         quantity: parseFloat(item.quantity || "1"),
         unitPrice: parseFloat(item.unitPrice || "0"),
         lineType: (item.lineType === "discount" ? "discount" : item.lineType === "part" ? "part" : "service") as "service" | "discount" | "part",
-        taxable: item.taxable ?? (item.lineType !== "discount"),
       }));
       
       setLineItems(convertedItems);
@@ -1570,8 +1562,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       description: discountDescription.trim(), 
       quantity: 1, 
       unitPrice: -Math.abs(amount),
-      lineType: "discount",
-      taxable: false
+      lineType: "discount"
     }]);
     setShowManualDiscount(false);
     setDiscountDescription("");
@@ -1591,12 +1582,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
 
   // Calculate subtotal (all items including discounts)
   const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-  // Tax only on taxable items (never discounts, never negative amounts)
-  const taxableAmount = lineItems
-    .filter(item => item.taxable && item.lineType !== "discount" && (item.quantity * item.unitPrice) > 0)
-    .reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-  const taxAmount = taxableAmount * (taxRate / 100);
-  const total = subtotal + taxAmount;
+  const total = subtotal;
 
   const handleCreateInvoice = () => {
     // Allow $0 items if they have a description (free services), but filter items with no description
@@ -1619,10 +1605,8 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         unitPrice: item.unitPrice,
         lineTotal: item.quantity * item.unitPrice,
         lineType: item.lineType,
-        taxable: item.lineType === "discount" ? false : item.taxable,
       })),
       subtotal,
-      taxTotal: taxAmount,
       total,
     });
   };
@@ -1702,10 +1686,6 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                           <div className="flex justify-between items-center text-sm">
                             <span className="text-slate-600">Subtotal</span>
                             <span className="font-medium">{formatCurrency(invoiceDetail.subtotal || "0")}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-slate-600">Tax</span>
-                            <span className="font-medium">{formatCurrency(invoiceDetail.taxTotal || "0")}</span>
                           </div>
                           <Separator />
                           <div className="flex justify-between items-center">
@@ -1965,15 +1945,6 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center justify-end gap-2 pt-1">
-                              <Label className="text-xs text-slate-500">Taxable</Label>
-                              <Checkbox
-                                checked={item.taxable}
-                                onCheckedChange={(checked) => updateLineItem(item.id, "taxable", !!checked)}
-                                className="h-5 w-5"
-                                data-testid={`checkbox-invoice-taxable-${item.id}`}
-                              />
-                            </div>
                           </>
                         )}
                       </div>
@@ -1988,24 +1959,6 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                   <span className="text-sm text-slate-600">Subtotal</span>
                   <span className="text-sm font-medium" data-testid="invoice-form-subtotal">
                     {formatCurrency(subtotal)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-600">Tax</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={taxRate}
-                      onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
-                      className="w-16 h-7 text-xs p-1"
-                      data-testid="input-invoice-tax-rate"
-                    />
-                    <span className="text-xs text-slate-500">%</span>
-                  </div>
-                  <span className="text-sm font-medium" data-testid="invoice-form-tax">
-                    {formatCurrency(taxAmount)}
                   </span>
                 </div>
                 <Separator />

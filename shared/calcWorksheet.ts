@@ -6,7 +6,6 @@ export interface WorksheetInputs {
   profitPct: number;
   financingPct: number;
   commissionPct: number;
-  taxRate: number;
   warrantyReserveDollar: number;
   crewDayHours: number;
   discountDollar: number;
@@ -14,15 +13,12 @@ export interface WorksheetInputs {
 
 export interface WorksheetLine {
   cost: number;
-  taxable: boolean;
 }
 
 export interface WorksheetCalculations {
   laborPayroll: number;
   laborBenefits: number;
   linesTotal: number;
-  taxableSubtotal: number;
-  salesTax: number;
   directCost: number;
   sellPrice: number;
   grossProfit: number;
@@ -47,7 +43,6 @@ export function calcWorksheet(
     profitPct,
     financingPct,
     commissionPct,
-    taxRate,
     warrantyReserveDollar,
     crewDayHours,
     discountDollar,
@@ -56,13 +51,8 @@ export function calcWorksheet(
   const laborPayroll = hoursToInstall * topManHourlyRate;
   const laborBenefits = laborPayroll * laborBenefitsPct;
   const linesTotal = lines.reduce((sum, line) => sum + line.cost, 0);
-  const taxableSubtotal = lines.reduce(
-    (sum, line) => sum + (line.taxable ? line.cost : 0),
-    0
-  );
-  const salesTax = taxableSubtotal * taxRate;
   const directCost =
-    linesTotal + laborPayroll + laborBenefits + salesTax + warrantyReserveDollar;
+    linesTotal + laborPayroll + laborBenefits + warrantyReserveDollar;
   const denom = 1 - overheadPct - profitPct - financingPct - commissionPct;
   const sellPrice = denom > 0 ? directCost / denom : 0;
   const grossProfit = sellPrice - directCost;
@@ -80,8 +70,6 @@ export function calcWorksheet(
     laborPayroll: round2(laborPayroll),
     laborBenefits: round2(laborBenefits),
     linesTotal: round2(linesTotal),
-    taxableSubtotal: round2(taxableSubtotal),
-    salesTax: round2(salesTax),
     directCost: round2(directCost),
     sellPrice: round2(sellPrice),
     grossProfit: round2(grossProfit),

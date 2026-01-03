@@ -787,10 +787,6 @@ export default function CrmQuotes() {
                     <span className="text-slate-600">Labor</span>
                     <span className="text-slate-900">{formatCurrency(selectedQuote.laborTotal)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Tax</span>
-                    <span className="text-slate-900">{formatCurrency(selectedQuote.taxAmount)}</span>
-                  </div>
                   <Separator />
                   <div className="flex justify-between font-semibold">
                     <span className="text-slate-900">Total</span>

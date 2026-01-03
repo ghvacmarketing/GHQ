@@ -15,7 +15,6 @@ interface SheetsPart {
 
 interface SheetsSettings {
   laborRate: number;
-  taxRate: number;
   markupPercentage: number;
   warrantyDiscountRate: number;
 }
@@ -80,7 +79,6 @@ export class GoogleSheetsService {
         financingPromotionPercent: 0.04,
         profitPercent: 0.21,
         laborBenefitsPercent: 0.34,
-        salesTaxPercent: 0.08,
         warrantyReserve: 25,
         overheadPercent: 0.30,
         warrantyDiscounts: {
@@ -140,15 +138,6 @@ export class GoogleSheetsService {
             const percent = parseFloat(text.replace(/[%]/g, ''));
             if (!isNaN(percent) && percent > 10) { // Labor benefits should be ~34%
               settings.laborBenefitsPercent = percent / 100;
-              break;
-            }
-          }
-        } else if (firstCell.includes('sales tax') || firstCell.includes('tax')) {
-          for (let col = 1; col < Math.min(row.length, 10); col++) {
-            const text = (row[col] || '').toString();
-            const percent = parseFloat(text.replace(/[%]/g, ''));
-            if (!isNaN(percent) && percent > 0 && percent < 20) { // Sales tax should be ~8%
-              settings.salesTaxPercent = percent / 100;
               break;
             }
           }
@@ -219,7 +208,6 @@ export class GoogleSheetsService {
         financingPromotionPercent: 0.04,
         profitPercent: 0.21,
         laborBenefitsPercent: 0.34,
-        salesTaxPercent: 0.08,
         warrantyReserve: 25,
         overheadPercent: 0.30,
         warrantyDiscounts: {

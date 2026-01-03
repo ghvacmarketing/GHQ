@@ -139,7 +139,6 @@ function buildTextBody(
   if (quote.laborTotal && parseFloat(quote.laborTotal) > 0) {
     lines.push(`Labor: ${asCurrency(quote.laborTotal)}`);
   }
-  lines.push(`Tax: ${asCurrency(quote.taxAmount || quote.taxTotal || "0")}`);
   lines.push(`TOTAL: ${asCurrency(quote.total)}`);
   lines.push("");
 
@@ -299,10 +298,6 @@ function buildHtmlBody(
                   <td style="padding:8px 14px;color:#374151;font-family:Arial,sans-serif;">Labor</td>
                   <td style="padding:8px 14px;text-align:right;color:#374151;font-family:Arial,sans-serif;">${esc(asCurrency(quote.laborTotal))}</td>
                 </tr>` : ""}
-                <tr>
-                  <td style="padding:8px 14px;color:#374151;font-family:Arial,sans-serif;">Tax</td>
-                  <td style="padding:8px 14px;text-align:right;color:#374151;font-family:Arial,sans-serif;">${esc(asCurrency(quote.taxAmount || quote.taxTotal || "0"))}</td>
-                </tr>
                 <tr style="border-top:2px solid #e5e7eb;">
                   <td style="padding:14px;font-weight:900;font-size:16px;color:${brandColor};font-family:Arial,sans-serif;">Total</td>
                   <td style="padding:14px;text-align:right;font-weight:900;font-size:20px;color:${brandColor};font-family:Arial,sans-serif;">${esc(asCurrency(quote.total))}</td>

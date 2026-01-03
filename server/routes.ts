@@ -84,7 +84,6 @@ type DiscountLineItem = {
   lineType?: string;
   discountKind?: string;
   quantity?: string | number;
-  taxable?: boolean;
   unitPrice?: string | number;
   lineTotal?: string | number;
 };
@@ -112,11 +111,6 @@ function validateDiscountLineItem(
   const qty = typeof lineItem.quantity === 'string' ? parseFloat(lineItem.quantity) : lineItem.quantity;
   if (qty !== undefined && qty !== 1) {
     return { valid: false, error: "Discount quantity must be 1" };
-  }
-
-  // Validate taxable is false
-  if (lineItem.taxable === true) {
-    return { valid: false, error: "Discount lines cannot be taxable" };
   }
 
   // Validate unitPrice is <= 0
@@ -1274,7 +1268,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           parts: quote.parts || [],
           subtotal: quote.subtotal,
           labor: quote.labor,
-          tax: quote.tax,
           status: quote.status || 'draft',
           createdAt: quote.createdAt?.toISOString(),
         }, adminSettings.emailSettings.notificationEmails);
@@ -1382,7 +1375,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (req.body.parts !== undefined) updateData.parts = req.body.parts;
         if (req.body.subtotal !== undefined) updateData.subtotal = req.body.subtotal;
         if (req.body.labor !== undefined) updateData.labor = req.body.labor;
-        if (req.body.tax !== undefined) updateData.tax = req.body.tax;
         if (req.body.total !== undefined) updateData.total = req.body.total;
         if (req.body.ghvacInstalled !== undefined) updateData.ghvacInstalled = req.body.ghvacInstalled;
         if (req.body.yearsSinceInstallation !== undefined) updateData.yearsSinceInstallation = req.body.yearsSinceInstallation;
@@ -1403,7 +1395,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           total: updatedQuote.total,
           subtotal: updatedQuote.subtotal,
           labor: updatedQuote.labor,
-          tax: updatedQuote.tax,
           parts: updatedQuote.parts,
           quoteId: updatedQuote.id,
           jobNotes: updatedQuote.jobNotes || undefined,
@@ -1421,7 +1412,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           total: updatedQuote.total,
           subtotal: updatedQuote.subtotal,
           labor: updatedQuote.labor,
-          tax: updatedQuote.tax,
           parts: updatedQuote.parts,
           quoteId: updatedQuote.id,
           jobNotes: updatedQuote.jobNotes || undefined,
@@ -1581,7 +1571,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     financingPromotionPercent: 0.03,
     profitPercent: 0.15,
     laborBenefitsPercent: 0.34,
-    salesTaxPercent: 0.08,
     warrantyReserve: 25,
     overheadPercent: 0.30,
     warrantyDiscounts: {
@@ -1776,7 +1765,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         profitPercent: sheetsData.profitPercentB42,
         materialShrinkagePercent: sheetsData.materialShrinkagePercent,
         laborBenefitsPercent: sheetsData.laborBenefitsPercent,
-        salesTaxPercent: sheetsData.salesTaxPercent,
         warrantyReserve: sheetsData.warrantyReserve,
         overheadPercent: sheetsData.overheadPercent,
         partsPrices: {
@@ -1819,7 +1807,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         profitPercent: sheetsData.profitPercentB42,
         materialShrinkagePercent: sheetsData.materialShrinkagePercent,
         laborBenefitsPercent: sheetsData.laborBenefitsPercent,
-        salesTaxPercent: sheetsData.salesTaxPercent,
         warrantyReserve: sheetsData.warrantyReserve,
         overheadPercent: sheetsData.overheadPercent,
         // Parts prices for direct access
@@ -9903,7 +9890,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         category: "maintenance",
         itemType: "agreement",
         rate: validated.defaultPrice || "0",
-        taxable: true,
         isActive: true,
       });
       
@@ -11625,7 +11611,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId: invoiceData.projectId || workOrder.projectId,
         createdBy: user.id,
         subtotal: invoiceData.subtotal ?? "0",
-        tax: invoiceData.tax ?? "0",
         total: invoiceData.total ?? "0",
         amountPaid: invoiceData.amountPaid ?? "0",
         balanceDue: invoiceData.balanceDue ?? "0",
@@ -11824,7 +11809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subtotal += parseFloat(item.lineTotal || "0");
       }
 
-      // Create the invoice (no tax - prices already include tax per business logic)
+      // Create the invoice
       const invoiceData = {
         invoiceNumber,
         customerId: quote.customerId,
@@ -11834,7 +11819,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "draft" as const,
         subtotal: String(subtotal),
         laborTotal: "0",
-        taxTotal: "0",
         total: String(subtotal),
         balanceDue: String(subtotal),
         notes: quote.notes || undefined,
@@ -11855,7 +11839,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           unitPrice: quoteItem.unitPrice,
           amount: quoteItem.lineTotal, // Required column - same as lineTotal
           lineTotal: quoteItem.lineTotal,
-          taxable: quoteItem.taxable,
           sortOrder: quoteItem.sortOrder,
           itemId: quoteItem.itemId,
           isDiscountLine: quoteItem.isDiscountLine,
@@ -11918,13 +11901,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Only draft invoices can be edited" });
       }
 
-      const { notes, subtotal, laborTotal, taxTotal, total, balanceDue, dueDate } = req.body;
+      const { notes, subtotal, laborTotal, total, balanceDue, dueDate } = req.body;
       const updates: Partial<CrmInvoice> = {};
       
       if (notes !== undefined) updates.notes = notes;
       if (subtotal !== undefined) updates.subtotal = subtotal;
       if (laborTotal !== undefined) updates.laborTotal = laborTotal;
-      if (taxTotal !== undefined) updates.taxTotal = taxTotal;
       if (total !== undefined) updates.total = total;
       if (balanceDue !== undefined) updates.balanceDue = balanceDue;
       if (dueDate !== undefined) updates.dueDate = dueDate ? new Date(dueDate) : null;
@@ -12414,7 +12396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Line item not found" });
       }
       
-      const { description, partNumber, quantity, unitPrice, lineTotal, taxable, sortOrder, lineType, isDiscountLine, discountKind } = req.body;
+      const { description, partNumber, quantity, unitPrice, lineTotal, sortOrder, lineType, isDiscountLine, discountKind } = req.body;
       
       // Merge existing line item data with updates to validate the final state
       const mergedLineItem = {
@@ -12424,7 +12406,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...(quantity !== undefined && { quantity }),
         ...(unitPrice !== undefined && { unitPrice }),
         ...(lineTotal !== undefined && { lineTotal }),
-        ...(taxable !== undefined && { taxable }),
         ...(sortOrder !== undefined && { sortOrder }),
         ...(lineType !== undefined && { lineType }),
         ...(isDiscountLine !== undefined && { isDiscountLine }),
@@ -12447,7 +12428,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (quantity !== undefined) updates.quantity = quantity;
       if (unitPrice !== undefined) updates.unitPrice = unitPrice;
       if (lineTotal !== undefined) updates.lineTotal = lineTotal;
-      if (taxable !== undefined) updates.taxable = taxable;
       if (sortOrder !== undefined) updates.sortOrder = sortOrder;
       if (lineType !== undefined) updates.lineType = lineType;
       if (isDiscountLine !== undefined) updates.isDiscountLine = isDiscountLine;
@@ -12726,9 +12706,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         title: crmQuotes.title,
         description: crmQuotes.description,
         subtotal: crmQuotes.subtotal,
-        taxRate: crmQuotes.taxRate,
-        taxAmount: crmQuotes.taxAmount,
-        taxTotal: crmQuotes.taxTotal,
         laborTotal: crmQuotes.laborTotal,
         total: crmQuotes.total,
         status: crmQuotes.status,
@@ -12779,8 +12756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customer_name as "customerName", customer_email as "customerEmail",
           customer_phone as "customerPhone", service_address as "serviceAddress",
           title, description, line_items as "lineItems", subtotal, 
-          tax_rate as "taxRate", tax_amount as "taxAmount",
-          tax_total as "taxTotal", labor_total as "laborTotal", total, status,
+          labor_total as "laborTotal", total, status,
           valid_until as "validUntil", sent_at as "sentAt", viewed_at as "viewedAt",
           accepted_at as "acceptedAt", declined_at as "declinedAt",
           work_order_id as "workOrderId", project_id as "projectId", scope, notes,
@@ -12805,7 +12781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           id, quote_id as "quoteId", line_type as "lineType", description,
           part_number as "partNumber", quantity, unit_price as "unitPrice",
-          line_total as "lineTotal", taxable, sort_order as "sortOrder",
+          line_total as "lineTotal", sort_order as "sortOrder",
           item_id as "itemId", is_discount_line as "isDiscountLine",
           discount_kind as "discountKind", created_at as "createdAt"
         FROM crm_quote_line_items
@@ -13007,9 +12983,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate totals from worksheet
       const { calcWorksheet } = await import("@shared/calcWorksheet");
-      const worksheetLines = lines.map((l: { cost: number; taxable: boolean }) => ({
+      const worksheetLines = lines.map((l: { cost: number }) => ({
         cost: l.cost,
-        taxable: l.taxable,
       }));
       const calcs = calcWorksheet(inputs, worksheetLines);
 
@@ -13026,7 +13001,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         title: `Install - ${installSubtype.charAt(0).toUpperCase() + installSubtype.slice(1)}`,
         description: `Generated from Install Pricing Worksheet.\nInstall Type: ${installSubtype}\nHours: ${inputs.hoursToInstall}\nCrew Days: ${calcs.crewDays.toFixed(2)}`,
         subtotal: calcs.linesTotal.toString(),
-        taxTotal: calcs.salesTax.toString(),
         total: calcs.discountedSellPrice.toString(),
         createdBy: user.id,
       }).returning();
@@ -13042,7 +13016,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           unitPrice: cost.toString(),
           quantity: "1",
           lineTotal: cost.toString(),
-          taxable: line.taxable,
           sortOrder: sortOrder++,
         });
       }
@@ -13057,7 +13030,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           unitPrice: laborTotal.toString(),
           quantity: "1",
           lineTotal: laborTotal.toString(),
-          taxable: false,
           sortOrder: sortOrder++,
         });
       }
@@ -13071,7 +13043,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           unitPrice: inputs.warrantyReserveDollar.toString(),
           quantity: "1",
           lineTotal: inputs.warrantyReserveDollar.toString(),
-          taxable: false,
           sortOrder: sortOrder++,
         });
       }
@@ -13207,17 +13178,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate totals from line items
       let subtotal = 0;
-      let taxableSubtotal = 0;
       for (const item of lineItems) {
         const lineTotal = (item.quantity || 1) * (item.unitPrice || 0);
         subtotal += lineTotal;
-        if (item.taxable !== false) {
-          taxableSubtotal += lineTotal;
-        }
       }
-      const taxRate = 0.0825; // 8.25% tax
-      const taxTotal = taxableSubtotal * taxRate;
-      const total = subtotal + taxTotal;
+      const total = subtotal;
 
       // Generate quote number
       const quoteNumber = await generateQuoteNumber();
@@ -13247,7 +13212,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: description || null,
         notes: combinedNotes || null,
         subtotal: subtotal.toFixed(2),
-        taxTotal: taxTotal.toFixed(2),
         total: total.toFixed(2),
         createdBy: user.id,
         acceptedAt: quoteStatus === "approved" ? new Date() : null,
@@ -13273,7 +13237,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quantity: quantity.toString(),
           unitPrice: unitPrice.toString(),
           lineTotal: lineTotal.toString(),
-          taxable: item.taxable !== false,
           sortOrder: sortOrder++,
           optionTag: item.optionTag || null,
         }).returning();
@@ -13322,21 +13285,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate totals from line items
       let subtotal = 0;
-      let taxableSubtotal = 0;
       for (const item of lineItems) {
         const lineTotal = (item.quantity || 1) * (item.unitPrice || 0);
-        if (!item.isDiscountLine) {
-          subtotal += lineTotal;
-          if (item.taxable !== false) {
-            taxableSubtotal += lineTotal;
-          }
-        } else {
-          subtotal += lineTotal; // discounts are negative
-        }
+        subtotal += lineTotal;
       }
-      const taxRate = 0.0825; // 8.25% tax
-      const taxTotal = taxableSubtotal * taxRate;
-      const total = subtotal + taxTotal;
+      const total = subtotal;
 
       // Generate quote number
       const quoteNumber = await generateQuoteNumber();
@@ -13357,9 +13310,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: description || null,
         notes: notes || null,
         subtotal: subtotal.toFixed(2),
-        taxRate: "0.0825",
-        taxAmount: taxTotal.toFixed(2),
-        taxTotal: taxTotal.toFixed(2),
         total: total.toFixed(2),
         createdBy: user.id,
       }).returning();
@@ -13381,7 +13331,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quantity: quantity.toString(),
           unitPrice: unitPrice.toString(),
           lineTotal: lineTotal.toString(),
-          taxable: item.isDiscountLine ? false : (item.taxable !== false),
           isDiscountLine: item.isDiscountLine || false,
           discountKind: item.discountKind || null,
           sortOrder: sortOrder++,
@@ -13568,7 +13517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Line item not found" });
       }
       
-      const { description, partNumber, quantity, unitPrice, lineTotal, taxable, sortOrder, lineType, isDiscountLine, discountKind } = req.body;
+      const { description, partNumber, quantity, unitPrice, lineTotal, sortOrder, lineType, isDiscountLine, discountKind } = req.body;
       
       // Merge existing line item data with updates to validate the final state
       const mergedLineItem = {
@@ -13578,7 +13527,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...(quantity !== undefined && { quantity }),
         ...(unitPrice !== undefined && { unitPrice }),
         ...(lineTotal !== undefined && { lineTotal }),
-        ...(taxable !== undefined && { taxable }),
         ...(sortOrder !== undefined && { sortOrder }),
         ...(lineType !== undefined && { lineType }),
         ...(isDiscountLine !== undefined && { isDiscountLine }),
@@ -13601,7 +13549,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (quantity !== undefined) updates.quantity = quantity;
       if (unitPrice !== undefined) updates.unitPrice = unitPrice;
       if (lineTotal !== undefined) updates.lineTotal = lineTotal;
-      if (taxable !== undefined) updates.taxable = taxable;
       if (sortOrder !== undefined) updates.sortOrder = sortOrder;
       if (lineType !== undefined) updates.lineType = lineType;
       if (isDiscountLine !== undefined) updates.isDiscountLine = isDiscountLine;
@@ -15187,6 +15134,5 @@ ${partsList}
 
 Subtotal: $${quote.subtotal}
 Labor: $${quote.labor}
-Tax: $${quote.tax}
 TOTAL: $${quote.total}`;
 }

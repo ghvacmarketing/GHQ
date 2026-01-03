@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -60,7 +59,6 @@ interface LocalLine {
   category: LineCategory;
   description: string;
   cost: number;
-  taxable: boolean;
 }
 
 const defaultInputs: WorksheetInputs = {
@@ -71,7 +69,6 @@ const defaultInputs: WorksheetInputs = {
   profitPct: 0.10,
   financingPct: 0.03,
   commissionPct: 0.03,
-  taxRate: 0.08,
   warrantyReserveDollar: 25,
   crewDayHours: 16,
   discountDollar: 0,
@@ -116,7 +113,7 @@ export default function CrmInstallWorksheet() {
       customerId: string;
       installSubtype: string;
       inputs: WorksheetInputs;
-      lines: Array<{ category: string; description: string; cost: number; taxable: boolean }>;
+      lines: Array<{ category: string; description: string; cost: number }>;
     }) => {
       const res = await apiRequest("POST", "/api/crm/quotes/from-worksheet", data);
       return res.json();
@@ -154,7 +151,6 @@ export default function CrmInstallWorksheet() {
         category: l.category,
         description: l.description,
         cost: l.cost,
-        taxable: l.taxable,
       })),
     });
   };
@@ -171,7 +167,6 @@ export default function CrmInstallWorksheet() {
         category: "equipment",
         description: "",
         cost: 0,
-        taxable: true,
       },
     ]);
   };
@@ -188,7 +183,6 @@ export default function CrmInstallWorksheet() {
 
   const worksheetLines: WorksheetLine[] = lines.map((l) => ({
     cost: l.cost,
-    taxable: l.taxable,
   }));
 
   const calcs = calcWorksheet(inputs, worksheetLines);
@@ -361,19 +355,6 @@ export default function CrmInstallWorksheet() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="taxRate">Tax Rate (%)</Label>
-                <Input
-                  id="taxRate"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={(inputs.taxRate * 100).toFixed(1)}
-                  onChange={(e) => updateInput("taxRate", (parseFloat(e.target.value) || 0) / 100)}
-                  data-testid="input-tax-rate"
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="warrantyReserveDollar">Warranty Reserve ($)</Label>
                 <Input
                   id="warrantyReserveDollar"
@@ -473,15 +454,6 @@ export default function CrmInstallWorksheet() {
                               className="w-28"
                               data-testid={`input-cost-${line.id}`}
                             />
-                            <div className="flex items-center gap-1">
-                              <Checkbox
-                                id={`taxable-${line.id}`}
-                                checked={line.taxable}
-                                onCheckedChange={(checked) => updateLine(line.id, "taxable", !!checked)}
-                                data-testid={`checkbox-taxable-${line.id}`}
-                              />
-                              <Label htmlFor={`taxable-${line.id}`} className="text-xs">Tax</Label>
-                            </div>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -535,15 +507,6 @@ export default function CrmInstallWorksheet() {
                           className="w-28"
                           data-testid={`input-cost-${line.id}`}
                         />
-                        <div className="flex items-center gap-1">
-                          <Checkbox
-                            id={`taxable-${line.id}`}
-                            checked={line.taxable}
-                            onCheckedChange={(checked) => updateLine(line.id, "taxable", !!checked)}
-                            data-testid={`checkbox-taxable-${line.id}`}
-                          />
-                          <Label htmlFor={`taxable-${line.id}`} className="text-xs">Tax</Label>
-                        </div>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -577,10 +540,6 @@ export default function CrmInstallWorksheet() {
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Lines Total</span>
                   <span data-testid="calc-lines-total">{formatCurrency(calcs.linesTotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Sales Tax</span>
-                  <span data-testid="calc-sales-tax">{formatCurrency(calcs.salesTax)}</span>
                 </div>
               </div>
 

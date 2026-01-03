@@ -95,7 +95,6 @@ interface FormData {
   description: string;
   lineItems: LineItem[];
   notes: string;
-  taxRate: number;
 }
 
 const initialFormData: FormData = {
@@ -110,7 +109,6 @@ const initialFormData: FormData = {
   description: "",
   lineItems: [],
   notes: "",
-  taxRate: 7,
 };
 
 type WorkOrderWithCustomer = CrmWorkOrder & {
@@ -430,15 +428,8 @@ export default function CrmInvoiceCreate() {
     }, 0);
   };
 
-  const calculateTax = () => {
-    const taxableTotal = formData.lineItems
-      .filter(item => item.taxable && !item.isDiscountLine)
-      .reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-    return taxableTotal * (formData.taxRate / 100);
-  };
-
   const calculateTotal = () => {
-    return calculateSubtotal() + calculateTax();
+    return calculateSubtotal();
   };
 
   const formatCurrency = (amount: number | null | undefined) => {
@@ -476,7 +467,6 @@ export default function CrmInvoiceCreate() {
       });
     } else if (formData.workOrderId) {
       const subtotal = calculateSubtotal();
-      const tax = calculateTax();
       const total = calculateTotal();
 
       createInvoiceMutation.mutate({
@@ -507,7 +497,7 @@ export default function CrmInvoiceCreate() {
           };
         }),
         subtotal: subtotal.toFixed(2),
-        tax: tax.toFixed(2),
+        tax: "0.00",
         total: total.toFixed(2),
       });
     }
@@ -1045,10 +1035,6 @@ export default function CrmInvoiceCreate() {
                             <div className="flex justify-between text-sm">
                               <span className="text-slate-600">Subtotal</span>
                               <span className="font-medium">{formatCurrency(calculateSubtotal())}</span>
-                            </div>
-                            <div className="flex justify-between text-sm items-center">
-                              <span className="text-slate-600">Tax ({formData.taxRate}%)</span>
-                              <span className="font-medium">{formatCurrency(calculateTax())}</span>
                             </div>
                             <div className="border-t pt-2 flex justify-between">
                               <span className="font-semibold">Total</span>

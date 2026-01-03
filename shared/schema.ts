@@ -10,7 +10,6 @@ export const quotes = pgTable("quotes", {
   parts: json("parts").$type<Part[]>().notNull().default([]),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   labor: decimal("labor", { precision: 10, scale: 2 }).notNull(),
-  tax: decimal("tax", { precision: 10, scale: 2 }).notNull(),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   ghvacInstalled: boolean("ghvac_installed").default(false),
   yearsSinceInstallation: text("years_since_installation"),
@@ -568,7 +567,6 @@ export type Proposal = {
   laborHours: number;
   subtotal: number;
   laborCost: number;
-  tax: number;
   total: number;
   notes?: string;
   isLocked: boolean; // Whether this is a guaranteed quote or preliminary proposal
@@ -1088,8 +1086,6 @@ export const crmQuotes = pgTable("crm_quotes", {
   description: text("description"),
   lineItems: json("line_items").default([]),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull().default("0"),
-  taxRate: decimal("tax_rate", { precision: 10, scale: 4 }).default("0.0825"),
-  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).notNull().default("0"),
   laborTotal: decimal("labor_total", { precision: 10, scale: 2 }).default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull().default("0"),
   status: text("status").$type<CrmQuoteStatus>().notNull().default("draft"),
@@ -1109,7 +1105,6 @@ export const crmQuotes = pgTable("crm_quotes", {
   workOrderId: varchar("work_order_id"),
   projectId: varchar("project_id"),
   scope: text("scope").$type<CrmQuoteScope>(),
-  taxTotal: decimal("tax_total", { precision: 10, scale: 2 }).default("0"),
   acceptedBy: text("accepted_by"),
   declineReason: text("decline_reason"),
   notes: text("notes"),
@@ -1139,7 +1134,6 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
-  taxable: boolean("taxable").default(true),
   sortOrder: integer("sort_order").default(0),
   itemId: varchar("item_id").references(() => crmItems.id, { onDelete: "set null" }),
   isDiscountLine: boolean("is_discount_line").default(false),
@@ -1191,7 +1185,6 @@ export const crmInvoices = pgTable("crm_invoices", {
   status: text("status").$type<CrmInvoiceStatus>().notNull().default("draft"),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).default("0"),
   laborTotal: decimal("labor_total", { precision: 10, scale: 2 }).default("0"),
-  taxTotal: decimal("tax_total", { precision: 10, scale: 2 }).default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).default("0"),
   amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).default("0"),
   balanceDue: decimal("balance_due", { precision: 10, scale: 2 }).default("0"),
@@ -1218,7 +1211,6 @@ export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
-  taxable: boolean("taxable").default(true),
   sortOrder: integer("sort_order").default(0),
   itemId: varchar("item_id").references(() => crmItems.id, { onDelete: "set null" }),
   isDiscountLine: boolean("is_discount_line").default(false),
@@ -1248,7 +1240,6 @@ export const crmItems = pgTable("crm_items", {
   rate: decimal("rate", { precision: 10, scale: 2 }).default("0"),
   costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
   unit: text("unit").default("each"),
-  taxable: boolean("taxable").default(true),
   inStock: boolean("in_stock").default(true),
   isActive: boolean("is_active").default(true),
   isVariableRate: boolean("is_variable_rate").default(false),

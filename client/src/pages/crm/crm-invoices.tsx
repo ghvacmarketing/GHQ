@@ -123,7 +123,6 @@ export default function CrmInvoices() {
     serviceAddress: "",
     description: "",
     subtotal: "",
-    taxAmount: "",
   });
 
   const debouncedSearch = useDebounce(searchInput, 300);
@@ -196,11 +195,9 @@ export default function CrmInvoices() {
       serviceAddress?: string;
       description?: string;
       subtotal: string;
-      taxAmount: string;
     }) => {
       const subtotal = parseFloat(data.subtotal) || 0;
-      const taxAmount = parseFloat(data.taxAmount) || 0;
-      const total = subtotal + taxAmount;
+      const total = subtotal;
       
       const res = await apiRequest("POST", "/api/crm/invoices", {
         customerName: data.customerName,
@@ -209,7 +206,7 @@ export default function CrmInvoices() {
         serviceAddress: data.serviceAddress || null,
         description: data.description || null,
         subtotal: subtotal.toFixed(2),
-        tax: taxAmount.toFixed(2),
+        tax: "0.00",
         total: total.toFixed(2),
         balanceDue: total.toFixed(2),
       });
@@ -225,7 +222,6 @@ export default function CrmInvoices() {
         serviceAddress: "",
         description: "",
         subtotal: "",
-        taxAmount: "",
       });
       toast({ title: "Invoice created successfully" });
     },
@@ -844,7 +840,6 @@ export default function CrmInvoices() {
             serviceAddress: "",
             description: "",
             subtotal: "",
-            taxAmount: "",
           });
         }
       }}>
@@ -923,35 +918,21 @@ export default function CrmInvoices() {
                 data-testid="input-create-description"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="subtotal">Subtotal ($)</Label>
-                <Input
-                  id="subtotal"
-                  type="number"
-                  step="0.01"
-                  value={createForm.subtotal}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, subtotal: e.target.value }))}
-                  placeholder="0.00"
-                  data-testid="input-create-subtotal"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="taxAmount">Tax ($)</Label>
-                <Input
-                  id="taxAmount"
-                  type="number"
-                  step="0.01"
-                  value={createForm.taxAmount}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, taxAmount: e.target.value }))}
-                  placeholder="0.00"
-                  data-testid="input-create-tax"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="subtotal">Total ($)</Label>
+              <Input
+                id="subtotal"
+                type="number"
+                step="0.01"
+                value={createForm.subtotal}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, subtotal: e.target.value }))}
+                placeholder="0.00"
+                data-testid="input-create-subtotal"
+              />
             </div>
-            {(createForm.subtotal || createForm.taxAmount) && (
+            {createForm.subtotal && (
               <div className="text-right text-sm text-slate-600">
-                Total: {formatCurrency((parseFloat(createForm.subtotal) || 0) + (parseFloat(createForm.taxAmount) || 0))}
+                Total: {formatCurrency(parseFloat(createForm.subtotal) || 0)}
               </div>
             )}
             <DialogFooter>
