@@ -991,9 +991,11 @@ export const workCategoryEnum = ["Service", "Maintenance", "Sales", "Install"] a
 export type WorkCategory = typeof workCategoryEnum[number];
 
 // Work Subtype options by Visit Type (direct mapping)
+// Note: MAINTENANCE subtypes are dynamic - "Preventative Maintenance" is the default,
+// additional subtypes come from custom_agreement_types table
 export const workSubtypeByVisitType = {
   SERVICE: ["No Cool", "No Heat", "Water Leak", "Electrical", "Thermostat", "Airflow", "Noise", "IAQ", "Other"] as const,
-  MAINTENANCE: ["Spring Tune-Up", "Fall Tune-Up", "Maintenance Plan Visit", "Safety Inspection", "Duct Cleaning", "IAQ Service"] as const,
+  MAINTENANCE: ["Preventative Maintenance"] as const,
   SALES: ["Replace System Estimate", "Add-on IAQ", "Duct Renovation", "Crawlspace", "Maintenance Plan Sale"] as const,
   INSTALL: ["Full System", "Changeout", "Add Ducts", "Replace Ducts", "IAQ Install", "Mini-split", "Crawlspace"] as const,
 } as const;
@@ -1006,11 +1008,13 @@ export const workSubtypeByCategory = {
   Install: workSubtypeByVisitType.INSTALL,
 } as const;
 
+// WorkSubtype includes static subtypes plus any string for dynamic maintenance subtypes
 export type WorkSubtype = 
   | typeof workSubtypeByVisitType.SERVICE[number]
   | typeof workSubtypeByVisitType.MAINTENANCE[number]
   | typeof workSubtypeByVisitType.SALES[number]
-  | typeof workSubtypeByVisitType.INSTALL[number];
+  | typeof workSubtypeByVisitType.INSTALL[number]
+  | string; // Allow dynamic subtypes from custom agreement types
 
 // Billing Disposition - how a completed work order was billed
 export const billingDispositionEnum = ["invoice_created", "no_charge", "billed_elsewhere"] as const;
@@ -1391,6 +1395,10 @@ export type ApprovalMetadata = z.infer<typeof approvalMetadataSchema>;
 export const crmAgreementStatusEnum = ["active", "expiring", "expired", "cancelled"] as const;
 export type CrmAgreementStatus = typeof crmAgreementStatusEnum[number];
 
+// Agreement Type Enum (standard HVAC maintenance vs custom agreement types)
+export const agreementTypeEnum = ["standard", "custom"] as const;
+export type AgreementType = typeof agreementTypeEnum[number];
+
 // Maintenance Regions (for reminder scheduling by county)
 export const maintenanceRegions = pgTable("maintenance_regions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1409,6 +1417,27 @@ export const insertMaintenanceRegionSchema = createInsertSchema(maintenanceRegio
 
 export type InsertMaintenanceRegion = z.infer<typeof insertMaintenanceRegionSchema>;
 export type MaintenanceRegion = typeof maintenanceRegions.$inferSelect;
+
+// Custom Agreement Types (reusable templates for custom maintenance services)
+export const customAgreementTypes = pgTable("custom_agreement_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  visitsPerYear: integer("visits_per_year").notNull().default(1),
+  defaultPrice: decimal("default_price", { precision: 10, scale: 2 }).default("0.00"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCustomAgreementTypeSchema = createInsertSchema(customAgreementTypes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCustomAgreementType = z.infer<typeof insertCustomAgreementTypeSchema>;
+export type CustomAgreementType = typeof customAgreementTypes.$inferSelect;
 
 // CRM Agreements (service/maintenance agreements with customers)
 export const crmAgreements = pgTable("crm_agreements", {
@@ -1431,6 +1460,8 @@ export const crmAgreements = pgTable("crm_agreements", {
   visitsPerYear: integer("visits_per_year").notNull().default(2),
   autoRenew: boolean("auto_renew").notNull().default(true),
   regionId: varchar("region_id").references(() => maintenanceRegions.id),
+  agreementType: text("agreement_type").$type<AgreementType>().notNull().default("standard"),
+  customAgreementTypeId: varchar("custom_agreement_type_id").references(() => customAgreementTypes.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

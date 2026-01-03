@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -8781,7 +8781,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             })
           );
           
-          return { ...agreement, maintenanceVisits: visitsWithWorkOrders };
+          // Calculate visit completion summary
+          const currentYear = new Date().getFullYear();
+          const currentYearVisits = visitsWithWorkOrders.filter(v => v.cycleYear === currentYear);
+          const completedVisits = currentYearVisits.filter(v => v.status === "completed").length;
+          const totalVisits = agreement.visitsPerYear || 2;
+          
+          const maintenanceStatus = {
+            completedThisYear: completedVisits,
+            totalPerYear: totalVisits,
+            summary: `${completedVisits} of ${totalVisits} visits complete`,
+            nextPending: visitsWithWorkOrders.find(v => v.status === "pending") || null,
+          };
+          
+          return { ...agreement, maintenanceVisits: visitsWithWorkOrders, maintenanceStatus };
         })
       );
       
@@ -9454,6 +9467,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const workOrder = await storage.updateWorkOrder(req.params.id, updateData);
 
+      // If work order status changed to "completed" and it's a MAINTENANCE visit,
+      // update any linked maintenance visit to completed
+      if (status === "completed" && workOrder?.visitType === "MAINTENANCE") {
+        const linkedVisits = await db.select()
+          .from(maintenanceVisits)
+          .where(eq(maintenanceVisits.workOrderId, req.params.id));
+        
+        for (const visit of linkedVisits) {
+          await db.update(maintenanceVisits)
+            .set({ 
+              status: "completed", 
+              completedAt: new Date(),
+              updatedAt: new Date() 
+            })
+            .where(eq(maintenanceVisits.id, visit.id));
+          
+          // Update the agreement's next service date if this was the most recent visit
+          if (visit.agreementId) {
+            const [agreement] = await db.select().from(crmAgreements)
+              .where(eq(crmAgreements.id, visit.agreementId));
+            
+            if (agreement) {
+              // Find the next pending visit for this agreement
+              const [nextVisit] = await db.select()
+                .from(maintenanceVisits)
+                .where(and(
+                  eq(maintenanceVisits.agreementId, visit.agreementId),
+                  eq(maintenanceVisits.status, "pending")
+                ))
+                .orderBy(asc(maintenanceVisits.targetDate))
+                .limit(1);
+              
+              // Update to next pending visit date, or clear if no more pending
+              await db.update(crmAgreements)
+                .set({ 
+                  nextServiceDate: nextVisit ? nextVisit.targetDate : null, 
+                  updatedAt: new Date() 
+                })
+                .where(eq(crmAgreements.id, visit.agreementId));
+            }
+          }
+        }
+      }
+
       await logCrmAudit(
         user.id,
         "work_order.updated",
@@ -9711,6 +9768,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching dispatch work orders:", error);
       return res.status(500).json({ message: "Failed to fetch dispatch work orders" });
+    }
+  });
+
+  // ============================================
+  // CUSTOM AGREEMENT TYPES ROUTES
+  // ============================================
+
+  // GET /api/crm/custom-agreement-types - List all active custom agreement types
+  app.get("/api/crm/custom-agreement-types", requireCrmAuth, async (req, res) => {
+    try {
+      const types = await db
+        .select()
+        .from(customAgreementTypes)
+        .where(eq(customAgreementTypes.isActive, true))
+        .orderBy(asc(customAgreementTypes.name));
+      
+      return res.json(types);
+    } catch (error) {
+      console.error("Error fetching custom agreement types:", error);
+      return res.status(500).json({ message: "Failed to fetch custom agreement types" });
+    }
+  });
+
+  // POST /api/crm/custom-agreement-types - Create a new custom agreement type
+  // Also auto-creates a corresponding item in the Maintenance category
+  app.post("/api/crm/custom-agreement-types", requireCrmAdmin, async (req, res) => {
+    try {
+      const validated = insertCustomAgreementTypeSchema.parse(req.body);
+      
+      const [created] = await db
+        .insert(customAgreementTypes)
+        .values(validated)
+        .returning();
+      
+      // Auto-create a corresponding item in the Maintenance category
+      await db.insert(crmItems).values({
+        name: validated.name,
+        description: validated.description || `${validated.name} - Custom Agreement Service`,
+        category: "maintenance",
+        itemType: "agreement",
+        rate: validated.defaultPrice || "0",
+        taxable: true,
+        isActive: true,
+      });
+      
+      return res.status(201).json(created);
+    } catch (error) {
+      console.error("Error creating custom agreement type:", error);
+      return res.status(500).json({ message: "Failed to create custom agreement type" });
+    }
+  });
+
+  // PATCH /api/crm/custom-agreement-types/:id - Update a custom agreement type
+  app.patch("/api/crm/custom-agreement-types/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const [updated] = await db
+        .update(customAgreementTypes)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(eq(customAgreementTypes.id, req.params.id))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Custom agreement type not found" });
+      }
+      
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating custom agreement type:", error);
+      return res.status(500).json({ message: "Failed to update custom agreement type" });
+    }
+  });
+
+  // DELETE /api/crm/custom-agreement-types/:id - Soft delete (set isActive = false)
+  app.delete("/api/crm/custom-agreement-types/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const [updated] = await db
+        .update(customAgreementTypes)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(customAgreementTypes.id, req.params.id))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Custom agreement type not found" });
+      }
+      
+      return res.json({ message: "Custom agreement type deactivated" });
+    } catch (error) {
+      console.error("Error deleting custom agreement type:", error);
+      return res.status(500).json({ message: "Failed to delete custom agreement type" });
+    }
+  });
+
+  // GET /api/crm/work-subtypes/:visitType - Get dynamic work subtypes for a visit type
+  app.get("/api/crm/work-subtypes/:visitType", requireCrmAuth, async (req, res) => {
+    try {
+      const visitType = req.params.visitType.toUpperCase() as keyof typeof workSubtypeByVisitType;
+      
+      if (visitType === "MAINTENANCE") {
+        // Return "Preventative Maintenance" + all active custom agreement type names
+        const customTypes = await db
+          .select({ name: customAgreementTypes.name })
+          .from(customAgreementTypes)
+          .where(eq(customAgreementTypes.isActive, true))
+          .orderBy(asc(customAgreementTypes.name));
+        
+        const subtypes = [
+          "Preventative Maintenance",
+          ...customTypes.map(t => t.name)
+        ];
+        
+        return res.json(subtypes);
+      }
+      
+      // For other visit types, return the static array
+      const subtypes = workSubtypeByVisitType[visitType];
+      if (!subtypes) {
+        return res.status(400).json({ message: "Invalid visit type" });
+      }
+      
+      return res.json([...subtypes]);
+    } catch (error) {
+      console.error("Error fetching work subtypes:", error);
+      return res.status(500).json({ message: "Failed to fetch work subtypes" });
     }
   });
 
