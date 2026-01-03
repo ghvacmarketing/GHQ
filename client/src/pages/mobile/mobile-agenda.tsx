@@ -515,11 +515,16 @@ export default function MobileAgenda() {
 
   const isAuthError = isError && error instanceof Error && error.message === "AUTH_REQUIRED";
 
-  const todaysOrders = workOrders?.filter((wo) => {
+  const todaysOrders = (workOrders?.filter((wo) => {
     if (!wo.scheduledStart) return false;
     const localStart = toLocalTime(wo.scheduledStart);
     return isToday(localStart);
-  }) ?? [];
+  }) ?? []).sort((a, b) => {
+    // Sort by scheduled start time (earliest first)
+    const aTime = a.scheduledStart ? new Date(a.scheduledStart).getTime() : Infinity;
+    const bTime = b.scheduledStart ? new Date(b.scheduledStart).getTime() : Infinity;
+    return aTime - bTime;
+  });
 
   const showCacheWarning = !isOnline || isFromCache;
 
