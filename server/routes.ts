@@ -12035,6 +12035,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.ip
       );
       
+      // Auto-create maintenance agreement if invoice is fully paid and contains maintenance items
+      if (newStatus === "paid" && invoice.customerId) {
+        try {
+          const maintenanceLineItems = await db.select()
+            .from(crmInvoiceLineItems)
+            .where(and(
+              eq(crmInvoiceLineItems.invoiceId, req.params.id),
+              eq(crmInvoiceLineItems.category, "maintenance")
+            ));
+          
+          if (maintenanceLineItems.length > 0) {
+            // Calculate total maintenance amount from line items
+            const maintenanceTotal = maintenanceLineItems.reduce((sum, item) => {
+              return sum + parseFloat(item.total || "0");
+            }, 0);
+            
+            // Get the first maintenance item name for the agreement plan
+            const maintenanceItemName = maintenanceLineItems[0].name || "Maintenance Agreement";
+            
+            // Get customer info for the agreement
+            const [customer] = await db.select().from(crmCustomers)
+              .where(eq(crmCustomers.id, invoice.customerId));
+            
+            if (customer) {
+              const today = new Date();
+              const appointmentDate = new Date(today);
+              appointmentDate.setMonth(appointmentDate.getMonth() + 1);
+              const endDate = new Date(today);
+              endDate.setFullYear(endDate.getFullYear() + 1);
+              
+              // Generate agreement number
+              const dateStr = format(today, "yyyyMMdd");
+              const existingAgreements = await db.select({ agreementNumber: crmAgreements.agreementNumber })
+                .from(crmAgreements)
+                .where(sql`${crmAgreements.agreementNumber} LIKE ${'MA-' + dateStr + '%'}`)
+                .orderBy(desc(crmAgreements.createdAt))
+                .limit(1);
+              
+              let sequence = 1;
+              if (existingAgreements.length > 0 && existingAgreements[0].agreementNumber) {
+                const parts = existingAgreements[0].agreementNumber.split('-');
+                if (parts.length >= 3) {
+                  sequence = parseInt(parts[2]) + 1;
+                }
+              }
+              const agreementNumber = `MA-${dateStr}-${String(sequence).padStart(3, '0')}`;
+              
+              // Create the maintenance agreement
+              const [newAgreement] = await db.insert(crmAgreements).values({
+                customerId: invoice.customerId,
+                agreementNumber,
+                customerName: customer.name,
+                agreementPlan: maintenanceItemName,
+                address: customer.fullAddress || "",
+                price: maintenanceTotal.toFixed(2),
+                contractDate: format(today, "yyyy-MM-dd"),
+                invoiceDate: format(today, "yyyy-MM-dd"),
+                appointmentDate: format(appointmentDate, "yyyy-MM-dd"),
+                startDate: format(today, "yyyy-MM-dd"),
+                endDate: format(endDate, "yyyy-MM-dd"),
+                nextServiceDate: format(appointmentDate, "yyyy-MM-dd"),
+                nextInvoiceDate: format(today, "yyyy-MM-dd"),
+                status: "active",
+                autoRenew: true,
+                visitsPerYear: 2,
+                notes: `Auto-created from Invoice ${invoice.invoiceNumber}`,
+              }).returning();
+              
+              // Generate maintenance visits for the new agreement
+              if (newAgreement) {
+                const visitsPerYear = 2;
+                const currentYear = today.getFullYear();
+                
+                for (let i = 0; i < visitsPerYear; i++) {
+                  const visitDate = new Date(appointmentDate);
+                  visitDate.setMonth(visitDate.getMonth() + (i * 6));
+                  
+                  await db.insert(maintenanceVisits).values({
+                    agreementId: newAgreement.id,
+                    cycleYear: visitDate.getFullYear(),
+                    visitNumber: i + 1,
+                    targetDate: format(visitDate, "yyyy-MM-dd"),
+                    status: "pending",
+                  });
+                }
+                
+                console.log(`[Invoice] Auto-created maintenance agreement ${agreementNumber} for customer ${customer.name} from invoice ${invoice.invoiceNumber}`);
+              }
+            }
+          }
+        } catch (agreementError) {
+          console.error("Error auto-creating maintenance agreement:", agreementError);
+          // Don't fail the payment - just log the error
+        }
+      }
+      
       return res.json(updatedInvoice);
     } catch (error) {
       console.error("Error marking invoice as paid:", error);

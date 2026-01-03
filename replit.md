@@ -72,6 +72,7 @@ Preferred communication style: Simple, everyday language.
   - **Work order integration**: Visits can be linked to work orders for scheduling. Work order completion auto-syncs to maintenance visits (marks complete, updates nextServiceDate)
   - **Custom Agreement Types**: Admin-configurable templates for non-HVAC services (crawlspace inspections, plumbing checks, etc.). Auto-creates billable items in Maintenance category. Dynamic work subtypes under MAINTENANCE include "Preventative Maintenance" + all active custom agreement types.
   - **Customer Profile Maintenance Status**: Shows "X of Y visits complete" summary with pending visit details via `/api/crm/customers/:id/agreements` endpoint
+  - **Auto-Agreement from Invoice**: When an invoice containing maintenance items is marked as paid, automatically creates a maintenance agreement in the customer's profile with proper dates, visits, and pricing
 - **Service Call Checklists**: Dynamic intake questionnaires for service work orders with:
   - **Database tables**: `serviceCallChecklists` (template per service type), `checklistQuestions` (questions with order/required flags), `workOrderChecklistResponses` (answers linked to work order)
   - **Service type mapping**: Work subtypes map to checklist templates (NO_HEAT, NO_AC, WATER_LEAK, OTHER)
