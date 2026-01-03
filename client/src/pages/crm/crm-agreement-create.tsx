@@ -492,8 +492,9 @@ export default function CrmAgreementCreate() {
                         min="1"
                         value={visitsPerPeriod}
                         onChange={(e) => setVisitsPerPeriod(parseInt(e.target.value) || 1)}
-                        className="mt-1"
+                        className={`mt-1 ${isPreventativeMaintenance ? "bg-slate-100 text-slate-600" : ""}`}
                         data-testid="input-visits-per-period"
+                        disabled={isPreventativeMaintenance}
                       />
                     </div>
 
