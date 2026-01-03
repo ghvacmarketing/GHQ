@@ -33,7 +33,6 @@ import CrmRouteGuard from "@/components/crm/crm-route-guard";
 
 // Lazy-load CRM pages to reduce initial bundle size
 const CrmLogin = lazy(() => import("@/pages/crm/crm-login"));
-const CrmDashboard = lazy(() => import("@/pages/crm/crm-dashboard"));
 const CrmDispatch = lazy(() => import("@/pages/crm/crm-dispatch"));
 const CrmCustomers = lazy(() => import("@/pages/crm/crm-customers"));
 const CrmCustomerDetail = lazy(() => import("@/pages/crm/crm-customer-detail"));
@@ -230,9 +229,9 @@ function Router() {
       <Route path="/crm/phone">{() => <ProtectedCrmWrapper><CrmPhone /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/checklists">{() => <ProtectedCrmWrapper><CrmChecklists /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings">{() => <ProtectedCrmWrapper><CrmSettings /></ProtectedCrmWrapper>}</Route>
-      <Route path="/crm/business-dashboard">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/dashboard">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/reports">{() => <ProtectedCrmWrapper><CrmGoalsTracker /></ProtectedCrmWrapper>}</Route>
-      <Route path="/crm">{() => <ProtectedCrmWrapper><CrmDashboard /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>
       <Route path="/mobile/job/:id">{() => <MobileWrapper><MobileJobDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/job">{() => <MobileWrapper><MobileJob /></MobileWrapper>}</Route>
       <Route path="/mobile/time">{() => <MobileWrapper><MobileTime /></MobileWrapper>}</Route>

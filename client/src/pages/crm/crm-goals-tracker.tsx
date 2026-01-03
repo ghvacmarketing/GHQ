@@ -387,22 +387,16 @@ export default function CrmGoalsTracker() {
                           </div>
                         </td>
                         <td className="text-right py-3 px-2">
-                          <div className="flex flex-col items-end">
-                            <span className="font-semibold text-slate-900">{formatCurrency(tech.service.mtdActual)}</span>
-                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.service.mtdGoal)} ({formatCurrency(tech.service.dailyGoal)}/d)</span>
-                          </div>
+                          <span className="font-semibold text-slate-900">{formatCurrency(tech.service.mtdActual)}</span>
+                          <span className="text-xs text-slate-500"> / {formatCurrency(tech.service.dailyGoal)}</span>
                         </td>
                         <td className="text-right py-3 px-2">
-                          <div className="flex flex-col items-end">
-                            <span className="font-semibold text-slate-900">{formatCurrency(tech.install.mtdActual)}</span>
-                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.install.mtdGoal)} ({formatCurrency(tech.install.dailyGoal)}/d)</span>
-                          </div>
+                          <span className="font-semibold text-slate-900">{formatCurrency(tech.install.mtdActual)}</span>
+                          <span className="text-xs text-slate-500"> / {formatCurrency(tech.install.dailyGoal)}</span>
                         </td>
                         <td className="text-right py-3 px-2">
-                          <div className="flex flex-col items-end">
-                            <span className="font-semibold text-slate-900">{formatCurrency(tech.maintenance.mtdActual)}</span>
-                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.maintenance.mtdGoal)} ({formatCurrency(tech.maintenance.dailyGoal)}/d)</span>
-                          </div>
+                          <span className="font-semibold text-slate-900">{formatCurrency(tech.maintenance.mtdActual)}</span>
+                          <span className="text-xs text-slate-500"> / {formatCurrency(tech.maintenance.dailyGoal)}</span>
                         </td>
                         <td className="text-right py-3 px-2">
                           <div className="flex flex-col items-end">

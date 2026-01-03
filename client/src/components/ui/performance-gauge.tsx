@@ -99,6 +99,17 @@ export function PerformanceGauge({ sold, quoted, goal, size = 180 }: Performance
           />
         )}
         
+        {/* Goal marker tick at 100% (right end) */}
+        <line
+          x1={centerX + (radius - strokeWidth/2 - 2)}
+          y1={centerY}
+          x2={centerX + (radius + strokeWidth/2 + 2)}
+          y2={centerY}
+          stroke="#dc2626"
+          strokeWidth={3}
+          strokeLinecap="round"
+        />
+        
         <line
           x1={centerX}
           y1={centerY}
@@ -117,8 +128,8 @@ export function PerformanceGauge({ sold, quoted, goal, size = 180 }: Performance
           <p className="text-xs text-slate-500">Sold</p>
         </div>
         <div className="text-center">
-          <p className="text-lg font-bold text-slate-900">{formatCurrency(potential)}</p>
-          <p className="text-xs text-slate-500">Potential</p>
+          <p className="text-lg font-bold text-red-600">{formatCurrency(goal)}</p>
+          <p className="text-xs text-slate-500">Goal</p>
         </div>
       </div>
     </div>

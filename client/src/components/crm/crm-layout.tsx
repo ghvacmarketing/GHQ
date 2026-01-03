@@ -51,8 +51,7 @@ const navSections: NavSection[] = [
   {
     title: "Main",
     items: [
-      { label: "Dashboard", href: "/crm", icon: LayoutDashboard },
-      { label: "Business Dashboard", href: "/crm/business-dashboard", icon: Target },
+      { label: "Dashboard", href: "/crm/dashboard", icon: LayoutDashboard },
       { label: "Dispatch Board", href: "/crm/dispatch", icon: CalendarClock },
       { label: "Phone", href: "/crm/phone", icon: Phone },
     ],
@@ -142,8 +141,8 @@ function SidebarContent({
   });
 
   const isActive = (href: string) => {
-    if (href === "/crm") {
-      return location === "/crm" || location === "/crm/";
+    if (href === "/crm/dashboard") {
+      return location === "/crm" || location === "/crm/" || location === "/crm/dashboard";
     }
     return location.startsWith(href);
   };
