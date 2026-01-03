@@ -8851,6 +8851,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/customers/:id/timeline - Get unified activity timeline for a customer
+  app.get("/api/crm/customers/:id/timeline", requireCrmAuth, async (req, res) => {
+    try {
+      const customerId = req.params.id;
+      
+      interface TimelineEntry {
+        id: string;
+        type: 'work_order' | 'project' | 'agreement' | 'quote' | 'invoice' | 'note' | 'payment';
+        title: string;
+        description: string;
+        timestamp: string;
+        status?: string;
+        amount?: string;
+        linkUrl?: string;
+      }
+      
+      const timeline: TimelineEntry[] = [];
+      
+      // Helper to safely convert dates/strings to ISO string
+      const toISOTimestamp = (dateValue: Date | string | null | undefined): string => {
+        if (!dateValue) return new Date().toISOString();
+        if (typeof dateValue === 'string') return new Date(dateValue).toISOString();
+        return dateValue.toISOString();
+      };
+      
+      // Query work orders
+      const workOrders = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.customerId, customerId));
+      for (const wo of workOrders) {
+        timeline.push({
+          id: wo.id,
+          type: 'work_order',
+          title: wo.title || `Work Order #${wo.workOrderNumber || wo.id.slice(0, 8)}`,
+          description: wo.description || wo.visitType || 'Work order created',
+          timestamp: toISOTimestamp(wo.createdAt),
+          status: wo.status || undefined,
+          linkUrl: `/crm/work-orders/${wo.id}`,
+        });
+      }
+      
+      // Query projects
+      const projects = await db.select().from(crmProjects).where(eq(crmProjects.customerId, customerId));
+      for (const proj of projects) {
+        timeline.push({
+          id: proj.id,
+          type: 'project',
+          title: proj.title || proj.projectNumber || 'Project',
+          description: proj.description || proj.projectType || 'Project created',
+          timestamp: toISOTimestamp(proj.createdAt),
+          status: proj.status || undefined,
+          amount: proj.totalAmount ? `$${parseFloat(proj.totalAmount).toLocaleString()}` : undefined,
+          linkUrl: `/crm/projects/${proj.id}`,
+        });
+      }
+      
+      // Query agreements
+      const agreements = await db.select().from(crmAgreements).where(eq(crmAgreements.customerId, customerId));
+      for (const agmt of agreements) {
+        timeline.push({
+          id: agmt.id,
+          type: 'agreement',
+          title: agmt.agreementPlan || 'Service Agreement',
+          description: `${agmt.frequency || 'Annual'} agreement - ${agmt.visitsPerPeriod || 2} visits`,
+          timestamp: toISOTimestamp(agmt.createdAt),
+          status: agmt.status || undefined,
+          amount: agmt.price ? `$${parseFloat(agmt.price).toLocaleString()}` : undefined,
+          linkUrl: `/crm/customers/${customerId}?tab=agreements`,
+        });
+      }
+      
+      // Query quotes
+      const quotes = await db.select().from(crmQuotes).where(eq(crmQuotes.customerId, customerId));
+      for (const quote of quotes) {
+        timeline.push({
+          id: quote.id,
+          type: 'quote',
+          title: quote.title || `Quote #${quote.quoteNumber || quote.id.slice(0, 8)}`,
+          description: quote.description || 'Quote created',
+          timestamp: toISOTimestamp(quote.createdAt),
+          status: quote.status || undefined,
+          amount: quote.total ? `$${parseFloat(quote.total).toLocaleString()}` : undefined,
+          linkUrl: `/crm/quotes/${quote.id}`,
+        });
+      }
+      
+      // Query invoices
+      const invoices = await db.select().from(crmInvoices).where(eq(crmInvoices.customerId, customerId));
+      for (const inv of invoices) {
+        timeline.push({
+          id: inv.id,
+          type: 'invoice',
+          title: `Invoice #${inv.invoiceNumber || inv.id.slice(0, 8)}`,
+          description: inv.notes || 'Invoice created',
+          timestamp: toISOTimestamp(inv.createdAt),
+          status: inv.status || undefined,
+          amount: inv.total ? `$${parseFloat(inv.total).toLocaleString()}` : undefined,
+          linkUrl: `/crm/invoices/${inv.id}`,
+        });
+        
+        // For paid invoices, add a payment entry
+        if (inv.status === 'paid' && inv.paidAt) {
+          timeline.push({
+            id: `payment-${inv.id}`,
+            type: 'payment',
+            title: `Payment Received`,
+            description: `Payment for Invoice #${inv.invoiceNumber || inv.id.slice(0, 8)}`,
+            timestamp: toISOTimestamp(inv.paidAt),
+            status: 'completed',
+            amount: inv.total ? `$${parseFloat(inv.total).toLocaleString()}` : undefined,
+            linkUrl: `/crm/invoices/${inv.id}`,
+          });
+        }
+      }
+      
+      // Query customer notes
+      const notes = await db.select().from(crmCustomerNotes).where(eq(crmCustomerNotes.customerId, customerId));
+      for (const note of notes) {
+        timeline.push({
+          id: note.id,
+          type: 'note',
+          title: 'Note Added',
+          description: note.body?.substring(0, 100) || 'Note created',
+          timestamp: toISOTimestamp(note.createdAt),
+        });
+      }
+      
+      // Sort by timestamp descending (newest first)
+      timeline.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      
+      return res.json(timeline);
+    } catch (error) {
+      console.error("Error fetching customer timeline:", error);
+      return res.status(500).json({ message: "Failed to fetch timeline" });
+    }
+  });
+
   // POST /api/crm/customers/:id/properties - Create a property for a customer
   app.post("/api/crm/customers/:id/properties", requireCrmAuth, async (req, res) => {
     try {

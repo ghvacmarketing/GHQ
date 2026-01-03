@@ -641,6 +641,254 @@ const visitStatusColors: Record<string, { bg: string; text: string }> = {
   cancelled: { bg: "bg-red-100", text: "text-red-700" },
 };
 
+interface TimelineEntry {
+  id: string;
+  type: 'work_order' | 'project' | 'agreement' | 'quote' | 'invoice' | 'note' | 'payment';
+  title: string;
+  description: string;
+  timestamp: string;
+  status?: string;
+  amount?: string;
+  linkUrl?: string;
+}
+
+const timelineTypeConfig: Record<TimelineEntry['type'], { icon: any; bgColor: string; textColor: string; borderColor: string; label: string }> = {
+  work_order: { icon: Wrench, bgColor: "bg-blue-100", textColor: "text-blue-700", borderColor: "border-blue-200", label: "Work Order" },
+  project: { icon: Briefcase, bgColor: "bg-purple-100", textColor: "text-purple-700", borderColor: "border-purple-200", label: "Project" },
+  agreement: { icon: FileText, bgColor: "bg-green-100", textColor: "text-green-700", borderColor: "border-green-200", label: "Agreement" },
+  quote: { icon: FileText, bgColor: "bg-amber-100", textColor: "text-amber-700", borderColor: "border-amber-200", label: "Quote" },
+  invoice: { icon: Receipt, bgColor: "bg-slate-100", textColor: "text-slate-700", borderColor: "border-slate-200", label: "Invoice" },
+  note: { icon: MessageSquare, bgColor: "bg-gray-100", textColor: "text-gray-700", borderColor: "border-gray-200", label: "Note" },
+  payment: { icon: DollarSign, bgColor: "bg-emerald-100", textColor: "text-emerald-700", borderColor: "border-emerald-200", label: "Payment" },
+};
+
+function HistoryTabContent({ customerId }: { customerId: string }) {
+  const allTypes: TimelineEntry['type'][] = ['work_order', 'project', 'agreement', 'quote', 'invoice', 'note', 'payment'];
+  const [activeFilters, setActiveFilters] = useState<Set<TimelineEntry['type']>>(() => new Set(allTypes));
+  
+  const { data: timeline, isLoading, isError, error } = useQuery<TimelineEntry[]>({
+    queryKey: ['/api/crm/customers', customerId, 'timeline'],
+    queryFn: async () => {
+      const response = await fetch(`/api/crm/customers/${customerId}/timeline`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch timeline');
+      return response.json();
+    },
+  });
+
+  const toggleFilter = (type: TimelineEntry['type']) => {
+    setActiveFilters(prev => {
+      const newFilters = new Set(prev);
+      if (newFilters.has(type)) {
+        newFilters.delete(type);
+      } else {
+        newFilters.add(type);
+      }
+      return newFilters;
+    });
+  };
+
+  const filteredTimeline = timeline?.filter(entry => activeFilters.has(entry.type)) || [];
+
+  if (isLoading) {
+    return (
+      <Card data-testid="card-history-loading">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5 text-[#711419]" />
+            Customer History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {Object.keys(timelineTypeConfig).map((type) => (
+                <Skeleton key={type} className="h-8 w-24 rounded-full" />
+              ))}
+            </div>
+            <div className="space-y-6 mt-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex gap-4">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-24 flex-1" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card data-testid="card-history-error">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5 text-[#711419]" />
+            Customer History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-3" />
+            <p className="text-red-500 mb-2">Failed to load history</p>
+            <p className="text-sm text-slate-400">
+              {(error as Error)?.message || 'An error occurred while loading the timeline.'}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!timeline || timeline.length === 0) {
+    return (
+      <Card data-testid="card-history-empty">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5 text-[#711419]" />
+            Customer History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <History className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 mb-2">No history yet</p>
+            <p className="text-sm text-slate-400">
+              Activity history will appear here as you work with this customer.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card data-testid="card-history">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <History className="h-5 w-5 text-[#711419]" />
+          Customer History
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap gap-2 mb-6" data-testid="history-filter-bar">
+          {(Object.keys(timelineTypeConfig) as TimelineEntry['type'][]).map((type) => {
+            const config = timelineTypeConfig[type];
+            const isActive = activeFilters.has(type);
+            return (
+              <Badge
+                key={type}
+                variant="outline"
+                className={cn(
+                  "cursor-pointer transition-all px-3 py-1.5",
+                  isActive
+                    ? `${config.bgColor} ${config.textColor} ${config.borderColor}`
+                    : "bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100"
+                )}
+                onClick={() => toggleFilter(type)}
+                data-testid={`filter-${type}`}
+              >
+                <config.icon className="h-3 w-3 mr-1.5" />
+                {config.label}
+              </Badge>
+            );
+          })}
+        </div>
+
+        {filteredTimeline.length === 0 ? (
+          <div className="text-center py-8" data-testid="history-filtered-empty">
+            <History className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 mb-2">No matching entries</p>
+            <p className="text-sm text-slate-400">
+              Adjust your filters to see more history.
+            </p>
+          </div>
+        ) : (
+          <div className="relative" data-testid="history-timeline">
+            <div className="absolute left-[90px] top-0 bottom-0 w-px bg-slate-200" />
+            <div className="space-y-4">
+              {filteredTimeline.map((entry) => {
+                const config = timelineTypeConfig[entry.type];
+                const IconComponent = config.icon;
+                const formattedDate = format(new Date(entry.timestamp), "MMM d, yyyy");
+                const formattedTime = format(new Date(entry.timestamp), "h:mm a");
+                
+                const content = (
+                  <div 
+                    className={cn(
+                      "flex items-start gap-4 group",
+                      entry.linkUrl && "cursor-pointer"
+                    )}
+                    data-testid={`timeline-entry-${entry.id}`}
+                  >
+                    <div className="w-[80px] text-right flex-shrink-0 pt-2">
+                      <p className="text-xs font-medium text-slate-600">{formattedDate}</p>
+                      <p className="text-xs text-slate-400">{formattedTime}</p>
+                    </div>
+                    
+                    <div className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 border-2 border-white shadow-sm",
+                      config.bgColor
+                    )}>
+                      <IconComponent className={cn("h-4 w-4", config.textColor)} />
+                    </div>
+                    
+                    <div className={cn(
+                      "flex-1 p-4 rounded-lg border transition-all",
+                      config.borderColor,
+                      "bg-white",
+                      entry.linkUrl && "group-hover:shadow-md group-hover:border-slate-300"
+                    )}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge className={cn("text-xs", config.bgColor, config.textColor)}>
+                              {config.label}
+                            </Badge>
+                            {entry.status && (
+                              <Badge variant="outline" className="text-xs capitalize">
+                                {entry.status.replace(/_/g, ' ')}
+                              </Badge>
+                            )}
+                          </div>
+                          <h4 className="font-medium text-slate-900">{entry.title}</h4>
+                          <p className="text-sm text-slate-500 mt-1 line-clamp-2">{entry.description}</p>
+                        </div>
+                        {entry.amount && (
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-semibold text-slate-900">{entry.amount}</p>
+                          </div>
+                        )}
+                      </div>
+                      {entry.linkUrl && (
+                        <div className="mt-2 flex items-center text-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          View details
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+
+                if (entry.linkUrl) {
+                  return (
+                    <Link key={entry.id} href={entry.linkUrl}>
+                      {content}
+                    </Link>
+                  );
+                }
+                
+                return <div key={entry.id}>{content}</div>;
+              })}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function AgreementsTabContent({ customerId }: { customerId: string }) {
   const { data: agreements, isLoading, isError, error } = useQuery<AgreementWithVisits[]>({
     queryKey: [`/api/crm/customers/${customerId}/agreements`],
@@ -1197,6 +1445,14 @@ function CustomerTabbedView({
         >
           <FileText className="h-4 w-4 mr-2" />
           Agreements
+        </TabsTrigger>
+        <TabsTrigger 
+          value="history" 
+          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          data-testid="tab-history"
+        >
+          <History className="h-4 w-4 mr-2" />
+          History
         </TabsTrigger>
         <TabsTrigger 
           value="settings" 
@@ -1921,6 +2177,11 @@ function CustomerTabbedView({
       {/* Agreements Tab */}
       <TabsContent value="agreements" className="space-y-6" data-testid="tab-content-agreements">
         <AgreementsTabContent customerId={customer.id} />
+      </TabsContent>
+
+      {/* History Tab */}
+      <TabsContent value="history" className="space-y-6" data-testid="tab-content-history">
+        <HistoryTabContent customerId={customer.id} />
       </TabsContent>
 
       {/* Settings Tab - Placeholder */}
