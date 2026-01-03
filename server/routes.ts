@@ -5062,6 +5062,313 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // CRM DASHBOARD ANALYTICS
+  // ============================================
+
+  // GET /api/crm/dashboard/analytics - Get aggregated dashboard analytics
+  app.get("/api/crm/dashboard/analytics", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const range = (req.query.range as string) || "month";
+      
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay());
+      const rolling12Start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+
+      let rangeStart: Date;
+      switch (range) {
+        case "day":
+          rangeStart = today;
+          break;
+        case "week":
+          rangeStart = startOfWeek;
+          break;
+        case "rolling12":
+          rangeStart = rolling12Start;
+          break;
+        case "month":
+        default:
+          rangeStart = startOfMonth;
+          break;
+      }
+
+      // 1. Company Overview KPIs
+      const quotesInRange = await db
+        .select({
+          total: sql<string>`COALESCE(SUM(CAST(${crmQuotes.total} AS DECIMAL(10,2))), 0)`,
+          count: sql<number>`COUNT(*)`,
+        })
+        .from(crmQuotes)
+        .where(sql`${crmQuotes.createdAt} >= ${rangeStart}`);
+
+      const acceptedQuotesInRange = await db
+        .select({
+          total: sql<string>`COALESCE(SUM(CAST(${crmQuotes.total} AS DECIMAL(10,2))), 0)`,
+          count: sql<number>`COUNT(*)`,
+        })
+        .from(crmQuotes)
+        .where(and(
+          sql`${crmQuotes.createdAt} >= ${rangeStart}`,
+          eq(crmQuotes.status, "accepted")
+        ));
+
+      const rolling12Invoices = await db
+        .select({
+          total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+        })
+        .from(crmInvoices)
+        .where(and(
+          sql`${crmInvoices.paidAt} IS NOT NULL AND ${crmInvoices.paidAt} >= ${rolling12Start}`,
+          eq(crmInvoices.status, "paid")
+        ));
+
+      const totalQuoted = parseFloat(quotesInRange[0]?.total || "0");
+      const totalSold = parseFloat(acceptedQuotesInRange[0]?.total || "0");
+      const totalQuotesCount = quotesInRange[0]?.count || 0;
+      const acceptedQuotesCount = acceptedQuotesInRange[0]?.count || 0;
+      const closeRate = totalQuotesCount > 0 ? (acceptedQuotesCount / totalQuotesCount) * 100 : 0;
+      const companyGoal = 250000;
+      const goalProgress = companyGoal > 0 ? (totalSold / companyGoal) * 100 : 0;
+      const rolling12Month = parseFloat(rolling12Invoices[0]?.total || "0");
+
+      // 2. Revenue by Department
+      const getDepartmentRevenue = async (visitType: string) => {
+        const todayRevenue = await db
+          .select({
+            total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+          })
+          .from(crmInvoices)
+          .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+          .where(and(
+            eq(crmWorkOrders.visitType, visitType),
+            eq(crmInvoices.status, "paid"),
+            sql`${crmInvoices.paidAt} >= ${today}`
+          ));
+
+        const mtdRevenue = await db
+          .select({
+            total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+          })
+          .from(crmInvoices)
+          .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+          .where(and(
+            eq(crmWorkOrders.visitType, visitType),
+            eq(crmInvoices.status, "paid"),
+            sql`${crmInvoices.paidAt} >= ${startOfMonth}`
+          ));
+
+        const ytdRevenue = await db
+          .select({
+            total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+          })
+          .from(crmInvoices)
+          .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+          .where(and(
+            eq(crmWorkOrders.visitType, visitType),
+            eq(crmInvoices.status, "paid"),
+            sql`${crmInvoices.paidAt} >= ${startOfYear}`
+          ));
+
+        return {
+          today: parseFloat(todayRevenue[0]?.total || "0"),
+          mtd: parseFloat(mtdRevenue[0]?.total || "0"),
+          ytd: parseFloat(ytdRevenue[0]?.total || "0"),
+        };
+      };
+
+      const serviceRevenue = await getDepartmentRevenue("SERVICE");
+      const installRevenue = await getDepartmentRevenue("INSTALL");
+      const maintenanceRevenue = await getDepartmentRevenue("MAINTENANCE");
+
+      const departmentGoals = {
+        SERVICE: 95000,
+        INSTALL: 100000,
+        MAINTENANCE: 25000,
+      };
+
+      const revenueByDepartment = {
+        SERVICE: { ...serviceRevenue, goal: departmentGoals.SERVICE, goalProgress: (serviceRevenue.mtd / departmentGoals.SERVICE) * 100 },
+        INSTALL: { ...installRevenue, goal: departmentGoals.INSTALL, goalProgress: (installRevenue.mtd / departmentGoals.INSTALL) * 100 },
+        MAINTENANCE: { ...maintenanceRevenue, goal: departmentGoals.MAINTENANCE, goalProgress: (maintenanceRevenue.mtd / departmentGoals.MAINTENANCE) * 100 },
+      };
+
+      // 3. Technician Performance
+      const techs = await db
+        .select()
+        .from(crmUsers)
+        .where(and(eq(crmUsers.role, "tech"), eq(crmUsers.isActive, true)));
+
+      const techPerformance = await Promise.all(
+        techs.map(async (tech) => {
+          const techWorkOrders = await db
+            .select({ id: crmWorkOrders.id })
+            .from(crmWorkOrders)
+            .where(and(
+              eq(crmWorkOrders.assignedTechId, tech.id),
+              eq(crmWorkOrders.status, "completed"),
+              sql`${crmWorkOrders.completedAt} >= ${startOfMonth}`
+            ));
+
+          const workOrderIds = techWorkOrders.map(wo => wo.id);
+          
+          let serviceRevenue = 0;
+          if (workOrderIds.length > 0) {
+            const revenueResult = await db
+              .select({
+                total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+              })
+              .from(crmInvoices)
+              .where(and(
+                inArray(crmInvoices.workOrderId, workOrderIds),
+                eq(crmInvoices.status, "paid")
+              ));
+            serviceRevenue = parseFloat(revenueResult[0]?.total || "0");
+          }
+
+          const serviceJobs = techWorkOrders.length;
+          const perTicketAvg = serviceJobs > 0 ? serviceRevenue / serviceJobs : 0;
+          const techGoal = 12000;
+          const goalMet = serviceRevenue >= techGoal;
+
+          const maintenanceAgreementsCount = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(crmAgreements)
+            .where(eq(crmAgreements.soldByUserId, tech.id));
+
+          return {
+            id: tech.id,
+            name: tech.name,
+            serviceRevenue,
+            serviceJobs,
+            perTicketAvg,
+            maintenanceAgreements: maintenanceAgreementsCount[0]?.count || 0,
+            goal: techGoal,
+            goalProgress: techGoal > 0 ? (serviceRevenue / techGoal) * 100 : 0,
+            goalMet,
+          };
+        })
+      );
+
+      // 4. Sales Team Performance
+      const salesUsers = await db
+        .select()
+        .from(crmUsers)
+        .where(and(eq(crmUsers.role, "sales"), eq(crmUsers.isActive, true)));
+
+      const salesPerformance = await Promise.all(
+        salesUsers.map(async (salesperson) => {
+          const leadsReceived = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(crmCustomers)
+            .where(sql`${crmCustomers.createdAt} >= ${startOfMonth}`);
+
+          const salesVisits = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(crmWorkOrders)
+            .where(and(
+              eq(crmWorkOrders.assignedTechId, salesperson.id),
+              eq(crmWorkOrders.visitType, "SALES"),
+              sql`${crmWorkOrders.createdAt} >= ${startOfMonth}`
+            ));
+
+          const quotesGenerated = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(crmQuotes)
+            .where(and(
+              eq(crmQuotes.createdById, salesperson.id),
+              sql`${crmQuotes.createdAt} >= ${startOfMonth}`
+            ));
+
+          const acceptedQuotes = await db
+            .select({
+              total: sql<string>`COALESCE(SUM(CAST(${crmQuotes.total} AS DECIMAL(10,2))), 0)`,
+              count: sql<number>`COUNT(*)`,
+            })
+            .from(crmQuotes)
+            .where(and(
+              eq(crmQuotes.createdById, salesperson.id),
+              eq(crmQuotes.status, "accepted"),
+              sql`${crmQuotes.createdAt} >= ${startOfMonth}`
+            ));
+
+          const totalSalesQuotes = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(crmQuotes)
+            .where(and(
+              eq(crmQuotes.createdById, salesperson.id),
+              sql`${crmQuotes.createdAt} >= ${startOfMonth}`
+            ));
+
+          const sentQuotes = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(crmQuotes)
+            .where(and(
+              eq(crmQuotes.createdById, salesperson.id),
+              eq(crmQuotes.status, "sent"),
+              sql`${crmQuotes.createdAt} >= ${startOfMonth}`
+            ));
+
+          const declinedQuotes = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(crmQuotes)
+            .where(and(
+              eq(crmQuotes.createdById, salesperson.id),
+              eq(crmQuotes.status, "declined"),
+              sql`${crmQuotes.createdAt} >= ${startOfMonth}`
+            ));
+
+          const acceptedCount = acceptedQuotes[0]?.count || 0;
+          const totalQuotes = totalSalesQuotes[0]?.count || 0;
+          const avgSaleTotal = parseFloat(acceptedQuotes[0]?.total || "0");
+          const averageSale = acceptedCount > 0 ? avgSaleTotal / acceptedCount : 0;
+          const closingRate = totalQuotes > 0 ? (acceptedCount / totalQuotes) * 100 : 0;
+
+          return {
+            id: salesperson.id,
+            name: salesperson.name,
+            leadsReceived: leadsReceived[0]?.count || 0,
+            salesVisits: salesVisits[0]?.count || 0,
+            quotesGenerated: quotesGenerated[0]?.count || 0,
+            averageSale,
+            closingRate,
+            pipeline: {
+              won: acceptedCount,
+              negotiating: sentQuotes[0]?.count || 0,
+              lost: declinedQuotes[0]?.count || 0,
+            },
+          };
+        })
+      );
+
+      return res.json({
+        range,
+        companyOverview: {
+          totalQuoted,
+          totalSold,
+          closeRate,
+          companyGoal,
+          goalProgress,
+          rolling12Month,
+        },
+        revenueByDepartment,
+        techPerformance,
+        salesPerformance,
+      });
+    } catch (error) {
+      console.error("Dashboard analytics error:", error);
+      return res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
+  // ============================================
   // CRM API ENDPOINTS
   // ============================================
 

@@ -52,6 +52,7 @@ const navSections: NavSection[] = [
     title: "Main",
     items: [
       { label: "Dashboard", href: "/crm", icon: LayoutDashboard },
+      { label: "Business Dashboard", href: "/crm/business-dashboard", icon: Target },
       { label: "Dispatch Board", href: "/crm/dispatch", icon: CalendarClock },
       { label: "Phone", href: "/crm/phone", icon: Phone },
     ],
