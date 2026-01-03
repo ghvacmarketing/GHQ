@@ -66,10 +66,12 @@ Preferred communication style: Simple, everyday language.
   - **Three key dates**: Contract date (signing), Invoice date (same as contract), Appointment date (1 month after contract for payment grace period)
   - **Regional reminders**: Configurable reminder days per region/county (e.g., Jefferson County on 1st, Richmond County on 15th)
   - **Visit tracking**: Auto-generates 2 visits per year, 6 months apart from appointment date
-  - **Database tables**: `maintenance_regions` (county name, reminder day), `maintenance_visits` (agreement ID, visit number, target date, work order link, status)
+  - **Database tables**: `maintenance_regions` (county name, reminder day), `maintenance_visits` (agreement ID, visit number, target date, work order link, status), `customAgreementTypes` (reusable templates)
   - **Smart form**: When contract date is set, auto-fills invoice date, appointment date (+1 month), start date, and end date (+1 year)
   - **Default pricing**: $229/year with auto-renew enabled
-  - **Work order integration**: Visits can be linked to work orders for scheduling
+  - **Work order integration**: Visits can be linked to work orders for scheduling. Work order completion auto-syncs to maintenance visits (marks complete, updates nextServiceDate)
+  - **Custom Agreement Types**: Admin-configurable templates for non-HVAC services (crawlspace inspections, plumbing checks, etc.). Auto-creates billable items in Maintenance category. Dynamic work subtypes under MAINTENANCE include "Preventative Maintenance" + all active custom agreement types.
+  - **Customer Profile Maintenance Status**: Shows "X of Y visits complete" summary with pending visit details via `/api/crm/customers/:id/agreements` endpoint
   - **Flexible Task System** (new immersive UI at `/crm/agreements/new`):
     - **Database tables**: `maintenance_agreement_tasks` (task per agreement), `maintenance_task_schedules` (frequency, day of month, active months), `maintenance_task_equipment` (equipment per task), `maintenance_task_parts` (billable/non-billable parts)
     - **Task builder table**: Add multiple maintenance tasks per agreement (HVAC, Vehicle, etc.) with duration, amount, confirmation/upgrade toggles
