@@ -376,13 +376,14 @@ export default function MobileAgenda() {
   });
 
   const { data: workOrders, isLoading: isLoadingOrders, error, isError } = useQuery<WorkOrderWithDetails[]>({
-    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: currentUser?.role === 'tech' ? currentUser?.id : undefined }],
+    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: (currentUser?.role === 'tech' || currentUser?.role === 'sales') ? currentUser?.id : undefined }],
     queryFn: async () => {
       const params = new URLSearchParams({
         dateFrom: todayStart,
         dateTo: todayEnd,
       });
-      if (currentUser?.role === 'tech' && currentUser?.id) {
+      // Both tech and sales users see only their assigned work orders on mobile
+      if ((currentUser?.role === 'tech' || currentUser?.role === 'sales') && currentUser?.id) {
         params.set('techId', currentUser.id);
       }
       const res = await fetch(`/api/crm/work-orders?${params}`);
