@@ -536,6 +536,26 @@ interface QuickQuoteLineItem {
   isMaintenanceItem?: boolean;
 }
 
+// Calculate tiered pricing for maintenance items: $229 for 1st, -$10 each additional
+function calculateMaintenanceTotal(quantity: number): number {
+  const BASE_PRICE = 229;
+  const DISCOUNT_PER_UNIT = 10;
+  let total = 0;
+  for (let i = 0; i < quantity; i++) {
+    const price = Math.max(0, BASE_PRICE - (i * DISCOUNT_PER_UNIT));
+    total += price;
+  }
+  return total;
+}
+
+// Calculate line total with tiered pricing for maintenance items
+function calculateLineTotal(item: { quantity: number; unitPrice: number; isMaintenanceItem?: boolean }): number {
+  if (item.isMaintenanceItem) {
+    return calculateMaintenanceTotal(item.quantity);
+  }
+  return item.quantity * item.unitPrice;
+}
+
 const quoteStatusConfig: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-slate-100 text-slate-700 border-slate-300" },
   sent: { label: "Sent", className: "bg-blue-100 text-blue-700 border-blue-300" },
@@ -784,7 +804,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     ));
   };
 
-  const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+  const subtotal = lineItems.reduce((sum, item) => sum + calculateLineTotal(item), 0);
   const total = subtotal; // No tax for quick quote
 
   const handleCreateQuote = () => {
@@ -800,7 +820,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         description: item.description,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        lineTotal: item.quantity * item.unitPrice,
+        lineTotal: calculateLineTotal(item),
         lineType: item.lineType,
       })),
       subtotal,
@@ -1067,7 +1087,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                               <div className="w-24 text-right">
                                 <Label className="text-xs text-slate-500">Total</Label>
                                 <p className="min-h-[44px] flex items-center justify-end font-medium" data-testid={`line-total-${item.id}`}>
-                                  {formatCurrency(item.quantity * item.unitPrice)}
+                                  {formatCurrency(calculateLineTotal(item))}
                                 </p>
                               </div>
                             </div>
@@ -1737,8 +1757,8 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     ));
   };
 
-  // Calculate subtotal (all items including discounts)
-  const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+  // Calculate subtotal (all items including discounts) with tiered maintenance pricing
+  const subtotal = lineItems.reduce((sum, item) => sum + calculateLineTotal(item), 0);
   const total = subtotal;
 
   const handleCreateInvoice = () => {
@@ -1749,7 +1769,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       return;
     }
     // Check if all items have $0 or negative totals (would create useless invoice)
-    const hasPositiveTotal = validItems.some(item => (item.quantity * item.unitPrice) > 0);
+    const hasPositiveTotal = validItems.some(item => calculateLineTotal(item) > 0);
     if (!hasPositiveTotal) {
       toast({ title: "Error", description: "Invoice must have at least one item with a positive amount.", variant: "destructive" });
       return;
@@ -1760,7 +1780,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         description: item.description,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        lineTotal: item.quantity * item.unitPrice,
+        lineTotal: calculateLineTotal(item),
         lineType: item.lineType,
       })),
       subtotal,
@@ -2126,7 +2146,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                               <div className="w-24 text-right">
                                 <Label className="text-xs text-slate-500">Total</Label>
                                 <p className="min-h-[44px] flex items-center justify-end font-medium" data-testid={`invoice-line-total-${item.id}`}>
-                                  {formatCurrency(item.quantity * item.unitPrice)}
+                                  {formatCurrency(calculateLineTotal(item))}
                                 </p>
                               </div>
                             </div>
