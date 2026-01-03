@@ -8806,7 +8806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: crmAgreements.startDate,
         endDate: crmAgreements.endDate,
         price: crmAgreements.price,
-        billingFrequency: crmAgreements.billingFrequency,
+        frequency: crmAgreements.frequency,
         visitsPerPeriod: crmAgreements.visitsPerPeriod,
         nextServiceDate: crmAgreements.nextServiceDate,
       })
