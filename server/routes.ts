@@ -15269,82 +15269,88 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         ));
 
       if (user.role === "tech") {
-        // Tech performance data
+        // Tech performance data - use same logic as dashboard/analytics endpoint
         const techCount = await db.select({ count: count() })
           .from(crmUsers)
           .where(and(eq(crmUsers.role, "tech"), eq(crmUsers.isActive, true)));
-        const numTechs = techCount[0]?.count || 1;
+        const numTechs = Number(techCount[0]?.count) || 1;
 
-        // Get paid invoices for this tech
-        const techInvoices = await db.select({
-          total: crmInvoices.total,
-          visitType: crmWorkOrders.visitType,
-        })
-          .from(crmInvoices)
-          .leftJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
-          .where(and(
-            eq(crmInvoices.status, "paid"),
-            eq(crmWorkOrders.assignedTechId, user.id),
-            isNotNull(crmInvoices.paidAt),
-            gt(crmInvoices.paidAt, startOfMonth)
-          ));
-
-        let serviceRevenue = 0;
-        let serviceJobs = 0;
-        for (const inv of techInvoices) {
-          const amount = parseFloat(inv.total || "0");
-          serviceRevenue += amount;
-          if (inv.visitType === "SERVICE") {
-            serviceJobs++;
-          }
-        }
-
-        // Get quoted amount for this tech (quotes created by them, status = sent or draft)
-        const techQuotes = await db.select({
-          total: crmQuotes.total,
-        })
-          .from(crmQuotes)
-          .where(and(
-            or(eq(crmQuotes.createdById, user.id), eq(crmQuotes.assignedToId, user.id)),
-            or(eq(crmQuotes.status, "sent"), eq(crmQuotes.status, "draft")),
-            gt(crmQuotes.createdAt, startOfMonth)
-          ));
-
-        let quotedAmount = 0;
-        for (const quote of techQuotes) {
-          quotedAmount += parseFloat(quote.total || "0");
-        }
-
-        // Get service jobs count for this tech
-        const serviceJobsCount = await db.select({ count: count() })
+        // Get COMPLETED work orders for this tech (same as dashboard)
+        const techWorkOrders = await db
+          .select({ id: crmWorkOrders.id })
           .from(crmWorkOrders)
           .where(and(
             eq(crmWorkOrders.assignedTechId, user.id),
-            eq(crmWorkOrders.visitType, "SERVICE"),
-            gt(crmWorkOrders.scheduledStart, startOfMonth)
+            eq(crmWorkOrders.status, "completed"),
+            sql`${crmWorkOrders.completedAt} >= ${startOfMonth}`
           ));
 
-        // Get maintenance agreements created this month (currently no soldBy tracking)
-        // For now, count all agreements created this month as a team metric
-        const agreementsSold = await db.select({ count: count() })
-          .from(crmAgreements)
-          .where(gt(crmAgreements.createdAt, startOfMonth));
+        const workOrderIds = techWorkOrders.map(wo => wo.id);
+        
+        // Get revenue from paid invoices for these work orders
+        let serviceRevenue = 0;
+        if (workOrderIds.length > 0) {
+          const revenueResult = await db
+            .select({
+              total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+            })
+            .from(crmInvoices)
+            .where(and(
+              inArray(crmInvoices.workOrderId, workOrderIds),
+              eq(crmInvoices.status, "paid")
+            ));
+          serviceRevenue = parseFloat(revenueResult[0]?.total || "0");
+        }
 
-        // Calculate per-ticket average
-        const perTicketAvg = techInvoices.length > 0 ? serviceRevenue / techInvoices.length : 0;
+        const serviceJobs = techWorkOrders.length;
+        const perTicketAvg = serviceJobs > 0 ? serviceRevenue / serviceJobs : 0;
 
-        // Calculate tech's individual goal (total service goal / number of techs)
-        const monthlyServiceGoal = parseFloat(goals?.monthlyServiceGoal || "0");
-        const techGoal = numTechs > 0 ? monthlyServiceGoal / numTechs : 0;
+        // Get quoted amount for this tech's work orders (sent but not accepted)
+        let quotedAmount = 0;
+        if (workOrderIds.length > 0) {
+          const quotedResult = await db
+            .select({
+              total: sql<string>`COALESCE(SUM(CAST(${crmQuotes.total} AS DECIMAL(10,2))), 0)`,
+            })
+            .from(crmQuotes)
+            .where(and(
+              inArray(crmQuotes.workOrderId, workOrderIds),
+              eq(crmQuotes.status, "sent"),
+              sql`${crmQuotes.createdAt} >= ${startOfMonth}`
+            ));
+          quotedAmount = parseFloat(quotedResult[0]?.total || "0");
+        }
+
+        // Get maintenance agreements completed by this tech
+        const maintenanceAgreementsCount = await db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(maintenanceVisits)
+          .innerJoin(crmWorkOrders, eq(maintenanceVisits.workOrderId, crmWorkOrders.id))
+          .where(and(
+            eq(crmWorkOrders.assignedTechId, user.id),
+            eq(maintenanceVisits.status, "completed"),
+            sql`${maintenanceVisits.completedAt} >= ${startOfMonth}`
+          ));
+
+        // Calculate tech's individual goal (same as dashboard: daily goal * days in range / numTechs)
+        const dailyServiceGoal = parseFloat(goals?.dailyServiceGoal || "0");
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const dayOfMonth = now.getDate();
+        const techDailyGoal = numTechs > 0 ? dailyServiceGoal / numTechs : 0;
+        const techGoal = techDailyGoal * dayOfMonth; // Goal through today
+
+        // Calculate potential: when nothing quoted, show goal; otherwise show sold+quoted or goal (whichever higher)
+        const salesOpportunity = serviceRevenue + quotedAmount;
+        const potential = salesOpportunity > 0 ? Math.max(salesOpportunity, techGoal) : techGoal;
 
         res.json({
           role: "tech",
           serviceRevenue,
           quotedAmount,
-          serviceJobs: serviceJobsCount[0]?.count || 0,
+          serviceJobs,
           perTicketAvg,
-          maintenanceAgreements: agreementsSold[0]?.count || 0,
-          goal: techGoal,
+          maintenanceAgreements: maintenanceAgreementsCount[0]?.count || 0,
+          goal: potential,
           goalTarget: techGoal,
         });
       } else if (user.role === "sales" || user.role === "owner" || user.role === "admin") {
