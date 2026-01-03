@@ -533,6 +533,7 @@ interface QuickQuoteLineItem {
   unitPrice: number;
   lineType: "service" | "discount" | "part";
   fromCatalog?: boolean;
+  isMaintenanceItem?: boolean;
 }
 
 const quoteStatusConfig: Record<string, { label: string; className: string }> = {
@@ -710,19 +711,30 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   };
 
   const addCatalogItem = (item: CrmItem) => {
-    const price = parseFloat(item.rate || "0") || 0;
+    let price = parseFloat(item.rate || "0") || 0;
+    const isMaintenance = item.category === "maintenance";
+    
+    // Multi-system maintenance pricing: $229 for 1st, -$10 each additional
+    if (isMaintenance) {
+      const existingMaintenanceCount = lineItems.filter(li => li.isMaintenanceItem).length;
+      // Base price $229, each additional system -$10
+      price = 229 - (existingMaintenanceCount * 10);
+      if (price < 0) price = 0;
+    }
+    
     setLineItems([...lineItems, { 
       id: Date.now().toString(), 
       description: item.name, 
       quantity: 1, 
       unitPrice: price,
       lineType: item.category === "service" ? "service" : "part",
-      fromCatalog: true
+      fromCatalog: true,
+      isMaintenanceItem: isMaintenance
     }]);
     setShowCatalog(false);
     setCatalogSearch("");
     setCatalogCategoryFilter("all");
-    toast({ title: "Item Added", description: item.name });
+    toast({ title: "Item Added", description: item.name + (isMaintenance && price < 229 ? ` (Multi-system discount: $${price})` : "") });
   };
 
   // Add discount from catalogue
@@ -1355,6 +1367,7 @@ interface InvoiceLineItem {
   unitPrice: number;
   lineType: "service" | "discount" | "part";
   fromCatalog?: boolean;
+  isMaintenanceItem?: boolean;
 }
 
 interface InvoiceWithLineItems extends CrmInvoice {
@@ -1615,19 +1628,30 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   };
 
   const addCatalogItem = (item: CrmItem) => {
-    const price = parseFloat(item.rate || "0") || 0;
+    let price = parseFloat(item.rate || "0") || 0;
+    const isMaintenance = item.category === "maintenance";
+    
+    // Multi-system maintenance pricing: $229 for 1st, -$10 each additional
+    if (isMaintenance) {
+      const existingMaintenanceCount = lineItems.filter(li => li.isMaintenanceItem).length;
+      // Base price $229, each additional system -$10
+      price = 229 - (existingMaintenanceCount * 10);
+      if (price < 0) price = 0;
+    }
+    
     setLineItems([...lineItems, { 
       id: Date.now().toString(), 
       description: item.name, 
       quantity: 1, 
       unitPrice: price,
       lineType: item.category === "service" ? "service" : "part",
-      fromCatalog: true
+      fromCatalog: true,
+      isMaintenanceItem: isMaintenance
     }]);
     setShowCatalog(false);
     setCatalogSearch("");
     setCatalogCategoryFilter("all");
-    toast({ title: "Item Added", description: item.name });
+    toast({ title: "Item Added", description: item.name + (isMaintenance && price < 229 ? ` (Multi-system discount: $${price})` : "") });
   };
 
   // Add discount from catalogue

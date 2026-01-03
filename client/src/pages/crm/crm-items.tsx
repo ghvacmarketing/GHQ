@@ -98,7 +98,6 @@ export default function CrmItems() {
     itemType: "residential" as CrmItemType,
     rate: "",
     costPrice: "",
-    taxable: true,
   });
 
   const debouncedSearch = useDebounce(searchInput, 300);
@@ -123,7 +122,6 @@ export default function CrmItems() {
       costPrice?: string;
       partNumber?: string;
       unit?: string;
-      taxable?: boolean;
       inStock?: boolean;
     }) => {
       const res = await apiRequest("POST", "/api/crm/items", data);
@@ -140,7 +138,6 @@ export default function CrmItems() {
         itemType: "residential",
         rate: "",
         costPrice: "",
-        taxable: true,
       });
     },
     onError: (error: any) => {
@@ -324,7 +321,6 @@ export default function CrmItems() {
       itemType: createForm.category === "install" ? createForm.itemType : undefined,
       rate: createForm.rate || undefined,
       costPrice: createForm.costPrice || undefined,
-      taxable: createForm.taxable,
     });
   };
 
@@ -476,7 +472,6 @@ export default function CrmItems() {
                             {getSortIcon("rate")}
                           </div>
                         </TableHead>
-                        <TableHead className="font-semibold hidden lg:table-cell text-center">Taxable</TableHead>
                       </>
                     )}
                     <TableHead className="font-semibold">Actions</TableHead>
@@ -571,13 +566,6 @@ export default function CrmItems() {
                             <TableCell className="text-slate-900 font-medium text-right">
                               {formatCurrency(item.rate)}
                             </TableCell>
-                            <TableCell className="hidden lg:table-cell text-center">
-                              {item.taxable !== false ? (
-                                <Check className="h-4 w-4 text-green-600 mx-auto" />
-                              ) : (
-                                <X className="h-4 w-4 text-slate-400 mx-auto" />
-                              )}
-                            </TableCell>
                           </>
                         )}
                         <TableCell>
@@ -644,16 +632,6 @@ export default function CrmItems() {
                   <div>
                     <Label className="text-xs text-slate-500">Cost Price</Label>
                     <p className="font-medium text-slate-600">{formatCurrency(selectedItem.costPrice)}</p>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-slate-500">Taxable</Label>
-                    <p className="font-medium">
-                      {selectedItem.taxable !== false ? (
-                        <span className="text-green-600">Yes</span>
-                      ) : (
-                        <span className="text-slate-500">No</span>
-                      )}
-                    </p>
                   </div>
                 </div>
               </div>
@@ -744,15 +722,6 @@ export default function CrmItems() {
                       data-testid="input-create-cost-price"
                     />
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="taxable"
-                    checked={createForm.taxable}
-                    onCheckedChange={(checked) => setCreateForm({ ...createForm, taxable: !!checked })}
-                    data-testid="checkbox-create-taxable"
-                  />
-                  <Label htmlFor="taxable" className="text-sm cursor-pointer">Taxable</Label>
                 </div>
               </div>
               <DialogFooter>
