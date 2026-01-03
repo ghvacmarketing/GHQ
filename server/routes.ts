@@ -12463,9 +12463,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invoice is already voided" });
       }
       
-      if (invoice.status === "paid") {
-        return res.status(400).json({ message: "Cannot void a paid invoice" });
-      }
+      // Allow voiding paid invoices - revenue will be reversed in dashboard/goals calculations
+      // Note: Paid invoices can now be voided to correct mistakes or handle refunds
       
       const { voidReason } = req.body;
       
