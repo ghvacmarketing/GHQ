@@ -5099,6 +5099,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       startOfWeek.setDate(today.getDate() - today.getDay());
       const rolling12Start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
 
+      // Calculate dynamic date range for technician performance based on range parameter
+      let rangeStartDate: Date;
+      let goalMultiplier: number;
+
+      if (range === "day") {
+        rangeStartDate = today;
+        goalMultiplier = 1;
+      } else if (range === "week") {
+        rangeStartDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        goalMultiplier = 7;
+      } else {
+        // month or rolling12 - use startOfMonth
+        rangeStartDate = startOfMonth;
+        goalMultiplier = currentMonthlyGoals?.serviceWorkDays || 22;
+      }
+
       let rangeStart: Date;
       switch (range) {
         case "day":
@@ -5230,7 +5246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(and(
               eq(crmWorkOrders.assignedTechId, tech.id),
               eq(crmWorkOrders.status, "completed"),
-              sql`${crmWorkOrders.completedAt} >= ${startOfMonth}`
+              sql`${crmWorkOrders.completedAt} >= ${rangeStartDate}`
             ));
 
           const workOrderIds = techWorkOrders.map(wo => wo.id);
@@ -5253,9 +5269,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const perTicketAvg = serviceJobs > 0 ? serviceRevenue / serviceJobs : 0;
           
           const dailyServiceGoal = currentMonthlyGoals ? parseFloat(currentMonthlyGoals.dailyServiceGoal || "0") : 0;
-          const serviceWorkDays = currentMonthlyGoals?.serviceWorkDays || 22;
           const techDailyGoal = techs.length > 0 ? dailyServiceGoal / techs.length : 0;
-          const techGoal = techDailyGoal * serviceWorkDays;
+          const techGoal = techDailyGoal * goalMultiplier;
           const goalMet = serviceRevenue >= techGoal;
 
           const maintenanceAgreementsCount = await db
@@ -5265,7 +5280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(and(
               eq(crmWorkOrders.assignedTechId, tech.id),
               eq(maintenanceVisits.status, "completed"),
-              sql`${maintenanceVisits.completedAt} >= ${startOfMonth}`
+              sql`${maintenanceVisits.completedAt} >= ${rangeStartDate}`
             ));
 
           // Get quoted amounts (sent but not accepted/paid) for current month
@@ -5279,7 +5294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(and(
                 inArray(crmQuotes.workOrderId, workOrderIds),
                 eq(crmQuotes.status, "sent"),
-                sql`${crmQuotes.createdAt} >= ${startOfMonth}`
+                sql`${crmQuotes.createdAt} >= ${rangeStartDate}`
               ));
             quotedAmount = parseFloat(quotedResult[0]?.total || "0");
           }

@@ -565,7 +565,9 @@ export default function CrmBusinessDashboard() {
                           <div className="bg-slate-50 border-l-4 border-purple-500 p-3 rounded">
                             <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Service Jobs</p>
                             <p className="text-xl font-bold text-slate-800">{tech.serviceJobs}</p>
-                            <p className="text-xs text-slate-500">MTD</p>
+                            <p className="text-xs text-slate-500">
+                              {timeRange === "day" ? "Today" : timeRange === "week" ? "7 Days" : "MTD"}
+                            </p>
                           </div>
                           <div className="bg-slate-50 border-l-4 border-amber-500 p-3 rounded">
                             <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Maint. Agreements</p>
