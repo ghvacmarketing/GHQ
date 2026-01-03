@@ -107,10 +107,10 @@ const statusColors: Record<string, string> = {
 };
 
 const tabFilters = [
-  { key: "all", label: "All" },
-  { key: "grace_period", label: "Grace Period" },
-  { key: "upcoming", label: "Upcoming Service" },
+  { key: "all", label: "All Active" },
   { key: "active", label: "Active" },
+  { key: "upcoming_service", label: "Upcoming Service" },
+  { key: "grace_period", label: "Grace Period" },
   { key: "expired", label: "Expired" },
 ];
 
@@ -150,6 +150,7 @@ export default function CrmAgreements() {
 
   const [sortField, setSortField] = useState<SortField>("customerName");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [agreementTypeFilter, setAgreementTypeFilter] = useState<string>("all");
 
   const [createForm, setCreateForm] = useState({
     agreementNumber: "",
@@ -363,15 +364,28 @@ export default function CrmAgreements() {
   };
 
   const statusCounts = useMemo(() => {
-    if (!agreementsData?.agreements) return { active: 0, grace_period: 0, expired: 0 };
-    const counts = { active: 0, grace_period: 0, expired: 0 };
+    if (!agreementsData?.agreements) return { active: 0, grace_period: 0, expired: 0, upcoming_service: 0, all_active: 0 };
+    const counts = { active: 0, grace_period: 0, expired: 0, upcoming_service: 0, all_active: 0 };
+
+    const today = startOfDay(new Date());
+    const fifteenDaysFromNow = addDays(today, 15);
 
     agreementsData.agreements.forEach((agreement) => {
       const status = getAgreementStatus(agreement);
       if (status === "active") counts.active++;
       else if (status === "grace_period") counts.grace_period++;
       else if (status === "expired") counts.expired++;
+      
+      if (agreement.nextServiceDate) {
+        const nextServiceDate = startOfDay(new Date(agreement.nextServiceDate));
+        const daysUntilService = differenceInCalendarDays(nextServiceDate, today);
+        if (daysUntilService >= 0 && daysUntilService <= 15) {
+          counts.upcoming_service++;
+        }
+      }
     });
+    
+    counts.all_active = counts.active + counts.grace_period;
     return counts;
   }, [agreementsData?.agreements]);
 
@@ -380,20 +394,32 @@ export default function CrmAgreements() {
     let filtered = [...agreementsData.agreements];
 
     const today = startOfDay(new Date());
+    const fifteenDaysFromNow = addDays(today, 15);
 
-    if (activeTab === "grace_period") {
+    if (activeTab === "all") {
+      filtered = filtered.filter((agreement) => {
+        const status = getAgreementStatus(agreement);
+        return status !== "expired" && status !== "cancelled";
+      });
+    } else if (activeTab === "grace_period") {
       filtered = filtered.filter((agreement) => {
         return getAgreementStatus(agreement) === "grace_period";
       });
-    } else if (activeTab === "upcoming") {
+    } else if (activeTab === "upcoming_service") {
       filtered = filtered.filter((agreement) => {
         if (!agreement.nextServiceDate) return false;
-        return isAfter(new Date(agreement.nextServiceDate), today);
+        const nextServiceDate = startOfDay(new Date(agreement.nextServiceDate));
+        const daysUntilService = differenceInCalendarDays(nextServiceDate, today);
+        return daysUntilService >= 0 && daysUntilService <= 15;
       });
     } else if (activeTab === "active") {
       filtered = filtered.filter((agreement) => getAgreementStatus(agreement) === "active");
     } else if (activeTab === "expired") {
       filtered = filtered.filter((agreement) => getAgreementStatus(agreement) === "expired");
+    }
+    
+    if (agreementTypeFilter !== "all") {
+      filtered = filtered.filter((agreement) => agreement.agreementPlan === agreementTypeFilter);
     }
 
     filtered.sort((a, b) => {
@@ -444,7 +470,7 @@ export default function CrmAgreements() {
     });
 
     return filtered;
-  }, [agreementsData?.agreements, activeTab, sortField, sortDirection]);
+  }, [agreementsData?.agreements, activeTab, sortField, sortDirection, agreementTypeFilter]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -469,9 +495,10 @@ export default function CrmAgreements() {
     setSearchInput("");
     setSortField("customerName");
     setSortDirection("asc");
+    setAgreementTypeFilter("all");
   };
 
-  const hasActiveFilters = activeTab !== "all" || debouncedSearch;
+  const hasActiveFilters = activeTab !== "all" || debouncedSearch || agreementTypeFilter !== "all";
 
   const formatDate = (date: string | null) => {
     if (!date) return "—";
@@ -703,6 +730,20 @@ export default function CrmAgreements() {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+            <Select value={agreementTypeFilter} onValueChange={setAgreementTypeFilter}>
+              <SelectTrigger className="w-[180px] h-8 text-sm" data-testid="select-agreement-type-filter">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="Preventative Maintenance">Preventative Maintenance</SelectItem>
+                {customAgreementTypes.filter(t => t.isActive).map((type) => (
+                  <SelectItem key={type.id} value={type.name}>
+                    {type.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -710,8 +751,9 @@ export default function CrmAgreements() {
         <div className="flex items-center justify-between border-b border-slate-200">
           <div className="flex overflow-x-auto">
             {tabFilters.map((tab) => {
-              const count = tab.key === "all" ? agreementsData?.pagination?.total
+              const count = tab.key === "all" ? statusCounts.all_active
                 : tab.key === "active" ? statusCounts.active
+                : tab.key === "upcoming_service" ? statusCounts.upcoming_service
                 : tab.key === "grace_period" ? statusCounts.grace_period
                 : tab.key === "expired" ? statusCounts.expired
                 : null;
