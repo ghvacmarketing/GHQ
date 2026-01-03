@@ -51,8 +51,6 @@ import {
   ArrowDown,
   RotateCcw,
   Trash2,
-  Eye,
-  Edit,
   Settings,
   Check,
   X,
@@ -61,7 +59,7 @@ import {
   FileText,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { format, addDays, subDays, addMonths, addYears, isAfter, isBefore, startOfDay, differenceInCalendarDays } from "date-fns";
+import { format, addDays, subDays, addMonths, addYears, isAfter, isBefore, startOfDay, differenceInCalendarDays, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser, CrmAgreement, MaintenanceRegion, CustomAgreementType } from "@shared/schema";
 import { Switch } from "@/components/ui/switch";
@@ -133,8 +131,6 @@ export default function CrmAgreements() {
   const [page, setPage] = useState(1);
   const [selectedAgreement, setSelectedAgreement] = useState<CrmAgreement | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState<typeof createForm | null>(null);
   
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showCreateTypeDialog, setShowCreateTypeDialog] = useState(false);
@@ -321,24 +317,6 @@ export default function CrmAgreements() {
     },
   });
 
-  const updateAgreementMutation = useMutation({
-    mutationFn: async (data: { id: string; updates: Partial<typeof createForm> }) => {
-      const res = await apiRequest("PATCH", `/api/crm/agreements/${data.id}`, data.updates);
-      return res.json();
-    },
-    onSuccess: (updatedAgreement) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
-      setIsEditing(false);
-      setEditForm(null);
-      // Update the selected agreement with the new data to reflect changes
-      setSelectedAgreement(updatedAgreement);
-      toast({ title: "Agreement updated successfully" });
-    },
-    onError: () => {
-      toast({ title: "Failed to update agreement", variant: "destructive" });
-    },
-  });
-
   const getAgreementStatus = (agreement: CrmAgreement): string => {
     // Honor any explicit non-active status before applying date-based logic
     if (agreement.status && agreement.status !== "active") {
@@ -503,7 +481,7 @@ export default function CrmAgreements() {
   const formatDate = (date: string | null) => {
     if (!date) return "—";
     try {
-      return format(new Date(date), "MMM d, yyyy");
+      return format(parseISO(date), "MMM d, yyyy");
     } catch {
       return "—";
     }
@@ -530,55 +508,28 @@ export default function CrmAgreements() {
     createAgreementMutation.mutate(createForm);
   };
 
-  const handleStartEdit = () => {
-    if (selectedAgreement) {
-      setEditForm({
-        agreementNumber: selectedAgreement.agreementNumber || "",
-        customerName: selectedAgreement.customerName || "",
-        agreementPlan: selectedAgreement.agreementPlan || "",
-        address: selectedAgreement.address || "",
-        nextServiceDate: selectedAgreement.nextServiceDate || "",
-        nextInvoiceDate: selectedAgreement.nextInvoiceDate || "",
-        startDate: selectedAgreement.startDate || "",
-        endDate: selectedAgreement.endDate || "",
-        notes: selectedAgreement.notes || "",
-        status: selectedAgreement.status as typeof createForm.status,
-        contractDate: selectedAgreement.contractDate || "",
-        appointmentDate: selectedAgreement.appointmentDate || "",
-        price: selectedAgreement.price || "229.00",
-        regionId: selectedAgreement.regionId || "",
-      });
-      setIsEditing(true);
-    }
-  };
-
-  const handleContractDateChange = (contractDate: string, isEdit = false) => {
+  const handleContractDateChange = (contractDate: string) => {
     if (!contractDate) return;
     
     const contractDateObj = new Date(contractDate);
     const appointmentDate = format(addMonths(contractDateObj, 1), "yyyy-MM-dd");
     const endDate = format(addYears(contractDateObj, 1), "yyyy-MM-dd");
     
-    const updates = {
+    setCreateForm({
+      ...createForm,
       contractDate,
       nextInvoiceDate: contractDate,
       appointmentDate,
       startDate: contractDate,
       endDate,
       nextServiceDate: appointmentDate,
-    };
-    
-    if (isEdit && editForm) {
-      setEditForm({ ...editForm, ...updates });
-    } else {
-      setCreateForm({ ...createForm, ...updates });
-    }
+    });
   };
 
   const getVisitSummary = (appointmentDateStr: string) => {
     if (!appointmentDateStr) return null;
     try {
-      const appointmentDate = new Date(appointmentDateStr);
+      const appointmentDate = parseISO(appointmentDateStr);
       const secondVisit = addMonths(appointmentDate, 6);
       return {
         firstVisit: format(appointmentDate, "MMM d, yyyy"),
@@ -592,20 +543,6 @@ export default function CrmAgreements() {
   const getSelectedRegion = (regionId: string) => {
     return regions.find((r) => r.id === regionId);
   };
-
-  const handleEditSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editForm || !selectedAgreement) return;
-    if (!editForm.address.trim()) {
-      toast({ title: "Address is required", variant: "destructive" });
-      return;
-    }
-    updateAgreementMutation.mutate({
-      id: selectedAgreement.id,
-      updates: editForm,
-    });
-  };
-
 
   if (authLoading) {
     return (
@@ -931,14 +868,17 @@ export default function CrmAgreements() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 w-7 p-0"
+                            className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedAgreement(agreement);
+                              if (confirm("Are you sure you want to delete this agreement?")) {
+                                deleteAgreementMutation.mutate(agreement.id);
+                              }
                             }}
-                            data-testid={`button-view-${agreement.id}`}
+                            disabled={deleteAgreementMutation.isPending}
+                            data-testid={`button-delete-${agreement.id}`}
                           >
-                            <Eye className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -1182,213 +1122,18 @@ export default function CrmAgreements() {
         onOpenChange={(open) => {
           if (!open) {
             setSelectedAgreement(null);
-            setIsEditing(false);
-            setEditForm(null);
           }
         }}
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Agreement" : "Agreement Details"}</DialogTitle>
+            <DialogTitle>Agreement Details</DialogTitle>
             <DialogDescription>
               {selectedAgreement?.agreementNumber}
             </DialogDescription>
           </DialogHeader>
           {selectedAgreement && (
-            <>
-              {isEditing && editForm ? (
-                <form onSubmit={handleEditSubmit}>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-agreementNumber">Agreement Number *</Label>
-                      <Input
-                        id="edit-agreementNumber"
-                        value={editForm.agreementNumber}
-                        onChange={(e) => setEditForm({ ...editForm, agreementNumber: e.target.value })}
-                        placeholder="AGR-001"
-                        data-testid="input-edit-agreement-number"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-customerName">Customer Name *</Label>
-                      <Input
-                        id="edit-customerName"
-                        value={editForm.customerName}
-                        onChange={(e) => setEditForm({ ...editForm, customerName: e.target.value })}
-                        placeholder="John Smith"
-                        data-testid="input-edit-customer-name"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-agreementPlan">Agreement Plan *</Label>
-                      <Input
-                        id="edit-agreementPlan"
-                        value={editForm.agreementPlan}
-                        onChange={(e) => setEditForm({ ...editForm, agreementPlan: e.target.value })}
-                        placeholder="1 unit, 5 units, etc."
-                        data-testid="input-edit-agreement-plan"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-address">Service Address *</Label>
-                      <Input
-                        id="edit-address"
-                        value={editForm.address}
-                        onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                        placeholder="123 Main St, City, ST 12345"
-                        data-testid="input-edit-address"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="edit-contractDate">Contract Date</Label>
-                        <Input
-                          id="edit-contractDate"
-                          type="date"
-                          value={editForm.contractDate}
-                          onChange={(e) => handleContractDateChange(e.target.value, true)}
-                          data-testid="input-edit-contract-date"
-                        />
-                        <p className="text-xs text-slate-500">Sets start, end, invoice & appointment dates automatically</p>
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="edit-price">Price ($)</Label>
-                        <Input
-                          id="edit-price"
-                          type="number"
-                          step="0.01"
-                          value={editForm.price}
-                          onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                          data-testid="input-edit-price"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-regionId">Region</Label>
-                      <Select
-                        value={editForm.regionId}
-                        onValueChange={(value) => setEditForm({ ...editForm, regionId: value })}
-                      >
-                        <SelectTrigger data-testid="select-edit-region">
-                          <SelectValue placeholder="Select a region" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {regions.map((region) => (
-                            <SelectItem key={region.id} value={region.id}>
-                              {region.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {editForm.regionId && getSelectedRegion(editForm.regionId) && (
-                        <p className="text-xs text-slate-500">
-                          Reminders sent on the {getSelectedRegion(editForm.regionId)?.reminderDayOfMonth}{getSelectedRegion(editForm.regionId)?.reminderDayOfMonth === 1 ? 'st' : getSelectedRegion(editForm.regionId)?.reminderDayOfMonth === 2 ? 'nd' : getSelectedRegion(editForm.regionId)?.reminderDayOfMonth === 3 ? 'rd' : 'th'} of appointment month
-                        </p>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="edit-appointmentDate">First Appointment Date</Label>
-                        <Input
-                          id="edit-appointmentDate"
-                          type="date"
-                          value={editForm.appointmentDate}
-                          onChange={(e) => setEditForm({ ...editForm, appointmentDate: e.target.value, nextServiceDate: e.target.value })}
-                          data-testid="input-edit-appointment-date"
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="edit-nextInvoiceDate">Next Invoice Date</Label>
-                        <Input
-                          id="edit-nextInvoiceDate"
-                          type="date"
-                          value={editForm.nextInvoiceDate}
-                          onChange={(e) => setEditForm({ ...editForm, nextInvoiceDate: e.target.value })}
-                          data-testid="input-edit-next-invoice-date"
-                        />
-                      </div>
-                    </div>
-                    {editForm.appointmentDate && (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                        <p className="text-sm text-blue-700">
-                          <strong>Visit Schedule:</strong> First visit: {getVisitSummary(editForm.appointmentDate)?.firstVisit}, Second visit: {getVisitSummary(editForm.appointmentDate)?.secondVisit}
-                        </p>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="edit-startDate">Start Date</Label>
-                        <Input
-                          id="edit-startDate"
-                          type="date"
-                          value={editForm.startDate}
-                          onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
-                          data-testid="input-edit-start-date"
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="edit-endDate">End Date</Label>
-                        <Input
-                          id="edit-endDate"
-                          type="date"
-                          value={editForm.endDate}
-                          onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
-                          data-testid="input-edit-end-date"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-status">Status</Label>
-                      <Select
-                        value={editForm.status}
-                        onValueChange={(value) => setEditForm({ ...editForm, status: value as typeof editForm.status })}
-                      >
-                        <SelectTrigger data-testid="select-edit-status">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="expiring">Expiring</SelectItem>
-                          <SelectItem value="expired">Expired</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-notes">Notes</Label>
-                      <Textarea
-                        id="edit-notes"
-                        value={editForm.notes}
-                        onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                        placeholder="Any additional notes..."
-                        data-testid="input-edit-notes"
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setIsEditing(false);
-                        setEditForm(null);
-                      }}
-                      data-testid="button-cancel-edit"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="bg-[#711419] hover:bg-[#5a1014]"
-                      disabled={updateAgreementMutation.isPending}
-                      data-testid="button-save-edit"
-                    >
-                      {updateAgreementMutation.isPending ? "Saving..." : "Save"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              ) : (
-                <div className="space-y-4">
+            <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-slate-500 text-xs">Customer</Label>
@@ -1475,15 +1220,6 @@ export default function CrmAgreements() {
                   )}
                   <div className="flex justify-end gap-2 pt-4 border-t">
                     <Button
-                      size="sm"
-                      className="bg-[#711419] hover:bg-[#5a1014]"
-                      onClick={handleStartEdit}
-                      data-testid="button-edit-agreement"
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
                       variant="destructive"
                       size="sm"
                       onClick={() => {
@@ -1498,9 +1234,7 @@ export default function CrmAgreements() {
                       Delete
                     </Button>
                   </div>
-                </div>
-              )}
-            </>
+            </div>
           )}
         </DialogContent>
       </Dialog>
