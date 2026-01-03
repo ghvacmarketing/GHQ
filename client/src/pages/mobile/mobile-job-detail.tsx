@@ -734,13 +734,18 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     let price = parseFloat(item.rate || "0") || 0;
     const isMaintenance = item.category === "maintenance";
     
-    // Multi-system maintenance pricing: $229 for 1st, -$10 each additional
-    if (isMaintenance) {
+    // Multi-system tiered pricing ONLY applies to standard "Preventative Maintenance"
+    // Custom maintenance items (Crawlspace, etc.) use their catalog price
+    const isPreventativeMaintenance = isMaintenance && 
+      (item.name?.toLowerCase().includes("preventative") || item.name?.toLowerCase().includes("preventive"));
+    
+    if (isPreventativeMaintenance) {
       const existingMaintenanceCount = lineItems.filter(li => li.isMaintenanceItem).length;
       // Base price $229, each additional system -$10
       price = 229 - (existingMaintenanceCount * 10);
       if (price < 0) price = 0;
     }
+    // For custom maintenance items, use the catalog price (already set above)
     
     // Map category to lineType
     const getLineType = (): QuickQuoteLineItem["lineType"] => {
@@ -749,6 +754,8 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       return "part";
     };
     
+    const discountApplied = isPreventativeMaintenance && price < 229;
+    
     setLineItems([...lineItems, { 
       id: Date.now().toString(), 
       description: item.name, 
@@ -756,12 +763,12 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       unitPrice: price,
       lineType: getLineType(),
       fromCatalog: true,
-      isMaintenanceItem: isMaintenance
+      isMaintenanceItem: isPreventativeMaintenance // Only standard PM gets tiered pricing
     }]);
     setShowCatalog(false);
     setCatalogSearch("");
     setCatalogCategoryFilter("all");
-    toast({ title: "Item Added", description: item.name + (isMaintenance && price < 229 ? ` (Multi-system discount: $${price})` : "") });
+    toast({ title: "Item Added", description: item.name + (discountApplied ? ` (Multi-system discount: $${price})` : "") });
   };
 
   // Add discount from catalogue
@@ -1667,13 +1674,18 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     let price = parseFloat(item.rate || "0") || 0;
     const isMaintenance = item.category === "maintenance";
     
-    // Multi-system maintenance pricing: $229 for 1st, -$10 each additional
-    if (isMaintenance) {
+    // Multi-system tiered pricing ONLY applies to standard "Preventative Maintenance"
+    // Custom maintenance items (Crawlspace, etc.) use their catalog price
+    const isPreventativeMaintenance = isMaintenance && 
+      (item.name?.toLowerCase().includes("preventative") || item.name?.toLowerCase().includes("preventive"));
+    
+    if (isPreventativeMaintenance) {
       const existingMaintenanceCount = lineItems.filter(li => li.isMaintenanceItem).length;
       // Base price $229, each additional system -$10
       price = 229 - (existingMaintenanceCount * 10);
       if (price < 0) price = 0;
     }
+    // For custom maintenance items, use the catalog price (already set above)
     
     // Map category to lineType
     const getLineType = (): InvoiceLineItem["lineType"] => {
@@ -1682,6 +1694,8 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       return "part";
     };
     
+    const discountApplied = isPreventativeMaintenance && price < 229;
+    
     setLineItems([...lineItems, { 
       id: Date.now().toString(), 
       description: item.name, 
@@ -1689,12 +1703,12 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       unitPrice: price,
       lineType: getLineType(),
       fromCatalog: true,
-      isMaintenanceItem: isMaintenance
+      isMaintenanceItem: isPreventativeMaintenance // Only standard PM gets tiered pricing
     }]);
     setShowCatalog(false);
     setCatalogSearch("");
     setCatalogCategoryFilter("all");
-    toast({ title: "Item Added", description: item.name + (isMaintenance && price < 229 ? ` (Multi-system discount: $${price})` : "") });
+    toast({ title: "Item Added", description: item.name + (discountApplied ? ` (Multi-system discount: $${price})` : "") });
   };
 
   // Add discount from catalogue

@@ -12344,9 +12344,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const appointmentDate = new Date(today);
               appointmentDate.setMonth(appointmentDate.getMonth() + 1);
               
-              // All agreements span 1 year by default, regardless of frequency
+              // End date depends on frequency: weekly=1 week, monthly=1 month, annual=1 year
               const endDate = new Date(today);
-              endDate.setFullYear(endDate.getFullYear() + 1);
+              if (agreementFrequency === "weekly") {
+                endDate.setDate(endDate.getDate() + 7);
+              } else if (agreementFrequency === "monthly") {
+                endDate.setMonth(endDate.getMonth() + 1);
+              } else {
+                // Annual - default 1 year
+                endDate.setFullYear(endDate.getFullYear() + 1);
+              }
               
               // Generate agreement number
               const dateStr = todayStr.replace(/-/g, "");
