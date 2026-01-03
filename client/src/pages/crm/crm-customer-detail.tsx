@@ -663,6 +663,7 @@ const timelineTypeConfig: Record<TimelineEntry['type'], { icon: any; bgColor: st
 };
 
 function HistoryTabContent({ customerId }: { customerId: string }) {
+  const [, navigate] = useLocation();
   const allTypes: TimelineEntry['type'][] = ['work_order', 'project', 'agreement', 'quote', 'invoice', 'note', 'payment'];
   const [activeFilters, setActiveFilters] = useState<Set<TimelineEntry['type']>>(() => new Set(allTypes));
   
@@ -871,15 +872,18 @@ function HistoryTabContent({ customerId }: { customerId: string }) {
                   </div>
                 );
 
-                if (entry.linkUrl) {
-                  return (
-                    <Link key={entry.id} href={entry.linkUrl}>
-                      {content}
-                    </Link>
-                  );
-                }
-                
-                return <div key={entry.id}>{content}</div>;
+                return (
+                  <div 
+                    key={entry.id} 
+                    onClick={() => entry.linkUrl && navigate(entry.linkUrl)}
+                    onKeyDown={(e) => e.key === 'Enter' && entry.linkUrl && navigate(entry.linkUrl)}
+                    tabIndex={entry.linkUrl ? 0 : undefined}
+                    role={entry.linkUrl ? "link" : undefined}
+                    className={entry.linkUrl ? "cursor-pointer" : ""}
+                  >
+                    {content}
+                  </div>
+                );
               })}
             </div>
           </div>

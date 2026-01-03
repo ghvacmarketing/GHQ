@@ -8912,7 +8912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: agmt.id,
           type: 'agreement',
           title: agmt.agreementPlan || 'Service Agreement',
-          description: `${agmt.frequency || 'Annual'} agreement - ${agmt.visitsPerPeriod || 2} visits`,
+          description: `${(agmt.frequency || 'annual').charAt(0).toUpperCase() + (agmt.frequency || 'annual').slice(1)} - ${agmt.visitsPerPeriod || 2} visits/period`,
           timestamp: toISOTimestamp(agmt.createdAt),
           status: agmt.status || undefined,
           amount: agmt.price ? `$${parseFloat(agmt.price).toLocaleString()}` : undefined,
@@ -10403,18 +10403,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const frequency = agreement.frequency || "annual";
         
         // Calculate visit target dates based on frequency
-        // weekly=7 days apart, monthly=30 days apart, annual=12/visits months apart
+        // Visits are evenly spaced within the period:
+        // weekly: 7 days ÷ visits = days apart
+        // monthly: 30 days ÷ visits = days apart
+        // annual: 12 months ÷ visits = months apart
         const visits = [];
+        
+        // Helper to format date as YYYY-MM-DD without timezone issues
+        const formatDateStr = (d: Date) => {
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
         
         for (let i = 0; i < visitsPerPeriod; i++) {
           const visitDate = new Date(appointmentDate);
           if (frequency === "weekly") {
-            visitDate.setDate(visitDate.getDate() + (i * 7));
+            // Weekly: 7 days ÷ number of visits = days apart (minimum 1 day)
+            const daysApart = Math.max(1, Math.round(7 / visitsPerPeriod));
+            visitDate.setDate(visitDate.getDate() + (i * daysApart));
           } else if (frequency === "monthly") {
-            visitDate.setDate(visitDate.getDate() + (i * 30));
+            // Monthly: 30 days ÷ number of visits = days apart (minimum 1 day)
+            const daysApart = Math.max(1, Math.round(30 / visitsPerPeriod));
+            visitDate.setDate(visitDate.getDate() + (i * daysApart));
           } else {
-            // annual - evenly spaced throughout the year
-            const monthsApart = Math.floor(12 / visitsPerPeriod);
+            // Annual: evenly spaced throughout the year (minimum 1 month)
+            const monthsApart = Math.max(1, Math.round(12 / visitsPerPeriod));
             visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
           }
           
@@ -10422,7 +10437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             agreementId: agreement.id,
             visitNumber: i + 1,
             cycleYear,
-            targetDate: visitDate.toISOString().split('T')[0],
+            targetDate: formatDateStr(visitDate),
             status: "pending" as const,
           });
         }
