@@ -15057,6 +15057,198 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // GET /api/crm/mobile/my-performance - Get performance data for the authenticated user
+  app.get("/api/crm/mobile/my-performance", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const startOfMonth = new Date(year, month - 1, 1);
+
+      // Get monthly goals
+      const [goals] = await db.select()
+        .from(monthlyGoals)
+        .where(and(
+          eq(monthlyGoals.year, year),
+          eq(monthlyGoals.month, month)
+        ));
+
+      if (user.role === "tech") {
+        // Tech performance data
+        const techCount = await db.select({ count: count() })
+          .from(crmUsers)
+          .where(and(eq(crmUsers.role, "tech"), eq(crmUsers.isActive, true)));
+        const numTechs = techCount[0]?.count || 1;
+
+        // Get paid invoices for this tech
+        const techInvoices = await db.select({
+          total: crmInvoices.total,
+          visitType: crmWorkOrders.visitType,
+        })
+          .from(crmInvoices)
+          .leftJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+          .where(and(
+            eq(crmInvoices.status, "paid"),
+            eq(crmWorkOrders.assignedTechId, user.id),
+            isNotNull(crmInvoices.paidAt),
+            gt(crmInvoices.paidAt, startOfMonth)
+          ));
+
+        let serviceRevenue = 0;
+        let serviceJobs = 0;
+        for (const inv of techInvoices) {
+          const amount = parseFloat(inv.total || "0");
+          serviceRevenue += amount;
+          if (inv.visitType === "SERVICE") {
+            serviceJobs++;
+          }
+        }
+
+        // Get quoted amount for this tech (quotes created by them, status = sent or draft)
+        const techQuotes = await db.select({
+          total: crmQuotes.total,
+        })
+          .from(crmQuotes)
+          .where(and(
+            or(eq(crmQuotes.createdById, user.id), eq(crmQuotes.assignedToId, user.id)),
+            or(eq(crmQuotes.status, "sent"), eq(crmQuotes.status, "draft")),
+            gt(crmQuotes.createdAt, startOfMonth)
+          ));
+
+        let quotedAmount = 0;
+        for (const quote of techQuotes) {
+          quotedAmount += parseFloat(quote.total || "0");
+        }
+
+        // Get service jobs count for this tech
+        const serviceJobsCount = await db.select({ count: count() })
+          .from(crmWorkOrders)
+          .where(and(
+            eq(crmWorkOrders.assignedTechId, user.id),
+            eq(crmWorkOrders.visitType, "SERVICE"),
+            gt(crmWorkOrders.scheduledStart, startOfMonth)
+          ));
+
+        // Get maintenance agreements sold by this tech
+        const agreementsSold = await db.select({ count: count() })
+          .from(crmAgreements)
+          .where(and(
+            eq(crmAgreements.soldBy, user.id),
+            gt(crmAgreements.createdAt, startOfMonth)
+          ));
+
+        // Calculate per-ticket average
+        const perTicketAvg = techInvoices.length > 0 ? serviceRevenue / techInvoices.length : 0;
+
+        // Calculate tech's individual goal (total service goal / number of techs)
+        const monthlyServiceGoal = parseFloat(goals?.monthlyServiceGoal || "0");
+        const techGoal = numTechs > 0 ? monthlyServiceGoal / numTechs : 0;
+
+        res.json({
+          role: "tech",
+          serviceRevenue,
+          quotedAmount,
+          serviceJobs: serviceJobsCount[0]?.count || 0,
+          perTicketAvg,
+          maintenanceAgreements: agreementsSold[0]?.count || 0,
+          goal: techGoal,
+          goalTarget: techGoal,
+        });
+      } else if (user.role === "sales" || user.role === "owner" || user.role === "admin") {
+        // Sales performance data
+        const installGoal = parseFloat(goals?.monthlyInstallGoal || "0");
+
+        // Get quotes created/assigned to this user
+        const salesQuotes = await db.select({
+          total: crmQuotes.total,
+          status: crmQuotes.status,
+        })
+          .from(crmQuotes)
+          .where(and(
+            or(eq(crmQuotes.createdById, user.id), eq(crmQuotes.assignedToId, user.id)),
+            gt(crmQuotes.createdAt, startOfMonth)
+          ));
+
+        let quotesGenerated = salesQuotes.length;
+        let sentQuotesTotal = 0;
+        let acceptedQuotesTotal = 0;
+        let wonCount = 0;
+        let lostCount = 0;
+
+        for (const quote of salesQuotes) {
+          const amount = parseFloat(quote.total || "0");
+          if (quote.status === "sent" || quote.status === "accepted" || quote.status === "declined") {
+            sentQuotesTotal += amount;
+          }
+          if (quote.status === "accepted") {
+            acceptedQuotesTotal += amount;
+            wonCount++;
+          }
+          if (quote.status === "declined") {
+            lostCount++;
+          }
+        }
+
+        // Get customers in negotiating stage assigned to this user
+        const negotiatingCustomers = await db.select({ count: count() })
+          .from(crmCustomers)
+          .where(and(
+            eq(crmCustomers.assignedSalesRepId, user.id),
+            eq(crmCustomers.salesStage, "negotiating")
+          ));
+        const negotiatingCount = negotiatingCustomers[0]?.count || 0;
+
+        // Get leads received (new prospects assigned to this user)
+        const leadsReceived = await db.select({ count: count() })
+          .from(crmCustomers)
+          .where(and(
+            eq(crmCustomers.assignedSalesRepId, user.id),
+            eq(crmCustomers.customerStatus, "prospect"),
+            gt(crmCustomers.createdAt, startOfMonth)
+          ));
+
+        // Get sales visits (work orders of type SALES assigned to this user)
+        const salesVisits = await db.select({ count: count() })
+          .from(crmWorkOrders)
+          .where(and(
+            eq(crmWorkOrders.assignedTechId, user.id),
+            eq(crmWorkOrders.visitType, "INSTALL"),
+            gt(crmWorkOrders.scheduledStart, startOfMonth)
+          ));
+
+        // Calculate closing rate and average sale
+        const closedDeals = wonCount + lostCount;
+        const closingRate = closedDeals > 0 ? (wonCount / closedDeals) * 100 : 0;
+        const averageSale = wonCount > 0 ? acceptedQuotesTotal / wonCount : 0;
+
+        res.json({
+          role: "sales",
+          leadsReceived: leadsReceived[0]?.count || 0,
+          salesVisits: salesVisits[0]?.count || 0,
+          quotesGenerated,
+          averageSale,
+          closingRate,
+          wonCount,
+          negotiatingCount,
+          lostCount,
+          sold: acceptedQuotesTotal,
+          quoted: sentQuotesTotal,
+          goal: installGoal,
+        });
+      } else {
+        res.json({ role: user.role, message: "No performance data for this role" });
+      }
+    } catch (error) {
+      console.error("Error fetching my performance:", error);
+      res.status(500).json({ message: "Failed to fetch performance data" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)

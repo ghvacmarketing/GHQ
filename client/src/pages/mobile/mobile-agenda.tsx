@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, formatLocal, toLocalTime } from "@/lib/timezone";
-import { MapPin, Clock, ClipboardList, WifiOff, CloudOff, LogIn } from "lucide-react";
+import { MapPin, Clock, ClipboardList, WifiOff, CloudOff, LogIn, User, DollarSign, TrendingUp, Wrench, FileText, Users, Target, CheckCircle, XCircle, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import MobileShell from "./mobile-shell";
 import { useOnlineStatus, OfflineIndicator, usePendingChanges } from "@/hooks/use-online-status";
+import { PerformanceGauge } from "@/components/ui/performance-gauge";
 import type { CrmWorkOrder, CrmCustomer, CrmProperty, CrmUser } from "@shared/schema";
 
 interface WorkOrderWithDetails extends CrmWorkOrder {
@@ -17,12 +18,47 @@ interface WorkOrderWithDetails extends CrmWorkOrder {
   property: CrmProperty | null;
 }
 
+interface TechPerformance {
+  role: "tech";
+  serviceRevenue: number;
+  quotedAmount: number;
+  serviceJobs: number;
+  perTicketAvg: number;
+  maintenanceAgreements: number;
+  goal: number;
+  goalTarget: number;
+}
+
+interface SalesPerformance {
+  role: "sales";
+  leadsReceived: number;
+  salesVisits: number;
+  quotesGenerated: number;
+  averageSale: number;
+  closingRate: number;
+  wonCount: number;
+  negotiatingCount: number;
+  lostCount: number;
+  sold: number;
+  quoted: number;
+  goal: number;
+}
+
+type PerformanceData = TechPerformance | SalesPerformance | { role: string; message?: string };
+
 const statusConfig: Record<string, { label: string; className: string }> = {
   scheduled: { label: "Scheduled", className: "bg-slate-100 text-slate-700 border-slate-300" },
   dispatched: { label: "Dispatched", className: "bg-blue-100 text-blue-700 border-blue-300" },
   en_route: { label: "En Route", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
   on_site: { label: "On Site", className: "bg-green-100 text-green-700 border-green-300" },
   completed: { label: "Completed", className: "bg-slate-200 text-slate-600 border-slate-400" },
+};
+
+const roleLabels: Record<string, { label: string; className: string }> = {
+  owner: { label: "Owner", className: "bg-purple-100 text-purple-700" },
+  admin: { label: "Admin", className: "bg-blue-100 text-blue-700" },
+  sales: { label: "Sales", className: "bg-green-100 text-green-700" },
+  tech: { label: "Technician", className: "bg-orange-100 text-orange-700" },
 };
 
 function formatScheduledTime(start: string | Date | null, end: string | Date | null): string {
@@ -39,6 +75,16 @@ function getPropertyAddress(property: CrmProperty | null): string {
   return parts.join(", ") || "No address";
 }
 
+function formatCurrency(value: number): string {
+  if (value >= 1000000) {
+    return `$${(value / 1000000).toFixed(1)}M`;
+  }
+  if (value >= 1000) {
+    return `$${(value / 1000).toFixed(1)}K`;
+  }
+  return `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
+
 function GlobalPendingChangesIndicator() {
   const pendingCount = usePendingChanges();
   
@@ -51,6 +97,191 @@ function GlobalPendingChangesIndicator() {
     >
       <CloudOff className="h-3 w-3" />
       {pendingCount} change{pendingCount !== 1 ? 's' : ''} pending sync
+    </div>
+  );
+}
+
+function ProfileHeader({ user }: { user: CrmUser }) {
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const roleConfig = roleLabels[user.role] || roleLabels.tech;
+
+  return (
+    <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm border border-slate-200 dark:border-slate-700" data-testid="profile-header">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+          <User className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm" data-testid="user-name">{user.name}</h3>
+          <Badge className={`text-xs ${roleConfig.className}`} data-testid="user-role-badge">
+            {roleConfig.label}
+          </Badge>
+        </div>
+      </div>
+      <div className="text-right">
+        <p className="text-lg font-semibold text-slate-800 dark:text-slate-200" data-testid="current-time">
+          {format(currentTime, "h:mm a")}
+        </p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          {format(currentTime, "MMM d")}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ 
+  label, 
+  value, 
+  subtitle, 
+  borderColor,
+  icon: Icon 
+}: { 
+  label: string; 
+  value: string | number; 
+  subtitle?: string; 
+  borderColor: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div 
+      className={`bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm border-l-4 ${borderColor}`}
+      data-testid={`stat-card-${label.toLowerCase().replace(/\s+/g, '-')}`}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        {Icon && <Icon className="w-3.5 h-3.5 text-slate-400" />}
+        <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</p>
+      </div>
+      <p className="text-lg font-bold text-slate-800 dark:text-slate-200">{value}</p>
+      {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+    </div>
+  );
+}
+
+function TechPerformanceSection({ performance }: { performance: TechPerformance }) {
+  return (
+    <div className="space-y-4" data-testid="tech-performance-section">
+      <div className="flex justify-center">
+        <PerformanceGauge
+          sold={performance.serviceRevenue}
+          quoted={performance.quotedAmount}
+          goal={performance.goal}
+          goalTarget={performance.goalTarget}
+          size={200}
+        />
+      </div>
+      
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard
+          label="Service Revenue"
+          value={formatCurrency(performance.serviceRevenue)}
+          subtitle={`Goal: ${formatCurrency(performance.goal)}`}
+          borderColor="border-blue-500"
+          icon={DollarSign}
+        />
+        <StatCard
+          label="Per Ticket Avg"
+          value={formatCurrency(performance.perTicketAvg)}
+          borderColor="border-purple-500"
+          icon={TrendingUp}
+        />
+        <StatCard
+          label="Service Jobs"
+          value={performance.serviceJobs}
+          subtitle="MTD"
+          borderColor="border-orange-500"
+          icon={Wrench}
+        />
+        <StatCard
+          label="Maint. Agreements"
+          value={performance.maintenanceAgreements}
+          borderColor="border-yellow-500"
+          icon={FileText}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SalesPerformanceSection({ performance }: { performance: SalesPerformance }) {
+  return (
+    <div className="space-y-4" data-testid="sales-performance-section">
+      <div className="flex justify-center">
+        <PerformanceGauge
+          sold={performance.sold}
+          quoted={performance.quoted}
+          goal={performance.goal}
+          size={200}
+        />
+      </div>
+      
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard
+          label="Leads Received"
+          value={performance.leadsReceived}
+          borderColor="border-blue-500"
+          icon={Users}
+        />
+        <StatCard
+          label="Sales Visits"
+          value={performance.salesVisits}
+          borderColor="border-purple-500"
+          icon={MapPin}
+        />
+        <StatCard
+          label="Quotes Generated"
+          value={performance.quotesGenerated}
+          borderColor="border-orange-500"
+          icon={FileText}
+        />
+        <StatCard
+          label="Average Sale"
+          value={formatCurrency(performance.averageSale)}
+          borderColor="border-green-500"
+          icon={DollarSign}
+        />
+        <div className="col-span-2">
+          <StatCard
+            label="Closing Rate"
+            value={`${performance.closingRate.toFixed(1)}%`}
+            borderColor="border-teal-500"
+            icon={Target}
+          />
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm" data-testid="sales-pipeline">
+        <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Pipeline</p>
+        <div className="flex gap-2">
+          <div className="flex-1 bg-green-100 dark:bg-green-900/30 rounded-lg p-2 text-center" data-testid="pipeline-won">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+              <span className="text-xs text-green-700 dark:text-green-400 font-medium">Won</span>
+            </div>
+            <p className="text-lg font-bold text-green-700 dark:text-green-400">{performance.wonCount}</p>
+          </div>
+          <div className="flex-1 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg p-2 text-center" data-testid="pipeline-negotiating">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <MessageSquare className="w-3.5 h-3.5 text-yellow-600" />
+              <span className="text-xs text-yellow-700 dark:text-yellow-400 font-medium">Negotiating</span>
+            </div>
+            <p className="text-lg font-bold text-yellow-700 dark:text-yellow-400">{performance.negotiatingCount}</p>
+          </div>
+          <div className="flex-1 bg-red-100 dark:bg-red-900/30 rounded-lg p-2 text-center" data-testid="pipeline-lost">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <XCircle className="w-3.5 h-3.5 text-red-600" />
+              <span className="text-xs text-red-700 dark:text-red-400 font-medium">Lost</span>
+            </div>
+            <p className="text-lg font-bold text-red-700 dark:text-red-400">{performance.lostCount}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -176,6 +407,18 @@ export default function MobileAgenda() {
     },
   });
 
+  const { data: performanceData, isLoading: isLoadingPerformance } = useQuery<PerformanceData>({
+    queryKey: ["/api/crm/mobile/my-performance"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/mobile/my-performance", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch performance data");
+      return res.json();
+    },
+    enabled: !!currentUser,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+  });
+
   const isLoading = isLoadingUser || isLoadingOrders;
 
   const isAuthError = isError && error instanceof Error && error.message === "AUTH_REQUIRED";
@@ -192,12 +435,14 @@ export default function MobileAgenda() {
     <MobileShell>
       <OfflineIndicator />
       
-      <div className="p-4 space-y-4" data-testid="mobile-agenda">
-        <div className="text-center mb-6" data-testid="agenda-date-header">
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
+      <div className="p-4 space-y-4 pb-24" data-testid="mobile-agenda">
+        {currentUser && <ProfileHeader user={currentUser} />}
+        
+        <div className="text-center" data-testid="agenda-date-header">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">
             {formatLocal(today, "EEEE")}
           </h2>
-          <p className="text-slate-500 dark:text-slate-400">
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
             {formatLocal(today, "MMMM d, yyyy")}
           </p>
           
@@ -237,25 +482,57 @@ export default function MobileAgenda() {
               </Card>
             ))}
           </div>
-        ) : todaysOrders.length === 0 ? (
-          <div 
-            className="flex flex-col items-center justify-center py-16 text-center"
-            data-testid="agenda-empty"
-          >
-            <ClipboardList className="h-16 w-16 text-slate-300 mb-4" />
-            <h3 className="text-lg font-medium text-slate-600 mb-1">No Jobs Today</h3>
-            <p className="text-slate-400 text-sm">You have no work orders scheduled for today.</p>
-          </div>
         ) : (
-          <div className="space-y-3" data-testid="agenda-list">
-            {todaysOrders.map((workOrder) => (
-              <WorkOrderCard 
-                key={workOrder.id} 
-                workOrder={workOrder} 
-                showCacheWarning={showCacheWarning} 
-              />
-            ))}
-          </div>
+          <>
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                Today's Jobs ({todaysOrders.length})
+              </h3>
+              {todaysOrders.length === 0 ? (
+                <div 
+                  className="flex flex-col items-center justify-center py-8 text-center bg-slate-50 dark:bg-slate-800/50 rounded-lg"
+                  data-testid="agenda-empty"
+                >
+                  <ClipboardList className="h-10 w-10 text-slate-300 mb-2" />
+                  <h3 className="text-sm font-medium text-slate-600 mb-1">No Jobs Today</h3>
+                  <p className="text-slate-400 text-xs">You have no work orders scheduled for today.</p>
+                </div>
+              ) : (
+                <div className="space-y-3" data-testid="agenda-list">
+                  {todaysOrders.map((workOrder) => (
+                    <WorkOrderCard 
+                      key={workOrder.id} 
+                      workOrder={workOrder} 
+                      showCacheWarning={showCacheWarning} 
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {performanceData && (
+              <div className="space-y-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                  My Performance (MTD)
+                </h3>
+                {isLoadingPerformance ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-32 w-full" />
+                    <div className="grid grid-cols-2 gap-3">
+                      <Skeleton className="h-20" />
+                      <Skeleton className="h-20" />
+                      <Skeleton className="h-20" />
+                      <Skeleton className="h-20" />
+                    </div>
+                  </div>
+                ) : performanceData.role === "tech" ? (
+                  <TechPerformanceSection performance={performanceData as TechPerformance} />
+                ) : performanceData.role === "sales" || performanceData.role === "owner" || performanceData.role === "admin" ? (
+                  <SalesPerformanceSection performance={performanceData as SalesPerformance} />
+                ) : null}
+              </div>
+            )}
+          </>
         )}
       </div>
     </MobileShell>
