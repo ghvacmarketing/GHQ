@@ -731,14 +731,14 @@ export default function CrmAgreements() {
               </DropdownMenuContent>
             </DropdownMenu>
             <Select value={agreementTypeFilter} onValueChange={setAgreementTypeFilter}>
-              <SelectTrigger className="w-[180px] h-8 text-sm" data-testid="select-agreement-type-filter">
-                <SelectValue placeholder="Filter by type" />
+              <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-agreement-type-filter">
+                <SelectValue placeholder="Type" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="Preventative Maintenance">Preventative Maintenance</SelectItem>
+              <SelectContent className="bg-white">
+                <SelectItem value="all" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">All Types</SelectItem>
+                <SelectItem value="Preventative Maintenance" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">Preventative Maintenance</SelectItem>
                 {customAgreementTypes.filter(t => t.isActive).map((type) => (
-                  <SelectItem key={type.id} value={type.name}>
+                  <SelectItem key={type.id} value={type.name} className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">
                     {type.name}
                   </SelectItem>
                 ))}
