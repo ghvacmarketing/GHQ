@@ -583,6 +583,9 @@ export default function CrmProspectFunnel() {
     enabled: !!currentUser,
   });
 
+  const salesUsers = useMemo(() => {
+    return (users || []).filter(u => u.role === 'sales' || u.role === 'owner');
+  }, [users]);
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -622,6 +625,20 @@ export default function CrmProspectFunnel() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to schedule follow-up", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateSalesRepMutation = useMutation({
+    mutationFn: async ({ id, assignedSalesRepId }: { id: string; assignedSalesRepId: string | null }) => {
+      const res = await apiRequest("PATCH", `/api/crm/customers/${id}`, { assignedSalesRepId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      toast({ title: "Salesperson updated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update salesperson", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1484,6 +1501,25 @@ export default function CrmProspectFunnel() {
                     </TabsList>
 
                     <TabsContent value="details" className="space-y-4">
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">Assigned Salesperson</h4>
+                        <Select
+                          value={expandedProspect.assignedSalesRepId || ""}
+                          onValueChange={(value) => updateSalesRepMutation.mutate({ id: expandedProspect.id, assignedSalesRepId: value || null })}
+                        >
+                          <SelectTrigger className="w-full" data-testid="select-salesperson">
+                            <SelectValue placeholder="Select salesperson" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {salesUsers.map((user) => (
+                              <SelectItem key={user.id} value={user.id}>
+                                {user.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
                       <div className="space-y-2">
                         <h4 className="text-sm font-medium">Contact Information</h4>
                         <div className="grid gap-2 text-sm">
