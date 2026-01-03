@@ -12493,10 +12493,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Standard Preventative Maintenance is ALWAYS annual with 2 visits
             // Only use custom type settings if explicitly matching a custom agreement type
             const agreementFrequency = customType ? (customType.frequency as "weekly" | "monthly" | "annual") : "annual";
-            // Use custom type's visitsPerPeriod, scaled by quantity if needed
-            const baseVisitsPerPeriod = customType?.visitsPerPeriod || 2;
-            // For quantity > 1, multiply visits by quantity (each system gets the same visits)
-            const agreementVisitsPerPeriod = baseVisitsPerPeriod * totalQuantity;
+            // Use custom type's visitsPerPeriod directly - visits are NOT multiplied by quantity
+            // Only the price is multiplied by quantity (handled by line total from invoice)
+            const agreementVisitsPerPeriod = customType?.visitsPerPeriod || 2;
             
             // Use "Preventative Maintenance" as default plan name if no custom type found
             const agreementPlanName = customType ? maintenanceItemName : "Preventative Maintenance";
@@ -12617,16 +12616,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const visitDate = new Date(appointmentDate);
                   
                   if (agreementFrequency === "weekly") {
-                    // Weekly: 7 days ÷ number of visits = days apart
-                    const daysApart = Math.floor(7 / agreementVisitsPerPeriod);
+                    // Weekly: 7 days ÷ number of visits = days apart (minimum 1 day)
+                    const daysApart = Math.max(1, Math.round(7 / agreementVisitsPerPeriod));
                     visitDate.setDate(visitDate.getDate() + (i * daysApart));
                   } else if (agreementFrequency === "monthly") {
-                    // Monthly: 30 days ÷ number of visits = days apart
-                    const daysApart = Math.floor(30 / agreementVisitsPerPeriod);
+                    // Monthly: 30 days ÷ number of visits = days apart (minimum 1 day)
+                    const daysApart = Math.max(1, Math.round(30 / agreementVisitsPerPeriod));
                     visitDate.setDate(visitDate.getDate() + (i * daysApart));
                   } else {
-                    // Annual: spread evenly across the year (months apart)
-                    const monthsApart = Math.max(1, Math.floor(12 / agreementVisitsPerPeriod));
+                    // Annual: spread evenly across the year (minimum 1 month)
+                    const monthsApart = Math.max(1, Math.round(12 / agreementVisitsPerPeriod));
                     visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
                   }
                   

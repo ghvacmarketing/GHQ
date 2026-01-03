@@ -3870,9 +3870,9 @@ export default function CrmCustomerDetail() {
     return (
       <CrmLayout currentUser={currentUser}>
         <div className="space-y-6">
-          <Button variant="ghost" onClick={() => navigate("/crm/customers")} data-testid="button-back">
+          <Button variant="ghost" onClick={() => window.history.back()} data-testid="button-back">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Customers
+            Back
           </Button>
           <Card>
             <CardContent className="p-8 text-center">
@@ -3892,9 +3892,9 @@ export default function CrmCustomerDetail() {
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => navigate("/crm/customers")} data-testid="button-back">
+          <Button variant="ghost" onClick={() => window.history.back()} data-testid="button-back">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Customers
+            Back
           </Button>
 
           <div className="flex flex-wrap items-center gap-2">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useRoute, Link } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -491,12 +491,10 @@ export default function CrmInvoiceDetail() {
           <FileText className="h-12 w-12 text-slate-300 mb-4" />
           <h2 className="text-lg font-medium text-slate-700">Invoice not found</h2>
           <p className="text-slate-500 mb-4">The invoice you're looking for doesn't exist.</p>
-          <Link href="/crm/invoices">
-            <Button variant="outline" data-testid="link-back-invoices">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Invoices
-            </Button>
-          </Link>
+          <Button variant="outline" data-testid="link-back-invoices" onClick={() => window.history.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
         </div>
       </CrmLayout>
     );
@@ -516,11 +514,9 @@ export default function CrmInvoiceDetail() {
         <div className="space-y-4">
           {/* First row: Back button, Title, Status */}
           <div className="flex items-center gap-3">
-            <Link href="/crm/invoices">
-              <Button variant="ghost" size="icon" data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
+            <Button variant="ghost" size="icon" data-testid="button-back" onClick={() => window.history.back()}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <h1 className="text-2xl font-bold text-slate-900" data-testid="text-invoice-number">
               Invoice {invoice.invoiceNumber}
             </h1>

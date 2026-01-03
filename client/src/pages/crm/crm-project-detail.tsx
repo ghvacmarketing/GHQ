@@ -398,12 +398,12 @@ export default function CrmProjectDetail() {
         <div className="p-6">
           <Button
             variant="ghost"
-            onClick={() => navigate("/crm/projects")}
+            onClick={() => window.history.back()}
             className="mb-4"
             data-testid="button-back-projects"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Projects
+            Back
           </Button>
           <Card>
             <CardContent className="p-12 text-center">
@@ -430,7 +430,7 @@ export default function CrmProjectDetail() {
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
-              onClick={() => navigate("/crm/projects")}
+              onClick={() => window.history.back()}
               data-testid="button-back-projects"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />

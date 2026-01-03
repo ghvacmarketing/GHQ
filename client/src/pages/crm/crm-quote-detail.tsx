@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useRoute, Link } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1100,12 +1100,10 @@ export default function CrmQuoteDetail() {
         <div className="flex flex-col items-center justify-center py-16">
           <FileText className="h-16 w-16 text-slate-300 mb-4" />
           <h2 className="text-xl font-semibold text-slate-700">Quote not found</h2>
-          <Link href="/crm/quotes">
-            <Button variant="outline" className="mt-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Quotes
-            </Button>
-          </Link>
+          <Button variant="outline" className="mt-4" onClick={() => window.history.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
         </div>
       </CrmLayout>
     );
@@ -1121,11 +1119,9 @@ export default function CrmQuoteDetail() {
           {/* First row: Back button, Quote number, Status, Preview icon */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Link href="/crm/quotes">
-                <Button variant="ghost" size="icon" data-testid="button-back">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-              </Link>
+              <Button variant="ghost" size="icon" data-testid="button-back" onClick={() => window.history.back()}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
               <h1 className="text-2xl font-bold text-slate-900" data-testid="text-quote-number">
                 {quote.quoteNumber}
               </h1>
