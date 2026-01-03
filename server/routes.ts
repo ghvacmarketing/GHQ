@@ -14104,6 +14104,115 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // ===== Goals Tracker API =====
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+  // Helper function to import goals from Excel file
+  async function importGoalsFromExcel(year: number): Promise<string[]> {
+    const excelPath = path.join(process.cwd(), "attached_assets/12-03-2025_GHVAC_1767440304627.xlsx");
+    
+    if (!fs.existsSync(excelPath)) {
+      console.log('[Goals] Excel file not found, skipping import');
+      return [];
+    }
+    
+    // Read file as buffer for ES module compatibility
+    const fileBuffer = fs.readFileSync(excelPath);
+    const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
+    const importedMonths: string[] = [];
+    
+    for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
+      const monthName = monthNames[monthIndex];
+      const sheet = workbook.Sheets[monthName];
+      
+      if (!sheet) continue;
+      
+      const data = xlsx.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+      
+      let dailyServiceGoal = 0;
+      let dailyInstallGoal = 0;
+      let dailyMaintenanceGoal = 0;
+      let daysCount = 0;
+      
+      for (let i = 18; i < data.length; i++) {
+        const row = data[i] as any[];
+        if (!row || !row[0] || !String(row[0]).startsWith("Day")) break;
+        
+        const serviceGoal = parseFloat(row[1]) || 0;
+        const installGoal = parseFloat(row[3]) || 0;
+        const maintenanceGoal = parseFloat(row[5]) || 0;
+        
+        dailyServiceGoal += serviceGoal;
+        dailyInstallGoal += installGoal;
+        dailyMaintenanceGoal += maintenanceGoal;
+        daysCount++;
+      }
+      
+      if (daysCount > 0) {
+        const avgDailyService = dailyServiceGoal / daysCount;
+        const avgDailyInstall = dailyInstallGoal / daysCount;
+        const avgDailyMaintenance = dailyMaintenanceGoal / daysCount;
+        
+        const monthlyServiceGoal = dailyServiceGoal;
+        const monthlyInstallGoal = dailyInstallGoal;
+        const monthlyMaintenanceGoal = dailyMaintenanceGoal;
+        const monthlySalesGoal = monthlyServiceGoal + monthlyInstallGoal + monthlyMaintenanceGoal;
+        
+        const [existing] = await db.select().from(monthlyGoals)
+          .where(and(eq(monthlyGoals.year, year), eq(monthlyGoals.month, monthIndex + 1)));
+        
+        if (existing) {
+          await db.update(monthlyGoals)
+            .set({
+              dailyServiceGoal: avgDailyService.toFixed(2),
+              dailyInstallGoal: avgDailyInstall.toFixed(2),
+              dailyMaintenanceGoal: avgDailyMaintenance.toFixed(2),
+              monthlyServiceGoal: monthlyServiceGoal.toFixed(2),
+              monthlyInstallGoal: monthlyInstallGoal.toFixed(2),
+              monthlyMaintenanceGoal: monthlyMaintenanceGoal.toFixed(2),
+              monthlySalesGoal: monthlySalesGoal.toFixed(2),
+              updatedAt: new Date(),
+            })
+            .where(eq(monthlyGoals.id, existing.id));
+        } else {
+          await db.insert(monthlyGoals).values({
+            year,
+            month: monthIndex + 1,
+            dailyServiceGoal: avgDailyService.toFixed(2),
+            dailyInstallGoal: avgDailyInstall.toFixed(2),
+            dailyMaintenanceGoal: avgDailyMaintenance.toFixed(2),
+            monthlyServiceGoal: monthlyServiceGoal.toFixed(2),
+            monthlyInstallGoal: monthlyInstallGoal.toFixed(2),
+            monthlyMaintenanceGoal: monthlyMaintenanceGoal.toFixed(2),
+            monthlySalesGoal: monthlySalesGoal.toFixed(2),
+          });
+        }
+        
+        importedMonths.push(monthName);
+      }
+    }
+    
+    return importedMonths;
+  }
+
+  // Bootstrap function to auto-import goals on server startup
+  async function bootstrapMonthlyGoals(): Promise<void> {
+    const year = new Date().getFullYear();
+    
+    // Check if goals exist for current year
+    const existingGoals = await db.select().from(monthlyGoals)
+      .where(eq(monthlyGoals.year, year));
+    
+    if (existingGoals.length >= 12) {
+      console.log(`[Goals] All 12 months already populated for ${year}`);
+      return;
+    }
+    
+    console.log(`[Goals] Importing missing goals for ${year}...`);
+    const imported = await importGoalsFromExcel(year);
+    
+    if (imported.length > 0) {
+      console.log(`[Goals] Successfully imported goals for ${imported.length} months: ${imported.join(', ')}`);
+    }
+  }
+
   // GET /api/crm/goals/:year/:month - Get goals for a specific month
   app.get("/api/crm/goals/:year/:month", requireCrmAuth, async (req, res) => {
     try {
@@ -14128,97 +14237,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  // POST /api/crm/goals/import - Parse Excel file and import all monthly goals
+  // POST /api/crm/goals/import - Parse Excel file and import all monthly goals (uses shared helper)
   app.post("/api/crm/goals/import", requireCrmSalesOrAbove, async (req, res) => {
     try {
-      const excelPath = path.join(process.cwd(), "attached_assets/12-03-2025_GHVAC_1767440304627.xlsx");
-      
-      if (!fs.existsSync(excelPath)) {
-        return res.status(404).json({ message: "Excel file not found" });
-      }
-      
-      const workbook = xlsx.readFile(excelPath);
-      const importedMonths: string[] = [];
       const year = req.body.year || new Date().getFullYear();
-      
-      for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
-        const monthName = monthNames[monthIndex];
-        const sheet = workbook.Sheets[monthName];
-        
-        if (!sheet) continue;
-        
-        const data = xlsx.utils.sheet_to_json<any[]>(sheet, { header: 1 });
-        
-        // Find row 19 (0-indexed: 18) which has "Day 1" data
-        // Column structure: A=Day label, B=Daily Service, C=Actual Service, D=Daily Install, E=Actual Install, F=Daily Maintenance, G=Actual Maintenance
-        let dailyServiceGoal = 0;
-        let dailyInstallGoal = 0;
-        let dailyMaintenanceGoal = 0;
-        let daysCount = 0;
-        
-        // Start at row 18 (Day 1) and sum up all days
-        for (let i = 18; i < data.length; i++) {
-          const row = data[i] as any[];
-          if (!row || !row[0] || !String(row[0]).startsWith("Day")) break;
-          
-          const serviceGoal = parseFloat(row[1]) || 0;
-          const installGoal = parseFloat(row[3]) || 0;
-          const maintenanceGoal = parseFloat(row[5]) || 0;
-          
-          dailyServiceGoal += serviceGoal;
-          dailyInstallGoal += installGoal;
-          dailyMaintenanceGoal += maintenanceGoal;
-          daysCount++;
-        }
-        
-        if (daysCount > 0) {
-          // Average daily goal
-          const avgDailyService = dailyServiceGoal / daysCount;
-          const avgDailyInstall = dailyInstallGoal / daysCount;
-          const avgDailyMaintenance = dailyMaintenanceGoal / daysCount;
-          
-          // Monthly goals are total of all days
-          const monthlyServiceGoal = dailyServiceGoal;
-          const monthlyInstallGoal = dailyInstallGoal;
-          const monthlyMaintenanceGoal = dailyMaintenanceGoal;
-          
-          // Sales goal from "Sales Goals" sheet or estimate (total revenue goal)
-          const monthlySalesGoal = monthlyServiceGoal + monthlyInstallGoal + monthlyMaintenanceGoal;
-          
-          // Check if exists, update or insert
-          const [existing] = await db.select().from(monthlyGoals)
-            .where(and(eq(monthlyGoals.year, year), eq(monthlyGoals.month, monthIndex + 1)));
-          
-          if (existing) {
-            await db.update(monthlyGoals)
-              .set({
-                dailyServiceGoal: avgDailyService.toFixed(2),
-                dailyInstallGoal: avgDailyInstall.toFixed(2),
-                dailyMaintenanceGoal: avgDailyMaintenance.toFixed(2),
-                monthlyServiceGoal: monthlyServiceGoal.toFixed(2),
-                monthlyInstallGoal: monthlyInstallGoal.toFixed(2),
-                monthlyMaintenanceGoal: monthlyMaintenanceGoal.toFixed(2),
-                monthlySalesGoal: monthlySalesGoal.toFixed(2),
-                updatedAt: new Date(),
-              })
-              .where(eq(monthlyGoals.id, existing.id));
-          } else {
-            await db.insert(monthlyGoals).values({
-              year,
-              month: monthIndex + 1,
-              dailyServiceGoal: avgDailyService.toFixed(2),
-              dailyInstallGoal: avgDailyInstall.toFixed(2),
-              dailyMaintenanceGoal: avgDailyMaintenance.toFixed(2),
-              monthlyServiceGoal: monthlyServiceGoal.toFixed(2),
-              monthlyInstallGoal: monthlyInstallGoal.toFixed(2),
-              monthlyMaintenanceGoal: monthlyMaintenanceGoal.toFixed(2),
-              monthlySalesGoal: monthlySalesGoal.toFixed(2),
-            });
-          }
-          
-          importedMonths.push(monthName);
-        }
-      }
+      const importedMonths = await importGoalsFromExcel(year);
       
       res.json({ 
         message: `Successfully imported goals for ${importedMonths.length} months`,
@@ -14365,6 +14388,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
     }).catch(err => {
       console.error('Error seeding vector store on startup:', err);
+    });
+
+    // Auto-import monthly goals from Excel if not already populated
+    bootstrapMonthlyGoals().catch(err => {
+      console.error('Error bootstrapping monthly goals:', err);
     });
   }, 5000); // 5 second delay to allow health checks to pass first
 

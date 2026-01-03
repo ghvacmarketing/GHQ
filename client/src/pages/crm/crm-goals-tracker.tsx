@@ -1,12 +1,11 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
+import { getQueryFn } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/hooks/use-toast";
 import {
   Wrench,
   HardHat,
@@ -16,7 +15,6 @@ import {
   TrendingDown,
   Calendar,
   RefreshCw,
-  Upload,
   DollarSign,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -143,7 +141,6 @@ function GoalCard({
 
 export default function CrmGoalsTracker() {
   const [, navigate] = useLocation();
-  const { toast } = useToast();
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -155,26 +152,6 @@ export default function CrmGoalsTracker() {
     enabled: !!currentUser,
   });
 
-  const importMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/crm/goals/import", { year: new Date().getFullYear() });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Goals Imported",
-        description: data.message,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/goals/tracker"] });
-    },
-    onError: () => {
-      toast({
-        title: "Import Failed",
-        description: "Failed to import goals from Excel file",
-        variant: "destructive",
-      });
-    },
-  });
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -252,49 +229,18 @@ export default function CrmGoalsTracker() {
               {trackerData?.month} {trackerData?.year} — Day {trackerData?.dayOfMonth} of {trackerData?.daysInMonth}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              className="gap-2"
-              data-testid="button-refresh-goals"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </Button>
-            {currentUser.role !== "tech" && (
-              <Button
-                size="sm"
-                onClick={() => importMutation.mutate()}
-                disabled={importMutation.isPending}
-                className="gap-2 bg-[#711419] hover:bg-[#8a1a1f]"
-                data-testid="button-import-goals"
-              >
-                <Upload className="h-4 w-4" />
-                {importMutation.isPending ? "Importing..." : "Import Goals"}
-              </Button>
-            )}
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            className="gap-2"
+            data-testid="button-refresh-goals"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </Button>
         </div>
 
-        {!trackerData?.hasGoals && (
-          <Card className="border-amber-200 bg-amber-50">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-100 rounded-lg">
-                  <Target className="h-5 w-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-amber-800">No Goals Set</p>
-                  <p className="text-sm text-amber-600">
-                    Click "Import Goals" to load goals from the Excel spreadsheet for {trackerData?.month} {trackerData?.year}.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {categories.map((cat) => (
