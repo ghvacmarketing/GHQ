@@ -74,6 +74,13 @@ type AgreementsResponse = {
     hasNextPage: boolean;
     hasPrevPage: boolean;
   };
+  statusCounts?: {
+    active: number;
+    grace_period: number;
+    expired: number;
+    upcoming_service: number;
+    all_active: number;
+  };
 };
 
 const ITEMS_PER_PAGE = 25;
@@ -341,31 +348,13 @@ export default function CrmAgreements() {
     }
   };
 
+  // Use server-provided statusCounts which are computed across ALL agreements
   const statusCounts = useMemo(() => {
-    if (!agreementsData?.agreements) return { active: 0, grace_period: 0, expired: 0, upcoming_service: 0, all_active: 0 };
-    const counts = { active: 0, grace_period: 0, expired: 0, upcoming_service: 0, all_active: 0 };
-
-    const today = startOfDay(new Date());
-    const fifteenDaysFromNow = addDays(today, 15);
-
-    agreementsData.agreements.forEach((agreement) => {
-      const status = getAgreementStatus(agreement);
-      if (status === "active") counts.active++;
-      else if (status === "grace_period") counts.grace_period++;
-      else if (status === "expired") counts.expired++;
-      
-      if (agreement.nextServiceDate) {
-        const nextServiceDate = startOfDay(new Date(agreement.nextServiceDate));
-        const daysUntilService = differenceInCalendarDays(nextServiceDate, today);
-        if (daysUntilService >= 0 && daysUntilService <= 15) {
-          counts.upcoming_service++;
-        }
-      }
-    });
-    
-    counts.all_active = counts.active + counts.grace_period;
-    return counts;
-  }, [agreementsData?.agreements]);
+    if (agreementsData?.statusCounts) {
+      return agreementsData.statusCounts;
+    }
+    return { active: 0, grace_period: 0, expired: 0, upcoming_service: 0, all_active: 0 };
+  }, [agreementsData?.statusCounts]);
 
   const filteredAndSortedAgreements = useMemo(() => {
     if (!agreementsData?.agreements) return [];

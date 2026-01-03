@@ -10020,6 +10020,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(limitNum)
         .offset(offset);
 
+      // Compute status counts for ALL agreements (ignoring search/pagination)
+      // Status is computed dynamically based on endDate:
+      // - active: endDate is in the future or null
+      // - grace_period: 0-30 days after endDate
+      // - expired: more than 30 days after endDate
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const fifteenDaysFromNow = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000);
+
+      // Count active: status='active' AND (end_date IS NULL OR end_date > today)
+      const [activeCount] = await db
+        .select({ count: count() })
+        .from(crmAgreements)
+        .where(and(
+          eq(crmAgreements.status, "active"),
+          or(
+            isNull(crmAgreements.endDate),
+            sql`${crmAgreements.endDate} > ${today.toISOString().split('T')[0]}`
+          )
+        ));
+
+      // Count grace_period: status='active' AND end_date between (today - 30 days) and today
+      const [gracePeriodCount] = await db
+        .select({ count: count() })
+        .from(crmAgreements)
+        .where(and(
+          eq(crmAgreements.status, "active"),
+          sql`${crmAgreements.endDate} IS NOT NULL`,
+          sql`${crmAgreements.endDate} <= ${today.toISOString().split('T')[0]}`,
+          sql`${crmAgreements.endDate} > ${thirtyDaysAgo.toISOString().split('T')[0]}`
+        ));
+
+      // Count expired: status='active' AND end_date <= (today - 30 days), OR status='expired'
+      const [expiredCount] = await db
+        .select({ count: count() })
+        .from(crmAgreements)
+        .where(or(
+          eq(crmAgreements.status, "expired"),
+          and(
+            eq(crmAgreements.status, "active"),
+            sql`${crmAgreements.endDate} IS NOT NULL`,
+            sql`${crmAgreements.endDate} <= ${thirtyDaysAgo.toISOString().split('T')[0]}`
+          )
+        ));
+
+      // Count upcoming_service: nextServiceDate is 0-15 days from now
+      const [upcomingServiceCount] = await db
+        .select({ count: count() })
+        .from(crmAgreements)
+        .where(and(
+          sql`${crmAgreements.nextServiceDate} IS NOT NULL`,
+          sql`${crmAgreements.nextServiceDate} >= ${today.toISOString().split('T')[0]}`,
+          sql`${crmAgreements.nextServiceDate} <= ${fifteenDaysFromNow.toISOString().split('T')[0]}`
+        ));
+
+      const statusCounts = {
+        active: Number(activeCount?.count || 0),
+        grace_period: Number(gracePeriodCount?.count || 0),
+        expired: Number(expiredCount?.count || 0),
+        upcoming_service: Number(upcomingServiceCount?.count || 0),
+        all_active: Number(activeCount?.count || 0) + Number(gracePeriodCount?.count || 0),
+      };
+
       return res.json({
         agreements,
         pagination: {
@@ -10030,6 +10094,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hasNextPage: pageNum * limitNum < Number(total),
           hasPrevPage: pageNum > 1,
         },
+        statusCounts,
       });
     } catch (error) {
       console.error("Error fetching agreements:", error);
