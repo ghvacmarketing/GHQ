@@ -16,6 +16,8 @@ import {
   Calendar,
   RefreshCw,
   DollarSign,
+  Users,
+  User,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser } from "@shared/schema";
@@ -36,6 +38,22 @@ type SalesData = {
   percentComplete: number;
 };
 
+type TechMetric = {
+  mtdGoal: number;
+  mtdActual: number;
+  difference: number;
+  percentComplete: number;
+};
+
+type TechnicianData = {
+  id: string;
+  name: string;
+  service: TechMetric;
+  install: TechMetric;
+  maintenance: TechMetric;
+  total: TechMetric;
+};
+
 type TrackerData = {
   month: string;
   year: number;
@@ -47,6 +65,7 @@ type TrackerData = {
   maintenance: CategoryData;
   total: CategoryData;
   sales: SalesData;
+  technicians: TechnicianData[];
 };
 
 function formatCurrency(amount: number): string {
@@ -314,6 +333,88 @@ export default function CrmGoalsTracker() {
             </div>
           </CardContent>
         </Card>
+
+        {trackerData?.technicians && trackerData.technicians.length > 0 && (
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600 rounded-lg">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Technician Performance</CardTitle>
+                  <p className="text-sm text-slate-500">Individual technician goals (total goal ÷ {trackerData.technicians.length} techs)</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      <th className="text-left py-3 px-2 font-semibold text-slate-600">Technician</th>
+                      <th className="text-right py-3 px-2 font-semibold text-slate-600">Service</th>
+                      <th className="text-right py-3 px-2 font-semibold text-slate-600">Install</th>
+                      <th className="text-right py-3 px-2 font-semibold text-slate-600">Maintenance</th>
+                      <th className="text-right py-3 px-2 font-semibold text-slate-600">Total</th>
+                      <th className="text-right py-3 px-2 font-semibold text-slate-600">% Goal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trackerData.technicians.map((tech) => (
+                      <tr key={tech.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`row-tech-${tech.id}`}>
+                        <td className="py-3 px-2">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-slate-100 rounded-full">
+                              <User className="h-4 w-4 text-slate-500" />
+                            </div>
+                            <span className="font-medium text-slate-900">{tech.name}</span>
+                          </div>
+                        </td>
+                        <td className="text-right py-3 px-2">
+                          <div className="flex flex-col items-end">
+                            <span className="font-semibold text-slate-900">{formatCurrency(tech.service.mtdActual)}</span>
+                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.service.mtdGoal)}</span>
+                          </div>
+                        </td>
+                        <td className="text-right py-3 px-2">
+                          <div className="flex flex-col items-end">
+                            <span className="font-semibold text-slate-900">{formatCurrency(tech.install.mtdActual)}</span>
+                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.install.mtdGoal)}</span>
+                          </div>
+                        </td>
+                        <td className="text-right py-3 px-2">
+                          <div className="flex flex-col items-end">
+                            <span className="font-semibold text-slate-900">{formatCurrency(tech.maintenance.mtdActual)}</span>
+                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.maintenance.mtdGoal)}</span>
+                          </div>
+                        </td>
+                        <td className="text-right py-3 px-2">
+                          <div className="flex flex-col items-end">
+                            <span className="font-bold text-slate-900">{formatCurrency(tech.total.mtdActual)}</span>
+                            <span className="text-xs text-slate-500">/ {formatCurrency(tech.total.mtdGoal)}</span>
+                          </div>
+                        </td>
+                        <td className="text-right py-3 px-2">
+                          <div className="flex items-center justify-end gap-2">
+                            <span className={`font-bold ${tech.total.percentComplete >= 100 ? 'text-emerald-600' : tech.total.percentComplete >= 75 ? 'text-amber-600' : 'text-red-600'}`}>
+                              {tech.total.percentComplete}%
+                            </span>
+                            {tech.total.difference >= 0 ? (
+                              <TrendingUp className="h-4 w-4 text-emerald-500" />
+                            ) : (
+                              <TrendingDown className="h-4 w-4 text-red-500" />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </CrmLayout>
   );

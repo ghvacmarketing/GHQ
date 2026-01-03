@@ -14344,6 +14344,92 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         percentComplete: mtdGoal > 0 ? Math.round((mtdActual / mtdGoal) * 100) : 0,
       });
       
+      // Get all technicians
+      const techs = await db.select({
+        id: crmUsers.id,
+        name: crmUsers.name,
+      }).from(crmUsers).where(eq(crmUsers.role, "tech"));
+      
+      const techCount = techs.length || 1; // Avoid division by zero
+      
+      // Calculate individual tech goals (total goal / number of techs)
+      const techMtdServiceGoal = mtdServiceGoal / techCount;
+      const techMtdInstallGoal = mtdInstallGoal / techCount;
+      const techMtdMaintenanceGoal = mtdMaintenanceGoal / techCount;
+      const techMtdTotalGoal = mtdTotalGoal / techCount;
+      
+      // Get paid invoices with tech assignment for current month
+      const techInvoices = await db.select({
+        total: crmInvoices.total,
+        paidAt: crmInvoices.paidAt,
+        visitType: crmWorkOrders.visitType,
+        assignedTechId: crmWorkOrders.assignedTechId,
+      })
+        .from(crmInvoices)
+        .leftJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+        .where(and(
+          eq(crmInvoices.status, "paid"),
+          isNotNull(crmInvoices.paidAt),
+          gt(crmInvoices.paidAt, startOfMonth),
+        ));
+      
+      // Build technician breakdown
+      const technicians = techs.map(tech => {
+        let serviceMTD = 0;
+        let installMTD = 0;
+        let maintenanceMTD = 0;
+        
+        for (const invoice of techInvoices) {
+          if (invoice.assignedTechId !== tech.id) continue;
+          
+          const amount = parseFloat(invoice.total || "0");
+          switch (invoice.visitType) {
+            case "SERVICE":
+              serviceMTD += amount;
+              break;
+            case "INSTALL":
+              installMTD += amount;
+              break;
+            case "MAINTENANCE":
+              maintenanceMTD += amount;
+              break;
+            default:
+              serviceMTD += amount;
+          }
+        }
+        
+        const totalMTD = serviceMTD + installMTD + maintenanceMTD;
+        
+        return {
+          id: tech.id,
+          name: tech.name,
+          service: {
+            mtdGoal: techMtdServiceGoal,
+            mtdActual: serviceMTD,
+            difference: serviceMTD - techMtdServiceGoal,
+            percentComplete: techMtdServiceGoal > 0 ? Math.round((serviceMTD / techMtdServiceGoal) * 100) : 0,
+          },
+          install: {
+            mtdGoal: techMtdInstallGoal,
+            mtdActual: installMTD,
+            difference: installMTD - techMtdInstallGoal,
+            percentComplete: techMtdInstallGoal > 0 ? Math.round((installMTD / techMtdInstallGoal) * 100) : 0,
+          },
+          maintenance: {
+            mtdGoal: techMtdMaintenanceGoal,
+            mtdActual: maintenanceMTD,
+            difference: maintenanceMTD - techMtdMaintenanceGoal,
+            percentComplete: techMtdMaintenanceGoal > 0 ? Math.round((maintenanceMTD / techMtdMaintenanceGoal) * 100) : 0,
+          },
+          total: {
+            mtdGoal: techMtdTotalGoal,
+            mtdActual: totalMTD,
+            difference: totalMTD - techMtdTotalGoal,
+            percentComplete: techMtdTotalGoal > 0 ? Math.round((totalMTD / techMtdTotalGoal) * 100) : 0,
+          },
+        };
+      });
+      
       res.json({
         month: monthName,
         year,
@@ -14360,6 +14446,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           difference: mtdTotalActual - monthlySalesGoal,
           percentComplete: monthlySalesGoal > 0 ? Math.round((mtdTotalActual / monthlySalesGoal) * 100) : 0,
         },
+        technicians,
       });
     } catch (error) {
       console.error("Error fetching goals tracker:", error);
