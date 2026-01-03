@@ -2316,6 +2316,9 @@ export default function MobileJobDetail() {
       return res.json();
     },
     enabled: !!params.id,
+    staleTime: 30 * 1000, // Data considered fresh for 30 seconds
+    refetchInterval: isOnline ? 30 * 1000 : false, // Auto-refresh every 30 seconds when online
+    refetchOnWindowFocus: true, // Refresh when app comes back to foreground
   });
 
   const { data: checklistResponse } = useQuery<ChecklistResponseData>({

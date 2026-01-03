@@ -398,8 +398,10 @@ export default function MobileAgenda() {
       return data.workOrders || [];
     },
     enabled: !!currentUser,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // Data considered fresh for 30 seconds
     gcTime: 24 * 60 * 60 * 1000,
+    refetchInterval: isOnline ? 30 * 1000 : false, // Auto-refresh every 30 seconds when online
+    refetchOnWindowFocus: true, // Refresh when app comes back to foreground
     retry: (failureCount, error) => {
       if (error instanceof Error && error.message === "AUTH_REQUIRED") return false;
       if (!isOnline) return false;
@@ -415,8 +417,10 @@ export default function MobileAgenda() {
       return res.json();
     },
     enabled: !!currentUser,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000, // Data considered fresh for 60 seconds
     gcTime: 24 * 60 * 60 * 1000,
+    refetchInterval: isOnline ? 60 * 1000 : false, // Auto-refresh every 60 seconds when online
+    refetchOnWindowFocus: true,
   });
 
   const isLoading = isLoadingUser || isLoadingOrders;
