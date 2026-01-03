@@ -1374,7 +1374,7 @@ export default function CrmInvoiceCreate() {
                   "INSTALL": "Full System",
                   "SERVICE": "No Cool",
                   "MAINTENANCE": "Spring Tune-Up",
-                  "SALES": "Replace System Estimate",
+                  "SALES": "Comfort Consultation",
                 };
                 setNewWOWorkSubtype(defaultSubtypes[val] || "Other");
               }}>
@@ -1428,10 +1428,9 @@ export default function CrmInvoiceCreate() {
                   )}
                   {newWOVisitType === "SALES" && (
                     <>
-                      <SelectItem value="Replace System Estimate">Replace System Estimate</SelectItem>
-                      <SelectItem value="New Construction">New Construction</SelectItem>
-                      <SelectItem value="Commercial Bid">Commercial Bid</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
+                      <SelectItem value="Comfort Consultation">Comfort Consultation</SelectItem>
+                      <SelectItem value="HEAR Program">HEAR Program</SelectItem>
+                      <SelectItem value="HER Program">HER Program</SelectItem>
                     </>
                   )}
                 </SelectContent>

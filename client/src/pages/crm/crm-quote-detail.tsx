@@ -2082,7 +2082,7 @@ export default function CrmQuoteDetail() {
                       "INSTALL": "Full System",
                       "SERVICE": "No Cool",
                       "MAINTENANCE": "Spring Tune-Up",
-                      "SALES": "Replace System Estimate",
+                      "SALES": "Comfort Consultation",
                     };
                     setNewWorkOrderSubtype(defaultSubtypes[val] || "Other");
                   }}>
@@ -2141,11 +2141,9 @@ export default function CrmQuoteDetail() {
                       )}
                       {newWorkOrderVisitType === "SALES" && (
                         <>
-                          <SelectItem value="Replace System Estimate">Replace System Estimate</SelectItem>
-                          <SelectItem value="Add-on IAQ">Add-on IAQ</SelectItem>
-                          <SelectItem value="Duct Renovation">Duct Renovation</SelectItem>
-                          <SelectItem value="Crawlspace">Crawlspace</SelectItem>
-                          <SelectItem value="Maintenance Plan Sale">Maintenance Plan Sale</SelectItem>
+                          <SelectItem value="Comfort Consultation">Comfort Consultation</SelectItem>
+                          <SelectItem value="HEAR Program">HEAR Program</SelectItem>
+                          <SelectItem value="HER Program">HER Program</SelectItem>
                         </>
                       )}
                     </SelectContent>

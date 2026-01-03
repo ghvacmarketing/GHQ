@@ -994,7 +994,7 @@ export type WorkCategory = typeof workCategoryEnum[number];
 export const workSubtypeByVisitType = {
   SERVICE: ["No Cool", "No Heat", "Water Leak", "Electrical", "Thermostat", "Airflow", "Noise", "IAQ", "Other"] as const,
   MAINTENANCE: ["Preventative Maintenance"] as const,
-  SALES: ["Replace System Estimate", "Add-on IAQ", "Duct Renovation", "Crawlspace", "Maintenance Plan Sale"] as const,
+  SALES: ["Comfort Consultation", "HEAR Program", "HER Program"] as const,
   INSTALL: ["Full System", "Changeout", "Add Ducts", "Replace Ducts", "IAQ Install", "Mini-split", "Crawlspace"] as const,
 } as const;
 
