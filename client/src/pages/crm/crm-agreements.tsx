@@ -99,6 +99,17 @@ const tabFilters = [
   { key: "expired", label: "Expired" },
 ];
 
+function formatCustomerName(name: string | null | undefined): string {
+  if (!name) return "";
+  if (name.includes(",")) {
+    const parts = name.split(",").map(p => p.trim());
+    if (parts.length === 2) {
+      return `${parts[1]} ${parts[0]}`;
+    }
+  }
+  return name;
+}
+
 export default function CrmAgreements() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -696,7 +707,7 @@ export default function CrmAgreements() {
                       onClick={() => setSelectedAgreement(agreement)}
                       data-testid={`row-agreement-${agreement.id}`}
                     >
-                      <TableCell className="font-medium">{agreement.customerName}</TableCell>
+                      <TableCell className="font-medium">{formatCustomerName(agreement.customerName)}</TableCell>
                       <TableCell className="text-slate-600">{agreement.agreementNumber}</TableCell>
                       <TableCell className="text-slate-600">{agreement.agreementPlan}</TableCell>
                       <TableCell className="text-slate-600">{formatDate(agreement.nextServiceDate)}</TableCell>
@@ -1175,7 +1186,7 @@ export default function CrmAgreements() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-slate-500 text-xs">Customer</Label>
-                      <p className="font-medium">{selectedAgreement.customerName}</p>
+                      <p className="font-medium">{formatCustomerName(selectedAgreement.customerName)}</p>
                     </div>
                     <div>
                       <Label className="text-slate-500 text-xs">Status</Label>

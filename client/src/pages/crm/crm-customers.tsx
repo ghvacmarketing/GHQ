@@ -58,6 +58,7 @@ export default function CrmCustomers() {
   const [searchInput, setSearchInput] = useState("");
   const [customerType, setCustomerType] = useState("all");
   const [statusTab, setStatusTab] = useState("all");
+  const [hasAgreement, setHasAgreement] = useState(false);
   const [page, setPage] = useState(1);
 
   const debouncedSearch = useDebounce(searchInput, 300);
@@ -75,7 +76,7 @@ export default function CrmCustomers() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, customerType, statusTab]);
+  }, [debouncedSearch, customerType, statusTab, hasAgreement]);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -90,10 +91,13 @@ export default function CrmCustomers() {
         params.set("customerStatus", statusMap[statusTab]);
       }
     }
+    if (hasAgreement) {
+      params.set("hasAgreement", "true");
+    }
     params.set("page", String(page));
     params.set("limit", String(ITEMS_PER_PAGE));
     return params.toString();
-  }, [debouncedSearch, customerType, statusTab, page]);
+  }, [debouncedSearch, customerType, statusTab, hasAgreement, page]);
 
   const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
     queryKey: ["/api/crm/customers", queryParams],
@@ -107,7 +111,7 @@ export default function CrmCustomers() {
     enabled: !!currentUser,
   });
 
-  const { data: statsData } = useQuery<{ prospects: number; customers: number; total: number }>({
+  const { data: statsData } = useQuery<{ prospects: number; customers: number; total: number; withAgreements: number }>({
     queryKey: ["/api/crm/customers/stats"],
     queryFn: async () => {
       const res = await fetch("/api/crm/customers/stats", { credentials: "include" });
@@ -225,9 +229,9 @@ export default function CrmCustomers() {
         {/* Tabs styled like projects page - underline style */}
         <div className="flex overflow-x-auto border-b border-slate-200">
           <button
-            onClick={() => { setStatusTab("all"); setCustomerType("all"); }}
+            onClick={() => { setStatusTab("all"); setCustomerType("all"); setHasAgreement(false); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              statusTab === "all" && customerType === "all"
+              statusTab === "all" && customerType === "all" && !hasAgreement
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -236,9 +240,9 @@ export default function CrmCustomers() {
             All ({statsData?.total?.toLocaleString() || 0})
           </button>
           <button
-            onClick={() => { setStatusTab("prospects"); setCustomerType("all"); }}
+            onClick={() => { setStatusTab("prospects"); setCustomerType("all"); setHasAgreement(false); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              statusTab === "prospects"
+              statusTab === "prospects" && !hasAgreement
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -247,9 +251,9 @@ export default function CrmCustomers() {
             Prospects ({statsData?.prospects?.toLocaleString() || 0})
           </button>
           <button
-            onClick={() => { setStatusTab("customers"); setCustomerType("all"); }}
+            onClick={() => { setStatusTab("customers"); setCustomerType("all"); setHasAgreement(false); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              statusTab === "customers"
+              statusTab === "customers" && !hasAgreement
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -259,9 +263,9 @@ export default function CrmCustomers() {
           </button>
           <div className="border-l border-slate-200 mx-2" />
           <button
-            onClick={() => { setCustomerType("Residential"); setStatusTab("all"); }}
+            onClick={() => { setCustomerType("Residential"); setStatusTab("all"); setHasAgreement(false); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              customerType === "Residential"
+              customerType === "Residential" && !hasAgreement
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -270,9 +274,9 @@ export default function CrmCustomers() {
             Residential
           </button>
           <button
-            onClick={() => { setCustomerType("Commercial"); setStatusTab("all"); }}
+            onClick={() => { setCustomerType("Commercial"); setStatusTab("all"); setHasAgreement(false); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              customerType === "Commercial"
+              customerType === "Commercial" && !hasAgreement
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -281,15 +285,27 @@ export default function CrmCustomers() {
             Commercial
           </button>
           <button
-            onClick={() => { setCustomerType("Property Manager"); setStatusTab("all"); }}
+            onClick={() => { setCustomerType("Property Manager"); setStatusTab("all"); setHasAgreement(false); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              customerType === "Property Manager"
+              customerType === "Property Manager" && !hasAgreement
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
             data-testid="tab-type-property-manager"
           >
             Property Manager
+          </button>
+          <div className="border-l border-slate-200 mx-2" />
+          <button
+            onClick={() => { setHasAgreement(true); setCustomerType("all"); setStatusTab("all"); }}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+              hasAgreement
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+            }`}
+            data-testid="tab-has-agreements"
+          >
+            Agreements ({statsData?.withAgreements?.toLocaleString() || 0})
           </button>
         </div>
 

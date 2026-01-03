@@ -5579,6 +5579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         search,
         customerType,
         customerStatus,
+        hasAgreement,
         page = "1",
         limit = "25",
       } = req.query as Record<string, string | undefined>;
@@ -5604,6 +5605,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (customerStatus && customerStatus !== "all") {
         conditions.push(sql`LOWER(${crmCustomers.customerStatus}) = LOWER(${customerStatus})`);
+      }
+
+      // Filter customers who have at least one agreement
+      if (hasAgreement === "true") {
+        conditions.push(
+          sql`EXISTS (SELECT 1 FROM crm_agreements WHERE crm_agreements.customer_id = ${crmCustomers.id})`
+        );
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -5671,10 +5679,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({ count: sql<number>`count(*)` })
         .from(crmCustomers);
 
+      // Count customers with at least one agreement
+      const [withAgreementsResult] = await db
+        .select({ count: sql<number>`count(DISTINCT ${crmCustomers.id})` })
+        .from(crmCustomers)
+        .innerJoin(crmAgreements, eq(crmAgreements.customerId, crmCustomers.id));
+
       return res.json({
         prospects: Number(prospectsResult?.count || 0),
         customers: Number(customersResult?.count || 0),
         total: Number(totalResult?.count || 0),
+        withAgreements: Number(withAgreementsResult?.count || 0),
       });
     } catch (error) {
       console.error("Error fetching customer stats:", error);
