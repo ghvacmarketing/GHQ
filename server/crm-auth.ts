@@ -247,6 +247,8 @@ export function requireCrmRole(...allowedRoles: string[]) {
 const ADMIN_ROLES = ["owner", "admin"];
 // Sales roles have manager-level features (desktop + mobile)
 const SALES_ROLES = ["owner", "admin", "sales"];
+// Tech roles can create invoices and quotes (all CRM users)
+const TECH_ROLES = ["owner", "admin", "sales", "tech"];
 // Mobile roles can access the mobile app
 const MOBILE_ROLES = ["owner", "sales", "tech"];
 
@@ -256,6 +258,10 @@ export function isAdmin(role: string): boolean {
 
 export function isSalesOrAbove(role: string): boolean {
   return SALES_ROLES.includes(role);
+}
+
+export function isTechOrAbove(role: string): boolean {
+  return TECH_ROLES.includes(role);
 }
 
 export function canAccessMobile(role: string): boolean {
@@ -287,6 +293,23 @@ export function requireCrmSalesOrAbove(req: Request, res: Response, next: NextFu
       }
       if (!isSalesOrAbove(user.role)) {
         return res.status(403).json({ message: "Forbidden - Sales role or above required" });
+      }
+      next();
+    })
+    .catch((error) => {
+      console.error("CRM auth error:", error);
+      return res.status(500).json({ message: "Authentication error" });
+    });
+}
+
+export function requireCrmTechOrAbove(req: Request, res: Response, next: NextFunction) {
+  getCurrentCrmUser(req)
+    .then((user) => {
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized - CRM authentication required" });
+      }
+      if (!isTechOrAbove(user.role)) {
+        return res.status(403).json({ message: "Forbidden - Tech role or above required" });
       }
       next();
     })

@@ -31,7 +31,7 @@ import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorSt
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
-import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, logCrmAudit, hashPassword as hashCrmPassword } from "./crm-auth";
+import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword } from "./crm-auth";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
@@ -5314,9 +5314,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quotedAmount = parseFloat(quotedResult[0]?.total || "0");
           }
 
-          // Calculate potential: when nothing quoted, show goal; otherwise show sold+quoted or goal (whichever higher)
+          // Calculate potential: sold + quoted (if no quotes, potential = sold showing 100% conversion)
+          // When there's no activity at all, fall back to goal
           const salesOpportunity = serviceRevenue + quotedAmount;
-          const potential = salesOpportunity > 0 ? Math.max(salesOpportunity, techGoal) : techGoal;
+          const potential = salesOpportunity > 0 ? salesOpportunity : techGoal;
           
           return {
             id: tech.id,
@@ -11746,7 +11747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/invoices - Create invoice (requires workOrderId)
-  app.post("/api/crm/invoices", requireCrmSalesOrAbove, async (req, res) => {
+  app.post("/api/crm/invoices", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
       if (!user) {
@@ -12183,7 +12184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/invoices/:id/send - Mark invoice as sent
-  app.post("/api/crm/invoices/:id/send", requireCrmSalesOrAbove, async (req, res) => {
+  app.post("/api/crm/invoices/:id/send", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
       if (!user) {
@@ -12225,7 +12226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/invoices/:id/pay - Mark invoice as paid (with payment details)
-  app.post("/api/crm/invoices/:id/pay", requireCrmSalesOrAbove, async (req, res) => {
+  app.post("/api/crm/invoices/:id/pay", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
       if (!user) {
@@ -12510,7 +12511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/invoices/:id/line-items - Add line item to invoice
-  app.post("/api/crm/invoices/:id/line-items", requireCrmSalesOrAbove, async (req, res) => {
+  app.post("/api/crm/invoices/:id/line-items", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
       if (!user) {
@@ -13023,7 +13024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/quotes - Create quote (validate scope + workOrderId/projectId)
-  app.post("/api/crm/quotes", requireCrmSalesOrAbove, async (req, res) => {
+  app.post("/api/crm/quotes", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
       if (!user) {
@@ -13631,7 +13632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/quotes/:id/line-items - Add line item to quote
-  app.post("/api/crm/quotes/:id/line-items", requireCrmSalesOrAbove, async (req, res) => {
+  app.post("/api/crm/quotes/:id/line-items", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
       if (!user) {
@@ -13853,7 +13854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/quotes/:id/send - Mark quote as sent
-  app.post("/api/crm/quotes/:id/send", requireCrmSalesOrAbove, async (req, res) => {
+  app.post("/api/crm/quotes/:id/send", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
       if (!user) {
@@ -15346,9 +15347,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         const techDailyGoal = numTechs > 0 ? dailyServiceGoal / numTechs : 0;
         const techGoal = techDailyGoal * dayOfMonth; // Goal through today
 
-        // Calculate potential: when nothing quoted, show goal; otherwise show sold+quoted or goal (whichever higher)
+        // Calculate potential: sold + quoted (if no quotes, potential = sold showing 100% conversion)
+        // When there's no activity at all, fall back to goal
         const salesOpportunity = serviceRevenue + quotedAmount;
-        const potential = salesOpportunity > 0 ? Math.max(salesOpportunity, techGoal) : techGoal;
+        const potential = salesOpportunity > 0 ? salesOpportunity : techGoal;
 
         res.json({
           role: "tech",
