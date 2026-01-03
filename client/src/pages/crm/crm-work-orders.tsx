@@ -1467,10 +1467,17 @@ export default function CrmWorkOrders() {
                   </div>
                 </div>
 
+                {selectedWorkOrder.status === "on_site" && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-sm text-amber-800 font-medium">Technician is on site</p>
+                    <p className="text-xs text-amber-600">Assignment and schedule cannot be changed while work is in progress.</p>
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   <h4 className="font-medium text-sm text-slate-700">Assigned Tech</h4>
                   <div className="flex items-center gap-2">
-                    <Select value={reassignTechId} onValueChange={setReassignTechId}>
+                    <Select value={reassignTechId} onValueChange={setReassignTechId} disabled={selectedWorkOrder.status === "on_site"}>
                       <SelectTrigger className="w-[180px]" data-testid="select-reassign-tech">
                         <SelectValue placeholder="Unassigned" />
                       </SelectTrigger>
@@ -1487,7 +1494,7 @@ export default function CrmWorkOrders() {
                       size="sm"
                       variant="outline"
                       onClick={handleReassignTech}
-                      disabled={updateWorkOrderMutation.isPending}
+                      disabled={updateWorkOrderMutation.isPending || selectedWorkOrder.status === "on_site"}
                       className="text-slate-700 hover:bg-slate-100"
                       data-testid="button-reassign-tech"
                     >
@@ -1560,7 +1567,7 @@ export default function CrmWorkOrders() {
                     size="sm"
                     variant="outline"
                     onClick={handleReschedule}
-                    disabled={updateWorkOrderMutation.isPending || !rescheduleDate}
+                    disabled={updateWorkOrderMutation.isPending || !rescheduleDate || selectedWorkOrder.status === "on_site"}
                     className="text-slate-700 hover:bg-slate-100"
                     data-testid="button-reschedule"
                   >

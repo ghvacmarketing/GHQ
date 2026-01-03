@@ -417,9 +417,13 @@ function DraggableQueueCard({
   const [scheduleStart, setScheduleStart] = useState("08:00");
   const [scheduleEnd, setScheduleEnd] = useState("09:00");
   
+  // Disable dragging for work orders where tech is on site
+  const isLocked = workOrder.status === "on_site";
+  
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `queue-${workOrder.id}`,
     data: { workOrder, fromQueue: true },
+    disabled: isLocked,
   });
 
   const age = workOrder.createdAt ? formatDistanceToNow(new Date(workOrder.createdAt), { addSuffix: false }) : null;
@@ -992,13 +996,17 @@ function DraggableScheduleCard({
   const accumulatedEndDeltaRef = useRef(0);
   const justResizedRef = useRef(false);
   
+  // Disable dragging for work orders where tech is on site
+  const isLocked = workOrder.status === "on_site";
+  
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `schedule-${workOrder.id}`,
     data: { workOrder, fromSchedule: true },
-    disabled: isResizing,
+    disabled: isResizing || isLocked,
   });
 
   const handleMouseDown = (e: React.MouseEvent, edge: 'start' | 'end') => {
+    if (isLocked) return; // Don't allow resizing for on_site work orders
     e.stopPropagation();
     e.preventDefault();
     setIsResizing(true);
@@ -1302,6 +1310,9 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
   const isCompletedStatus = ["completed", "cancelled"].includes(workOrder.status);
   const { startHour, endHour } = getWorkOrderDisplayTimes(workOrder);
   
+  // Disable dragging/resizing for work orders where tech is on site
+  const isLocked = workOrder.status === "on_site";
+  
   const cardRef = useRef<HTMLDivElement>(null);
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const [isResizingRight, setIsResizingRight] = useState(false);
@@ -1323,10 +1334,11 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: workOrder.id,
     data: { workOrder, fromQueue: false },
-    disabled: isResizing,
+    disabled: isResizing || isLocked,
   });
 
   const handleResizeStart = useCallback((e: React.MouseEvent, side: 'left' | 'right') => {
+    if (isLocked) return; // Don't allow resizing for on_site work orders
     e.stopPropagation();
     e.preventDefault();
     resizeStartX.current = e.clientX;
@@ -1340,7 +1352,7 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
     } else {
       setIsResizingRight(true);
     }
-  }, [startHour, endHour]);
+  }, [startHour, endHour, isLocked]);
 
   useEffect(() => {
     if (!isResizing) return;

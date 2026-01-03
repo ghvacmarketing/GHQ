@@ -9385,6 +9385,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied - work order not assigned to you" });
       }
 
+      // Prevent editing work orders that are "on_site" - only allow status, notes, and completion details
+      if (existingWorkOrder.status === "on_site") {
+        const lockedFields = ["assignedTechId", "scheduledStart", "scheduledEnd", "customerId", "propertyId", "title", "description", "priority", "visitType", "workSubtype", "projectId", "agreementId", "dispatchQueueStage"];
+        const requestedUpdates = Object.keys(req.body);
+        const disallowedUpdates = requestedUpdates.filter(k => lockedFields.includes(k));
+        
+        if (disallowedUpdates.length > 0) {
+          return res.status(403).json({ 
+            message: "Cannot modify work order while technician is on site. Only status, notes, and completion details can be updated.",
+            blockedFields: disallowedUpdates
+          });
+        }
+      }
+
       const allowedFields = insertCrmWorkOrderSchema.partial().pick({
         status: true,
         assignedTechId: true,
