@@ -334,6 +334,9 @@ function WorkOrderCard({ workOrder, showCacheWarning }: { workOrder: WorkOrderWi
       window.open(`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`, '_blank');
     }
   };
+
+  // Combine visual indicators for cache/offline state
+  const hasCacheOrPendingWarning = showCacheWarning || pendingCount > 0;
   
   return (
     <Link
@@ -342,7 +345,7 @@ function WorkOrderCard({ workOrder, showCacheWarning }: { workOrder: WorkOrderWi
     >
       <Card 
         className={`cursor-pointer hover:shadow-lg transition-all active:scale-[0.98] border-l-4 overflow-hidden ${accentColor} ${
-          pendingCount > 0 ? 'ring-2 ring-amber-400/50' : ''
+          hasCacheOrPendingWarning ? 'ring-2 ring-amber-400/50 ring-offset-1' : ''
         }`}
       >
         <CardContent className="p-0">
