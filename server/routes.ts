@@ -12296,17 +12296,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .leftJoin(crmItems, eq(crmInvoiceLineItems.itemId, crmItems.id))
             .where(eq(crmInvoiceLineItems.invoiceId, req.params.id));
           
-          // Filter for maintenance items: either catalog item has category "maintenance" OR description contains "maintenance"
-          const maintenanceLineItems = lineItemsWithCatalog.filter(row => 
-            row.catalogItem?.category === "maintenance" || 
-            row.lineItem.description?.toLowerCase().includes("maintenance") ||
-            row.lineItem.description?.toLowerCase().includes("preventative")
-          );
+          // Get all active custom agreement types to check names against
+          const allCustomTypes = await db.select()
+            .from(customAgreementTypes)
+            .where(eq(customAgreementTypes.isActive, true));
+          const customTypeNames = allCustomTypes.map(ct => ct.name.toLowerCase());
+          
+          // Filter for maintenance items: catalog category "maintenance", description contains keywords, OR matches custom agreement type name
+          const maintenanceLineItems = lineItemsWithCatalog.filter(row => {
+            const catalogCategory = row.catalogItem?.category?.toLowerCase();
+            const catalogName = row.catalogItem?.name?.toLowerCase() || "";
+            const description = row.lineItem.description?.toLowerCase() || "";
+            
+            return catalogCategory === "maintenance" || 
+              description.includes("maintenance") ||
+              description.includes("preventative") ||
+              customTypeNames.includes(catalogName) ||
+              customTypeNames.includes(description);
+          });
           
           if (maintenanceLineItems.length > 0) {
             // Calculate total maintenance amount from line items (use lineTotal, not total)
             const maintenanceTotal = maintenanceLineItems.reduce((sum, row) => {
               return sum + parseFloat(row.lineItem.lineTotal || "0");
+            }, 0);
+            
+            // Get the total quantity from maintenance line items for numberOfSystems
+            const totalQuantity = maintenanceLineItems.reduce((sum, row) => {
+              return sum + (parseInt(row.lineItem.quantity || "1") || 1);
             }, 0);
             
             // Get the maintenance item name for the agreement plan (use description or catalog name)
@@ -12326,7 +12343,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Standard Preventative Maintenance is ALWAYS annual with 2 visits
             // Only use custom type settings if explicitly matching a custom agreement type
             const agreementFrequency = customType ? (customType.frequency as "weekly" | "monthly" | "annual") : "annual";
-            const agreementVisitsPerPeriod = customType?.visitsPerPeriod || 2;
+            // Use custom type's visitsPerPeriod, scaled by quantity if needed
+            const baseVisitsPerPeriod = customType?.visitsPerPeriod || 2;
+            // For quantity > 1, multiply visits by quantity (each system gets the same visits)
+            const agreementVisitsPerPeriod = baseVisitsPerPeriod * totalQuantity;
             
             // Use "Preventative Maintenance" as default plan name if no custom type found
             const agreementPlanName = customType ? maintenanceItemName : "Preventative Maintenance";
@@ -12413,7 +12433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 customerName: customer.name,
                 agreementPlan: agreementPlanName,
                 address: propertyAddress,
-                numberOfSystems: 1, // Default to 1 system for auto-created agreements
+                numberOfSystems: totalQuantity, // Use quantity from invoice line items
                 price: maintenanceTotal.toFixed(2),
                 contractDate: todayStr,
                 appointmentDate: appointmentDateStr,
@@ -12457,7 +12477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   });
                 }
                 
-                console.log(`[Invoice] Auto-created ${agreementFrequency} maintenance agreement ${agreementNumber} for customer ${customer.name} from invoice ${invoice.invoiceNumber} (${agreementVisitsPerPeriod} visits)`);
+                console.log(`[Invoice] Auto-created ${agreementFrequency} maintenance agreement ${agreementNumber} for customer ${customer.name} from invoice ${invoice.invoiceNumber} (${totalQuantity} systems, ${agreementVisitsPerPeriod} visits)`);
               }
             }
           }
