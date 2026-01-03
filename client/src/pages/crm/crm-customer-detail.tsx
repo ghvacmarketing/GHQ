@@ -672,15 +672,97 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
   }
 
   return (
-    <Card data-testid="card-agreements">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-[#711419]" />
-          Maintenance Agreements ({agreements.length})
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {agreements.map((agreement) => {
+    <div className="space-y-4">
+      {/* Agreement Summary Cards */}
+      {agreements.map((agreement) => (
+        <Card key={`summary-${agreement.id}`} className="bg-green-50/50 border-green-100" data-testid={`agreement-summary-${agreement.id}`}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Agreement Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Customer Name */}
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Customer</p>
+              <p className="font-semibold">{agreement.customerName || 'Not selected'}</p>
+            </div>
+
+            {/* Plan Name */}
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Plan</p>
+              <p className="font-semibold">{agreement.agreementPlan || 'Annual Maintenance Agreement'}</p>
+            </div>
+
+            {/* Tasks and Total Amount - side by side */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Tasks</p>
+                <p className="text-xl font-bold">{agreement.visitsPerYear || 0}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Amount</p>
+                <p className="text-xl font-bold text-green-600">${parseFloat(agreement.price || '0').toFixed(2)}</p>
+              </div>
+            </div>
+
+            {/* Scheduled Visits */}
+            {agreement.maintenanceVisits && agreement.maintenanceVisits.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Scheduled Visits</p>
+                <div className="space-y-1">
+                  {agreement.maintenanceVisits.map((visit, index) => (
+                    <div key={visit.id} className="flex items-center gap-2">
+                      <span className="bg-slate-200 text-slate-700 rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium">
+                        {index + 1}
+                      </span>
+                      <span className="text-sm">{format(new Date(visit.targetDate), 'MMM d, yyyy')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Start and End dates */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Start</p>
+                <p className="font-medium">{agreement.startDate ? format(new Date(agreement.startDate), 'MMM d, yyyy') : 'Not set'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">End</p>
+                <p className="font-medium">{agreement.endDate ? format(new Date(agreement.endDate), 'MMM d, yyyy') : 'Not set'}</p>
+              </div>
+            </div>
+
+            {/* Auto-renew badge */}
+            <div className="flex items-center gap-2 pt-2">
+              {agreement.autoRenew ? (
+                <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Auto-renew enabled
+                </Badge>
+              ) : (
+                <Badge variant="secondary">
+                  Auto-renew disabled
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+
+      {/* Detailed Agreements Card */}
+      <Card data-testid="card-agreements">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-[#711419]" />
+            Maintenance Agreements ({agreements.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {agreements.map((agreement) => {
           const currentYear = new Date().getFullYear();
           const currentYearVisits = agreement.maintenanceVisits.filter(
             (v) => v.cycleYear === currentYear
@@ -841,6 +923,7 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
         })}
       </CardContent>
     </Card>
+    </div>
   );
 }
 
