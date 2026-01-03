@@ -5253,8 +5253,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const perTicketAvg = serviceJobs > 0 ? serviceRevenue / serviceJobs : 0;
           
           const dailyServiceGoal = currentMonthlyGoals ? parseFloat(currentMonthlyGoals.dailyServiceGoal || "0") : 0;
-          const totalMonthlyServiceGoal = dailyServiceGoal * daysInMonth;
-          const techGoal = techs.length > 0 && totalMonthlyServiceGoal > 0 ? totalMonthlyServiceGoal / techs.length : 0;
+          const serviceWorkDays = currentMonthlyGoals?.serviceWorkDays || 22;
+          const techDailyGoal = techs.length > 0 ? dailyServiceGoal / techs.length : 0;
+          const techGoal = techDailyGoal * serviceWorkDays;
           const goalMet = serviceRevenue >= techGoal;
 
           const maintenanceAgreementsCount = await db
@@ -5283,9 +5284,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quotedAmount = parseFloat(quotedResult[0]?.total || "0");
           }
 
-          // Calculate potential as max of (goal, sold + quoted) with some headroom
+          // Calculate potential: when nothing quoted, show goal; otherwise show sold+quoted or goal (whichever higher)
           const salesOpportunity = serviceRevenue + quotedAmount;
-          const potential = Math.max(techGoal * 1.2, salesOpportunity, techGoal);
+          const potential = salesOpportunity > 0 ? Math.max(salesOpportunity, techGoal) : techGoal;
           
           return {
             id: tech.id,
@@ -14340,6 +14341,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
               monthlyInstallGoal: monthlyInstallGoal.toFixed(2),
               monthlyMaintenanceGoal: monthlyMaintenanceGoal.toFixed(2),
               monthlySalesGoal: monthlySalesGoal.toFixed(2),
+              serviceWorkDays: daysCount,
               updatedAt: new Date(),
             })
             .where(eq(monthlyGoals.id, existing.id));
@@ -14354,6 +14356,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             monthlyInstallGoal: monthlyInstallGoal.toFixed(2),
             monthlyMaintenanceGoal: monthlyMaintenanceGoal.toFixed(2),
             monthlySalesGoal: monthlySalesGoal.toFixed(2),
+            serviceWorkDays: daysCount,
           });
         }
         
