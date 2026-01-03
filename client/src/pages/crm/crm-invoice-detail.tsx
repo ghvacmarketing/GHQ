@@ -403,12 +403,6 @@ export default function CrmInvoiceDetail() {
       doc.text(formatCurrency(invoice.subtotal), margin + contentWidth - 3, y, { align: 'right' });
       y += 6;
 
-      if (invoice.taxTotal && parseFloat(invoice.taxTotal) > 0) {
-        doc.text("Tax:", totalsX, y);
-        doc.text(formatCurrency(invoice.taxTotal), margin + contentWidth - 3, y, { align: 'right' });
-        y += 6;
-      }
-
       checkPageBreak(15);
       doc.setFillColor(...brandColor);
       doc.rect(totalsX - 5, y - 3, 85, 12, 'F');
@@ -696,12 +690,6 @@ export default function CrmInvoiceDetail() {
                 <span className="text-slate-600">Subtotal</span>
                 <span className="font-medium" data-testid="text-subtotal">{formatCurrency(invoice.subtotal)}</span>
               </div>
-              {invoice.taxTotal && parseFloat(invoice.taxTotal) > 0 && (
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-slate-600">Tax</span>
-                  <span className="font-medium" data-testid="text-tax">{formatCurrency(invoice.taxTotal)}</span>
-                </div>
-              )}
               <Separator />
               <div className="flex justify-between items-center py-2">
                 <span className="text-lg font-semibold text-slate-900">Total</span>

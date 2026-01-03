@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { format } from "date-fns";
+import { jsPDF } from "jspdf";
 import { 
   ArrowLeft, 
   Receipt, 
@@ -13,7 +14,10 @@ import {
   DollarSign,
   Tag,
   CreditCard,
-  CheckCircle2
+  CheckCircle2,
+  Download,
+  Eye,
+  Ban
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,18 +25,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import MobileShell from "./mobile-shell";
-import type { CrmInvoice, CrmInvoiceLineItem } from "@shared/schema";
+import type { CrmInvoice, CrmInvoiceLineItem, CrmUser } from "@shared/schema";
 
 interface InvoiceWithLineItems extends CrmInvoice {
   lineItems?: CrmInvoiceLineItem[];
-  customer?: { name?: string; phone?: string } | null;
+  customer?: { name?: string; phone?: string; email?: string; fullAddress?: string } | null;
   property?: { address1?: string; city?: string; state?: string; zip?: string } | null;
+  taxTotal?: string | null;
 }
 
 const invoiceStatusConfig: Record<string, { label: string; className: string }> = {
@@ -48,15 +71,36 @@ function formatCurrency(amount: number | string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num || 0);
 }
 
+function formatDate(date: Date | string | null) {
+  if (!date) return "—";
+  try {
+    return format(new Date(date), "MMM d, yyyy");
+  } catch {
+    return "—";
+  }
+}
+
 export default function MobileInvoiceDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showVoidConfirm, setShowVoidConfirm] = useState(false);
+  const [showPreviewSheet, setShowPreviewSheet] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "check" | "card">("cash");
   const [paymentReference, setPaymentReference] = useState("");
+
+  const { data: currentUser } = useQuery<CrmUser | null>({
+    queryKey: ["/api/crm/auth/me"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/auth/me", { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data: invoice, isLoading, error } = useQuery<InvoiceWithLineItems>({
     queryKey: ["/api/crm/invoices", id],
@@ -76,6 +120,7 @@ export default function MobileInvoiceDetail() {
     onSuccess: () => {
       toast({ title: "Invoice Sent", description: "Invoice has been sent successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to send invoice", variant: "destructive" });
@@ -94,6 +139,7 @@ export default function MobileInvoiceDetail() {
     onSuccess: () => {
       toast({ title: "Payment Recorded", description: "Payment has been recorded successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       setShowPaymentDialog(false);
       setPaymentAmount("");
       setPaymentMethod("cash");
@@ -101,6 +147,25 @@ export default function MobileInvoiceDetail() {
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to record payment", variant: "destructive" });
+    },
+  });
+
+  const voidMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/crm/invoices/${id}/void`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to void invoice");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      toast({ title: "Invoice Voided", description: "Invoice has been voided." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to void invoice", variant: "destructive" });
     },
   });
 
@@ -129,6 +194,222 @@ export default function MobileInvoiceDetail() {
       paymentMethod: paymentMethod,
       paymentReference: paymentReference || undefined,
     });
+  };
+
+  const handleVoid = () => {
+    setShowVoidConfirm(true);
+  };
+
+  const confirmVoid = () => {
+    voidMutation.mutate();
+    setShowVoidConfirm(false);
+  };
+
+  const handleDownloadPDF = () => {
+    if (!invoice) return;
+
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - (margin * 2);
+      let y = margin;
+
+      const brandColor: [number, number, number] = [113, 20, 25];
+      const textColor: [number, number, number] = [30, 41, 59];
+      const mutedColor: [number, number, number] = [100, 116, 139];
+      const lightBg: [number, number, number] = [248, 250, 252];
+
+      const addPageHeader = () => {
+        doc.setFillColor(...brandColor);
+        doc.roundedRect(margin, y, contentWidth, 28, 3, 3, 'F');
+        
+        doc.setFontSize(20);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("Giesbrecht HVAC", margin + 8, y + 12);
+        
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(220, 220, 220);
+        doc.text("PO Box 917, Wrens, GA 30833", margin + 8, y + 20);
+
+        doc.setFontSize(9);
+        doc.text("(706) 826-0644", pageWidth - margin - 8, y + 10, { align: 'right' });
+        doc.text("chandler@ghvacinc.com", pageWidth - margin - 8, y + 15, { align: 'right' });
+        doc.text("www.ghvacinc.com", pageWidth - margin - 8, y + 20, { align: 'right' });
+      };
+
+      const checkPageBreak = (neededSpace: number) => {
+        if (y + neededSpace > pageHeight - 35) {
+          doc.addPage();
+          y = margin;
+          addPageHeader();
+          y += 35;
+        }
+      };
+
+      addPageHeader();
+      y += 35;
+
+      doc.setFontSize(24);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...brandColor);
+      doc.text("INVOICE", pageWidth - margin, y, { align: 'right' });
+      y += 12;
+
+      doc.setFillColor(...lightBg);
+      doc.roundedRect(pageWidth - margin - 70, y - 5, 70, 28, 2, 2, 'F');
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...mutedColor);
+      doc.text("Invoice #:", pageWidth - margin - 65, y + 3);
+      doc.text("Date:", pageWidth - margin - 65, y + 10);
+      doc.text("Due Date:", pageWidth - margin - 65, y + 17);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...textColor);
+      doc.text(invoice.invoiceNumber || "", pageWidth - margin - 5, y + 3, { align: 'right' });
+      doc.text(formatDate(invoice.createdAt), pageWidth - margin - 5, y + 10, { align: 'right' });
+      doc.text(invoice.dueDate ? formatDate(invoice.dueDate) : "Upon Receipt", pageWidth - margin - 5, y + 17, { align: 'right' });
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...textColor);
+      doc.text("Bill To:", margin, y);
+      y += 5;
+      doc.setFont("helvetica", "normal");
+      doc.text(invoice.customer?.name || "Customer", margin, y + 5);
+      if (invoice.customer?.phone) {
+        doc.text(String(invoice.customer.phone), margin, y + 10);
+      }
+      if (invoice.customer?.email) {
+        doc.text(String(invoice.customer.email), margin, y + 15);
+      }
+      if (invoice.customer?.fullAddress) {
+        doc.text(invoice.customer.fullAddress, margin, y + 20);
+      }
+      y += 40;
+
+      const col1Width = contentWidth * 0.55;
+      const col2Width = contentWidth * 0.15;
+      const col3Width = contentWidth * 0.15;
+
+      doc.setFillColor(...brandColor);
+      doc.rect(margin, y, contentWidth, 10, 'F');
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("Description", margin + 3, y + 7);
+      doc.text("Qty", margin + col1Width + col2Width / 2, y + 7, { align: 'center' });
+      doc.text("Unit Price", margin + col1Width + col2Width + col3Width / 2, y + 7, { align: 'center' });
+      doc.text("Amount", margin + contentWidth - 3, y + 7, { align: 'right' });
+      y += 10;
+
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...textColor);
+      let rowIndex = 0;
+      
+      if (invoice.lineItems && invoice.lineItems.length > 0) {
+        invoice.lineItems.forEach((item) => {
+          const descLines = doc.splitTextToSize(item.description || "", col1Width - 6);
+          const rowHeight = Math.max(8, descLines.length * 4 + 4);
+          
+          checkPageBreak(rowHeight + 2);
+          if (rowIndex % 2 === 0) {
+            doc.setFillColor(...lightBg);
+            doc.rect(margin, y, contentWidth, rowHeight, 'F');
+          }
+          
+          doc.setFontSize(9);
+          let textY = y + 5;
+          descLines.forEach((line: string) => {
+            doc.text(line, margin + 3, textY);
+            textY += 4;
+          });
+          
+          doc.text(String(item.quantity || 1), margin + col1Width + col2Width / 2, y + 5, { align: 'center' });
+          doc.text(formatCurrency(item.unitPrice), margin + col1Width + col2Width + col3Width / 2, y + 5, { align: 'center' });
+          doc.text(formatCurrency(item.lineTotal), margin + contentWidth - 3, y + 5, { align: 'right' });
+          
+          y += rowHeight;
+          rowIndex++;
+        });
+      }
+
+      doc.setDrawColor(...brandColor);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, margin + contentWidth, y);
+      y += 8;
+
+      const totalsX = margin + contentWidth - 80;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text("Subtotal:", totalsX, y);
+      doc.text(formatCurrency(invoice.subtotal || "0"), margin + contentWidth - 3, y, { align: 'right' });
+      y += 6;
+
+      if (invoice.taxTotal && parseFloat(invoice.taxTotal) > 0) {
+        doc.text("Tax:", totalsX, y);
+        doc.text(formatCurrency(invoice.taxTotal), margin + contentWidth - 3, y, { align: 'right' });
+        y += 6;
+      }
+
+      checkPageBreak(15);
+      doc.setFillColor(...brandColor);
+      doc.rect(totalsX - 5, y - 3, 85, 12, 'F');
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("TOTAL:", totalsX, y + 5);
+      doc.text(formatCurrency(invoice.total || "0"), margin + contentWidth - 3, y + 5, { align: 'right' });
+      y += 18;
+      doc.setTextColor(...textColor);
+
+      const amountPaid = parseFloat(invoice.total || "0") - parseFloat(invoice.balanceDue || "0");
+      if (amountPaid > 0) {
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text("Amount Paid:", totalsX, y);
+        doc.text(formatCurrency(amountPaid), margin + contentWidth - 3, y, { align: 'right' });
+        y += 8;
+      }
+
+      const balanceDue = parseFloat(invoice.balanceDue || "0");
+      if (balanceDue > 0) {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(220, 38, 38);
+        doc.text("Balance Due:", totalsX, y);
+        doc.text(formatCurrency(invoice.balanceDue || "0"), margin + contentWidth - 3, y, { align: 'right' });
+        y += 10;
+      } else {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(22, 163, 74);
+        doc.text("PAID IN FULL", margin + contentWidth - 3, y, { align: 'right' });
+        y += 10;
+      }
+
+      const footerY = pageHeight - 20;
+      doc.setDrawColor(...brandColor);
+      doc.setLineWidth(0.5);
+      doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(...mutedColor);
+      doc.text("Thank you for your business!", pageWidth / 2, footerY, { align: 'center' });
+      doc.text("Payment is due upon receipt unless otherwise specified.", pageWidth / 2, footerY + 5, { align: 'center' });
+
+      const customerName = (invoice.customer?.name || "Customer").replace(/[^a-zA-Z0-9]/g, '_');
+      const fileName = `Invoice_${invoice.invoiceNumber}_${customerName}.pdf`;
+      doc.save(fileName);
+
+      toast({ title: "PDF Downloaded", description: `Invoice saved as ${fileName}` });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" });
+    }
   };
 
   if (isLoading) {
@@ -175,7 +456,11 @@ export default function MobileInvoiceDetail() {
   const lineItems = invoice.lineItems || [];
   const isPaid = invoice.status === "paid";
   const isPartial = invoice.status === "partial";
+  const isVoid = invoice.status === "void";
   const canRecordPayment = invoice.status === "sent" || invoice.status === "partial";
+  const canVoid = currentUser && (currentUser.role === "owner" || currentUser.role === "admin") && !isVoid;
+
+  const amountPaid = parseFloat(invoice.total || "0") - parseFloat(invoice.balanceDue || "0");
 
   return (
     <MobileShell>
@@ -349,6 +634,27 @@ export default function MobileInvoiceDetail() {
         )}
 
         <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1 min-h-[48px]"
+              onClick={() => setShowPreviewSheet(true)}
+              data-testid="button-preview"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Preview
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 min-h-[48px]"
+              onClick={handleDownloadPDF}
+              data-testid="button-download"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download
+            </Button>
+          </div>
+
           {invoice.status === "draft" && (
             <Button
               className="w-full min-h-[48px] bg-blue-600 hover:bg-blue-700"
@@ -375,7 +681,141 @@ export default function MobileInvoiceDetail() {
               Record Payment
             </Button>
           )}
+
+          {canVoid && (
+            <Button
+              variant="outline"
+              className="w-full min-h-[48px] text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+              onClick={handleVoid}
+              disabled={voidMutation.isPending}
+              data-testid="button-void"
+            >
+              {voidMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Ban className="h-4 w-4 mr-2" />
+              )}
+              Void Invoice
+            </Button>
+          )}
         </div>
+
+        <Sheet open={showPreviewSheet} onOpenChange={setShowPreviewSheet}>
+          <SheetContent side="bottom" className="h-[90vh] p-0">
+            <SheetHeader className="p-4 border-b">
+              <SheetTitle>Invoice Preview</SheetTitle>
+              <SheetDescription>
+                Preview of {invoice.invoiceNumber}
+              </SheetDescription>
+            </SheetHeader>
+            <ScrollArea className="h-[calc(90vh-80px)]">
+              <div className="p-4">
+                <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+                  <div className="p-4 text-white" style={{ backgroundColor: '#711419' }}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h2 className="text-xl font-bold">Giesbrecht HVAC</h2>
+                        <p className="text-sm opacity-90">PO Box 917, Wrens GA 30833</p>
+                      </div>
+                      <div className="text-right text-sm opacity-90">
+                        <p>706-826-0644</p>
+                        <p>chandler@ghvacinc.com</p>
+                        <p>www.ghvacinc.com</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <h3 className="text-lg font-bold" style={{ color: '#711419' }}>INVOICE</h3>
+                      </div>
+                      <div className="text-right text-sm bg-slate-50 p-3 rounded">
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-600">Invoice #:</span>
+                          <span className="font-medium">{invoice.invoiceNumber}</span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-600">Date:</span>
+                          <span className="font-medium">{formatDate(invoice.createdAt)}</span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-600">Due Date:</span>
+                          <span className="font-medium">{invoice.dueDate ? formatDate(invoice.dueDate) : "Upon Receipt"}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mb-6">
+                      <h4 className="text-sm font-semibold text-slate-700 mb-1">Bill To:</h4>
+                      <p className="font-medium">{invoice.customer?.name || "Customer"}</p>
+                      {invoice.customer?.phone && <p className="text-sm text-slate-600">{invoice.customer.phone}</p>}
+                      {invoice.customer?.email && <p className="text-sm text-slate-600">{invoice.customer.email}</p>}
+                      {invoice.customer?.fullAddress && <p className="text-sm text-slate-600">{invoice.customer.fullAddress}</p>}
+                    </div>
+
+                    <table className="w-full mb-4">
+                      <thead>
+                        <tr className="text-white text-sm" style={{ backgroundColor: '#711419' }}>
+                          <th className="py-2 px-2 text-left">Description</th>
+                          <th className="py-2 px-2 text-center">Qty</th>
+                          <th className="py-2 px-2 text-right">Unit Price</th>
+                          <th className="py-2 px-2 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lineItems.map((item, idx) => (
+                          <tr key={item.id} className={idx % 2 === 0 ? "bg-slate-50" : ""}>
+                            <td className="py-2 px-2 text-sm">{item.description}</td>
+                            <td className="py-2 px-2 text-sm text-center">{item.quantity}</td>
+                            <td className="py-2 px-2 text-sm text-right">{formatCurrency(item.unitPrice)}</td>
+                            <td className="py-2 px-2 text-sm text-right">{formatCurrency(item.lineTotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    <div className="border-t pt-3" style={{ borderColor: '#711419' }}>
+                      <div className="flex justify-end">
+                        <div className="w-48 space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-slate-600">Subtotal:</span>
+                            <span>{formatCurrency(invoice.subtotal || "0")}</span>
+                          </div>
+                          <div className="flex justify-between font-bold text-white p-2 rounded" style={{ backgroundColor: '#711419' }}>
+                            <span>TOTAL:</span>
+                            <span>{formatCurrency(invoice.total || "0")}</span>
+                          </div>
+                          {amountPaid > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-600">Amount Paid:</span>
+                              <span className="text-green-600">{formatCurrency(amountPaid)}</span>
+                            </div>
+                          )}
+                          {parseFloat(invoice.balanceDue || "0") > 0 ? (
+                            <div className="flex justify-between font-semibold">
+                              <span className="text-red-600">Balance Due:</span>
+                              <span className="text-red-600">{formatCurrency(invoice.balanceDue || "0")}</span>
+                            </div>
+                          ) : (
+                            <div className="text-center font-bold mt-2" style={{ color: '#711419' }}>
+                              PAID IN FULL
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t mt-6 pt-4 text-center text-xs text-slate-500" style={{ borderColor: '#711419' }}>
+                      <p className="italic">Thank you for your business!</p>
+                      <p>Payment is due upon receipt unless otherwise specified.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+          </SheetContent>
+        </Sheet>
 
         <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
           <DialogContent className="max-w-md">
@@ -450,6 +890,27 @@ export default function MobileInvoiceDetail() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={showVoidConfirm} onOpenChange={setShowVoidConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Void Invoice</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to void invoice {invoice.invoiceNumber}? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="min-h-[44px]">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700 min-h-[44px]"
+                onClick={confirmVoid}
+                data-testid="button-confirm-void"
+              >
+                Void Invoice
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MobileShell>
   );
