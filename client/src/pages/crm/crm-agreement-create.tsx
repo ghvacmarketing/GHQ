@@ -413,9 +413,10 @@ export default function CrmAgreementCreate() {
                         id="agreementPlan"
                         value={agreementPlan}
                         onChange={(e) => setAgreementPlan(e.target.value)}
-                        className="mt-1"
+                        className={`mt-1 ${isPreventativeMaintenance ? "bg-slate-100 text-slate-600" : ""}`}
                         placeholder="e.g., Preventative Maintenance"
                         data-testid="input-agreement-plan"
+                        disabled={isPreventativeMaintenance}
                       />
                     </div>
 
@@ -584,8 +585,13 @@ export default function CrmAgreementCreate() {
                           onChange={(e) => setPrice(e.target.value)}
                           placeholder="0.00"
                           data-testid="input-price"
+                          className={isPreventativeMaintenance ? "bg-slate-100 text-slate-600" : ""}
+                          disabled={isPreventativeMaintenance}
                         />
                       </div>
+                      {isPreventativeMaintenance && (
+                        <p className="text-xs text-slate-500 mt-1">Auto-calculated from number of systems</p>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-lg">
