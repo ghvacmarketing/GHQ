@@ -2100,3 +2100,28 @@ export const insertProposalSessionSchema = createInsertSchema(proposalSessions).
 
 export type InsertProposalSession = z.infer<typeof insertProposalSessionSchema>;
 export type ProposalSession = typeof proposalSessions.$inferSelect;
+
+// Monthly Goals for revenue tracking
+export const monthlyGoals = pgTable("monthly_goals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  dailyServiceGoal: decimal("daily_service_goal", { precision: 10, scale: 2 }).notNull().default("0"),
+  dailyInstallGoal: decimal("daily_install_goal", { precision: 10, scale: 2 }).notNull().default("0"),
+  dailyMaintenanceGoal: decimal("daily_maintenance_goal", { precision: 10, scale: 2 }).notNull().default("0"),
+  monthlyServiceGoal: decimal("monthly_service_goal", { precision: 10, scale: 2 }).notNull().default("0"),
+  monthlyInstallGoal: decimal("monthly_install_goal", { precision: 10, scale: 2 }).notNull().default("0"),
+  monthlyMaintenanceGoal: decimal("monthly_maintenance_goal", { precision: 10, scale: 2 }).notNull().default("0"),
+  monthlySalesGoal: decimal("monthly_sales_goal", { precision: 10, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMonthlyGoalSchema = createInsertSchema(monthlyGoals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMonthlyGoal = z.infer<typeof insertMonthlyGoalSchema>;
+export type MonthlyGoal = typeof monthlyGoals.$inferSelect;

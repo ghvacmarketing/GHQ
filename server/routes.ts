@@ -10,7 +10,8 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal } from "@shared/schema";
+import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
@@ -14097,6 +14098,249 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error summarizing checklist:", error);
       res.status(500).json({ message: "Failed to summarize checklist" });
+    }
+  });
+
+  // ===== Goals Tracker API =====
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  // GET /api/crm/goals/:year/:month - Get goals for a specific month
+  app.get("/api/crm/goals/:year/:month", requireCrmAuth, async (req, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      
+      if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+        return res.status(400).json({ message: "Invalid year or month" });
+      }
+      
+      const [goal] = await db.select().from(monthlyGoals)
+        .where(and(eq(monthlyGoals.year, year), eq(monthlyGoals.month, month)));
+      
+      if (!goal) {
+        return res.status(404).json({ message: "Goals not found for this month" });
+      }
+      
+      res.json(goal);
+    } catch (error) {
+      console.error("Error fetching monthly goals:", error);
+      res.status(500).json({ message: "Failed to fetch monthly goals" });
+    }
+  });
+
+  // POST /api/crm/goals/import - Parse Excel file and import all monthly goals
+  app.post("/api/crm/goals/import", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const excelPath = path.join(process.cwd(), "attached_assets/12-03-2025_GHVAC_1767440304627.xlsx");
+      
+      if (!fs.existsSync(excelPath)) {
+        return res.status(404).json({ message: "Excel file not found" });
+      }
+      
+      const workbook = xlsx.readFile(excelPath);
+      const importedMonths: string[] = [];
+      const year = req.body.year || new Date().getFullYear();
+      
+      for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
+        const monthName = monthNames[monthIndex];
+        const sheet = workbook.Sheets[monthName];
+        
+        if (!sheet) continue;
+        
+        const data = xlsx.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+        
+        // Find row 19 (0-indexed: 18) which has "Day 1" data
+        // Column structure: A=Day label, B=Daily Service, C=Actual Service, D=Daily Install, E=Actual Install, F=Daily Maintenance, G=Actual Maintenance
+        let dailyServiceGoal = 0;
+        let dailyInstallGoal = 0;
+        let dailyMaintenanceGoal = 0;
+        let daysCount = 0;
+        
+        // Start at row 18 (Day 1) and sum up all days
+        for (let i = 18; i < data.length; i++) {
+          const row = data[i] as any[];
+          if (!row || !row[0] || !String(row[0]).startsWith("Day")) break;
+          
+          const serviceGoal = parseFloat(row[1]) || 0;
+          const installGoal = parseFloat(row[3]) || 0;
+          const maintenanceGoal = parseFloat(row[5]) || 0;
+          
+          dailyServiceGoal += serviceGoal;
+          dailyInstallGoal += installGoal;
+          dailyMaintenanceGoal += maintenanceGoal;
+          daysCount++;
+        }
+        
+        if (daysCount > 0) {
+          // Average daily goal
+          const avgDailyService = dailyServiceGoal / daysCount;
+          const avgDailyInstall = dailyInstallGoal / daysCount;
+          const avgDailyMaintenance = dailyMaintenanceGoal / daysCount;
+          
+          // Monthly goals are total of all days
+          const monthlyServiceGoal = dailyServiceGoal;
+          const monthlyInstallGoal = dailyInstallGoal;
+          const monthlyMaintenanceGoal = dailyMaintenanceGoal;
+          
+          // Sales goal from "Sales Goals" sheet or estimate (total revenue goal)
+          const monthlySalesGoal = monthlyServiceGoal + monthlyInstallGoal + monthlyMaintenanceGoal;
+          
+          // Check if exists, update or insert
+          const [existing] = await db.select().from(monthlyGoals)
+            .where(and(eq(monthlyGoals.year, year), eq(monthlyGoals.month, monthIndex + 1)));
+          
+          if (existing) {
+            await db.update(monthlyGoals)
+              .set({
+                dailyServiceGoal: avgDailyService.toFixed(2),
+                dailyInstallGoal: avgDailyInstall.toFixed(2),
+                dailyMaintenanceGoal: avgDailyMaintenance.toFixed(2),
+                monthlyServiceGoal: monthlyServiceGoal.toFixed(2),
+                monthlyInstallGoal: monthlyInstallGoal.toFixed(2),
+                monthlyMaintenanceGoal: monthlyMaintenanceGoal.toFixed(2),
+                monthlySalesGoal: monthlySalesGoal.toFixed(2),
+                updatedAt: new Date(),
+              })
+              .where(eq(monthlyGoals.id, existing.id));
+          } else {
+            await db.insert(monthlyGoals).values({
+              year,
+              month: monthIndex + 1,
+              dailyServiceGoal: avgDailyService.toFixed(2),
+              dailyInstallGoal: avgDailyInstall.toFixed(2),
+              dailyMaintenanceGoal: avgDailyMaintenance.toFixed(2),
+              monthlyServiceGoal: monthlyServiceGoal.toFixed(2),
+              monthlyInstallGoal: monthlyInstallGoal.toFixed(2),
+              monthlyMaintenanceGoal: monthlyMaintenanceGoal.toFixed(2),
+              monthlySalesGoal: monthlySalesGoal.toFixed(2),
+            });
+          }
+          
+          importedMonths.push(monthName);
+        }
+      }
+      
+      res.json({ 
+        message: `Successfully imported goals for ${importedMonths.length} months`,
+        months: importedMonths,
+        year 
+      });
+    } catch (error) {
+      console.error("Error importing goals:", error);
+      res.status(500).json({ message: "Failed to import goals" });
+    }
+  });
+
+  // GET /api/crm/goals/tracker - Get current month's goals vs actual revenue data
+  app.get("/api/crm/goals/tracker", requireCrmAuth, async (req, res) => {
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const dayOfMonth = now.getDate();
+      const monthName = monthNames[month - 1];
+      
+      // Get goals for current month
+      const [goals] = await db.select().from(monthlyGoals)
+        .where(and(eq(monthlyGoals.year, year), eq(monthlyGoals.month, month)));
+      
+      // Calculate start of month and today in Eastern timezone
+      const startOfMonth = new Date(year, month - 1, 1, 0, 0, 0);
+      const startOfToday = new Date(year, month - 1, dayOfMonth, 0, 0, 0);
+      const endOfToday = new Date(year, month - 1, dayOfMonth, 23, 59, 59);
+      
+      // Get paid invoices for current month with work order visit types
+      const paidInvoices = await db.select({
+        total: crmInvoices.total,
+        paidAt: crmInvoices.paidAt,
+        visitType: crmWorkOrders.visitType,
+      })
+        .from(crmInvoices)
+        .leftJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+        .where(and(
+          eq(crmInvoices.status, "paid"),
+          isNotNull(crmInvoices.paidAt),
+          gt(crmInvoices.paidAt, startOfMonth),
+        ));
+      
+      // Categorize revenue by visit type
+      let serviceActualMTD = 0;
+      let installActualMTD = 0;
+      let maintenanceActualMTD = 0;
+      let serviceActualToday = 0;
+      let installActualToday = 0;
+      let maintenanceActualToday = 0;
+      
+      for (const invoice of paidInvoices) {
+        const amount = parseFloat(invoice.total || "0");
+        const paidAt = invoice.paidAt ? new Date(invoice.paidAt) : null;
+        const isToday = paidAt && paidAt >= startOfToday && paidAt <= endOfToday;
+        
+        switch (invoice.visitType) {
+          case "SERVICE":
+            serviceActualMTD += amount;
+            if (isToday) serviceActualToday += amount;
+            break;
+          case "INSTALL":
+            installActualMTD += amount;
+            if (isToday) installActualToday += amount;
+            break;
+          case "MAINTENANCE":
+            maintenanceActualMTD += amount;
+            if (isToday) maintenanceActualToday += amount;
+            break;
+          default:
+            // Count untyped invoices as service
+            serviceActualMTD += amount;
+            if (isToday) serviceActualToday += amount;
+        }
+      }
+      
+      // Calculate goals and metrics
+      const dailyServiceGoal = parseFloat(goals?.dailyServiceGoal || "0");
+      const dailyInstallGoal = parseFloat(goals?.dailyInstallGoal || "0");
+      const dailyMaintenanceGoal = parseFloat(goals?.dailyMaintenanceGoal || "0");
+      
+      const mtdServiceGoal = dailyServiceGoal * dayOfMonth;
+      const mtdInstallGoal = dailyInstallGoal * dayOfMonth;
+      const mtdMaintenanceGoal = dailyMaintenanceGoal * dayOfMonth;
+      
+      const dailyTotalGoal = dailyServiceGoal + dailyInstallGoal + dailyMaintenanceGoal;
+      const dailyTotalActual = serviceActualToday + installActualToday + maintenanceActualToday;
+      const mtdTotalGoal = mtdServiceGoal + mtdInstallGoal + mtdMaintenanceGoal;
+      const mtdTotalActual = serviceActualMTD + installActualMTD + maintenanceActualMTD;
+      
+      const monthlySalesGoal = parseFloat(goals?.monthlySalesGoal || "0");
+      
+      const buildCategory = (dailyGoal: number, dailyActual: number, mtdGoal: number, mtdActual: number) => ({
+        dailyGoal,
+        dailyActual,
+        mtdGoal,
+        mtdActual,
+        difference: mtdActual - mtdGoal,
+        percentComplete: mtdGoal > 0 ? Math.round((mtdActual / mtdGoal) * 100) : 0,
+      });
+      
+      res.json({
+        month: monthName,
+        year,
+        dayOfMonth,
+        daysInMonth: new Date(year, month, 0).getDate(),
+        hasGoals: !!goals,
+        service: buildCategory(dailyServiceGoal, serviceActualToday, mtdServiceGoal, serviceActualMTD),
+        install: buildCategory(dailyInstallGoal, installActualToday, mtdInstallGoal, installActualMTD),
+        maintenance: buildCategory(dailyMaintenanceGoal, maintenanceActualToday, mtdMaintenanceGoal, maintenanceActualMTD),
+        total: buildCategory(dailyTotalGoal, dailyTotalActual, mtdTotalGoal, mtdTotalActual),
+        sales: {
+          mtdGoal: monthlySalesGoal,
+          mtdActual: mtdTotalActual,
+          difference: mtdTotalActual - monthlySalesGoal,
+          percentComplete: monthlySalesGoal > 0 ? Math.round((mtdTotalActual / monthlySalesGoal) * 100) : 0,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching goals tracker:", error);
+      res.status(500).json({ message: "Failed to fetch goals tracker data" });
     }
   });
 
