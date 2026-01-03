@@ -55,7 +55,15 @@ import {
   Clock,
   Check,
   AlertCircle,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -1146,43 +1154,20 @@ export default function CrmQuoteDetail() {
               {["draft", "sent", "viewed"].includes(status) && (
                 <Button
                   onClick={handleOpenSendDialog}
-                  variant="outline"
                   size="sm"
-                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                   data-testid="button-send-quote"
                 >
                   <Mail className="h-4 w-4 mr-2" />
                   Send Quote
                 </Button>
               )}
-              {status === "draft" && (
-                <Button
-                  onClick={() => setShowMarkAsSentDialog(true)}
-                  variant="outline"
-                  size="sm"
-                  className="text-slate-600 hover:text-slate-700"
-                  data-testid="button-mark-sent"
-                >
-                  <Check className="h-4 w-4 mr-2" />
-                  Mark as Sent
-                </Button>
-              )}
-              <Button
-                onClick={handleDownloadPDF}
-                variant="outline"
-                size="sm"
-                data-testid="button-download-pdf"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Print PDF
-              </Button>
               {status === "sent" && (
                 <>
                   <Button
                     onClick={handleApprove}
-                    variant="outline"
                     size="sm"
-                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                    className="bg-green-600 hover:bg-green-700 text-white"
                     disabled={acceptMutation.isPending}
                     data-testid="button-approve"
                   >
@@ -1205,9 +1190,8 @@ export default function CrmQuoteDetail() {
               {status === "accepted" && (
                 <Button
                   onClick={handleCreateInvoice}
-                  variant="outline"
                   size="sm"
-                  className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
                   disabled={createInvoiceMutation.isPending}
                   data-testid="button-create-invoice"
                 >
@@ -1219,21 +1203,39 @@ export default function CrmQuoteDetail() {
                   Create Invoice
                 </Button>
               )}
-              <Button
-                onClick={handleDelete}
-                variant="outline"
-                size="sm"
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                disabled={deleteMutation.isPending}
-                data-testid="button-delete"
-              >
-                {deleteMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4 mr-2" />
-                )}
-                Delete
-              </Button>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-more-actions">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleDownloadPDF} data-testid="menu-print-pdf">
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print PDF
+                  </DropdownMenuItem>
+                  {status === "draft" && (
+                    <DropdownMenuItem 
+                      onClick={() => setShowMarkAsSentDialog(true)}
+                      data-testid="menu-mark-sent"
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      Mark as Sent
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={handleDelete}
+                    disabled={deleteMutation.isPending}
+                    className="text-red-600 focus:text-red-600"
+                    data-testid="menu-delete"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Quote
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>

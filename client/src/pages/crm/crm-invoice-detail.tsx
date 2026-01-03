@@ -56,7 +56,15 @@ import {
   MapPin,
   CreditCard,
   Trash2,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { jsPDF } from "jspdf";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
@@ -528,70 +536,70 @@ export default function CrmInvoiceDetail() {
             </p>
             
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSend}
-                disabled={isSent || isVoid || sendMutation.isPending}
-                data-testid="button-send"
-              >
-                {sendMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4 mr-2" />
-                )}
-                Send
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowPaymentDialog(true)}
-                disabled={isVoid || isPaid}
-                className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                data-testid="button-record-payment"
-              >
-                <CreditCard className="h-4 w-4 mr-2" />
-                Record Payment
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadPDF}
-                data-testid="button-print"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Print PDF
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleVoid}
-                disabled={isVoid || voidMutation.isPending}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                data-testid="button-void"
-              >
-                {voidMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <XCircle className="h-4 w-4 mr-2" />
-                )}
-                Void
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                data-testid="button-delete"
-              >
-                {deleteMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4 mr-2" />
-                )}
-                Delete
-              </Button>
+              {!isSent && !isVoid && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSend}
+                  disabled={sendMutation.isPending}
+                  data-testid="button-send"
+                >
+                  {sendMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  Send
+                </Button>
+              )}
+              {!isVoid && !isPaid && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowPaymentDialog(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  data-testid="button-record-payment"
+                >
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Record Payment
+                </Button>
+              )}
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-more-actions">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleDownloadPDF} data-testid="menu-print-pdf">
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print PDF
+                  </DropdownMenuItem>
+                  {!isVoid && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={handleVoid}
+                        disabled={voidMutation.isPending}
+                        className="text-red-600 focus:text-red-600"
+                        data-testid="menu-void"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Void Invoice
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuItem 
+                    onClick={handleDelete}
+                    disabled={deleteMutation.isPending}
+                    className="text-red-600 focus:text-red-600"
+                    data-testid="menu-delete"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Invoice
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
