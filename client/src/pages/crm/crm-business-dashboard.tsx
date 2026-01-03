@@ -80,6 +80,13 @@ interface DashboardAnalytics {
     created: number;
     sent: number;
     pending: number;
+    recent: Array<{
+      id: string;
+      invoiceNumber: string;
+      total: string;
+      status: string;
+      createdAt: string;
+    }>;
   };
   techPerformance: Array<{
     id: string;
@@ -90,6 +97,7 @@ interface DashboardAnalytics {
     perTicketAvg: number;
     maintenanceAgreements: number;
     goal: number;
+    goalTarget: number;
     goalProgress: number;
     goalMet: boolean;
   }>;
@@ -472,7 +480,7 @@ export default function CrmBusinessDashboard() {
                   <p className="text-xs text-slate-500">Last 30 days</p>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 gap-3 mb-4">
                     <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
                       <p className="text-2xl font-bold text-slate-800">{analytics.invoicesOverview.created}</p>
                       <p className="text-xs text-slate-600">Created</p>
@@ -485,6 +493,22 @@ export default function CrmBusinessDashboard() {
                       <p className="text-2xl font-bold text-amber-800">{analytics.invoicesOverview.pending}</p>
                       <p className="text-xs text-amber-600">Pending</p>
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Recent Invoices</p>
+                    {analytics.invoicesOverview.recent && analytics.invoicesOverview.recent.length > 0 ? (
+                      analytics.invoicesOverview.recent.map((invoice) => (
+                        <div key={invoice.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                          <div className="truncate flex-1">
+                            <p className="text-sm font-medium text-slate-800">{invoice.invoiceNumber || `INV-${invoice.id.slice(0, 8)}`}</p>
+                            <p className="text-xs text-slate-500">{formatCurrency(parseFloat(invoice.total || "0"))}</p>
+                          </div>
+                          <Badge className="text-xs ml-2" variant="outline">{invoice.status}</Badge>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500 text-center py-2">No recent invoices</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -522,6 +546,7 @@ export default function CrmBusinessDashboard() {
                             sold={tech.serviceRevenue}
                             quoted={tech.quotedAmount}
                             goal={tech.goal}
+                            goalTarget={tech.goalTarget}
                             size={200}
                           />
                         </div>

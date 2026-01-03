@@ -5079,6 +5079,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+      
+      const monthlyGoalsResult = await db
+        .select()
+        .from(monthlyGoals)
+        .where(and(
+          eq(monthlyGoals.year, currentYear),
+          eq(monthlyGoals.month, currentMonth)
+        ))
+        .limit(1);
+      
+      const currentMonthlyGoals = monthlyGoalsResult[0] || null;
       const startOfYear = new Date(now.getFullYear(), 0, 1);
       const startOfWeek = new Date(today);
       startOfWeek.setDate(today.getDate() - today.getDay());
@@ -5236,7 +5251,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const serviceJobs = techWorkOrders.length;
           const perTicketAvg = serviceJobs > 0 ? serviceRevenue / serviceJobs : 0;
-          const techGoal = 12000;
+          
+          const dailyServiceGoal = currentMonthlyGoals ? parseFloat(currentMonthlyGoals.dailyServiceGoal || "0") : 0;
+          const totalMonthlyServiceGoal = dailyServiceGoal * daysInMonth;
+          const techGoal = techs.length > 0 ? totalMonthlyServiceGoal / techs.length : 12000;
           const goalMet = serviceRevenue >= techGoal;
 
           const maintenanceAgreementsCount = await db
@@ -5265,6 +5283,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quotedAmount = parseFloat(quotedResult[0]?.total || "0");
           }
 
+          // Calculate potential as max of (goal, sold + quoted) with some headroom
+          const salesOpportunity = serviceRevenue + quotedAmount;
+          const potential = Math.max(techGoal * 1.2, salesOpportunity, techGoal);
+          
           return {
             id: tech.id,
             name: tech.name,
@@ -5273,7 +5295,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             serviceJobs,
             perTicketAvg,
             maintenanceAgreements: maintenanceAgreementsCount[0]?.count || 0,
-            goal: techGoal,
+            goal: potential,
+            goalTarget: techGoal,
             goalProgress: techGoal > 0 ? (serviceRevenue / techGoal) * 100 : 0,
             goalMet,
           };
@@ -5379,6 +5402,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(crmInvoices.status, "draft"),
           sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`
         ));
+      
+      const recentInvoices = await db
+        .select({
+          id: crmInvoices.id,
+          invoiceNumber: crmInvoices.invoiceNumber,
+          total: crmInvoices.total,
+          status: crmInvoices.status,
+          createdAt: crmInvoices.createdAt,
+        })
+        .from(crmInvoices)
+        .orderBy(desc(crmInvoices.createdAt))
+        .limit(5);
 
       // 8. Sales Team Performance
       const salesUsers = await db
@@ -5391,7 +5426,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const leadsReceived = await db
             .select({ count: sql<number>`COUNT(*)` })
             .from(crmCustomers)
-            .where(sql`${crmCustomers.createdAt} >= ${startOfMonth}`);
+            .where(and(
+              sql`${crmCustomers.createdAt} >= ${startOfMonth}`,
+              eq(crmCustomers.assignedSalesRepId, salesperson.id)
+            ));
 
           const salesVisits = await db
             .select({ count: sql<number>`COUNT(*)` })
@@ -5497,6 +5535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           created: createdInvoicesCount[0]?.count || 0,
           sent: sentInvoicesCount[0]?.count || 0,
           pending: pendingInvoicesCount[0]?.count || 0,
+          recent: recentInvoices,
         },
         techPerformance,
         salesPerformance,

@@ -2,6 +2,7 @@ interface PerformanceGaugeProps {
   sold: number;
   quoted: number;
   goal: number;
+  goalTarget?: number;
   size?: number;
 }
 
@@ -15,13 +16,13 @@ function formatCurrency(value: number): string {
   return `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 }
 
-export function PerformanceGauge({ sold, quoted, goal, size = 180 }: PerformanceGaugeProps) {
-  const potential = goal;
-  const missed = Math.max(0, goal - sold - quoted);
+export function PerformanceGauge({ sold, quoted, goal, goalTarget, size = 180 }: PerformanceGaugeProps) {
+  const actualGoal = goalTarget ?? goal;
+  const potential = Math.max(actualGoal, sold + quoted, goal);
+  const missed = Math.max(0, potential - sold - quoted);
   
   const soldPercent = potential > 0 ? Math.min((sold / potential) * 100, 100) : 0;
   const quotedPercent = potential > 0 ? Math.min((quoted / potential) * 100, 100 - soldPercent) : 0;
-  const missedPercent = potential > 0 ? (missed / potential) * 100 : 0;
   
   const soldAngle = Math.min((soldPercent / 100) * 180, 180);
   const quotedAngle = Math.min((quotedPercent / 100) * 180, 180 - soldAngle);
@@ -52,6 +53,15 @@ export function PerformanceGauge({ sold, quoted, goal, size = 180 }: Performance
   const needleLength = radius - 15;
   const needleX = centerX + needleLength * Math.cos(needleRadians);
   const needleY = centerY - needleLength * Math.sin(needleRadians);
+
+  const showGoalMarker = actualGoal > 0 && potential > 0;
+  const goalMarkerPercent = showGoalMarker ? Math.min((actualGoal / potential) * 100, 100) : 0;
+  const goalMarkerAngle = (goalMarkerPercent / 100) * 180;
+  const goalMarkerRadians = ((180 - goalMarkerAngle) * Math.PI) / 180;
+  const goalMarkerInnerX = centerX + (radius - strokeWidth/2 - 2) * Math.cos(goalMarkerRadians);
+  const goalMarkerInnerY = centerY - (radius - strokeWidth/2 - 2) * Math.sin(goalMarkerRadians);
+  const goalMarkerOuterX = centerX + (radius + strokeWidth/2 + 2) * Math.cos(goalMarkerRadians);
+  const goalMarkerOuterY = centerY - (radius + strokeWidth/2 + 2) * Math.sin(goalMarkerRadians);
 
   return (
     <div className="flex flex-col items-center" style={{ width: size }}>
@@ -99,16 +109,17 @@ export function PerformanceGauge({ sold, quoted, goal, size = 180 }: Performance
           />
         )}
         
-        {/* Goal marker tick at 100% (right end) */}
-        <line
-          x1={centerX + (radius - strokeWidth/2 - 2)}
-          y1={centerY}
-          x2={centerX + (radius + strokeWidth/2 + 2)}
-          y2={centerY}
-          stroke="#dc2626"
-          strokeWidth={3}
-          strokeLinecap="round"
-        />
+        {showGoalMarker && (
+          <line
+            x1={goalMarkerInnerX}
+            y1={goalMarkerInnerY}
+            x2={goalMarkerOuterX}
+            y2={goalMarkerOuterY}
+            stroke="#dc2626"
+            strokeWidth={3}
+            strokeLinecap="round"
+          />
+        )}
         
         <line
           x1={centerX}
@@ -128,8 +139,12 @@ export function PerformanceGauge({ sold, quoted, goal, size = 180 }: Performance
           <p className="text-xs text-slate-500">Sold</p>
         </div>
         <div className="text-center">
-          <p className="text-lg font-bold text-red-600">{formatCurrency(goal)}</p>
+          <p className="text-lg font-bold text-red-600">{formatCurrency(actualGoal)}</p>
           <p className="text-xs text-slate-500">Goal</p>
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-bold text-slate-900">{formatCurrency(potential)}</p>
+          <p className="text-xs text-slate-500">Potential</p>
         </div>
       </div>
     </div>
