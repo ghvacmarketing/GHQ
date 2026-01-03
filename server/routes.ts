@@ -12361,15 +12361,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const todayStr = nowUtc.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE }); // YYYY-MM-DD in Eastern
               const today = new Date(todayStr + 'T12:00:00'); // Use noon to avoid DST edge cases
               
+              // For weekly/monthly: NO grace period - first appointment is same as contract date
+              // For annual: 1 month grace period before first appointment
               const appointmentDate = new Date(today);
-              appointmentDate.setMonth(appointmentDate.getMonth() + 1);
+              if (agreementFrequency === "annual") {
+                appointmentDate.setMonth(appointmentDate.getMonth() + 1);
+              }
+              // For weekly/monthly, appointmentDate stays as today (no grace period)
               
-              // End date depends on frequency: weekly=1 week, monthly=1 month, annual=1 year
+              // End date depends on frequency:
+              // Weekly: exactly 7 days later
+              // Monthly: exactly 30 days later
+              // Annual: 1 year later
               const endDate = new Date(today);
               if (agreementFrequency === "weekly") {
                 endDate.setDate(endDate.getDate() + 7);
               } else if (agreementFrequency === "monthly") {
-                endDate.setMonth(endDate.getMonth() + 1);
+                endDate.setDate(endDate.getDate() + 30);
               } else {
                 // Annual - default 1 year
                 endDate.setFullYear(endDate.getFullYear() + 1);
@@ -12450,20 +12458,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }).returning();
               
               // Generate maintenance visits for the new agreement based on frequency
-              // Visits are spaced based on the cadence (weekly=7 days, monthly=30 days, annual=spread across year)
+              // Visits are evenly spaced within the period:
+              // Weekly: 7 days ÷ visits = spacing
+              // Monthly: 30 days ÷ visits = spacing
+              // Annual: spread evenly across the year (months apart)
               if (newAgreement) {
                 for (let i = 0; i < agreementVisitsPerPeriod; i++) {
                   const visitDate = new Date(appointmentDate);
                   
-                  // Calculate visit dates: each visit is spaced by the full cadence interval
                   if (agreementFrequency === "weekly") {
-                    // Weekly: visits are 7 days apart
-                    visitDate.setDate(visitDate.getDate() + (i * 7));
+                    // Weekly: 7 days ÷ number of visits = days apart
+                    const daysApart = Math.floor(7 / agreementVisitsPerPeriod);
+                    visitDate.setDate(visitDate.getDate() + (i * daysApart));
                   } else if (agreementFrequency === "monthly") {
-                    // Monthly: visits are 30 days apart
-                    visitDate.setDate(visitDate.getDate() + (i * 30));
+                    // Monthly: 30 days ÷ number of visits = days apart
+                    const daysApart = Math.floor(30 / agreementVisitsPerPeriod);
+                    visitDate.setDate(visitDate.getDate() + (i * daysApart));
                   } else {
-                    // Annual: spread evenly across the year
+                    // Annual: spread evenly across the year (months apart)
                     const monthsApart = Math.max(1, Math.floor(12 / agreementVisitsPerPeriod));
                     visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
                   }

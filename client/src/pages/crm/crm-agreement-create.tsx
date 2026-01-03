@@ -30,7 +30,7 @@ import {
   Building2,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { format, addMonths, addYears, addWeeks, parseISO } from "date-fns";
+import { format, addMonths, addYears, addDays, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser, MaintenanceRegion, CrmCustomer, CrmProperty, CustomAgreementType } from "@shared/schema";
 
@@ -186,15 +186,17 @@ export default function CrmAgreementCreate() {
 
   const calculateEndDate = (startDateStr: string, freq: "weekly" | "monthly" | "annual") => {
     if (!startDateStr) return "";
-    const startDateObj = new Date(startDateStr);
+    const startDateObj = parseISO(startDateStr);
     if (isPreventativeMaintenance) {
       return format(addYears(startDateObj, 1), "yyyy-MM-dd");
     }
     switch (freq) {
       case "weekly":
-        return format(addWeeks(startDateObj, 1), "yyyy-MM-dd");
+        // Weekly: exactly 7 days later
+        return format(addDays(startDateObj, 7), "yyyy-MM-dd");
       case "monthly":
-        return format(addMonths(startDateObj, 1), "yyyy-MM-dd");
+        // Monthly: exactly 30 days later
+        return format(addDays(startDateObj, 30), "yyyy-MM-dd");
       case "annual":
       default:
         return format(addYears(startDateObj, 1), "yyyy-MM-dd");
@@ -206,8 +208,14 @@ export default function CrmAgreementCreate() {
     setInvoiceDate(newContractDate);
     setStartDate(newContractDate);
     if (newContractDate) {
-      const contractDateObj = new Date(newContractDate);
-      setAppointmentDate(format(addMonths(contractDateObj, 1), "yyyy-MM-dd"));
+      const contractDateObj = parseISO(newContractDate);
+      // For annual agreements: 1 month grace period before first appointment
+      // For weekly/monthly: NO grace period - first appointment is same as contract date
+      if (frequency === "annual" || isPreventativeMaintenance) {
+        setAppointmentDate(format(addMonths(contractDateObj, 1), "yyyy-MM-dd"));
+      } else {
+        setAppointmentDate(newContractDate); // No grace period for weekly/monthly
+      }
       setEndDate(calculateEndDate(newContractDate, frequency));
     }
   };
@@ -215,6 +223,13 @@ export default function CrmAgreementCreate() {
   useEffect(() => {
     if (contractDate) {
       setEndDate(calculateEndDate(contractDate, frequency));
+      // Update appointment date based on frequency
+      const contractDateObj = parseISO(contractDate);
+      if (frequency === "annual" || isPreventativeMaintenance) {
+        setAppointmentDate(format(addMonths(contractDateObj, 1), "yyyy-MM-dd"));
+      } else {
+        setAppointmentDate(contractDate); // No grace period for weekly/monthly
+      }
     }
   }, [frequency, isPreventativeMaintenance]);
 
@@ -290,22 +305,42 @@ export default function CrmAgreementCreate() {
     createAgreementMutation.mutate();
   };
 
-  const getVisitSummary = () => {
-    if (!appointmentDate) return null;
+  const getScheduledVisits = () => {
+    if (!appointmentDate || visitsPerPeriod < 1) return [];
     try {
-      // Use parseISO to correctly parse the date string without timezone shift
       const firstVisit = parseISO(appointmentDate);
-      const secondVisit = addMonths(firstVisit, 6);
-      return {
-        firstVisit: format(firstVisit, "MMM d, yyyy"),
-        secondVisit: format(secondVisit, "MMM d, yyyy"),
-      };
+      const visits: { visitNumber: number; date: string }[] = [];
+      
+      for (let i = 0; i < visitsPerPeriod; i++) {
+        let visitDate: Date;
+        
+        if (frequency === "weekly") {
+          // Weekly: 7 days ÷ visits = spacing between visits
+          const daysApart = Math.floor(7 / visitsPerPeriod);
+          visitDate = addDays(firstVisit, i * daysApart);
+        } else if (frequency === "monthly") {
+          // Monthly: 30 days ÷ visits = spacing between visits
+          const daysApart = Math.floor(30 / visitsPerPeriod);
+          visitDate = addDays(firstVisit, i * daysApart);
+        } else {
+          // Annual: spread evenly across the year (months apart)
+          const monthsApart = Math.max(1, Math.floor(12 / visitsPerPeriod));
+          visitDate = addMonths(firstVisit, i * monthsApart);
+        }
+        
+        visits.push({
+          visitNumber: i + 1,
+          date: format(visitDate, "MMM d, yyyy"),
+        });
+      }
+      
+      return visits;
     } catch {
-      return null;
+      return [];
     }
   };
 
-  const visitSummary = getVisitSummary();
+  const scheduledVisits = getScheduledVisits();
   const priceBreakdown = getPriceBreakdown(numberOfSystems);
 
   if (authLoading) {
@@ -699,22 +734,22 @@ export default function CrmAgreementCreate() {
 
                     <div className="h-px bg-slate-100" />
 
-                    {visitSummary && (
+                    {scheduledVisits.length > 0 && (
                       <div>
                         <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Scheduled Visits</p>
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className="h-5 w-5 rounded-full bg-green-100 flex items-center justify-center">
-                              <span className="text-xs font-medium text-green-700">1</span>
+                        <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                          {scheduledVisits.map((visit) => (
+                            <div key={visit.visitNumber} className="flex items-center gap-2 text-sm">
+                              <div className={`h-5 w-5 rounded-full flex items-center justify-center ${
+                                visit.visitNumber === 1 ? "bg-green-100" : "bg-blue-100"
+                              }`}>
+                                <span className={`text-xs font-medium ${
+                                  visit.visitNumber === 1 ? "text-green-700" : "text-blue-700"
+                                }`}>{visit.visitNumber}</span>
+                              </div>
+                              <span>{visit.date}</span>
                             </div>
-                            <span>{visitSummary.firstVisit}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className="h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center">
-                              <span className="text-xs font-medium text-blue-700">2</span>
-                            </div>
-                            <span>{visitSummary.secondVisit}</span>
-                          </div>
+                          ))}
                         </div>
                       </div>
                     )}
