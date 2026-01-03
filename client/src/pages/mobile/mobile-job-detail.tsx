@@ -28,7 +28,8 @@ import {
   Eye,
   Search,
   Tag,
-  Package
+  Package,
+  CreditCard
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
@@ -687,6 +689,21 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     },
   });
 
+  // Send quote mutation
+  const sendQuoteMutation = useMutation({
+    mutationFn: async (quoteId: string) => {
+      const response = await apiRequest("POST", `/api/crm/quotes/${quoteId}/send`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Quote Sent", description: "Quote has been sent successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", { workOrderId: workOrder.id }] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to send quote", variant: "destructive" });
+    },
+  });
+
   const addLineItem = () => {
     setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service" }]);
   };
@@ -828,16 +845,35 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                       <span className="text-lg font-semibold text-green-700" data-testid={`quote-total-${quote.id}`}>
                         {formatCurrency(quote.total)}
                       </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="min-h-[44px]"
-                        onClick={() => navigate(`/crm/quotes/${quote.id}`)}
-                        data-testid={`button-view-quote-${quote.id}`}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
+                      <div className="flex gap-2">
+                        {quote.status === "draft" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="min-h-[44px] border-blue-200 text-blue-700 hover:bg-blue-50"
+                            onClick={() => sendQuoteMutation.mutate(quote.id)}
+                            disabled={sendQuoteMutation.isPending}
+                            data-testid={`button-send-quote-${quote.id}`}
+                          >
+                            {sendQuoteMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                            ) : (
+                              <Send className="h-4 w-4 mr-1" />
+                            )}
+                            Send
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="min-h-[44px]"
+                          onClick={() => navigate(`/crm/quotes/${quote.id}`)}
+                          data-testid={`button-view-quote-${quote.id}`}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                      </div>
                     </div>
                     {quote.createdAt && (
                       <p className="text-xs text-slate-400">
@@ -1342,6 +1378,11 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [discountAmount, setDiscountAmount] = useState("");
   const [showQuoteSelection, setShowQuoteSelection] = useState(false);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "check" | "card">("cash");
+  const [paymentReference, setPaymentReference] = useState("");
 
   const { data: invoicesData, isLoading: invoicesLoading, error: invoicesError } = useQuery<{ invoices: CrmInvoice[] }>({
     queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }],
@@ -1493,6 +1534,75 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       toast({ title: "Error", description: error.message || "Failed to create invoice", variant: "destructive" });
     },
   });
+
+  // Send invoice mutation
+  const sendInvoiceMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const response = await apiRequest("POST", `/api/crm/invoices/${invoiceId}/send`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invoice Sent", description: "Invoice has been sent successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
+      if (expandedInvoiceId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", expandedInvoiceId] });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to send invoice", variant: "destructive" });
+    },
+  });
+
+  // Record payment mutation
+  const recordPaymentMutation = useMutation({
+    mutationFn: async (data: { invoiceId: string; amountPaid: number; paymentMethod: string; paymentReference?: string }) => {
+      const response = await apiRequest("POST", `/api/crm/invoices/${data.invoiceId}/pay`, {
+        amountPaid: data.amountPaid,
+        paymentMethod: data.paymentMethod,
+        paymentReference: data.paymentReference,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Payment Recorded", description: "Payment has been recorded successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
+      if (paymentInvoiceId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", paymentInvoiceId] });
+      }
+      setShowPaymentDialog(false);
+      setPaymentInvoiceId(null);
+      setPaymentAmount("");
+      setPaymentMethod("cash");
+      setPaymentReference("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to record payment", variant: "destructive" });
+    },
+  });
+
+  const openPaymentDialog = (invoice: CrmInvoice) => {
+    setPaymentInvoiceId(invoice.id);
+    const balanceDue = parseFloat(invoice.balanceDue || invoice.total || "0");
+    setPaymentAmount(balanceDue.toFixed(2));
+    setPaymentMethod("cash");
+    setPaymentReference("");
+    setShowPaymentDialog(true);
+  };
+
+  const handleRecordPayment = () => {
+    if (!paymentInvoiceId) return;
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "Error", description: "Please enter a valid payment amount.", variant: "destructive" });
+      return;
+    }
+    recordPaymentMutation.mutate({
+      invoiceId: paymentInvoiceId,
+      amountPaid: amount,
+      paymentMethod: paymentMethod,
+      paymentReference: paymentReference || undefined,
+    });
+  };
 
   const addLineItem = () => {
     setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service" }]);
@@ -1776,16 +1886,43 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                           </div>
                         )}
 
-                        {/* View Full Invoice Button */}
-                        <Button
-                          variant="outline"
-                          className="w-full min-h-[44px]"
-                          onClick={() => navigate(`/crm/invoices/${invoice.id}`)}
-                          data-testid="button-view-invoice-detail"
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Full Invoice
-                        </Button>
+                        {/* Action Buttons */}
+                        <div className="flex flex-col gap-2">
+                          {invoice.status === "draft" && (
+                            <Button
+                              className="w-full min-h-[44px] bg-blue-600 hover:bg-blue-700"
+                              onClick={() => sendInvoiceMutation.mutate(invoice.id)}
+                              disabled={sendInvoiceMutation.isPending}
+                              data-testid={`button-send-invoice-${invoice.id}`}
+                            >
+                              {sendInvoiceMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              ) : (
+                                <Send className="h-4 w-4 mr-2" />
+                              )}
+                              Send Invoice
+                            </Button>
+                          )}
+                          {(invoice.status === "sent" || invoice.status === "partial") && (
+                            <Button
+                              className="w-full min-h-[44px] bg-green-600 hover:bg-green-700"
+                              onClick={() => openPaymentDialog(invoice)}
+                              data-testid={`button-record-payment-${invoice.id}`}
+                            >
+                              <CreditCard className="h-4 w-4 mr-2" />
+                              Record Payment
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            className="w-full min-h-[44px]"
+                            onClick={() => navigate(`/crm/invoices/${invoice.id}`)}
+                            data-testid="button-view-invoice-detail"
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Full Invoice
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2301,6 +2438,97 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowQuoteSelection(false)} className="min-h-[44px]">
               Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Record Payment Dialog */}
+      <Dialog open={showPaymentDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowPaymentDialog(false);
+          setPaymentInvoiceId(null);
+          setPaymentAmount("");
+          setPaymentMethod("cash");
+          setPaymentReference("");
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-green-600" />
+              Record Payment
+            </DialogTitle>
+            <DialogDescription>
+              Enter payment details for this invoice
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium">Amount ($)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-payment-amount"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Payment Method</Label>
+              <Select value={paymentMethod} onValueChange={(val: "cash" | "check" | "card") => setPaymentMethod(val)}>
+                <SelectTrigger className="min-h-[44px] mt-1" data-testid="select-payment-method">
+                  <SelectValue placeholder="Select method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="check">Check</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Reference (optional)</Label>
+              <Input
+                placeholder="e.g., Check #1234"
+                value={paymentReference}
+                onChange={(e) => setPaymentReference(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-payment-reference"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowPaymentDialog(false);
+                setPaymentInvoiceId(null);
+                setPaymentAmount("");
+                setPaymentMethod("cash");
+                setPaymentReference("");
+              }}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="bg-green-600 hover:bg-green-700 min-h-[44px]"
+              onClick={handleRecordPayment}
+              disabled={recordPaymentMutation.isPending}
+              data-testid="button-confirm-payment"
+            >
+              {recordPaymentMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <DollarSign className="h-4 w-4 mr-2" />
+              )}
+              Record Payment
             </Button>
           </DialogFooter>
         </DialogContent>
