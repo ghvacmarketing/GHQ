@@ -1374,32 +1374,37 @@ export default function CrmAgreements() {
                   data-testid="input-type-description"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="type-frequency">Frequency *</Label>
-                <Select
-                  value={typeForm.frequency}
-                  onValueChange={(value: "weekly" | "monthly" | "annual") => {
-                    const max = value === "weekly" ? 7 : value === "monthly" ? 30 : 365;
-                    setTypeForm({ 
-                      ...typeForm, 
-                      frequency: value,
-                      visitsPerPeriod: Math.min(typeForm.visitsPerPeriod, max)
-                    });
-                  }}
-                >
-                  <SelectTrigger id="type-frequency" data-testid="select-type-frequency">
-                    <SelectValue placeholder="Select frequency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="annual">Annual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="type-visits">Visits Per Period *</Label>
+                  <Label htmlFor="type-frequency">Billing Cycle *</Label>
+                  <Select
+                    value={typeForm.frequency}
+                    onValueChange={(value: "weekly" | "monthly" | "annual") => {
+                      const max = value === "weekly" ? 7 : value === "monthly" ? 30 : 365;
+                      setTypeForm({ 
+                        ...typeForm, 
+                        frequency: value,
+                        visitsPerPeriod: Math.min(typeForm.visitsPerPeriod, max)
+                      });
+                    }}
+                  >
+                    <SelectTrigger id="type-frequency" data-testid="select-type-frequency">
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="annual">Annual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="type-visits">Visits *</Label>
+                    <Badge variant="outline" className="text-xs font-normal">
+                      max {typeForm.frequency === "weekly" ? "7" : typeForm.frequency === "monthly" ? "30" : "365"}
+                    </Badge>
+                  </div>
                   <Input
                     id="type-visits"
                     type="number"
@@ -1413,22 +1418,20 @@ export default function CrmAgreements() {
                     }}
                     data-testid="input-type-visits"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Max: {typeForm.frequency === "weekly" ? "7 (days in week)" : typeForm.frequency === "monthly" ? "30 (days in month)" : "365 (days in year)"}
-                  </p>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="type-price">Default Price ($) *</Label>
-                  <Input
-                    id="type-price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={typeForm.defaultPrice}
-                    onChange={(e) => setTypeForm({ ...typeForm, defaultPrice: e.target.value })}
-                    data-testid="input-type-price"
-                  />
-                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="type-price">Default Price ($) *</Label>
+                <Input
+                  id="type-price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={typeForm.defaultPrice}
+                  onChange={(e) => setTypeForm({ ...typeForm, defaultPrice: e.target.value })}
+                  placeholder="0.00"
+                  data-testid="input-type-price"
+                />
               </div>
               <div className="flex items-center gap-3">
                 <Switch
