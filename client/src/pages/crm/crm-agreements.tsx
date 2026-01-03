@@ -639,7 +639,7 @@ export default function CrmAgreements() {
                 <DropdownMenuLabel>Select Agreement Type</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => navigate("/crm/agreements/create?type=preventative")}
+                  onClick={() => navigate("/crm/agreements/new?type=preventative")}
                   className="cursor-pointer"
                   data-testid="menu-item-preventative"
                 >
@@ -657,7 +657,7 @@ export default function CrmAgreements() {
                     {customAgreementTypes.filter(t => t.isActive).map((type) => (
                       <DropdownMenuItem
                         key={type.id}
-                        onClick={() => navigate(`/crm/agreements/create?type=custom&typeId=${type.id}`)}
+                        onClick={() => navigate(`/crm/agreements/new?type=custom&typeId=${type.id}`)}
                         className="cursor-pointer"
                         data-testid={`menu-item-custom-${type.id}`}
                       >
