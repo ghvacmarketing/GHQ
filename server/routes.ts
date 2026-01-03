@@ -5250,32 +5250,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const techPerformance = await Promise.all(
         techs.map(async (tech) => {
+          // Invoice-payment-driven attribution: revenue counts when invoice is paid
+          // regardless of work order completion status
           const techWorkOrders = await db
             .select({ id: crmWorkOrders.id })
             .from(crmWorkOrders)
-            .where(and(
-              eq(crmWorkOrders.assignedTechId, tech.id),
-              eq(crmWorkOrders.status, "completed"),
-              sql`${crmWorkOrders.completedAt} >= ${rangeStartDate}`
-            ));
+            .where(eq(crmWorkOrders.assignedTechId, tech.id));
 
           const workOrderIds = techWorkOrders.map(wo => wo.id);
           
+          // Get revenue from PAID invoices for this tech's work orders (paid in range)
+          // Use paidAt if available, otherwise fall back to updatedAt for legacy invoices
           let serviceRevenue = 0;
+          let paidInvoiceCount = 0;
           if (workOrderIds.length > 0) {
             const revenueResult = await db
               .select({
                 total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+                count: sql<number>`COUNT(*)`,
               })
               .from(crmInvoices)
               .where(and(
                 inArray(crmInvoices.workOrderId, workOrderIds),
-                eq(crmInvoices.status, "paid")
+                eq(crmInvoices.status, "paid"),
+                sql`COALESCE(${crmInvoices.paidAt}, ${crmInvoices.updatedAt}) >= ${rangeStartDate}`
               ));
             serviceRevenue = parseFloat(revenueResult[0]?.total || "0");
+            paidInvoiceCount = Number(revenueResult[0]?.count) || 0;
           }
 
-          const serviceJobs = techWorkOrders.length;
+          // Service jobs = number of paid invoices in the range
+          const serviceJobs = paidInvoiceCount;
           const perTicketAvg = serviceJobs > 0 ? serviceRevenue / serviceJobs : 0;
           
           const dailyServiceGoal = currentMonthlyGoals ? parseFloat(currentMonthlyGoals.dailyServiceGoal || "0") : 0;
@@ -5293,7 +5298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               sql`${maintenanceVisits.completedAt} >= ${rangeStartDate}`
             ));
 
-          // Get quoted amounts (sent but not accepted/paid) for current month
+          // Get quoted amounts (sent but not accepted/paid) for this tech's work orders
           let quotedAmount = 0;
           if (workOrderIds.length > 0) {
             const quotedResult = await db
@@ -15268,40 +15273,43 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         ));
 
       if (user.role === "tech") {
-        // Tech performance data - use same logic as dashboard/analytics endpoint
+        // Tech performance data - invoice-payment-driven attribution
+        // Revenue counts as soon as invoice is paid, regardless of work order status
         const techCount = await db.select({ count: count() })
           .from(crmUsers)
           .where(and(eq(crmUsers.role, "tech"), eq(crmUsers.isActive, true)));
         const numTechs = Number(techCount[0]?.count) || 1;
 
-        // Get COMPLETED work orders for this tech (same as dashboard)
+        // Get all work orders assigned to this tech (any status)
         const techWorkOrders = await db
           .select({ id: crmWorkOrders.id })
           .from(crmWorkOrders)
-          .where(and(
-            eq(crmWorkOrders.assignedTechId, user.id),
-            eq(crmWorkOrders.status, "completed"),
-            sql`${crmWorkOrders.completedAt} >= ${startOfMonth}`
-          ));
+          .where(eq(crmWorkOrders.assignedTechId, user.id));
 
         const workOrderIds = techWorkOrders.map(wo => wo.id);
         
-        // Get revenue from paid invoices for these work orders
+        // Get revenue from PAID invoices for this tech's work orders (paid this month)
+        // Use paidAt if available, otherwise fall back to updatedAt for legacy invoices
         let serviceRevenue = 0;
+        let paidInvoiceCount = 0;
         if (workOrderIds.length > 0) {
           const revenueResult = await db
             .select({
               total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+              count: sql<number>`COUNT(*)`,
             })
             .from(crmInvoices)
             .where(and(
               inArray(crmInvoices.workOrderId, workOrderIds),
-              eq(crmInvoices.status, "paid")
+              eq(crmInvoices.status, "paid"),
+              sql`COALESCE(${crmInvoices.paidAt}, ${crmInvoices.updatedAt}) >= ${startOfMonth}`
             ));
           serviceRevenue = parseFloat(revenueResult[0]?.total || "0");
+          paidInvoiceCount = Number(revenueResult[0]?.count) || 0;
         }
 
-        const serviceJobs = techWorkOrders.length;
+        // Service jobs = number of distinct work orders with paid invoices this month
+        const serviceJobs = paidInvoiceCount;
         const perTicketAvg = serviceJobs > 0 ? serviceRevenue / serviceJobs : 0;
 
         // Get quoted amount for this tech's work orders (sent but not accepted)

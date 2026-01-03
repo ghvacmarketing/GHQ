@@ -867,7 +867,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                           variant="outline"
                           size="sm"
                           className="min-h-[44px]"
-                          onClick={() => navigate(`/crm/quotes/${quote.id}`)}
+                          onClick={() => navigate(`/mobile/quotes/${quote.id}`)}
                           data-testid={`button-view-quote-${quote.id}`}
                         >
                           <Eye className="h-4 w-4 mr-1" />
@@ -1916,7 +1916,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                           <Button
                             variant="outline"
                             className="w-full min-h-[44px]"
-                            onClick={() => navigate(`/crm/invoices/${invoice.id}`)}
+                            onClick={() => navigate(`/mobile/invoices/${invoice.id}`)}
                             data-testid="button-view-invoice-detail"
                           >
                             <Eye className="h-4 w-4 mr-2" />

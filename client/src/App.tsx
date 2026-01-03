@@ -68,6 +68,8 @@ const MobileJobDetail = lazy(() => import("@/pages/mobile/mobile-job-detail"));
 const MobileTime = lazy(() => import("@/pages/mobile/mobile-time"));
 const MobileJob = lazy(() => import("@/pages/mobile/mobile-job"));
 const MobileProfile = lazy(() => import("@/pages/mobile/mobile-profile"));
+const MobileQuoteDetail = lazy(() => import("@/pages/mobile/mobile-quote-detail"));
+const MobileInvoiceDetail = lazy(() => import("@/pages/mobile/mobile-invoice-detail"));
 
 // Global Error Boundary to prevent blank screens
 class ErrorBoundary extends Component<
@@ -234,6 +236,8 @@ function Router() {
       <Route path="/crm">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>
       <Route path="/mobile/job/:id">{() => <MobileWrapper><MobileJobDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/job">{() => <MobileWrapper><MobileJob /></MobileWrapper>}</Route>
+      <Route path="/mobile/quotes/:id">{() => <MobileWrapper><MobileQuoteDetail /></MobileWrapper>}</Route>
+      <Route path="/mobile/invoices/:id">{() => <MobileWrapper><MobileInvoiceDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/time">{() => <MobileWrapper><MobileTime /></MobileWrapper>}</Route>
       <Route path="/mobile/profile">{() => <MobileWrapper><MobileProfile /></MobileWrapper>}</Route>
       <Route path="/mobile">{() => <MobileWrapper><MobileAgenda /></MobileWrapper>}</Route>
