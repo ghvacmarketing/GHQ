@@ -12336,7 +12336,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(eq(crmCustomers.id, invoice.customerId));
             
             if (customer) {
-              const today = new Date();
+              // Use timezone-aware date to ensure correct calendar day in Eastern Time
+              const nowUtc = new Date();
+              const todayStr = nowUtc.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE }); // YYYY-MM-DD in Eastern
+              const today = new Date(todayStr + 'T12:00:00'); // Use noon to avoid DST edge cases
+              
               const appointmentDate = new Date(today);
               appointmentDate.setMonth(appointmentDate.getMonth() + 1);
               
@@ -12345,7 +12349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               endDate.setFullYear(endDate.getFullYear() + 1);
               
               // Generate agreement number
-              const dateStr = format(today, "yyyyMMdd");
+              const dateStr = todayStr.replace(/-/g, "");
               const existingAgreements = await db.select({ agreementNumber: crmAgreements.agreementNumber })
                 .from(crmAgreements)
                 .where(sql`${crmAgreements.agreementNumber} LIKE ${'MA-' + dateStr + '%'}`)
@@ -12383,6 +12387,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               }
               
+              // Helper to format dates as YYYY-MM-DD
+              const formatDateStr = (d: Date) => {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+              };
+              
+              const appointmentDateStr = formatDateStr(appointmentDate);
+              const endDateStr = formatDateStr(endDate);
+              
               // Create the maintenance agreement
               const [newAgreement] = await db.insert(crmAgreements).values({
                 customerId: invoice.customerId,
@@ -12393,12 +12408,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 address: propertyAddress,
                 numberOfSystems: 1, // Default to 1 system for auto-created agreements
                 price: maintenanceTotal.toFixed(2),
-                contractDate: format(today, "yyyy-MM-dd"),
-                appointmentDate: format(appointmentDate, "yyyy-MM-dd"),
-                startDate: format(today, "yyyy-MM-dd"),
-                endDate: format(endDate, "yyyy-MM-dd"),
-                nextServiceDate: format(appointmentDate, "yyyy-MM-dd"),
-                nextInvoiceDate: format(today, "yyyy-MM-dd"),
+                contractDate: todayStr,
+                appointmentDate: appointmentDateStr,
+                startDate: todayStr,
+                endDate: endDateStr,
+                nextServiceDate: appointmentDateStr,
+                nextInvoiceDate: todayStr,
                 status: "active",
                 autoRenew: true,
                 visitsPerPeriod: agreementVisitsPerPeriod,
@@ -12430,7 +12445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     agreementId: newAgreement.id,
                     cycleYear: visitDate.getFullYear(),
                     visitNumber: i + 1,
-                    targetDate: format(visitDate, "yyyy-MM-dd"),
+                    targetDate: formatDateStr(visitDate),
                     status: "pending",
                   });
                 }
