@@ -12266,6 +12266,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(crmWorkOrders.id, existingInvoice.workOrderId));
       }
       
+      // Delete any auto-created maintenance agreements that reference this invoice
+      // Agreements are linked by the notes field containing "Auto-created from Invoice {invoiceNumber}"
+      if (existingInvoice.invoiceNumber) {
+        const autoCreatedAgreements = await db.select()
+          .from(crmAgreements)
+          .where(sql`${crmAgreements.notes} LIKE ${'%Auto-created from Invoice ' + existingInvoice.invoiceNumber + '%'}`);
+        
+        for (const agreement of autoCreatedAgreements) {
+          // First delete maintenance visits for this agreement
+          await db.delete(maintenanceVisits).where(eq(maintenanceVisits.agreementId, agreement.id));
+          // Then delete the agreement itself
+          await db.delete(crmAgreements).where(eq(crmAgreements.id, agreement.id));
+          console.log(`[Invoice] Deleted auto-created agreement ${agreement.agreementNumber} along with invoice ${existingInvoice.invoiceNumber}`);
+        }
+      }
+      
       await db.delete(crmInvoices).where(eq(crmInvoices.id, req.params.id));
       
       await logCrmAudit(
