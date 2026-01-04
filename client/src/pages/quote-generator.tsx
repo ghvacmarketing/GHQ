@@ -135,19 +135,6 @@ export default function QuoteGenerator() {
         settings.financingPromotionPercent === undefined ||
         settings.commissionPercent === undefined ||
         !settings.warrantyDiscounts) {
-      // Only show error if query has actually failed, not during initial load
-      if (isErrorData || initialData) {
-        // Extract error message from API response if available
-        const errorMessage = initialDataError instanceof Error 
-          ? (initialDataError as any).message || "Unable to load pricing settings from Google Sheets."
-          : "Unable to load pricing settings from Google Sheets.";
-        
-        toast({
-          title: "Google Sheets Sync Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
       return null;
     }
     
