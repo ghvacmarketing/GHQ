@@ -188,9 +188,9 @@ export default function MobileInvoiceDetail() {
   };
 
   const handleRecordPayment = () => {
-    const amount = parseFloat(paymentAmount);
+    const amount = parseFloat(invoice?.total || "0");
     if (isNaN(amount) || amount <= 0) {
-      toast({ title: "Error", description: "Please enter a valid payment amount.", variant: "destructive" });
+      toast({ title: "Error", description: "Invoice has no valid amount.", variant: "destructive" });
       return;
     }
     recordPaymentMutation.mutate({
@@ -835,15 +835,12 @@ export default function MobileInvoiceDetail() {
             
             <div className="space-y-4">
               <div>
-                <Label className="text-sm font-medium">Payment Amount ($)</Label>
+                <Label className="text-sm font-medium">Amount ($)</Label>
                 <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                  className="min-h-[44px] mt-1"
+                  type="text"
+                  value={formatCurrency(parseFloat(invoice?.total || "0"))}
+                  readOnly
+                  className="min-h-[44px] mt-1 bg-slate-50 cursor-not-allowed"
                   data-testid="input-payment-amount"
                 />
               </div>

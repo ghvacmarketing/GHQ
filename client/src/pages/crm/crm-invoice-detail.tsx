@@ -199,9 +199,9 @@ export default function CrmInvoiceDetail() {
   };
 
   const handleRecordPayment = () => {
-    const amount = parseFloat(paymentAmount);
+    const amount = parseFloat(invoice?.total || "0");
     if (isNaN(amount) || amount <= 0) {
-      toast({ title: "Error", description: "Please enter a valid payment amount.", variant: "destructive" });
+      toast({ title: "Error", description: "Invoice has no valid amount.", variant: "destructive" });
       return;
     }
     payMutation.mutate({
@@ -741,12 +741,10 @@ export default function CrmInvoiceDetail() {
               <Label htmlFor="paymentAmount">Amount</Label>
               <Input
                 id="paymentAmount"
-                type="number"
-                step="0.01"
-                min="0"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                placeholder="0.00"
+                type="text"
+                value={formatCurrency(parseFloat(invoice.total || "0"))}
+                readOnly
+                className="bg-slate-50 cursor-not-allowed"
                 data-testid="input-payment-amount"
               />
             </div>
