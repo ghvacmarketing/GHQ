@@ -7383,10 +7383,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ));
 
       // Count work orders - both directly linked to customer AND through jobs
-      const workOrdersResult = await db.execute(
-        sql`SELECT count(*) as count FROM crm_work_orders WHERE customer_id = ${customerId} OR job_id = ANY(${jobIds.length > 0 ? jobIds.map(j => j.id) : []}::uuid[])`
-      );
-      const workOrderCount = Number(workOrdersResult.rows?.[0]?.count || 0);
+      let workOrderCount = 0;
+      if (jobIds.length > 0) {
+        const jobIdArray = jobIds.map(j => j.id);
+        const workOrdersResult = await db.execute(
+          sql`SELECT count(*) as count FROM crm_work_orders WHERE customer_id = ${customerId} OR job_id = ANY(${jobIdArray}::uuid[])`
+        );
+        workOrderCount = Number(workOrdersResult.rows?.[0]?.count || 0);
+      } else {
+        const workOrdersResult = await db.execute(
+          sql`SELECT count(*) as count FROM crm_work_orders WHERE customer_id = ${customerId}`
+        );
+        workOrderCount = Number(workOrdersResult.rows?.[0]?.count || 0);
+      }
 
       // Count quotes linked to this customer (check both account_id and customer_id)
       const quotesResult = await db.execute(
@@ -7459,10 +7468,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ));
 
       // Count work orders - both directly linked to customer AND through jobs
-      const workOrdersResult = await db.execute(
-        sql`SELECT count(*) as count FROM crm_work_orders WHERE customer_id = ${customerId} OR job_id = ANY(${jobIds.length > 0 ? jobIds.map(j => j.id) : []}::uuid[])`
-      );
-      const workOrderCount = Number(workOrdersResult.rows?.[0]?.count || 0);
+      let workOrderCount = 0;
+      if (jobIds.length > 0) {
+        const jobIdArray = jobIds.map(j => j.id);
+        const workOrdersResult = await db.execute(
+          sql`SELECT count(*) as count FROM crm_work_orders WHERE customer_id = ${customerId} OR job_id = ANY(${jobIdArray}::uuid[])`
+        );
+        workOrderCount = Number(workOrdersResult.rows?.[0]?.count || 0);
+      } else {
+        const workOrdersResult = await db.execute(
+          sql`SELECT count(*) as count FROM crm_work_orders WHERE customer_id = ${customerId}`
+        );
+        workOrderCount = Number(workOrdersResult.rows?.[0]?.count || 0);
+      }
 
       // Count quotes linked to this customer (check both account_id and customer_id)
       const quotesResult = await db.execute(
