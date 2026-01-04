@@ -125,22 +125,12 @@ function OverviewTab({
   optimisticStatus,
   updateStatusMutation,
   handleStatusChange,
-  noteInput,
-  setNoteInput,
-  handleAddNote,
-  addNoteMutation,
-  pendingNotes
 }: {
   workOrder: WorkOrderDetail;
   checklistResponse: ChecklistResponseData | null | undefined;
   optimisticStatus: WorkOrderStatus | null;
   updateStatusMutation: any;
   handleStatusChange: (status: WorkOrderStatus) => void;
-  noteInput: string;
-  setNoteInput: (val: string) => void;
-  handleAddNote: () => void;
-  addNoteMutation: any;
-  pendingNotes: any[];
 }) {
   const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(false);
   const displayStatus = optimisticStatus || workOrder.status;
@@ -295,67 +285,6 @@ function OverviewTab({
               </Badge>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      <Card data-testid="notes-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Notes</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {workOrder.techNotes ? (
-            <div 
-              className="text-sm text-slate-600 whitespace-pre-wrap bg-slate-50 p-3 rounded-md max-h-40 overflow-auto"
-              data-testid="existing-notes"
-            >
-              {workOrder.techNotes}
-            </div>
-          ) : pendingNotes.length === 0 ? (
-            <p className="text-sm text-slate-400 italic" data-testid="no-notes">
-              No notes yet
-            </p>
-          ) : null}
-          
-          {pendingNotes.length > 0 && (
-            <div className="space-y-2" data-testid="pending-notes-container">
-              {pendingNotes.map((pendingNote: any) => (
-                <div 
-                  key={pendingNote.id}
-                  className="text-sm text-slate-600 whitespace-pre-wrap bg-amber-50 border border-amber-200 p-3 rounded-md"
-                >
-                  <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300 mb-1">
-                    Pending sync
-                  </Badge>
-                  <p>{pendingNote.noteText}</p>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          <Separator />
-          <div className="flex gap-2">
-            <Input
-              placeholder="Add a note..."
-              value={noteInput}
-              onChange={(e) => setNoteInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
-              className="flex-1 min-h-[44px]"
-              data-testid="input-note"
-            />
-            <Button
-              size="icon"
-              className="min-h-[44px] min-w-[44px] bg-[#711419] hover:bg-[#5a1014]"
-              onClick={handleAddNote}
-              disabled={!noteInput.trim() || addNoteMutation.isPending}
-              data-testid="button-add-note"
-            >
-              {addNoteMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
         </CardContent>
       </Card>
 
@@ -2845,11 +2774,6 @@ export default function MobileJobDetail() {
               optimisticStatus={optimisticStatus}
               updateStatusMutation={updateStatusMutation}
               handleStatusChange={handleStatusChange}
-              noteInput={noteInput}
-              setNoteInput={setNoteInput}
-              handleAddNote={handleAddNote}
-              addNoteMutation={addNoteMutation}
-              pendingNotes={pendingNotes}
             />
           )}
           {activeTab === "work" && (
