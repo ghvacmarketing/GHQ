@@ -3109,12 +3109,10 @@ export default function CrmProposalBuilder() {
         {/* Fixed Header */}
         <div className="flex items-center justify-between pb-4 mb-4">
           <div className="flex items-center gap-3">
-            <Link href="/crm/quotes">
-              <Button variant="ghost" size="sm" data-testid="button-back-to-quotes">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-            </Link>
+            <Button variant="ghost" size="sm" onClick={() => window.history.back()} data-testid="button-back-to-quotes">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
             <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Proposal Builder</h1>
           </div>
           <div className="flex items-center space-x-2">

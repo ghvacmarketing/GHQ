@@ -966,7 +966,15 @@ export default function CrmProjectDetail() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Quotes</CardTitle>
-                <Button onClick={() => setCreateQuoteDialogOpen(true)} data-testid="button-create-quote">
+                <Button 
+                  onClick={() => {
+                    const customerId = project?.customerId || project?.customer?.id;
+                    if (customerId) {
+                      navigate(`/crm/quotes/proposal/${customerId}?projectId=${projectId}`);
+                    }
+                  }} 
+                  data-testid="button-create-quote"
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Create Quote
                 </Button>
@@ -1016,7 +1024,12 @@ export default function CrmProjectDetail() {
                     <Button
                       variant="outline"
                       className="mt-3"
-                      onClick={() => setCreateQuoteDialogOpen(true)}
+                      onClick={() => {
+                        const customerId = project?.customerId || project?.customer?.id;
+                        if (customerId) {
+                          navigate(`/crm/quotes/proposal/${customerId}?projectId=${projectId}`);
+                        }
+                      }}
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Create First Quote
