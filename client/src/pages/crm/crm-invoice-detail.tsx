@@ -145,6 +145,7 @@ export default function CrmInvoiceDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", invoiceId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Invoice sent", description: "Invoice status updated to sent." });
     },
     onError: (error: Error) => {
@@ -164,6 +165,7 @@ export default function CrmInvoiceDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", invoiceId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Payment recorded", description: `Payment of ${formatCurrency(parseFloat(paymentAmount))} recorded.` });
       setShowPaymentDialog(false);
       setPaymentAmount("");
@@ -187,6 +189,7 @@ export default function CrmInvoiceDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", invoiceId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Invoice voided", description: "Invoice has been voided." });
     },
     onError: (error: Error) => {
@@ -222,6 +225,7 @@ export default function CrmInvoiceDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Invoice deleted", description: "Invoice has been deleted." });
       navigate("/crm/invoices");
     },

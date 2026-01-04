@@ -2720,6 +2720,7 @@ export default function CrmCustomerDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", selectedQuoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote sent", description: "Quote status updated to sent." });
     },
     onError: (error: Error) => {
@@ -2739,6 +2740,7 @@ export default function CrmCustomerDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", selectedQuoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote approved", description: "Quote status updated to approved." });
     },
     onError: (error: Error) => {
@@ -2758,6 +2760,7 @@ export default function CrmCustomerDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", selectedQuoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote declined", description: "Quote status updated to declined." });
     },
     onError: (error: Error) => {
@@ -2776,6 +2779,7 @@ export default function CrmCustomerDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote deleted", description: "The quote has been permanently deleted." });
       setSelectedQuoteId(null);
     },
@@ -2797,6 +2801,7 @@ export default function CrmCustomerDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", selectedQuoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ 
         title: "Invoice created!", 
         description: `Invoice ${data.invoice?.invoiceNumber || ''} has been created from this quote.`
@@ -3076,6 +3081,7 @@ export default function CrmCustomerDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", selectedInvoiceId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to send invoice", description: error.message, variant: "destructive" });
@@ -3096,6 +3102,7 @@ export default function CrmCustomerDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", selectedInvoiceId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setShowInvoicePaymentDialog(false);
       setInvoicePaymentAmount("");
       setInvoicePaymentMethod("check");
@@ -3116,6 +3123,7 @@ export default function CrmCustomerDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", selectedInvoiceId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setShowInvoiceVoidConfirm(false);
       setSelectedInvoiceId(null);
     },

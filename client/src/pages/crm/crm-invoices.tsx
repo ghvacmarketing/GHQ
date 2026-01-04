@@ -181,6 +181,7 @@ export default function CrmInvoices() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       if (selectedInvoiceId) {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", selectedInvoiceId] });
       }
@@ -214,6 +215,7 @@ export default function CrmInvoices() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setShowCreateDialog(false);
       setCreateForm({
         customerName: "",
@@ -313,6 +315,7 @@ export default function CrmInvoices() {
       
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", selectedInvoiceId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Payment recorded", description: `Payment of ${formatCurrency(amount)} recorded.` });
       setShowPaymentDialog(false);
       setPaymentAmount("");

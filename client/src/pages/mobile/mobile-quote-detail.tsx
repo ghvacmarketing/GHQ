@@ -85,6 +85,7 @@ export default function MobileQuoteDetail() {
       toast({ title: "Quote Sent", description: "Quote has been sent successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to send quote", variant: "destructive" });
@@ -104,6 +105,7 @@ export default function MobileQuoteDetail() {
       toast({ title: "Quote Accepted", description: "Quote status updated to accepted." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to accept quote", variant: "destructive" });
@@ -123,6 +125,7 @@ export default function MobileQuoteDetail() {
       toast({ title: "Quote Declined", description: "Quote status updated to declined." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to decline quote", variant: "destructive" });

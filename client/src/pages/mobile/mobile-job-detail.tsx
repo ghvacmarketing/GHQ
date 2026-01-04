@@ -631,6 +631,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     onSuccess: () => {
       toast({ title: "Quote Created", description: "Your quick quote has been created as a draft." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", { workOrderId: workOrder.id }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setShowQuickQuote(false);
       setLineItems([]);
       setQuoteTitle("");
@@ -649,6 +650,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     onSuccess: () => {
       toast({ title: "Quote Sent", description: "Quote has been sent successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", { workOrderId: workOrder.id }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to send quote", variant: "destructive" });
@@ -1520,6 +1522,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     onSuccess: () => {
       toast({ title: "Invoice Created", description: "Your invoice has been created as a draft." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setShowCreateForm(false);
       setLineItems([]);
     },
@@ -1537,6 +1540,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     onSuccess: () => {
       toast({ title: "Invoice Sent", description: "Invoice has been sent successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       if (expandedInvoiceId) {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", expandedInvoiceId] });
       }
@@ -1559,6 +1563,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     onSuccess: () => {
       toast({ title: "Payment Recorded", description: "Payment has been recorded successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       if (paymentInvoiceId) {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", paymentInvoiceId] });
       }

@@ -1123,6 +1123,7 @@ export default function CrmProposalBuilder() {
         description: `Quote ${data.quote?.quoteNumber || ''} created successfully.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
     },
     onError: (error) => {
       toast({

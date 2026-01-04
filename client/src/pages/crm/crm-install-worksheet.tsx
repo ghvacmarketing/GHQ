@@ -151,6 +151,7 @@ export default function CrmInstallWorksheet() {
     onSuccess: (data: { quoteId: string }) => {
       toast({ title: "Quote created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
       navigate(`/crm/quotes/${data.quoteId}`);
     },
@@ -184,6 +185,7 @@ export default function CrmInstallWorksheet() {
         description: `Quote ${data.quote?.quoteNumber || ''} created successfully.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setServiceParts([]);
       setServiceLaborHours("");
       setServiceGhvacInstalled(undefined);

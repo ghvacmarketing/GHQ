@@ -274,6 +274,7 @@ export default function CrmInvoiceCreate() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       if (formData.workOrderId) {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", formData.workOrderId, "invoices"] });
       }
@@ -300,6 +301,7 @@ export default function CrmInvoiceCreate() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       if (formData.workOrderId) {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", formData.workOrderId, "invoices"] });
       }

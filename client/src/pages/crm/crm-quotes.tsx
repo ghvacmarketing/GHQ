@@ -188,6 +188,7 @@ export default function CrmQuotes() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setShowCreateDialog(false);
       setCreateForm({
         customerName: "",
@@ -210,6 +211,7 @@ export default function CrmQuotes() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setSelectedQuote(null);
       toast({ title: "Quote deleted successfully" });
     },
