@@ -53,6 +53,8 @@ import {
   Wrench,
   BadgeDollarSign,
   ArrowLeft,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
@@ -104,6 +106,7 @@ export default function CrmSettingsUsers() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState<CrmUserListItem | null>(null);
+  const [confirmPermanentDelete, setConfirmPermanentDelete] = useState<CrmUserListItem | null>(null);
   const [editingUser, setEditingUser] = useState<CrmUserListItem | null>(null);
   
   const [formData, setFormData] = useState({
@@ -188,6 +191,23 @@ export default function CrmSettingsUsers() {
     },
   });
 
+  const permanentDeleteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return apiRequest("DELETE", `/api/crm/users/${userId}/permanent`);
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/users"] });
+      setConfirmPermanentDelete(null);
+      toast({ 
+        title: "User permanently deleted", 
+        description: `${data.deletedUser?.name} has been removed from the system. Active techs: ${data.technicianCount}` 
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -240,6 +260,7 @@ export default function CrmSettingsUsers() {
   }
 
   const isAdmin = currentUser.role === "owner" || currentUser.role === "admin";
+  const isOwner = currentUser.role === "owner";
   const canViewSettings = isAdmin || currentUser.role === "sales";
 
   return (
@@ -350,20 +371,34 @@ export default function CrmSettingsUsers() {
                                       <UserX className="h-4 w-4" />
                                     </Button>
                                   ) : (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-green-600 hover:text-green-700"
-                                      onClick={() => activateUserMutation.mutate(user.id)}
-                                      disabled={activateUserMutation.isPending}
-                                      data-testid={`button-activate-user-${user.id}`}
-                                    >
-                                      {activateUserMutation.isPending ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <UserCheck className="h-4 w-4" />
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-green-600 hover:text-green-700"
+                                        onClick={() => activateUserMutation.mutate(user.id)}
+                                        disabled={activateUserMutation.isPending}
+                                        data-testid={`button-activate-user-${user.id}`}
+                                      >
+                                        {activateUserMutation.isPending ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <UserCheck className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                      {isOwner && user.role !== "owner" && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-red-700 hover:text-red-800 hover:bg-red-50"
+                                          onClick={() => setConfirmPermanentDelete(user)}
+                                          data-testid={`button-permanent-delete-user-${user.id}`}
+                                          title="Permanently delete"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
                                       )}
-                                    </Button>
+                                    </>
                                   )
                                 )}
                               </div>
@@ -585,6 +620,47 @@ export default function CrmSettingsUsers() {
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : null}
               Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!confirmPermanentDelete} onOpenChange={() => setConfirmPermanentDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              Permanently Delete User?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                <strong className="text-red-600">This action cannot be undone.</strong> You are about to permanently delete <strong>{confirmPermanentDelete?.name}</strong> from the system.
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
+                <strong>What will happen:</strong>
+                <ul className="list-disc ml-5 mt-1 space-y-1">
+                  <li>Work orders assigned to this user will be unassigned</li>
+                  <li>Quotes and invoices created by this user will keep their data but show as "unknown author"</li>
+                  <li>Follow-up tasks assigned to this user will be deleted</li>
+                  <li>Customer notes by this user will remain but show as "unknown author"</li>
+                  <li>Per-tech goals will automatically recalculate</li>
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmPermanentDelete && permanentDeleteMutation.mutate(confirmPermanentDelete.id)}
+              className="bg-red-700 hover:bg-red-800"
+              data-testid="button-confirm-permanent-delete"
+            >
+              {permanentDeleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Permanently Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

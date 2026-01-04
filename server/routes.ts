@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -6807,8 +6807,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(crmInvoices.createdBy, userId));
 
       // Begin cascade deletion - order matters for foreign key constraints
-      // 1. Delete job assignments
-      await db.delete(crmJobAssignments).where(eq(crmJobAssignments.userId, userId));
+      // 1. Delete job assignments (has notNull constraint on techUserId)
+      await db.delete(crmJobAssignments).where(eq(crmJobAssignments.techUserId, userId));
 
       // 2. Nullify work order references (don't delete the work orders, just unassign)
       await db.update(crmWorkOrders)
@@ -6825,25 +6825,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({ createdBy: null })
         .where(eq(crmQuotes.createdBy, userId));
 
-      // 5. Delete CRM follow-ups assigned to this user
-      await db.delete(crmFollowUps).where(eq(crmFollowUps.assignedTo, userId));
+      // 5. Nullify follow-ups (assignedUserId and createdBy)
+      await db.update(crmFollowUps)
+        .set({ assignedUserId: null })
+        .where(eq(crmFollowUps.assignedUserId, userId));
+      await db.update(crmFollowUps)
+        .set({ createdBy: null })
+        .where(eq(crmFollowUps.createdBy, userId));
 
-      // 6. Nullify customer notes author
+      // 6. Nullify customer notes author (userId column)
       await db.update(crmCustomerNotes)
-        .set({ authorId: null })
-        .where(eq(crmCustomerNotes.authorId, userId));
+        .set({ userId: null })
+        .where(eq(crmCustomerNotes.userId, userId));
 
       // 7. Nullify audit log references
       await db.update(crmAuditLog)
         .set({ actorUserId: null })
         .where(eq(crmAuditLog.actorUserId, userId));
 
-      // 8. Delete checklist responses completed by this user
+      // 8. Nullify checklist responses completed by this user
       await db.update(workOrderChecklistResponses)
         .set({ completedBy: null })
         .where(eq(workOrderChecklistResponses.completedBy, userId));
 
-      // 9. Delete the user
+      // 9. Nullify job status events (userId)
+      await db.update(crmJobStatusEvents)
+        .set({ userId: null })
+        .where(eq(crmJobStatusEvents.userId, userId));
+
+      // 10. Nullify project activities (userId)
+      await db.update(projectActivities)
+        .set({ userId: null })
+        .where(eq(projectActivities.userId, userId));
+
+      // 11. Nullify proposal sessions (createdBy)
+      await db.update(proposalSessions)
+        .set({ createdBy: null })
+        .where(eq(proposalSessions.createdBy, userId));
+
+      // 12. Nullify job notes (userId)
+      await db.update(crmJobNotes)
+        .set({ userId: null })
+        .where(eq(crmJobNotes.userId, userId));
+
+      // 13. Nullify attachments (uploadedBy)
+      await db.update(attachments)
+        .set({ uploadedBy: null })
+        .where(eq(attachments.uploadedBy, userId));
+
+      // 14. Delete the user (crmSessions cascade deleted automatically)
       await db.delete(crmUsers).where(eq(crmUsers.id, userId));
 
       // Log the permanent deletion
