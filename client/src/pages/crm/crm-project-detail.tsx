@@ -1444,7 +1444,7 @@ export default function CrmProjectDetail() {
               </div>
 
               <div className="space-y-2">
-                <Label>Title <span className="text-xs text-muted-foreground">(optional - auto-generated if empty)</span></Label>
+                <Label>Title <span className="text-red-500">*</span></Label>
                 <Input
                   value={woTitle}
                   onChange={(e) => setWoTitle(e.target.value)}
@@ -1454,7 +1454,7 @@ export default function CrmProjectDetail() {
               </div>
 
               <div className="space-y-2">
-                <Label>Description <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                <Label>Description <span className="text-red-500">*</span></Label>
                 <Textarea
                   value={woDescription}
                   onChange={(e) => setWoDescription(e.target.value)}
@@ -1476,7 +1476,7 @@ export default function CrmProjectDetail() {
               </Button>
               <Button
                 onClick={() => createWorkOrderMutation.mutate()}
-                disabled={!scheduledDate || !areRequiredQuestionsAnswered() || createWorkOrderMutation.isPending}
+                disabled={!scheduledDate || !woTitle.trim() || !woDescription.trim() || !areRequiredQuestionsAnswered() || createWorkOrderMutation.isPending}
                 className="bg-[#711419] hover:bg-[#5a1014]"
                 data-testid="button-submit-wo"
               >
