@@ -48,11 +48,6 @@ import type { CrmUser, CrmCustomer, InterestLevel } from "@shared/schema";
 
 type ProspectMode = "choose" | "existing";
 
-const SALES_REPS = [
-  { value: "chandler", label: "Chandler" },
-  { value: "earnest", label: "Earnest" },
-];
-
 const INTEREST_LEVELS: { value: InterestLevel; label: string }[] = [
   { value: "hot", label: "Hot" },
   { value: "warm", label: "Warm" },
@@ -85,6 +80,19 @@ export default function CrmAddProspect() {
     queryKey: ["/api/crm/customers"],
     enabled: !!currentUser && mode === "existing",
   });
+
+  // Fetch CRM users for sales rep dropdown (sales and owner roles can sell)
+  const { data: crmUsers } = useQuery<CrmUser[]>({
+    queryKey: ["/api/crm/users"],
+    enabled: !!currentUser,
+  });
+
+  const salesReps = useMemo(() => {
+    if (!crmUsers) return [];
+    return crmUsers
+      .filter(u => u.isActive && (u.role === "sales" || u.role === "owner"))
+      .map(u => ({ value: u.id, label: u.name }));
+  }, [crmUsers]);
 
   const customers = customersData?.customers || [];
 
@@ -412,7 +420,7 @@ export default function CrmAddProspect() {
                             <SelectValue placeholder="Select sales person" />
                           </SelectTrigger>
                           <SelectContent>
-                            {SALES_REPS.map((rep) => (
+                            {salesReps.map((rep) => (
                               <SelectItem key={rep.value} value={rep.value}>
                                 {rep.label}
                               </SelectItem>
