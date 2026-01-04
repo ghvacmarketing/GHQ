@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -29,11 +31,18 @@ import {
   Loader2,
   Search,
   User,
+  Package,
+  Wrench,
+  Save,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { calcWorksheet, type WorksheetInputs, type WorksheetLine } from "@shared/calcWorksheet";
-import type { CrmUser, CrmCustomer } from "@shared/schema";
+import type { CrmUser, CrmCustomer, QuotePart } from "@shared/schema";
+import PartsSelection from "@/components/parts-selection";
+import SelectedParts from "@/components/selected-parts";
+import WarrantySection from "@/components/warranty-section";
+import CustomPartModal from "@/components/custom-part-modal";
 
 type InstallSubtype = "residential" | "commercial" | "crawlspace";
 type LineCategory = "equipment" | "materials" | "accessories" | "subcontractor" | "permit" | "spiff" | "other";
@@ -74,10 +83,13 @@ const defaultInputs: WorksheetInputs = {
   discountDollar: 0,
 };
 
+type PricingMode = "install" | "service";
+
 export default function CrmInstallWorksheet() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
+  const [pricingMode, setPricingMode] = useState<PricingMode>("install");
   const [inputs, setInputs] = useState<WorksheetInputs>(defaultInputs);
   const [installSubtype, setInstallSubtype] = useState<InstallSubtype>("residential");
   const [lines, setLines] = useState<LocalLine[]>([]);
@@ -86,10 +98,28 @@ export default function CrmInstallWorksheet() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomer | null>(null);
 
+  const [serviceParts, setServiceParts] = useState<QuotePart[]>([]);
+  const [serviceLaborHours, setServiceLaborHours] = useState<string>("");
+  const [serviceGhvacInstalled, setServiceGhvacInstalled] = useState<boolean | undefined>(undefined);
+  const [serviceYearsSinceInstallation, setServiceYearsSinceInstallation] = useState<string>("");
+  const [serviceJobNotes, setServiceJobNotes] = useState<string>("");
+  const [serviceValidationErrors, setServiceValidationErrors] = useState<string[]>([]);
+  const [isCustomPartModalOpen, setIsCustomPartModalOpen] = useState(false);
+  const [customPartPrefillData, setCustomPartPrefillData] = useState<any>(null);
+
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
+
+  const { data: initialData, isLoading: isLoadingInitialData, isError: isErrorInitialData } = useQuery({
+    queryKey: ["/api/initial-data"],
+    staleTime: Infinity,
+    gcTime: Infinity,
+    enabled: pricingMode === "service",
+  });
+  const serviceSettings = (initialData as any)?.settings;
+  const availableParts = (initialData as any)?.parts || [];
 
   const { data: searchResults, isLoading: searchLoading } = useQuery<CrmCustomer[]>({
     queryKey: ["/api/crm/customers", "search", customerSearch],
@@ -128,6 +158,282 @@ export default function CrmInstallWorksheet() {
       toast({ title: "Error creating quote", description: error.message, variant: "destructive" });
     },
   });
+
+  const saveServiceQuoteMutation = useMutation({
+    mutationFn: async (data: {
+      customerId: string;
+      title: string;
+      description?: string;
+      notes?: string;
+      lineItems: Array<{
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        taxable?: boolean;
+      }>;
+      status?: string;
+      quoteType: string;
+      serviceQuoteData?: object;
+    }) => {
+      const res = await apiRequest("POST", "/api/crm/quotes/from-proposal", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Service Quote Saved!",
+        description: `Quote ${data.quote?.quoteNumber || ''} created successfully.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setServiceParts([]);
+      setServiceLaborHours("");
+      setServiceGhvacInstalled(undefined);
+      setServiceYearsSinceInstallation("");
+      setServiceJobNotes("");
+      setSelectedCustomer(null);
+      setShowCustomerModal(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to save service quote. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Save service quote error:", error);
+    },
+  });
+
+  const calculateServiceTotals = useMemo(() => {
+    if (isLoadingInitialData) return null;
+    if (!serviceSettings || 
+        serviceSettings.laborRate === undefined ||
+        serviceSettings.laborBenefitsPercent === undefined ||
+        serviceSettings.salesTaxPercent === undefined ||
+        serviceSettings.warrantyReserve === undefined ||
+        serviceSettings.materialShrinkagePercent === undefined ||
+        serviceSettings.overheadPercent === undefined ||
+        serviceSettings.profitPercent === undefined ||
+        serviceSettings.financingPromotionPercent === undefined ||
+        serviceSettings.commissionPercent === undefined ||
+        !serviceSettings.warrantyDiscounts) {
+      return null;
+    }
+    
+    if (!serviceParts.length && !serviceLaborHours) return null;
+
+    const isGHVACWarranty = serviceGhvacInstalled === true && serviceYearsSinceInstallation;
+    const warrantyYears = isGHVACWarranty ? parseInt(serviceYearsSinceInstallation!) : 0;
+    const warrantyCoverage = serviceSettings.warrantyDiscounts;
+    const warrantyCoveragePercent = isGHVACWarranty ? (warrantyCoverage[warrantyYears] || 0) : 0;
+
+    let customerPartsCost = 0;
+    let ghvacCoveredPartsCost = 0;
+    
+    serviceParts.forEach(part => {
+      const partCost = parseFloat(part.price) * (part.quantity || 1);
+      const description = part.description.toLowerCase();
+      
+      const isGHVACCovered = isGHVACWarranty && (
+        description.includes('control board') ||
+        description.includes('evaporator coil') ||
+        description.includes('evap coil') ||
+        description.includes('compressor')
+      );
+      
+      if (isGHVACCovered) {
+        ghvacCoveredPartsCost += partCost;
+      } else {
+        customerPartsCost += partCost;
+      }
+    });
+
+    const materialShrinkagePercent = serviceSettings.materialShrinkagePercent;
+    const shrinkageMaterials = ['refrigerant filter dryer', 'copper', 'armaflex insulation', 'acid away'];
+    
+    const shrinkagePartsTotal = serviceParts.reduce((sum, part) => {
+      const description = part.description.toLowerCase();
+      const isShrinkageMaterial = shrinkageMaterials.some(material => 
+        description.includes(material)
+      );
+      
+      const isGHVACCovered = isGHVACWarranty && (
+        description.includes('control board') ||
+        description.includes('evaporator coil') ||
+        description.includes('evap coil') ||
+        description.includes('compressor')
+      );
+      
+      if (isShrinkageMaterial && !isGHVACCovered) {
+        const partCost = parseFloat(part.price) * (part.quantity || 1);
+        return sum + partCost;
+      }
+      return sum;
+    }, 0);
+    
+    const materialShrinkageCost = shrinkagePartsTotal * materialShrinkagePercent;
+    
+    const hours = parseFloat(serviceLaborHours || "1");
+    const laborRate = serviceSettings.laborRate;
+    const baseLaborCost = laborRate * hours;
+    
+    const laborBenefitsPercent = serviceSettings.laborBenefitsPercent;
+    const salesTaxPercent = serviceSettings.salesTaxPercent;
+    const warrantyReserve = serviceSettings.warrantyReserve;
+    const overheadPercent = serviceSettings.overheadPercent;
+    const profitPercent = serviceSettings.profitPercent;
+    const financingPercent = serviceSettings.financingPromotionPercent;
+    const commissionPercent = serviceSettings.commissionPercent;
+    
+    const laborBenefits = baseLaborCost * laborBenefitsPercent;
+    const totalLaborCost = baseLaborCost + laborBenefits;
+    
+    const allPartsSubtotal = customerPartsCost + ghvacCoveredPartsCost;
+    const allPartsWithShrinkage = allPartsSubtotal + materialShrinkageCost;
+    const fullSalesTax = allPartsWithShrinkage * salesTaxPercent;
+    const fullDirectCost = allPartsWithShrinkage + totalLaborCost + fullSalesTax + warrantyReserve;
+    const totalDeductionRate = overheadPercent + profitPercent + financingPercent + commissionPercent;
+    const remainingRate = 1.0 - totalDeductionRate;
+    const fullSellingPrice = fullDirectCost / remainingRate;
+    
+    const customerPartsWithShrinkage = customerPartsCost + materialShrinkageCost;
+    const customerSalesTax = customerPartsWithShrinkage * salesTaxPercent;
+    const customerDirectCost = customerPartsWithShrinkage + totalLaborCost + customerSalesTax + warrantyReserve;
+    const customerSellingPrice = customerDirectCost / remainingRate;
+    
+    let customerTotal = fullSellingPrice;
+    let priceBeforeWarranty = fullSellingPrice;
+    
+    if (isGHVACWarranty && warrantyCoveragePercent > 0) {
+      customerTotal = customerSellingPrice * warrantyCoveragePercent;
+      priceBeforeWarranty = customerSellingPrice;
+    }
+    
+    const overhead = fullDirectCost * overheadPercent;
+    const profit = fullDirectCost * profitPercent;
+    const financingCost = fullDirectCost * financingPercent;
+    const commission = fullDirectCost * commissionPercent;
+
+    return {
+      partsSubtotal: allPartsSubtotal.toFixed(2),
+      ghvacCoveredParts: ghvacCoveredPartsCost.toFixed(2),
+      materialShrinkage: materialShrinkageCost.toFixed(2),
+      adjustedPartsTotal: allPartsWithShrinkage.toFixed(2),
+      baseLaborCost: baseLaborCost.toFixed(2),
+      laborBenefits: laborBenefits.toFixed(2),
+      totalLaborCost: totalLaborCost.toFixed(2),
+      salesTax: fullSalesTax.toFixed(2),
+      warrantyReserve: warrantyReserve.toFixed(2),
+      directCost: fullDirectCost.toFixed(2),
+      overhead: overhead.toFixed(2),
+      profit: profit.toFixed(2),
+      financingCost: financingCost.toFixed(2),
+      commission: commission.toFixed(2),
+      fullSellingPrice: fullSellingPrice.toFixed(2),
+      priceBeforeWarranty: priceBeforeWarranty.toFixed(2),
+      warrantyCoverage: warrantyCoveragePercent,
+      total: customerTotal.toFixed(2),
+      isGHVACWarranty: Boolean(isGHVACWarranty),
+      subtotal: allPartsSubtotal.toFixed(2),
+      labor: baseLaborCost.toFixed(2),
+      tax: fullSalesTax.toFixed(2),
+    };
+  }, [serviceParts, serviceLaborHours, serviceGhvacInstalled, serviceYearsSinceInstallation, serviceSettings, isLoadingInitialData]);
+
+  const handleUpdateServiceParts = (updates: { parts: QuotePart[] }) => {
+    setServiceParts(updates.parts);
+  };
+
+  const handleAddCustomPart = (partData: { description: string; partNumber?: string; price: string; quantity: number }) => {
+    const newPart: QuotePart = {
+      id: `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      description: partData.description,
+      partNumber: partData.partNumber || '',
+      price: partData.price,
+      quantity: partData.quantity,
+    };
+    setServiceParts(prev => [...prev, newPart]);
+    setIsCustomPartModalOpen(false);
+    setCustomPartPrefillData(null);
+  };
+
+  const handleSaveServiceQuote = () => {
+    const errors: string[] = [];
+    
+    if (!selectedCustomer) errors.push('customer');
+    if (serviceParts.length === 0) errors.push('parts');
+    if (serviceGhvacInstalled === undefined) errors.push('warranty');
+    if (!serviceLaborHours) errors.push('laborHours');
+    
+    if (errors.length > 0) {
+      setServiceValidationErrors(errors);
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setServiceValidationErrors([]);
+    
+    if (!calculateServiceTotals) {
+      toast({
+        title: "Error",
+        description: "Unable to calculate totals. Please check settings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const lineItems = serviceParts.map(part => ({
+      description: part.description + (part.partNumber ? ` (${part.partNumber})` : ''),
+      quantity: part.quantity || 1,
+      unitPrice: parseFloat(part.price),
+      taxable: true,
+    }));
+
+    const laborHours = parseFloat(serviceLaborHours);
+    const laborRate = serviceSettings?.laborRate || 0;
+    lineItems.push({
+      description: `Labor (${laborHours} hours @ $${laborRate}/hr)`,
+      quantity: 1,
+      unitPrice: parseFloat(calculateServiceTotals.totalLaborCost || "0"),
+      taxable: false,
+    });
+
+    saveServiceQuoteMutation.mutate({
+      customerId: selectedCustomer.id,
+      title: "Service Quote",
+      description: serviceJobNotes || undefined,
+      notes: serviceJobNotes || undefined,
+      lineItems,
+      status: "draft",
+      quoteType: "service",
+      serviceQuoteData: {
+        parts: serviceParts,
+        laborHours: serviceLaborHours,
+        ghvacInstalled: serviceGhvacInstalled,
+        yearsSinceInstallation: serviceYearsSinceInstallation,
+        jobNotes: serviceJobNotes,
+        totals: calculateServiceTotals,
+      },
+    });
+  };
+
+  const handleServiceFinalizeClick = () => {
+    if (serviceParts.length === 0) {
+      toast({ title: "No parts", description: "Add at least one part before creating a quote", variant: "destructive" });
+      return;
+    }
+    if (!serviceLaborHours) {
+      toast({ title: "Missing labor hours", description: "Enter labor hours before creating a quote", variant: "destructive" });
+      return;
+    }
+    if (serviceGhvacInstalled === undefined) {
+      toast({ title: "Missing warranty info", description: "Select GHVAC warranty status", variant: "destructive" });
+      return;
+    }
+    setShowCustomerModal(true);
+  };
 
   const handleFinalizeClick = () => {
     if (lines.length === 0) {
@@ -217,7 +523,7 @@ export default function CrmInstallWorksheet() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => navigate("/crm/quotes/new")} data-testid="button-back">
               <ArrowLeft className="h-5 w-5" />
@@ -227,38 +533,76 @@ export default function CrmInstallWorksheet() {
                 Custom Pricing
               </h1>
               <p className="text-slate-500 text-sm mt-1">
-                Calculate install pricing with labor, materials, and margins
+                {pricingMode === "install" 
+                  ? "Calculate install pricing with labor, materials, and margins"
+                  : "Calculate service pricing with parts, labor, and warranty"}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Select
-              value={installSubtype}
-              onValueChange={(v) => setInstallSubtype(v as InstallSubtype)}
-            >
-              <SelectTrigger className="w-40" data-testid="select-install-subtype">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {INSTALL_SUBTYPES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
-              onClick={handleFinalizeClick}
-              disabled={isFinalizing || lines.length === 0}
-              data-testid="button-finalize"
-            >
-              {isFinalizing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-              Finalize → Create Quote
-            </Button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Tabs value={pricingMode} onValueChange={(v) => setPricingMode(v as PricingMode)} className="w-auto">
+              <TabsList className="grid w-full grid-cols-2 h-10">
+                <TabsTrigger 
+                  value="install" 
+                  className="px-4 data-[state=active]:bg-[#711419] data-[state=active]:text-white"
+                  data-testid="toggle-install-mode"
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Install
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="service" 
+                  className="px-4 data-[state=active]:bg-[#711419] data-[state=active]:text-white"
+                  data-testid="toggle-service-mode"
+                >
+                  <Wrench className="h-4 w-4 mr-2" />
+                  Service
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {pricingMode === "install" && (
+              <>
+                <Select
+                  value={installSubtype}
+                  onValueChange={(v) => setInstallSubtype(v as InstallSubtype)}
+                >
+                  <SelectTrigger className="w-40" data-testid="select-install-subtype">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INSTALL_SUBTYPES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
+                  onClick={handleFinalizeClick}
+                  disabled={isFinalizing || lines.length === 0}
+                  data-testid="button-finalize"
+                >
+                  {isFinalizing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                  Finalize → Create Quote
+                </Button>
+              </>
+            )}
+            {pricingMode === "service" && (
+              <Button
+                className="bg-[#711419] hover:bg-[#8a1a20] text-white"
+                onClick={handleServiceFinalizeClick}
+                disabled={saveServiceQuoteMutation.isPending || serviceParts.length === 0}
+                data-testid="button-finalize-service"
+              >
+                {saveServiceQuoteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                Finalize → Create Quote
+              </Button>
+            )}
           </div>
         </div>
 
+        {pricingMode === "install" && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <Card className="lg:col-span-1">
             <CardHeader className="pb-3">
@@ -605,6 +949,126 @@ export default function CrmInstallWorksheet() {
             </CardContent>
           </Card>
         </div>
+        )}
+
+        {pricingMode === "service" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              {isLoadingInitialData ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                      <span className="ml-3 text-slate-500">Loading parts...</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : isErrorInitialData ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="text-center py-8 text-red-600">
+                      <p>Failed to load parts data. Please check your connection to Google Sheets.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className={`${serviceValidationErrors.includes('parts') ? 'ring-2 ring-red-500 rounded-lg' : ''}`}>
+                  <PartsSelection
+                    selectedParts={serviceParts}
+                    onUpdate={handleUpdateServiceParts}
+                    onAddCustomPart={(prefillData?: any) => {
+                      setCustomPartPrefillData(prefillData);
+                      setIsCustomPartModalOpen(true);
+                    }}
+                    availableParts={availableParts}
+                  />
+                </div>
+              )}
+
+              <div className={`${serviceValidationErrors.includes('warranty') ? 'ring-2 ring-red-500 rounded-lg' : ''}`}>
+                <WarrantySection
+                  ghvacInstalled={serviceGhvacInstalled}
+                  yearsSinceInstallation={serviceYearsSinceInstallation}
+                  onUpdate={(updates) => {
+                    if ('ghvacInstalled' in updates) setServiceGhvacInstalled(updates.ghvacInstalled);
+                    if ('yearsSinceInstallation' in updates) setServiceYearsSinceInstallation(updates.yearsSinceInstallation || '');
+                  }}
+                />
+              </div>
+
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Wrench className="h-5 w-5" />
+                    Labor & Notes
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={`${serviceValidationErrors.includes('laborHours') ? 'ring-2 ring-red-500 rounded-lg p-2' : ''}`}>
+                      <Label htmlFor="laborHours" className="text-sm font-medium mb-2 block">Labor Hours</Label>
+                      <Input
+                        id="laborHours"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={serviceLaborHours}
+                        onChange={(e) => setServiceLaborHours(e.target.value)}
+                        placeholder="Enter labor hours"
+                        className="min-h-[44px]"
+                        data-testid="input-service-labor-hours"
+                      />
+                      {serviceSettings?.laborRate && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          Rate: ${serviceSettings.laborRate}/hr
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="jobNotes" className="text-sm font-medium mb-2 block">Job Notes</Label>
+                      <Textarea
+                        id="jobNotes"
+                        value={serviceJobNotes}
+                        onChange={(e) => setServiceJobNotes(e.target.value)}
+                        placeholder="Enter any job notes..."
+                        className="min-h-[80px]"
+                        data-testid="input-service-job-notes"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-6">
+              {serviceParts.length > 0 && calculateServiceTotals && (
+                <SelectedParts
+                  parts={serviceParts}
+                  totals={calculateServiceTotals}
+                  onUpdate={handleUpdateServiceParts}
+                />
+              )}
+
+              {serviceParts.length === 0 && (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <Package className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                    <p className="text-slate-500">No parts selected yet</p>
+                    <p className="text-sm text-slate-400">Search and add parts from the left panel</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            <CustomPartModal
+              isOpen={isCustomPartModalOpen}
+              onClose={() => {
+                setIsCustomPartModalOpen(false);
+                setCustomPartPrefillData(null);
+              }}
+              onAdd={handleAddCustomPart}
+              prefillData={customPartPrefillData}
+            />
+          </div>
+        )}
       </div>
 
       <Dialog open={showCustomerModal} onOpenChange={setShowCustomerModal}>
@@ -681,15 +1145,27 @@ export default function CrmInstallWorksheet() {
             >
               Cancel
             </Button>
-            <Button
-              className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
-              onClick={handleCreateQuote}
-              disabled={isFinalizing}
-              data-testid="button-confirm-create-quote"
-            >
-              {isFinalizing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-              Create Quote
-            </Button>
+            {pricingMode === "install" ? (
+              <Button
+                className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
+                onClick={handleCreateQuote}
+                disabled={isFinalizing}
+                data-testid="button-confirm-create-quote"
+              >
+                {isFinalizing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                Create Quote
+              </Button>
+            ) : (
+              <Button
+                className="bg-[#711419] hover:bg-[#8a1a20] text-white"
+                onClick={handleSaveServiceQuote}
+                disabled={saveServiceQuoteMutation.isPending}
+                data-testid="button-confirm-create-service-quote"
+              >
+                {saveServiceQuoteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                Create Service Quote
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
