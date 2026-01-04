@@ -1598,12 +1598,24 @@ export type MaintenanceTaskPart = typeof maintenanceTaskParts.$inferSelect;
 // SERVICE CALL CHECKLISTS
 // =============================================
 
-// Service types for checklists
+// Visit types for checklists (top-level work order type)
+export const checklistVisitTypeEnum = ["SERVICE", "INSTALL", "SALES", "MAINTENANCE"] as const;
+export type ChecklistVisitType = typeof checklistVisitTypeEnum[number];
+
+// Subtypes for each visit type
 export const serviceCallTypeEnum = [
   "NO_HEAT", "NO_AC", "WATER_LEAK", "STRANGE_NOISE", "THERMOSTAT_ISSUE",
   "MAINTENANCE", "INSTALL", "DUCT_WORK", "OTHER"
 ] as const;
 export type ServiceCallType = typeof serviceCallTypeEnum[number];
+
+// Subtype mappings for each visit type
+export const checklistSubtypesByVisitType: Record<ChecklistVisitType, readonly string[]> = {
+  SERVICE: ["NO_HEAT", "NO_AC", "WATER_LEAK", "STRANGE_NOISE", "THERMOSTAT_ISSUE", "OTHER"],
+  INSTALL: ["NEW_SYSTEM", "REPLACEMENT", "DUCT_WORK", "OTHER"],
+  SALES: ["ESTIMATE", "CONSULTATION", "FOLLOW_UP", "OTHER"],
+  MAINTENANCE: ["PREVENTATIVE", "INSPECTION", "TUNE_UP", "OTHER"],
+};
 
 // Question types for checklist questions
 export const checklistQuestionTypeEnum = ["yes_no", "text", "number", "select"] as const;
@@ -1612,6 +1624,7 @@ export type ChecklistQuestionType = typeof checklistQuestionTypeEnum[number];
 // Service Call Checklist Templates
 export const serviceCallChecklists = pgTable("service_call_checklists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  visitType: text("visit_type").$type<ChecklistVisitType>().notNull().default("SERVICE"),
   serviceType: text("service_type").$type<ServiceCallType>().notNull(),
   name: text("name").notNull(),
   description: text("description"),

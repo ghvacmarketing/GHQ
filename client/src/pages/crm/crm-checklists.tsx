@@ -58,15 +58,43 @@ import { useToast } from "@/hooks/use-toast";
 import {
   serviceCallTypeEnum,
   checklistQuestionTypeEnum,
+  checklistVisitTypeEnum,
+  checklistSubtypesByVisitType,
   type CrmUser,
   type ServiceCallChecklist,
   type ChecklistQuestion,
   type ServiceCallType,
   type ChecklistQuestionType,
+  type ChecklistVisitType,
 } from "@shared/schema";
 
 type ChecklistWithQuestions = ServiceCallChecklist & {
   questions: ChecklistQuestion[];
+};
+
+const VISIT_TYPE_LABELS: Record<ChecklistVisitType, string> = {
+  SERVICE: "Service",
+  INSTALL: "Install",
+  SALES: "Sales",
+  MAINTENANCE: "Maintenance",
+};
+
+const SUBTYPE_LABELS: Record<string, string> = {
+  NO_HEAT: "No Heat",
+  NO_AC: "No AC",
+  WATER_LEAK: "Water Leak",
+  STRANGE_NOISE: "Strange Noise",
+  THERMOSTAT_ISSUE: "Thermostat Issue",
+  NEW_SYSTEM: "New System",
+  REPLACEMENT: "Replacement",
+  DUCT_WORK: "Duct Work",
+  ESTIMATE: "Estimate",
+  CONSULTATION: "Consultation",
+  FOLLOW_UP: "Follow Up",
+  PREVENTATIVE: "Preventative",
+  INSPECTION: "Inspection",
+  TUNE_UP: "Tune Up",
+  OTHER: "Other",
 };
 
 const SERVICE_TYPE_LABELS: Record<ServiceCallType, string> = {
@@ -123,7 +151,8 @@ export default function CrmChecklists() {
 
   const [checklistForm, setChecklistForm] = useState({
     name: "",
-    serviceType: "NO_HEAT" as ServiceCallType,
+    visitType: "SERVICE" as ChecklistVisitType,
+    serviceType: "NO_HEAT" as string,
     description: "",
     isActive: true,
   });
@@ -286,6 +315,7 @@ export default function CrmChecklists() {
   const resetChecklistForm = () => {
     setChecklistForm({
       name: "",
+      visitType: "SERVICE" as ChecklistVisitType,
       serviceType: "NO_HEAT",
       description: "",
       isActive: true,
@@ -327,6 +357,7 @@ export default function CrmChecklists() {
     if (selectedChecklist) {
       setChecklistForm({
         name: selectedChecklist.name,
+        visitType: (selectedChecklist as any).visitType || "SERVICE" as ChecklistVisitType,
         serviceType: selectedChecklist.serviceType,
         description: selectedChecklist.description || "",
         isActive: selectedChecklist.isActive,
@@ -683,7 +714,7 @@ export default function CrmChecklists() {
           <DialogHeader>
             <DialogTitle>Create New Checklist</DialogTitle>
             <DialogDescription>
-              Create a new checklist template for service calls.
+              Create a new checklist template for work orders.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -698,20 +729,46 @@ export default function CrmChecklists() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="serviceType">Service Type</Label>
+              <Label htmlFor="visitType">Work Order Type</Label>
+              <Select
+                value={checklistForm.visitType}
+                onValueChange={(value) => {
+                  const newVisitType = value as ChecklistVisitType;
+                  const subtypes = checklistSubtypesByVisitType[newVisitType];
+                  setChecklistForm({ 
+                    ...checklistForm, 
+                    visitType: newVisitType,
+                    serviceType: subtypes[0] || "OTHER"
+                  });
+                }}
+              >
+                <SelectTrigger data-testid="select-visit-type">
+                  <SelectValue placeholder="Select work order type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {checklistVisitTypeEnum.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {VISIT_TYPE_LABELS[type]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="serviceType">Subtype</Label>
               <Select
                 value={checklistForm.serviceType}
                 onValueChange={(value) =>
-                  setChecklistForm({ ...checklistForm, serviceType: value as ServiceCallType })
+                  setChecklistForm({ ...checklistForm, serviceType: value })
                 }
               >
                 <SelectTrigger data-testid="select-service-type">
-                  <SelectValue placeholder="Select service type" />
+                  <SelectValue placeholder="Select subtype" />
                 </SelectTrigger>
                 <SelectContent>
-                  {serviceCallTypeEnum.map((type) => (
+                  {checklistSubtypesByVisitType[checklistForm.visitType].map((type) => (
                     <SelectItem key={type} value={type}>
-                      {SERVICE_TYPE_LABELS[type]}
+                      {SUBTYPE_LABELS[type] || type}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -766,20 +823,46 @@ export default function CrmChecklists() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-serviceType">Service Type</Label>
+              <Label htmlFor="edit-visitType">Work Order Type</Label>
+              <Select
+                value={checklistForm.visitType}
+                onValueChange={(value) => {
+                  const newVisitType = value as ChecklistVisitType;
+                  const subtypes = checklistSubtypesByVisitType[newVisitType];
+                  setChecklistForm({ 
+                    ...checklistForm, 
+                    visitType: newVisitType,
+                    serviceType: subtypes[0] || "OTHER"
+                  });
+                }}
+              >
+                <SelectTrigger data-testid="select-edit-visit-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {checklistVisitTypeEnum.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {VISIT_TYPE_LABELS[type]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-serviceType">Subtype</Label>
               <Select
                 value={checklistForm.serviceType}
                 onValueChange={(value) =>
-                  setChecklistForm({ ...checklistForm, serviceType: value as ServiceCallType })
+                  setChecklistForm({ ...checklistForm, serviceType: value })
                 }
               >
                 <SelectTrigger data-testid="select-edit-service-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {serviceCallTypeEnum.map((type) => (
+                  {checklistSubtypesByVisitType[checklistForm.visitType].map((type) => (
                     <SelectItem key={type} value={type}>
-                      {SERVICE_TYPE_LABELS[type]}
+                      {SUBTYPE_LABELS[type] || type}
                     </SelectItem>
                   ))}
                 </SelectContent>
