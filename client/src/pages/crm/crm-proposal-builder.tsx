@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download, Save, X, MapPin } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download, Save, X, MapPin, Cog, Shield, Plus, FileEdit } from "lucide-react";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType } from "docx";
 import { saveAs } from "file-saver";
 import { jsPDF } from "jspdf";
@@ -28,7 +28,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import redlogo from "@assets/redlogo.webp";
 import packagesData from "@assets/pricebook-packages.json";
 import componentsData from "@assets/pricebook-components.json";
-import type { Customer, CrmUser, CrmCustomer } from "@shared/schema";
+import type { Customer, CrmUser, CrmCustomer, QuotePart } from "@shared/schema";
+import PartsSelection from "@/components/parts-selection";
+import SelectedParts from "@/components/selected-parts";
+import WarrantySection from "@/components/warranty-section";
+import CustomPartModal from "@/components/custom-part-modal";
 
 // Simplified CRM customer type for proposal builder
 type CrmCustomerForProposal = {
@@ -871,6 +875,19 @@ export default function CrmProposalBuilder() {
   const [selectedCrawlspaceServices, setSelectedCrawlspaceServices] = useState<string[]>([]);
   const [selectedDoorOption, setSelectedDoorOption] = useState<string | null>(null);
   
+  // Proposal mode: "install" = existing equipment/pricebook mode, "service" = service quote mode
+  const [proposalMode, setProposalMode] = useState<"install" | "service">("install");
+  
+  // Service mode state (separate from install cart)
+  const [serviceParts, setServiceParts] = useState<QuotePart[]>([]);
+  const [serviceLaborHours, setServiceLaborHours] = useState<string>("");
+  const [serviceGhvacInstalled, setServiceGhvacInstalled] = useState<boolean | undefined>(undefined);
+  const [serviceYearsSinceInstallation, setServiceYearsSinceInstallation] = useState<string>("");
+  const [serviceJobNotes, setServiceJobNotes] = useState<string>("");
+  const [serviceValidationErrors, setServiceValidationErrors] = useState<string[]>([]);
+  const [isCustomPartModalOpen, setIsCustomPartModalOpen] = useState(false);
+  const [customPartPrefillData, setCustomPartPrefillData] = useState<any>(null);
+  
   // Debounce customer search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -897,6 +914,17 @@ export default function CrmProposalBuilder() {
     refetchOnWindowFocus: false,
   });
   const customerSearchResults = Array.isArray(customerSearchData) ? customerSearchData : [];
+
+  // Fetch initial data for service mode (parts, settings, technicians from Google Sheets)
+  const { data: initialData, isLoading: isLoadingInitialData, isError: isErrorInitialData, error: initialDataError } = useQuery({
+    queryKey: ["/api/initial-data"],
+    staleTime: Infinity,
+    gcTime: Infinity,
+    enabled: proposalMode === "service",
+  });
+  const serviceModeSettings = (initialData as any)?.settings;
+  const serviceModeAvailableParts = (initialData as any)?.parts || [];
+  const serviceModeTechnicians = (initialData as any)?.technicians || [];
 
   // Accept quote mutation
   const acceptQuoteMutation = useMutation({
@@ -1092,6 +1120,171 @@ export default function CrmProposalBuilder() {
     });
   };
 
+  // Calculate totals for service mode (same formulas as quote-generator.tsx)
+  const calculateServiceTotals = () => {
+    if (isLoadingInitialData) return null;
+    if (!serviceModeSettings || 
+        serviceModeSettings.laborRate === undefined ||
+        serviceModeSettings.laborBenefitsPercent === undefined ||
+        serviceModeSettings.salesTaxPercent === undefined ||
+        serviceModeSettings.warrantyReserve === undefined ||
+        serviceModeSettings.materialShrinkagePercent === undefined ||
+        serviceModeSettings.overheadPercent === undefined ||
+        serviceModeSettings.profitPercent === undefined ||
+        serviceModeSettings.financingPromotionPercent === undefined ||
+        serviceModeSettings.commissionPercent === undefined ||
+        !serviceModeSettings.warrantyDiscounts) {
+      return null;
+    }
+    
+    if (!serviceParts.length && !serviceLaborHours) return null;
+
+    const isGHVACWarranty = serviceGhvacInstalled === true && serviceYearsSinceInstallation;
+    const warrantyYears = isGHVACWarranty ? parseInt(serviceYearsSinceInstallation!) : 0;
+    const warrantyCoverage = serviceModeSettings.warrantyDiscounts;
+    const warrantyCoveragePercent = isGHVACWarranty ? (warrantyCoverage[warrantyYears] || 0) : 0;
+
+    let customerPartsCost = 0;
+    let ghvacCoveredPartsCost = 0;
+    
+    serviceParts.forEach(part => {
+      const partCost = parseFloat(part.price) * (part.quantity || 1);
+      const description = part.description.toLowerCase();
+      
+      const isGHVACCovered = isGHVACWarranty && (
+        description.includes('control board') ||
+        description.includes('evaporator coil') ||
+        description.includes('evap coil') ||
+        description.includes('compressor')
+      );
+      
+      if (isGHVACCovered) {
+        ghvacCoveredPartsCost += partCost;
+      } else {
+        customerPartsCost += partCost;
+      }
+    });
+
+    const materialShrinkagePercent = serviceModeSettings.materialShrinkagePercent;
+    const shrinkageMaterials = ['refrigerant filter dryer', 'copper', 'armaflex insulation', 'acid away'];
+    
+    const shrinkagePartsTotal = serviceParts.reduce((sum, part) => {
+      const description = part.description.toLowerCase();
+      const isShrinkageMaterial = shrinkageMaterials.some(material => 
+        description.includes(material)
+      );
+      
+      const isGHVACCovered = isGHVACWarranty && (
+        description.includes('control board') ||
+        description.includes('evaporator coil') ||
+        description.includes('evap coil') ||
+        description.includes('compressor')
+      );
+      
+      if (isShrinkageMaterial && !isGHVACCovered) {
+        const partCost = parseFloat(part.price) * (part.quantity || 1);
+        return sum + partCost;
+      }
+      return sum;
+    }, 0);
+    
+    const materialShrinkageCost = shrinkagePartsTotal * materialShrinkagePercent;
+    
+    const hours = parseFloat(serviceLaborHours || "1");
+    const laborRate = serviceModeSettings.laborRate;
+    const baseLaborCost = laborRate * hours;
+    
+    const laborBenefitsPercent = serviceModeSettings.laborBenefitsPercent;
+    const salesTaxPercent = serviceModeSettings.salesTaxPercent;
+    const warrantyReserve = serviceModeSettings.warrantyReserve;
+    const overheadPercent = serviceModeSettings.overheadPercent;
+    const profitPercent = serviceModeSettings.profitPercent;
+    const financingPercent = serviceModeSettings.financingPromotionPercent;
+    const commissionPercent = serviceModeSettings.commissionPercent;
+    
+    const laborBenefits = baseLaborCost * laborBenefitsPercent;
+    const totalLaborCost = baseLaborCost + laborBenefits;
+    
+    const allPartsSubtotal = customerPartsCost + ghvacCoveredPartsCost;
+    const allPartsWithShrinkage = allPartsSubtotal + materialShrinkageCost;
+    const fullSalesTax = allPartsWithShrinkage * salesTaxPercent;
+    const fullDirectCost = allPartsWithShrinkage + totalLaborCost + fullSalesTax + warrantyReserve;
+    const totalDeductionRate = overheadPercent + profitPercent + financingPercent + commissionPercent;
+    const remainingRate = 1.0 - totalDeductionRate;
+    const fullSellingPrice = fullDirectCost / remainingRate;
+    
+    const customerPartsWithShrinkage = customerPartsCost + materialShrinkageCost;
+    const customerSalesTax = customerPartsWithShrinkage * salesTaxPercent;
+    const customerDirectCost = customerPartsWithShrinkage + totalLaborCost + customerSalesTax + warrantyReserve;
+    const customerSellingPrice = customerDirectCost / remainingRate;
+    
+    let customerTotal = fullSellingPrice;
+    let priceBeforeWarranty = fullSellingPrice;
+    
+    if (isGHVACWarranty && warrantyCoveragePercent > 0) {
+      customerTotal = customerSellingPrice * warrantyCoveragePercent;
+      priceBeforeWarranty = customerSellingPrice;
+    }
+    
+    const overhead = fullDirectCost * overheadPercent;
+    const profit = fullDirectCost * profitPercent;
+    const financingCost = fullDirectCost * financingPercent;
+    const commission = fullDirectCost * commissionPercent;
+
+    return {
+      partsSubtotal: allPartsSubtotal.toFixed(2),
+      ghvacCoveredParts: ghvacCoveredPartsCost.toFixed(2),
+      materialShrinkage: materialShrinkageCost.toFixed(2),
+      adjustedPartsTotal: allPartsWithShrinkage.toFixed(2),
+      baseLaborCost: baseLaborCost.toFixed(2),
+      laborBenefits: laborBenefits.toFixed(2),
+      totalLaborCost: totalLaborCost.toFixed(2),
+      salesTax: fullSalesTax.toFixed(2),
+      warrantyReserve: warrantyReserve.toFixed(2),
+      directCost: fullDirectCost.toFixed(2),
+      overhead: overhead.toFixed(2),
+      profit: profit.toFixed(2),
+      financingCost: financingCost.toFixed(2),
+      commission: commission.toFixed(2),
+      fullSellingPrice: fullSellingPrice.toFixed(2),
+      priceBeforeWarranty: priceBeforeWarranty.toFixed(2),
+      warrantyCoverage: warrantyCoveragePercent,
+      total: customerTotal.toFixed(2),
+      isGHVACWarranty: Boolean(isGHVACWarranty),
+      subtotal: allPartsSubtotal.toFixed(2),
+      labor: baseLaborCost.toFixed(2),
+      tax: fullSalesTax.toFixed(2),
+    };
+  };
+
+  const serviceTotals = useMemo(() => calculateServiceTotals(), [
+    serviceParts, serviceLaborHours, serviceGhvacInstalled, serviceYearsSinceInstallation, serviceModeSettings, isLoadingInitialData
+  ]);
+
+  // Handle update for service parts (for SelectedParts component)
+  const handleUpdateServiceParts = (updates: { parts: QuotePart[] }) => {
+    setServiceParts(updates.parts);
+  };
+
+  // Handle adding parts from PartsSelection
+  const handleAddServicePart = (part: QuotePart) => {
+    setServiceParts(prev => [...prev, part]);
+  };
+
+  // Handle adding custom part
+  const handleAddCustomPart = (partData: { description: string; partNumber?: string; price: string; quantity: number }) => {
+    const newPart: QuotePart = {
+      id: `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      description: partData.description,
+      partNumber: partData.partNumber || '',
+      price: partData.price,
+      quantity: partData.quantity,
+    };
+    setServiceParts(prev => [...prev, newPart]);
+    setIsCustomPartModalOpen(false);
+    setCustomPartPrefillData(null);
+  };
+
   // Save to CRM Quote mutation
   const saveToCrmMutation = useMutation({
     mutationFn: async (data: {
@@ -1112,6 +1305,7 @@ export default function CrmProposalBuilder() {
       status?: string;
       aiGeneratedQuote?: object;
       quoteMode?: string;
+      quoteType?: string;
     }) => {
       const res = await apiRequest("POST", "/api/crm/quotes/from-proposal", data);
       return res.json();
@@ -1233,6 +1427,139 @@ export default function CrmProposalBuilder() {
       status: "draft",
       aiGeneratedQuote: aiGeneratedQuote,
       quoteMode: quoteMode,
+      quoteType: "install",
+    });
+  };
+
+  // Service quote save mutation
+  const saveServiceQuoteMutation = useMutation({
+    mutationFn: async (data: {
+      customerId: string;
+      propertyId?: string;
+      projectId?: string;
+      workOrderId?: string;
+      title: string;
+      description?: string;
+      notes?: string;
+      lineItems: Array<{
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        taxable?: boolean;
+      }>;
+      status?: string;
+      quoteType: string;
+      serviceQuoteData?: object;
+    }) => {
+      const res = await apiRequest("POST", "/api/crm/quotes/from-proposal", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Service Quote Saved!",
+        description: `Quote ${data.quote?.quoteNumber || ''} created successfully.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      // Reset service mode state after successful save
+      setServiceParts([]);
+      setServiceLaborHours("");
+      setServiceGhvacInstalled(undefined);
+      setServiceYearsSinceInstallation("");
+      setServiceJobNotes("");
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to save service quote. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Save service quote error:", error);
+    },
+  });
+
+  const handleSaveServiceQuote = () => {
+    const errors: string[] = [];
+    
+    if (!selectedCustomer) errors.push('customer');
+    if (serviceParts.length === 0) errors.push('parts');
+    if (serviceGhvacInstalled === undefined) errors.push('warranty');
+    if (!serviceLaborHours) errors.push('laborHours');
+    
+    if (errors.length > 0) {
+      setServiceValidationErrors(errors);
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setServiceValidationErrors([]);
+    
+    if (!serviceTotals) {
+      toast({
+        title: "Error",
+        description: "Unable to calculate totals. Please check settings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Build line items from service parts
+    const lineItems = serviceParts.map(part => ({
+      description: part.description + (part.partNumber ? ` (${part.partNumber})` : ''),
+      quantity: part.quantity || 1,
+      unitPrice: parseFloat(part.price),
+      taxable: true,
+    }));
+
+    // Add labor as a line item
+    const laborHours = parseFloat(serviceLaborHours);
+    const laborRate = serviceModeSettings?.laborRate || 0;
+    lineItems.push({
+      description: `Labor (${laborHours} hours @ $${laborRate}/hr)`,
+      quantity: 1,
+      unitPrice: parseFloat(serviceTotals.totalLaborCost || "0"),
+      taxable: false,
+    });
+
+    // Check property selection
+    const propertyIdToUse = selectedPropertyId || preloadedPropertyId;
+    const isValidProperty = customerProperties.length === 0 || 
+      customerProperties.some(p => p.id === propertyIdToUse);
+    
+    if (customerProperties.length > 1 && (!propertyIdToUse || !isValidProperty)) {
+      toast({
+        title: "Property Required",
+        description: "Please select a property/site for this quote.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const finalPropertyId = isValidProperty ? propertyIdToUse : 
+      (customerProperties.length === 1 ? customerProperties[0].id : undefined);
+
+    saveServiceQuoteMutation.mutate({
+      customerId: selectedCustomer.id,
+      propertyId: finalPropertyId || undefined,
+      projectId: preloadedProjectId || undefined,
+      workOrderId: preloadedWorkOrderId || undefined,
+      title: "Service Quote",
+      description: serviceJobNotes || undefined,
+      notes: serviceJobNotes || undefined,
+      lineItems,
+      status: "draft",
+      quoteType: "service",
+      serviceQuoteData: {
+        parts: serviceParts,
+        laborHours: serviceLaborHours,
+        ghvacInstalled: serviceGhvacInstalled,
+        yearsSinceInstallation: serviceYearsSinceInstallation,
+        jobNotes: serviceJobNotes,
+        totals: serviceTotals,
+      },
     });
   };
 
@@ -3107,16 +3434,18 @@ export default function CrmProposalBuilder() {
     <CrmLayout currentUser={currentUser}>
       <div className="flex flex-col h-full min-h-0">
         {/* Fixed Header */}
-        <div className="flex items-center justify-between pb-4 mb-4">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => window.history.back()} data-testid="button-back-to-quotes">
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
-            </Button>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Proposal Builder</h1>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Sheet open={cartOpen} onOpenChange={setCartOpen}>
+        <div className="flex flex-col gap-4 pb-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={() => window.history.back()} data-testid="button-back-to-quotes">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+              <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Proposal Builder</h1>
+            </div>
+            <div className="flex items-center space-x-2">
+              {proposalMode === "install" && (
+                <Sheet open={cartOpen} onOpenChange={setCartOpen}>
               <SheetTrigger asChild>
                 <Button
                   variant="outline"
@@ -3473,12 +3802,40 @@ export default function CrmProposalBuilder() {
                   </div>
                 )}
               </SheetContent>
-            </Sheet>
+                </Sheet>
+              )}
+            </div>
+          </div>
+          
+          {/* Mode Toggle - Install vs Service */}
+          <div className="flex justify-center">
+            <Tabs value={proposalMode} onValueChange={(v) => setProposalMode(v as "install" | "service")} className="w-auto">
+              <TabsList className="grid w-full grid-cols-2 h-10">
+                <TabsTrigger 
+                  value="install" 
+                  className="px-6 data-[state=active]:bg-[#711419] data-[state=active]:text-white"
+                  data-testid="toggle-install-mode"
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Install
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="service" 
+                  className="px-6 data-[state=active]:bg-[#711419] data-[state=active]:text-white"
+                  data-testid="toggle-service-mode"
+                >
+                  <Cog className="h-4 w-4 mr-2" />
+                  Service
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </div>
 
-        {/* Tabs Section */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        {/* Install Mode Content */}
+        {proposalMode === "install" && (
+          <>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
           <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap" data-testid="tabs-view-switcher">
             <TabsTrigger 
               value="preset" 
@@ -4865,42 +5222,293 @@ export default function CrmProposalBuilder() {
           </TabsContent>
         </Tabs>
 
-        {cart.length > 0 && !cartOpen && activeTab === "crawlspace" && !selectedCrawlspaceTier && (
-          <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80">
-            <Button
-              className="w-full min-h-[52px] shadow-lg bg-teal-600 hover:bg-teal-700"
-              onClick={() => setCartOpen(true)}
-              data-testid="button-view-cart-crawlspace"
-            >
-              <ShoppingCart className="h-5 w-5 mr-2" />
-              View Proposal ({cartItemCount} packages)
-            </Button>
-          </div>
+          {cart.length > 0 && !cartOpen && activeTab === "crawlspace" && !selectedCrawlspaceTier && (
+            <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80">
+              <Button
+                className="w-full min-h-[52px] shadow-lg bg-teal-600 hover:bg-teal-700"
+                onClick={() => setCartOpen(true)}
+                data-testid="button-view-cart-crawlspace"
+              >
+                <ShoppingCart className="h-5 w-5 mr-2" />
+                View Proposal ({cartItemCount} packages)
+              </Button>
+            </div>
+          )}
+
+          {cart.length > 0 && !cartOpen && activeTab === "preset" && currentStep < totalSteps && (
+            <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80">
+              <Button
+                className="w-full min-h-[52px] shadow-lg"
+                onClick={() => setCartOpen(true)}
+                data-testid="button-view-cart"
+              >
+                <ShoppingCart className="h-5 w-5 mr-2" />
+                View Proposal ({cartItemCount} packages)
+              </Button>
+            </div>
+          )}
+
+          {cart.length > 0 && !cartOpen && activeTab === "custom" && customBuildStep < 3 && (
+            <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80">
+              <Button
+                className="w-full min-h-[52px] shadow-lg"
+                onClick={() => setCartOpen(true)}
+                data-testid="button-view-cart-custom"
+              >
+                <ShoppingCart className="h-5 w-5 mr-2" />
+                View Proposal ({cartItemCount} packages)
+              </Button>
+            </div>
+          )}
+        </>
         )}
 
-        {cart.length > 0 && !cartOpen && activeTab === "preset" && currentStep < totalSteps && (
-          <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80">
-            <Button
-              className="w-full min-h-[52px] shadow-lg"
-              onClick={() => setCartOpen(true)}
-              data-testid="button-view-cart"
-            >
-              <ShoppingCart className="h-5 w-5 mr-2" />
-              View Proposal ({cartItemCount} packages)
-            </Button>
-          </div>
-        )}
+        {/* Service Mode Content */}
+        {proposalMode === "service" && (
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column: Parts Selection */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Customer Selection for Service Mode */}
+                <Card>
+                  <CardContent className="p-6">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Search className="h-5 w-5" />
+                      Customer Selection
+                    </h2>
+                    <div className={`${serviceValidationErrors.includes('customer') ? 'ring-2 ring-red-500 rounded-lg' : ''}`}>
+                      <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              value={customerSearchTerm}
+                              onChange={(e) => {
+                                setCustomerSearchTerm(e.target.value);
+                                if (e.target.value.length >= 2) {
+                                  setIsCustomerPopoverOpen(true);
+                                }
+                              }}
+                              placeholder="Search customers by name, phone, or email..."
+                              className="pl-10 min-h-[44px]"
+                              data-testid="input-service-customer-search"
+                            />
+                          </div>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 p-0" align="start">
+                          {isSearchingCustomers ? (
+                            <div className="p-4 text-center text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                              Searching...
+                            </div>
+                          ) : customerSearchResults.length > 0 ? (
+                            <div className="max-h-64 overflow-y-auto">
+                              {customerSearchResults.map((customer) => (
+                                <button
+                                  key={customer.id}
+                                  className="w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-800 border-b last:border-b-0"
+                                  onClick={() => handleSelectCustomer(customer)}
+                                  data-testid={`customer-result-${customer.id}`}
+                                >
+                                  <p className="font-medium text-sm">{customer.name}</p>
+                                  {customer.fullAddress && (
+                                    <p className="text-xs text-muted-foreground">{customer.fullAddress}</p>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          ) : debouncedCustomerSearch.length >= 2 ? (
+                            <div className="p-4 text-center text-muted-foreground">
+                              No customers found
+                            </div>
+                          ) : null}
+                        </PopoverContent>
+                      </Popover>
+                      {selectedCustomer && (
+                        <div className="mt-3 p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-green-800 dark:text-green-200">{selectedCustomer.name}</p>
+                              {selectedCustomer.fullAddress && (
+                                <p className="text-sm text-green-700 dark:text-green-300">{selectedCustomer.fullAddress}</p>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedCustomer(null);
+                                setCustomerSearchTerm("");
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Property selection if customer has multiple properties */}
+                    {customerProperties.length > 1 && (
+                      <div className="mt-4">
+                        <Label className="text-sm font-medium mb-2 block">Select Property/Site</Label>
+                        <Select value={selectedPropertyId || ""} onValueChange={setSelectedPropertyId}>
+                          <SelectTrigger className="w-full">
+                            <MapPin className="h-4 w-4 mr-2" />
+                            <SelectValue placeholder="Select a property" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {customerProperties.map((property) => (
+                              <SelectItem key={property.id} value={property.id}>
+                                {property.address}{property.city ? `, ${property.city}` : ''}{property.state ? ` ${property.state}` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-        {cart.length > 0 && !cartOpen && activeTab === "custom" && customBuildStep < 3 && (
-          <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80">
-            <Button
-              className="w-full min-h-[52px] shadow-lg"
-              onClick={() => setCartOpen(true)}
-              data-testid="button-view-cart-custom"
-            >
-              <ShoppingCart className="h-5 w-5 mr-2" />
-              View Proposal ({cartItemCount} packages)
-            </Button>
+                {/* Parts Selection */}
+                {isLoadingInitialData ? (
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        <span className="ml-3 text-muted-foreground">Loading parts...</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : isErrorInitialData ? (
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="text-center py-8 text-red-600">
+                        <p>Failed to load parts data. Please check your connection to Google Sheets.</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className={`${serviceValidationErrors.includes('parts') ? 'ring-2 ring-red-500 rounded-lg' : ''}`}>
+                    <PartsSelection
+                      parts={serviceModeAvailableParts}
+                      selectedParts={serviceParts}
+                      onSelectPart={handleAddServicePart}
+                      onAddCustomPart={(prefillData: any) => {
+                        setCustomPartPrefillData(prefillData);
+                        setIsCustomPartModalOpen(true);
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Warranty Section */}
+                <div className={`${serviceValidationErrors.includes('warranty') ? 'ring-2 ring-red-500 rounded-lg' : ''}`}>
+                  <WarrantySection
+                    ghvacInstalled={serviceGhvacInstalled}
+                    yearsSinceInstallation={serviceYearsSinceInstallation}
+                    onUpdate={(updates) => {
+                      if ('ghvacInstalled' in updates) setServiceGhvacInstalled(updates.ghvacInstalled);
+                      if ('yearsSinceInstallation' in updates) setServiceYearsSinceInstallation(updates.yearsSinceInstallation || '');
+                    }}
+                  />
+                </div>
+
+                {/* Labor Hours & Notes */}
+                <Card>
+                  <CardContent className="p-6">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Wrench className="h-5 w-5" />
+                      Labor & Notes
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className={`${serviceValidationErrors.includes('laborHours') ? 'ring-2 ring-red-500 rounded-lg p-2' : ''}`}>
+                        <Label htmlFor="laborHours" className="text-sm font-medium mb-2 block">Labor Hours</Label>
+                        <Input
+                          id="laborHours"
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={serviceLaborHours}
+                          onChange={(e) => setServiceLaborHours(e.target.value)}
+                          placeholder="Enter labor hours"
+                          className="min-h-[44px]"
+                          data-testid="input-service-labor-hours"
+                        />
+                        {serviceModeSettings?.laborRate && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Rate: ${serviceModeSettings.laborRate}/hr
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="jobNotes" className="text-sm font-medium mb-2 block">Job Notes</Label>
+                        <Textarea
+                          id="jobNotes"
+                          value={serviceJobNotes}
+                          onChange={(e) => setServiceJobNotes(e.target.value)}
+                          placeholder="Enter any job notes..."
+                          className="min-h-[80px]"
+                          data-testid="input-service-job-notes"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Right Column: Selected Parts & Pricing */}
+              <div className="space-y-6">
+                {serviceParts.length > 0 && serviceTotals && (
+                  <SelectedParts
+                    parts={serviceParts}
+                    totals={serviceTotals}
+                    onUpdate={handleUpdateServiceParts}
+                  />
+                )}
+
+                {serviceParts.length === 0 && (
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <Package className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                      <p className="text-muted-foreground">No parts selected yet</p>
+                      <p className="text-sm text-muted-foreground">Search and add parts from the left panel</p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Save Service Quote Button */}
+                <Button
+                  onClick={handleSaveServiceQuote}
+                  disabled={saveServiceQuoteMutation.isPending}
+                  className="w-full min-h-[52px] bg-[#711419] hover:bg-[#8a1a20]"
+                  data-testid="button-save-service-quote"
+                >
+                  {saveServiceQuoteMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-5 w-5 mr-2" />
+                      Save Service Quote to CRM
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Custom Part Modal */}
+            <CustomPartModal
+              isOpen={isCustomPartModalOpen}
+              onClose={() => {
+                setIsCustomPartModalOpen(false);
+                setCustomPartPrefillData(null);
+              }}
+              onAdd={handleAddCustomPart}
+              prefillData={customPartPrefillData}
+            />
           </div>
         )}
 
