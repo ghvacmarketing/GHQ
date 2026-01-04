@@ -245,10 +245,16 @@ export default function CrmSettingsUsers() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="p-6 max-w-6xl mx-auto">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" onClick={() => window.history.back()} data-testid="button-back">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mb-3 -ml-2 text-muted-foreground hover:text-foreground"
+            onClick={() => navigate("/crm/settings")}
+            data-testid="button-back-to-settings"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to Settings
           </Button>
           <h1 className="text-2xl font-bold text-slate-900">Users & Permissions</h1>
         </div>

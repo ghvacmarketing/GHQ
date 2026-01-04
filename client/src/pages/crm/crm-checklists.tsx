@@ -461,6 +461,16 @@ export default function CrmChecklists() {
       <div className="flex h-[calc(100vh-4rem)] lg:h-screen">
         <div className="w-80 border-r bg-slate-50 flex flex-col">
           <div className="p-4 border-b bg-white">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mb-3 -ml-2 text-muted-foreground hover:text-foreground"
+              onClick={() => navigate("/crm/settings")}
+              data-testid="button-back-to-settings"
+            >
+              <ChevronDown className="h-4 w-4 mr-1 rotate-90" />
+              Back to Settings
+            </Button>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 <ClipboardList className="h-5 w-5 text-[#711419]" />
