@@ -161,7 +161,7 @@ export function GhqSearch() {
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading } = useQuery<SearchResponse>({
-    queryKey: ["/api/crm/ghq/search", { q: debouncedQuery }],
+    queryKey: [`/api/crm/ghq/search?q=${encodeURIComponent(debouncedQuery)}`],
     enabled: debouncedQuery.length >= 2,
   });
 
