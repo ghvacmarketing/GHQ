@@ -92,7 +92,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject, WorkOrderStatus, ChecklistQuestion } from "@shared/schema";
-import { workOrderVisitTypeEnum, type WorkOrderVisitType, workSubtypeByVisitType, type WorkSubtype, dispatchQueueStageEnum, type DispatchQueueStage } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkSubtype, dispatchQueueStageEnum, type DispatchQueueStage, type WorkOrderSubtype } from "@shared/schema";
 
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
@@ -1813,6 +1813,25 @@ export default function CrmDispatch() {
 
   const projects = projectsResponse?.projects || [];
 
+  // Query to fetch work order subtypes dynamically
+  const { data: workOrderSubtypes = [] } = useQuery<WorkOrderSubtype[]>({
+    queryKey: ["/api/crm/work-order-subtypes", { activeOnly: "true" }],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/work-order-subtypes?activeOnly=true", {
+        credentials: "include",
+      });
+      return res.json();
+    },
+    enabled: !!currentUser,
+  });
+
+  // Helper to get subtypes for a visit type
+  const getSubtypesForVisitType = (vt: WorkOrderVisitType) => {
+    return workOrderSubtypes
+      .filter(s => s.visitType === vt)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  };
+
   const { data: workOrdersData, isLoading: workOrdersLoading } = useQuery<any[]>({
     queryKey: ["/api/crm/dispatch/work-orders", dateString],
     queryFn: async () => {
@@ -3281,7 +3300,9 @@ export default function CrmDispatch() {
                 <Select value={visitType} onValueChange={(v) => {
                   const newVisitType = v as WorkOrderVisitType;
                   setVisitType(newVisitType);
-                  setWorkSubtype(workSubtypeByVisitType[newVisitType][0]);
+                  // Set default subtype from dynamic list
+                  const subtypes = getSubtypesForVisitType(newVisitType);
+                  setWorkSubtype(subtypes.length > 0 ? subtypes[0].subtype : "Other");
                 }}>
                   <SelectTrigger>
                     <SelectValue />
@@ -3313,12 +3334,16 @@ export default function CrmDispatch() {
               <Label>Work Subtype</Label>
               <Select value={workSubtype} onValueChange={(v) => setWorkSubtype(v as WorkSubtype)}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select subtype" />
                 </SelectTrigger>
                 <SelectContent>
-                  {workSubtypeByVisitType[visitType].map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
+                  {getSubtypesForVisitType(visitType).length > 0 ? (
+                    getSubtypesForVisitType(visitType).map((s) => (
+                      <SelectItem key={s.id} value={s.subtype}>{s.subtype}</SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="Other">Other</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

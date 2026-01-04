@@ -62,7 +62,7 @@ import {
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkOrderStatus, workSubtypeByVisitType, type WorkSubtype, type ChecklistQuestion } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkOrderStatus, type WorkSubtype, type ChecklistQuestion, type WorkOrderSubtype } from "@shared/schema";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, isToday, isThisWeek, addDays } from "date-fns";
@@ -441,6 +441,25 @@ export default function CrmWorkOrders() {
   });
 
   const reassignCustomers = reassignCustomersData?.customers || [];
+
+  // Query to fetch work order subtypes dynamically
+  const { data: workOrderSubtypes = [] } = useQuery<WorkOrderSubtype[]>({
+    queryKey: ["/api/crm/work-order-subtypes", { activeOnly: "true" }],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/work-order-subtypes?activeOnly=true", {
+        credentials: "include",
+      });
+      return res.json();
+    },
+    enabled: !!currentUser,
+  });
+
+  // Helper to get subtypes for a visit type
+  const getSubtypesForVisitType = (vt: WorkOrderVisitType) => {
+    return workOrderSubtypes
+      .filter(s => s.visitType === vt)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  };
 
   // Query for properties of the current work order's customer (for property reassignment)
   const { data: woPropertiesData } = useQuery<CrmProperty[]>({
@@ -1748,8 +1767,9 @@ export default function CrmWorkOrders() {
                     onValueChange={(v) => {
                       const vt = v as WorkOrderVisitType;
                       setVisitType(vt);
-                      // For MAINTENANCE, default to "Preventative Maintenance" (dynamic subtypes load via useEffect)
-                      setWorkSubtype(vt === "MAINTENANCE" ? "Preventative Maintenance" : workSubtypeByVisitType[vt][0]);
+                      // Set default subtype from dynamic list
+                      const subtypes = getSubtypesForVisitType(vt);
+                      setWorkSubtype(subtypes.length > 0 ? subtypes[0].subtype : "Other");
                     }}
                   >
                     <SelectTrigger data-testid="select-visit-type">
@@ -1785,14 +1805,18 @@ export default function CrmWorkOrders() {
                 <Label>Work Subtype</Label>
                 <Select value={workSubtype} onValueChange={(v) => setWorkSubtype(v as WorkSubtype)}>
                   <SelectTrigger data-testid="select-work-subtype">
-                    <SelectValue />
+                    <SelectValue placeholder="Select subtype" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(visitType === "MAINTENANCE" ? maintenanceSubtypes : workSubtypeByVisitType[visitType]).map((sub) => (
-                      <SelectItem key={sub} value={sub}>
-                        {sub}
-                      </SelectItem>
-                    ))}
+                    {getSubtypesForVisitType(visitType).length > 0 ? (
+                      getSubtypesForVisitType(visitType).map((s) => (
+                        <SelectItem key={s.id} value={s.subtype}>
+                          {s.subtype}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="Other">Other</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

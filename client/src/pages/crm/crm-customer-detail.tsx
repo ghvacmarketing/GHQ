@@ -77,7 +77,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty, CrmQuote, ChecklistQuestion } from "@shared/schema";
-import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus, workSubtypeByVisitType, type WorkSubtype } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus, type WorkSubtype, type WorkOrderSubtype } from "@shared/schema";
 import { createLocalDateTime } from "@/lib/timezone";
 import { format, formatDistanceToNow, differenceInCalendarDays } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -3254,6 +3254,25 @@ export default function CrmCustomerDetail() {
 
   const technicians = dispatchData?.technicians?.filter((t) => t.role === "tech") || [];
 
+  // Query to fetch work order subtypes dynamically
+  const { data: workOrderSubtypes = [] } = useQuery<WorkOrderSubtype[]>({
+    queryKey: ["/api/crm/work-order-subtypes", { activeOnly: "true" }],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/work-order-subtypes?activeOnly=true", {
+        credentials: "include",
+      });
+      return res.json();
+    },
+    enabled: !!currentUser,
+  });
+
+  // Helper to get subtypes for a visit type
+  const getSubtypesForVisitType = (vt: WorkOrderVisitType) => {
+    return workOrderSubtypes
+      .filter(s => s.visitType === vt)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  };
+
   const canDeleteCustomer = currentUser && ["owner", "admin", "sales"].includes(currentUser.role);
 
   const validateForm = (): boolean => {
@@ -4197,10 +4216,9 @@ export default function CrmCustomerDetail() {
                   if (newType !== "MAINTENANCE") {
                     setWoAgreementId("");
                   }
-                  const newSubtypes = newType === "MAINTENANCE" 
-                    ? maintenanceSubtypes 
-                    : workSubtypeByVisitType[newType] || ["Other"];
-                  setWoWorkSubtype(newSubtypes[0] as WorkSubtype);
+                  // Set default subtype from dynamic list
+                  const subtypes = getSubtypesForVisitType(newType);
+                  setWoWorkSubtype(subtypes.length > 0 ? subtypes[0].subtype : "Other");
                 }}>
                   <SelectTrigger data-testid="select-wo-visit-type">
                     <SelectValue placeholder="Select visit type" />
@@ -4223,14 +4241,15 @@ export default function CrmCustomerDetail() {
                     <SelectValue placeholder="Select work subtype" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(woVisitType === "MAINTENANCE" 
-                      ? maintenanceSubtypes 
-                      : (workSubtypeByVisitType[woVisitType] || ["Other"])
-                    ).map((subtype) => (
-                      <SelectItem key={subtype} value={subtype} data-testid={`wo-subtype-${subtype}`}>
-                        {subtype}
-                      </SelectItem>
-                    ))}
+                    {getSubtypesForVisitType(woVisitType).length > 0 ? (
+                      getSubtypesForVisitType(woVisitType).map((s) => (
+                        <SelectItem key={s.id} value={s.subtype} data-testid={`wo-subtype-${s.subtype}`}>
+                          {s.subtype}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="Other" data-testid="wo-subtype-Other">Other</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

@@ -92,8 +92,9 @@ import type {
 } from "@shared/schema";
 import { 
   projectActivityTypeEnum, financialSubtypeEnum, approvalStatusEnum,
-  workOrderVisitTypeEnum, workSubtypeByVisitType
+  workOrderVisitTypeEnum
 } from "@shared/schema";
+import type { WorkOrderSubtype } from "@shared/schema";
 
 type ProjectDetail = CrmProject & {
   customerName: string | null;
@@ -318,6 +319,25 @@ export default function CrmProjectDetail() {
     queryKey: ["/api/crm/users"],
     enabled: !!currentUser,
   });
+
+  // Query to fetch work order subtypes dynamically
+  const { data: workOrderSubtypes = [] } = useQuery<WorkOrderSubtype[]>({
+    queryKey: ["/api/crm/work-order-subtypes", { activeOnly: "true" }],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/work-order-subtypes?activeOnly=true", {
+        credentials: "include",
+      });
+      return res.json();
+    },
+    enabled: !!currentUser,
+  });
+
+  // Helper to get subtypes for a visit type
+  const getSubtypesForVisitType = (vt: WorkOrderVisitType) => {
+    return workOrderSubtypes
+      .filter(s => s.visitType === vt)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  };
 
   const technicians = useMemo(() => 
     (techniciansData || []).filter(u => u.role === "tech"),
@@ -1153,7 +1173,9 @@ export default function CrmProjectDetail() {
                     onValueChange={(v) => {
                       const vt = v as WorkOrderVisitType;
                       setWoVisitType(vt);
-                      setWoWorkSubtype(vt === "MAINTENANCE" ? "Preventative Maintenance" : workSubtypeByVisitType[vt][0]);
+                      // Set default subtype from dynamic list
+                      const subtypes = getSubtypesForVisitType(vt);
+                      setWoWorkSubtype(subtypes.length > 0 ? subtypes[0].subtype : "Other");
                     }}
                   >
                     <SelectTrigger data-testid="select-wo-visit-type">
@@ -1189,14 +1211,18 @@ export default function CrmProjectDetail() {
                 <Label>Work Subtype</Label>
                 <Select value={woWorkSubtype} onValueChange={(v) => setWoWorkSubtype(v as WorkSubtype)}>
                   <SelectTrigger data-testid="select-wo-work-subtype">
-                    <SelectValue />
+                    <SelectValue placeholder="Select subtype" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(woVisitType === "MAINTENANCE" ? maintenanceSubtypes : workSubtypeByVisitType[woVisitType]).map((sub) => (
-                      <SelectItem key={sub} value={sub}>
-                        {sub}
-                      </SelectItem>
-                    ))}
+                    {getSubtypesForVisitType(woVisitType).length > 0 ? (
+                      getSubtypesForVisitType(woVisitType).map((s) => (
+                        <SelectItem key={s.id} value={s.subtype}>
+                          {s.subtype}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="Other">Other</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
