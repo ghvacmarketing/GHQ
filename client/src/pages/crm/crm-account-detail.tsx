@@ -218,7 +218,7 @@ export default function CrmAccountDetail() {
     enabled: !!currentUser && jobDialogOpen,
   });
 
-  const technicians = dispatchData?.technicians?.filter((t) => t.role === "tech") || [];
+  const technicians = dispatchData?.technicians || [];
 
   useEffect(() => {
     if (accountData?.account?.accountType === "PROPERTY_MANAGER") {

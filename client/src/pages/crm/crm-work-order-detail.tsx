@@ -415,12 +415,10 @@ export default function CrmWorkOrderDetail() {
     enabled: !!currentUser && !!workOrderId,
   });
 
-  const { data: techniciansData } = useQuery<CrmUser[]>({
-    queryKey: ["/api/crm/users"],
+  const { data: technicians = [] } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
+    queryKey: ["/api/crm/technicians"],
     enabled: !!currentUser,
   });
-
-  const technicians = (techniciansData || []).filter(u => u.role === "tech");
 
   const { data: propertiesData } = useQuery<CrmProperty[]>({
     queryKey: ["/api/crm/properties", workOrder?.customerId],

@@ -3252,7 +3252,7 @@ export default function CrmCustomerDetail() {
     enabled: !!currentUser && !!customerId && deleteDialogOpen,
   });
 
-  const technicians = dispatchData?.technicians?.filter((t) => t.role === "tech") || [];
+  const technicians = dispatchData?.technicians || [];
 
   // Query to fetch work order subtypes dynamically
   const { data: workOrderSubtypes = [] } = useQuery<WorkOrderSubtype[]>({

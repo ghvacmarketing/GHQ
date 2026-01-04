@@ -315,8 +315,8 @@ export default function CrmProjectDetail() {
     enabled: !!currentUser && !!projectId,
   });
 
-  const { data: techniciansData } = useQuery<CrmUser[]>({
-    queryKey: ["/api/crm/users"],
+  const { data: technicians = [] } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
+    queryKey: ["/api/crm/technicians"],
     enabled: !!currentUser,
   });
 
@@ -338,11 +338,6 @@ export default function CrmProjectDetail() {
       .filter(s => s.visitType === vt)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   };
-
-  const technicians = useMemo(() => 
-    (techniciansData || []).filter(u => u.role === "tech"),
-    [techniciansData]
-  );
 
   useEffect(() => {
     if (woVisitType !== "MAINTENANCE") return;
