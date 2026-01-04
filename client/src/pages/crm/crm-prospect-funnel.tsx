@@ -4,6 +4,14 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -159,7 +167,7 @@ function InterestBadge({ level }: { level: InterestLevel | null | undefined }) {
   const config = {
     hot: { icon: Flame, className: "bg-red-100 text-red-700 border-red-200" },
     warm: { icon: Thermometer, className: "bg-amber-100 text-amber-700 border-amber-200" },
-    cold: { icon: Snowflake, className: "bg-blue-100 text-blue-700 border-blue-200" },
+    cold: { icon: Snowflake, className: "bg-slate-100 text-slate-600 border-slate-200" },
   };
   
   const { icon: Icon, className } = config[level];
@@ -922,37 +930,36 @@ export default function CrmProspectFunnel() {
   const expandedProspect = expandedProspectId ? filteredProspects.find(p => p.id === expandedProspectId) : null;
 
   const SearchFiltersComponent = () => (
-    <div className="flex w-full flex-col md:flex-row md:items-center gap-4 bg-slate-100 rounded-lg py-4 px-4 mb-4">
-      <div className="relative w-full md:flex-1 md:max-w-lg md:mx-auto">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          type="text"
-          placeholder="Search by name or phone..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 bg-white rounded-full border-slate-300"
-          data-testid="input-search-prospects"
-        />
-        {searchTerm && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
-            onClick={() => setSearchTerm("")}
-            data-testid="button-clear-search"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
+    <div className="space-y-4">
+      <div className="flex justify-center">
+        <div className="relative w-full max-w-xl">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
+            type="text"
+            placeholder="Search by name or phone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+            data-testid="input-search-prospects"
+          />
+          {searchTerm && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+              onClick={() => setSearchTerm("")}
+              data-testid="button-clear-search"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="flex gap-2 md:ml-auto flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-3">
         <Select value={activeFilter} onValueChange={setActiveFilter}>
-          <SelectTrigger className="w-[130px] bg-white rounded-full border-slate-300" data-testid="select-status-filter">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              <SelectValue />
-            </div>
+          <SelectTrigger className="w-[140px] h-9 text-sm bg-white border-slate-300" data-testid="select-status-filter">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All Active">All Active</SelectItem>
@@ -966,11 +973,8 @@ export default function CrmProspectFunnel() {
         </Select>
 
         <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-          <SelectTrigger className="w-[140px] bg-white rounded-full border-slate-300" data-testid="select-employee-filter">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <SelectValue placeholder="All Sales People" />
-            </div>
+          <SelectTrigger className="w-[160px] h-9 text-sm bg-white border-slate-300" data-testid="select-employee-filter">
+            <SelectValue placeholder="All Sales People" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Sales People</SelectItem>
@@ -1406,168 +1410,196 @@ export default function CrmProspectFunnel() {
 
             <TabsContent value="list" className="space-y-4 mt-4">
               <SearchFiltersComponent />
-              {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-32 w-full" />
-            ))}
-          </div>
-        ) : filteredProspects.length === 0 ? (
-          <Card className="p-8">
-            <p className="text-center text-muted-foreground">
-              {searchTerm ? "No prospects found matching your search" : "No prospects found"}
-            </p>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {filteredProspects.map((prospect) => {
-              const prospectFollowUps = getProspectFollowUps(prospect.id);
-              const nextStage = prospect.salesStage ? NEXT_STAGE[prospect.salesStage] : null;
-              const isActive = prospect.salesStage !== "won" && prospect.salesStage !== "lost";
-              
-              const nextFollowUpDate = prospect.nextFollowUpAt
-                ? typeof prospect.nextFollowUpAt === "string"
-                  ? parseISO(prospect.nextFollowUpAt)
-                  : prospect.nextFollowUpAt
-                : null;
-              const isOverdue = nextFollowUpDate && isPast(nextFollowUpDate) && !isToday(nextFollowUpDate);
-              const isDueToday = nextFollowUpDate && isToday(nextFollowUpDate);
+              <Card className="bg-white border shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50">
+                        <TableHead className="font-semibold">Name / Contact</TableHead>
+                        <TableHead className="font-semibold">Stage</TableHead>
+                        <TableHead className="font-semibold">Interest</TableHead>
+                        <TableHead className="font-semibold hidden md:table-cell">Next Follow-up</TableHead>
+                        <TableHead className="font-semibold text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoading ? (
+                        Array.from({ length: 8 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell><Skeleton className="h-10 w-48" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                            <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : filteredProspects.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-12">
+                            <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                            <p className="text-slate-500 font-medium">
+                              {searchTerm ? "No prospects found matching your search" : "No prospects found"}
+                            </p>
+                            <p className="text-slate-400 text-sm mt-1">
+                              {searchTerm ? "Try adjusting your search" : "Add a new prospect to get started"}
+                            </p>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredProspects.map((prospect) => {
+                          const nextFollowUpDate = prospect.nextFollowUpAt
+                            ? typeof prospect.nextFollowUpAt === "string"
+                              ? parseISO(prospect.nextFollowUpAt)
+                              : prospect.nextFollowUpAt
+                            : null;
+                          const isOverdue = nextFollowUpDate && isPast(nextFollowUpDate) && !isToday(nextFollowUpDate);
+                          const isDueToday = nextFollowUpDate && isToday(nextFollowUpDate);
+                          const isActive = prospect.salesStage !== "won" && prospect.salesStage !== "lost";
 
-              return (
-                <Card
-                  key={prospect.id}
-                  className="hover:shadow-sm transition-shadow"
-                  data-testid={`card-prospect-${prospect.id}`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <InitialsAvatar name={prospect.name} size="md" />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-base truncate" data-testid={`text-prospect-name-${prospect.id}`}>
-                            {prospect.name}
-                          </div>
-                          
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
-                            {prospect.phone && (
-                              <a href={`tel:${prospect.phone}`} className="flex items-center gap-1 hover:underline" data-testid={`link-phone-${prospect.id}`}>
-                                <Phone className="h-3.5 w-3.5" />
-                                <span>{prospect.phone}</span>
-                              </a>
-                            )}
-                            {prospect.email && (
-                              <a href={`mailto:${prospect.email}`} className="flex items-center gap-1 hover:underline truncate max-w-[200px]" data-testid={`link-email-${prospect.id}`}>
-                                <Mail className="h-3.5 w-3.5 flex-shrink-0" />
-                                <span className="truncate">{prospect.email}</span>
-                              </a>
-                            )}
-                            {nextFollowUpDate && (
-                              <span className={`flex items-center gap-1 ${
-                                isOverdue ? "text-red-600 font-medium" : isDueToday ? "text-amber-600 font-medium" : ""
-                              }`}>
-                                Next: {format(nextFollowUpDate, "MMM d")}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {isActive ? (
-                          <div className="flex items-center gap-1.5">
-                            <Select
-                              value={prospect.salesStage || "new"}
-                              onValueChange={(value) => updateStageMutation.mutate({ id: prospect.id, salesStage: value as SalesStage })}
-                            >
-                              <SelectTrigger className="h-7 min-w-[90px] text-xs border-slate-200" data-testid={`select-stage-${prospect.id}`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="new">New</SelectItem>
-                                <SelectItem value="contacted">Contacted</SelectItem>
-                                <SelectItem value="quote_sent">Quote Sent</SelectItem>
-                                <SelectItem value="negotiating">Negotiating</SelectItem>
-                                <SelectItem value="won">Won</SelectItem>
-                                <SelectItem value="lost">Lost</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <InterestBadge level={prospect.interestLevel as InterestLevel} />
-                          </div>
-                        ) : (
-                          <Badge variant={prospect.salesStage === "won" ? "default" : "destructive"} className="text-xs">
-                            {STAGE_LABELS[prospect.salesStage as SalesStage] || prospect.salesStage}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+                          const getStageBadgeClass = (stage: string | null) => {
+                            switch (stage) {
+                              case "new":
+                                return "bg-blue-100 text-blue-700 border-blue-200";
+                              case "contacted":
+                                return "bg-amber-100 text-amber-700 border-amber-200";
+                              case "quote_sent":
+                                return "bg-purple-100 text-purple-700 border-purple-200";
+                              case "negotiating":
+                                return "bg-green-100 text-green-700 border-green-200";
+                              case "won":
+                                return "bg-emerald-100 text-emerald-700 border-emerald-200";
+                              case "lost":
+                                return "bg-red-100 text-red-600 border-red-200";
+                              default:
+                                return "bg-slate-100 text-slate-700 border-slate-200";
+                            }
+                          };
 
-                    <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="h-8 px-3 touch-manipulation text-xs"
-                          onClick={() => handleAddFollowUp(prospect.id)}
-                          data-testid={`button-add-followup-${prospect.id}`}
-                        >
-                          <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                          Follow-up
-                          {nextFollowUpDate && (
-                            <span className="ml-1 text-muted-foreground">· {format(nextFollowUpDate, "MMM d")}</span>
-                          )}
-                        </Button>
-                        {isActive && (
-                          <>
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="h-8 w-8 touch-manipulation text-green-600 hover:bg-green-50" 
-                              onClick={() => {
-                                setConfirmProspectId(prospect.id);
-                                setWonConfirmOpen(true);
-                              }}
-                              title="Mark Won"
-                              data-testid={`button-mark-won-${prospect.id}`}
+                          return (
+                            <TableRow
+                              key={prospect.id}
+                              className="cursor-pointer hover:bg-slate-50 transition-colors"
+                              data-testid={`row-prospect-${prospect.id}`}
                             >
-                              <CheckCircle2 className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="h-8 w-8 touch-manipulation text-red-600 hover:bg-red-50" 
-                              onClick={() => {
-                                setConfirmProspectId(prospect.id);
-                                setLostConfirmOpen(true);
-                              }}
-                              title="Mark Lost"
-                              data-testid={`button-mark-lost-${prospect.id}`}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="text-xs h-8 text-muted-foreground hover:text-foreground" 
-                        onClick={() => {
-                          setExpandedProspectId(prospect.id);
-                          setActiveTab("details");
-                        }} 
-                        data-testid={`button-expand-${prospect.id}`}
-                      >
-                        Details
-                        <ChevronRight className="h-3 w-3 ml-1" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
+                              <TableCell className="py-3">
+                                <div className="flex items-center gap-3">
+                                  <InitialsAvatar name={prospect.name} size="md" />
+                                  <div className="min-w-0">
+                                    <div 
+                                      className="font-medium text-slate-900 truncate cursor-pointer hover:text-[#711419]"
+                                      onClick={() => {
+                                        setExpandedProspectId(prospect.id);
+                                        setActiveTab("details");
+                                      }}
+                                      data-testid={`text-prospect-name-${prospect.id}`}
+                                    >
+                                      {prospect.name}
+                                    </div>
+                                    {prospect.companyName && (
+                                      <div className="text-xs text-slate-500 truncate">{prospect.companyName}</div>
+                                    )}
+                                    <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
+                                      {prospect.phone && (
+                                        <span className="flex items-center gap-1">
+                                          <Phone className="h-3 w-3" />
+                                          {prospect.phone}
+                                        </span>
+                                      )}
+                                      {prospect.email && (
+                                        <span className="flex items-center gap-1 truncate max-w-[150px]">
+                                          <Mail className="h-3 w-3 flex-shrink-0" />
+                                          <span className="truncate">{prospect.email}</span>
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs ${getStageBadgeClass(prospect.salesStage)}`}
+                                >
+                                  {STAGE_LABELS[prospect.salesStage as SalesStage] || "New"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <InterestBadge level={prospect.interestLevel as InterestLevel} />
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {nextFollowUpDate ? (
+                                  <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                                    isOverdue 
+                                      ? "text-red-700" 
+                                      : isDueToday 
+                                      ? "text-amber-700" 
+                                      : "text-slate-600"
+                                  }`}>
+                                    <Calendar className="h-3.5 w-3.5" />
+                                    {isOverdue ? `Overdue (${format(nextFollowUpDate, "MMM d")})` : isDueToday ? "Today" : format(nextFollowUpDate, "MMM d")}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-slate-400">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {isActive && (
+                                    <>
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="h-7 w-7 text-green-600 hover:bg-green-50" 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setConfirmProspectId(prospect.id);
+                                          setWonConfirmOpen(true);
+                                        }}
+                                        title="Mark Won"
+                                        data-testid={`button-mark-won-${prospect.id}`}
+                                      >
+                                        <CheckCircle2 className="h-4 w-4" />
+                                      </Button>
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="h-7 w-7 text-red-600 hover:bg-red-50" 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setConfirmProspectId(prospect.id);
+                                          setLostConfirmOpen(true);
+                                        }}
+                                        title="Mark Lost"
+                                        data-testid={`button-mark-lost-${prospect.id}`}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </>
+                                  )}
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-7 px-2 text-xs text-slate-600 hover:text-slate-900" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setExpandedProspectId(prospect.id);
+                                      setActiveTab("details");
+                                    }} 
+                                    data-testid={`button-expand-${prospect.id}`}
+                                  >
+                                    View
+                                    <ChevronRight className="h-3 w-3 ml-0.5" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
           </TabsContent>
 
             <TabsContent value="calendar" className="space-y-4 mt-4">
