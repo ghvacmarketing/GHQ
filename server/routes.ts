@@ -7566,6 +7566,343 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // CRM GHQ UNIVERSAL SEARCH ENDPOINT
+  // ============================================
+
+  // GET /api/crm/ghq/search - Universal search across CRM tables
+  app.get("/api/crm/ghq/search", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const query = (req.query.q as string)?.trim();
+      if (!query || query.length < 2) {
+        return res.json({
+          query: query || "",
+          results: {
+            customers: [],
+            workOrders: [],
+            invoices: [],
+            quotes: [],
+            agreements: [],
+            notes: [],
+            projects: []
+          },
+          totalCount: 0
+        });
+      }
+
+      const searchPattern = `%${query}%`;
+      const LIMIT = 5;
+
+      // Helper to create snippet from matched text
+      const createSnippet = (text: string | null, maxLen = 100): string => {
+        if (!text) return "";
+        const lowerText = text.toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        const idx = lowerText.indexOf(lowerQuery);
+        if (idx === -1) return text.substring(0, maxLen);
+        const start = Math.max(0, idx - 20);
+        const end = Math.min(text.length, idx + query.length + 80);
+        let snippet = text.substring(start, end);
+        if (start > 0) snippet = "..." + snippet;
+        if (end < text.length) snippet = snippet + "...";
+        return snippet;
+      };
+
+      // Helper to determine which field matched
+      const findMatchField = (record: Record<string, any>, fields: string[]): string => {
+        const lowerQuery = query.toLowerCase();
+        for (const field of fields) {
+          const value = record[field];
+          if (value && String(value).toLowerCase().includes(lowerQuery)) {
+            return field;
+          }
+        }
+        return fields[0];
+      };
+
+      // 1. Search crmCustomers
+      const customerResults = await db
+        .select({
+          id: crmCustomers.id,
+          name: crmCustomers.name,
+          companyName: crmCustomers.companyName,
+          email: crmCustomers.email,
+          phone: crmCustomers.phone,
+        })
+        .from(crmCustomers)
+        .where(
+          or(
+            ilike(crmCustomers.name, searchPattern),
+            ilike(crmCustomers.companyName, searchPattern),
+            ilike(crmCustomers.email, searchPattern),
+            ilike(crmCustomers.phone, searchPattern)
+          )
+        )
+        .limit(LIMIT);
+
+      // 2. Search crmAccounts (uses displayName and companyName - no email/phone in this table)
+      const accountResults = await db
+        .select({
+          id: crmAccounts.id,
+          name: crmAccounts.displayName,
+          companyName: crmAccounts.companyName,
+        })
+        .from(crmAccounts)
+        .where(
+          or(
+            ilike(crmAccounts.displayName, searchPattern),
+            ilike(crmAccounts.companyName, searchPattern)
+          )
+        )
+        .limit(LIMIT);
+
+      // Combine customers from both tables, dedupe by id, limit to 5
+      const allCustomers = [
+        ...customerResults.map(c => ({
+          id: c.id,
+          name: c.name,
+          email: c.email,
+          phone: c.phone,
+          matchField: findMatchField(c, ['name', 'companyName', 'email', 'phone']),
+          snippet: createSnippet(c.name || c.companyName || c.email)
+        })),
+        ...accountResults.map(a => ({
+          id: a.id,
+          name: a.name,
+          email: null,
+          phone: null,
+          matchField: findMatchField({ name: a.name, companyName: a.companyName }, ['name', 'companyName']),
+          snippet: createSnippet(a.name || a.companyName)
+        }))
+      ].slice(0, LIMIT);
+
+      // 3. Search crmWorkOrders
+      const workOrderResults = await db
+        .select({
+          id: crmWorkOrders.id,
+          workOrderNumber: crmWorkOrders.workOrderNumber,
+          title: crmWorkOrders.title,
+          description: crmWorkOrders.description,
+          techNotes: crmWorkOrders.techNotes,
+          completionSummary: crmWorkOrders.completionSummary,
+          status: crmWorkOrders.status,
+          customerId: crmWorkOrders.customerId,
+        })
+        .from(crmWorkOrders)
+        .where(
+          or(
+            ilike(crmWorkOrders.title, searchPattern),
+            ilike(crmWorkOrders.description, searchPattern),
+            ilike(crmWorkOrders.techNotes, searchPattern),
+            ilike(crmWorkOrders.completionSummary, searchPattern),
+            sql`CAST(${crmWorkOrders.workOrderNumber} AS TEXT) ILIKE ${searchPattern}`
+          )
+        )
+        .limit(LIMIT);
+
+      // Get customer names for work orders
+      const woCustomerIds = workOrderResults.map(wo => wo.customerId).filter(Boolean) as string[];
+      const woCustomerMap = new Map<string, string>();
+      if (woCustomerIds.length > 0) {
+        const woCustomers = await db.select({ id: crmCustomers.id, name: crmCustomers.name })
+          .from(crmCustomers).where(inArray(crmCustomers.id, woCustomerIds));
+        woCustomers.forEach(c => woCustomerMap.set(c.id, c.name));
+      }
+
+      const workOrders = workOrderResults.map(wo => {
+        const matchField = findMatchField(
+          { title: wo.title, description: wo.description, techNotes: wo.techNotes, completionSummary: wo.completionSummary, workOrderNumber: String(wo.workOrderNumber) },
+          ['title', 'description', 'techNotes', 'completionSummary', 'workOrderNumber']
+        );
+        const matchValue = matchField === 'workOrderNumber' ? String(wo.workOrderNumber) : (wo as any)[matchField];
+        return {
+          id: wo.id,
+          workOrderNumber: wo.workOrderNumber,
+          title: wo.title,
+          customerName: wo.customerId ? woCustomerMap.get(wo.customerId) || null : null,
+          status: wo.status,
+          matchField,
+          snippet: createSnippet(matchValue)
+        };
+      });
+
+      // 4. Search crmInvoices
+      const invoiceResults = await db
+        .select({
+          id: crmInvoices.id,
+          invoiceNumber: crmInvoices.invoiceNumber,
+          notes: crmInvoices.notes,
+          status: crmInvoices.status,
+          total: crmInvoices.total,
+          customerId: crmInvoices.customerId,
+        })
+        .from(crmInvoices)
+        .where(
+          or(
+            ilike(crmInvoices.invoiceNumber, searchPattern),
+            ilike(crmInvoices.notes, searchPattern)
+          )
+        )
+        .limit(LIMIT);
+
+      // Get customer names for invoices
+      const invCustomerIds = invoiceResults.map(inv => inv.customerId).filter(Boolean) as string[];
+      const invCustomerMap = new Map<string, string>();
+      if (invCustomerIds.length > 0) {
+        const invCustomers = await db.select({ id: crmCustomers.id, name: crmCustomers.name })
+          .from(crmCustomers).where(inArray(crmCustomers.id, invCustomerIds));
+        invCustomers.forEach(c => invCustomerMap.set(c.id, c.name));
+      }
+
+      const invoices = invoiceResults.map(inv => {
+        const matchField = findMatchField({ invoiceNumber: inv.invoiceNumber, notes: inv.notes }, ['invoiceNumber', 'notes']);
+        return {
+          id: inv.id,
+          invoiceNumber: inv.invoiceNumber,
+          customerName: inv.customerId ? invCustomerMap.get(inv.customerId) || null : null,
+          status: inv.status,
+          total: inv.total,
+          matchField,
+          snippet: createSnippet(matchField === 'invoiceNumber' ? inv.invoiceNumber : inv.notes)
+        };
+      });
+
+      // 5. Search crmQuotes
+      const quoteResults = await db
+        .select({
+          id: crmQuotes.id,
+          quoteNumber: crmQuotes.quoteNumber,
+          title: crmQuotes.title,
+          description: crmQuotes.description,
+          customerName: crmQuotes.customerName,
+          status: crmQuotes.status,
+        })
+        .from(crmQuotes)
+        .where(
+          or(
+            ilike(crmQuotes.quoteNumber, searchPattern),
+            ilike(crmQuotes.title, searchPattern),
+            ilike(crmQuotes.description, searchPattern),
+            ilike(crmQuotes.customerName, searchPattern)
+          )
+        )
+        .limit(LIMIT);
+
+      const quotes = quoteResults.map(q => {
+        const matchField = findMatchField(q, ['quoteNumber', 'title', 'description', 'customerName']);
+        return {
+          id: q.id,
+          quoteNumber: q.quoteNumber,
+          title: q.title,
+          customerName: q.customerName,
+          status: q.status,
+          matchField,
+          snippet: createSnippet((q as any)[matchField])
+        };
+      });
+
+      // 6. Search crmAgreements
+      const agreementResults = await db
+        .select({
+          id: crmAgreements.id,
+          customerName: crmAgreements.customerName,
+          notes: crmAgreements.notes,
+          status: crmAgreements.status,
+        })
+        .from(crmAgreements)
+        .where(ilike(crmAgreements.notes, searchPattern))
+        .limit(LIMIT);
+
+      const agreements = agreementResults.map(ag => ({
+        id: ag.id,
+        customerName: ag.customerName,
+        status: ag.status,
+        matchField: 'notes',
+        snippet: createSnippet(ag.notes)
+      }));
+
+      // 7. Search crmCustomerNotes
+      const noteResults = await db
+        .select({
+          id: crmCustomerNotes.id,
+          customerId: crmCustomerNotes.customerId,
+          body: crmCustomerNotes.body,
+        })
+        .from(crmCustomerNotes)
+        .where(ilike(crmCustomerNotes.body, searchPattern))
+        .limit(LIMIT);
+
+      // Get customer names for notes
+      const noteCustomerIds = noteResults.map(n => n.customerId).filter(Boolean) as string[];
+      const noteCustomerMap = new Map<string, string>();
+      if (noteCustomerIds.length > 0) {
+        const noteCustomers = await db.select({ id: crmCustomers.id, name: crmCustomers.name })
+          .from(crmCustomers).where(inArray(crmCustomers.id, noteCustomerIds));
+        noteCustomers.forEach(c => noteCustomerMap.set(c.id, c.name));
+      }
+
+      const notes = noteResults.map(n => ({
+        id: n.id,
+        customerId: n.customerId,
+        customerName: noteCustomerMap.get(n.customerId) || null,
+        snippet: createSnippet(n.body)
+      }));
+
+      // 8. Search crmProjects (uses title field, not name)
+      const projectResults = await db
+        .select({
+          id: crmProjects.id,
+          name: crmProjects.title,
+          description: crmProjects.description,
+          status: crmProjects.status,
+        })
+        .from(crmProjects)
+        .where(
+          or(
+            ilike(crmProjects.title, searchPattern),
+            ilike(crmProjects.description, searchPattern)
+          )
+        )
+        .limit(LIMIT);
+
+      const projects = projectResults.map(p => {
+        const matchField = findMatchField({ name: p.name, description: p.description }, ['name', 'description']);
+        return {
+          id: p.id,
+          name: p.name,
+          status: p.status,
+          matchField,
+          snippet: createSnippet(matchField === 'name' ? p.name : p.description)
+        };
+      });
+
+      const totalCount = allCustomers.length + workOrders.length + invoices.length + 
+                         quotes.length + agreements.length + notes.length + projects.length;
+
+      return res.json({
+        query,
+        results: {
+          customers: allCustomers,
+          workOrders,
+          invoices,
+          quotes,
+          agreements,
+          notes,
+          projects
+        },
+        totalCount
+      });
+    } catch (error) {
+      console.error("Error in GHQ search:", error);
+      return res.status(500).json({ message: "Search failed" });
+    }
+  });
+
+  // ============================================
   // CRM ACCOUNTS API ENDPOINTS (NEW ACCOUNT MODEL)
   // ============================================
 
