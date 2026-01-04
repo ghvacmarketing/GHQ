@@ -334,20 +334,24 @@ export default function CrmChecklists() {
   };
 
   const groupedChecklists = useMemo(() => {
-    const filtered = checklists.filter((c) =>
-      c.name.toLowerCase().includes(searchInput.toLowerCase()) ||
-      SERVICE_TYPE_LABELS[c.serviceType].toLowerCase().includes(searchInput.toLowerCase())
-    );
-
-    const grouped: Record<ServiceCallType, ChecklistWithQuestions[]> = {} as any;
-    serviceCallTypeEnum.forEach((type) => {
-      grouped[type] = [];
+    const filtered = checklists.filter((c) => {
+      const cAny = c as any;
+      const visitTypeLabel = cAny.visitType ? VISIT_TYPE_LABELS[cAny.visitType as ChecklistVisitType] : "";
+      return c.name.toLowerCase().includes(searchInput.toLowerCase()) ||
+        SERVICE_TYPE_LABELS[c.serviceType]?.toLowerCase().includes(searchInput.toLowerCase()) ||
+        visitTypeLabel?.toLowerCase().includes(searchInput.toLowerCase());
     });
 
+    const grouped: Record<ChecklistVisitType, ChecklistWithQuestions[]> = {
+      SERVICE: [],
+      INSTALL: [],
+      SALES: [],
+      MAINTENANCE: [],
+    };
+
     filtered.forEach((checklist) => {
-      if (grouped[checklist.serviceType]) {
-        grouped[checklist.serviceType].push(checklist);
-      }
+      const visitType = ((checklist as any).visitType || "SERVICE") as ChecklistVisitType;
+      grouped[visitType].push(checklist);
     });
 
     return grouped;
@@ -496,14 +500,14 @@ export default function CrmChecklists() {
               </div>
             ) : (
               <div className="p-2">
-                {serviceCallTypeEnum.map((serviceType) => {
-                  const typeChecklists = groupedChecklists[serviceType];
+                {checklistVisitTypeEnum.map((visitType) => {
+                  const typeChecklists = groupedChecklists[visitType];
                   if (typeChecklists.length === 0) return null;
 
                   return (
-                    <div key={serviceType} className="mb-4">
+                    <div key={visitType} className="mb-4">
                       <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        {SERVICE_TYPE_LABELS[serviceType]}
+                        {VISIT_TYPE_LABELS[visitType]}
                       </div>
                       {typeChecklists.map((checklist) => (
                         <div
@@ -517,9 +521,14 @@ export default function CrmChecklists() {
                           data-testid={`checklist-item-${checklist.id}`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-medium truncate">{checklist.name}</span>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-medium truncate">{checklist.name}</span>
+                              <Badge variant="secondary" className="text-xs shrink-0">
+                                {SUBTYPE_LABELS[checklist.serviceType] || checklist.serviceType}
+                              </Badge>
+                            </div>
                             {!checklist.isActive && (
-                              <Badge variant="outline" className="text-xs ml-2">
+                              <Badge variant="outline" className="text-xs ml-2 shrink-0">
                                 Inactive
                               </Badge>
                             )}
@@ -558,8 +567,11 @@ export default function CrmChecklists() {
                     >
                       {selectedChecklist.name}
                     </h1>
-                    <Badge className={SERVICE_TYPE_COLORS[selectedChecklist.serviceType]}>
-                      {SERVICE_TYPE_LABELS[selectedChecklist.serviceType]}
+                    <Badge variant="outline" className="bg-slate-100 text-slate-700">
+                      {VISIT_TYPE_LABELS[((selectedChecklist as any).visitType || "SERVICE") as ChecklistVisitType]}
+                    </Badge>
+                    <Badge className={SERVICE_TYPE_COLORS[selectedChecklist.serviceType] || "bg-gray-100 text-gray-700"}>
+                      {SUBTYPE_LABELS[selectedChecklist.serviceType] || selectedChecklist.serviceType}
                     </Badge>
                     {!selectedChecklist.isActive && (
                       <Badge variant="outline">Inactive</Badge>
