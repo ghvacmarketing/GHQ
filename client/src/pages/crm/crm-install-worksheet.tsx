@@ -561,32 +561,15 @@ export default function CrmInstallWorksheet() {
               </TabsList>
             </Tabs>
             {pricingMode === "install" && (
-              <>
-                <Select
-                  value={installSubtype}
-                  onValueChange={(v) => setInstallSubtype(v as InstallSubtype)}
-                >
-                  <SelectTrigger className="w-40" data-testid="select-install-subtype">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INSTALL_SUBTYPES.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
-                  onClick={handleFinalizeClick}
-                  disabled={isFinalizing || lines.length === 0}
-                  data-testid="button-finalize"
-                >
-                  {isFinalizing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                  Finalize → Create Quote
-                </Button>
-              </>
+              <Button
+                className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
+                onClick={handleFinalizeClick}
+                disabled={isFinalizing || lines.length === 0}
+                data-testid="button-finalize"
+              >
+                {isFinalizing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                Finalize → Create Quote
+              </Button>
             )}
             {pricingMode === "service" && (
               <Button
@@ -923,6 +906,25 @@ export default function CrmInstallWorksheet() {
                   <span className="text-slate-500">GP per Crew Day</span>
                   <span data-testid="calc-gp-per-crew-day">{formatCurrency(calcs.grossProfitPerCrewDay)}</span>
                 </div>
+              </div>
+
+              <div className="space-y-2 pb-3 border-b">
+                <Label className="text-sm text-slate-500">Install Type</Label>
+                <Select
+                  value={installSubtype}
+                  onValueChange={(v) => setInstallSubtype(v as InstallSubtype)}
+                >
+                  <SelectTrigger className="w-full" data-testid="select-install-subtype">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INSTALL_SUBTYPES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {inputs.discountDollar > 0 && (
