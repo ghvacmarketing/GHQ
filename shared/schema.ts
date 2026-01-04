@@ -984,6 +984,23 @@ export const crmProjects = pgTable("crm_projects", {
 export const workOrderVisitTypeEnum = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
 export type WorkOrderVisitType = typeof workOrderVisitTypeEnum[number];
 
+// Work Order Subtypes - dynamic configuration stored in database
+export const workOrderSubtypes = pgTable("work_order_subtypes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  visitType: text("visit_type").$type<WorkOrderVisitType>().notNull(),
+  subtype: text("subtype").notNull(),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWorkOrderSubtypeSchema = createInsertSchema(workOrderSubtypes).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertWorkOrderSubtype = z.infer<typeof insertWorkOrderSubtypeSchema>;
+export type WorkOrderSubtype = typeof workOrderSubtypes.$inferSelect;
+
 // Work Category - DEPRECATED: Now derived from Visit Type
 export const workCategoryEnum = ["Service", "Maintenance", "Sales", "Install"] as const;
 export type WorkCategory = typeof workCategoryEnum[number];
