@@ -59,13 +59,13 @@ import {
   serviceCallTypeEnum,
   checklistQuestionTypeEnum,
   checklistVisitTypeEnum,
-  checklistSubtypesByVisitType,
   type CrmUser,
   type ServiceCallChecklist,
   type ChecklistQuestion,
   type ServiceCallType,
   type ChecklistQuestionType,
   type ChecklistVisitType,
+  type WorkOrderSubtype,
 } from "@shared/schema";
 
 type ChecklistWithQuestions = ServiceCallChecklist & {
@@ -175,6 +175,21 @@ export default function CrmChecklists() {
     queryKey: ["/api/crm/checklists"],
     enabled: !!currentUser,
   });
+
+  const { data: workOrderSubtypes = [] } = useQuery<WorkOrderSubtype[]>({
+    queryKey: ["/api/crm/work-order-subtypes", { activeOnly: "true" }],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/work-order-subtypes?activeOnly=true");
+      return res.json();
+    },
+    enabled: !!currentUser,
+  });
+
+  const getSubtypesForVisitType = (visitType: ChecklistVisitType) => {
+    return workOrderSubtypes
+      .filter(s => s.visitType === visitType)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  };
 
   const createChecklistMutation = useMutation({
     mutationFn: async (data: typeof checklistForm) => {
@@ -756,11 +771,11 @@ export default function CrmChecklists() {
                 value={checklistForm.visitType}
                 onValueChange={(value) => {
                   const newVisitType = value as ChecklistVisitType;
-                  const subtypes = checklistSubtypesByVisitType[newVisitType];
+                  const subtypes = getSubtypesForVisitType(newVisitType);
                   setChecklistForm({ 
                     ...checklistForm, 
                     visitType: newVisitType,
-                    serviceType: subtypes[0] || "OTHER"
+                    serviceType: subtypes[0]?.subtype || "Other"
                   });
                 }}
               >
@@ -788,11 +803,15 @@ export default function CrmChecklists() {
                   <SelectValue placeholder="Select subtype" />
                 </SelectTrigger>
                 <SelectContent>
-                  {checklistSubtypesByVisitType[checklistForm.visitType].map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {SUBTYPE_LABELS[type] || type}
-                    </SelectItem>
-                  ))}
+                  {getSubtypesForVisitType(checklistForm.visitType).length > 0 ? (
+                    getSubtypesForVisitType(checklistForm.visitType).map((s) => (
+                      <SelectItem key={s.id} value={s.subtype}>
+                        {s.subtype}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="Other">Other</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -850,11 +869,11 @@ export default function CrmChecklists() {
                 value={checklistForm.visitType}
                 onValueChange={(value) => {
                   const newVisitType = value as ChecklistVisitType;
-                  const subtypes = checklistSubtypesByVisitType[newVisitType];
+                  const subtypes = getSubtypesForVisitType(newVisitType);
                   setChecklistForm({ 
                     ...checklistForm, 
                     visitType: newVisitType,
-                    serviceType: subtypes[0] || "OTHER"
+                    serviceType: subtypes[0]?.subtype || "Other"
                   });
                 }}
               >
@@ -882,11 +901,15 @@ export default function CrmChecklists() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {checklistSubtypesByVisitType[checklistForm.visitType].map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {SUBTYPE_LABELS[type] || type}
-                    </SelectItem>
-                  ))}
+                  {getSubtypesForVisitType(checklistForm.visitType).length > 0 ? (
+                    getSubtypesForVisitType(checklistForm.visitType).map((s) => (
+                      <SelectItem key={s.id} value={s.subtype}>
+                        {s.subtype}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="Other">Other</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
