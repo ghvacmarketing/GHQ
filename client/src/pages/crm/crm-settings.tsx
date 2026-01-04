@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, ClipboardList, ChevronRight } from "lucide-react";
+import { Shield, Users, ClipboardList, ChevronRight, Tags } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser } from "@shared/schema";
 
@@ -27,6 +27,12 @@ const settingsItems: SettingsItem[] = [
     description: "Configure intake questionnaires for service calls",
     href: "/crm/checklists",
     icon: ClipboardList,
+  },
+  {
+    title: "Work Order Subtypes",
+    description: "Manage subtypes for each work order visit type",
+    href: "/crm/settings/subtypes",
+    icon: Tags,
   },
 ];
 
