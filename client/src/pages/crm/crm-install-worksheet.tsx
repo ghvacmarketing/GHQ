@@ -349,6 +349,10 @@ export default function CrmInstallWorksheet() {
       partNumber: partData.partNumber || '',
       price: partData.price,
       quantity: partData.quantity,
+      category: 'Custom',
+      availability: 'Available',
+      warranty: false,
+      isCustom: true,
     };
     setServiceParts(prev => [...prev, newPart]);
     setIsCustomPartModalOpen(false);
@@ -1066,7 +1070,7 @@ export default function CrmInstallWorksheet() {
                 setIsCustomPartModalOpen(false);
                 setCustomPartPrefillData(null);
               }}
-              onAdd={handleAddCustomPart}
+              onAddPart={handleAddCustomPart}
               prefillData={customPartPrefillData}
             />
           </div>
