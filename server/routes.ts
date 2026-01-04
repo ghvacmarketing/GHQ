@@ -1767,6 +1767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         laborBenefitsPercent: sheetsData.laborBenefitsPercent,
         warrantyReserve: sheetsData.warrantyReserve,
         overheadPercent: sheetsData.overheadPercent,
+        salesTaxPercent: sheetsData.salesTaxPercent,
         partsPrices: {
           refrigerantFilterDryer: sheetsData.refrigerantFilterDryerPrice,
           copper: sheetsData.copperPrice,
@@ -1809,6 +1810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         laborBenefitsPercent: sheetsData.laborBenefitsPercent,
         warrantyReserve: sheetsData.warrantyReserve,
         overheadPercent: sheetsData.overheadPercent,
+        salesTaxPercent: sheetsData.salesTaxPercent,
         // Parts prices for direct access
         partsPrices: {
           refrigerantFilterDryer: sheetsData.refrigerantFilterDryerPrice,
