@@ -7579,16 +7579,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const query = (req.query.q as string)?.trim();
       if (!query || query.length < 2) {
+        const emptyCategory = { items: [], total: 0, hasMore: false };
         return res.json({
           query: query || "",
           results: {
-            customers: [],
-            workOrders: [],
-            invoices: [],
-            quotes: [],
-            agreements: [],
-            notes: [],
-            projects: []
+            customers: emptyCategory,
+            workOrders: emptyCategory,
+            invoices: emptyCategory,
+            quotes: emptyCategory,
+            agreements: emptyCategory,
+            notes: emptyCategory,
+            projects: emptyCategory
           },
           totalCount: 0
         });
@@ -7596,6 +7597,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const searchPattern = `%${query}%`;
       const LIMIT = 5;
+
+      // Helper to count total matches for hasMore flag
+      const countMatches = async (table: any, conditions: any): Promise<number> => {
+        const result = await db.select({ count: sql<number>`count(*)::int` }).from(table).where(conditions);
+        return result[0]?.count || 0;
+      };
 
       // Helper to create snippet from matched text
       const createSnippet = (text: string | null, maxLen = 100): string => {
@@ -7625,6 +7632,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // 1. Search crmCustomers
+      const customerCondition = or(
+        ilike(crmCustomers.name, searchPattern),
+        ilike(crmCustomers.companyName, searchPattern),
+        ilike(crmCustomers.email, searchPattern),
+        ilike(crmCustomers.phone, searchPattern)
+      );
       const customerResults = await db
         .select({
           id: crmCustomers.id,
@@ -7634,17 +7647,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phone: crmCustomers.phone,
         })
         .from(crmCustomers)
-        .where(
-          or(
-            ilike(crmCustomers.name, searchPattern),
-            ilike(crmCustomers.companyName, searchPattern),
-            ilike(crmCustomers.email, searchPattern),
-            ilike(crmCustomers.phone, searchPattern)
-          )
-        )
+        .where(customerCondition)
         .limit(LIMIT);
+      const customerCount = await countMatches(crmCustomers, customerCondition);
 
       // 2. Search crmAccounts (uses displayName and companyName - no email/phone in this table)
+      const accountCondition = or(
+        ilike(crmAccounts.displayName, searchPattern),
+        ilike(crmAccounts.companyName, searchPattern)
+      );
       const accountResults = await db
         .select({
           id: crmAccounts.id,
@@ -7652,13 +7663,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           companyName: crmAccounts.companyName,
         })
         .from(crmAccounts)
-        .where(
-          or(
-            ilike(crmAccounts.displayName, searchPattern),
-            ilike(crmAccounts.companyName, searchPattern)
-          )
-        )
+        .where(accountCondition)
         .limit(LIMIT);
+      const accountCount = await countMatches(crmAccounts, accountCondition);
+      const totalCustomerCount = customerCount + accountCount;
 
       // Combine customers from both tables, dedupe by id, limit to 5
       const allCustomers = [
@@ -7681,6 +7689,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ].slice(0, LIMIT);
 
       // 3. Search crmWorkOrders
+      const workOrderCondition = or(
+        ilike(crmWorkOrders.title, searchPattern),
+        ilike(crmWorkOrders.description, searchPattern),
+        ilike(crmWorkOrders.techNotes, searchPattern),
+        ilike(crmWorkOrders.completionSummary, searchPattern),
+        sql`CAST(${crmWorkOrders.workOrderNumber} AS TEXT) ILIKE ${searchPattern}`
+      );
       const workOrderResults = await db
         .select({
           id: crmWorkOrders.id,
@@ -7693,16 +7708,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerId: crmWorkOrders.customerId,
         })
         .from(crmWorkOrders)
-        .where(
-          or(
-            ilike(crmWorkOrders.title, searchPattern),
-            ilike(crmWorkOrders.description, searchPattern),
-            ilike(crmWorkOrders.techNotes, searchPattern),
-            ilike(crmWorkOrders.completionSummary, searchPattern),
-            sql`CAST(${crmWorkOrders.workOrderNumber} AS TEXT) ILIKE ${searchPattern}`
-          )
-        )
+        .where(workOrderCondition)
         .limit(LIMIT);
+      const workOrderCount = await countMatches(crmWorkOrders, workOrderCondition);
 
       // Get customer names for work orders
       const woCustomerIds = workOrderResults.map(wo => wo.customerId).filter(Boolean) as string[];
@@ -7731,6 +7739,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // 4. Search crmInvoices
+      const invoiceCondition = or(
+        ilike(crmInvoices.invoiceNumber, searchPattern),
+        ilike(crmInvoices.notes, searchPattern)
+      );
       const invoiceResults = await db
         .select({
           id: crmInvoices.id,
@@ -7741,13 +7753,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerId: crmInvoices.customerId,
         })
         .from(crmInvoices)
-        .where(
-          or(
-            ilike(crmInvoices.invoiceNumber, searchPattern),
-            ilike(crmInvoices.notes, searchPattern)
-          )
-        )
+        .where(invoiceCondition)
         .limit(LIMIT);
+      const invoiceCount = await countMatches(crmInvoices, invoiceCondition);
 
       // Get customer names for invoices
       const invCustomerIds = invoiceResults.map(inv => inv.customerId).filter(Boolean) as string[];
@@ -7772,6 +7780,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // 5. Search crmQuotes
+      const quoteCondition = or(
+        ilike(crmQuotes.quoteNumber, searchPattern),
+        ilike(crmQuotes.title, searchPattern),
+        ilike(crmQuotes.description, searchPattern),
+        ilike(crmQuotes.customerName, searchPattern)
+      );
       const quoteResults = await db
         .select({
           id: crmQuotes.id,
@@ -7782,15 +7796,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: crmQuotes.status,
         })
         .from(crmQuotes)
-        .where(
-          or(
-            ilike(crmQuotes.quoteNumber, searchPattern),
-            ilike(crmQuotes.title, searchPattern),
-            ilike(crmQuotes.description, searchPattern),
-            ilike(crmQuotes.customerName, searchPattern)
-          )
-        )
+        .where(quoteCondition)
         .limit(LIMIT);
+      const quoteCount = await countMatches(crmQuotes, quoteCondition);
 
       const quotes = quoteResults.map(q => {
         const matchField = findMatchField(q, ['quoteNumber', 'title', 'description', 'customerName']);
@@ -7806,6 +7814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // 6. Search crmAgreements
+      const agreementCondition = ilike(crmAgreements.notes, searchPattern);
       const agreementResults = await db
         .select({
           id: crmAgreements.id,
@@ -7814,8 +7823,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: crmAgreements.status,
         })
         .from(crmAgreements)
-        .where(ilike(crmAgreements.notes, searchPattern))
+        .where(agreementCondition)
         .limit(LIMIT);
+      const agreementCount = await countMatches(crmAgreements, agreementCondition);
 
       const agreements = agreementResults.map(ag => ({
         id: ag.id,
@@ -7826,6 +7836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       // 7. Search crmCustomerNotes
+      const noteCondition = ilike(crmCustomerNotes.body, searchPattern);
       const noteResults = await db
         .select({
           id: crmCustomerNotes.id,
@@ -7833,8 +7844,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           body: crmCustomerNotes.body,
         })
         .from(crmCustomerNotes)
-        .where(ilike(crmCustomerNotes.body, searchPattern))
+        .where(noteCondition)
         .limit(LIMIT);
+      const noteCount = await countMatches(crmCustomerNotes, noteCondition);
 
       // Get customer names for notes
       const noteCustomerIds = noteResults.map(n => n.customerId).filter(Boolean) as string[];
@@ -7853,6 +7865,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       // 8. Search crmProjects (uses title field, not name)
+      const projectCondition = or(
+        ilike(crmProjects.title, searchPattern),
+        ilike(crmProjects.description, searchPattern)
+      );
       const projectResults = await db
         .select({
           id: crmProjects.id,
@@ -7861,13 +7877,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: crmProjects.status,
         })
         .from(crmProjects)
-        .where(
-          or(
-            ilike(crmProjects.title, searchPattern),
-            ilike(crmProjects.description, searchPattern)
-          )
-        )
+        .where(projectCondition)
         .limit(LIMIT);
+      const projectCount = await countMatches(crmProjects, projectCondition);
 
       const projects = projectResults.map(p => {
         const matchField = findMatchField({ name: p.name, description: p.description }, ['name', 'description']);
@@ -7880,19 +7892,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      const totalCount = allCustomers.length + workOrders.length + invoices.length + 
-                         quotes.length + agreements.length + notes.length + projects.length;
+      const totalCount = totalCustomerCount + workOrderCount + invoiceCount + 
+                         quoteCount + agreementCount + noteCount + projectCount;
 
       return res.json({
         query,
         results: {
-          customers: allCustomers,
-          workOrders,
-          invoices,
-          quotes,
-          agreements,
-          notes,
-          projects
+          customers: { items: allCustomers, total: totalCustomerCount, hasMore: totalCustomerCount > LIMIT },
+          workOrders: { items: workOrders, total: workOrderCount, hasMore: workOrderCount > LIMIT },
+          invoices: { items: invoices, total: invoiceCount, hasMore: invoiceCount > LIMIT },
+          quotes: { items: quotes, total: quoteCount, hasMore: quoteCount > LIMIT },
+          agreements: { items: agreements, total: agreementCount, hasMore: agreementCount > LIMIT },
+          notes: { items: notes, total: noteCount, hasMore: noteCount > LIMIT },
+          projects: { items: projects, total: projectCount, hasMore: projectCount > LIMIT }
         },
         totalCount
       });

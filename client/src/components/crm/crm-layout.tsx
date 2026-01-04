@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
+import GhqSearch from "./ghq-search";
 
 interface CrmLayoutProps {
   children: React.ReactNode;
@@ -323,6 +324,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false }: CrmL
           </div>
         )}
       </main>
+      <GhqSearch />
     </div>
   );
 }
