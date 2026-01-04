@@ -15171,6 +15171,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/prospects/overview-analytics - Get comprehensive sales analytics for funnel overview
+  app.get("/api/crm/prospects/overview-analytics", requireCrmAuth, async (req, res) => {
+    try {
+      const { employee } = req.query;
+      const employeeFilter = employee && typeof employee === 'string' ? employee : null;
+
+      // Get all sales reps (users with role 'sales' or 'owner')
+      const salesReps = await db.select({
+        id: crmUsers.id,
+        name: crmUsers.name,
+        role: crmUsers.role,
+      })
+        .from(crmUsers)
+        .where(and(
+          or(eq(crmUsers.role, 'sales'), eq(crmUsers.role, 'owner')),
+          eq(crmUsers.isActive, true)
+        ));
+
+      // Create a map for quick lookup
+      const salesRepMap = new Map(salesReps.map(rep => [rep.id, rep.name]));
+
+      // Get all prospects with a sales stage
+      let prospectsQuery = db.select()
+        .from(crmCustomers)
+        .where(sql`${crmCustomers.salesStage} IS NOT NULL`);
+      
+      const allProspects = await prospectsQuery;
+
+      // Filter by employee if provided
+      const filteredProspects = employeeFilter 
+        ? allProspects.filter(p => p.assignedSalesRepId === employeeFilter)
+        : allProspects;
+
+      // ============================================
+      // 1. SALES REP LEADERBOARD
+      // ============================================
+      // When employee filter is applied, only show that rep's stats
+      const repsToShow = employeeFilter 
+        ? salesReps.filter(rep => rep.id === employeeFilter)
+        : salesReps;
+      
+      const leaderboard = repsToShow.map(rep => {
+        const repProspects = allProspects.filter(p => p.assignedSalesRepId === rep.id);
+        const leadsAssigned = repProspects.length;
+        
+        // quote_sent or later stages: quote_sent, negotiating, won, lost
+        const quotesGenerated = repProspects.filter(p => 
+          p.salesStage === 'quote_sent' || 
+          p.salesStage === 'negotiating' || 
+          p.salesStage === 'won' || 
+          p.salesStage === 'lost'
+        ).length;
+        
+        const wonProspects = repProspects.filter(p => p.salesStage === 'won');
+        const wins = wonProspects.length;
+        
+        // Conversion rate: wins / leadsAssigned * 100
+        const conversionRate = leadsAssigned > 0 
+          ? Math.round((wins / leadsAssigned) * 100 * 10) / 10 
+          : 0;
+        
+        // Total revenue: sum of potentialValue for won prospects
+        const totalRevenue = wonProspects.reduce((sum, p) => sum + (p.potentialValue || 0), 0);
+        
+        return {
+          repId: rep.id,
+          repName: rep.name,
+          leadsAssigned,
+          quotesGenerated,
+          wins,
+          conversionRate,
+          totalRevenue,
+        };
+      });
+
+      // ============================================
+      // 2. STALLED DEALS (7+ days without activity)
+      // ============================================
+      const now = new Date();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      
+      const activeProspects = filteredProspects.filter(p => 
+        p.salesStage !== 'won' && p.salesStage !== 'lost'
+      );
+      
+      const stalledDeals = activeProspects
+        .filter(prospect => {
+          // Check updatedAt
+          const lastActivity = prospect.updatedAt ? new Date(prospect.updatedAt) : null;
+          
+          // Check if nextFollowUpAt is in the past
+          const nextFollowUp = prospect.nextFollowUpAt ? new Date(prospect.nextFollowUpAt) : null;
+          const followUpIsPast = nextFollowUp && nextFollowUp < now;
+          
+          // Stalled if: updatedAt is more than 7 days ago, OR nextFollowUp is past and more than 7 days ago
+          if (lastActivity && lastActivity < sevenDaysAgo) {
+            return true;
+          }
+          if (followUpIsPast && nextFollowUp < sevenDaysAgo) {
+            return true;
+          }
+          return false;
+        })
+        .map(prospect => {
+          // Calculate days since activity
+          const lastActivity = prospect.updatedAt ? new Date(prospect.updatedAt) : now;
+          const daysSinceActivity = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
+          
+          return {
+            customerId: prospect.id,
+            customerName: prospect.name,
+            salesStage: prospect.salesStage || '',
+            daysSinceActivity,
+            potentialValue: prospect.potentialValue,
+            assignedSalesRepName: prospect.assignedSalesRepId 
+              ? salesRepMap.get(prospect.assignedSalesRepId) || null 
+              : null,
+          };
+        })
+        .sort((a, b) => b.daysSinceActivity - a.daysSinceActivity);
+
+      // ============================================
+      // 3. 30-DAY REVENUE FORECAST (Weighted Pipeline)
+      // ============================================
+      const stageWeights: Record<string, number> = {
+        'new': 0.10,
+        'contacted': 0.25,
+        'quote_sent': 0.50,
+        'negotiating': 0.75,
+      };
+      
+      const forecastStages = ['new', 'contacted', 'quote_sent', 'negotiating'];
+      
+      const breakdown = forecastStages.map(stage => {
+        const stageProspects = filteredProspects.filter(p => p.salesStage === stage);
+        const count = stageProspects.length;
+        const totalValue = stageProspects.reduce((sum, p) => sum + (p.potentialValue || 0), 0);
+        const weight = stageWeights[stage] || 0;
+        const weightedValue = Math.round(totalValue * weight);
+        
+        return {
+          stage,
+          count,
+          totalValue,
+          weightedValue,
+          weight,
+        };
+      });
+      
+      const totalWeightedForecast = breakdown.reduce((sum, b) => sum + b.weightedValue, 0);
+
+      return res.json({
+        leaderboard,
+        stalledDeals,
+        forecast: {
+          totalWeightedForecast,
+          breakdown,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching prospect overview analytics:", error);
+      return res.status(500).json({ message: "Failed to fetch prospect overview analytics" });
+    }
+  });
+
   // PATCH /api/crm/customers/:id/stage - Update customer's salesStage
   app.patch("/api/crm/customers/:id/stage", requireCrmAuth, async (req, res) => {
     try {

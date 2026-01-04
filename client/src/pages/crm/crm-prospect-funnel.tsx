@@ -85,6 +85,7 @@ import {
   BarChart3,
   GripVertical,
   LayoutGrid,
+  Trophy,
 } from "lucide-react";
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType } from "@shared/schema";
@@ -101,6 +102,36 @@ type ProspectMetrics = {
     negotiating: number;
     won: number;
     lost: number;
+  };
+};
+
+type OverviewAnalytics = {
+  leaderboard: Array<{
+    repId: string;
+    repName: string;
+    leadsAssigned: number;
+    quotesGenerated: number;
+    wins: number;
+    conversionRate: number;
+    totalRevenue: number;
+  }>;
+  stalledDeals: Array<{
+    customerId: string;
+    customerName: string;
+    salesStage: string;
+    daysSinceActivity: number;
+    potentialValue: number | null;
+    assignedSalesRepName: string | null;
+  }>;
+  forecast: {
+    totalWeightedForecast: number;
+    breakdown: Array<{
+      stage: string;
+      count: number;
+      totalValue: number;
+      weightedValue: number;
+      weight: number;
+    }>;
   };
 };
 
@@ -570,6 +601,17 @@ export default function CrmProspectFunnel() {
 
   const { data: metrics, isLoading: metricsLoading } = useQuery<ProspectMetrics>({
     queryKey: ["/api/crm/prospects/metrics"],
+    enabled: !!currentUser,
+  });
+
+  const { data: overviewAnalytics, isLoading: analyticsLoading } = useQuery<OverviewAnalytics>({
+    queryKey: ["/api/crm/prospects/overview-analytics", selectedEmployeeId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedEmployeeId !== "all") params.set("employee", selectedEmployeeId);
+      const res = await fetch(`/api/crm/prospects/overview-analytics?${params.toString()}`);
+      return res.json();
+    },
     enabled: !!currentUser,
   });
 
@@ -1161,6 +1203,203 @@ export default function CrmProspectFunnel() {
                 </div>
               </div>
             </div>
+              </CardContent>
+            </Card>
+
+            {/* Sales Rep Leaderboard Section */}
+            <Card className="mb-6" data-testid="card-leaderboard">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Trophy className="h-5 w-5 text-amber-500" />
+                  Sales Rep Leaderboard
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {analyticsLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                ) : overviewAnalytics?.leaderboard && overviewAnalytics.leaderboard.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 px-2 font-medium">Rep Name</th>
+                          <th className="text-center py-2 px-2 font-medium">Leads</th>
+                          <th className="text-center py-2 px-2 font-medium">Quotes</th>
+                          <th className="text-center py-2 px-2 font-medium">Wins</th>
+                          <th className="text-center py-2 px-2 font-medium">Conv %</th>
+                          <th className="text-right py-2 px-2 font-medium">Revenue</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...overviewAnalytics.leaderboard]
+                          .sort((a, b) => b.totalRevenue - a.totalRevenue)
+                          .map((rep) => (
+                            <tr key={rep.repId} className="border-b border-slate-100">
+                              <td className="py-2 px-2 font-medium">{rep.repName}</td>
+                              <td className="text-center py-2 px-2">{rep.leadsAssigned}</td>
+                              <td className="text-center py-2 px-2">{rep.quotesGenerated}</td>
+                              <td className="text-center py-2 px-2">{rep.wins}</td>
+                              <td className="text-center py-2 px-2">{rep.conversionRate}%</td>
+                              <td className="text-right py-2 px-2 text-green-600 font-medium">
+                                ${rep.totalRevenue.toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-4">No sales data available</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Stalled Deals Section */}
+            <Card className="mb-6" data-testid="card-stalled-deals">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    Stalled Deals
+                  </CardTitle>
+                  {overviewAnalytics?.stalledDeals && overviewAnalytics.stalledDeals.length > 0 && (
+                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                      {overviewAnalytics.stalledDeals.length} deals need attention
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {analyticsLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : overviewAnalytics?.stalledDeals && overviewAnalytics.stalledDeals.length > 0 ? (
+                  <div className="space-y-2">
+                    {overviewAnalytics.stalledDeals.map((deal) => (
+                      <div
+                        key={deal.customerId}
+                        className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+                        onClick={() => {
+                          setExpandedProspectId(deal.customerId);
+                          setActiveTab("details");
+                        }}
+                        data-testid={`stalled-deal-${deal.customerId}`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <InitialsAvatar name={deal.customerName} size="sm" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{deal.customerName}</div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Badge variant="outline" className={`text-xs ${
+                                deal.salesStage === 'new' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                deal.salesStage === 'contacted' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                deal.salesStage === 'quote_sent' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                deal.salesStage === 'negotiating' ? 'bg-green-50 text-green-700 border-green-200' :
+                                'bg-slate-50 text-slate-700 border-slate-200'
+                              }`}>
+                                {STAGE_LABELS[deal.salesStage as SalesStage] || deal.salesStage}
+                              </Badge>
+                              <span className="text-red-600 font-medium">{deal.daysSinceActivity} days stalled</span>
+                              {deal.assignedSalesRepName && (
+                                <span>· {deal.assignedSalesRepName}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {deal.potentialValue && (
+                          <div className="text-right flex-shrink-0 ml-2">
+                            <div className="font-medium text-green-600">
+                              ${deal.potentialValue.toLocaleString()}
+                            </div>
+                          </div>
+                        )}
+                        <ChevronRight className="h-4 w-4 text-muted-foreground ml-2 flex-shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2 py-6 text-green-600">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span className="font-medium">No stalled deals - all prospects active!</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 30-Day Revenue Forecast Section */}
+            <Card className="mb-6" data-testid="card-forecast">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                  30-Day Revenue Forecast
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {analyticsLoading ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-12 w-48" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="text-center py-4">
+                      <div className="text-4xl font-bold text-green-600" data-testid="text-forecast-total">
+                        ${(overviewAnalytics?.forecast?.totalWeightedForecast || 0).toLocaleString()}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">Weighted Pipeline Value</p>
+                    </div>
+
+                    {overviewAnalytics?.forecast?.breakdown && overviewAnalytics.forecast.breakdown.length > 0 && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left py-2 px-2 font-medium">Stage</th>
+                              <th className="text-center py-2 px-2 font-medium">Count</th>
+                              <th className="text-right py-2 px-2 font-medium">Value</th>
+                              <th className="text-center py-2 px-2 font-medium">Weight</th>
+                              <th className="text-right py-2 px-2 font-medium">Weighted Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {overviewAnalytics.forecast.breakdown.map((row) => (
+                              <tr key={row.stage} className="border-b border-slate-100">
+                                <td className="py-2 px-2">
+                                  <span className={`font-medium ${
+                                    row.stage === 'new' ? 'text-blue-600' :
+                                    row.stage === 'contacted' ? 'text-amber-600' :
+                                    row.stage === 'quote_sent' ? 'text-purple-600' :
+                                    row.stage === 'negotiating' ? 'text-green-600' :
+                                    'text-slate-600'
+                                  }`}>
+                                    {STAGE_LABELS[row.stage as SalesStage] || row.stage}
+                                  </span>
+                                </td>
+                                <td className="text-center py-2 px-2">{row.count}</td>
+                                <td className="text-right py-2 px-2">${row.totalValue.toLocaleString()}</td>
+                                <td className="text-center py-2 px-2">{Math.round(row.weight * 100)}%</td>
+                                <td className="text-right py-2 px-2 text-green-600 font-medium">
+                                  ${row.weightedValue.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <p className="text-xs text-muted-foreground text-center italic">
+                      Based on weighted probability by stage
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
             </TabsContent>
