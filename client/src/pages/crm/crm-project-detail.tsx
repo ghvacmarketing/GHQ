@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation, useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -26,7 +26,11 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { createLocalDateTime } from "@/lib/timezone";
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -64,6 +68,8 @@ import {
   Loader2,
   Trash2,
   Wand2,
+  Clipboard,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -81,10 +87,12 @@ import { format } from "date-fns";
 import type { 
   CrmUser, CrmProject, CrmWorkOrder, CrmInvoice, CrmQuote, CrmCustomer, CrmProperty,
   ActivityAttachment, NoteMetadata, PhotoMetadata, FileMetadata, FinancialMetadata, 
-  ApprovalMetadata, StatusChangeMetadata, FinancialSubtype, ApprovalStatus
+  ApprovalMetadata, StatusChangeMetadata, FinancialSubtype, ApprovalStatus,
+  WorkOrderVisitType, WorkSubtype, ChecklistQuestion
 } from "@shared/schema";
 import { 
-  projectActivityTypeEnum, financialSubtypeEnum, approvalStatusEnum 
+  projectActivityTypeEnum, financialSubtypeEnum, approvalStatusEnum,
+  workOrderVisitTypeEnum, workSubtypeByVisitType
 } from "@shared/schema";
 
 type ProjectDetail = CrmProject & {
@@ -164,7 +172,26 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
   urgent: { bg: "bg-red-100", text: "text-red-700" },
 };
 
-const VISIT_TYPES = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
+const visitTypeLabels: Record<string, string> = {
+  SERVICE: "Service",
+  INSTALL: "Install",
+  MAINTENANCE: "Maintenance",
+  SALES: "Sales",
+};
+
+const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+
+const WORK_SUBTYPE_TO_SERVICE_TYPE: Record<string, string> = {
+  "No Heat": "NO_HEAT",
+  "No Cool": "NO_AC",
+  "Water Leak": "WATER_LEAK",
+  "Electrical": "OTHER",
+  "Thermostat": "THERMOSTAT_ISSUE",
+  "Airflow": "OTHER",
+  "Noise": "STRANGE_NOISE",
+  "IAQ": "OTHER",
+  "Other": "OTHER",
+};
 
 function formatDateTime(date: Date | string | null): string {
   if (!date) return "—";
@@ -213,9 +240,35 @@ export default function CrmProjectDetail() {
   const [scheduleWODialogOpen, setScheduleWODialogOpen] = useState(false);
   const [woTitle, setWoTitle] = useState("");
   const [woDescription, setWoDescription] = useState("");
-  const [woVisitType, setWoVisitType] = useState<string>("SERVICE");
-  const [woScheduledStart, setWoScheduledStart] = useState("");
-  const [woScheduledEnd, setWoScheduledEnd] = useState("");
+  const [woVisitType, setWoVisitType] = useState<WorkOrderVisitType>("SERVICE");
+  const [woWorkSubtype, setWoWorkSubtype] = useState<WorkSubtype>("Other");
+  const [woPriority, setWoPriority] = useState<string>("normal");
+  const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
+  const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
+  const [startTime, setStartTime] = useState("08:00");
+  const [endTime, setEndTime] = useState("10:00");
+  const [checklistQuestions, setChecklistQuestions] = useState<ChecklistQuestion[]>([]);
+  const [checklistAnswers, setChecklistAnswers] = useState<Record<string, string | boolean | number>>({});
+  const [showChecklist, setShowChecklist] = useState(true);
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  const [maintenanceSubtypes, setMaintenanceSubtypes] = useState<string[]>(["Preventative Maintenance"]);
+
+  const timeOptions = (() => {
+    const options: { value: string; label: string }[] = [];
+    for (let hour = 8; hour <= 20; hour++) {
+      for (let min = 0; min < 60; min += 30) {
+        if (hour === 20 && min > 0) break;
+        const h = hour.toString().padStart(2, "0");
+        const m = min.toString().padStart(2, "0");
+        const value = `${h}:${m}`;
+        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+        const ampm = hour >= 12 ? "PM" : "AM";
+        const label = `${displayHour}:${m.padStart(2, "0")} ${ampm}`;
+        options.push({ value, label });
+      }
+    }
+    return options;
+  })();
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -261,6 +314,139 @@ export default function CrmProjectDetail() {
     enabled: !!currentUser && !!projectId,
   });
 
+  const { data: techniciansData } = useQuery<CrmUser[]>({
+    queryKey: ["/api/crm/users"],
+    enabled: !!currentUser,
+  });
+
+  const technicians = useMemo(() => 
+    (techniciansData || []).filter(u => u.role === "tech"),
+    [techniciansData]
+  );
+
+  useEffect(() => {
+    if (woVisitType !== "MAINTENANCE") return;
+    
+    fetch("/api/crm/work-subtypes/MAINTENANCE", { credentials: "include" })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setMaintenanceSubtypes(data);
+        }
+      })
+      .catch(() => {
+        setMaintenanceSubtypes(["Preventative Maintenance"]);
+      });
+  }, [woVisitType]);
+
+  useEffect(() => {
+    if (!scheduleWODialogOpen) return;
+    if (woVisitType !== "SERVICE") {
+      setChecklistQuestions([]);
+      setChecklistAnswers({});
+      return;
+    }
+
+    const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[woWorkSubtype];
+    if (!serviceType) {
+      setChecklistQuestions([]);
+      setChecklistAnswers({});
+      return;
+    }
+
+    setChecklistLoading(true);
+    fetch(`/api/crm/checklists/${serviceType}`, { credentials: "include" })
+      .then(res => {
+        if (!res.ok) {
+          setChecklistQuestions([]);
+          return null;
+        }
+        return res.json();
+      })
+      .then(data => {
+        if (data && data.questions) {
+          setChecklistQuestions(data.questions);
+          setChecklistAnswers({});
+        } else {
+          setChecklistQuestions([]);
+        }
+      })
+      .catch(() => {
+        setChecklistQuestions([]);
+      })
+      .finally(() => {
+        setChecklistLoading(false);
+      });
+  }, [woVisitType, woWorkSubtype, scheduleWODialogOpen]);
+
+  const generateLocalChecklistSummary = (): string => {
+    if (checklistQuestions.length === 0) return "";
+    
+    const summaryParts: string[] = [];
+    checklistQuestions.forEach(q => {
+      const answer = checklistAnswers[q.id];
+      if (answer !== undefined && answer !== "") {
+        let answerText = String(answer);
+        if (q.questionType === "yes_no") {
+          answerText = answer === "yes" || answer === true ? "Yes" : "No";
+        }
+        summaryParts.push(`${q.question}: ${answerText}`);
+      }
+    });
+    
+    if (summaryParts.length === 0) return "";
+    return "--- Service Call Checklist ---\n" + summaryParts.join("\n") + "\n---\n\n";
+  };
+
+  const areRequiredQuestionsAnswered = (): boolean => {
+    if (woVisitType !== "SERVICE" || checklistQuestions.length === 0) return true;
+    
+    const requiredQuestions = checklistQuestions.filter(q => q.isRequired);
+    for (const q of requiredQuestions) {
+      const answer = checklistAnswers[q.id];
+      if (answer === undefined || answer === "" || answer === null) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const generateChecklistSummary = async (): Promise<string> => {
+    if (checklistQuestions.length === 0 || Object.keys(checklistAnswers).length === 0) return "";
+    
+    try {
+      const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[woWorkSubtype] || "OTHER";
+      const res = await apiRequest("POST", "/api/ai/summarize-checklist", {
+        questions: checklistQuestions,
+        answers: checklistAnswers,
+        serviceType,
+      });
+      const data = await res.json();
+      if (data.summary) {
+        return "--- Service Call Summary ---\n" + data.summary + "\n---\n\n";
+      }
+    } catch (err) {
+      console.error("AI summarization failed, using local fallback:", err);
+    }
+    
+    return generateLocalChecklistSummary();
+  };
+
+  const resetWOForm = () => {
+    setWoTitle("");
+    setWoDescription("");
+    setWoVisitType("SERVICE");
+    setWoWorkSubtype("Other");
+    setWoPriority("normal");
+    setAssignedTechId("unassigned");
+    setScheduledDate(new Date());
+    setStartTime("08:00");
+    setEndTime("10:00");
+    setChecklistQuestions([]);
+    setChecklistAnswers({});
+    setShowChecklist(true);
+  };
+
   const createQuoteMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/crm/quotes", {
@@ -291,17 +477,40 @@ export default function CrmProjectDetail() {
 
   const createWorkOrderMutation = useMutation({
     mutationFn: async () => {
-      if (!woTitle.trim()) throw new Error("Title is required");
-      if (!woDescription.trim()) throw new Error("Description is required");
+      if (!scheduledDate) throw new Error("Scheduled date is required");
+      
+      if (!areRequiredQuestionsAnswered()) {
+        const requiredQuestions = checklistQuestions.filter(q => q.isRequired);
+        const missingQuestions = requiredQuestions.filter(q => {
+          const answer = checklistAnswers[q.id];
+          return answer === undefined || answer === "" || answer === null;
+        });
+        throw new Error(`Please answer required checklist questions: ${missingQuestions.map(q => q.question).join(", ")}`);
+      }
+
+      const [startHours, startMinutes] = startTime.split(":").map(Number);
+      const [endHours, endMinutes] = endTime.split(":").map(Number);
+      
+      const scheduledStartUTC = createLocalDateTime(scheduledDate, startHours, startMinutes);
+      const scheduledEndUTC = createLocalDateTime(scheduledDate, endHours, endMinutes);
+
+      const checklistSummary = await generateChecklistSummary();
+      const finalDescription = checklistSummary + (woDescription?.trim() || "");
+
+      const title = woTitle.trim() || `${visitTypeLabels[woVisitType]} - ${woWorkSubtype}`;
+
       const res = await apiRequest("POST", "/api/crm/work-orders", {
-        title: woTitle,
-        description: woDescription,
+        title,
+        description: finalDescription || `${visitTypeLabels[woVisitType]} work order`,
         visitType: woVisitType,
+        workSubtype: woWorkSubtype,
+        priority: woPriority,
         projectId: projectId,
         customerId: project?.customerId || project?.customer?.id,
         propertyId: project?.propertyId || project?.property?.id,
-        scheduledStart: woScheduledStart ? new Date(woScheduledStart).toISOString() : null,
-        scheduledEnd: woScheduledEnd ? new Date(woScheduledEnd).toISOString() : null,
+        scheduledStart: scheduledStartUTC.toISOString(),
+        scheduledEnd: scheduledEndUTC.toISOString(),
+        assignedTechId: assignedTechId === "unassigned" ? null : assignedTechId,
         status: "scheduled",
       });
       return res.json();
@@ -310,11 +519,7 @@ export default function CrmProjectDetail() {
       toast({ title: "Work order scheduled successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId] });
       setScheduleWODialogOpen(false);
-      setWoTitle("");
-      setWoDescription("");
-      setWoVisitType("SERVICE");
-      setWoScheduledStart("");
-      setWoScheduledEnd("");
+      resetWOForm();
     },
     onError: (error: Error) => {
       toast({
@@ -931,79 +1136,291 @@ export default function CrmProjectDetail() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={scheduleWODialogOpen} onOpenChange={setScheduleWODialogOpen}>
-          <DialogContent>
+        <Dialog open={scheduleWODialogOpen} onOpenChange={(open) => {
+          setScheduleWODialogOpen(open);
+          if (!open) resetWOForm();
+        }}>
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Schedule Work Order</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="wo-title">Title *</Label>
-                <Input
-                  id="wo-title"
-                  placeholder="Work order title"
-                  value={woTitle}
-                  onChange={(e) => setWoTitle(e.target.value)}
-                  data-testid="input-wo-title"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Visit Type</Label>
+                  <Select 
+                    value={woVisitType} 
+                    onValueChange={(v) => {
+                      const vt = v as WorkOrderVisitType;
+                      setWoVisitType(vt);
+                      setWoWorkSubtype(vt === "MAINTENANCE" ? "Preventative Maintenance" : workSubtypeByVisitType[vt][0]);
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-wo-visit-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workOrderVisitTypeEnum.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {visitTypeLabels[type]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Priority</Label>
+                  <Select value={woPriority} onValueChange={setWoPriority}>
+                    <SelectTrigger data-testid="select-wo-priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRIORITIES.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p.charAt(0).toUpperCase() + p.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="wo-description">Description *</Label>
-                <Textarea
-                  id="wo-description"
-                  placeholder="Describe the work to be done..."
-                  value={woDescription}
-                  onChange={(e) => setWoDescription(e.target.value)}
-                  className="min-h-[80px]"
-                  data-testid="textarea-wo-description"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="wo-visit-type">Visit Type</Label>
-                <Select value={woVisitType} onValueChange={setWoVisitType}>
-                  <SelectTrigger data-testid="select-wo-visit-type">
-                    <SelectValue placeholder="Select visit type" />
+                <Label>Work Subtype</Label>
+                <Select value={woWorkSubtype} onValueChange={(v) => setWoWorkSubtype(v as WorkSubtype)}>
+                  <SelectTrigger data-testid="select-wo-work-subtype">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {VISIT_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type.charAt(0) + type.slice(1).toLowerCase()}
+                    {(woVisitType === "MAINTENANCE" ? maintenanceSubtypes : workSubtypeByVisitType[woVisitType]).map((sub) => (
+                      <SelectItem key={sub} value={sub}>
+                        {sub}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              {woVisitType === "SERVICE" && (checklistLoading || checklistQuestions.length > 0) && (
+                <Collapsible open={showChecklist} onOpenChange={setShowChecklist} className="space-y-2">
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="flex w-full justify-between p-3 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg"
+                      data-testid="button-toggle-checklist"
+                    >
+                      <div className="flex items-center gap-2">
+                        {Object.keys(checklistAnswers).length === checklistQuestions.length && checklistQuestions.length > 0 ? (
+                          <ClipboardCheck className="h-5 w-5 text-amber-700" />
+                        ) : (
+                          <Clipboard className="h-5 w-5 text-amber-700" />
+                        )}
+                        <span className="font-medium text-amber-900">Service Call Checklist</span>
+                        {checklistQuestions.length > 0 && (
+                          <span className="text-sm text-amber-600">
+                            ({Object.keys(checklistAnswers).filter(k => checklistAnswers[k] !== undefined && checklistAnswers[k] !== "").length}/{checklistQuestions.length} answered)
+                          </span>
+                        )}
+                      </div>
+                      <ChevronDown className={cn(
+                        "h-4 w-4 text-amber-700 transition-transform",
+                        showChecklist && "rotate-180"
+                      )} />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="bg-amber-50/50 border border-amber-200 rounded-lg p-4 space-y-4">
+                    {checklistLoading ? (
+                      <div className="space-y-3">
+                        <Skeleton className="h-6 w-3/4" />
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-6 w-2/3" />
+                        <Skeleton className="h-10 w-full" />
+                      </div>
+                    ) : checklistQuestions.length === 0 ? (
+                      <p className="text-sm text-amber-700">No checklist questions available for this service type.</p>
+                    ) : (
+                      checklistQuestions.map((question) => (
+                        <div key={question.id} className="space-y-2">
+                          <Label className="text-sm font-medium text-amber-900">
+                            {question.question}
+                            {question.isRequired && <span className="text-red-500 ml-1">*</span>}
+                          </Label>
+                          {question.helpText && (
+                            <p className="text-xs text-amber-600">{question.helpText}</p>
+                          )}
+                          
+                          {question.questionType === "yes_no" && (
+                            <RadioGroup
+                              value={checklistAnswers[question.id] as string || ""}
+                              onValueChange={(value) => setChecklistAnswers(prev => ({ ...prev, [question.id]: value }))}
+                              className="flex gap-4"
+                              data-testid={`radio-${question.id}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <RadioGroupItem value="yes" id={`${question.id}-yes`} />
+                                <Label htmlFor={`${question.id}-yes`} className="font-normal cursor-pointer">Yes</Label>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <RadioGroupItem value="no" id={`${question.id}-no`} />
+                                <Label htmlFor={`${question.id}-no`} className="font-normal cursor-pointer">No</Label>
+                              </div>
+                            </RadioGroup>
+                          )}
+                          
+                          {question.questionType === "text" && (
+                            <Input
+                              value={checklistAnswers[question.id] as string || ""}
+                              onChange={(e) => setChecklistAnswers(prev => ({ ...prev, [question.id]: e.target.value }))}
+                              placeholder="Enter response..."
+                              className="bg-white"
+                              data-testid={`input-${question.id}`}
+                            />
+                          )}
+                          
+                          {question.questionType === "number" && (
+                            <Input
+                              type="number"
+                              value={checklistAnswers[question.id] as number || ""}
+                              onChange={(e) => setChecklistAnswers(prev => ({ ...prev, [question.id]: e.target.value ? Number(e.target.value) : "" }))}
+                              placeholder="Enter number..."
+                              className="bg-white"
+                              data-testid={`input-${question.id}`}
+                            />
+                          )}
+                          
+                          {question.questionType === "select" && question.options && (
+                            <Select
+                              value={checklistAnswers[question.id] as string || ""}
+                              onValueChange={(value) => setChecklistAnswers(prev => ({ ...prev, [question.id]: value }))}
+                            >
+                              <SelectTrigger className="bg-white" data-testid={`select-${question.id}`}>
+                                <SelectValue placeholder="Select an option..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {question.options.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
               <div className="space-y-2">
-                <Label htmlFor="wo-scheduled-start">Scheduled Start</Label>
+                <Label>Scheduled Date <span className="text-red-500">*</span></Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                      data-testid="button-scheduled-date"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {scheduledDate ? format(scheduledDate, "MMM d, yyyy") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarPicker
+                      mode="single"
+                      selected={scheduledDate}
+                      onSelect={setScheduledDate}
+                      data-testid="calendar-scheduled-date"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Start Time</Label>
+                  <Select value={startTime} onValueChange={setStartTime}>
+                    <SelectTrigger data-testid="select-start-time">
+                      <SelectValue placeholder="Start" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px]">
+                      {timeOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>End Time</Label>
+                  <Select value={endTime} onValueChange={setEndTime}>
+                    <SelectTrigger data-testid="select-end-time">
+                      <SelectValue placeholder="End" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px]">
+                      {timeOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Assign Technician</Label>
+                <Select value={assignedTechId} onValueChange={setAssignedTechId}>
+                  <SelectTrigger data-testid="select-assigned-tech">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {technicians.map((tech) => (
+                      <SelectItem key={tech.id} value={tech.id}>
+                        {tech.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Title <span className="text-xs text-muted-foreground">(optional - auto-generated if empty)</span></Label>
                 <Input
-                  id="wo-scheduled-start"
-                  type="datetime-local"
-                  value={woScheduledStart}
-                  onChange={(e) => setWoScheduledStart(e.target.value)}
-                  data-testid="input-wo-scheduled-start"
+                  value={woTitle}
+                  onChange={(e) => setWoTitle(e.target.value)}
+                  placeholder={`${visitTypeLabels[woVisitType]} - ${woWorkSubtype}`}
+                  data-testid="input-wo-title"
                 />
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="wo-scheduled-end">Scheduled End</Label>
-                <Input
-                  id="wo-scheduled-end"
-                  type="datetime-local"
-                  value={woScheduledEnd}
-                  onChange={(e) => setWoScheduledEnd(e.target.value)}
-                  data-testid="input-wo-scheduled-end"
+                <Label>Description <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                <Textarea
+                  value={woDescription}
+                  onChange={(e) => setWoDescription(e.target.value)}
+                  placeholder="Describe the work to be done..."
+                  className="min-h-[80px]"
+                  data-testid="textarea-wo-description"
                 />
               </div>
             </div>
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setScheduleWODialogOpen(false)}
+                onClick={() => {
+                  setScheduleWODialogOpen(false);
+                  resetWOForm();
+                }}
               >
                 Cancel
               </Button>
               <Button
                 onClick={() => createWorkOrderMutation.mutate()}
-                disabled={!woTitle.trim() || !woDescription.trim() || createWorkOrderMutation.isPending}
+                disabled={!scheduledDate || !areRequiredQuestionsAnswered() || createWorkOrderMutation.isPending}
+                className="bg-[#711419] hover:bg-[#5a1014]"
                 data-testid="button-submit-wo"
               >
                 {createWorkOrderMutation.isPending ? "Scheduling..." : "Schedule Work Order"}
