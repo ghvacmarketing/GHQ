@@ -6773,6 +6773,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DELETE /api/crm/users/:id/permanent - Permanently delete user (OWNER only)
+  // This removes the user and all associated records
+  app.delete("/api/crm/users/:id/permanent", requireCrmAdmin, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      const userId = req.params.id;
+
+      // Only owners can permanently delete users
+      if (currentUser?.role !== "owner") {
+        return res.status(403).json({ message: "Only owners can permanently delete users" });
+      }
+
+      // Cannot delete yourself
+      if (currentUser?.id === userId) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      const [userToDelete] = await db.select().from(crmUsers).where(eq(crmUsers.id, userId));
+      if (!userToDelete) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Cannot delete another owner
+      if (userToDelete.role === "owner") {
+        return res.status(400).json({ message: "Cannot delete an owner account. Demote them first." });
+      }
+
+      // Count associated records for the response
+      const workOrderCount = await db.select({ count: count() }).from(crmWorkOrders)
+        .where(eq(crmWorkOrders.assignedTechId, userId));
+      const invoiceCount = await db.select({ count: count() }).from(crmInvoices)
+        .where(eq(crmInvoices.createdBy, userId));
+
+      // Begin cascade deletion - order matters for foreign key constraints
+      // 1. Delete job assignments
+      await db.delete(crmJobAssignments).where(eq(crmJobAssignments.userId, userId));
+
+      // 2. Nullify work order references (don't delete the work orders, just unassign)
+      await db.update(crmWorkOrders)
+        .set({ assignedTechId: null })
+        .where(eq(crmWorkOrders.assignedTechId, userId));
+
+      // 3. Nullify invoice created_by references
+      await db.update(crmInvoices)
+        .set({ createdBy: null })
+        .where(eq(crmInvoices.createdBy, userId));
+
+      // 4. Nullify quote created_by references
+      await db.update(crmQuotes)
+        .set({ createdBy: null })
+        .where(eq(crmQuotes.createdBy, userId));
+
+      // 5. Delete CRM follow-ups assigned to this user
+      await db.delete(crmFollowUps).where(eq(crmFollowUps.assignedTo, userId));
+
+      // 6. Nullify customer notes author
+      await db.update(crmCustomerNotes)
+        .set({ authorId: null })
+        .where(eq(crmCustomerNotes.authorId, userId));
+
+      // 7. Nullify audit log references
+      await db.update(crmAuditLog)
+        .set({ actorUserId: null })
+        .where(eq(crmAuditLog.actorUserId, userId));
+
+      // 8. Delete checklist responses completed by this user
+      await db.update(workOrderChecklistResponses)
+        .set({ completedBy: null })
+        .where(eq(workOrderChecklistResponses.completedBy, userId));
+
+      // 9. Delete the user
+      await db.delete(crmUsers).where(eq(crmUsers.id, userId));
+
+      // Log the permanent deletion
+      await logCrmAudit(
+        currentUser?.id || null,
+        "user.permanently_deleted",
+        "user",
+        userId,
+        { 
+          name: userToDelete.name, 
+          email: userToDelete.email, 
+          role: userToDelete.role,
+          workOrdersUnassigned: workOrderCount[0].count,
+          invoicesOrphaned: invoiceCount[0].count 
+        },
+        req.ip
+      );
+
+      // Get updated tech count for the response
+      const techCount = await db.select({ count: count() }).from(crmUsers)
+        .where(and(eq(crmUsers.role, "tech"), eq(crmUsers.isActive, true)));
+
+      return res.json({ 
+        message: "User permanently deleted", 
+        deletedUser: { name: userToDelete.name, email: userToDelete.email },
+        technicianCount: techCount[0].count 
+      });
+    } catch (error) {
+      console.error("Error permanently deleting CRM user:", error);
+      return res.status(500).json({ message: "Failed to permanently delete user" });
+    }
+  });
+
   // GET /api/crm/dispatch - Get dispatch board data for a specific date
   app.get("/api/crm/dispatch", requireCrmAuth, async (req, res) => {
     try {
