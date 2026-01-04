@@ -480,11 +480,16 @@ export default function CrmProjectDetail() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Quote created successfully" });
+      toast({ title: "Quote created - opening proposal builder" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "quotes"] });
       setCreateQuoteDialogOpen(false);
       setQuoteTitle("");
       setQuoteDescription("");
+      // Navigate to proposal builder with project and customer context
+      const customerId = project?.customerId || project?.customer?.id;
+      if (customerId) {
+        navigate(`/crm/quotes/proposal/${customerId}?projectId=${projectId}`);
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -1024,8 +1029,26 @@ export default function CrmProjectDetail() {
 
           <TabsContent value="invoices" className="mt-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Invoices</CardTitle>
+                <Button 
+                  onClick={() => {
+                    const hasWorkOrders = project?.workOrders && project.workOrders.length > 0;
+                    if (!hasWorkOrders) {
+                      toast({
+                        title: "Work order required",
+                        description: "Please create a work order in this project first before creating an invoice.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    navigate("/crm/invoices/new");
+                  }}
+                  data-testid="button-create-invoice"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Invoice
+                </Button>
               </CardHeader>
               <CardContent>
                 {invoicesLoading ? (
