@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -57,6 +57,9 @@ import {
   XCircle,
   Navigation,
   AlertTriangle,
+  ChevronDown,
+  Clipboard,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -67,12 +70,15 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty, CrmQuote } from "@shared/schema";
-import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus } from "@shared/schema";
+import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty, CrmQuote, ChecklistQuestion } from "@shared/schema";
+import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus, workSubtypeByVisitType, type WorkSubtype } from "@shared/schema";
+import { createLocalDateTime } from "@/lib/timezone";
 import { format, formatDistanceToNow, differenceInCalendarDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -127,6 +133,25 @@ const workOrderStatusLabels: Record<string, string> = {
   on_site: "On Site",
   completed: "Completed",
   cancelled: "Cancelled",
+};
+
+const visitTypeLabels: Record<string, string> = {
+  SERVICE: "Service",
+  INSTALL: "Install",
+  MAINTENANCE: "Maintenance",
+  SALES: "Sales",
+};
+
+const WORK_SUBTYPE_TO_SERVICE_TYPE: Record<string, string> = {
+  "No Heat": "NO_HEAT",
+  "No Cool": "NO_AC",
+  "Water Leak": "WATER_LEAK",
+  "Electrical": "OTHER",
+  "Thermostat": "THERMOSTAT_ISSUE",
+  "Airflow": "OTHER",
+  "Noise": "STRANGE_NOISE",
+  "IAQ": "OTHER",
+  "Other": "OTHER",
 };
 
 function formatDate(date: Date | string | null): string {
@@ -2229,8 +2254,6 @@ export default function CrmCustomerDetail() {
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [showQuotePreview, setShowQuotePreview] = useState(false);
   const [showQuoteDeleteConfirm, setShowQuoteDeleteConfirm] = useState(false);
-  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [showInvoicePaymentDialog, setShowInvoicePaymentDialog] = useState(false);
   const [showInvoiceVoidConfirm, setShowInvoiceVoidConfirm] = useState(false);
@@ -2261,22 +2284,43 @@ export default function CrmCustomerDetail() {
   // Form state for Create Work Order dialog
   const [woTitle, setWoTitle] = useState<string>("");
   const [woVisitType, setWoVisitType] = useState<WorkOrderVisitType>("SERVICE");
+  const [woWorkSubtype, setWoWorkSubtype] = useState<WorkSubtype>("Other");
   const [woPropertyId, setWoPropertyId] = useState<string>("");
   const [woProjectId, setWoProjectId] = useState<string>("");
   const [woDate, setWoDate] = useState<Date | undefined>(new Date());
-  const [woTimeSlot, setWoTimeSlot] = useState<string>("08:00-10:00");
+  const [woStartTime, setWoStartTime] = useState<string>("08:00");
+  const [woEndTime, setWoEndTime] = useState<string>("10:00");
   const [woTechId, setWoTechId] = useState<string>("unassigned");
   const [woDescription, setWoDescription] = useState<string>("");
   const [woPriority, setWoPriority] = useState<string>("normal");
   const [woAgreementId, setWoAgreementId] = useState<string>("");
   
-  // Time slot options (2-hour blocks from 8am to 5pm)
-  const timeSlots = [
-    { value: "08:00-10:00", label: "8:00 AM - 10:00 AM" },
-    { value: "10:00-12:00", label: "10:00 AM - 12:00 PM" },
-    { value: "13:00-15:00", label: "1:00 PM - 3:00 PM" },
-    { value: "15:00-17:00", label: "3:00 PM - 5:00 PM" },
-  ];
+  // Service call checklist state
+  const [checklistQuestions, setChecklistQuestions] = useState<ChecklistQuestion[]>([]);
+  const [checklistAnswers, setChecklistAnswers] = useState<Record<string, string | boolean | number>>({});
+  const [showChecklist, setShowChecklist] = useState(true);
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  
+  // Dynamic maintenance subtypes (includes custom agreement types)
+  const [maintenanceSubtypes, setMaintenanceSubtypes] = useState<string[]>(["Preventative Maintenance"]);
+  
+  // Generate 30-minute interval time options from 8 AM to 8 PM
+  const timeOptions = (() => {
+    const options: { value: string; label: string }[] = [];
+    for (let hour = 8; hour <= 20; hour++) {
+      for (let min = 0; min < 60; min += 30) {
+        if (hour === 20 && min > 0) break;
+        const h = hour.toString().padStart(2, "0");
+        const m = min.toString().padStart(2, "0");
+        const value = `${h}:${m}`;
+        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+        const ampm = hour >= 12 ? "PM" : "AM";
+        const label = `${displayHour}:${m.padStart(2, "0")} ${ampm}`;
+        options.push({ value, label });
+      }
+    }
+    return options;
+  })();
 
   // Form state for Create Project dialog
   const [projTitle, setProjTitle] = useState<string>("");
@@ -2299,14 +2343,72 @@ export default function CrmCustomerDetail() {
   const resetWoForm = () => {
     setWoTitle("");
     setWoVisitType("SERVICE");
+    setWoWorkSubtype("Other");
     setWoPropertyId("");
     setWoProjectId("");
     setWoDate(new Date());
-    setWoTimeSlot("08:00-10:00");
+    setWoStartTime("08:00");
+    setWoEndTime("10:00");
     setWoTechId("unassigned");
     setWoDescription("");
     setWoPriority("normal");
     setWoAgreementId("");
+    setChecklistQuestions([]);
+    setChecklistAnswers({});
+    setShowChecklist(true);
+  };
+
+  const generateLocalChecklistSummary = (): string => {
+    if (checklistQuestions.length === 0) return "";
+    
+    const summaryParts: string[] = [];
+    checklistQuestions.forEach(q => {
+      const answer = checklistAnswers[q.id];
+      if (answer !== undefined && answer !== "") {
+        let answerText = String(answer);
+        if (q.questionType === "yes_no") {
+          answerText = answer === "yes" || answer === true ? "Yes" : "No";
+        }
+        summaryParts.push(`${q.question}: ${answerText}`);
+      }
+    });
+    
+    if (summaryParts.length === 0) return "";
+    return "--- Service Call Checklist ---\n" + summaryParts.join("\n") + "\n---\n\n";
+  };
+
+  const areRequiredQuestionsAnswered = (): boolean => {
+    if (woVisitType !== "SERVICE" || checklistQuestions.length === 0) return true;
+    
+    const requiredQuestions = checklistQuestions.filter(q => q.isRequired);
+    for (const q of requiredQuestions) {
+      const answer = checklistAnswers[q.id];
+      if (answer === undefined || answer === "" || answer === null) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const generateChecklistSummary = async (): Promise<string> => {
+    if (checklistQuestions.length === 0 || Object.keys(checklistAnswers).length === 0) return "";
+    
+    try {
+      const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[woWorkSubtype] || "OTHER";
+      const res = await apiRequest("POST", "/api/ai/summarize-checklist", {
+        questions: checklistQuestions,
+        answers: checklistAnswers,
+        serviceType,
+      });
+      const data = await res.json();
+      if (data.summary) {
+        return "--- Service Call Summary ---\n" + data.summary + "\n---\n\n";
+      }
+    } catch (err) {
+      console.error("AI summarization failed, using local fallback:", err);
+    }
+    
+    return generateLocalChecklistSummary();
   };
 
   const resetProjForm = () => {
@@ -2507,6 +2609,63 @@ export default function CrmCustomerDetail() {
     enabled: !!currentUser && !!customerId,
   });
   const crmInvoices = crmInvoicesData?.invoices || [];
+
+  // Fetch maintenance subtypes (includes custom agreement types) when MAINTENANCE is selected
+  useEffect(() => {
+    if (woVisitType !== "MAINTENANCE") return;
+    
+    fetch("/api/crm/work-subtypes/MAINTENANCE", { credentials: "include" })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setMaintenanceSubtypes(data);
+        }
+      })
+      .catch(() => {
+        setMaintenanceSubtypes(["Preventative Maintenance"]);
+      });
+  }, [woVisitType]);
+
+  // Fetch checklist questions when SERVICE is selected and workSubtype changes
+  useEffect(() => {
+    if (!scheduleVisitDialogOpen) return;
+    if (woVisitType !== "SERVICE") {
+      setChecklistQuestions([]);
+      setChecklistAnswers({});
+      return;
+    }
+
+    const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[woWorkSubtype];
+    if (!serviceType) {
+      setChecklistQuestions([]);
+      setChecklistAnswers({});
+      return;
+    }
+
+    setChecklistLoading(true);
+    fetch(`/api/crm/checklists/${serviceType}`, { credentials: "include" })
+      .then(res => {
+        if (!res.ok) {
+          setChecklistQuestions([]);
+          return null;
+        }
+        return res.json();
+      })
+      .then(data => {
+        if (data && data.questions) {
+          setChecklistQuestions(data.questions);
+          setChecklistAnswers({});
+        } else {
+          setChecklistQuestions([]);
+        }
+      })
+      .catch(() => {
+        setChecklistQuestions([]);
+      })
+      .finally(() => {
+        setChecklistLoading(false);
+      });
+  }, [woVisitType, woWorkSubtype, scheduleVisitDialogOpen]);
 
   // Fetch selected quote details for the detail sheet
   interface QuoteLineItem {
@@ -2872,28 +3031,6 @@ export default function CrmCustomerDetail() {
       currency: "USD",
     }).format(num);
   };
-
-  // Fetch selected work order details for the detail sheet
-  const { data: selectedWorkOrderData, isLoading: selectedWorkOrderLoading } = useQuery<WorkOrderWithDetails>({
-    queryKey: ["/api/crm/work-orders", selectedWorkOrderId],
-    queryFn: async () => {
-      const res = await fetch(`/api/crm/work-orders/${selectedWorkOrderId}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch work order");
-      return res.json();
-    },
-    enabled: !!currentUser && !!selectedWorkOrderId,
-  });
-
-  // Fetch selected project details for the detail sheet
-  const { data: selectedProjectData, isLoading: selectedProjectLoading } = useQuery<ProjectWithDetails>({
-    queryKey: ["/api/crm/projects", selectedProjectId],
-    queryFn: async () => {
-      const res = await fetch(`/api/crm/projects/${selectedProjectId}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch project");
-      return res.json();
-    },
-    enabled: !!currentUser && !!selectedProjectId,
-  });
 
   // Fetch selected invoice details for the detail sheet
   interface InvoiceLineItem {
@@ -3324,32 +3461,42 @@ export default function CrmCustomerDetail() {
   // Create standalone Work Order mutation
   const createWorkOrderMutation = useMutation({
     mutationFn: async () => {
-      if (!woTitle.trim()) throw new Error("Title is required");
-      if (!woDescription.trim()) throw new Error("Description is required");
       if (!woDate) throw new Error("Date is required");
       if (woVisitType === "MAINTENANCE" && !woAgreementId) {
         throw new Error("Agreement is required for maintenance work orders");
       }
-
-      const [startTimeStr, endTimeStr] = woTimeSlot.split("-");
-      const [hours, minutes] = startTimeStr.split(":").map(Number);
-      const scheduledStart = new Date(woDate);
-      scheduledStart.setHours(hours, minutes, 0, 0);
       
-      const [endHours, endMinutes] = endTimeStr.split(":").map(Number);
-      const scheduledEnd = new Date(woDate);
-      scheduledEnd.setHours(endHours, endMinutes, 0, 0);
+      if (!areRequiredQuestionsAnswered()) {
+        const requiredQuestions = checklistQuestions.filter(q => q.isRequired);
+        const missingQuestions = requiredQuestions.filter(q => {
+          const answer = checklistAnswers[q.id];
+          return answer === undefined || answer === "" || answer === null;
+        });
+        throw new Error(`Please answer required checklist questions: ${missingQuestions.map(q => q.question).join(", ")}`);
+      }
+
+      const [startHours, startMinutes] = woStartTime.split(":").map(Number);
+      const [endHours, endMinutes] = woEndTime.split(":").map(Number);
+      
+      const scheduledStartUTC = createLocalDateTime(woDate, startHours, startMinutes);
+      const scheduledEndUTC = createLocalDateTime(woDate, endHours, endMinutes);
+
+      const checklistSummary = await generateChecklistSummary();
+      const finalDescription = checklistSummary + (woDescription?.trim() || "");
+
+      const title = woTitle.trim() || `${visitTypeLabels[woVisitType]} - ${woWorkSubtype}`;
 
       const res = await apiRequest("POST", "/api/crm/work-orders", {
         customerId,
         propertyId: woPropertyId || null,
         projectId: woProjectId || null,
         agreementId: woVisitType === "MAINTENANCE" ? woAgreementId : null,
-        title: woTitle.trim(),
+        title,
         visitType: woVisitType,
-        description: woDescription.trim(),
-        scheduledStart: scheduledStart.toISOString(),
-        scheduledEnd: scheduledEnd.toISOString(),
+        workSubtype: woWorkSubtype,
+        description: finalDescription || `${visitTypeLabels[woVisitType]} work order`,
+        scheduledStart: scheduledStartUTC.toISOString(),
+        scheduledEnd: scheduledEndUTC.toISOString(),
         assignedTechId: woTechId !== "unassigned" ? woTechId : null,
         priority: woPriority,
         status: "scheduled",
@@ -3387,6 +3534,14 @@ export default function CrmCustomerDetail() {
         });
         return;
       }
+      if (!areRequiredQuestionsAnswered()) {
+        toast({
+          title: "Checklist incomplete",
+          description: "Please answer all required checklist questions",
+          variant: "destructive",
+        });
+        return;
+      }
       createWorkOrderMutation.mutate();
     } else if (!woPropertyId) {
       toast({
@@ -3402,119 +3557,9 @@ export default function CrmCustomerDetail() {
     resetWoForm();
   };
 
-  const isWoFormValid = woDate && woPropertyId && (woVisitType !== "MAINTENANCE" || woAgreementId);
-
-  const woUpdateStatusMutation = useMutation({
-    mutationFn: async ({ workOrderId, status }: { workOrderId: string; status: string }) => {
-      const res = await apiRequest("PATCH", `/api/crm/work-orders/${workOrderId}`, { status });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to update status");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Work order status updated" });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list", { customerId }] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", selectedWorkOrderId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to update status",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const woCreateQuoteMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedWorkOrderData) throw new Error("No work order selected");
-      const res = await apiRequest("POST", "/api/crm/quotes", {
-        title: `Quote for ${selectedWorkOrderData.title || selectedWorkOrderData.visitType || "Work Order"}`,
-        scope: "work_order",
-        workOrderId: selectedWorkOrderId,
-        customerId: selectedWorkOrderData.customerId,
-        propertyId: selectedWorkOrderData.propertyId,
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to create quote");
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      toast({ title: "Quote created successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
-      setSelectedWorkOrderId(null);
-      navigate(`/crm/quotes/${data.id}`);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to create quote",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const projectUpdateStatusMutation = useMutation({
-    mutationFn: async ({ projectId, status }: { projectId: string; status: string }) => {
-      const res = await apiRequest("PATCH", `/api/crm/projects/${projectId}`, { status });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to update project status");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Project status updated" });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", selectedProjectId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects/customer", customerId] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to update project status",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const projectCreateWorkOrderMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedProjectData) throw new Error("No project selected");
-      const res = await apiRequest("POST", "/api/crm/work-orders", {
-        title: `Work Order for ${selectedProjectData.title || "Project"}`,
-        visitType: selectedProjectData.projectType === "MAINTENANCE_AGREEMENT" ? "MAINTENANCE" : 
-                   selectedProjectData.projectType === "INSTALL" ? "INSTALL" : "SERVICE",
-        projectId: selectedProjectId,
-        customerId: selectedProjectData.customerId,
-        propertyId: selectedProjectData.propertyId,
-        status: "scheduled",
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to create work order");
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      toast({ title: "Work order created successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list", { customerId }] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", selectedProjectId] });
-      setSelectedProjectId(null);
-      navigate(`/crm/work-orders/${data.id}`);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to create work order",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
+  const isWoFormValid = woDate && woPropertyId && 
+    (woVisitType !== "MAINTENANCE" || woAgreementId) && 
+    areRequiredQuestionsAnswered();
 
   const deleteJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
@@ -4088,15 +4133,16 @@ export default function CrmCustomerDetail() {
             </DialogHeader>
             
             <div className="space-y-4 py-4">
-              {/* Title */}
+              {/* Title (optional - will auto-generate) */}
               <div className="space-y-2">
-                <Label>Title *</Label>
+                <Label>Title (optional)</Label>
                 <Input
-                  placeholder="Work order title..."
+                  placeholder={`Auto: ${visitTypeLabels[woVisitType]} - ${woWorkSubtype}`}
                   value={woTitle}
                   onChange={(e) => setWoTitle(e.target.value)}
                   data-testid="input-wo-title"
                 />
+                <p className="text-xs text-slate-500">Leave blank to auto-generate from visit type and subtype</p>
               </div>
 
               {/* Property Selection */}
@@ -4146,10 +4192,15 @@ export default function CrmCustomerDetail() {
               <div className="space-y-2">
                 <Label>Visit Type *</Label>
                 <Select value={woVisitType} onValueChange={(v) => {
-                  setWoVisitType(v as WorkOrderVisitType);
-                  if (v !== "MAINTENANCE") {
+                  const newType = v as WorkOrderVisitType;
+                  setWoVisitType(newType);
+                  if (newType !== "MAINTENANCE") {
                     setWoAgreementId("");
                   }
+                  const newSubtypes = newType === "MAINTENANCE" 
+                    ? maintenanceSubtypes 
+                    : workSubtypeByVisitType[newType] || ["Other"];
+                  setWoWorkSubtype(newSubtypes[0] as WorkSubtype);
                 }}>
                   <SelectTrigger data-testid="select-wo-visit-type">
                     <SelectValue placeholder="Select visit type" />
@@ -4157,7 +4208,27 @@ export default function CrmCustomerDetail() {
                   <SelectContent>
                     {workOrderVisitTypeEnum.map((type) => (
                       <SelectItem key={type} value={type} data-testid={`wo-visit-type-${type}`}>
-                        {type.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                        {visitTypeLabels[type] || type.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Work Subtype */}
+              <div className="space-y-2">
+                <Label>Work Subtype *</Label>
+                <Select value={woWorkSubtype} onValueChange={(v) => setWoWorkSubtype(v as WorkSubtype)}>
+                  <SelectTrigger data-testid="select-wo-work-subtype">
+                    <SelectValue placeholder="Select work subtype" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(woVisitType === "MAINTENANCE" 
+                      ? maintenanceSubtypes 
+                      : (workSubtypeByVisitType[woVisitType] || ["Other"])
+                    ).map((subtype) => (
+                      <SelectItem key={subtype} value={subtype} data-testid={`wo-subtype-${subtype}`}>
+                        {subtype}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -4208,44 +4279,66 @@ export default function CrmCustomerDetail() {
                 </Select>
               </div>
 
-              {/* Date and Time */}
+              {/* Date */}
+              <div className="space-y-2">
+                <Label>Date *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !woDate && "text-muted-foreground"
+                      )}
+                      data-testid="button-wo-date"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {woDate ? format(woDate, "MMM d, yyyy") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={woDate}
+                      onSelect={setWoDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Start/End Time */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Date *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !woDate && "text-muted-foreground"
-                        )}
-                        data-testid="button-wo-date"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {woDate ? format(woDate, "MMM d") : "Pick"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="single"
-                        selected={woDate}
-                        onSelect={setWoDate}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label>Time Slot</Label>
-                  <Select value={woTimeSlot} onValueChange={setWoTimeSlot}>
-                    <SelectTrigger data-testid="select-wo-time-slot">
-                      <SelectValue placeholder="Select time slot" />
+                  <Label>Start Time *</Label>
+                  <Select value={woStartTime} onValueChange={(v) => {
+                    setWoStartTime(v);
+                    const [hours] = v.split(":").map(Number);
+                    const endHour = Math.min(hours + 2, 20);
+                    setWoEndTime(`${endHour.toString().padStart(2, "0")}:00`);
+                  }}>
+                    <SelectTrigger data-testid="select-wo-start-time">
+                      <SelectValue placeholder="Start time" />
                     </SelectTrigger>
                     <SelectContent>
-                      {timeSlots.map((slot) => (
-                        <SelectItem key={slot.value} value={slot.value}>
-                          {slot.label}
+                      {timeOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>End Time *</Label>
+                  <Select value={woEndTime} onValueChange={setWoEndTime}>
+                    <SelectTrigger data-testid="select-wo-end-time">
+                      <SelectValue placeholder="End time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timeOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -4273,11 +4366,133 @@ export default function CrmCustomerDetail() {
                 </Select>
               </div>
 
-              {/* Description */}
+              {/* Service Call Checklist - Only for SERVICE visit type */}
+              {woVisitType === "SERVICE" && (
+                <div className="space-y-2">
+                  <Collapsible open={showChecklist} onOpenChange={setShowChecklist}>
+                    <CollapsibleTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        className="w-full justify-between p-0 h-auto hover:bg-transparent"
+                        data-testid="toggle-checklist"
+                      >
+                        <div className="flex items-center gap-2">
+                          {checklistQuestions.length > 0 && areRequiredQuestionsAnswered() ? (
+                            <ClipboardCheck className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Clipboard className="h-4 w-4 text-slate-500" />
+                          )}
+                          <span className="font-medium">Service Call Checklist</span>
+                          {checklistLoading && (
+                            <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
+                          )}
+                          {checklistQuestions.length > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              {Object.keys(checklistAnswers).length}/{checklistQuestions.length}
+                            </Badge>
+                          )}
+                        </div>
+                        <ChevronDown className={cn(
+                          "h-4 w-4 transition-transform",
+                          showChecklist && "rotate-180"
+                        )} />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-3 space-y-4">
+                      {checklistLoading ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                          <span className="ml-2 text-sm text-slate-500">Loading checklist...</span>
+                        </div>
+                      ) : checklistQuestions.length === 0 ? (
+                        <p className="text-sm text-slate-500 text-center py-4">
+                          No checklist questions available for this service type.
+                        </p>
+                      ) : (
+                        <div className="space-y-4 border rounded-lg p-4 bg-slate-50">
+                          {checklistQuestions.map((q) => (
+                            <div key={q.id} className="space-y-2">
+                              <Label className="flex items-start gap-1">
+                                <span>{q.question}</span>
+                                {q.isRequired && <span className="text-red-500">*</span>}
+                              </Label>
+                              {q.questionType === "yes_no" ? (
+                                <RadioGroup
+                                  value={checklistAnswers[q.id]?.toString() || ""}
+                                  onValueChange={(val) => {
+                                    setChecklistAnswers(prev => ({
+                                      ...prev,
+                                      [q.id]: val
+                                    }));
+                                  }}
+                                  className="flex gap-4"
+                                  data-testid={`checklist-radio-${q.id}`}
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="yes" id={`${q.id}-yes`} />
+                                    <Label htmlFor={`${q.id}-yes`} className="font-normal">Yes</Label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="no" id={`${q.id}-no`} />
+                                    <Label htmlFor={`${q.id}-no`} className="font-normal">No</Label>
+                                  </div>
+                                </RadioGroup>
+                              ) : q.questionType === "text" ? (
+                                <Textarea
+                                  placeholder="Enter your answer..."
+                                  value={checklistAnswers[q.id]?.toString() || ""}
+                                  onChange={(e) => {
+                                    setChecklistAnswers(prev => ({
+                                      ...prev,
+                                      [q.id]: e.target.value
+                                    }));
+                                  }}
+                                  rows={2}
+                                  className="bg-white"
+                                  data-testid={`checklist-text-${q.id}`}
+                                />
+                              ) : q.questionType === "number" ? (
+                                <Input
+                                  type="number"
+                                  placeholder="Enter a number..."
+                                  value={checklistAnswers[q.id]?.toString() || ""}
+                                  onChange={(e) => {
+                                    setChecklistAnswers(prev => ({
+                                      ...prev,
+                                      [q.id]: Number(e.target.value)
+                                    }));
+                                  }}
+                                  className="bg-white"
+                                  data-testid={`checklist-number-${q.id}`}
+                                />
+                              ) : (
+                                <Input
+                                  placeholder="Enter your answer..."
+                                  value={checklistAnswers[q.id]?.toString() || ""}
+                                  onChange={(e) => {
+                                    setChecklistAnswers(prev => ({
+                                      ...prev,
+                                      [q.id]: e.target.value
+                                    }));
+                                  }}
+                                  className="bg-white"
+                                  data-testid={`checklist-input-${q.id}`}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
+                </div>
+              )}
+
+              {/* Description (optional) */}
               <div className="space-y-2">
-                <Label>Description *</Label>
+                <Label>Description (optional)</Label>
                 <Textarea
-                  placeholder="Work order description..."
+                  placeholder="Additional notes or work order description..."
                   value={woDescription}
                   onChange={(e) => setWoDescription(e.target.value)}
                   rows={3}
@@ -4296,7 +4511,7 @@ export default function CrmCustomerDetail() {
               </Button>
               <Button
                 onClick={handleSubmitWorkOrder}
-                disabled={createWorkOrderMutation.isPending || !isWoFormValid || !woTitle.trim() || !woDescription.trim()}
+                disabled={createWorkOrderMutation.isPending || !isWoFormValid}
                 className="bg-[#711419] hover:bg-[#5a1014] text-white"
                 data-testid="button-submit-wo"
               >
@@ -5013,8 +5228,8 @@ export default function CrmCustomerDetail() {
           propertyDialogOpen={propertyDialogOpen}
           setPropertyDialogOpen={setPropertyDialogOpen}
           onViewQuote={(quoteId) => setSelectedQuoteId(quoteId)}
-          onViewWorkOrder={(id) => setSelectedWorkOrderId(id)}
-          onViewProject={(id) => setSelectedProjectId(id)}
+          onViewWorkOrder={(id) => navigate(`/crm/work-orders/${id}`)}
+          onViewProject={(id) => navigate(`/crm/projects/${id}`)}
           onViewInvoice={(id) => navigate(`/crm/invoices/${id}`)}
         />
 
@@ -5486,507 +5701,6 @@ export default function CrmCustomerDetail() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        {/* Work Order Detail Dialog */}
-        <Dialog open={!!selectedWorkOrderId} onOpenChange={(open) => !open && setSelectedWorkOrderId(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-work-order-detail">
-            <DialogHeader className="shrink-0 pb-4 border-b">
-              <div className="flex items-center justify-between">
-                <DialogTitle className="flex items-center gap-2 text-xl">
-                  <Wrench className="h-5 w-5 text-[#711419]" />
-                  {selectedWorkOrderData?.title || selectedWorkOrderData?.visitType?.replace(/_/g, " ") || "Work Order Details"}
-                </DialogTitle>
-                <div className="flex items-center gap-2">
-                  {selectedWorkOrderData && (
-                    <>
-                      <Badge className={cn(
-                        "text-xs",
-                        workOrderStatusColors[selectedWorkOrderData.status]?.bg,
-                        workOrderStatusColors[selectedWorkOrderData.status]?.text,
-                        workOrderStatusColors[selectedWorkOrderData.status]?.border
-                      )}>
-                        {workOrderStatusLabels[selectedWorkOrderData.status] || selectedWorkOrderData.status}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {selectedWorkOrderData.visitType?.replace(/_/g, " ")}
-                      </Badge>
-                    </>
-                  )}
-                </div>
-              </div>
-            </DialogHeader>
-            
-            <ScrollArea className="flex-1">
-              {selectedWorkOrderLoading ? (
-                <div className="space-y-4 p-6">
-                  <Skeleton className="h-6 w-48" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-32 w-full" />
-                </div>
-              ) : selectedWorkOrderData ? (
-                <div className="space-y-6 p-6">
-                  {/* Work Order Actions Card */}
-                  <Card className="bg-gradient-to-br from-[#711419]/10 to-red-50 border-[#711419]/30">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg text-[#711419]">Work Order Actions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm font-medium text-slate-600">Status:</Label>
-                          <Select
-                            value={selectedWorkOrderData.status}
-                            onValueChange={(value) => {
-                              if (selectedWorkOrderId) {
-                                woUpdateStatusMutation.mutate({ workOrderId: selectedWorkOrderId, status: value });
-                              }
-                            }}
-                            disabled={woUpdateStatusMutation.isPending}
-                          >
-                            <SelectTrigger className="w-[160px]" data-testid="select-wo-status">
-                              <SelectValue placeholder="Update Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="scheduled">Scheduled</SelectItem>
-                              <SelectItem value="dispatched">Dispatched</SelectItem>
-                              <SelectItem value="en_route">En Route</SelectItem>
-                              <SelectItem value="on_site">On Site</SelectItem>
-                              <SelectItem value="completed">Completed</SelectItem>
-                              <SelectItem value="cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <Separator orientation="vertical" className="h-10 mx-2" />
-                        
-                        <Button
-                          onClick={() => woCreateQuoteMutation.mutate()}
-                          className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
-                          disabled={woCreateQuoteMutation.isPending}
-                          data-testid="button-wo-create-quote"
-                        >
-                          {woCreateQuoteMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : (
-                            <FileText className="h-4 w-4 mr-2" />
-                          )}
-                          Create Quote
-                        </Button>
-                        
-                        {selectedWorkOrderData.propertyAddress && (
-                          <Button
-                            variant="outline"
-                            className="border-blue-500 text-blue-600 hover:bg-blue-50"
-                            onClick={() => {
-                              const address = encodeURIComponent(selectedWorkOrderData.propertyAddress || "");
-                              window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, "_blank");
-                            }}
-                            data-testid="button-wo-navigate"
-                          >
-                            <Navigation className="h-4 w-4 mr-2" />
-                            Navigate
-                          </Button>
-                        )}
-                        
-                        <Button
-                          className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                          onClick={() => {
-                            const woId = selectedWorkOrderId;
-                            setSelectedWorkOrderId(null);
-                            navigate(`/crm/work-orders/${woId}`);
-                          }}
-                          data-testid="button-wo-open-full"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          Open Full Details
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Work Order Info Cards */}
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {/* Schedule & Assignment Card */}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base text-slate-800">Schedule & Assignment</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Scheduled Date</p>
-                            <div className="flex items-center gap-1 text-sm font-medium">
-                              <CalendarIcon className="h-4 w-4 text-slate-400" />
-                              {selectedWorkOrderData.scheduledStart 
-                                ? format(new Date(selectedWorkOrderData.scheduledStart), 'MMM d, yyyy') 
-                                : '—'}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Time</p>
-                            <div className="flex items-center gap-1 text-sm font-medium">
-                              <Clock className="h-4 w-4 text-slate-400" />
-                              {selectedWorkOrderData.scheduledStart 
-                                ? format(new Date(selectedWorkOrderData.scheduledStart), 'h:mm a') 
-                                : '—'}
-                              {selectedWorkOrderData.scheduledEnd && 
-                                ` - ${format(new Date(selectedWorkOrderData.scheduledEnd), 'h:mm a')}`}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Assigned Tech</p>
-                            <div className="flex items-center gap-1 text-sm">
-                              <User className="h-4 w-4 text-slate-400" />
-                              <span className="font-medium">{selectedWorkOrderData.assignedTechName || "Unassigned"}</span>
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Priority</p>
-                            <Badge className={cn(
-                              "text-xs",
-                              priorityColors[selectedWorkOrderData.priority || "normal"]?.bg,
-                              priorityColors[selectedWorkOrderData.priority || "normal"]?.text
-                            )}>
-                              {(selectedWorkOrderData.priority || "normal").charAt(0).toUpperCase() + (selectedWorkOrderData.priority || "normal").slice(1)}
-                            </Badge>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Service Address Card */}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base text-slate-800">Service Location</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {selectedWorkOrderData.propertyAddress ? (
-                          <div className="space-y-3">
-                            <div className="flex items-start gap-2">
-                              <MapPin className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
-                              <p className="text-sm text-slate-700">{selectedWorkOrderData.propertyAddress}</p>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full border-blue-500 text-blue-600 hover:bg-blue-50"
-                              onClick={() => {
-                                const address = encodeURIComponent(selectedWorkOrderData.propertyAddress || "");
-                                window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, "_blank");
-                              }}
-                              data-testid="button-wo-navigate-card"
-                            >
-                              <Navigation className="h-4 w-4 mr-2" />
-                              Get Directions
-                            </Button>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-slate-500 italic">No address on file</p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Description Card */}
-                  {selectedWorkOrderData.description && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base text-slate-800">Description</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedWorkOrderData.description}</p>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Related Project Card */}
-                  {selectedWorkOrderData.projectTitle && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base text-slate-800">Related Project</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Briefcase className="h-4 w-4 text-blue-600" />
-                          <span className="font-medium text-blue-600">{selectedWorkOrderData.projectTitle}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500 text-center py-8">Work order not found</p>
-              )}
-            </ScrollArea>
-            
-            <DialogFooter className="shrink-0 pt-4 border-t flex items-center justify-between gap-3 sm:justify-between">
-              <Button
-                variant="outline"
-                onClick={() => setSelectedWorkOrderId(null)}
-                data-testid="button-close-wo-dialog"
-              >
-                Close
-              </Button>
-              <Button
-                className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                onClick={() => {
-                  const woId = selectedWorkOrderId;
-                  setSelectedWorkOrderId(null);
-                  navigate(`/crm/work-orders/${woId}`);
-                }}
-                data-testid="button-open-full-wo"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Open Full Details
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Project Detail Dialog */}
-        <Dialog open={!!selectedProjectId} onOpenChange={(open) => !open && setSelectedProjectId(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-project-detail">
-            <DialogHeader className="shrink-0 pb-4 border-b">
-              <div className="flex items-center justify-between">
-                <DialogTitle className="flex items-center gap-2 text-xl">
-                  <Briefcase className="h-5 w-5 text-[#711419]" />
-                  {selectedProjectData?.title || "Project Details"}
-                </DialogTitle>
-                <div className="flex items-center gap-2">
-                  {selectedProjectData && (
-                    <>
-                      <Badge className={cn(
-                        "text-xs",
-                        selectedProjectData.status === "lead" && "bg-slate-100 text-slate-700",
-                        selectedProjectData.status === "proposal_sent" && "bg-amber-100 text-amber-700",
-                        selectedProjectData.status === "approved" && "bg-blue-100 text-blue-700",
-                        selectedProjectData.status === "in_progress" && "bg-green-100 text-green-700",
-                        selectedProjectData.status === "completed" && "bg-emerald-100 text-emerald-700",
-                        selectedProjectData.status === "closed" && "bg-slate-100 text-slate-600",
-                        selectedProjectData.status === "archived" && "bg-gray-100 text-gray-700"
-                      )}>
-                        {selectedProjectData.status?.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) || "Lead"}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {selectedProjectData.projectType?.replace(/_/g, " ")}
-                      </Badge>
-                    </>
-                  )}
-                </div>
-              </div>
-            </DialogHeader>
-            
-            <ScrollArea className="flex-1">
-              {selectedProjectLoading ? (
-                <div className="space-y-4 p-6">
-                  <Skeleton className="h-6 w-48" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-32 w-full" />
-                </div>
-              ) : selectedProjectData ? (
-                <div className="space-y-6 p-6">
-                  {/* Project Actions Card */}
-                  <Card className="bg-gradient-to-br from-blue-500/10 to-blue-50 border-blue-200/50">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg text-blue-700">Project Actions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm font-medium text-slate-600">Status:</Label>
-                          <Select
-                            value={selectedProjectData.status}
-                            onValueChange={(value) => {
-                              if (selectedProjectId) {
-                                projectUpdateStatusMutation.mutate({ projectId: selectedProjectId, status: value });
-                              }
-                            }}
-                            disabled={projectUpdateStatusMutation.isPending}
-                          >
-                            <SelectTrigger className="w-[160px]" data-testid="select-project-status">
-                              <SelectValue placeholder="Update Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="lead">Lead</SelectItem>
-                              <SelectItem value="proposal_sent">Proposal Sent</SelectItem>
-                              <SelectItem value="approved">Approved</SelectItem>
-                              <SelectItem value="in_progress">In Progress</SelectItem>
-                              <SelectItem value="completed">Completed</SelectItem>
-                              <SelectItem value="closed">Closed</SelectItem>
-                              <SelectItem value="archived">Archived</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <Separator orientation="vertical" className="h-10 mx-2" />
-                        
-                        <Button
-                          size="sm"
-                          onClick={() => projectCreateWorkOrderMutation.mutate()}
-                          className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
-                          disabled={projectCreateWorkOrderMutation.isPending}
-                          data-testid="button-project-create-wo"
-                        >
-                          {projectCreateWorkOrderMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          ) : (
-                            <Plus className="h-4 w-4 mr-1" />
-                          )}
-                          New Work Order
-                        </Button>
-                        
-                        <Button
-                          className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                          onClick={() => {
-                            const projId = selectedProjectId;
-                            setSelectedProjectId(null);
-                            navigate(`/crm/projects/${projId}`);
-                          }}
-                          data-testid="button-project-open-full-actions"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          Open Full Details
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Project Info Cards */}
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {/* Project Details Card */}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base text-slate-800">Project Information</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Project Type</p>
-                            <Badge variant="outline" className="text-xs">
-                              {selectedProjectData.projectType?.replace(/_/g, " ")}
-                            </Badge>
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Priority</p>
-                            <Badge className={cn(
-                              "text-xs",
-                              selectedProjectData.priority === "low" && "bg-slate-100 text-slate-600",
-                              selectedProjectData.priority === "normal" && "bg-blue-100 text-blue-600",
-                              selectedProjectData.priority === "high" && "bg-amber-100 text-amber-600",
-                              selectedProjectData.priority === "urgent" && "bg-red-100 text-red-600"
-                            )}>
-                              {(selectedProjectData.priority || "normal").charAt(0).toUpperCase() + (selectedProjectData.priority || "normal").slice(1)}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Created</p>
-                            <div className="flex items-center gap-1 text-sm font-medium">
-                              <Calendar className="h-4 w-4 text-slate-400" />
-                              {selectedProjectData.createdAt 
-                                ? format(new Date(selectedProjectData.createdAt), 'MMM d, yyyy') 
-                                : '—'}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Work Orders</p>
-                            <div className="flex items-center gap-1 text-sm font-medium">
-                              <Wrench className="h-4 w-4 text-slate-400" />
-                              {selectedProjectData.workOrderCount || 0} work order(s)
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Financial Card */}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base text-slate-800">Customer & Value</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {selectedProjectData.customerName && (
-                          <div>
-                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Customer</p>
-                            <div className="flex items-center gap-1 text-sm">
-                              <User className="h-4 w-4 text-slate-400" />
-                              <span className="font-medium">{selectedProjectData.customerName}</span>
-                            </div>
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Expected Value</p>
-                          <div className="flex items-center gap-1 text-sm font-semibold text-[#711419]">
-                            <DollarSign className="h-4 w-4" />
-                            {selectedProjectData.expectedValue 
-                              ? Number(selectedProjectData.expectedValue).toLocaleString('en-US', { minimumFractionDigits: 2 }) 
-                              : '—'}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Property Address Card */}
-                  {selectedProjectData.propertyAddress && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base text-slate-800">Property Location</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-start gap-2">
-                          <MapPin className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
-                          <p className="text-sm text-slate-700">{selectedProjectData.propertyAddress}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Description Card */}
-                  {selectedProjectData.description && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base text-slate-800">Description</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedProjectData.description}</p>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500 text-center py-8">Project not found</p>
-              )}
-            </ScrollArea>
-            
-            <DialogFooter className="shrink-0 pt-4 border-t flex items-center justify-between gap-3 sm:justify-between">
-              <Button
-                variant="outline"
-                onClick={() => setSelectedProjectId(null)}
-                data-testid="button-close-project-dialog"
-              >
-                Close
-              </Button>
-              <Button
-                className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                onClick={() => {
-                  const projId = selectedProjectId;
-                  setSelectedProjectId(null);
-                  navigate(`/crm/projects/${projId}`);
-                }}
-                data-testid="button-open-full-project"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Open Full Details
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
 
       </div>
