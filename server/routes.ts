@@ -7578,6 +7578,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const query = (req.query.q as string)?.trim();
+      const aiRequested = req.query.ai !== "false"; // AI enabled by default
+      
       if (!query || query.length < 2) {
         const emptyCategory = { items: [], total: 0, hasMore: false };
         return res.json({
@@ -7596,23 +7598,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Import AI search helper dynamically to avoid blocking startup
-      const { interpretSearchIntent, buildExpandedSearchPatterns } = await import("./services/ghqSearchAI");
-      
-      // Try AI-enhanced search
+      // AI-enhanced search (only if enabled)
       let searchPatterns: string[] = [`%${query}%`];
-      let aiIntent: Awaited<ReturnType<typeof interpretSearchIntent>> = null;
+      let aiIntent: { expandedTerms: string[]; intent: string } | null = null;
       let aiEnhanced = false;
 
-      try {
-        aiIntent = await interpretSearchIntent(query);
-        if (aiIntent) {
-          searchPatterns = buildExpandedSearchPatterns(aiIntent);
-          aiEnhanced = true;
-          console.log(`[GHQ AI] Query "${query}" expanded to: ${searchPatterns.join(", ")}`);
+      if (aiRequested) {
+        try {
+          const { interpretSearchIntent, buildExpandedSearchPatterns } = await import("./services/ghqSearchAI");
+          aiIntent = await interpretSearchIntent(query);
+          if (aiIntent) {
+            searchPatterns = buildExpandedSearchPatterns(aiIntent);
+            aiEnhanced = true;
+            console.log(`[GHQ AI] Query "${query}" expanded to: ${searchPatterns.join(", ")}`);
+          }
+        } catch (aiError) {
+          console.error("[GHQ AI] Falling back to basic search:", aiError);
         }
-      } catch (aiError) {
-        console.error("[GHQ AI] Falling back to basic search:", aiError);
       }
 
       const LIMIT = 5;

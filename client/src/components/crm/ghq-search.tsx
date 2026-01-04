@@ -161,13 +161,14 @@ export function GhqSearch() {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [aiEnabled, setAiEnabled] = useState(true);
   const debouncedQuery = useDebounce(searchQuery, 300);
   const [, navigate] = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading } = useQuery<SearchResponse>({
-    queryKey: [`/api/crm/ghq/search?q=${encodeURIComponent(debouncedQuery)}`],
+    queryKey: [`/api/crm/ghq/search?q=${encodeURIComponent(debouncedQuery)}&ai=${aiEnabled}`],
     enabled: debouncedQuery.length >= 2,
   });
 
@@ -396,6 +397,18 @@ export function GhqSearch() {
           </ScrollArea>
 
           <div className="px-4 py-2 border-t border-slate-700 flex items-center gap-4 text-xs text-slate-500">
+            <button
+              onClick={() => setAiEnabled(!aiEnabled)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
+                aiEnabled
+                  ? "bg-purple-900/50 text-purple-300 border border-purple-700/50"
+                  : "bg-slate-800 text-slate-400 border border-slate-700"
+              }`}
+              data-testid="toggle-ai-search"
+            >
+              <Sparkles className="h-3 w-3" />
+              <span>AI {aiEnabled ? "On" : "Off"}</span>
+            </button>
             <div className="flex items-center gap-1">
               <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">↑</kbd>
               <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">↓</kbd>
