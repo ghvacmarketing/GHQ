@@ -117,6 +117,7 @@ export default function CrmQuoteCreate() {
   const workOrderIdFromUrl = urlParams.get("workOrderId");
   const customerIdFromUrl = urlParams.get("customerId");
   const propertyIdFromUrl = urlParams.get("propertyId");
+  const projectIdFromUrl = urlParams.get("projectId");
 
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
   const [discountKind, setDiscountKind] = useState<"promotion" | "maintenance">("promotion");
@@ -269,7 +270,19 @@ export default function CrmQuoteCreate() {
 
   const handleQuoteTypeSelect = (type: "quick" | "proposal" | "worksheet") => {
     if (type === "proposal") {
-      navigate("/crm/quotes/proposal");
+      // Use route param for customer ID when available, then add projectId as query param
+      const effectiveCustomerId = customerIdFromUrl || formData.customerId;
+      const queryParams = new URLSearchParams();
+      if (projectIdFromUrl) {
+        queryParams.set("projectId", projectIdFromUrl);
+      }
+      const queryStr = queryParams.toString();
+      
+      if (effectiveCustomerId) {
+        navigate(`/crm/quotes/proposal/${effectiveCustomerId}${queryStr ? `?${queryStr}` : ""}`);
+      } else {
+        navigate(`/crm/quotes/proposal${queryStr ? `?${queryStr}` : ""}`);
+      }
       return;
     }
     if (type === "worksheet") {
@@ -471,6 +484,7 @@ export default function CrmQuoteCreate() {
         notes: formData.notes || undefined,
         workOrderId: workOrderIdFromUrl || undefined,
         propertyId: propertyIdFromUrl || undefined,
+        projectId: projectIdFromUrl || undefined,
         lineItems: validLineItems.map(item => ({
           description: item.description,
           quantity: item.quantity,

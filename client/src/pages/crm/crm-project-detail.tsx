@@ -970,7 +970,7 @@ export default function CrmProjectDetail() {
                   onClick={() => {
                     const customerId = project?.customerId || project?.customer?.id;
                     if (customerId) {
-                      navigate(`/crm/quotes/proposal/${customerId}?projectId=${projectId}`);
+                      navigate(`/crm/quotes/new?customerId=${customerId}&projectId=${projectId}`);
                     }
                   }} 
                   data-testid="button-create-quote"
@@ -1027,7 +1027,7 @@ export default function CrmProjectDetail() {
                       onClick={() => {
                         const customerId = project?.customerId || project?.customer?.id;
                         if (customerId) {
-                          navigate(`/crm/quotes/proposal/${customerId}?projectId=${projectId}`);
+                          navigate(`/crm/quotes/new?customerId=${customerId}&projectId=${projectId}`);
                         }
                       }}
                     >
