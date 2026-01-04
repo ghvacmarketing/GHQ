@@ -7569,7 +7569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CRM GHQ UNIVERSAL SEARCH ENDPOINT
   // ============================================
 
-  // GET /api/crm/ghq/search - Universal search across CRM tables
+  // GET /api/crm/ghq/search - Universal search across CRM tables with AI enhancement
   app.get("/api/crm/ghq/search", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -7591,12 +7591,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notes: emptyCategory,
             projects: emptyCategory
           },
-          totalCount: 0
+          totalCount: 0,
+          aiEnhanced: false
         });
       }
 
-      const searchPattern = `%${query}%`;
+      // Import AI search helper dynamically to avoid blocking startup
+      const { interpretSearchIntent, buildExpandedSearchPatterns } = await import("./services/ghqSearchAI");
+      
+      // Try AI-enhanced search
+      let searchPatterns: string[] = [`%${query}%`];
+      let aiIntent: Awaited<ReturnType<typeof interpretSearchIntent>> = null;
+      let aiEnhanced = false;
+
+      try {
+        aiIntent = await interpretSearchIntent(query);
+        if (aiIntent) {
+          searchPatterns = buildExpandedSearchPatterns(aiIntent);
+          aiEnhanced = true;
+          console.log(`[GHQ AI] Query "${query}" expanded to: ${searchPatterns.join(", ")}`);
+        }
+      } catch (aiError) {
+        console.error("[GHQ AI] Falling back to basic search:", aiError);
+      }
+
       const LIMIT = 5;
+
+      // Helper to build OR conditions across all search patterns for a field
+      const buildPatternConditions = (field: any) => {
+        const conditions = searchPatterns.map(pattern => ilike(field, pattern));
+        if (conditions.length === 0) return ilike(field, `%${query}%`);
+        if (conditions.length === 1) return conditions[0];
+        return or(...conditions);
+      };
 
       // Helper to count total matches for hasMore flag
       const countMatches = async (table: any, conditions: any): Promise<number> => {
@@ -7631,12 +7658,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return fields[0];
       };
 
-      // 1. Search crmCustomers
+      // 1. Search crmCustomers (using all expanded patterns)
       const customerCondition = or(
-        ilike(crmCustomers.name, searchPattern),
-        ilike(crmCustomers.companyName, searchPattern),
-        ilike(crmCustomers.email, searchPattern),
-        ilike(crmCustomers.phone, searchPattern)
+        buildPatternConditions(crmCustomers.name),
+        buildPatternConditions(crmCustomers.companyName),
+        buildPatternConditions(crmCustomers.email),
+        buildPatternConditions(crmCustomers.phone)
       );
       const customerResults = await db
         .select({
@@ -7653,8 +7680,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 2. Search crmAccounts (uses displayName and companyName - no email/phone in this table)
       const accountCondition = or(
-        ilike(crmAccounts.displayName, searchPattern),
-        ilike(crmAccounts.companyName, searchPattern)
+        buildPatternConditions(crmAccounts.displayName),
+        buildPatternConditions(crmAccounts.companyName)
       );
       const accountResults = await db
         .select({
@@ -7690,11 +7717,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 3. Search crmWorkOrders
       const workOrderCondition = or(
-        ilike(crmWorkOrders.title, searchPattern),
-        ilike(crmWorkOrders.description, searchPattern),
-        ilike(crmWorkOrders.techNotes, searchPattern),
-        ilike(crmWorkOrders.completionSummary, searchPattern),
-        sql`CAST(${crmWorkOrders.workOrderNumber} AS TEXT) ILIKE ${searchPattern}`
+        buildPatternConditions(crmWorkOrders.title),
+        buildPatternConditions(crmWorkOrders.description),
+        buildPatternConditions(crmWorkOrders.techNotes),
+        buildPatternConditions(crmWorkOrders.completionSummary),
+        ...searchPatterns.map(pattern => sql`CAST(${crmWorkOrders.workOrderNumber} AS TEXT) ILIKE ${pattern}`)
       );
       const workOrderResults = await db
         .select({
@@ -7740,8 +7767,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 4. Search crmInvoices
       const invoiceCondition = or(
-        ilike(crmInvoices.invoiceNumber, searchPattern),
-        ilike(crmInvoices.notes, searchPattern)
+        buildPatternConditions(crmInvoices.invoiceNumber),
+        buildPatternConditions(crmInvoices.notes)
       );
       const invoiceResults = await db
         .select({
@@ -7781,10 +7808,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 5. Search crmQuotes
       const quoteCondition = or(
-        ilike(crmQuotes.quoteNumber, searchPattern),
-        ilike(crmQuotes.title, searchPattern),
-        ilike(crmQuotes.description, searchPattern),
-        ilike(crmQuotes.customerName, searchPattern)
+        buildPatternConditions(crmQuotes.quoteNumber),
+        buildPatternConditions(crmQuotes.title),
+        buildPatternConditions(crmQuotes.description),
+        buildPatternConditions(crmQuotes.customerName)
       );
       const quoteResults = await db
         .select({
@@ -7813,8 +7840,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // 6. Search crmAgreements
-      const agreementCondition = ilike(crmAgreements.notes, searchPattern);
+      // 6. Search crmAgreements (also search customerName for better results)
+      const agreementCondition = or(
+        buildPatternConditions(crmAgreements.notes),
+        buildPatternConditions(crmAgreements.customerName)
+      );
       const agreementResults = await db
         .select({
           id: crmAgreements.id,
@@ -7836,7 +7866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       // 7. Search crmCustomerNotes
-      const noteCondition = ilike(crmCustomerNotes.body, searchPattern);
+      const noteCondition = buildPatternConditions(crmCustomerNotes.body);
       const noteResults = await db
         .select({
           id: crmCustomerNotes.id,
@@ -7866,8 +7896,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 8. Search crmProjects (uses title field, not name)
       const projectCondition = or(
-        ilike(crmProjects.title, searchPattern),
-        ilike(crmProjects.description, searchPattern)
+        buildPatternConditions(crmProjects.title),
+        buildPatternConditions(crmProjects.description)
       );
       const projectResults = await db
         .select({
@@ -7906,7 +7936,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notes: { items: notes, total: noteCount, hasMore: noteCount > LIMIT },
           projects: { items: projects, total: projectCount, hasMore: projectCount > LIMIT }
         },
-        totalCount
+        totalCount,
+        aiEnhanced,
+        aiIntent: aiIntent ? {
+          expandedTerms: aiIntent.expandedTerms,
+          intent: aiIntent.intent
+        } : null
       });
     } catch (error) {
       console.error("Error in GHQ search:", error);

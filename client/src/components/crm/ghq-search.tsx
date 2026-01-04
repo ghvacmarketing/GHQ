@@ -18,6 +18,7 @@ import {
   FolderKanban,
   Loader2,
   SearchX,
+  Sparkles,
 } from "lucide-react";
 
 interface SearchResultItem {
@@ -55,6 +56,11 @@ interface SearchResponse {
   query: string;
   results: SearchResults;
   totalCount: number;
+  aiEnhanced?: boolean;
+  aiIntent?: {
+    expandedTerms: string[];
+    intent: string;
+  } | null;
 }
 
 type CategoryKey = keyof SearchResults;
@@ -276,6 +282,14 @@ export function GhqSearch() {
 
     return (
       <div ref={resultsRef} className="space-y-4">
+        {data.aiEnhanced && data.aiIntent && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-900/30 to-transparent rounded-lg border border-purple-700/30">
+            <Sparkles className="h-4 w-4 text-purple-400" />
+            <span className="text-xs text-purple-300">
+              AI-enhanced: {data.aiIntent.intent}
+            </span>
+          </div>
+        )}
         {categoryOrder.map((categoryKey) => {
           const categoryData = data.results[categoryKey];
           if (!categoryData || categoryData.items.length === 0) return null;
