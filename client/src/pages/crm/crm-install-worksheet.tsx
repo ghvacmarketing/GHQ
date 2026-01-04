@@ -413,7 +413,7 @@ export default function CrmInstallWorksheet() {
       notes: serviceJobNotes || undefined,
       lineItems,
       status: "draft",
-      quoteType: "service",
+      quoteType: "custom_service",
       serviceQuoteData: {
         parts: serviceParts,
         laborHours: serviceLaborHours,

@@ -1235,7 +1235,7 @@ export default function CrmProposalBuilder() {
       status: "draft",
       aiGeneratedQuote: aiGeneratedQuote,
       quoteMode: quoteMode,
-      quoteType: "install",
+      quoteType: "proposal",
     });
   };
 

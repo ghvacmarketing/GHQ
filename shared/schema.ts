@@ -1087,6 +1087,9 @@ export type CrmQuoteStatus = typeof crmQuoteStatusEnum[number];
 export const crmQuoteScopeEnum = ["work_order", "project", "standalone"] as const;
 export type CrmQuoteScope = typeof crmQuoteScopeEnum[number];
 
+export const crmQuoteTypeEnum = ["quick", "proposal", "custom_install", "custom_service"] as const;
+export type CrmQuoteType = typeof crmQuoteTypeEnum[number];
+
 // CRM Quotes (proposals attached to either a Work Order or Project)
 export const crmQuotes = pgTable("crm_quotes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1139,6 +1142,7 @@ export const crmQuotes = pgTable("crm_quotes", {
   }>(),
   quoteMode: text("quote_mode").$type<"single" | "options">(),
   selectedOption: text("selected_option"),
+  quoteType: text("quote_type").$type<CrmQuoteType>(),
 });
 
 // CRM Quote Line Items

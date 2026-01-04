@@ -117,13 +117,12 @@ const tabFilters = [
   { key: "expired", label: "Expired" },
 ];
 
-const amountRanges = [
-  { key: "all", label: "All Amounts" },
-  { key: "0-500", label: "$0 - $500" },
-  { key: "500-1000", label: "$500 - $1,000" },
-  { key: "1000-5000", label: "$1,000 - $5,000" },
-  { key: "5000-10000", label: "$5,000 - $10,000" },
-  { key: "10000+", label: "$10,000+" },
+const quoteTypeFilters = [
+  { key: "all", label: "All Types" },
+  { key: "quick", label: "Quick Quote" },
+  { key: "proposal", label: "Proposal Builder" },
+  { key: "custom_install", label: "Custom Install" },
+  { key: "custom_service", label: "Custom Service" },
 ];
 
 export default function CrmQuotes() {
@@ -140,7 +139,7 @@ export default function CrmQuotes() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   
   // Additional filters
-  const [amountFilter, setAmountFilter] = useState("all");
+  const [quoteTypeFilter, setQuoteTypeFilter] = useState("all");
 
   // Create form state
   const [createForm, setCreateForm] = useState({
@@ -167,12 +166,18 @@ export default function CrmQuotes() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, activeTab, amountFilter]);
+  }, [debouncedSearch, activeTab, quoteTypeFilter]);
 
   const { data: quotesData, isLoading: quotesLoading } = useQuery<QuotesResponse>({
-    queryKey: ["/api/crm/quotes", page],
+    queryKey: ["/api/crm/quotes", page, quoteTypeFilter],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/quotes?page=${page}&limit=${ITEMS_PER_PAGE}`, {
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("limit", String(ITEMS_PER_PAGE));
+      if (quoteTypeFilter !== "all") {
+        params.set("quoteType", quoteTypeFilter);
+      }
+      const res = await fetch(`/api/crm/quotes?${params.toString()}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch quotes");
@@ -255,20 +260,7 @@ export default function CrmQuotes() {
       filtered = filtered.filter((quote) => quote.status === activeTab);
     }
 
-    // Amount filter
-    if (amountFilter !== "all") {
-      filtered = filtered.filter((quote) => {
-        const total = typeof quote.total === "string" ? parseFloat(quote.total) : (quote.total || 0);
-        switch (amountFilter) {
-          case "0-500": return total >= 0 && total < 500;
-          case "500-1000": return total >= 500 && total < 1000;
-          case "1000-5000": return total >= 1000 && total < 5000;
-          case "5000-10000": return total >= 5000 && total < 10000;
-          case "10000+": return total >= 10000;
-          default: return true;
-        }
-      });
-    }
+    // Quote type filter is handled server-side, no client-side filtering needed
 
     // Sorting
     filtered.sort((a, b) => {
@@ -311,7 +303,7 @@ export default function CrmQuotes() {
     });
 
     return filtered;
-  }, [quotesData?.quotes, debouncedSearch, activeTab, amountFilter, sortField, sortDirection]);
+  }, [quotesData?.quotes, debouncedSearch, activeTab, sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -333,13 +325,13 @@ export default function CrmQuotes() {
 
   const resetFilters = () => {
     setActiveTab("all");
-    setAmountFilter("all");
+    setQuoteTypeFilter("all");
     setSearchInput("");
     setSortField("createdAt");
     setSortDirection("desc");
   };
 
-  const hasActiveFilters = activeTab !== "all" || amountFilter !== "all" || debouncedSearch;
+  const hasActiveFilters = activeTab !== "all" || quoteTypeFilter !== "all" || debouncedSearch;
 
   const formatCurrency = (value: string | number | null) => {
     if (value === null || value === undefined) return "$0.00";
@@ -445,7 +437,7 @@ export default function CrmQuotes() {
           </div>
         </div>
 
-        {/* Tab Filters with Amount dropdown on right */}
+        {/* Tab Filters with Quote Type dropdown on right */}
         <div className="flex items-center justify-between border-b border-slate-200">
           <div className="flex overflow-x-auto">
             {tabFilters.map((tab) => {
@@ -475,18 +467,18 @@ export default function CrmQuotes() {
             })}
           </div>
           <div className="shrink-0 pb-1">
-            <Select value={amountFilter} onValueChange={setAmountFilter}>
-              <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-amount-filter">
-                <SelectValue placeholder="Amount" />
+            <Select value={quoteTypeFilter} onValueChange={setQuoteTypeFilter}>
+              <SelectTrigger className="w-[160px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-quote-type-filter">
+                <SelectValue placeholder="Quote Type" />
               </SelectTrigger>
               <SelectContent className="bg-white">
-                {amountRanges.map((range) => (
+                {quoteTypeFilters.map((type) => (
                   <SelectItem 
-                    key={range.key} 
-                    value={range.key}
+                    key={type.key} 
+                    value={type.key}
                     className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]"
                   >
-                    {range.label}
+                    {type.label}
                   </SelectItem>
                 ))}
               </SelectContent>

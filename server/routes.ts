@@ -13715,7 +13715,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/quotes - List quotes with filters and pagination (OPTIMIZED)
   app.get("/api/crm/quotes", requireCrmAuth, async (req, res) => {
     try {
-      const { scope, status, customerId, projectId, workOrderId, page = "1", limit = "25" } = req.query;
+      const { scope, status, customerId, projectId, workOrderId, quoteType, page = "1", limit = "25" } = req.query;
       const pageNum = parseInt(page as string, 10) || 1;
       const limitNum = Math.min(50, parseInt(limit as string, 10) || 25);
       const offset = (pageNum - 1) * limitNum;
@@ -13735,6 +13735,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (workOrderId) {
         conditions.push(eq(crmQuotes.workOrderId, workOrderId as string));
+      }
+      if (quoteType) {
+        conditions.push(eq(crmQuotes.quoteType, quoteType as string));
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -13769,6 +13772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId: crmQuotes.projectId,
         scope: crmQuotes.scope,
         notes: crmQuotes.notes,
+        quoteType: crmQuotes.quoteType,
         createdAt: crmQuotes.createdAt,
         updatedAt: crmQuotes.updatedAt,
       })
@@ -14054,6 +14058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subtotal: calcs.linesTotal.toString(),
         total: calcs.discountedSellPrice.toString(),
         createdBy: user.id,
+        quoteType: "custom_install",
       }).returning();
 
       // Create line items from worksheet lines
@@ -14207,7 +14212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { customerId, propertyId, projectId, workOrderId, title, description, notes, lineItems, status, aiNotes, aiGeneratedQuote, quoteMode } = req.body;
+      const { customerId, propertyId, projectId, workOrderId, title, description, notes, lineItems, status, aiNotes, aiGeneratedQuote, quoteMode, quoteType } = req.body;
 
       if (!customerId) {
         return res.status(400).json({ message: "Customer is required" });
@@ -14269,6 +14274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         acceptedBy: quoteStatus === "approved" ? user.name : null,
         aiGeneratedQuote: aiGeneratedQuote || null,
         quoteMode: quoteMode || null,
+        quoteType: quoteType || "proposal",
       }).returning();
 
       // Create line items
@@ -14363,6 +14369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subtotal: subtotal.toFixed(2),
         total: total.toFixed(2),
         createdBy: user.id,
+        quoteType: "quick",
       }).returning();
 
       // Create line items
