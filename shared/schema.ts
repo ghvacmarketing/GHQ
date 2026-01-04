@@ -934,7 +934,7 @@ export const projectStatusEnum = ["lead", "proposal_sent", "approved", "in_progr
 export type ProjectStatus = typeof projectStatusEnum[number];
 
 // Project Type Enum
-export const projectTypeEnum = ["INSTALL", "DUCT", "COMMERCIAL", "MAINTENANCE_AGREEMENT", "MAJOR_REPAIR"] as const;
+export const projectTypeEnum = ["INSTALL", "DUCT", "COMMERCIAL", "CRAWLSPACE", "MAJOR_REPAIR"] as const;
 export type ProjectType = typeof projectTypeEnum[number];
 
 // WorkOrder Status Enum (dispatch-style)

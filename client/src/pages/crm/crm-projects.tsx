@@ -136,7 +136,7 @@ const projectTypeColors: Record<string, { bg: string; text: string; border: stri
   INSTALL: { bg: "bg-purple-100", text: "text-purple-700", border: "border-purple-200" },
   DUCT: { bg: "bg-cyan-100", text: "text-cyan-700", border: "border-cyan-200" },
   COMMERCIAL: { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
-  MAINTENANCE_AGREEMENT: { bg: "bg-indigo-100", text: "text-indigo-700", border: "border-indigo-200" },
+  CRAWLSPACE: { bg: "bg-indigo-100", text: "text-indigo-700", border: "border-indigo-200" },
   MAJOR_REPAIR: { bg: "bg-red-100", text: "text-red-700", border: "border-red-200" },
 };
 
@@ -144,7 +144,7 @@ const projectTypeLabels: Record<string, string> = {
   INSTALL: "Install",
   DUCT: "Duct",
   COMMERCIAL: "Commercial",
-  MAINTENANCE_AGREEMENT: "Maintenance Agreement",
+  CRAWLSPACE: "Crawlspace",
   MAJOR_REPAIR: "Major Repair",
 };
 
@@ -155,7 +155,7 @@ const priorityColors: Record<string, { bg: string; text: string; border: string 
   urgent: { bg: "bg-red-100", text: "text-red-700", border: "border-red-200" },
 };
 
-const PROJECT_TYPES = ["INSTALL", "DUCT", "COMMERCIAL", "MAINTENANCE_AGREEMENT", "MAJOR_REPAIR"] as const;
+const PROJECT_TYPES = ["INSTALL", "DUCT", "COMMERCIAL", "CRAWLSPACE", "MAJOR_REPAIR"] as const;
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
 function useDebounce<T>(value: T, delay: number): T {
