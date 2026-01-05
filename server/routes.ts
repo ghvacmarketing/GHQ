@@ -17242,22 +17242,6 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           return res.status(200).json({ received: true, processed: false, reason: "Invoice not found" });
         }
 
-        // Store the incoming email in invoice_email_logs
-        await db.insert(invoiceEmailLogs).values({
-          invoiceId: invoice.id,
-          direction: "incoming",
-          fromEmail: senderEmail,
-          recipientEmail: Array.isArray(to) ? to[0] : to,
-          recipientName: null,
-          subject: subject,
-          htmlContent: html || null,
-          textContent: text || null,
-          status: "received",
-          sentAt: new Date(),
-        });
-
-        console.log("[Resend Inbound] Stored incoming email for invoice:", invoiceNumber);
-
         // Forward the email to the invoice creator
         let forwardedTo: string | null = null;
         if (invoice.createdBy) {
@@ -17322,22 +17306,6 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         console.log("[Resend Inbound] Quote not found:", quoteNumber);
         return res.status(200).json({ received: true, processed: false, reason: "Quote not found" });
       }
-
-      // Store the incoming email in quote_email_logs
-      await db.insert(quoteEmailLogs).values({
-        quoteId: quote.id,
-        direction: "incoming",
-        fromEmail: senderEmail,
-        recipientEmail: Array.isArray(to) ? to[0] : to,
-        recipientName: null,
-        subject: subject,
-        htmlContent: html || null,
-        textContent: text || null,
-        status: "received",
-        sentAt: new Date(),
-      });
-
-      console.log("[Resend Inbound] Stored incoming email for quote:", quoteNumber);
 
       // Forward the email to the assigned salesperson
       let forwardedTo: string | null = null;
