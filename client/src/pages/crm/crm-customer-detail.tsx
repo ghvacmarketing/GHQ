@@ -4002,7 +4002,7 @@ export default function CrmCustomerDetail() {
               <Pencil className="h-4 w-4 mr-2" />
               Edit Customer
             </Button>
-            {currentUser && ["admin", "owner"].includes(currentUser.role) && (
+            {currentUser && ["admin", "owner", "sales"].includes(currentUser.role) && (
               <Button 
                 variant="outline"
                 onClick={() => generatePortalLinkMutation.mutate()}
