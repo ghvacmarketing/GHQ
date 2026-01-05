@@ -14882,7 +14882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/crm/quotes/:id/send-email - Send quote via email
   app.post("/api/crm/quotes/:id/send-email", requireCrmSalesOrAbove, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
