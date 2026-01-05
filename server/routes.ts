@@ -14279,6 +14279,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Customer not found" });
       }
 
+      // Validate assignedToId if provided (must be sales role or above)
+      if (assignedToId) {
+        const [assignedUser] = await db.select().from(crmUsers).where(eq(crmUsers.id, assignedToId));
+        if (!assignedUser) {
+          return res.status(400).json({ message: "Assigned user not found" });
+        }
+        const validRoles = ["owner", "admin", "sales"];
+        if (!validRoles.includes(assignedUser.role)) {
+          return res.status(400).json({ message: "Assigned user must have sales role or above for install quotes" });
+        }
+      }
+
       // Calculate totals from line items
       let subtotal = 0;
       for (const item of lineItems) {

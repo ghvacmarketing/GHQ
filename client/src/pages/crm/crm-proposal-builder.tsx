@@ -1235,6 +1235,16 @@ export default function CrmProposalBuilder() {
       return;
     }
     
+    // Validate assigned user for install quotes
+    if (!assignedToId) {
+      toast({
+        title: "Assignment Required",
+        description: "Please assign this quote to a team member before saving to CRM.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Only use propertyId if it's valid for this customer
     const finalPropertyId = isValidProperty ? propertyIdToUse : 
       (customerProperties.length === 1 ? customerProperties[0].id : undefined);
