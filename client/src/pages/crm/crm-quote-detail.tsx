@@ -180,6 +180,7 @@ export default function CrmQuoteDetail() {
       return res.json();
     },
     enabled: !!quoteId && !!currentUser,
+    refetchInterval: 10000, // Auto-refresh every 10 seconds to catch status updates
   });
 
   const { data: emailLogs = [], isLoading: emailLogsLoading } = useQuery<QuoteEmailLog[]>({
@@ -662,6 +663,39 @@ export default function CrmQuoteDetail() {
 
       addPageHeader();
       y += 35;
+
+      // Add ACCEPTED status banner if quote is accepted
+      if (quote.status === "accepted") {
+        const acceptedColor: [number, number, number] = [16, 185, 129]; // emerald-500
+        doc.setFillColor(...acceptedColor);
+        doc.roundedRect(margin, y, contentWidth, 20, 2, 2, 'F');
+        
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("ACCEPTED", margin + 8, y + 9);
+        
+        // Show selected option if this is an options-based quote
+        if (isOptionsMode && quote.selectedOption) {
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.text(`Selected Option: ${quote.selectedOption}`, margin + 8, y + 16);
+        } else if (quote.signedAt) {
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          const signedDate = new Date(quote.signedAt).toLocaleDateString('en-US', { 
+            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
+          });
+          doc.text(`Signed: ${signedDate}`, margin + 8, y + 16);
+        }
+        
+        // Add checkmark on the right
+        doc.setFontSize(16);
+        doc.text("✓", pageWidth - margin - 15, y + 12);
+        
+        y += 26;
+        doc.setTextColor(...textColor);
+      }
 
       // Check if this is an AI-generated quote from proposal builder
       if (quote.aiGeneratedQuote) {
