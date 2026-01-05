@@ -1218,7 +1218,7 @@ export default function CrmInstallWorksheet() {
               <Button
                 className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
                 onClick={handleCreateQuote}
-                disabled={isFinalizing}
+                disabled={isFinalizing || !selectedCustomer || !assignedToId}
                 data-testid="button-confirm-create-quote"
               >
                 {isFinalizing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
@@ -1228,7 +1228,7 @@ export default function CrmInstallWorksheet() {
               <Button
                 className="bg-[#711419] hover:bg-[#8a1a20] text-white"
                 onClick={handleSaveServiceQuote}
-                disabled={saveServiceQuoteMutation.isPending}
+                disabled={saveServiceQuoteMutation.isPending || !selectedCustomer || !assignedToId}
                 data-testid="button-confirm-create-service-quote"
               >
                 {saveServiceQuoteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
