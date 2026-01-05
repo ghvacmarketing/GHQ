@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import MobileShell from "./mobile-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2, Circle } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
 import type { CrmWorkOrder, CrmCustomer, CrmUser, CrmProperty } from "@shared/schema";
@@ -181,18 +181,28 @@ export default function MobileJob() {
               const cityState = [job.property?.city, job.property?.state]
                 .filter(Boolean).join(", ");
               
+              const isCompleted = job.status === "completed";
+              
               return (
                 <Card 
                   key={job.id} 
-                  className={`cursor-pointer hover:shadow-md transition-shadow border-l-4 ${colors.stripe} ${colors.bg} ${colors.border}`}
+                  className={`cursor-pointer hover:shadow-md transition-shadow border-l-4 ${colors.stripe} ${colors.bg} ${colors.border} ${isCompleted ? "opacity-75" : ""}`}
                   onClick={() => navigate(`/mobile/job/${job.id}`)}
                   data-testid={`job-card-${job.id}`}
                 >
                   <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-3">
+                      {/* Completion checkbox indicator */}
+                      <div className="flex-shrink-0 mt-0.5">
+                        {isCompleted ? (
+                          <CheckCircle2 className="h-6 w-6 text-green-600" />
+                        ) : (
+                          <Circle className="h-6 w-6 text-slate-300" />
+                        )}
+                      </div>
                       <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-slate-900">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className={`font-semibold ${isCompleted ? "text-slate-500 line-through" : "text-slate-900"}`}>
                             {job.customer?.name || "Unknown Customer"}
                           </h3>
                           <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
