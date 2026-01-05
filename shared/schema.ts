@@ -1170,15 +1170,22 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
 });
 
 // CRM Quote Email Logs - tracks email sends for quotes
-export const quoteEmailLogsStatusEnum = ["pending", "sent", "failed", "bounced"] as const;
+export const quoteEmailLogsStatusEnum = ["pending", "sent", "failed", "bounced", "received"] as const;
 export type QuoteEmailLogStatus = typeof quoteEmailLogsStatusEnum[number];
+
+export const quoteEmailDirectionEnum = ["outgoing", "incoming"] as const;
+export type QuoteEmailDirection = typeof quoteEmailDirectionEnum[number];
 
 export const quoteEmailLogs = pgTable("quote_email_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   quoteId: varchar("quote_id").notNull().references(() => crmQuotes.id, { onDelete: "cascade" }),
+  direction: text("direction").$type<QuoteEmailDirection>().notNull().default("outgoing"),
+  fromEmail: text("from_email"),
   recipientEmail: text("recipient_email").notNull(),
   recipientName: text("recipient_name"),
   subject: text("subject").notNull(),
+  htmlContent: text("html_content"),
+  textContent: text("text_content"),
   status: text("status").$type<QuoteEmailLogStatus>().notNull().default("pending"),
   errorMessage: text("error_message"),
   sentBy: varchar("sent_by"),
@@ -1187,6 +1194,7 @@ export const quoteEmailLogs = pgTable("quote_email_logs", {
   openedAt: timestamp("opened_at"),
   personalMessage: text("personal_message"),
   isManual: boolean("is_manual").default(false),
+  resendMessageId: text("resend_message_id"),
 });
 
 export const insertQuoteEmailLogSchema = createInsertSchema(quoteEmailLogs).omit({
