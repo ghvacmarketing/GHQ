@@ -14888,7 +14888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { recipientEmail, personalMessage } = req.body;
 
-      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      let [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
       if (!quote) {
         return res.status(404).json({ message: "Quote not found" });
       }
@@ -14898,6 +14898,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No recipient email provided and quote has no customer email" });
       }
 
+      // Generate viewToken if one doesn't exist
+      if (!quote.viewToken) {
+        const { nanoid } = await import("nanoid");
+        const viewToken = nanoid(32);
+        [quote] = await db.update(crmQuotes)
+          .set({ viewToken, updatedAt: new Date() })
+          .where(eq(crmQuotes.id, quote.id))
+          .returning();
+      }
+
+      // Build the public quote view URL
+      const baseUrl = `https://${req.get("host")}`;
+      const quoteViewUrl = `${baseUrl}/quote/${quote.viewToken}`;
+
       const lineItems = await db.select().from(crmQuoteLineItems)
         .where(eq(crmQuoteLineItems.quoteId, quote.id))
         .orderBy(crmQuoteLineItems.sortOrder);
@@ -14905,10 +14919,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sentByName = user.displayName || user.name || user.email;
       const subject = `Your Quote from Giesbrecht HVAC - ${quote.quoteNumber}`;
 
-      // Pass sender's email so the quote comes from their email address
+      // Pass sender's email and quote view URL so the quote comes from their email address
       const result = await sendCrmQuoteEmail(quote, lineItems, emailTo, personalMessage, sentByName, {
         senderEmail: user.email,
         senderName: sentByName,
+        quoteViewUrl,
       });
 
       const [emailLog] = await db.insert(quoteEmailLogs).values({
@@ -16481,6 +16496,162 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error fetching my performance:", error);
       res.status(500).json({ message: "Failed to fetch performance data" });
+    }
+  });
+
+  // ============================================
+  // PUBLIC QUOTE VIEW & E-SIGNATURE ROUTES
+  // ============================================
+
+  // GET /api/public/quotes/:token - Fetch quote by viewToken (public, no auth)
+  app.get("/api/public/quotes/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Invalid token" });
+      }
+
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.viewToken, token)).limit(1);
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found or link is invalid" });
+      }
+
+      // Track that the quote was viewed (first view only)
+      if (!quote.viewedAt) {
+        await db.update(crmQuotes)
+          .set({ viewedAt: new Date(), updatedAt: new Date() })
+          .where(eq(crmQuotes.id, quote.id));
+      }
+
+      const lineItems = await db.select().from(crmQuoteLineItems)
+        .where(eq(crmQuoteLineItems.quoteId, quote.id))
+        .orderBy(crmQuoteLineItems.sortOrder);
+
+      // Return only public-safe fields, exclude internal data
+      const publicQuote = {
+        id: quote.id,
+        quoteNumber: quote.quoteNumber,
+        customerName: quote.customerName,
+        serviceAddress: quote.serviceAddress,
+        title: quote.title,
+        description: quote.description,
+        subtotal: quote.subtotal,
+        laborTotal: quote.laborTotal,
+        total: quote.total,
+        status: quote.status,
+        validUntil: quote.validUntil,
+        createdAt: quote.createdAt,
+        acceptedAt: quote.acceptedAt,
+        acceptedBy: quote.acceptedBy,
+        signedAt: quote.signedAt,
+        customerNotes: quote.customerNotes,
+        aiGeneratedQuote: quote.aiGeneratedQuote,
+        quoteMode: quote.quoteMode,
+        selectedOption: quote.selectedOption,
+      };
+
+      const publicLineItems = lineItems.map((item) => ({
+        id: item.id,
+        lineType: item.lineType,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        lineTotal: item.lineTotal,
+        sortOrder: item.sortOrder,
+        optionTag: item.optionTag,
+      }));
+
+      return res.json({ quote: publicQuote, lineItems: publicLineItems });
+    } catch (error) {
+      console.error("Error fetching public quote:", error);
+      return res.status(500).json({ message: "Failed to load quote" });
+    }
+  });
+
+  // POST /api/public/quotes/:token/sign - Accept signature and update quote status
+  app.post("/api/public/quotes/:token/sign", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { signatureImage, signerName } = req.body;
+
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Invalid token" });
+      }
+
+      if (!signatureImage || typeof signatureImage !== "string") {
+        return res.status(400).json({ message: "Signature is required" });
+      }
+
+      if (!signerName || typeof signerName !== "string" || signerName.trim().length === 0) {
+        return res.status(400).json({ message: "Signer name is required" });
+      }
+
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.viewToken, token)).limit(1);
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found or link is invalid" });
+      }
+
+      if (quote.status === "accepted") {
+        return res.status(400).json({ message: "This quote has already been accepted" });
+      }
+
+      if (quote.status === "declined") {
+        return res.status(400).json({ message: "This quote has been declined" });
+      }
+
+      if (quote.status === "expired") {
+        return res.status(400).json({ message: "This quote has expired" });
+      }
+
+      // Capture IP address
+      const signerIp = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() 
+        || req.socket?.remoteAddress 
+        || "unknown";
+
+      const now = new Date();
+
+      const [updated] = await db.update(crmQuotes)
+        .set({
+          status: "accepted",
+          acceptedAt: now,
+          acceptedBy: signerName.trim(),
+          signatureImage,
+          signerName: signerName.trim(),
+          signerIp,
+          signedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(crmQuotes.id, quote.id))
+        .returning();
+
+      // Log activity to projectActivities if quote has a projectId
+      if (quote.projectId) {
+        await db.insert(projectActivities).values({
+          projectId: quote.projectId,
+          type: "approval",
+          title: "Quote Accepted",
+          description: `Quote ${quote.quoteNumber} was electronically signed and accepted by ${signerName.trim()}`,
+          metadata: {
+            quoteId: quote.id,
+            quoteNumber: quote.quoteNumber,
+            total: quote.total,
+            signerName: signerName.trim(),
+            signedAt: now.toISOString(),
+          },
+        });
+      }
+
+      console.log(`Quote ${quote.quoteNumber} signed and accepted by ${signerName.trim()} from IP ${signerIp}`);
+
+      return res.json({ 
+        success: true, 
+        message: "Quote accepted successfully",
+        quote: updated,
+      });
+    } catch (error) {
+      console.error("Error signing quote:", error);
+      return res.status(500).json({ message: "Failed to accept quote" });
     }
   });
 

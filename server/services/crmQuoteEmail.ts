@@ -45,6 +45,7 @@ export interface CrmQuoteEmailResult {
 export interface CrmQuoteEmailOptions {
   senderEmail?: string;
   senderName?: string;
+  quoteViewUrl?: string;
 }
 
 export async function sendCrmQuoteEmail(
@@ -80,8 +81,8 @@ export async function sendCrmQuoteEmail(
   }
 
   const subject = `Your Quote from ${brandName} - ${quote.quoteNumber}`;
-  const html = buildHtmlBody(quote, lineItems, personalMessage, sentBy);
-  const text = buildTextBody(quote, lineItems, personalMessage, sentBy);
+  const html = buildHtmlBody(quote, lineItems, personalMessage, sentBy, options?.quoteViewUrl);
+  const text = buildTextBody(quote, lineItems, personalMessage, sentBy, options?.quoteViewUrl);
 
   try {
     const { data, error } = await resend.emails.send({
@@ -110,7 +111,8 @@ function buildTextBody(
   quote: CrmQuote,
   lineItems: CrmQuoteLineItem[],
   personalMessage?: string,
-  sentBy?: string
+  sentBy?: string,
+  quoteViewUrl?: string
 ): string {
   const lines: string[] = [];
   lines.push(`${brandDefaults.name} - Quote ${quote.quoteNumber}`);
@@ -159,7 +161,15 @@ function buildTextBody(
   lines.push(`TOTAL: ${asCurrency(quote.total)}`);
   lines.push("");
 
-  lines.push("To accept this quote or ask questions, please contact us.");
+  if (quoteViewUrl) {
+    lines.push("VIEW & SIGN YOUR QUOTE ONLINE:");
+    lines.push(quoteViewUrl);
+    lines.push("");
+    lines.push("Click the link above to view the full quote details and electronically sign to accept.");
+    lines.push("");
+  }
+
+  lines.push("To accept this quote or ask questions, please contact us at (830) 626-0408.");
   lines.push("");
   lines.push("Thank you for choosing Giesbrecht HVAC!");
   if (sentBy) {
@@ -173,7 +183,8 @@ function buildHtmlBody(
   quote: CrmQuote,
   lineItems: CrmQuoteLineItem[],
   personalMessage?: string,
-  sentBy?: string
+  sentBy?: string,
+  quoteViewUrl?: string
 ): string {
   const brandName = brandDefaults.name;
   const brandColor = brandDefaults.color;
@@ -326,8 +337,14 @@ function buildHtmlBody(
           <!-- CTA -->
           <tr>
             <td class="px-24" style="padding:0 20px 24px 20px;text-align:center;">
+              ${quoteViewUrl ? `
+              <p style="margin:0 0 16px 0;font-size:14px;color:#4b5563;">Ready to move forward? Click below to view the full quote and sign electronically to accept.</p>
+              <a href="${esc(quoteViewUrl)}" style="display:inline-block;background:${brandColor};color:#ffffff;padding:16px 40px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;margin-bottom:12px;">View & Sign Quote</a>
+              <p style="margin:16px 0 0 0;font-size:13px;color:#6b7280;">Or call us: <a href="tel:+18306260408" style="color:${brandColor};font-weight:600;text-decoration:none;">(830) 626-0408</a></p>
+              ` : `
               <p style="margin:0 0 16px 0;font-size:14px;color:#4b5563;">Ready to move forward? Contact us to accept this quote or if you have any questions.</p>
               <a href="tel:+18306260408" style="display:inline-block;background:${brandColor};color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">Call Us: (830) 626-0408</a>
+              `}
             </td>
           </tr>
 
