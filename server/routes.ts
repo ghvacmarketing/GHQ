@@ -15042,26 +15042,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sentByName = user.displayName || user.name || user.email;
       const subject = `Your Quote from Giesbrecht HVAC - ${quote.quoteNumber}`;
 
-      // Determine Reply-To email based on quote category and assigned user
-      let replyToEmail: string | undefined;
+      // Use Resend inbound address for Reply-To so customer replies get routed to webhook
+      // Format: quotes@bronaekaru.resend.app (or use RESEND_INBOUND_ADDRESS env var)
+      const resendInboundAddress = process.env.RESEND_INBOUND_ADDRESS || "quotes@bronaekaru.resend.app";
+      const replyToEmail = resendInboundAddress;
       
-      // Check if quote has an assigned user for Reply-To
-      if (quote.assignedToId) {
-        const [assignedUser] = await db.select({ email: crmUsers.email })
-          .from(crmUsers)
-          .where(eq(crmUsers.id, quote.assignedToId))
-          .limit(1);
-        if (assignedUser?.email) {
-          replyToEmail = assignedUser.email;
-        }
-      }
-      
-      // Fallback to user sending the email if no assigned user
-      if (!replyToEmail) {
-        replyToEmail = user.email;
-      }
-      
-      console.log("[Quote Email] Reply-To:", replyToEmail, "Category:", quote.quoteCategory);
+      console.log("[Quote Email] Reply-To:", replyToEmail, "(Resend inbound for webhook routing)");
 
       // Pass sender's email and quote view URL
       const result = await sendCrmQuoteEmail(quote, lineItems, emailTo, personalMessage, sentByName, {
