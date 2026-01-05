@@ -1143,6 +1143,12 @@ export const crmQuotes = pgTable("crm_quotes", {
   quoteMode: text("quote_mode").$type<"single" | "options">(),
   selectedOption: text("selected_option"),
   quoteType: text("quote_type").$type<CrmQuoteType>(),
+  // Customer viewing and e-signature fields
+  viewToken: text("view_token"),
+  signatureImage: text("signature_image"),
+  signerName: text("signer_name"),
+  signerIp: text("signer_ip"),
+  signedAt: timestamp("signed_at"),
 });
 
 // CRM Quote Line Items
