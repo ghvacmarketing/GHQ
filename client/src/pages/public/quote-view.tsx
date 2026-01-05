@@ -9,18 +9,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, FileText, AlertCircle, Loader2 } from "lucide-react";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
+import ghvacLogo from "@assets/ghvac-logo.png";
 
 const BRAND_COLOR = "#711419";
 const BRAND_NAME = "Giesbrecht HVAC";
 
-function BrandEmblem({ size = 48 }: { size?: number }) {
+function BrandEmblem() {
   return (
     <div className="flex justify-center mb-4">
-      <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="10" y="12" width="6" height="24" rx="1" fill={BRAND_COLOR} />
-        <rect x="21" y="8" width="6" height="32" rx="1" fill={BRAND_COLOR} />
-        <rect x="32" y="12" width="6" height="24" rx="1" fill={BRAND_COLOR} />
-      </svg>
+      <img 
+        src={ghvacLogo} 
+        alt="Giesbrecht HVAC" 
+        className="h-16 sm:h-20 w-auto object-contain"
+      />
     </div>
   );
 }
@@ -287,7 +288,7 @@ function QuoteAlreadyAccepted({ quote }: { quote: CrmQuote }) {
     <div className="min-h-screen bg-slate-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
-          <BrandEmblem size={64} />
+          <BrandEmblem />
           <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR }}>
             {BRAND_NAME}
           </h1>
@@ -318,7 +319,7 @@ function QuoteSuccess({ quote }: { quote: CrmQuote }) {
     <div className="min-h-screen bg-slate-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
-          <BrandEmblem size={64} />
+          <BrandEmblem />
           <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR }}>
             {BRAND_NAME}
           </h1>
@@ -432,7 +433,7 @@ export default function PublicQuoteView() {
       <div className="min-h-screen bg-slate-50 py-8 px-4">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
-            <BrandEmblem size={64} />
+            <BrandEmblem />
             <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR }}>
               {BRAND_NAME}
             </h1>
@@ -471,7 +472,7 @@ export default function PublicQuoteView() {
     <div className="min-h-screen bg-slate-50 py-4 sm:py-8 px-3 sm:px-4">
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-8">
-          <BrandEmblem size={64} />
+          <BrandEmblem />
           <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR }}>
             {BRAND_NAME}
           </h1>
