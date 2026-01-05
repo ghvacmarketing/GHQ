@@ -14,17 +14,22 @@ interface PortalCustomer {
 }
 
 interface PortalDashboardData {
-  openInvoices: {
-    count: number;
-    totalAmount: number;
+  customer: {
+    id: string;
+    name: string;
   };
-  agreements: {
+  invoicesSummary: {
+    openCount: number;
+    openTotal: string;
+    totalCount: number;
+  };
+  agreementsSummary: {
     active: number;
     total: number;
   };
   recentService: {
+    title: string;
     date: string | null;
-    description: string | null;
   } | null;
 }
 
@@ -109,10 +114,10 @@ export default function PortalDashboard() {
               ) : (
                 <>
                   <p className="text-2xl font-bold text-slate-900" data-testid="text-open-invoices-count">
-                    {dashboardData?.openInvoices.count || 0}
+                    {dashboardData?.invoicesSummary?.openCount || 0}
                   </p>
                   <p className="text-sm text-slate-500" data-testid="text-open-invoices-total">
-                    {formatCurrency(dashboardData?.openInvoices.totalAmount || 0)} total
+                    {formatCurrency(parseFloat(dashboardData?.invoicesSummary?.openTotal || "0"))} total
                   </p>
                 </>
               )}
@@ -134,10 +139,10 @@ export default function PortalDashboard() {
               ) : (
                 <>
                   <p className="text-2xl font-bold text-slate-900" data-testid="text-agreements-active">
-                    {dashboardData?.agreements.active || 0}
+                    {dashboardData?.agreementsSummary?.active || 0}
                   </p>
                   <p className="text-sm text-slate-500" data-testid="text-agreements-total">
-                    {dashboardData?.agreements.total || 0} total agreements
+                    {dashboardData?.agreementsSummary?.total || 0} total agreements
                   </p>
                 </>
               )}
@@ -162,7 +167,7 @@ export default function PortalDashboard() {
                     {formatDate(dashboardData.recentService.date)}
                   </p>
                   <p className="text-sm text-slate-500 truncate" data-testid="text-recent-service-description">
-                    {dashboardData.recentService.description || "Service completed"}
+                    {dashboardData.recentService.title || "Service completed"}
                   </p>
                 </>
               ) : (

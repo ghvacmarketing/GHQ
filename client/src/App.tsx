@@ -77,6 +77,8 @@ const MobileInvoiceDetail = lazy(() => import("@/pages/mobile/mobile-invoice-det
 const PortalLogin = lazy(() => import("@/pages/portal/portal-login"));
 const PortalDashboard = lazy(() => import("@/pages/portal/portal-dashboard"));
 const PortalInvoices = lazy(() => import("@/pages/portal/portal-invoices"));
+const PortalAgreements = lazy(() => import("@/pages/portal/portal-agreements"));
+const PortalServiceHistory = lazy(() => import("@/pages/portal/portal-service-history"));
 
 // Global Error Boundary to prevent blank screens
 class ErrorBoundary extends Component<
@@ -268,6 +270,8 @@ function Router() {
       <Route path="/portal/login">{() => <PortalWrapper><PortalLogin /></PortalWrapper>}</Route>
       <Route path="/portal/dashboard">{() => <PortalWrapper><PortalDashboard /></PortalWrapper>}</Route>
       <Route path="/portal/invoices">{() => <PortalWrapper><PortalInvoices /></PortalWrapper>}</Route>
+      <Route path="/portal/agreements">{() => <PortalWrapper><PortalAgreements /></PortalWrapper>}</Route>
+      <Route path="/portal/service-history">{() => <PortalWrapper><PortalServiceHistory /></PortalWrapper>}</Route>
       <Route component={NotFound} />
     </Switch>
   );

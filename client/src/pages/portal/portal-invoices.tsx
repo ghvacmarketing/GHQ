@@ -10,32 +10,44 @@ import { ArrowLeft, FileText } from "lucide-react";
 import { PortalLayout } from "./portal-layout";
 
 interface PortalInvoice {
-  id: number;
+  id: string;
   invoiceNumber: string;
-  date: string;
-  amount: number;
-  status: "paid" | "pending" | "overdue";
+  total: string;
+  subtotal: string;
+  amountPaid: string;
+  balanceDue: string;
+  status: string;
+  dueDate: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+interface InvoicesResponse {
+  invoices: PortalInvoice[];
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   paid: { label: "Paid", className: "bg-green-100 text-green-700 border-green-200" },
-  pending: { label: "Pending", className: "bg-amber-100 text-amber-700 border-amber-200" },
-  overdue: { label: "Overdue", className: "bg-red-100 text-red-700 border-red-200" },
+  sent: { label: "Pending", className: "bg-amber-100 text-amber-700 border-amber-200" },
+  draft: { label: "Draft", className: "bg-slate-100 text-slate-700 border-slate-200" },
+  void: { label: "Void", className: "bg-red-100 text-red-700 border-red-200" },
 };
 
 export default function PortalInvoices() {
   const [, setLocation] = useLocation();
 
-  const { data: customer, error: customerError } = useQuery<{ id: number; name: string }>({
+  const { data: customer, error: customerError } = useQuery<{ id: string; name: string }>({
     queryKey: ["/api/portal/auth/me"],
     retry: false,
   });
 
-  const { data: invoices, isLoading } = useQuery<PortalInvoice[]>({
+  const { data: invoicesData, isLoading } = useQuery<InvoicesResponse>({
     queryKey: ["/api/portal/invoices"],
     enabled: !!customer,
     retry: false,
   });
+
+  const invoices = invoicesData?.invoices || [];
 
   useEffect(() => {
     if (customerError) {
@@ -43,11 +55,12 @@ export default function PortalInvoices() {
     }
   }, [customerError, setLocation]);
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: string | number | null | undefined) => {
+    const num = typeof amount === 'string' ? parseFloat(amount) : (amount ?? 0);
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-    }).format(amount);
+    }).format(isNaN(num) ? 0 : num);
   };
 
   const formatDate = (dateString: string) => {
@@ -91,7 +104,7 @@ export default function PortalInvoices() {
                 <Skeleton className="h-12 w-full" />
                 <Skeleton className="h-12 w-full" />
               </div>
-            ) : !invoices || invoices.length === 0 ? (
+            ) : invoices.length === 0 ? (
               <div className="text-center py-12" data-testid="status-no-invoices">
                 <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
                 <p className="text-slate-500">No invoices found</p>
@@ -103,23 +116,27 @@ export default function PortalInvoices() {
                     <TableRow>
                       <TableHead>Invoice #</TableHead>
                       <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
                       <TableHead className="text-center">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {invoices.map((invoice) => {
-                      const status = statusConfig[invoice.status] || statusConfig.pending;
+                      const status = statusConfig[invoice.status] || statusConfig.sent;
                       return (
                         <TableRow key={invoice.id} data-testid={`row-invoice-${invoice.id}`}>
                           <TableCell className="font-medium" data-testid={`text-invoice-number-${invoice.id}`}>
                             {invoice.invoiceNumber}
                           </TableCell>
                           <TableCell data-testid={`text-invoice-date-${invoice.id}`}>
-                            {formatDate(invoice.date)}
+                            {formatDate(invoice.createdAt)}
                           </TableCell>
-                          <TableCell className="text-right font-semibold" data-testid={`text-invoice-amount-${invoice.id}`}>
-                            {formatCurrency(invoice.amount)}
+                          <TableCell className="text-right" data-testid={`text-invoice-total-${invoice.id}`}>
+                            {formatCurrency(invoice.total)}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold" data-testid={`text-invoice-balance-${invoice.id}`}>
+                            {formatCurrency(invoice.balanceDue)}
                           </TableCell>
                           <TableCell className="text-center">
                             <Badge

@@ -16717,22 +16717,28 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const customerId = req.portalCustomer.id;
       const customer = req.portalCustomer;
 
-      const recentInvoices = await db.select({
+      // Get all invoices for the customer
+      const allInvoices = await db.select({
         id: crmInvoices.id,
         invoiceNumber: crmInvoices.invoiceNumber,
         total: crmInvoices.total,
+        balanceDue: crmInvoices.balanceDue,
         status: crmInvoices.status,
-        invoiceDate: crmInvoices.invoiceDate,
+        createdAt: crmInvoices.createdAt,
       })
         .from(crmInvoices)
         .where(eq(crmInvoices.customerId, customerId))
-        .orderBy(desc(crmInvoices.invoiceDate))
-        .limit(5);
+        .orderBy(desc(crmInvoices.createdAt));
 
+      // Calculate open invoices (not paid, not void)
+      const openInvoices = allInvoices.filter(inv => inv.status !== "paid" && inv.status !== "void");
+      const openInvoicesTotal = openInvoices.reduce((sum, inv) => sum + parseFloat(inv.balanceDue || "0"), 0);
+
+      // Get agreements for the customer
       const agreements = await db.select({
         id: crmAgreements.id,
         agreementNumber: crmAgreements.agreementNumber,
-        type: crmAgreements.type,
+        agreementPlan: crmAgreements.agreementPlan,
         status: crmAgreements.status,
         startDate: crmAgreements.startDate,
         endDate: crmAgreements.endDate,
@@ -16743,16 +16749,39 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const activeAgreements = agreements.filter(a => a.status === "active").length;
       const totalAgreements = agreements.length;
 
+      // Get recent service (most recent completed work order)
+      const recentService = await db.select({
+        id: crmWorkOrders.id,
+        title: crmWorkOrders.title,
+        completedAt: crmWorkOrders.completedAt,
+        scheduledStart: crmWorkOrders.scheduledStart,
+      })
+        .from(crmWorkOrders)
+        .where(and(
+          eq(crmWorkOrders.customerId, customerId),
+          eq(crmWorkOrders.status, "completed")
+        ))
+        .orderBy(desc(crmWorkOrders.completedAt))
+        .limit(1);
+
       res.json({
         customer: {
           id: customer.id,
           name: customer.name,
         },
-        recentInvoices,
+        invoicesSummary: {
+          openCount: openInvoices.length,
+          openTotal: openInvoicesTotal.toFixed(2),
+          totalCount: allInvoices.length,
+        },
         agreementsSummary: {
           active: activeAgreements,
           total: totalAgreements,
         },
+        recentService: recentService.length > 0 ? {
+          title: recentService[0].title,
+          date: recentService[0].completedAt || recentService[0].scheduledStart,
+        } : null,
       });
     } catch (error) {
       console.error("Error fetching portal dashboard:", error);
@@ -16770,15 +16799,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         invoiceNumber: crmInvoices.invoiceNumber,
         total: crmInvoices.total,
         subtotal: crmInvoices.subtotal,
-        tax: crmInvoices.tax,
+        amountPaid: crmInvoices.amountPaid,
+        balanceDue: crmInvoices.balanceDue,
         status: crmInvoices.status,
-        invoiceDate: crmInvoices.invoiceDate,
         dueDate: crmInvoices.dueDate,
-        paidDate: crmInvoices.paidDate,
+        paidAt: crmInvoices.paidAt,
+        createdAt: crmInvoices.createdAt,
       })
         .from(crmInvoices)
         .where(eq(crmInvoices.customerId, customerId))
-        .orderBy(desc(crmInvoices.invoiceDate));
+        .orderBy(desc(crmInvoices.createdAt));
 
       res.json({ invoices });
     } catch (error) {
@@ -16821,12 +16851,14 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const agreementsResult = await db.select({
         id: crmAgreements.id,
         agreementNumber: crmAgreements.agreementNumber,
-        type: crmAgreements.type,
+        agreementPlan: crmAgreements.agreementPlan,
         status: crmAgreements.status,
         startDate: crmAgreements.startDate,
         endDate: crmAgreements.endDate,
-        annualPrice: crmAgreements.annualPrice,
-        description: crmAgreements.description,
+        price: crmAgreements.price,
+        frequency: crmAgreements.frequency,
+        visitsPerPeriod: crmAgreements.visitsPerPeriod,
+        nextServiceDate: crmAgreements.nextServiceDate,
       })
         .from(crmAgreements)
         .where(eq(crmAgreements.customerId, customerId))
