@@ -664,36 +664,45 @@ export default function CrmQuoteDetail() {
       addPageHeader();
       y += 35;
 
-      // Add diagonal APPROVED stamp across the page if quote is accepted
-      const addApprovedStamp = () => {
-        if (quote.status === "accepted") {
-          doc.saveGraphicsState();
+      // Add diagonal APPROVED stamp across all pages if quote is accepted or converted
+      const addApprovedStampToAllPages = () => {
+        if (quote.status === "accepted" || quote.status === "converted") {
+          const totalPages = doc.getNumberOfPages();
           
-          // Position stamp in center of page
-          const centerX = pageWidth / 2;
-          const centerY = pageHeight / 2;
-          
-          // Draw diagonal stamp text
-          doc.setFontSize(72);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(16, 185, 129); // emerald-500
-          doc.setGState(new doc.GState({ opacity: 0.15 }));
-          
-          // Rotate and draw APPROVED stamp
-          const stampText = "APPROVED";
-          const textWidth = doc.getTextWidth(stampText);
-          
-          // Save current state, translate, rotate, draw, restore
-          doc.text(stampText, centerX - textWidth / 2, centerY, { 
-            angle: 45
-          });
-          
-          doc.restoreGraphicsState();
+          for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+            doc.setPage(pageNum);
+            doc.saveGraphicsState();
+            
+            // Position stamp in center of page
+            const centerX = pageWidth / 2;
+            const centerY = pageHeight / 2;
+            
+            // Draw diagonal stamp text with higher opacity for visibility
+            doc.setFontSize(60);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(16, 185, 129); // emerald-500
+            doc.setGState(new doc.GState({ opacity: 0.25 }));
+            
+            // Main APPROVED stamp - rotated the other direction (-45)
+            const stampText = "APPROVED";
+            doc.text(stampText, centerX, centerY - 10, { 
+              angle: -45,
+              align: 'center'
+            });
+            
+            // Show selected option if this is an options-based quote
+            if (quote.selectedOption) {
+              doc.setFontSize(24);
+              doc.text(`Selected: ${quote.selectedOption}`, centerX, centerY + 15, { 
+                angle: -45,
+                align: 'center'
+              });
+            }
+            
+            doc.restoreGraphicsState();
+          }
         }
       };
-      
-      // Add stamp to first page (will be added after content is drawn)
-      addApprovedStamp();
 
       // Check if this is an AI-generated quote from proposal builder
       if (quote.aiGeneratedQuote) {
@@ -1139,6 +1148,9 @@ export default function CrmQuoteDetail() {
       doc.setTextColor(...mutedColor);
       doc.text("Terms: Payment due upon completion. Prices valid for 30 days.", pageWidth / 2, footerY + 4, { align: 'center' });
       doc.text("(706) 826-0644  |  chandler@ghvacinc.com  |  www.ghvacinc.com", pageWidth / 2, footerY + 9, { align: 'center' });
+
+      // Add APPROVED stamp on top of all content (last layer)
+      addApprovedStampToAllPages();
 
       const custName = (quote.customer?.name || quote.customerName || "Quote").replace(/[^a-zA-Z0-9]/g, '_');
       const dateStr = new Date().toISOString().split('T')[0];
