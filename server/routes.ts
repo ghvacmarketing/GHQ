@@ -16597,10 +16597,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  // GET /api/portal/auth/validate-token - Validate login token and create session
-  app.get("/api/portal/auth/validate-token", async (req, res) => {
+  // POST /api/portal/auth/validate-token - Validate login token and create session
+  app.post("/api/portal/auth/validate-token", async (req, res) => {
     try {
-      const { token } = req.query;
+      const { token } = req.body;
 
       if (!token || typeof token !== "string") {
         return res.status(400).json({ message: "Token required" });

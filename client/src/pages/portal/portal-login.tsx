@@ -22,7 +22,10 @@ export default function PortalLogin() {
 
     const validateToken = async () => {
       try {
-        const res = await fetch(`/api/portal/auth/validate-token?token=${encodeURIComponent(token)}`, {
+        const res = await fetch("/api/portal/auth/validate-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
           credentials: "include",
         });
 
