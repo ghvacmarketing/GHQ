@@ -6590,11 +6590,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/users/by-role - List users filtered by minimum role level for quote assignment
+  // GET /api/crm/users/by-role - List users filtered by role for quote assignment
+  // Supports: exactRole (single role) or minRole (role and above in hierarchy)
   // Role hierarchy: owner > admin > sales > tech
   app.get("/api/crm/users/by-role", requireCrmAuth, async (req, res) => {
     try {
-      const { minRole } = req.query as { minRole?: string };
+      const { minRole, exactRole } = req.query as { minRole?: string; exactRole?: string };
       
       // Define role hierarchy
       const roleHierarchy: Record<string, string[]> = {
@@ -6604,9 +6605,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tech: ["owner", "admin", "sales", "tech"],
       };
       
-      const allowedRoles = minRole && roleHierarchy[minRole] 
-        ? roleHierarchy[minRole] 
-        : ["owner", "admin", "sales", "tech"];
+      let allowedRoles: string[];
+      
+      // exactRole takes precedence - filter by exact role only
+      if (exactRole) {
+        allowedRoles = [exactRole];
+      } else if (minRole && roleHierarchy[minRole]) {
+        allowedRoles = roleHierarchy[minRole];
+      } else {
+        allowedRoles = ["owner", "admin", "sales", "tech"];
+      }
       
       const users = await db.select({
         id: crmUsers.id,
@@ -14090,15 +14098,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       const calcs = calcWorksheet(inputs, worksheetLines);
 
-      // Validate assignedToId if provided
+      // Validate assignedToId if provided - install quotes require exactly sales role
       if (assignedToId) {
         const [assignedUser] = await db.select().from(crmUsers).where(eq(crmUsers.id, assignedToId));
         if (!assignedUser) {
           return res.status(400).json({ message: "Assigned user not found" });
         }
-        const validRoles = ["owner", "admin", "sales"];
+        const validRoles = ["sales"];
         if (!validRoles.includes(assignedUser.role)) {
-          return res.status(400).json({ message: "Assigned user must have sales role or above for install quotes" });
+          return res.status(400).json({ message: "Assigned user must have sales role for install quotes" });
         }
       }
 
@@ -14293,19 +14301,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate assignedToId if provided
-      // Service quotes (quick, custom_service) require admin+ role
-      // Install quotes (proposal, custom_install) require sales+ role
+      // Service quotes (quick, custom_service) require exactly admin role
+      // Install quotes (proposal, custom_install) require exactly sales role
       if (assignedToId) {
         const [assignedUser] = await db.select().from(crmUsers).where(eq(crmUsers.id, assignedToId));
         if (!assignedUser) {
           return res.status(400).json({ message: "Assigned user not found" });
         }
         const isServiceQuote = quoteType === "quick" || quoteType === "custom_service";
-        const validRoles = isServiceQuote ? ["owner", "admin"] : ["owner", "admin", "sales"];
+        const validRoles = isServiceQuote ? ["admin"] : ["sales"];
         if (!validRoles.includes(assignedUser.role)) {
           const roleMsg = isServiceQuote 
-            ? "Assigned user must have admin role or above for service quotes" 
-            : "Assigned user must have sales role or above for install quotes";
+            ? "Assigned user must have admin role for service quotes" 
+            : "Assigned user must have sales role for install quotes";
           return res.status(400).json({ message: roleMsg });
         }
       }

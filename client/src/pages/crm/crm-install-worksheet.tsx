@@ -141,12 +141,12 @@ export default function CrmInstallWorksheet() {
   });
 
   // Fetch assignable users based on pricing mode
-  // Install quotes need sales+ role, service quotes need admin+ role
-  const minRoleForQuoteType = pricingMode === "service" ? "admin" : "sales";
+  // Install quotes need exactly sales role, service quotes need exactly admin role
+  const exactRoleForQuoteType = pricingMode === "service" ? "admin" : "sales";
   const { data: assignableUsers, isLoading: isLoadingUsers } = useQuery<AssignableUser[]>({
-    queryKey: ["/api/crm/users/by-role", minRoleForQuoteType],
+    queryKey: ["/api/crm/users/by-role", exactRoleForQuoteType],
     queryFn: async () => {
-      const response = await fetch(`/api/crm/users/by-role?minRole=${minRoleForQuoteType}`, { credentials: "include" });
+      const response = await fetch(`/api/crm/users/by-role?exactRole=${exactRoleForQuoteType}`, { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch users");
       return response.json();
     },

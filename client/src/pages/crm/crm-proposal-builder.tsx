@@ -901,12 +901,12 @@ export default function CrmProposalBuilder() {
   });
   const customerSearchResults = Array.isArray(customerSearchData) ? customerSearchData : [];
 
-  // Assignable users query (sales role or above for install quotes)
+  // Assignable users query (exactly sales role for install quotes)
   type AssignableUser = { id: string; displayName: string; email: string; role: string };
   const { data: assignableUsers } = useQuery<AssignableUser[]>({
     queryKey: ["/api/crm/users/by-role", "sales"],
     queryFn: async () => {
-      const response = await fetch(`/api/crm/users/by-role?minRole=sales`, { credentials: "include" });
+      const response = await fetch(`/api/crm/users/by-role?exactRole=sales`, { credentials: "include" });
       if (!response.ok) return [];
       return response.json();
     },

@@ -173,15 +173,15 @@ export default function CrmQuoteCreate() {
   });
 
   // Determine which users to show based on quote type
-  // Quick quotes (service) need admin role or above
-  // Proposal quotes (install) need sales role or above
-  const minRoleForQuoteType = formData.quoteType === "quick" ? "admin" : "sales";
+  // Quick quotes (service) need exactly admin role
+  // Proposal quotes (install) need exactly sales role
+  const exactRoleForQuoteType = formData.quoteType === "quick" ? "admin" : "sales";
 
   // Fetch assignable users based on quote type
   const { data: assignableUsers, isLoading: isLoadingUsers } = useQuery<AssignableUser[]>({
-    queryKey: ["/api/crm/users/by-role", minRoleForQuoteType],
+    queryKey: ["/api/crm/users/by-role", exactRoleForQuoteType],
     queryFn: async () => {
-      const response = await fetch(`/api/crm/users/by-role?minRole=${minRoleForQuoteType}`, { credentials: "include" });
+      const response = await fetch(`/api/crm/users/by-role?exactRole=${exactRoleForQuoteType}`, { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch users");
       return response.json();
     },
