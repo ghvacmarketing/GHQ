@@ -233,12 +233,13 @@ function SignaturePad({ onSignatureChange }: { onSignatureChange: (dataUrl: stri
   return (
     <div className="space-y-2">
       <div className="text-sm font-medium text-slate-700">Signature</div>
+      <p className="text-xs text-slate-500">Draw your signature below using your finger or mouse</p>
       <div className="border-2 border-dashed border-slate-300 rounded-lg p-1 bg-white">
         <canvas
           ref={canvasRef}
           width={400}
           height={150}
-          className="w-full h-[150px] cursor-crosshair touch-none"
+          className="w-full h-[120px] sm:h-[150px] cursor-crosshair touch-none"
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
@@ -452,7 +453,7 @@ export default function PublicQuoteView() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4">
+    <div className="min-h-screen bg-slate-50 py-4 sm:py-8 px-3 sm:px-4">
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-8">
           <BrandEmblem size={64} />
@@ -485,17 +486,14 @@ export default function PublicQuoteView() {
             {quote.quoteMode === "options" ? (
               <>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Your Home Comfort Options</h3>
-                  <p className="text-slate-600">
-                    Prepared for {quote.customerName}{quote.serviceAddress ? ` at ${quote.serviceAddress}` : ""}. 
-                    This proposal includes multiple HVAC replacement options for you to choose from. 
-                    Each option is a complete, standalone package—please select ONE option (prices are not combined).
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2">Your Home Comfort Options</h3>
+                  <p className="text-sm sm:text-base text-slate-600">
+                    This proposal includes multiple HVAC options for you to choose from. 
+                    Each option is a complete package—please tap to select ONE option.
                   </p>
                 </div>
 
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-slate-700">Available Options</h3>
-                  <p className="text-sm text-slate-500">Click on an option to select it</p>
+                <div className="space-y-3 sm:space-y-4">
                   {groupLineItemsByOption(lineItems).map((option) => {
                     const isSelected = selectedOption === option.tag;
                     const whatsIncluded = getWhatsIncludedForOption(
@@ -513,44 +511,48 @@ export default function PublicQuoteView() {
                         }`}
                         data-testid={`option-card-${option.tag.toLowerCase().replace(/\s+/g, "-")}`}
                       >
-                        <div className={`px-4 py-3 flex justify-between items-center ${isSelected ? "bg-[#711419]/10" : "bg-slate-100"}`}>
-                          <div className="flex items-center gap-3">
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        <div className={`px-3 sm:px-4 py-4 flex justify-between items-center ${isSelected ? "bg-[#711419]/10" : "bg-slate-100"}`}>
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className={`w-6 h-6 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                               isSelected ? "border-[#711419] bg-[#711419]" : "border-slate-400"
                             }`}>
-                              {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                              {isSelected && <div className="w-2.5 h-2.5 sm:w-2 sm:h-2 rounded-full bg-white" />}
                             </div>
-                            <span className="font-semibold text-slate-900">{option.tag}</span>
+                            <span className="font-semibold text-slate-900 text-base sm:text-lg">{option.tag}</span>
                           </div>
-                          <span className="text-lg font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</span>
+                          <span className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</span>
                         </div>
-                        <div className="p-4">
+                        <div className="p-3 sm:p-4">
                           {option.items.map((item) => {
                             const equipmentImages = parseEquipmentImages(item.imageUrl);
                             return (
-                              <div key={item.id} className="flex gap-4 py-2 border-b border-slate-100 last:border-0">
-                                {equipmentImages ? (
-                                  <div className="flex-shrink-0">
-                                    <EquipmentImageGrid images={equipmentImages} />
-                                  </div>
-                                ) : item.imageUrl && (
-                                  <div className="flex-shrink-0">
-                                    <img 
-                                      src={item.imageUrl} 
-                                      alt={item.description}
-                                      className="w-20 h-20 object-cover rounded-lg border border-slate-200"
-                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                    />
-                                  </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-slate-800">{item.description}</div>
-                                  {item.partNumber && (
-                                    <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
+                              <div key={item.id} className="py-2 border-b border-slate-100 last:border-0">
+                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                                  {equipmentImages ? (
+                                    <div className="flex-shrink-0">
+                                      <EquipmentImageGrid images={equipmentImages} />
+                                    </div>
+                                  ) : item.imageUrl && (
+                                    <div className="flex-shrink-0">
+                                      <img 
+                                        src={item.imageUrl} 
+                                        alt={item.description}
+                                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-slate-200"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                      />
+                                    </div>
                                   )}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-slate-800 text-sm sm:text-base">{item.description}</div>
+                                    {item.partNumber && (
+                                      <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
+                                    )}
+                                    <div className="flex justify-between items-center mt-1 text-sm text-slate-600">
+                                      <span>Qty: {parseFloat(item.quantity || "1")}</span>
+                                      <span className="font-medium text-slate-800">{formatCurrency(item.lineTotal)}</span>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="text-center text-slate-600 w-12 text-sm">{parseFloat(item.quantity || "1")}</div>
-                                <div className="text-right text-slate-800 font-medium w-24">{formatCurrency(item.lineTotal)}</div>
                               </div>
                             );
                           })}
@@ -701,19 +703,20 @@ export default function PublicQuoteView() {
                 value={printedName}
                 onChange={(e) => setPrintedName(e.target.value)}
                 placeholder="Enter your full name"
-                className="max-w-sm"
+                className="w-full sm:max-w-sm text-base"
                 data-testid="input-printed-name"
               />
             </div>
 
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
               <Checkbox
                 id="terms"
                 checked={agreedToTerms}
                 onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+                className="mt-0.5 h-5 w-5"
                 data-testid="checkbox-agree-terms"
               />
-              <label htmlFor="terms" className="text-sm text-slate-600 cursor-pointer">
+              <label htmlFor="terms" className="text-sm text-slate-600 cursor-pointer leading-relaxed">
                 I have read and agree to the terms and conditions above. By signing this document, I authorize {BRAND_NAME} to perform the work described in this quote.
               </label>
             </div>
