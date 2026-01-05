@@ -13865,7 +13865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let project = null;
       if (quote.projectId) {
         const projQuery = await db.execute(sql`
-          SELECT id, name, status FROM crm_projects WHERE id = ${quote.projectId} LIMIT 1
+          SELECT id, title, status FROM crm_projects WHERE id = ${quote.projectId} LIMIT 1
         `);
         project = projQuery.rows[0] || null;
       }
