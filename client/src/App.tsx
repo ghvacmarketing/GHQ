@@ -73,6 +73,11 @@ const MobileProfile = lazy(() => import("@/pages/mobile/mobile-profile"));
 const MobileQuoteDetail = lazy(() => import("@/pages/mobile/mobile-quote-detail"));
 const MobileInvoiceDetail = lazy(() => import("@/pages/mobile/mobile-invoice-detail"));
 
+// Lazy-load Customer Portal pages
+const PortalLogin = lazy(() => import("@/pages/portal/portal-login"));
+const PortalDashboard = lazy(() => import("@/pages/portal/portal-dashboard"));
+const PortalInvoices = lazy(() => import("@/pages/portal/portal-invoices"));
+
 // Global Error Boundary to prevent blank screens
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -172,6 +177,21 @@ function MobileWrapper({ children }: { children: ReactNode }) {
   return <Suspense fallback={<MobileLoader />}>{children}</Suspense>;
 }
 
+// Portal-specific loading placeholder
+function PortalLoader() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#faf9f7]" data-testid="portal-loader">
+      <Loader2 className="h-8 w-8 animate-spin text-[#711419] mb-4" />
+      <p className="text-slate-500">Loading Customer Portal...</p>
+    </div>
+  );
+}
+
+// Wrapper for lazy-loaded Portal pages
+function PortalWrapper({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<PortalLoader />}>{children}</Suspense>;
+}
+
 // Lazy load admin settings to reduce initial bundle size
 const AdminSettings = lazy(() => import("@/pages/admin-settings"));
 
@@ -245,6 +265,9 @@ function Router() {
       <Route path="/mobile/time">{() => <MobileWrapper><MobileTime /></MobileWrapper>}</Route>
       <Route path="/mobile/profile">{() => <MobileWrapper><MobileProfile /></MobileWrapper>}</Route>
       <Route path="/mobile">{() => <MobileWrapper><MobileAgenda /></MobileWrapper>}</Route>
+      <Route path="/portal/login">{() => <PortalWrapper><PortalLogin /></PortalWrapper>}</Route>
+      <Route path="/portal/dashboard">{() => <PortalWrapper><PortalDashboard /></PortalWrapper>}</Route>
+      <Route path="/portal/invoices">{() => <PortalWrapper><PortalInvoices /></PortalWrapper>}</Route>
       <Route component={NotFound} />
     </Switch>
   );

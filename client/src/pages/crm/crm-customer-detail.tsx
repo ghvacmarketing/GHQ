@@ -60,6 +60,7 @@ import {
   ChevronDown,
   Clipboard,
   ClipboardCheck,
+  Link2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -3671,6 +3672,29 @@ export default function CrmCustomerDetail() {
     setDeleteReason("");
   };
 
+  const generatePortalLinkMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/admin/portal/generate-link/${customerId}`);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to generate portal link");
+      }
+      return res.json();
+    },
+    onSuccess: async (data: { loginUrl: string }) => {
+      const fullUrl = window.location.origin + data.loginUrl;
+      await navigator.clipboard.writeText(fullUrl);
+      toast({ title: "Portal link copied to clipboard", description: "Share this link with the customer to give them portal access." });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to generate portal link",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const openEditDialog = () => {
     if (customer) {
       setEditName(customer.name || "");
@@ -3978,6 +4002,21 @@ export default function CrmCustomerDetail() {
               <Pencil className="h-4 w-4 mr-2" />
               Edit Customer
             </Button>
+            {currentUser && ["admin", "owner"].includes(currentUser.role) && (
+              <Button 
+                variant="outline"
+                onClick={() => generatePortalLinkMutation.mutate()}
+                disabled={generatePortalLinkMutation.isPending}
+                data-testid="button-generate-portal-link"
+              >
+                {generatePortalLinkMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Link2 className="h-4 w-4 mr-2" />
+                )}
+                Portal Link
+              </Button>
+            )}
             {canDeleteCustomer && (
               <Button 
                 variant="outline"
