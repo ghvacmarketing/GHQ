@@ -43,6 +43,7 @@ export interface CrmQuoteEmailResult {
   htmlContent?: string;
   textContent?: string;
   fromEmail?: string;
+  replyToEmail?: string;
   subject?: string;
 }
 
@@ -50,6 +51,7 @@ export interface CrmQuoteEmailOptions {
   senderEmail?: string;
   senderName?: string;
   quoteViewUrl?: string;
+  replyToEmail?: string;
 }
 
 export async function sendCrmQuoteEmail(
@@ -93,7 +95,11 @@ export async function sendCrmQuoteEmail(
     }
   }
   
-  console.log("[CRM Email] Sending quote email FROM:", fromEmail, "TO:", recipientEmail);
+  // Use quotes@ghvacinc.com as the standard From address
+  const standardFromEmail = "quotes@ghvacinc.com";
+  const replyToEmail = options?.replyToEmail;
+  
+  console.log("[CRM Email] Sending quote email FROM:", standardFromEmail, "REPLY-TO:", replyToEmail, "TO:", recipientEmail);
 
   const subject = `Your Quote from ${brandName} - ${quote.quoteNumber}`;
   const html = buildHtmlBody(quote, lineItems, personalMessage, sentBy, options?.quoteViewUrl);
@@ -101,8 +107,9 @@ export async function sendCrmQuoteEmail(
 
   try {
     const { data, error } = await resend.emails.send({
-      from: fromEmail,
+      from: standardFromEmail,
       to: [recipientEmail],
+      replyTo: replyToEmail || undefined,
       subject,
       html,
       text,
@@ -120,7 +127,8 @@ export async function sendCrmQuoteEmail(
       messageId: data?.id,
       htmlContent: html,
       textContent: text,
-      fromEmail,
+      fromEmail: standardFromEmail,
+      replyToEmail,
       subject,
     };
   } catch (err) {

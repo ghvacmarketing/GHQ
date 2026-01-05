@@ -347,7 +347,7 @@ export class QuoteEmailTemplate {
 // -----------------------------
 export class EmailService {
   private cfg: EmailConfig;
-  private resend: Resend;
+  private resend: Resend | null = null;
   private builder: QuoteEmailTemplate;
 
   constructor() {
@@ -367,7 +367,11 @@ export class EmailService {
       dryRun: (process.env.DRY_RUN_EMAIL || "false") === "true",
     };
 
-    this.resend = new Resend(this.cfg.apiKey);
+    if (this.cfg.apiKey) {
+      this.resend = new Resend(this.cfg.apiKey);
+    } else {
+      console.warn("[EmailService] RESEND_API_KEY not configured - email sending disabled");
+    }
     this.builder = new QuoteEmailTemplate(this.cfg);
   }
 
@@ -413,6 +417,11 @@ export class EmailService {
     to: string[];
   }): Promise<boolean> {
     try {
+      if (!this.resend) {
+        console.error("Resend not initialized - missing API key");
+        return false;
+      }
+
       const payload: Parameters<typeof this.resend.emails.send>[0] = {
         from: this.cfg.fromEmail,
         to,

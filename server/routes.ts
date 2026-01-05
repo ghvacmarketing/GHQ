@@ -6590,6 +6590,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/users/by-role - List users filtered by minimum role level for quote assignment
+  // Role hierarchy: owner > admin > sales > tech
+  app.get("/api/crm/users/by-role", requireCrmAuth, async (req, res) => {
+    try {
+      const { minRole } = req.query as { minRole?: string };
+      
+      // Define role hierarchy
+      const roleHierarchy: Record<string, string[]> = {
+        owner: ["owner"],
+        admin: ["owner", "admin"],
+        sales: ["owner", "admin", "sales"],
+        tech: ["owner", "admin", "sales", "tech"],
+      };
+      
+      const allowedRoles = minRole && roleHierarchy[minRole] 
+        ? roleHierarchy[minRole] 
+        : ["owner", "admin", "sales", "tech"];
+      
+      const users = await db.select({
+        id: crmUsers.id,
+        displayName: crmUsers.name,
+        email: crmUsers.email,
+        role: crmUsers.role,
+      }).from(crmUsers)
+        .where(and(
+          sql`${crmUsers.role} IN (${sql.raw(allowedRoles.map(r => `'${r}'`).join(', '))})`,
+          eq(crmUsers.isActive, true)
+        ))
+        .orderBy(crmUsers.name);
+      
+      return res.json(users);
+    } catch (error) {
+      console.error("Error fetching users by role:", error);
+      return res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
   // GET /api/crm/users - List users (all CRM users can view, but only admins can modify)
   app.get("/api/crm/users", requireCrmAuth, async (req, res) => {
     try {
@@ -14920,17 +14957,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sentByName = user.displayName || user.name || user.email;
       const subject = `Your Quote from Giesbrecht HVAC - ${quote.quoteNumber}`;
 
-      // Pass sender's email and quote view URL so the quote comes from their email address
+      // Determine Reply-To email based on quote category and assigned user
+      let replyToEmail: string | undefined;
+      
+      // Check if quote has an assigned user for Reply-To
+      if (quote.assignedToId) {
+        const [assignedUser] = await db.select({ email: crmUsers.email })
+          .from(crmUsers)
+          .where(eq(crmUsers.id, quote.assignedToId))
+          .limit(1);
+        if (assignedUser?.email) {
+          replyToEmail = assignedUser.email;
+        }
+      }
+      
+      // Fallback to user sending the email if no assigned user
+      if (!replyToEmail) {
+        replyToEmail = user.email;
+      }
+      
+      console.log("[Quote Email] Reply-To:", replyToEmail, "Category:", quote.quoteCategory);
+
+      // Pass sender's email and quote view URL
       const result = await sendCrmQuoteEmail(quote, lineItems, emailTo, personalMessage, sentByName, {
         senderEmail: user.email,
         senderName: sentByName,
         quoteViewUrl,
+        replyToEmail,
       });
 
       const [emailLog] = await db.insert(quoteEmailLogs).values({
         quoteId: quote.id,
         direction: "outgoing",
-        fromEmail: result.fromEmail || user.email,
+        fromEmail: result.fromEmail || "quotes@ghvacinc.com",
         recipientEmail: emailTo,
         recipientName: quote.customerName,
         subject: result.subject || subject,
@@ -14942,6 +15001,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         personalMessage: personalMessage || null,
         isManual: false,
         resendMessageId: result.messageId || null,
+        replyToEmail: result.replyToEmail || null,
       }).returning();
 
       if (result.success) {
