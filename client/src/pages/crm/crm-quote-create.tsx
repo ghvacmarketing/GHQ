@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { getQueryFn, apiRequest } from "@/lib/queryClient";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -312,10 +312,7 @@ export default function CrmQuoteCreate() {
   };
 
   const removeLineItem = (id: string) => {
-    const item = formData.lineItems.find(i => i.id === id);
-    if (item?.isDiscountLine || formData.lineItems.filter(i => !i.isDiscountLine).length > 1) {
-      updateField("lineItems", formData.lineItems.filter(i => i.id !== id));
-    }
+    updateField("lineItems", formData.lineItems.filter(i => i.id !== id));
   };
 
   const calculateSubtotal = () => {
@@ -497,6 +494,12 @@ export default function CrmQuoteCreate() {
       });
 
       const data = await response.json();
+      
+      // Invalidate quotes cache for instant sync
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      if (projectIdFromUrl) {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectIdFromUrl, "quotes"] });
+      }
       
       toast({
         title: "Quote Created",
@@ -864,7 +867,6 @@ export default function CrmQuoteCreate() {
                         size="icon"
                         className="mt-8"
                         onClick={() => removeLineItem(item.id)}
-                        disabled={formData.lineItems.filter(i => !i.isDiscountLine).length === 1}
                         data-testid={`button-remove-line-item-${index}`}
                       >
                         <Trash2 className="h-4 w-4 text-red-500" />
