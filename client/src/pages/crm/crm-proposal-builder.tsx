@@ -5090,6 +5090,30 @@ export default function CrmProposalBuilder() {
                   {customerProperties[0].address}
                 </div>
               )}
+              
+              {/* Assign To dropdown - for install quotes (sales+ users only) */}
+              <div className="mt-4">
+                <Label className="text-xs text-muted-foreground mb-1 block">Assign To (Sales Team)</Label>
+                <Select
+                  value={assignedToId || ""}
+                  onValueChange={(value) => setAssignedToId(value || null)}
+                >
+                  <SelectTrigger className="w-full" data-testid="select-assigned-user">
+                    <SelectValue placeholder="Select team member..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignableUsers && assignableUsers.length > 0 ? (
+                      assignableUsers.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.displayName} ({user.role})
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>No users available</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
 
@@ -5716,29 +5740,6 @@ export default function CrmProposalBuilder() {
           </ScrollArea>
           
           <div className="border-t p-4 bg-card shrink-0 flex-none">
-            {/* Assigned To dropdown for CRM quotes */}
-            <div className="mb-3">
-              <Label className="text-xs text-muted-foreground mb-1 block">Assign To (for CRM)</Label>
-              <Select
-                value={assignedToId || ""}
-                onValueChange={(value) => setAssignedToId(value || null)}
-              >
-                <SelectTrigger className="w-full" data-testid="select-assigned-user">
-                  <SelectValue placeholder="Select team member..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {assignableUsers && assignableUsers.length > 0 ? (
-                    assignableUsers.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.displayName} ({user.role})
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="" disabled>No users available</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button
                 variant="outline"
