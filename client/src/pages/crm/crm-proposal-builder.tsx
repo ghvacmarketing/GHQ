@@ -5748,20 +5748,6 @@ export default function CrmProposalBuilder() {
                 Close
               </Button>
               <Button
-                variant="secondary"
-                onClick={handleSaveProposal}
-                disabled={!aiGeneratedQuote || saveProposalMutation.isPending}
-                className="flex-1 min-h-[44px]"
-                data-testid="button-save-quote"
-              >
-                {saveProposalMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4 mr-2" />
-                )}
-                Save Quote
-              </Button>
-              <Button
                 variant="default"
                 onClick={handleSaveToCrm}
                 disabled={!aiGeneratedQuote || !selectedCustomer || saveToCrmMutation.isPending}
@@ -5782,19 +5768,6 @@ export default function CrmProposalBuilder() {
               >
                 <Download className="h-4 w-4 mr-2" />
                 Download PDF
-              </Button>
-              <Button
-                onClick={handleAcceptQuote}
-                disabled={!selectedCustomer || acceptQuoteMutation.isPending}
-                className="flex-1 min-h-[44px] bg-green-600 hover:bg-green-700"
-                data-testid="button-accept-quote"
-              >
-                {acceptQuoteMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                )}
-                Accept Quote
               </Button>
             </div>
           </div>
