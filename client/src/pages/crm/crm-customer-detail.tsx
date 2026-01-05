@@ -4263,9 +4263,13 @@ export default function CrmCustomerDetail() {
                   if (newType !== "MAINTENANCE") {
                     setWoAgreementId("");
                   }
-                  // Set default subtype from dynamic list
-                  const subtypes = getSubtypesForVisitType(newType);
-                  setWoWorkSubtype(subtypes.length > 0 ? subtypes[0].subtype : "Other");
+                  // Set default subtype - use maintenanceSubtypes for MAINTENANCE, otherwise dynamic list
+                  if (newType === "MAINTENANCE") {
+                    setWoWorkSubtype(maintenanceSubtypes[0] || "Preventative Maintenance");
+                  } else {
+                    const subtypes = getSubtypesForVisitType(newType);
+                    setWoWorkSubtype(subtypes.length > 0 ? subtypes[0].subtype : "Other");
+                  }
                 }}>
                   <SelectTrigger data-testid="select-wo-visit-type">
                     <SelectValue placeholder="Select visit type" />
@@ -4288,7 +4292,13 @@ export default function CrmCustomerDetail() {
                     <SelectValue placeholder="Select work subtype" />
                   </SelectTrigger>
                   <SelectContent>
-                    {getSubtypesForVisitType(woVisitType).length > 0 ? (
+                    {woVisitType === "MAINTENANCE" ? (
+                      maintenanceSubtypes.map((subtype) => (
+                        <SelectItem key={subtype} value={subtype} data-testid={`wo-subtype-${subtype}`}>
+                          {subtype}
+                        </SelectItem>
+                      ))
+                    ) : getSubtypesForVisitType(woVisitType).length > 0 ? (
                       getSubtypesForVisitType(woVisitType).map((s) => (
                         <SelectItem key={s.id} value={s.subtype} data-testid={`wo-subtype-${s.subtype}`}>
                           {s.subtype}

@@ -1763,9 +1763,13 @@ export default function CrmWorkOrders() {
                     onValueChange={(v) => {
                       const vt = v as WorkOrderVisitType;
                       setVisitType(vt);
-                      // Set default subtype from dynamic list
-                      const subtypes = getSubtypesForVisitType(vt);
-                      setWorkSubtype(subtypes.length > 0 ? subtypes[0].subtype : "Other");
+                      // Set default subtype - use maintenanceSubtypes for MAINTENANCE, otherwise dynamic list
+                      if (vt === "MAINTENANCE") {
+                        setWorkSubtype(maintenanceSubtypes[0] || "Preventative Maintenance");
+                      } else {
+                        const subtypes = getSubtypesForVisitType(vt);
+                        setWorkSubtype(subtypes.length > 0 ? subtypes[0].subtype : "Other");
+                      }
                     }}
                   >
                     <SelectTrigger data-testid="select-visit-type">
@@ -1804,7 +1808,13 @@ export default function CrmWorkOrders() {
                     <SelectValue placeholder="Select subtype" />
                   </SelectTrigger>
                   <SelectContent>
-                    {getSubtypesForVisitType(visitType).length > 0 ? (
+                    {visitType === "MAINTENANCE" ? (
+                      maintenanceSubtypes.map((subtype) => (
+                        <SelectItem key={subtype} value={subtype}>
+                          {subtype}
+                        </SelectItem>
+                      ))
+                    ) : getSubtypesForVisitType(visitType).length > 0 ? (
                       getSubtypesForVisitType(visitType).map((s) => (
                         <SelectItem key={s.id} value={s.subtype}>
                           {s.subtype}
