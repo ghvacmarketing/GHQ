@@ -42,6 +42,22 @@ const adminTokens = new Map<string, { createdAt: number }>();
 const TOKEN_EXPIRY_DAYS = parseInt(process.env.ADMIN_TOKEN_EXPIRY_DAYS || '90', 10);
 const TOKEN_EXPIRY = TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
+// Analytics cache to speed up dashboard loading (30-second TTL)
+const analyticsCache = new Map<string, { data: any; timestamp: number }>();
+const ANALYTICS_CACHE_TTL = 30 * 1000; // 30 seconds
+
+function getCachedAnalytics(cacheKey: string): any | null {
+  const cached = analyticsCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < ANALYTICS_CACHE_TTL) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedAnalytics(cacheKey: string, data: any): void {
+  analyticsCache.set(cacheKey, { data, timestamp: Date.now() });
+}
+
 function generateAdminToken(): string {
   const token = randomUUID();
   adminTokens.set(token, { createdAt: Date.now() });
@@ -5066,6 +5082,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const range = (req.query.range as string) || "month";
       
+      // Check cache first for faster response
+      const cacheKey = `analytics_${range}`;
+      const cachedData = getCachedAnalytics(cacheKey);
+      if (cachedData) {
+        return res.json(cachedData);
+      }
+      
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -5544,7 +5567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      return res.json({
+      const analyticsData = {
         range,
         companyOverview: {
           totalQuoted,
@@ -5574,7 +5597,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         techPerformance,
         salesPerformance,
-      });
+      };
+      
+      // Cache the result for 30 seconds to speed up subsequent requests
+      setCachedAnalytics(cacheKey, analyticsData);
+      
+      return res.json(analyticsData);
     } catch (error) {
       console.error("Dashboard analytics error:", error);
       return res.status(500).json({ message: "Failed to fetch analytics" });
