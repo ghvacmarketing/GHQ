@@ -2192,3 +2192,61 @@ export const insertMonthlyGoalSchema = createInsertSchema(monthlyGoals).omit({
 
 export type InsertMonthlyGoal = z.infer<typeof insertMonthlyGoalSchema>;
 export type MonthlyGoal = typeof monthlyGoals.$inferSelect;
+
+// =============================================
+// CUSTOMER PORTAL TABLES
+// =============================================
+
+// Customer portal accounts - for customer-facing portal (separate from employee portal)
+export const customerPortalAccounts = pgTable("customer_portal_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => crmCustomers.id, { onDelete: "cascade" }),
+  email: text("email"),
+  phone: text("phone"),
+  isActive: boolean("is_active").notNull().default(true),
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Customer portal login tokens - for magic link authentication
+export const customerPortalLoginTokens = pgTable("customer_portal_login_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").notNull().references(() => customerPortalAccounts.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Customer portal sessions - authenticated sessions for customer portal users
+export const customerPortalSessions = pgTable("customer_portal_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").notNull().references(() => customerPortalAccounts.id, { onDelete: "cascade" }),
+  sessionToken: text("session_token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCustomerPortalAccountSchema = createInsertSchema(customerPortalAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCustomerPortalLoginTokenSchema = createInsertSchema(customerPortalLoginTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCustomerPortalSessionSchema = createInsertSchema(customerPortalSessions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCustomerPortalAccount = z.infer<typeof insertCustomerPortalAccountSchema>;
+export type CustomerPortalAccount = typeof customerPortalAccounts.$inferSelect;
+export type InsertCustomerPortalLoginToken = z.infer<typeof insertCustomerPortalLoginTokenSchema>;
+export type CustomerPortalLoginToken = typeof customerPortalLoginTokens.$inferSelect;
+export type InsertCustomerPortalSession = z.infer<typeof insertCustomerPortalSessionSchema>;
+export type CustomerPortalSession = typeof customerPortalSessions.$inferSelect;
