@@ -2271,3 +2271,97 @@ export type InsertCustomerPortalLoginToken = z.infer<typeof insertCustomerPortal
 export type CustomerPortalLoginToken = typeof customerPortalLoginTokens.$inferSelect;
 export type InsertCustomerPortalSession = z.infer<typeof insertCustomerPortalSessionSchema>;
 export type CustomerPortalSession = typeof customerPortalSessions.$inferSelect;
+
+// ============================================
+// CRM Messaging Module
+// ============================================
+
+// Messaging module enums
+export const messagingConversationStatusEnum = ["open", "snoozed", "resolved", "archived"] as const;
+export type MessagingConversationStatus = typeof messagingConversationStatusEnum[number];
+
+export const messagingSourceEnum = ["internal", "textline"] as const;
+export type MessagingSource = typeof messagingSourceEnum[number];
+
+export const messagingDirectionEnum = ["inbound", "outbound", "system"] as const;
+export type MessagingDirection = typeof messagingDirectionEnum[number];
+
+export const messagingChannelEnum = ["sms", "mms", "email", "call", "note"] as const;
+export type MessagingChannel = typeof messagingChannelEnum[number];
+
+export const messagingStatusEnum = ["queued", "sent", "delivered", "failed", "received", "read"] as const;
+export type MessagingStatus = typeof messagingStatusEnum[number];
+
+// Attachment type for messages
+export type MessageAttachment = {
+  id: string;
+  url: string;
+  filename: string;
+  mimeType: string;
+};
+
+// CRM Messaging Conversations
+export const crmMessagingConversations = pgTable("crm_messaging_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => crmCustomers.id, { onDelete: "cascade" }),
+  subject: text("subject"),
+  externalSource: text("external_source").$type<MessagingSource>().default("internal"),
+  externalConversationId: text("external_conversation_id"),
+  status: text("status").$type<MessagingConversationStatus>().default("open"),
+  lastMessageAt: timestamp("last_message_at"),
+  lastOutboundAt: timestamp("last_outbound_at"),
+  unreadInboundCount: integer("unread_inbound_count").default(0),
+  assignedToId: varchar("assigned_to_id").references(() => crmUsers.id),
+  snoozeUntil: timestamp("snooze_until"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CRM Messaging Messages
+export const crmMessagingMessages = pgTable("crm_messaging_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => crmMessagingConversations.id, { onDelete: "cascade" }),
+  direction: text("direction").$type<MessagingDirection>().default("outbound"),
+  channel: text("channel").$type<MessagingChannel>().default("sms"),
+  body: text("body"),
+  attachments: json("attachments").$type<MessageAttachment[]>(),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  readAt: timestamp("read_at"),
+  authorUserId: varchar("author_user_id").references(() => crmUsers.id),
+  externalMessageId: text("external_message_id"),
+  status: text("status").$type<MessagingStatus>().default("queued"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// CRM Messaging Conversation Tags (join table)
+export const crmMessagingConversationTags = pgTable("crm_messaging_conversation_tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => crmMessagingConversations.id, { onDelete: "cascade" }),
+  tag: text("tag").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCrmMessagingConversationSchema = createInsertSchema(crmMessagingConversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCrmMessagingMessageSchema = createInsertSchema(crmMessagingMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmMessagingConversationTagSchema = createInsertSchema(crmMessagingConversationTags).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCrmMessagingConversation = z.infer<typeof insertCrmMessagingConversationSchema>;
+export type CrmMessagingConversation = typeof crmMessagingConversations.$inferSelect;
+export type InsertCrmMessagingMessage = z.infer<typeof insertCrmMessagingMessageSchema>;
+export type CrmMessagingMessage = typeof crmMessagingMessages.$inferSelect;
+export type InsertCrmMessagingConversationTag = z.infer<typeof insertCrmMessagingConversationTagSchema>;
+export type CrmMessagingConversationTag = typeof crmMessagingConversationTags.$inferSelect;

@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -16646,6 +16646,226 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error fetching my performance:", error);
       res.status(500).json({ message: "Failed to fetch performance data" });
+    }
+  });
+
+  // ============================================
+  // CRM MESSAGING ROUTES
+  // ============================================
+
+  // GET /api/crm/messaging/conversations - List conversations with filters
+  app.get("/api/crm/messaging/conversations", requireCrmAuth, async (req, res) => {
+    try {
+      const { status, assignedToId, customerId, search } = req.query;
+      
+      const filters: { status?: string; assignedToId?: string; customerId?: string; search?: string } = {};
+      if (status && typeof status === "string") filters.status = status;
+      if (assignedToId && typeof assignedToId === "string") filters.assignedToId = assignedToId;
+      if (customerId && typeof customerId === "string") filters.customerId = customerId;
+      if (search && typeof search === "string") filters.search = search;
+
+      const conversations = await storage.getMessagingConversations(filters);
+      
+      // Attach customer info to each conversation
+      const conversationsWithCustomers = await Promise.all(
+        conversations.map(async (conv) => {
+          let customer = null;
+          if (conv.customerId) {
+            const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, conv.customerId));
+            customer = cust || null;
+          }
+          return { ...conv, customer };
+        })
+      );
+
+      return res.json(conversationsWithCustomers);
+    } catch (error) {
+      console.error("Error fetching messaging conversations:", error);
+      return res.status(500).json({ message: "Failed to fetch conversations" });
+    }
+  });
+
+  // POST /api/crm/messaging/conversations - Create new conversation
+  app.post("/api/crm/messaging/conversations", requireCrmAuth, async (req, res) => {
+    try {
+      const parseResult = insertCrmMessagingConversationSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: parseResult.error.errors });
+      }
+
+      const conversation = await storage.createMessagingConversation(parseResult.data);
+      return res.status(201).json(conversation);
+    } catch (error) {
+      console.error("Error creating messaging conversation:", error);
+      return res.status(500).json({ message: "Failed to create conversation" });
+    }
+  });
+
+  // GET /api/crm/messaging/conversations/:id - Get single conversation with messages
+  app.get("/api/crm/messaging/conversations/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const conversation = await storage.getMessagingConversationById(id);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      const messages = await storage.getMessagesForConversation(id);
+      const tags = await storage.getConversationTags(id);
+
+      let customer = null;
+      if (conversation.customerId) {
+        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, conversation.customerId));
+        customer = cust || null;
+      }
+
+      return res.json({ conversation, messages, tags, customer });
+    } catch (error) {
+      console.error("Error fetching conversation details:", error);
+      return res.status(500).json({ message: "Failed to fetch conversation" });
+    }
+  });
+
+  // PATCH /api/crm/messaging/conversations/:id - Update conversation
+  app.patch("/api/crm/messaging/conversations/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, assignedToId, snoozeUntil, subject } = req.body;
+
+      const existing = await storage.getMessagingConversationById(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      const updates: Record<string, any> = {};
+      if (status !== undefined) updates.status = status;
+      if (assignedToId !== undefined) updates.assignedToId = assignedToId;
+      if (snoozeUntil !== undefined) updates.snoozeUntil = snoozeUntil ? new Date(snoozeUntil) : null;
+      if (subject !== undefined) updates.subject = subject;
+
+      const updated = await storage.updateMessagingConversation(id, updates);
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating conversation:", error);
+      return res.status(500).json({ message: "Failed to update conversation" });
+    }
+  });
+
+  // POST /api/crm/messaging/conversations/:id/messages - Send a message
+  app.post("/api/crm/messaging/conversations/:id/messages", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const existing = await storage.getMessagingConversationById(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      const { body, channel, attachments: msgAttachments } = req.body;
+
+      const messageData = {
+        conversationId: id,
+        body: body || "",
+        channel: channel || "sms",
+        attachments: msgAttachments || null,
+        direction: "outbound" as const,
+        status: "sent" as const,
+        authorUserId: user.id,
+        sentAt: new Date(),
+      };
+
+      const parseResult = insertCrmMessagingMessageSchema.safeParse(messageData);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid message data", errors: parseResult.error.errors });
+      }
+
+      const message = await storage.createMessage(parseResult.data);
+      return res.status(201).json(message);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      return res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  // POST /api/crm/messaging/conversations/:id/read - Mark conversation as read
+  app.post("/api/crm/messaging/conversations/:id/read", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const existing = await storage.getMessagingConversationById(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      const updated = await storage.updateMessagingConversation(id, { unreadInboundCount: 0 } as any);
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error marking conversation as read:", error);
+      return res.status(500).json({ message: "Failed to mark as read" });
+    }
+  });
+
+  // GET /api/crm/messaging/conversations/:id/tags - Get conversation tags
+  app.get("/api/crm/messaging/conversations/:id/tags", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const existing = await storage.getMessagingConversationById(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      const tags = await storage.getConversationTags(id);
+      return res.json(tags);
+    } catch (error) {
+      console.error("Error fetching conversation tags:", error);
+      return res.status(500).json({ message: "Failed to fetch tags" });
+    }
+  });
+
+  // POST /api/crm/messaging/conversations/:id/tags - Add tag
+  app.post("/api/crm/messaging/conversations/:id/tags", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { tag } = req.body;
+
+      if (!tag || typeof tag !== "string") {
+        return res.status(400).json({ message: "Tag is required and must be a string" });
+      }
+
+      const existing = await storage.getMessagingConversationById(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      const created = await storage.addConversationTag(id, tag);
+      return res.status(201).json(created);
+    } catch (error) {
+      console.error("Error adding conversation tag:", error);
+      return res.status(500).json({ message: "Failed to add tag" });
+    }
+  });
+
+  // DELETE /api/crm/messaging/conversations/:id/tags/:tag - Remove tag
+  app.delete("/api/crm/messaging/conversations/:id/tags/:tag", requireCrmAuth, async (req, res) => {
+    try {
+      const { id, tag } = req.params;
+
+      const existing = await storage.getMessagingConversationById(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      await storage.removeConversationTag(id, tag);
+      return res.json({ message: "Tag removed" });
+    } catch (error) {
+      console.error("Error removing conversation tag:", error);
+      return res.status(500).json({ message: "Failed to remove tag" });
     }
   });
 

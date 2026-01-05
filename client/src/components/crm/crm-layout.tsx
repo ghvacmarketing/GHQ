@@ -26,6 +26,7 @@ import {
   Package,
   Phone,
   Smartphone,
+  MessageSquare,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
@@ -55,6 +56,7 @@ const navSections: NavSection[] = [
       { label: "Dashboard", href: "/crm/dashboard", icon: LayoutDashboard },
       { label: "Dispatch Board", href: "/crm/dispatch", icon: CalendarClock },
       { label: "Phone", href: "/crm/phone", icon: Phone },
+      { label: "Messaging", href: "/crm/messaging", icon: MessageSquare },
     ],
   },
   {

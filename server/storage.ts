@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc, isNull } from "drizzle-orm";
@@ -244,6 +244,18 @@ export interface IStorage {
   updateCrmItem(id: string, data: Partial<InsertCrmItem>): Promise<CrmItem | undefined>;
   deleteCrmItem(id: string): Promise<boolean>;
   searchCrmItems(query: string): Promise<CrmItem[]>;
+
+  // Messaging operations
+  getMessagingConversations(filters?: { status?: string; assignedToId?: string; customerId?: string; search?: string }): Promise<CrmMessagingConversation[]>;
+  getMessagingConversationById(id: string): Promise<CrmMessagingConversation | undefined>;
+  createMessagingConversation(conversation: InsertCrmMessagingConversation): Promise<CrmMessagingConversation>;
+  updateMessagingConversation(id: string, updates: Partial<InsertCrmMessagingConversation>): Promise<CrmMessagingConversation | undefined>;
+  getMessagesForConversation(conversationId: string): Promise<CrmMessagingMessage[]>;
+  createMessage(message: InsertCrmMessagingMessage): Promise<CrmMessagingMessage>;
+  updateMessage(id: string, updates: Partial<InsertCrmMessagingMessage>): Promise<CrmMessagingMessage | undefined>;
+  getConversationTags(conversationId: string): Promise<CrmMessagingConversationTag[]>;
+  addConversationTag(conversationId: string, tag: string): Promise<CrmMessagingConversationTag>;
+  removeConversationTag(conversationId: string, tag: string): Promise<void>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -1814,6 +1826,129 @@ export class DatabaseStorage implements IStorage {
         )
       ))
       .orderBy(asc(crmItems.name));
+  }
+
+  // Messaging operations
+  async getMessagingConversations(filters?: { status?: string; assignedToId?: string; customerId?: string; search?: string }): Promise<CrmMessagingConversation[]> {
+    const conditions: ReturnType<typeof eq>[] = [];
+    
+    if (filters?.status) {
+      conditions.push(sql`${crmMessagingConversations.status} = ${filters.status}`);
+    }
+    if (filters?.assignedToId) {
+      conditions.push(eq(crmMessagingConversations.assignedToId, filters.assignedToId));
+    }
+    if (filters?.customerId) {
+      conditions.push(eq(crmMessagingConversations.customerId, filters.customerId));
+    }
+
+    if (filters?.search) {
+      const searchResults = await db
+        .select({ conversation: crmMessagingConversations })
+        .from(crmMessagingConversations)
+        .leftJoin(crmCustomers, eq(crmMessagingConversations.customerId, crmCustomers.id))
+        .where(
+          conditions.length > 0
+            ? and(...conditions, ilike(crmCustomers.name, `%${filters.search}%`))
+            : ilike(crmCustomers.name, `%${filters.search}%`)
+        )
+        .orderBy(desc(crmMessagingConversations.lastMessageAt));
+      return searchResults.map(r => r.conversation);
+    }
+
+    if (conditions.length === 0) {
+      return await db.select().from(crmMessagingConversations).orderBy(desc(crmMessagingConversations.lastMessageAt));
+    }
+
+    return await db.select().from(crmMessagingConversations)
+      .where(and(...conditions))
+      .orderBy(desc(crmMessagingConversations.lastMessageAt));
+  }
+
+  async getMessagingConversationById(id: string): Promise<CrmMessagingConversation | undefined> {
+    const [conversation] = await db.select().from(crmMessagingConversations).where(eq(crmMessagingConversations.id, id));
+    return conversation || undefined;
+  }
+
+  async createMessagingConversation(conversation: InsertCrmMessagingConversation): Promise<CrmMessagingConversation> {
+    const [created] = await db.insert(crmMessagingConversations).values(conversation as any).returning();
+    return created;
+  }
+
+  async updateMessagingConversation(id: string, updates: Partial<InsertCrmMessagingConversation>): Promise<CrmMessagingConversation | undefined> {
+    const [updated] = await db.update(crmMessagingConversations)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(crmMessagingConversations.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getMessagesForConversation(conversationId: string): Promise<CrmMessagingMessage[]> {
+    return await db.select().from(crmMessagingMessages)
+      .where(eq(crmMessagingMessages.conversationId, conversationId))
+      .orderBy(asc(crmMessagingMessages.createdAt));
+  }
+
+  async createMessage(message: InsertCrmMessagingMessage): Promise<CrmMessagingMessage> {
+    const [created] = await db.insert(crmMessagingMessages).values(message as any).returning();
+    
+    if (message.direction === 'outbound') {
+      await db.update(crmMessagingConversations)
+        .set({ 
+          lastMessageAt: new Date(),
+          lastOutboundAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(crmMessagingConversations.id, message.conversationId));
+    } else if (message.direction === 'inbound') {
+      const conversation = await this.getMessagingConversationById(message.conversationId);
+      if (conversation) {
+        await db.update(crmMessagingConversations)
+          .set({ 
+            lastMessageAt: new Date(),
+            unreadInboundCount: (conversation.unreadInboundCount || 0) + 1,
+            updatedAt: new Date()
+          })
+          .where(eq(crmMessagingConversations.id, message.conversationId));
+      }
+    } else {
+      await db.update(crmMessagingConversations)
+        .set({ 
+          lastMessageAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(crmMessagingConversations.id, message.conversationId));
+    }
+    
+    return created;
+  }
+
+  async updateMessage(id: string, updates: Partial<InsertCrmMessagingMessage>): Promise<CrmMessagingMessage | undefined> {
+    const [updated] = await db.update(crmMessagingMessages)
+      .set(updates as any)
+      .where(eq(crmMessagingMessages.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getConversationTags(conversationId: string): Promise<CrmMessagingConversationTag[]> {
+    return await db.select().from(crmMessagingConversationTags)
+      .where(eq(crmMessagingConversationTags.conversationId, conversationId));
+  }
+
+  async addConversationTag(conversationId: string, tag: string): Promise<CrmMessagingConversationTag> {
+    const [created] = await db.insert(crmMessagingConversationTags)
+      .values({ conversationId, tag })
+      .returning();
+    return created;
+  }
+
+  async removeConversationTag(conversationId: string, tag: string): Promise<void> {
+    await db.delete(crmMessagingConversationTags)
+      .where(and(
+        eq(crmMessagingConversationTags.conversationId, conversationId),
+        eq(crmMessagingConversationTags.tag, tag)
+      ));
   }
 
   // Initialize default data if needed
