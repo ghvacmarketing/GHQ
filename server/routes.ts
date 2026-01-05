@@ -12741,15 +12741,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(crmQuotes.id, quoteId));
       }
 
-      // Check for existing invoice on the work order
-      const [existingInvoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.workOrderId, workOrderIdToUse));
-      if (existingInvoice) {
-        return res.status(400).json({ 
-          message: "An invoice already exists for this work order",
-          existingInvoiceId: existingInvoice.id 
-        });
-      }
-
       // Check if this quote was already converted
       if (quote.status === "converted") {
         return res.status(400).json({ 
