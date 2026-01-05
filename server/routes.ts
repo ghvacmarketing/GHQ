@@ -13911,7 +13911,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let assignedTo = null;
       if (quote.assignedToId) {
         const assignedQuery = await db.execute(sql`
-          SELECT id, display_name as "displayName", role FROM crm_users WHERE id = ${quote.assignedToId} LIMIT 1
+          SELECT id, name as "displayName", role FROM crm_users WHERE id = ${quote.assignedToId} LIMIT 1
         `);
         assignedTo = assignedQuery.rows[0] || null;
       }
