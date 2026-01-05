@@ -5,10 +5,11 @@ import MobileShell from "./mobile-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
+import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
 import type { CrmWorkOrder, CrmCustomer, CrmUser, CrmProperty } from "@shared/schema";
 
-interface DispatchWorkOrder extends CrmWorkOrder {
+interface WorkOrderWithDetails extends CrmWorkOrder {
   customer: CrmCustomer | null;
   tech: CrmUser | null;
   property?: CrmProperty | null;
@@ -56,6 +57,9 @@ function formatSubtype(subtype: string | null | undefined): string {
 
 export default function MobileJob() {
   const [, navigate] = useLocation();
+  const today = new Date();
+  const todayStart = getLocalStartOfDay(today).toISOString();
+  const todayEnd = getLocalEndOfDay(today).toISOString();
 
   const { data: currentUser, isLoading: userLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -66,35 +70,36 @@ export default function MobileJob() {
     },
   });
 
-  const { data: workOrders = [], isLoading: ordersLoading } = useQuery<DispatchWorkOrder[]>({
-    queryKey: ["/api/crm/dispatch/work-orders"],
+  const { data: workOrders = [], isLoading: ordersLoading } = useQuery<WorkOrderWithDetails[]>({
+    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: (currentUser?.role === 'tech' || currentUser?.role === 'sales') ? currentUser?.id : undefined }],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        dateFrom: todayStart,
+        dateTo: todayEnd,
+      });
+      if ((currentUser?.role === 'tech' || currentUser?.role === 'sales') && currentUser?.id) {
+        params.set('techId', currentUser.id);
+      }
+      const res = await fetch(`/api/crm/work-orders?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch work orders");
+      const data = await res.json();
+      return data.workOrders || [];
+    },
     enabled: !!currentUser,
   });
 
-  const myWorkOrders = useMemo(() => {
-    if (!currentUser) return [];
-    // Only include work orders that are both assigned to this tech AND have a scheduled time
-    // Work orders without scheduledStart are still in the "unassigned queue" on dispatch board
-    return workOrders.filter(wo => wo.assignedTechId === currentUser.id && wo.scheduledStart);
-  }, [workOrders, currentUser]);
-
   const activeJob = useMemo(() => {
-    return myWorkOrders.find(wo => 
+    return workOrders.find(wo => 
       wo.status === "on_site" || wo.status === "en_route" || wo.status === "dispatched"
     );
-  }, [myWorkOrders]);
+  }, [workOrders]);
 
   const todaysJobs = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    return myWorkOrders
+    return workOrders
       .filter(wo => {
         if (!wo.scheduledStart) return false;
-        const start = new Date(wo.scheduledStart);
-        return start >= today && start < tomorrow;
+        const localStart = toLocalTime(wo.scheduledStart);
+        return isToday(localStart);
       })
       .sort((a, b) => {
         const statusOrder: Record<string, number> = { on_site: 0, en_route: 1, dispatched: 2, scheduled: 3, completed: 4 };
@@ -105,7 +110,7 @@ export default function MobileJob() {
         const bStart = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
         return aStart - bStart;
       });
-  }, [myWorkOrders]);
+  }, [workOrders]);
 
   useEffect(() => {
     if (activeJob) {
