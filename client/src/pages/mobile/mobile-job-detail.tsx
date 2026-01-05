@@ -514,17 +514,18 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [emailRecipient, setEmailRecipient] = useState("");
   const [emailQuoteId, setEmailQuoteId] = useState<string | null>(null);
 
-  // Fetch users with admin/owner roles for quote assignee selection
+  // Fetch users with admin role only for quote assignee selection
   const { data: adminUsers } = useQuery<CrmUser[]>({
-    queryKey: ["/api/crm/users"],
+    queryKey: ["/api/crm/users", "admin-only"],
     queryFn: async () => {
       const res = await fetch("/api/crm/users", { credentials: "include" });
       if (!res.ok) return [];
       const users = await res.json();
-      // Filter to only admin and owner roles
-      return users.filter((u: CrmUser) => u.role === 'admin' || u.role === 'owner');
+      // Filter to only admin role (not owner, not sales, not tech)
+      return users.filter((u: CrmUser) => u.role === 'admin' && u.isActive);
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0, // Always get fresh data
+    refetchOnMount: "always",
   });
 
   // Fetch existing quotes for this work order
@@ -802,7 +803,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       return;
     }
     if (!selectedAssigneeId) {
-      toast({ title: "Error", description: "Please select a sales rep to assign this quote to.", variant: "destructive" });
+      toast({ title: "Error", description: "Please select an admin to assign this quote to.", variant: "destructive" });
       return;
     }
 
@@ -956,17 +957,17 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                 />
               </div>
 
-              {/* Assign To Sales Rep (Required) */}
+              {/* Assign To Admin Personnel (Required) */}
               <div>
                 <Label htmlFor="quote-assignee" className="text-sm font-medium">
-                  Assign to Sales Rep <span className="text-red-500">*</span>
+                  Assign to Admin Personnel <span className="text-red-500">*</span>
                 </Label>
                 <Select 
                   value={selectedAssigneeId} 
                   onValueChange={setSelectedAssigneeId}
                 >
                   <SelectTrigger className="min-h-[44px] mt-1" data-testid="select-quote-assignee">
-                    <SelectValue placeholder="Select a sales rep..." />
+                    <SelectValue placeholder="Select an admin..." />
                   </SelectTrigger>
                   <SelectContent>
                     {adminUsers?.map((user) => (
@@ -977,7 +978,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                   </SelectContent>
                 </Select>
                 {!selectedAssigneeId && (
-                  <p className="text-xs text-slate-500 mt-1">Required: Select a sales rep to handle this quote</p>
+                  <p className="text-xs text-slate-500 mt-1">Required: Select an admin to handle this quote</p>
                 )}
               </div>
 
