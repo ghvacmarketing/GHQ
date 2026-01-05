@@ -17186,20 +17186,46 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   app.post("/api/webhooks/resend/inbound", async (req, res) => {
     console.log("[Resend Inbound] POST request received at", new Date().toISOString());
     try {
-      // Validate webhook secret if configured
-      const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
-      const authHeader = req.headers["x-webhook-secret"] || req.headers["authorization"];
+      // Get raw body for signature verification
+      const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
       
-      if (webhookSecret && authHeader !== webhookSecret && authHeader !== `Bearer ${webhookSecret}`) {
-        console.log("[Resend Inbound] Unauthorized webhook request - invalid secret");
-        return res.status(401).json({ error: "Unauthorized" });
+      // Validate webhook signature using Svix
+      const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
+      if (webhookSecret) {
+        const { Webhook } = await import("svix");
+        const svixId = req.headers["svix-id"] as string;
+        const svixTimestamp = req.headers["svix-timestamp"] as string;
+        const svixSignature = req.headers["svix-signature"] as string;
+        
+        if (!svixId || !svixTimestamp || !svixSignature) {
+          console.log("[Resend Inbound] Missing Svix headers for signature verification");
+          return res.status(400).json({ error: "Missing signature headers" });
+        }
+        
+        try {
+          const wh = new Webhook(webhookSecret);
+          wh.verify(rawBody, {
+            "svix-id": svixId,
+            "svix-timestamp": svixTimestamp,
+            "svix-signature": svixSignature,
+          });
+          console.log("[Resend Inbound] Webhook signature verified successfully");
+        } catch (verifyError) {
+          console.log("[Resend Inbound] Webhook signature verification failed:", verifyError);
+          return res.status(401).json({ error: "Invalid webhook signature" });
+        }
       }
 
-      const payload = req.body;
+      // Parse the body
+      const payload = Buffer.isBuffer(req.body) ? JSON.parse(rawBody) : req.body;
       console.log("[Resend Inbound] Received webhook:", JSON.stringify(payload, null, 2));
 
-      // Resend inbound email webhook payload structure
-      const { from, to, subject, html, text, headers } = payload;
+      // Handle different event types from Resend
+      const eventType = payload.type;
+      const eventData = payload.data || payload;
+      
+      // For email.received events, extract email data
+      const { from, to, subject, html, text, headers } = eventData;
 
       if (!from || !subject) {
         console.log("[Resend Inbound] Missing required fields");

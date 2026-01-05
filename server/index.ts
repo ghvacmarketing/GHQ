@@ -8,10 +8,15 @@ const app = express();
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
-// Conditional JSON parsing - skip for PDF upload route which needs 50MB limit
+// Conditional JSON parsing - skip for PDF upload route and webhook routes that need raw body
 app.use((req, res, next) => {
   if (req.path === '/api/price-book/upload') {
     return next(); // Skip global JSON parsing for PDF upload
+  }
+  if (req.path === '/api/webhooks/resend/inbound') {
+    // Webhook needs raw body for signature verification
+    express.raw({ type: 'application/json' })(req, res, next);
+    return;
   }
   express.json({ limit: '1mb' })(req, res, next);
 });
