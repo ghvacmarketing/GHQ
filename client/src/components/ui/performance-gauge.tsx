@@ -19,9 +19,8 @@ function formatCurrency(value: number): string {
 export function PerformanceGauge({ sold, quoted, goal, goalTarget, size = 180 }: PerformanceGaugeProps) {
   const actualGoal = goalTarget ?? goal;
   
-  // Potential is the outstanding quoted amount that hasn't converted to sales yet
-  // max(quoted - sold, 0) ensures it never goes negative
-  const potential = Math.max(quoted - sold, 0);
+  // Potential is the outstanding quoted amount (quotes with status "sent" that haven't been accepted yet)
+  const potential = quoted;
   
   // Check if pipeline is empty (no quotes and no sales)
   const isPipelineEmpty = quoted === 0 && sold === 0;

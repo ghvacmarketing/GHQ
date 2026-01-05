@@ -5300,7 +5300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               sql`${maintenanceVisits.completedAt} >= ${rangeStartDate}`
             ));
 
-          // Get quoted amounts (sent but not accepted/paid) for this tech's work orders
+          // Get quoted amounts (draft or sent - potential revenue not yet won) for this tech's work orders
           let quotedAmount = 0;
           if (workOrderIds.length > 0) {
             const quotedResult = await db
@@ -5310,7 +5310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .from(crmQuotes)
               .where(and(
                 inArray(crmQuotes.workOrderId, workOrderIds),
-                eq(crmQuotes.status, "sent"),
+                sql`${crmQuotes.status} IN ('draft', 'sent')`,
                 sql`${crmQuotes.createdAt} >= ${rangeStartDate}`
               ));
             quotedAmount = parseFloat(quotedResult[0]?.total || "0");
@@ -16449,7 +16449,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         const serviceJobs = paidInvoiceCount;
         const perTicketAvg = serviceJobs > 0 ? serviceRevenue / serviceJobs : 0;
 
-        // Get quoted amount for this tech's work orders (sent but not accepted)
+        // Get quoted amount for this tech's work orders (draft or sent - potential revenue not yet won)
         let quotedAmount = 0;
         if (workOrderIds.length > 0) {
           const quotedResult = await db
@@ -16459,7 +16459,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             .from(crmQuotes)
             .where(and(
               inArray(crmQuotes.workOrderId, workOrderIds),
-              eq(crmQuotes.status, "sent"),
+              sql`${crmQuotes.status} IN ('draft', 'sent')`,
               sql`${crmQuotes.createdAt} >= ${startOfMonth}`
             ));
           quotedAmount = parseFloat(quotedResult[0]?.total || "0");
