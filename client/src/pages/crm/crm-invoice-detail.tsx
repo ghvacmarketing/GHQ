@@ -585,22 +585,6 @@ export default function CrmInvoiceDetail() {
             </p>
             
             <div className="flex items-center gap-2">
-              {!isSent && !isVoid && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSend}
-                  disabled={sendMutation.isPending}
-                  data-testid="button-send"
-                >
-                  {sendMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4 mr-2" />
-                  )}
-                  Send
-                </Button>
-              )}
               {!isVoid && !isPaid && (
                 <Button
                   size="sm"
