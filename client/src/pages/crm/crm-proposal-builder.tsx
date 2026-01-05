@@ -797,6 +797,9 @@ export default function CrmProposalBuilder() {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [isLoadingProperties, setIsLoadingProperties] = useState(false);
   
+  // Assigned user for quotes (install quotes require sales+ role)
+  const [assignedToId, setAssignedToId] = useState<string | null>(null);
+  
   // Parse URL parameters on mount and pre-fill customer if provided
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -897,6 +900,18 @@ export default function CrmProposalBuilder() {
     refetchOnWindowFocus: false,
   });
   const customerSearchResults = Array.isArray(customerSearchData) ? customerSearchData : [];
+
+  // Assignable users query (sales role or above for install quotes)
+  type AssignableUser = { id: string; displayName: string; email: string; role: string };
+  const { data: assignableUsers } = useQuery<AssignableUser[]>({
+    queryKey: ["/api/crm/users/by-role", "sales"],
+    queryFn: async () => {
+      const response = await fetch(`/api/crm/users/by-role?minRole=sales`, { credentials: "include" });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    refetchOnWindowFocus: false,
+  });
 
   // Accept quote mutation
   const acceptQuoteMutation = useMutation({
@@ -1113,6 +1128,7 @@ export default function CrmProposalBuilder() {
       aiGeneratedQuote?: object;
       quoteMode?: string;
       quoteType?: string;
+      assignedToId?: string;
     }) => {
       const res = await apiRequest("POST", "/api/crm/quotes/from-proposal", data);
       return res.json();
@@ -1236,6 +1252,7 @@ export default function CrmProposalBuilder() {
       aiGeneratedQuote: aiGeneratedQuote,
       quoteMode: quoteMode,
       quoteType: "proposal",
+      assignedToId: assignedToId || undefined,
     });
   };
 
@@ -5689,6 +5706,29 @@ export default function CrmProposalBuilder() {
           </ScrollArea>
           
           <div className="border-t p-4 bg-card shrink-0 flex-none">
+            {/* Assigned To dropdown for CRM quotes */}
+            <div className="mb-3">
+              <Label className="text-xs text-muted-foreground mb-1 block">Assign To (for CRM)</Label>
+              <Select
+                value={assignedToId || ""}
+                onValueChange={(value) => setAssignedToId(value || null)}
+              >
+                <SelectTrigger className="w-full" data-testid="select-assigned-user">
+                  <SelectValue placeholder="Select team member..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignableUsers && assignableUsers.length > 0 ? (
+                    assignableUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.displayName} ({user.role})
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>No users available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button
                 variant="outline"

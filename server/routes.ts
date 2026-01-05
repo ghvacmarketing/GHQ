@@ -14259,7 +14259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { customerId, propertyId, projectId, workOrderId, title, description, notes, lineItems, status, aiNotes, aiGeneratedQuote, quoteMode, quoteType } = req.body;
+      const { customerId, propertyId, projectId, workOrderId, title, description, notes, lineItems, status, aiNotes, aiGeneratedQuote, quoteMode, quoteType, assignedToId } = req.body;
 
       if (!customerId) {
         return res.status(400).json({ message: "Customer is required" });
@@ -14322,6 +14322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         aiGeneratedQuote: aiGeneratedQuote || null,
         quoteMode: quoteMode || null,
         quoteType: quoteType || "proposal",
+        assignedToId: assignedToId || null,
       }).returning();
 
       // Create line items
