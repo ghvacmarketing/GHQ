@@ -143,6 +143,19 @@ interface OptionGroup {
   total: number;
 }
 
+const PACKAGE_LEVEL_ORDER = ["Best", "Better", "Good", "Budget"];
+
+function getOptionSortOrder(tag: string): number {
+  const lowerTag = tag.toLowerCase();
+  for (let i = 0; i < PACKAGE_LEVEL_ORDER.length; i++) {
+    const level = PACKAGE_LEVEL_ORDER[i].toLowerCase();
+    if (lowerTag === level || lowerTag.startsWith(level)) {
+      return i;
+    }
+  }
+  return PACKAGE_LEVEL_ORDER.length;
+}
+
 function groupLineItemsByOption(lineItems: CrmQuoteLineItem[]): OptionGroup[] {
   const groups = new Map<string, CrmQuoteLineItem[]>();
   
@@ -155,11 +168,13 @@ function groupLineItemsByOption(lineItems: CrmQuoteLineItem[]): OptionGroup[] {
     groups.get(tag)!.push(item);
   });
   
-  return Array.from(groups.entries()).map(([tag, items]) => ({
-    tag,
-    items,
-    total: items.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0),
-  }));
+  return Array.from(groups.entries())
+    .map(([tag, items]) => ({
+      tag,
+      items,
+      total: items.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0),
+    }))
+    .sort((a, b) => getOptionSortOrder(a.tag) - getOptionSortOrder(b.tag));
 }
 
 function buildTextBody(
