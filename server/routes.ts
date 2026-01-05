@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -19,6 +19,7 @@ import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
 import { sendCrmQuoteEmail } from "./services/crmQuoteEmail";
+import { sendCrmInvoiceEmail } from "./services/crmInvoiceEmail";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
 import { eq, inArray, desc, sql, and, or, ilike, asc, count, isNull, lt, gt, ne, isNotNull } from "drizzle-orm";
@@ -13411,6 +13412,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/crm/invoices/:id/send-email - Send invoice via email
+  app.post("/api/crm/invoices/:id/send-email", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { recipientEmail, personalMessage } = req.body;
+
+      const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, req.params.id)).limit(1);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Get customer info
+      let customerEmail = recipientEmail;
+      let customerName = "Customer";
+      
+      if (invoice.customerId) {
+        const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, invoice.customerId)).limit(1);
+        if (customer) {
+          customerEmail = recipientEmail || customer.email;
+          customerName = customer.name || "Customer";
+        }
+      }
+
+      if (!customerEmail) {
+        return res.status(400).json({ message: "No recipient email provided and customer has no email" });
+      }
+
+      const lineItems = await db.select().from(crmInvoiceLineItems)
+        .where(eq(crmInvoiceLineItems.invoiceId, invoice.id))
+        .orderBy(crmInvoiceLineItems.sortOrder);
+
+      const sentByName = user.displayName || user.name || user.email;
+      const subject = `Your Invoice from Giesbrecht HVAC - ${invoice.invoiceNumber}`;
+
+      // Use Resend inbound address for Reply-To so customer replies get routed to webhook
+      const resendInboundAddress = process.env.RESEND_INBOUND_ADDRESS || "invoices@bronaekaru.resend.app";
+      const replyToEmail = resendInboundAddress;
+      
+      console.log("[Invoice Email] Reply-To:", replyToEmail, "(Resend inbound for webhook routing)");
+
+      const result = await sendCrmInvoiceEmail(
+        invoice,
+        lineItems,
+        customerEmail,
+        customerName,
+        personalMessage,
+        sentByName,
+        {
+          senderEmail: user.email,
+          senderName: sentByName,
+          replyToEmail,
+        }
+      );
+
+      const [emailLog] = await db.insert(invoiceEmailLogs).values({
+        invoiceId: invoice.id,
+        direction: "outgoing",
+        fromEmail: result.fromEmail || "invoices@ghvacinc.com",
+        recipientEmail: customerEmail,
+        recipientName: customerName,
+        subject,
+        htmlContent: result.htmlContent || null,
+        textContent: result.textContent || null,
+        status: result.success ? "sent" : "failed",
+        errorMessage: result.error || null,
+        sentBy: user.id,
+        personalMessage: personalMessage || null,
+        isManual: false,
+        resendMessageId: result.messageId || null,
+        replyToEmail,
+      }).returning();
+
+      if (!result.success) {
+        return res.status(500).json({ 
+          message: result.error || "Failed to send invoice email",
+          emailLogId: emailLog.id
+        });
+      }
+
+      // Update invoice status to sent if it was draft
+      if (invoice.status === "draft") {
+        await db.update(crmInvoices)
+          .set({ 
+            status: "sent" as const,
+            sentAt: new Date(),
+            updatedAt: new Date()
+          })
+          .where(eq(crmInvoices.id, invoice.id));
+      }
+
+      await logCrmAudit(
+        user.id,
+        "invoice.email_sent",
+        "invoice",
+        invoice.id,
+        { invoiceNumber: invoice.invoiceNumber, recipientEmail: customerEmail },
+        req.ip
+      );
+
+      return res.json({ 
+        success: true, 
+        messageId: result.messageId,
+        emailLogId: emailLog.id
+      });
+    } catch (error) {
+      console.error("Error sending invoice email:", error);
+      return res.status(500).json({ message: "Failed to send invoice email" });
+    }
+  });
+
+  // GET /api/crm/invoices/:id/email-logs - Get email logs for an invoice
+  app.get("/api/crm/invoices/:id/email-logs", requireCrmAuth, async (req, res) => {
+    try {
+      const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, req.params.id)).limit(1);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      const logs = await db.select().from(invoiceEmailLogs)
+        .where(eq(invoiceEmailLogs.invoiceId, invoice.id))
+        .orderBy(desc(invoiceEmailLogs.sentAt));
+
+      return res.json(logs);
+    } catch (error) {
+      console.error("Error fetching invoice email logs:", error);
+      return res.status(500).json({ message: "Failed to fetch email logs" });
+    }
+  });
+
   // POST /api/crm/invoices/:id/line-items - Add line item to invoice
   app.post("/api/crm/invoices/:id/line-items", requireCrmTechOrAbove, async (req, res) => {
     try {
@@ -17072,11 +17206,94 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(200).json({ received: true, processed: false, reason: "Missing fields" });
       }
 
+      // Extract sender email from the "from" field (could be "Name <email>" or just "email")
+      const fromEmailMatch = from.match(/<([^>]+)>/) || [null, from];
+      const senderEmail = fromEmailMatch[1] || from;
+      const senderNameMatch = from.match(/^([^<]+)</);
+      const senderName = senderNameMatch ? senderNameMatch[1].trim() : null;
+
+      // Try to find the invoice from the subject line (format: "Re: Your Invoice from Giesbrecht HVAC - INV-XXXXXXXX-XXX")
+      const invoiceNumberMatch = subject.match(/INV-\d{8}-\d{3}/i);
+      if (invoiceNumberMatch) {
+        const invoiceNumber = invoiceNumberMatch[0].toUpperCase();
+        console.log("[Resend Inbound] Found invoice number:", invoiceNumber);
+
+        // Find the invoice
+        const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.invoiceNumber, invoiceNumber)).limit(1);
+        if (!invoice) {
+          console.log("[Resend Inbound] Invoice not found:", invoiceNumber);
+          return res.status(200).json({ received: true, processed: false, reason: "Invoice not found" });
+        }
+
+        // Store the incoming email in invoice_email_logs
+        await db.insert(invoiceEmailLogs).values({
+          invoiceId: invoice.id,
+          direction: "incoming",
+          fromEmail: senderEmail,
+          recipientEmail: Array.isArray(to) ? to[0] : to,
+          recipientName: null,
+          subject: subject,
+          htmlContent: html || null,
+          textContent: text || null,
+          status: "received",
+          sentAt: new Date(),
+        });
+
+        console.log("[Resend Inbound] Stored incoming email for invoice:", invoiceNumber);
+
+        // Forward the email to the invoice creator
+        let forwardedTo: string | null = null;
+        if (invoice.createdBy) {
+          const [createdByUser] = await db.select({ email: crmUsers.email, name: crmUsers.name, displayName: crmUsers.displayName })
+            .from(crmUsers)
+            .where(eq(crmUsers.id, invoice.createdBy))
+            .limit(1);
+          
+          if (createdByUser?.email) {
+            try {
+              const { Resend } = await import("resend");
+              const resend = new Resend(process.env.RESEND_API_KEY);
+              
+              const customerName = senderName || senderEmail;
+              const forwardSubject = `[Customer Reply] ${subject}`;
+              const forwardHtml = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px;">
+                  <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; margin-bottom: 16px;">
+                    <strong>Customer Reply for Invoice ${invoiceNumber}</strong><br/>
+                    <span style="color: #64748b;">From: ${customerName} (${senderEmail})</span>
+                  </div>
+                  <div style="padding: 16px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    ${html || text?.replace(/\n/g, '<br/>') || '<em>No message content</em>'}
+                  </div>
+                  <div style="margin-top: 16px; padding: 12px; background: #f8fafc; border-radius: 4px; font-size: 13px; color: #64748b;">
+                    <a href="https://${req.get("host")}/crm/invoices/${invoice.id}" style="color: #f59e0b;">View Invoice in CRM</a>
+                  </div>
+                </div>
+              `;
+              
+              await resend.emails.send({
+                from: "invoices@ghvacinc.com",
+                to: [createdByUser.email],
+                subject: forwardSubject,
+                html: forwardHtml,
+              });
+              
+              forwardedTo = createdByUser.email;
+              console.log("[Resend Inbound] Forwarded invoice reply to creator:", createdByUser.email);
+            } catch (forwardError) {
+              console.error("[Resend Inbound] Failed to forward invoice email:", forwardError);
+            }
+          }
+        }
+
+        return res.status(200).json({ received: true, processed: true, invoiceNumber, forwardedTo });
+      }
+
       // Try to find the quote from the subject line (format: "Re: Your Quote from Giesbrecht HVAC - Q-YYYYMMDD-XXX")
       const quoteNumberMatch = subject.match(/Q-\d{8}-\d{3}/i);
       if (!quoteNumberMatch) {
-        console.log("[Resend Inbound] Could not extract quote number from subject:", subject);
-        return res.status(200).json({ received: true, processed: false, reason: "No quote number found" });
+        console.log("[Resend Inbound] Could not extract quote or invoice number from subject:", subject);
+        return res.status(200).json({ received: true, processed: false, reason: "No quote or invoice number found" });
       }
 
       const quoteNumber = quoteNumberMatch[0].toUpperCase();
@@ -17088,12 +17305,6 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         console.log("[Resend Inbound] Quote not found:", quoteNumber);
         return res.status(200).json({ received: true, processed: false, reason: "Quote not found" });
       }
-
-      // Extract sender email from the "from" field (could be "Name <email>" or just "email")
-      const fromEmailMatch = from.match(/<([^>]+)>/) || [null, from];
-      const senderEmail = fromEmailMatch[1] || from;
-      const senderNameMatch = from.match(/^([^<]+)</);
-      const senderName = senderNameMatch ? senderNameMatch[1].trim() : null;
 
       // Store the incoming email in quote_email_logs
       await db.insert(quoteEmailLogs).values({

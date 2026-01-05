@@ -1261,6 +1261,43 @@ export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// CRM Invoice Email Logs - tracks email sends for invoices
+export const invoiceEmailLogsStatusEnum = ["pending", "sent", "failed", "bounced", "received"] as const;
+export type InvoiceEmailLogStatus = typeof invoiceEmailLogsStatusEnum[number];
+
+export const invoiceEmailDirectionEnum = ["outgoing", "incoming", "system"] as const;
+export type InvoiceEmailDirection = typeof invoiceEmailDirectionEnum[number];
+
+export const invoiceEmailLogs = pgTable("invoice_email_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => crmInvoices.id, { onDelete: "cascade" }),
+  direction: text("direction").$type<InvoiceEmailDirection>().notNull().default("outgoing"),
+  fromEmail: text("from_email"),
+  recipientEmail: text("recipient_email").notNull(),
+  recipientName: text("recipient_name"),
+  subject: text("subject").notNull(),
+  htmlContent: text("html_content"),
+  textContent: text("text_content"),
+  status: text("status").$type<InvoiceEmailLogStatus>().notNull().default("pending"),
+  errorMessage: text("error_message"),
+  sentBy: varchar("sent_by"),
+  sentAt: timestamp("sent_at").defaultNow(),
+  deliveredAt: timestamp("delivered_at"),
+  openedAt: timestamp("opened_at"),
+  personalMessage: text("personal_message"),
+  isManual: boolean("is_manual").default(false),
+  resendMessageId: text("resend_message_id"),
+  replyToEmail: text("reply_to_email"),
+});
+
+export const insertInvoiceEmailLogSchema = createInsertSchema(invoiceEmailLogs).omit({
+  id: true,
+  sentAt: true,
+});
+
+export type InsertInvoiceEmailLog = z.infer<typeof insertInvoiceEmailLogSchema>;
+export type InvoiceEmailLog = typeof invoiceEmailLogs.$inferSelect;
+
 // CRM Items (parts, services, materials catalog)
 // itemType = what it IS (controls quote section placement)
 export const crmItemTypeEnum = ["parts", "equipment", "material", "service", "discount", "agreement", "residential", "commercial", "crawlspace"] as const;
