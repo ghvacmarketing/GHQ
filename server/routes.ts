@@ -14887,6 +14887,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.ip
       );
 
+      // Add system email log entry for quote acceptance
+      const now = new Date();
+      await db.insert(quoteEmailLogs).values({
+        quoteId: existing.id,
+        direction: "system",
+        fromEmail: "system",
+        recipientEmail: existing.customerEmail || "",
+        recipientName: acceptedBy || "Customer",
+        subject: `Quote ${existing.quoteNumber} - Accepted`,
+        textContent: `Quote was marked as accepted by ${user.name || user.email}${acceptedBy ? ` on behalf of ${acceptedBy}` : ""} at ${now.toLocaleString()}`,
+        status: "sent",
+        isManual: false,
+        personalMessage: JSON.stringify({
+          eventType: "quote_accepted",
+          acceptedBy: acceptedBy || null,
+          markedByUser: user.name || user.email,
+          acceptedAt: now.toISOString(),
+          selectedOption: selectedOption || null,
+        }),
+      });
+
       return res.json(updated);
     } catch (error) {
       console.error("Error marking quote as accepted:", error);
@@ -16730,6 +16751,25 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           },
         });
       }
+
+      // Add system email log entry for quote acceptance
+      await db.insert(quoteEmailLogs).values({
+        quoteId: quote.id,
+        direction: "system",
+        fromEmail: "system",
+        recipientEmail: quote.customerEmail || "",
+        recipientName: signerName.trim(),
+        subject: `Quote ${quote.quoteNumber} - Signed & Accepted`,
+        textContent: `Quote was electronically signed and accepted by ${signerName.trim()} at ${now.toLocaleString()}`,
+        status: "sent",
+        isManual: false,
+        personalMessage: JSON.stringify({
+          eventType: "quote_accepted",
+          signerName: signerName.trim(),
+          signerIp,
+          signedAt: now.toISOString(),
+        }),
+      });
 
       console.log(`Quote ${quote.quoteNumber} signed and accepted by ${signerName.trim()} from IP ${signerIp}`);
 
