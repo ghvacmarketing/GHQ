@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   Download,
   Eye,
-  Ban
+  Ban,
+  Mail
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,8 @@ export default function MobileInvoiceDetail() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "check" | "card">("cash");
   const [paymentReference, setPaymentReference] = useState("");
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState("");
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -112,21 +115,43 @@ export default function MobileInvoiceDetail() {
     enabled: !!id,
   });
 
-  const sendInvoiceMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/crm/invoices/${id}/send`);
+  const sendInvoiceEmailMutation = useMutation({
+    mutationFn: async (recipientEmail: string) => {
+      const response = await apiRequest("POST", `/api/crm/invoices/${id}/send-email`, {
+        recipientEmail,
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || error.error || "Failed to send invoice email");
+      }
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Invoice Sent", description: "Invoice has been sent successfully." });
+      toast({ title: "Email Sent", description: "Invoice email has been sent successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      setShowEmailDialog(false);
+      setEmailRecipient("");
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message || "Failed to send invoice", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to send invoice email", variant: "destructive" });
     },
   });
+
+  const openEmailDialog = () => {
+    const customerEmail = invoice?.customer?.email || invoice?.customerEmail || "";
+    setEmailRecipient(customerEmail);
+    setShowEmailDialog(true);
+  };
+
+  const handleSendEmail = () => {
+    if (!emailRecipient.trim()) {
+      toast({ title: "Error", description: "Please enter a recipient email address.", variant: "destructive" });
+      return;
+    }
+    sendInvoiceEmailMutation.mutate(emailRecipient.trim());
+  };
 
   const recordPaymentMutation = useMutation({
     mutationFn: async (data: { amountPaid: number; paymentMethod: string; paymentReference?: string }) => {
@@ -665,16 +690,16 @@ export default function MobileInvoiceDetail() {
           {invoice.status === "draft" && (
             <Button
               className="w-full min-h-[48px] bg-blue-600 hover:bg-blue-700"
-              onClick={() => sendInvoiceMutation.mutate()}
-              disabled={sendInvoiceMutation.isPending}
+              onClick={openEmailDialog}
+              disabled={sendInvoiceEmailMutation.isPending}
               data-testid="button-send-invoice"
             >
-              {sendInvoiceMutation.isPending ? (
+              {sendInvoiceEmailMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
-                <Send className="h-4 w-4 mr-2" />
+                <Mail className="h-4 w-4 mr-2" />
               )}
-              Send Invoice
+              Send Email
             </Button>
           )}
 
@@ -915,6 +940,61 @@ export default function MobileInvoiceDetail() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Send Invoice Email Dialog */}
+        <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailRecipient(""); } }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Send Invoice Email</DialogTitle>
+              <DialogDescription>
+                Enter the email address where you want to send this invoice.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="invoice-email-recipient" className="text-sm font-medium">
+                  Recipient Email
+                </Label>
+                <Input
+                  id="invoice-email-recipient"
+                  type="email"
+                  placeholder="customer@example.com"
+                  value={emailRecipient}
+                  onChange={(e) => setEmailRecipient(e.target.value)}
+                  className="min-h-[44px] mt-1"
+                  data-testid="input-invoice-email-recipient"
+                />
+              </div>
+            </div>
+            <DialogFooter className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => { setShowEmailDialog(false); setEmailRecipient(""); }}
+                className="min-h-[44px]"
+              >
+                Cancel
+              </Button>
+              <Button 
+                className="bg-blue-600 hover:bg-blue-700 min-h-[44px]"
+                onClick={handleSendEmail}
+                disabled={sendInvoiceEmailMutation.isPending || !emailRecipient.trim()}
+                data-testid="button-confirm-send-invoice-email"
+              >
+                {sendInvoiceEmailMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4 mr-2" />
+                    Send Email
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MobileShell>
   );

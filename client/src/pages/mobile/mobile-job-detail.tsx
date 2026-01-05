@@ -29,7 +29,8 @@ import {
   Search,
   Tag,
   Package,
-  CreditCard
+  CreditCard,
+  Mail
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
 import { useOnlineStatus, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
-import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus, CrmQuote, CrmInvoice, CrmInvoiceLineItem, CrmItem, CrmQuoteLineItem } from "@shared/schema";
+import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus, CrmQuote, CrmInvoice, CrmInvoiceLineItem, CrmItem, CrmQuoteLineItem, CrmUser } from "@shared/schema";
 
 interface WorkOrderDetail extends CrmWorkOrder {
   customer: CrmCustomer | null;
@@ -508,6 +509,21 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [showManualDiscount, setShowManualDiscount] = useState(false);
   const [discountDescription, setDiscountDescription] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>("");
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState("");
+  const [emailQuoteId, setEmailQuoteId] = useState<string | null>(null);
+
+  // Fetch users with sales roles for assignee selection
+  const { data: salesUsers } = useQuery<CrmUser[]>({
+    queryKey: ["/api/crm/users/by-role", { exactRole: "sales" }],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/users/by-role?exactRole=sales", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Fetch existing quotes for this work order
   const { data: quotesData, isLoading: quotesLoading, error: quotesError } = useQuery<{ quotes: CrmQuote[] }>({
@@ -625,6 +641,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         taxTotal: "0",
         total: data.total.toFixed(2),
         status: "draft",
+        assignedToId: selectedAssigneeId || undefined,
       });
       return response.json();
     },
@@ -635,27 +652,51 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       setShowQuickQuote(false);
       setLineItems([]);
       setQuoteTitle("");
+      setSelectedAssigneeId("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to create quote", variant: "destructive" });
     },
   });
 
-  // Send quote mutation
-  const sendQuoteMutation = useMutation({
-    mutationFn: async (quoteId: string) => {
-      const response = await apiRequest("POST", `/api/crm/quotes/${quoteId}/send`);
+  // Send quote email mutation
+  const sendQuoteEmailMutation = useMutation({
+    mutationFn: async ({ quoteId, recipientEmail }: { quoteId: string; recipientEmail: string }) => {
+      const response = await apiRequest("POST", `/api/crm/quotes/${quoteId}/send-email`, {
+        recipientEmail,
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || error.error || "Failed to send quote email");
+      }
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Quote Sent", description: "Quote has been sent successfully." });
+      toast({ title: "Email Sent", description: "Quote email has been sent successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", { workOrderId: workOrder.id }] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      setShowEmailDialog(false);
+      setEmailQuoteId(null);
+      setEmailRecipient("");
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message || "Failed to send quote", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to send quote email", variant: "destructive" });
     },
   });
+
+  const openEmailDialog = (quoteId: string) => {
+    setEmailQuoteId(quoteId);
+    setEmailRecipient(workOrder.customer?.email || "");
+    setShowEmailDialog(true);
+  };
+
+  const handleSendEmail = () => {
+    if (!emailQuoteId || !emailRecipient.trim()) {
+      toast({ title: "Error", description: "Please enter a recipient email address.", variant: "destructive" });
+      return;
+    }
+    sendQuoteEmailMutation.mutate({ quoteId: emailQuoteId, recipientEmail: emailRecipient.trim() });
+  };
 
   const addLineItem = () => {
     setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service" }]);
@@ -758,6 +799,10 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       toast({ title: "Error", description: "Please add at least one line item.", variant: "destructive" });
       return;
     }
+    if (!selectedAssigneeId) {
+      toast({ title: "Error", description: "Please select a sales rep to assign this quote to.", variant: "destructive" });
+      return;
+    }
 
     createQuoteMutation.mutate({
       title: quoteTitle,
@@ -832,16 +877,16 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                             variant="outline"
                             size="sm"
                             className="min-h-[44px] border-blue-200 text-blue-700 hover:bg-blue-50"
-                            onClick={() => sendQuoteMutation.mutate(quote.id)}
-                            disabled={sendQuoteMutation.isPending}
+                            onClick={() => openEmailDialog(quote.id)}
+                            disabled={sendQuoteEmailMutation.isPending}
                             data-testid={`button-send-quote-${quote.id}`}
                           >
-                            {sendQuoteMutation.isPending ? (
+                            {sendQuoteEmailMutation.isPending ? (
                               <Loader2 className="h-4 w-4 animate-spin mr-1" />
                             ) : (
-                              <Send className="h-4 w-4 mr-1" />
+                              <Mail className="h-4 w-4 mr-1" />
                             )}
-                            Send
+                            Send Email
                           </Button>
                         )}
                         <Button
@@ -907,6 +952,31 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                   className="min-h-[44px] mt-1"
                   data-testid="input-quote-title"
                 />
+              </div>
+
+              {/* Assign To Sales Rep (Required) */}
+              <div>
+                <Label htmlFor="quote-assignee" className="text-sm font-medium">
+                  Assign to Sales Rep <span className="text-red-500">*</span>
+                </Label>
+                <Select 
+                  value={selectedAssigneeId} 
+                  onValueChange={setSelectedAssigneeId}
+                >
+                  <SelectTrigger className="min-h-[44px] mt-1" data-testid="select-quote-assignee">
+                    <SelectValue placeholder="Select a sales rep..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {salesUsers?.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.fullName || user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!selectedAssigneeId && (
+                  <p className="text-xs text-slate-500 mt-1">Required: Select a sales rep to handle this quote</p>
+                )}
               </div>
 
               {/* Line Items Section */}
@@ -1332,6 +1402,61 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Send Quote Email Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailQuoteId(null); setEmailRecipient(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Quote Email</DialogTitle>
+            <DialogDescription>
+              Enter the email address where you want to send this quote.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="email-recipient" className="text-sm font-medium">
+                Recipient Email
+              </Label>
+              <Input
+                id="email-recipient"
+                type="email"
+                placeholder="customer@example.com"
+                value={emailRecipient}
+                onChange={(e) => setEmailRecipient(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-quote-email-recipient"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => { setShowEmailDialog(false); setEmailQuoteId(null); setEmailRecipient(""); }}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700 min-h-[44px]"
+              onClick={handleSendEmail}
+              disabled={sendQuoteEmailMutation.isPending || !emailRecipient.trim()}
+              data-testid="button-confirm-send-quote-email"
+            >
+              {sendQuoteEmailMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Email
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1378,6 +1503,9 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "check" | "card">("cash");
   const [paymentReference, setPaymentReference] = useState("");
+  const [showInvoiceEmailDialog, setShowInvoiceEmailDialog] = useState(false);
+  const [invoiceEmailRecipient, setInvoiceEmailRecipient] = useState("");
+  const [emailInvoiceId, setEmailInvoiceId] = useState<string | null>(null);
 
   const { data: invoicesData, isLoading: invoicesLoading, error: invoicesError } = useQuery<{ invoices: CrmInvoice[] }>({
     queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }],
@@ -1531,24 +1659,47 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     },
   });
 
-  // Send invoice mutation
-  const sendInvoiceMutation = useMutation({
-    mutationFn: async (invoiceId: string) => {
-      const response = await apiRequest("POST", `/api/crm/invoices/${invoiceId}/send`);
+  // Send invoice email mutation
+  const sendInvoiceEmailMutation = useMutation({
+    mutationFn: async ({ invoiceId, recipientEmail }: { invoiceId: string; recipientEmail: string }) => {
+      const response = await apiRequest("POST", `/api/crm/invoices/${invoiceId}/send-email`, {
+        recipientEmail,
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || error.error || "Failed to send invoice email");
+      }
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Invoice Sent", description: "Invoice has been sent successfully." });
+      toast({ title: "Email Sent", description: "Invoice email has been sent successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
-      if (expandedInvoiceId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", expandedInvoiceId] });
+      if (emailInvoiceId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", emailInvoiceId] });
       }
+      setShowInvoiceEmailDialog(false);
+      setEmailInvoiceId(null);
+      setInvoiceEmailRecipient("");
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message || "Failed to send invoice", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to send invoice email", variant: "destructive" });
     },
   });
+
+  const openInvoiceEmailDialog = (invoiceId: string) => {
+    setEmailInvoiceId(invoiceId);
+    setInvoiceEmailRecipient(workOrder.customer?.email || "");
+    setShowInvoiceEmailDialog(true);
+  };
+
+  const handleSendInvoiceEmail = () => {
+    if (!emailInvoiceId || !invoiceEmailRecipient.trim()) {
+      toast({ title: "Error", description: "Please enter a recipient email address.", variant: "destructive" });
+      return;
+    }
+    sendInvoiceEmailMutation.mutate({ invoiceId: emailInvoiceId, recipientEmail: invoiceEmailRecipient.trim() });
+  };
 
   // Record payment mutation
   const recordPaymentMutation = useMutation({
@@ -1916,16 +2067,16 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                           {invoice.status === "draft" && (
                             <Button
                               className="w-full min-h-[44px] bg-blue-600 hover:bg-blue-700"
-                              onClick={() => sendInvoiceMutation.mutate(invoice.id)}
-                              disabled={sendInvoiceMutation.isPending}
+                              onClick={() => openInvoiceEmailDialog(invoice.id)}
+                              disabled={sendInvoiceEmailMutation.isPending}
                               data-testid={`button-send-invoice-${invoice.id}`}
                             >
-                              {sendInvoiceMutation.isPending ? (
+                              {sendInvoiceEmailMutation.isPending ? (
                                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                               ) : (
-                                <Send className="h-4 w-4 mr-2" />
+                                <Mail className="h-4 w-4 mr-2" />
                               )}
-                              Send Invoice
+                              Send Email
                             </Button>
                           )}
                           {(invoice.status === "sent" || invoice.status === "partial") && (
@@ -2566,6 +2717,61 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                 <DollarSign className="h-4 w-4 mr-2" />
               )}
               Record Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Invoice Email Dialog */}
+      <Dialog open={showInvoiceEmailDialog} onOpenChange={(open) => { if (!open) { setShowInvoiceEmailDialog(false); setEmailInvoiceId(null); setInvoiceEmailRecipient(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Invoice Email</DialogTitle>
+            <DialogDescription>
+              Enter the email address where you want to send this invoice.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="invoice-email-recipient" className="text-sm font-medium">
+                Recipient Email
+              </Label>
+              <Input
+                id="invoice-email-recipient"
+                type="email"
+                placeholder="customer@example.com"
+                value={invoiceEmailRecipient}
+                onChange={(e) => setInvoiceEmailRecipient(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-invoice-email-recipient"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => { setShowInvoiceEmailDialog(false); setEmailInvoiceId(null); setInvoiceEmailRecipient(""); }}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700 min-h-[44px]"
+              onClick={handleSendInvoiceEmail}
+              disabled={sendInvoiceEmailMutation.isPending || !invoiceEmailRecipient.trim()}
+              data-testid="button-confirm-send-invoice-email"
+            >
+              {sendInvoiceEmailMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Email
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

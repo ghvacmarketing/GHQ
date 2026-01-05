@@ -16,13 +16,17 @@ import {
   Download,
   Eye,
   CheckCircle,
-  XCircle
+  XCircle,
+  Mail
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -65,6 +69,8 @@ export default function MobileQuoteDetail() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [showPreview, setShowPreview] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState("");
 
   const { data: quote, isLoading, error } = useQuery<QuoteWithLineItems>({
     queryKey: ["/api/crm/quotes", id],
@@ -76,21 +82,42 @@ export default function MobileQuoteDetail() {
     enabled: !!id,
   });
 
-  const sendQuoteMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/crm/quotes/${id}/send`);
+  const sendQuoteEmailMutation = useMutation({
+    mutationFn: async (recipientEmail: string) => {
+      const response = await apiRequest("POST", `/api/crm/quotes/${id}/send-email`, {
+        recipientEmail,
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || error.error || "Failed to send quote email");
+      }
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Quote Sent", description: "Quote has been sent successfully." });
+      toast({ title: "Email Sent", description: "Quote email has been sent successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      setShowEmailDialog(false);
+      setEmailRecipient("");
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message || "Failed to send quote", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to send quote email", variant: "destructive" });
     },
   });
+
+  const openEmailDialog = () => {
+    setEmailRecipient(quote?.customerEmail || "");
+    setShowEmailDialog(true);
+  };
+
+  const handleSendEmail = () => {
+    if (!emailRecipient.trim()) {
+      toast({ title: "Error", description: "Please enter a recipient email address.", variant: "destructive" });
+      return;
+    }
+    sendQuoteEmailMutation.mutate(emailRecipient.trim());
+  };
 
   const acceptMutation = useMutation({
     mutationFn: async () => {
@@ -494,16 +521,16 @@ export default function MobileQuoteDetail() {
         {quote.status === "draft" && (
           <Button
             className="w-full min-h-[48px] bg-blue-600 hover:bg-blue-700"
-            onClick={() => sendQuoteMutation.mutate()}
-            disabled={sendQuoteMutation.isPending}
+            onClick={openEmailDialog}
+            disabled={sendQuoteEmailMutation.isPending}
             data-testid="button-send-quote"
           >
-            {sendQuoteMutation.isPending ? (
+            {sendQuoteEmailMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : (
-              <Send className="h-4 w-4 mr-2" />
+              <Mail className="h-4 w-4 mr-2" />
             )}
-            Send Quote
+            Send Email
           </Button>
         )}
 
@@ -648,6 +675,61 @@ export default function MobileQuoteDetail() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Send Quote Email Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailRecipient(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Quote Email</DialogTitle>
+            <DialogDescription>
+              Enter the email address where you want to send this quote.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="email-recipient" className="text-sm font-medium">
+                Recipient Email
+              </Label>
+              <Input
+                id="email-recipient"
+                type="email"
+                placeholder="customer@example.com"
+                value={emailRecipient}
+                onChange={(e) => setEmailRecipient(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-quote-email-recipient"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => { setShowEmailDialog(false); setEmailRecipient(""); }}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700 min-h-[44px]"
+              onClick={handleSendEmail}
+              disabled={sendQuoteEmailMutation.isPending || !emailRecipient.trim()}
+              data-testid="button-confirm-send-quote-email"
+            >
+              {sendQuoteEmailMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Email
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MobileShell>
   );
 }
