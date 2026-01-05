@@ -30,9 +30,7 @@ interface PublicQuoteData {
   lineItems: CrmQuoteLineItem[];
 }
 
-interface ExtendedLineItem extends CrmQuoteLineItem {
-  imageUrl?: string | null;
-}
+type ExtendedLineItem = CrmQuoteLineItem;
 
 interface OptionGroup {
   tag: string;
@@ -73,6 +71,53 @@ function formatDate(dateString: string | Date | null | undefined): string {
     month: "long",
     day: "numeric",
   }).format(date);
+}
+
+interface EquipmentImages {
+  outdoor?: string;
+  coil?: string;
+  furnace?: string;
+  thermostat?: string;
+}
+
+function parseEquipmentImages(imageUrl: string | null | undefined): EquipmentImages | null {
+  if (!imageUrl) return null;
+  try {
+    const parsed = JSON.parse(imageUrl);
+    if (typeof parsed === 'object' && parsed !== null) {
+      return parsed as EquipmentImages;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function EquipmentImageGrid({ images }: { images: EquipmentImages }) {
+  const imageItems = [
+    { key: 'outdoor', url: images.outdoor, label: 'Outdoor' },
+    { key: 'coil', url: images.coil, label: 'Coil' },
+    { key: 'furnace', url: images.furnace, label: 'Indoor' },
+    { key: 'thermostat', url: images.thermostat, label: 'T-stat' },
+  ].filter(item => item.url);
+
+  if (imageItems.length === 0) return null;
+
+  return (
+    <div className={`grid ${imageItems.length <= 2 ? 'grid-cols-2' : 'grid-cols-4'} gap-1`}>
+      {imageItems.map(item => (
+        <div key={item.key} className="flex flex-col items-center">
+          <img
+            src={item.url}
+            alt={item.label}
+            className="w-12 h-12 object-contain border border-slate-200 rounded bg-white"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+          <span className="text-[10px] text-slate-500 mt-0.5">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function SignaturePad({ onSignatureChange }: { onSignatureChange: (dataUrl: string) => void }) {
@@ -454,28 +499,35 @@ export default function PublicQuoteView() {
                           <span className="text-lg font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</span>
                         </div>
                         <div className="p-4">
-                          {option.items.map((item) => (
-                            <div key={item.id} className="flex gap-4 py-2 border-b border-slate-100 last:border-0">
-                              {item.imageUrl && (
-                                <div className="flex-shrink-0">
-                                  <img 
-                                    src={item.imageUrl} 
-                                    alt={item.description}
-                                    className="w-20 h-20 object-cover rounded-lg border border-slate-200"
-                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                  />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-slate-800">{item.description}</div>
-                                {item.partNumber && (
-                                  <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
+                          {option.items.map((item) => {
+                            const equipmentImages = parseEquipmentImages(item.imageUrl);
+                            return (
+                              <div key={item.id} className="flex gap-4 py-2 border-b border-slate-100 last:border-0">
+                                {equipmentImages ? (
+                                  <div className="flex-shrink-0">
+                                    <EquipmentImageGrid images={equipmentImages} />
+                                  </div>
+                                ) : item.imageUrl && (
+                                  <div className="flex-shrink-0">
+                                    <img 
+                                      src={item.imageUrl} 
+                                      alt={item.description}
+                                      className="w-20 h-20 object-cover rounded-lg border border-slate-200"
+                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                    />
+                                  </div>
                                 )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-slate-800">{item.description}</div>
+                                  {item.partNumber && (
+                                    <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
+                                  )}
+                                </div>
+                                <div className="text-center text-slate-600 w-12 text-sm">{parseFloat(item.quantity || "1")}</div>
+                                <div className="text-right text-slate-800 font-medium w-24">{formatCurrency(item.lineTotal)}</div>
                               </div>
-                              <div className="text-center text-slate-600 w-12 text-sm">{parseFloat(item.quantity || "1")}</div>
-                              <div className="text-right text-slate-800 font-medium w-24">{formatCurrency(item.lineTotal)}</div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -518,18 +570,30 @@ export default function PublicQuoteView() {
                       </thead>
                       <tbody>
                         {lineItems.length > 0 ? (
-                          lineItems.map((item, idx) => (
-                            <tr key={item.id} className={idx % 2 === 1 ? "bg-slate-50" : ""}>
-                              <td className="px-4 py-3">
-                                <div className="font-medium text-slate-900">{item.description}</div>
-                                {item.partNumber && (
-                                  <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
-                                )}
-                              </td>
-                              <td className="text-center px-4 py-3 text-slate-600">{parseFloat(item.quantity || "1")}</td>
-                              <td className="text-right px-4 py-3 font-medium text-slate-900">{formatCurrency(item.lineTotal)}</td>
-                            </tr>
-                          ))
+                          lineItems.map((item, idx) => {
+                            const equipmentImages = parseEquipmentImages(item.imageUrl);
+                            return (
+                              <tr key={item.id} className={idx % 2 === 1 ? "bg-slate-50" : ""}>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-start gap-3">
+                                    {equipmentImages && (
+                                      <div className="flex-shrink-0">
+                                        <EquipmentImageGrid images={equipmentImages} />
+                                      </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-slate-900">{item.description}</div>
+                                      {item.partNumber && (
+                                        <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="text-center px-4 py-3 text-slate-600">{parseFloat(item.quantity || "1")}</td>
+                                <td className="text-right px-4 py-3 font-medium text-slate-900">{formatCurrency(item.lineTotal)}</td>
+                              </tr>
+                            );
+                          })
                         ) : (
                           <tr>
                             <td colSpan={3} className="px-4 py-6 text-center text-slate-500 italic">
