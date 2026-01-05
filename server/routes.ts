@@ -14253,10 +14253,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedToId: assignedToId || null,
       }).returning();
 
-      // Create line items from worksheet lines
+      // Create line items from worksheet lines (equipment only - labor/warranty used for pricing calculation only)
       let sortOrder = 0;
+      let equipmentSubtotal = 0;
       for (const line of lines) {
         const cost = line.cost || 0;
+        equipmentSubtotal += cost;
         await db.insert(crmQuoteLineItems).values({
           quoteId: newQuote.id,
           lineType: "part",
@@ -14268,50 +14270,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Add labor line item
-      const laborTotal = calcs.laborPayroll + calcs.laborBenefits;
-      if (laborTotal > 0) {
-        await db.insert(crmQuoteLineItems).values({
-          quoteId: newQuote.id,
-          lineType: "labor",
-          description: `Labor (${inputs.hoursToInstall} hours)`,
-          unitPrice: laborTotal.toString(),
-          quantity: "1",
-          lineTotal: laborTotal.toString(),
-          sortOrder: sortOrder++,
-        });
-      }
+      // Note: Labor and warranty reserve are factored into the final selling price calculation
+      // but are NOT shown as separate line items on the quote
 
-      // Add warranty reserve line item
-      if (inputs.warrantyReserveDollar > 0) {
-        await db.insert(crmQuoteLineItems).values({
-          quoteId: newQuote.id,
-          lineType: "other",
-          description: "Warranty Reserve",
-          unitPrice: inputs.warrantyReserveDollar.toString(),
-          quantity: "1",
-          lineTotal: inputs.warrantyReserveDollar.toString(),
-          sortOrder: sortOrder++,
-        });
-      }
-
-      // Recalculate totals from all line items to ensure accuracy
-      const allLineItems = await db.select().from(crmQuoteLineItems)
-        .where(eq(crmQuoteLineItems.quoteId, newQuote.id));
-      
-      const recalculatedSubtotal = allLineItems.reduce((sum, item) => {
-        return sum + parseFloat(item.lineTotal || "0");
-      }, 0);
-      
-      // Apply the markup/overhead calculation from the worksheet for the final total
-      // The discounted sell price already includes proper markups
-      const recalculatedTotal = calcs.discountedSellPrice;
-      
-      // Update the quote with accurate totals
+      // Update the quote with the equipment subtotal and calculated selling price
       await db.update(crmQuotes)
         .set({
-          subtotal: recalculatedSubtotal.toString(),
-          total: recalculatedTotal.toString(),
+          subtotal: equipmentSubtotal.toString(),
+          total: calcs.discountedSellPrice.toString(),
           updatedAt: new Date(),
         })
         .where(eq(crmQuotes.id, newQuote.id));
