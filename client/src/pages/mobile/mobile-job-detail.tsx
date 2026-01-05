@@ -514,13 +514,15 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [emailRecipient, setEmailRecipient] = useState("");
   const [emailQuoteId, setEmailQuoteId] = useState<string | null>(null);
 
-  // Fetch users with sales roles for assignee selection
-  const { data: salesUsers } = useQuery<CrmUser[]>({
-    queryKey: ["/api/crm/users/by-role", { exactRole: "sales" }],
+  // Fetch users with admin/owner roles for quote assignee selection
+  const { data: adminUsers } = useQuery<CrmUser[]>({
+    queryKey: ["/api/crm/users"],
     queryFn: async () => {
-      const res = await fetch("/api/crm/users/by-role?exactRole=sales", { credentials: "include" });
+      const res = await fetch("/api/crm/users", { credentials: "include" });
       if (!res.ok) return [];
-      return res.json();
+      const users = await res.json();
+      // Filter to only admin and owner roles
+      return users.filter((u: CrmUser) => u.role === 'admin' || u.role === 'owner');
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -967,7 +969,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                     <SelectValue placeholder="Select a sales rep..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {salesUsers?.map((user) => (
+                    {adminUsers?.map((user) => (
                       <SelectItem key={user.id} value={user.id}>
                         {user.fullName || user.email}
                       </SelectItem>
