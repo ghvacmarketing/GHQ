@@ -1123,6 +1123,7 @@ export default function CrmProposalBuilder() {
         unitPrice: number;
         taxable?: boolean;
         optionTag?: string;
+        imageUrl?: string;
       }>;
       status?: string;
       aiGeneratedQuote?: object;
@@ -1186,17 +1187,26 @@ export default function CrmProposalBuilder() {
       unitPrice: number;
       taxable: boolean;
       optionTag?: string;
+      imageUrl?: string;
     }> = [];
     
     cart.forEach(item => {
       if (isHvacPackage(item)) {
         const price = item.eliteData ? item.eliteData.finalTotal : parseFloat(item.totalInvestment) || 0;
+        // Build equipment images JSON for display in public quote view
+        const equipmentImages: Record<string, string> = {};
+        if (item.outdoorImageUrl) equipmentImages.outdoor = `/assets/${item.outdoorImageUrl}`;
+        if (item.thermostatImageUrl) equipmentImages.thermostat = `/assets/${item.thermostatImageUrl}`;
+        if (item.coilImageUrl) equipmentImages.coil = `/assets/${item.coilImageUrl}`;
+        if (item.furnaceImageUrl) equipmentImages.furnace = `/assets/${item.furnaceImageUrl}`;
+        
         lineItems.push({
           description: `${item.packageLevel} Package - ${item.extractedTonnage} - ${item.outdoorBrand} ${item.outdoorName}`,
           quantity: item.quantity,
           unitPrice: price,
           taxable: true,
           optionTag: quoteMode === "options" ? item.packageLevel : undefined,
+          imageUrl: Object.keys(equipmentImages).length > 0 ? JSON.stringify(equipmentImages) : undefined,
         });
       } else if (isCrawlspaceItem(item)) {
         const price = item.eliteData ? item.eliteData.finalTotal : item.pricingBreakdown.totalPrice;
@@ -1209,12 +1219,20 @@ export default function CrmProposalBuilder() {
         });
       } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
+        // Build equipment images JSON for custom builds
+        const equipmentImages: Record<string, string> = {};
+        if (item.outdoorUnit?.imageUrl) equipmentImages.outdoor = `/assets/${item.outdoorUnit.imageUrl}`;
+        if (item.thermostat?.imageUrl) equipmentImages.thermostat = `/assets/${item.thermostat.imageUrl}`;
+        if (item.coil?.imageUrl) equipmentImages.coil = `/assets/${item.coil.imageUrl}`;
+        if (item.indoorUnit?.imageUrl) equipmentImages.furnace = `/assets/${item.indoorUnit.imageUrl}`;
+        
         lineItems.push({
           description: `Custom Build - ${item.tonnage} System`,
           quantity: item.quantity,
           unitPrice: estimate.high,
           taxable: true,
           optionTag: quoteMode === "options" ? "Custom Build" : undefined,
+          imageUrl: Object.keys(equipmentImages).length > 0 ? JSON.stringify(equipmentImages) : undefined,
         });
       }
     });

@@ -14383,6 +14383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lineTotal: lineTotal.toString(),
           sortOrder: sortOrder++,
           optionTag: item.optionTag || null,
+          imageUrl: item.imageUrl || null,
         }).returning();
         createdLineItems.push(createdItem);
       }
