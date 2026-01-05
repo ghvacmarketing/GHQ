@@ -13441,11 +13441,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sentByName = user.displayName || user.name || user.email;
       const subject = `Your Invoice from Giesbrecht HVAC - ${invoice.invoiceNumber}`;
 
-      // Use Resend inbound address for Reply-To so customer replies get routed to webhook
-      const resendInboundAddress = process.env.RESEND_INBOUND_ADDRESS || "invoices@bronaekaru.resend.app";
-      const replyToEmail = resendInboundAddress;
+      // Use the sender's email as Reply-To so customer replies go directly to them
+      const replyToEmail = user.email;
       
-      console.log("[Invoice Email] Reply-To:", replyToEmail, "(Resend inbound for webhook routing)");
+      console.log("[Invoice Email] Reply-To:", replyToEmail, "(sender's email)");
 
       const result = await sendCrmInvoiceEmail(
         invoice,
@@ -15167,12 +15166,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sentByName = user.displayName || user.name || user.email;
       const subject = `Your Quote from Giesbrecht HVAC - ${quote.quoteNumber}`;
 
-      // Use Resend inbound address for Reply-To so customer replies get routed to webhook
-      // Format: quotes@bronaekaru.resend.app (or use RESEND_INBOUND_ADDRESS env var)
-      const resendInboundAddress = process.env.RESEND_INBOUND_ADDRESS || "quotes@bronaekaru.resend.app";
-      const replyToEmail = resendInboundAddress;
+      // Use assigned user's email as Reply-To so customer replies go directly to them
+      let replyToEmail = user.email; // Default to sender
+      if (quote.assignedToId) {
+        const [assignedUser] = await db.select({ email: crmUsers.email })
+          .from(crmUsers)
+          .where(eq(crmUsers.id, quote.assignedToId))
+          .limit(1);
+        if (assignedUser?.email) {
+          replyToEmail = assignedUser.email;
+        }
+      }
       
-      console.log("[Quote Email] Reply-To:", replyToEmail, "(Resend inbound for webhook routing)");
+      console.log("[Quote Email] Reply-To:", replyToEmail, "(assigned user's email)");
 
       // Pass sender's email and quote view URL
       const result = await sendCrmQuoteEmail(quote, lineItems, emailTo, personalMessage, sentByName, {
