@@ -42,15 +42,21 @@ export interface CrmQuoteEmailResult {
   messageId?: string;
 }
 
+export interface CrmQuoteEmailOptions {
+  senderEmail?: string;
+  senderName?: string;
+}
+
 export async function sendCrmQuoteEmail(
   quote: CrmQuote,
   lineItems: CrmQuoteLineItem[],
   recipientEmail: string,
   personalMessage?: string,
-  sentBy?: string
+  sentBy?: string,
+  options?: CrmQuoteEmailOptions
 ): Promise<CrmQuoteEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.FROM_EMAIL || "quotes@ghvac.work";
+  const fallbackEmail = process.env.FROM_EMAIL || "quotes@ghvac.work";
   const brandName = brandDefaults.name;
   const brandColor = brandDefaults.color;
   const logoUrl = brandDefaults.logoUrl;
@@ -61,6 +67,17 @@ export async function sendCrmQuoteEmail(
   }
 
   const resend = new Resend(apiKey);
+
+  // Use sender's email if provided and domain is verified, otherwise fall back to default
+  let fromEmail = fallbackEmail;
+  if (options?.senderEmail) {
+    // Format: "Name <email@domain.com>" for better email display
+    if (options.senderName) {
+      fromEmail = `${options.senderName} <${options.senderEmail}>`;
+    } else {
+      fromEmail = options.senderEmail;
+    }
+  }
 
   const subject = `Your Quote from ${brandName} - ${quote.quoteNumber}`;
   const html = buildHtmlBody(quote, lineItems, personalMessage, sentBy);

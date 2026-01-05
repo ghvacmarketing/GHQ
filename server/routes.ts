@@ -14902,10 +14902,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(crmQuoteLineItems.quoteId, quote.id))
         .orderBy(crmQuoteLineItems.sortOrder);
 
-      const sentByName = user.displayName || user.email;
+      const sentByName = user.displayName || user.name || user.email;
       const subject = `Your Quote from Giesbrecht HVAC - ${quote.quoteNumber}`;
 
-      const result = await sendCrmQuoteEmail(quote, lineItems, emailTo, personalMessage, sentByName);
+      // Pass sender's email so the quote comes from their email address
+      const result = await sendCrmQuoteEmail(quote, lineItems, emailTo, personalMessage, sentByName, {
+        senderEmail: user.email,
+        senderName: sentByName,
+      });
 
       const [emailLog] = await db.insert(quoteEmailLogs).values({
         quoteId: quote.id,
