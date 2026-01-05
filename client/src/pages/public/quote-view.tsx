@@ -30,9 +30,13 @@ interface PublicQuoteData {
   lineItems: CrmQuoteLineItem[];
 }
 
+interface ExtendedLineItem extends CrmQuoteLineItem {
+  imageUrl?: string | null;
+}
+
 interface OptionGroup {
   tag: string;
-  items: CrmQuoteLineItem[];
+  items: ExtendedLineItem[];
   total: number;
 }
 
@@ -263,6 +267,7 @@ export default function PublicQuoteView() {
   const [printedName, setPrintedName] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isAccepted, setIsAccepted] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery<PublicQuoteData>({
     queryKey: ["/api/public/quotes", token],
@@ -279,7 +284,7 @@ export default function PublicQuoteView() {
   });
 
   const signMutation = useMutation({
-    mutationFn: async (payload: { signatureImage: string; signerName: string }) => {
+    mutationFn: async (payload: { signatureImage: string; signerName: string; selectedOption?: string }) => {
       const response = await fetch(`/api/public/quotes/${token}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -316,8 +321,16 @@ export default function PublicQuoteView() {
       toast({ variant: "destructive", title: "Terms Required", description: "Please agree to the terms and conditions." });
       return;
     }
+    if (data?.quote?.quoteMode === "options" && !selectedOption) {
+      toast({ variant: "destructive", title: "Selection Required", description: "Please select one of the available options above." });
+      return;
+    }
 
-    signMutation.mutate({ signatureImage: signatureData, signerName: printedName.trim() });
+    signMutation.mutate({ 
+      signatureImage: signatureData, 
+      signerName: printedName.trim(),
+      ...(selectedOption ? { selectedOption } : {}),
+    });
   };
 
   if (isLoading) {
@@ -415,39 +428,73 @@ export default function PublicQuoteView() {
 
                 <div className="space-y-4">
                   <h3 className="font-semibold text-slate-700">Available Options</h3>
-                  {groupLineItemsByOption(lineItems).map((option, idx) => (
-                    <div key={option.tag} className="border-2 rounded-lg overflow-hidden hover:border-slate-400 transition-colors">
-                      <div className="bg-slate-100 px-4 py-3 flex justify-between items-center">
-                        <span className="font-semibold text-slate-900">{option.tag}</span>
-                        <span className="text-lg font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</span>
+                  <p className="text-sm text-slate-500">Click on an option to select it</p>
+                  {groupLineItemsByOption(lineItems).map((option) => {
+                    const isSelected = selectedOption === option.tag;
+                    return (
+                      <div 
+                        key={option.tag} 
+                        onClick={() => setSelectedOption(option.tag)}
+                        className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
+                          isSelected 
+                            ? "border-[#711419] ring-2 ring-[#711419]/20 shadow-md" 
+                            : "border-slate-200 hover:border-slate-400"
+                        }`}
+                        data-testid={`option-card-${option.tag.toLowerCase().replace(/\s+/g, "-")}`}
+                      >
+                        <div className={`px-4 py-3 flex justify-between items-center ${isSelected ? "bg-[#711419]/10" : "bg-slate-100"}`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                              isSelected ? "border-[#711419] bg-[#711419]" : "border-slate-400"
+                            }`}>
+                              {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                            </div>
+                            <span className="font-semibold text-slate-900">{option.tag}</span>
+                          </div>
+                          <span className="text-lg font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</span>
+                        </div>
+                        <div className="p-4">
+                          {option.items.map((item) => (
+                            <div key={item.id} className="flex gap-4 py-2 border-b border-slate-100 last:border-0">
+                              {item.imageUrl && (
+                                <div className="flex-shrink-0">
+                                  <img 
+                                    src={item.imageUrl} 
+                                    alt={item.description}
+                                    className="w-20 h-20 object-cover rounded-lg border border-slate-200"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-slate-800">{item.description}</div>
+                                {item.partNumber && (
+                                  <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
+                                )}
+                              </div>
+                              <div className="text-center text-slate-600 w-12 text-sm">{parseFloat(item.quantity || "1")}</div>
+                              <div className="text-right text-slate-800 font-medium w-24">{formatCurrency(item.lineTotal)}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="p-4">
-                        <table className="w-full text-sm">
-                          <tbody>
-                            {option.items.map((item) => (
-                              <tr key={item.id}>
-                                <td className="py-1.5">
-                                  <div className="font-medium text-slate-800">{item.description}</div>
-                                  {item.partNumber && (
-                                    <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
-                                  )}
-                                </td>
-                                <td className="py-1.5 text-center text-slate-600 w-16">{parseFloat(item.quantity || "1")}</td>
-                                <td className="py-1.5 text-right text-slate-800 font-medium w-24">{formatCurrency(item.lineTotal)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
-                  <p className="text-amber-800 font-medium">
-                    Please select one option above. Contact us at (830) 626-0408 to discuss which option is right for you.
-                  </p>
-                </div>
+                {selectedOption ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                    <p className="text-green-800 font-medium">
+                      You have selected: <strong>{selectedOption}</strong>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                    <p className="text-amber-800 font-medium">
+                      Please select one option above. Contact us at (830) 626-0408 to discuss which option is right for you.
+                    </p>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -569,7 +616,7 @@ export default function PublicQuoteView() {
 
             <Button
               onClick={handleSubmit}
-              disabled={signMutation.isPending || !signatureData || !printedName.trim() || !agreedToTerms}
+              disabled={signMutation.isPending || !signatureData || !printedName.trim() || !agreedToTerms || (quote.quoteMode === "options" && !selectedOption)}
               className="w-full py-6 text-lg font-semibold"
               style={{ backgroundColor: BRAND_COLOR }}
               data-testid="button-accept-quote"
