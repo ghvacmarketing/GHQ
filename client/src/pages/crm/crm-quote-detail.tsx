@@ -664,38 +664,36 @@ export default function CrmQuoteDetail() {
       addPageHeader();
       y += 35;
 
-      // Add ACCEPTED status banner if quote is accepted
-      if (quote.status === "accepted") {
-        const acceptedColor: [number, number, number] = [16, 185, 129]; // emerald-500
-        doc.setFillColor(...acceptedColor);
-        doc.roundedRect(margin, y, contentWidth, 20, 2, 2, 'F');
-        
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(255, 255, 255);
-        doc.text("ACCEPTED", margin + 8, y + 9);
-        
-        // Show selected option if this is an options-based quote
-        if (isOptionsMode && quote.selectedOption) {
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "normal");
-          doc.text(`Selected Option: ${quote.selectedOption}`, margin + 8, y + 16);
-        } else if (quote.signedAt) {
-          doc.setFontSize(9);
-          doc.setFont("helvetica", "normal");
-          const signedDate = new Date(quote.signedAt).toLocaleDateString('en-US', { 
-            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
+      // Add diagonal APPROVED stamp across the page if quote is accepted
+      const addApprovedStamp = () => {
+        if (quote.status === "accepted") {
+          doc.saveGraphicsState();
+          
+          // Position stamp in center of page
+          const centerX = pageWidth / 2;
+          const centerY = pageHeight / 2;
+          
+          // Draw diagonal stamp text
+          doc.setFontSize(72);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(16, 185, 129); // emerald-500
+          doc.setGState(new doc.GState({ opacity: 0.15 }));
+          
+          // Rotate and draw APPROVED stamp
+          const stampText = "APPROVED";
+          const textWidth = doc.getTextWidth(stampText);
+          
+          // Save current state, translate, rotate, draw, restore
+          doc.text(stampText, centerX - textWidth / 2, centerY, { 
+            angle: 45
           });
-          doc.text(`Signed: ${signedDate}`, margin + 8, y + 16);
+          
+          doc.restoreGraphicsState();
         }
-        
-        // Add checkmark on the right
-        doc.setFontSize(16);
-        doc.text("✓", pageWidth - margin - 15, y + 12);
-        
-        y += 26;
-        doc.setTextColor(...textColor);
-      }
+      };
+      
+      // Add stamp to first page (will be added after content is drawn)
+      addApprovedStamp();
 
       // Check if this is an AI-generated quote from proposal builder
       if (quote.aiGeneratedQuote) {
