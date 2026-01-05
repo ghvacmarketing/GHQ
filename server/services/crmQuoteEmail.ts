@@ -62,6 +62,9 @@ export async function sendCrmQuoteEmail(
   const brandColor = brandDefaults.color;
   const logoUrl = brandDefaults.logoUrl;
 
+  // Debug: log first 15 chars of API key to verify correct key is loaded
+  console.log("[CRM Email] API Key prefix:", apiKey ? apiKey.substring(0, 15) + "..." : "NOT SET");
+
   if (!apiKey) {
     console.error("RESEND_API_KEY is not configured");
     return { success: false, error: "Email service not configured" };
