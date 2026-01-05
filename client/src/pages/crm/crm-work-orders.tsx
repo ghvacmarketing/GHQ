@@ -1929,63 +1929,6 @@ export default function CrmWorkOrders() {
               )}
 
               <div className="space-y-2">
-                <Label>Scheduled Date <span className="text-red-500">*</span></Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                      data-testid="button-scheduled-date"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {scheduledDate ? format(scheduledDate, "MMM d, yyyy") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={scheduledDate}
-                      onSelect={setScheduledDate}
-                      data-testid="calendar-scheduled-date"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Start Time</Label>
-                  <Select value={startTime} onValueChange={setStartTime}>
-                    <SelectTrigger data-testid="select-start-time">
-                      <SelectValue placeholder="Start" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[200px]">
-                      {timeOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>End Time</Label>
-                  <Select value={endTime} onValueChange={setEndTime}>
-                    <SelectTrigger data-testid="select-end-time">
-                      <SelectValue placeholder="End" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[200px]">
-                      {timeOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
                 <Label>Assign Technician</Label>
                 <Select value={assignedTechId} onValueChange={setAssignedTechId}>
                   <SelectTrigger data-testid="select-assigned-tech">
@@ -2000,7 +1943,71 @@ export default function CrmWorkOrders() {
                     ))}
                   </SelectContent>
                 </Select>
+                {assignedTechId === "unassigned" && (
+                  <p className="text-xs text-slate-500 mt-1">Leave unassigned to add to backlog. You can schedule later.</p>
+                )}
               </div>
+
+              {assignedTechId && assignedTechId !== "unassigned" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Scheduled Date <span className="text-red-500">*</span></Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                          data-testid="button-scheduled-date"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {scheduledDate ? format(scheduledDate, "MMM d, yyyy") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={scheduledDate}
+                          onSelect={setScheduledDate}
+                          data-testid="calendar-scheduled-date"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Start Time</Label>
+                      <Select value={startTime} onValueChange={setStartTime}>
+                        <SelectTrigger data-testid="select-start-time">
+                          <SelectValue placeholder="Start" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[200px]">
+                          {timeOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Time</Label>
+                      <Select value={endTime} onValueChange={setEndTime}>
+                        <SelectTrigger data-testid="select-end-time">
+                          <SelectValue placeholder="End" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[200px]">
+                          {timeOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="space-y-2">
                 <Label>Title *</Label>
@@ -2055,7 +2062,7 @@ export default function CrmWorkOrders() {
               </Button>
               <Button
                 onClick={() => createWorkOrderMutation.mutate()}
-                disabled={createWorkOrderMutation.isPending || !selectedCustomer || !scheduledDate || !woTitle.trim() || !woDescription.trim() || !areRequiredQuestionsAnswered()}
+                disabled={createWorkOrderMutation.isPending || !selectedCustomer || !woTitle.trim() || !woDescription.trim() || !areRequiredQuestionsAnswered() || (assignedTechId !== "unassigned" && !scheduledDate)}
                 className="bg-[#711419] hover:bg-[#5a1014]"
                 data-testid="button-submit-create"
               >
