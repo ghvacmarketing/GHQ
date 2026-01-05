@@ -287,8 +287,9 @@ export default function CrmWorkOrders() {
     }
   }, []);
 
-  // Fetch maintenance subtypes (includes custom agreement types) when MAINTENANCE is selected
+  // Fetch maintenance subtypes (includes custom agreement types) when MAINTENANCE is selected or dialog opens
   useEffect(() => {
+    if (!createDialogOpen) return;
     if (visitType !== "MAINTENANCE") return;
     
     fetch("/api/crm/work-subtypes/MAINTENANCE", { credentials: "include" })
@@ -302,7 +303,7 @@ export default function CrmWorkOrders() {
         // Fall back to default if API fails
         setMaintenanceSubtypes(["Preventative Maintenance"]);
       });
-  }, [visitType]);
+  }, [visitType, createDialogOpen]);
 
   // Fetch checklist questions when SERVICE is selected and workSubtype changes
   useEffect(() => {

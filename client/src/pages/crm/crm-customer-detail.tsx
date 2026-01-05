@@ -2611,8 +2611,9 @@ export default function CrmCustomerDetail() {
   });
   const crmInvoices = crmInvoicesData?.invoices || [];
 
-  // Fetch maintenance subtypes (includes custom agreement types) when MAINTENANCE is selected
+  // Fetch maintenance subtypes (includes custom agreement types) when MAINTENANCE is selected or dialog opens
   useEffect(() => {
+    if (!scheduleVisitDialogOpen) return;
     if (woVisitType !== "MAINTENANCE") return;
     
     fetch("/api/crm/work-subtypes/MAINTENANCE", { credentials: "include" })
@@ -2625,7 +2626,7 @@ export default function CrmCustomerDetail() {
       .catch(() => {
         setMaintenanceSubtypes(["Preventative Maintenance"]);
       });
-  }, [woVisitType]);
+  }, [woVisitType, scheduleVisitDialogOpen]);
 
   // Fetch checklist questions when SERVICE is selected and workSubtype changes
   useEffect(() => {

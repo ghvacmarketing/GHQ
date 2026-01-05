@@ -339,7 +339,9 @@ export default function CrmProjectDetail() {
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   };
 
+  // Fetch maintenance subtypes (includes custom agreement types) when MAINTENANCE is selected or dialog opens
   useEffect(() => {
+    if (!scheduleWODialogOpen) return;
     if (woVisitType !== "MAINTENANCE") return;
     
     fetch("/api/crm/work-subtypes/MAINTENANCE", { credentials: "include" })
@@ -352,7 +354,7 @@ export default function CrmProjectDetail() {
       .catch(() => {
         setMaintenanceSubtypes(["Preventative Maintenance"]);
       });
-  }, [woVisitType]);
+  }, [woVisitType, scheduleWODialogOpen]);
 
   useEffect(() => {
     if (!scheduleWODialogOpen) return;
