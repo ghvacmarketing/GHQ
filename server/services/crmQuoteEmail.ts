@@ -137,6 +137,31 @@ export async function sendCrmQuoteEmail(
   }
 }
 
+interface OptionGroup {
+  tag: string;
+  items: CrmQuoteLineItem[];
+  total: number;
+}
+
+function groupLineItemsByOption(lineItems: CrmQuoteLineItem[]): OptionGroup[] {
+  const groups = new Map<string, CrmQuoteLineItem[]>();
+  
+  lineItems.forEach(item => {
+    const tag = item.optionTag;
+    if (!tag) return;
+    if (!groups.has(tag)) {
+      groups.set(tag, []);
+    }
+    groups.get(tag)!.push(item);
+  });
+  
+  return Array.from(groups.entries()).map(([tag, items]) => ({
+    tag,
+    items,
+    total: items.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0),
+  }));
+}
+
 function buildTextBody(
   quote: CrmQuote,
   lineItems: CrmQuoteLineItem[],
@@ -164,32 +189,50 @@ function buildTextBody(
   }
   lines.push("");
 
-  if (quote.title) {
-    lines.push(`Quote Title: ${quote.title}`);
-  }
-  if (quote.description) {
-    lines.push(`Description: ${quote.description}`);
+  // Handle option-based quotes differently
+  if (quote.quoteMode === "options") {
+    lines.push("YOUR HOME COMFORT OPTIONS");
+    lines.push("This proposal includes multiple HVAC replacement options for you to choose from.");
+    lines.push("Each option is a complete, standalone package - please select ONE option.");
     lines.push("");
-  }
-
-  lines.push("Line Items:");
-  if (lineItems.length > 0) {
-    lineItems.forEach((item) => {
-      const qty = parseFloat(item.quantity || "1");
-      const price = asCurrency(item.lineTotal);
-      lines.push(`- ${item.description} (Qty: ${qty}) - ${price}`);
+    
+    const optionGroups = groupLineItemsByOption(lineItems);
+    optionGroups.forEach((option) => {
+      lines.push(`=== ${option.tag} - ${asCurrency(option.total)} ===`);
+      option.items.forEach((item) => {
+        const qty = parseFloat(item.quantity || "1");
+        lines.push(`  - ${item.description} (Qty: ${qty}) - ${asCurrency(item.lineTotal)}`);
+      });
+      lines.push("");
     });
   } else {
-    lines.push("- No items listed");
-  }
-  lines.push("");
+    if (quote.title) {
+      lines.push(`Quote Title: ${quote.title}`);
+    }
+    if (quote.description) {
+      lines.push(`Description: ${quote.description}`);
+      lines.push("");
+    }
 
-  lines.push(`Subtotal: ${asCurrency(quote.subtotal)}`);
-  if (quote.laborTotal && parseFloat(quote.laborTotal) > 0) {
-    lines.push(`Labor: ${asCurrency(quote.laborTotal)}`);
+    lines.push("Line Items:");
+    if (lineItems.length > 0) {
+      lineItems.forEach((item) => {
+        const qty = parseFloat(item.quantity || "1");
+        const price = asCurrency(item.lineTotal);
+        lines.push(`- ${item.description} (Qty: ${qty}) - ${price}`);
+      });
+    } else {
+      lines.push("- No items listed");
+    }
+    lines.push("");
+
+    lines.push(`Subtotal: ${asCurrency(quote.subtotal)}`);
+    if (quote.laborTotal && parseFloat(quote.laborTotal) > 0) {
+      lines.push(`Labor: ${asCurrency(quote.laborTotal)}`);
+    }
+    lines.push(`TOTAL: ${asCurrency(quote.total)}`);
+    lines.push("");
   }
-  lines.push(`TOTAL: ${asCurrency(quote.total)}`);
-  lines.push("");
 
   if (quoteViewUrl) {
     lines.push("VIEW & SIGN YOUR QUOTE ONLINE:");
@@ -315,7 +358,65 @@ function buildHtmlBody(
 
           ${personalMessageHtml}
 
-          <!-- Title/Description -->
+          ${quote.quoteMode === "options" ? `
+          <!-- Option-based Quote: Multiple packages to choose from -->
+          <tr>
+            <td class="px-24" style="padding:0 20px 20px 20px;">
+              <h2 style="margin:0 0 8px 0;font-size:18px;font-weight:800;color:#111827;">Your Home Comfort Options</h2>
+              <p style="margin:0;font-size:14px;color:#4b5563;line-height:1.6;">
+                Prepared for ${esc(quote.customerName)}${quote.serviceAddress ? ` at ${esc(quote.serviceAddress)}` : ""}. 
+                This proposal includes multiple HVAC replacement options for you to choose from. 
+                Each option is a complete, standalone package—please select ONE option (prices are not combined).
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Option Cards -->
+          ${groupLineItemsByOption(lineItems).map((option) => `
+          <tr>
+            <td class="px-24" style="padding:0 20px 16px 20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+                <tr>
+                  <td style="background:#f1f5f9;padding:12px 16px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="font-weight:700;font-size:16px;color:#111827;">${esc(option.tag)}</td>
+                        <td style="text-align:right;font-weight:800;font-size:18px;color:${brandColor};">${esc(asCurrency(option.total))}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 16px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    ${option.items.map((item) => `
+                      <tr style="border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:8px 0;vertical-align:top;">
+                          <div style="font-weight:600;color:#111827;font-size:14px;">${esc(item.description)}</div>
+                          ${item.partNumber ? `<div style="font-size:12px;color:#6b7280;">Part #: ${esc(item.partNumber)}</div>` : ""}
+                        </td>
+                        <td style="padding:8px 8px;text-align:center;color:#6b7280;font-size:13px;width:40px;vertical-align:top;">${parseFloat(item.quantity || "1")}</td>
+                        <td style="padding:8px 0;text-align:right;font-weight:600;color:#111827;font-size:14px;width:80px;vertical-align:top;">${esc(asCurrency(item.lineTotal))}</td>
+                      </tr>
+                    `).join("")}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          `).join("")}
+          
+          <!-- Option Selection Notice -->
+          <tr>
+            <td class="px-24" style="padding:0 20px 20px 20px;">
+              <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;text-align:center;">
+                <p style="margin:0;color:#92400e;font-weight:600;">Please select one option. Contact us at (830) 626-0408 to discuss which option is right for you.</p>
+              </div>
+            </td>
+          </tr>
+          ` : `
+          <!-- Standard Quote: Title/Description -->
           ${quote.title || quote.description ? `
           <tr>
             <td class="px-24" style="padding:0 20px 20px 20px;">
@@ -363,6 +464,7 @@ function buildHtmlBody(
               </table>
             </td>
           </tr>
+          `}
 
           <!-- CTA -->
           <tr>

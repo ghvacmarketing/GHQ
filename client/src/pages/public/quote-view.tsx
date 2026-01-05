@@ -30,6 +30,31 @@ interface PublicQuoteData {
   lineItems: CrmQuoteLineItem[];
 }
 
+interface OptionGroup {
+  tag: string;
+  items: CrmQuoteLineItem[];
+  total: number;
+}
+
+function groupLineItemsByOption(lineItems: CrmQuoteLineItem[]): OptionGroup[] {
+  const groups = new Map<string, CrmQuoteLineItem[]>();
+  
+  lineItems.forEach(item => {
+    const tag = item.optionTag;
+    if (!tag) return;
+    if (!groups.has(tag)) {
+      groups.set(tag, []);
+    }
+    groups.get(tag)!.push(item);
+  });
+  
+  return Array.from(groups.entries()).map(([tag, items]) => ({
+    tag,
+    items,
+    total: items.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0),
+  }));
+}
+
 function formatCurrency(value: string | number): string {
   const num = typeof value === "string" ? parseFloat(value.replace(/[^0-9.-]/g, "")) : value;
   if (isNaN(num)) return String(value);
@@ -376,66 +401,118 @@ export default function PublicQuoteView() {
               )}
             </div>
 
-            {(quote.title || quote.description) && (
-              <div>
-                {quote.title && <h3 className="text-lg font-semibold text-slate-900 mb-1">{quote.title}</h3>}
-                {quote.description && <p className="text-slate-600">{quote.description}</p>}
-              </div>
-            )}
-
-            <div>
-              <h3 className="font-semibold text-slate-700 mb-3">Quote Details</h3>
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-slate-100">
-                    <tr>
-                      <th className="text-left px-4 py-3 text-sm font-semibold text-slate-700">Description</th>
-                      <th className="text-center px-4 py-3 text-sm font-semibold text-slate-700 w-20">Qty</th>
-                      <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700 w-28">Price</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lineItems.length > 0 ? (
-                      lineItems.map((item, idx) => (
-                        <tr key={item.id} className={idx % 2 === 1 ? "bg-slate-50" : ""}>
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-slate-900">{item.description}</div>
-                            {item.partNumber && (
-                              <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
-                            )}
-                          </td>
-                          <td className="text-center px-4 py-3 text-slate-600">{parseFloat(item.quantity || "1")}</td>
-                          <td className="text-right px-4 py-3 font-medium text-slate-900">{formatCurrency(item.lineTotal)}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-6 text-center text-slate-500 italic">
-                          No items listed
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 rounded-lg p-4 space-y-2">
-              <div className="flex justify-between text-slate-600">
-                <span>Subtotal</span>
-                <span>{formatCurrency(quote.subtotal)}</span>
-              </div>
-              {quote.laborTotal && parseFloat(quote.laborTotal) > 0 && (
-                <div className="flex justify-between text-slate-600">
-                  <span>Labor</span>
-                  <span>{formatCurrency(quote.laborTotal)}</span>
+            {/* Option-based quotes: show intro explaining this is a multi-option proposal */}
+            {quote.quoteMode === "options" ? (
+              <>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Your Home Comfort Options</h3>
+                  <p className="text-slate-600">
+                    Prepared for {quote.customerName}{quote.serviceAddress ? ` at ${quote.serviceAddress}` : ""}. 
+                    This proposal includes multiple HVAC replacement options for you to choose from. 
+                    Each option is a complete, standalone package—please select ONE option (prices are not combined).
+                  </p>
                 </div>
-              )}
-              <div className="flex justify-between text-xl font-bold border-t pt-2" style={{ color: BRAND_COLOR }}>
-                <span>Total</span>
-                <span data-testid="text-quote-total">{formatCurrency(quote.total)}</span>
-              </div>
-            </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-slate-700">Available Options</h3>
+                  {groupLineItemsByOption(lineItems).map((option, idx) => (
+                    <div key={option.tag} className="border-2 rounded-lg overflow-hidden hover:border-slate-400 transition-colors">
+                      <div className="bg-slate-100 px-4 py-3 flex justify-between items-center">
+                        <span className="font-semibold text-slate-900">{option.tag}</span>
+                        <span className="text-lg font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</span>
+                      </div>
+                      <div className="p-4">
+                        <table className="w-full text-sm">
+                          <tbody>
+                            {option.items.map((item) => (
+                              <tr key={item.id}>
+                                <td className="py-1.5">
+                                  <div className="font-medium text-slate-800">{item.description}</div>
+                                  {item.partNumber && (
+                                    <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
+                                  )}
+                                </td>
+                                <td className="py-1.5 text-center text-slate-600 w-16">{parseFloat(item.quantity || "1")}</td>
+                                <td className="py-1.5 text-right text-slate-800 font-medium w-24">{formatCurrency(item.lineTotal)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                  <p className="text-amber-800 font-medium">
+                    Please select one option above. Contact us at (830) 626-0408 to discuss which option is right for you.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                {(quote.title || quote.description) && (
+                  <div>
+                    {quote.title && <h3 className="text-lg font-semibold text-slate-900 mb-1">{quote.title}</h3>}
+                    {quote.description && <p className="text-slate-600">{quote.description}</p>}
+                  </div>
+                )}
+
+                <div>
+                  <h3 className="font-semibold text-slate-700 mb-3">Quote Details</h3>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-slate-100">
+                        <tr>
+                          <th className="text-left px-4 py-3 text-sm font-semibold text-slate-700">Description</th>
+                          <th className="text-center px-4 py-3 text-sm font-semibold text-slate-700 w-20">Qty</th>
+                          <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700 w-28">Price</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lineItems.length > 0 ? (
+                          lineItems.map((item, idx) => (
+                            <tr key={item.id} className={idx % 2 === 1 ? "bg-slate-50" : ""}>
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-slate-900">{item.description}</div>
+                                {item.partNumber && (
+                                  <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
+                                )}
+                              </td>
+                              <td className="text-center px-4 py-3 text-slate-600">{parseFloat(item.quantity || "1")}</td>
+                              <td className="text-right px-4 py-3 font-medium text-slate-900">{formatCurrency(item.lineTotal)}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={3} className="px-4 py-6 text-center text-slate-500 italic">
+                              No items listed
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Subtotal</span>
+                    <span>{formatCurrency(quote.subtotal)}</span>
+                  </div>
+                  {quote.laborTotal && parseFloat(quote.laborTotal) > 0 && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>Labor</span>
+                      <span>{formatCurrency(quote.laborTotal)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xl font-bold border-t pt-2" style={{ color: BRAND_COLOR }}>
+                    <span>Total</span>
+                    <span data-testid="text-quote-total">{formatCurrency(quote.total)}</span>
+                  </div>
+                </div>
+              </>
+            )}
 
             {quote.validUntil && (
               <p className="text-sm text-slate-500 text-center">

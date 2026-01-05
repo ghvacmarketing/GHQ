@@ -5105,7 +5105,7 @@ export default function CrmProposalBuilder() {
                     {assignableUsers && assignableUsers.length > 0 ? (
                       assignableUsers.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
-                          {user.displayName} ({user.role})
+                          {user.displayName}
                         </SelectItem>
                       ))
                     ) : (

@@ -1359,10 +1359,7 @@ export default function CrmQuoteDetail() {
                       <SelectContent>
                         {assignableUsers.map((user) => (
                           <SelectItem key={user.id} value={user.id} data-testid={`assignee-option-${user.id}`}>
-                            <span className="flex items-center gap-2">
-                              <span>{user.displayName}</span>
-                              <span className="text-xs text-slate-500 capitalize">({user.role})</span>
-                            </span>
+                            {user.displayName}
                           </SelectItem>
                         ))}
                       </SelectContent>
