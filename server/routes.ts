@@ -17038,8 +17038,19 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // RESEND INBOUND EMAIL WEBHOOK
   // ============================================
 
+  // GET /api/webhooks/resend/inbound - Test endpoint to verify webhook is reachable
+  app.get("/api/webhooks/resend/inbound", (req, res) => {
+    console.log("[Resend Inbound] Test GET request received - webhook is reachable");
+    return res.status(200).json({ 
+      status: "ok", 
+      message: "Resend inbound webhook is configured and reachable",
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // POST /api/webhooks/resend/inbound - Receive incoming email replies from Resend
   app.post("/api/webhooks/resend/inbound", async (req, res) => {
+    console.log("[Resend Inbound] POST request received at", new Date().toISOString());
     try {
       // Validate webhook secret if configured
       const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
@@ -17100,7 +17111,52 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       console.log("[Resend Inbound] Stored incoming email for quote:", quoteNumber);
 
-      return res.status(200).json({ received: true, processed: true, quoteNumber });
+      // Forward the email to the assigned salesperson
+      let forwardedTo: string | null = null;
+      if (quote.assignedToId) {
+        const [assignedUser] = await db.select({ email: crmUsers.email, name: crmUsers.name, displayName: crmUsers.displayName })
+          .from(crmUsers)
+          .where(eq(crmUsers.id, quote.assignedToId))
+          .limit(1);
+        
+        if (assignedUser?.email) {
+          try {
+            const { Resend } = await import("resend");
+            const resend = new Resend(process.env.RESEND_API_KEY);
+            
+            const customerName = senderName || senderEmail;
+            const forwardSubject = `[Customer Reply] ${subject}`;
+            const forwardHtml = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px;">
+                <div style="background: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 12px 16px; margin-bottom: 16px;">
+                  <strong>Customer Reply for Quote ${quoteNumber}</strong><br/>
+                  <span style="color: #64748b;">From: ${customerName} (${senderEmail})</span>
+                </div>
+                <div style="padding: 16px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+                  ${html || text?.replace(/\n/g, '<br/>') || '<em>No message content</em>'}
+                </div>
+                <div style="margin-top: 16px; padding: 12px; background: #f8fafc; border-radius: 4px; font-size: 13px; color: #64748b;">
+                  <a href="https://${req.get("host")}/crm/quotes/${quote.id}" style="color: #0ea5e9;">View Quote in CRM</a>
+                </div>
+              </div>
+            `;
+            
+            await resend.emails.send({
+              from: "quotes@ghvacinc.com",
+              to: [assignedUser.email],
+              subject: forwardSubject,
+              html: forwardHtml,
+            });
+            
+            forwardedTo = assignedUser.email;
+            console.log("[Resend Inbound] Forwarded reply to assigned user:", assignedUser.email);
+          } catch (forwardError) {
+            console.error("[Resend Inbound] Failed to forward email to assigned user:", forwardError);
+          }
+        }
+      }
+
+      return res.status(200).json({ received: true, processed: true, quoteNumber, forwardedTo });
     } catch (error) {
       console.error("[Resend Inbound] Error processing webhook:", error);
       return res.status(200).json({ received: true, processed: false, error: "Processing error" });
