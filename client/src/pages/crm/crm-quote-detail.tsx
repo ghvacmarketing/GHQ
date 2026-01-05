@@ -1577,8 +1577,19 @@ export default function CrmQuoteDetail() {
               <div className="space-y-3">
                 {emailLogs.map((log) => {
                   const isOutgoing = log.direction === "outgoing" || !log.direction;
+                  const isSystemEvent = log.direction === "system";
                   const isExpanded = expandedEmailIds.has(log.id);
                   const hasContent = log.htmlContent || log.textContent;
+                  
+                  // Parse system event metadata
+                  let systemEventData: { eventType?: string; signerName?: string; signedAt?: string; acceptedAt?: string; markedByUser?: string } | null = null;
+                  if (isSystemEvent && log.personalMessage) {
+                    try {
+                      systemEventData = JSON.parse(log.personalMessage);
+                    } catch {
+                      systemEventData = null;
+                    }
+                  }
                   
                   const toggleExpanded = () => {
                     setExpandedEmailIds(prev => {
@@ -1591,6 +1602,55 @@ export default function CrmQuoteDetail() {
                       return newSet;
                     });
                   };
+                  
+                  // Render system events differently
+                  if (isSystemEvent) {
+                    const eventTime = systemEventData?.signedAt || systemEventData?.acceptedAt || log.sentAt;
+                    const signerName = systemEventData?.signerName || log.recipientName;
+                    
+                    return (
+                      <div
+                        key={log.id}
+                        className="rounded-lg border overflow-hidden bg-emerald-50 border-emerald-200"
+                        data-testid={`email-log-${log.id}`}
+                      >
+                        <div className="p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <CheckCircle className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                                <span className="font-medium text-sm text-emerald-800">
+                                  Quote Signed & Accepted
+                                </span>
+                              </div>
+                              
+                              {signerName && (
+                                <p className="text-sm text-emerald-700 mb-1">
+                                  Signed by: <span className="font-medium">{signerName}</span>
+                                </p>
+                              )}
+                              
+                              <div className="flex items-center gap-2 text-xs text-emerald-600">
+                                <Clock className="h-3 w-3" />
+                                <span>
+                                  {eventTime
+                                    ? format(new Date(eventTime), "MMM d, yyyy 'at' h:mm a")
+                                    : "—"}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <Badge
+                              variant="outline"
+                              className="bg-emerald-100 text-emerald-700 border-emerald-300"
+                            >
+                              Accepted
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
                   
                   return (
                     <div

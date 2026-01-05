@@ -1179,7 +1179,7 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
 export const quoteEmailLogsStatusEnum = ["pending", "sent", "failed", "bounced", "received"] as const;
 export type QuoteEmailLogStatus = typeof quoteEmailLogsStatusEnum[number];
 
-export const quoteEmailDirectionEnum = ["outgoing", "incoming"] as const;
+export const quoteEmailDirectionEnum = ["outgoing", "incoming", "system"] as const;
 export type QuoteEmailDirection = typeof quoteEmailDirectionEnum[number];
 
 export const quoteEmailLogs = pgTable("quote_email_logs", {
