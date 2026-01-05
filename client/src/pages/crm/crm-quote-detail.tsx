@@ -107,6 +107,14 @@ type QuoteWithLines = CrmQuote & {
   } | null;
   quoteMode?: "single" | "options" | null;
   selectedOption?: string | null;
+  assignedTo?: { id: string; displayName: string; role: string } | null;
+};
+
+type AssignableUser = {
+  id: string;
+  displayName: string;
+  email: string;
+  role: string;
 };
 
 const statusLabels: Record<string, string> = {
@@ -156,6 +164,8 @@ export default function CrmQuoteDetail() {
   const [expandedEmailIds, setExpandedEmailIds] = useState<Set<string>>(new Set());
   const [showMarkAsSentDialog, setShowMarkAsSentDialog] = useState(false);
   const [markSentNote, setMarkSentNote] = useState("");
+  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -180,6 +190,23 @@ export default function CrmQuoteDetail() {
       return res.json();
     },
     enabled: !!quoteId && !!currentUser,
+  });
+
+  // Determine which users to show based on quote type
+  // Quick/custom_service quotes (service) need admin role or above
+  // Proposal/custom_install quotes (install) need sales role or above
+  const isServiceQuote = quote?.quoteType === "quick" || quote?.quoteType === "custom_service";
+  const minRoleForQuoteType = isServiceQuote ? "admin" : "sales";
+
+  // Fetch assignable users based on quote type
+  const { data: assignableUsers = [] } = useQuery<AssignableUser[]>({
+    queryKey: ["/api/crm/users/by-role", minRoleForQuoteType],
+    queryFn: async () => {
+      const response = await fetch(`/api/crm/users/by-role?minRole=${minRoleForQuoteType}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch users");
+      return response.json();
+    },
+    enabled: !!quote && isEditingAssignment,
   });
 
   useEffect(() => {
@@ -262,6 +289,32 @@ export default function CrmQuoteDetail() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to mark as sent", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateAssignmentMutation = useMutation({
+    mutationFn: async (assignedToId: string | null) => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ assignedToId }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to update assignment");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setIsEditingAssignment(false);
+      setSelectedAssigneeId(null);
+      toast({ title: "Assignment updated", description: "The quote assignment has been updated." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update assignment", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1292,6 +1345,75 @@ export default function CrmQuoteDetail() {
                   <span className="text-sm">{formatDate(quote.sentAt)}</span>
                 </div>
               )}
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500">Assigned To</span>
+                {isEditingAssignment ? (
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={selectedAssigneeId || ""}
+                      onValueChange={(value) => setSelectedAssigneeId(value || null)}
+                    >
+                      <SelectTrigger className="w-[180px] h-8 text-sm" data-testid="select-edit-assigned-to">
+                        <SelectValue placeholder="Select assignee" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {assignableUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id} data-testid={`assignee-option-${user.id}`}>
+                            <span className="flex items-center gap-2">
+                              <span>{user.displayName}</span>
+                              <span className="text-xs text-slate-500 capitalize">({user.role})</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={() => {
+                        updateAssignmentMutation.mutate(selectedAssigneeId);
+                      }}
+                      disabled={updateAssignmentMutation.isPending}
+                      data-testid="button-save-assignment"
+                    >
+                      {updateAssignmentMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4 text-green-600" />
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={() => {
+                        setIsEditingAssignment(false);
+                        setSelectedAssigneeId(null);
+                      }}
+                      data-testid="button-cancel-assignment"
+                    >
+                      <X className="h-4 w-4 text-slate-500" />
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingAssignment(true);
+                      setSelectedAssigneeId(quote.assignedToId || null);
+                    }}
+                    className="text-sm hover:text-[#711419] transition-colors flex items-center gap-1"
+                    data-testid="button-edit-assignment"
+                  >
+                    {quote.assignedTo ? (
+                      <span>{quote.assignedTo.displayName}</span>
+                    ) : (
+                      <span className="text-slate-400 italic">Not assigned</span>
+                    )}
+                  </button>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>

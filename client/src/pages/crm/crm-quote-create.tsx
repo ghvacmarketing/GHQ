@@ -90,6 +90,7 @@ interface FormData {
   description: string;
   lineItems: LineItem[];
   notes: string;
+  assignedToId: string | null;
 }
 
 const initialFormData: FormData = {
@@ -103,6 +104,14 @@ const initialFormData: FormData = {
   description: "",
   lineItems: [],
   notes: "",
+  assignedToId: null,
+};
+
+type AssignableUser = {
+  id: string;
+  displayName: string;
+  email: string;
+  role: string;
 };
 
 export default function CrmQuoteCreate() {
@@ -161,6 +170,22 @@ export default function CrmQuoteCreate() {
       return data.items || data || [];
     },
     enabled: itemsCatalogOpen,
+  });
+
+  // Determine which users to show based on quote type
+  // Quick quotes (service) need admin role or above
+  // Proposal quotes (install) need sales role or above
+  const minRoleForQuoteType = formData.quoteType === "quick" ? "admin" : "sales";
+
+  // Fetch assignable users based on quote type
+  const { data: assignableUsers, isLoading: isLoadingUsers } = useQuery<AssignableUser[]>({
+    queryKey: ["/api/crm/users/by-role", minRoleForQuoteType],
+    queryFn: async () => {
+      const response = await fetch(`/api/crm/users/by-role?minRole=${minRoleForQuoteType}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch users");
+      return response.json();
+    },
+    enabled: currentStep >= 2,
   });
 
   const handleAddItemFromCatalog = (item: CrmItem) => {
@@ -482,6 +507,7 @@ export default function CrmQuoteCreate() {
         workOrderId: workOrderIdFromUrl || undefined,
         propertyId: propertyIdFromUrl || undefined,
         projectId: projectIdFromUrl || undefined,
+        assignedToId: formData.assignedToId || undefined,
         lineItems: validLineItems.map(item => ({
           description: item.description,
           quantity: item.quantity,
@@ -792,6 +818,38 @@ export default function CrmQuoteCreate() {
                     data-testid="input-quote-description"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="assignedTo">Assigned To</Label>
+                  <Select
+                    value={formData.assignedToId || ""}
+                    onValueChange={(value) => updateField("assignedToId", value || null)}
+                  >
+                    <SelectTrigger id="assignedTo" data-testid="select-assigned-to">
+                      <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select assignee"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assignableUsers && assignableUsers.length > 0 ? (
+                        assignableUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id} data-testid={`assignee-option-${user.id}`}>
+                            <span className="flex items-center gap-2">
+                              <span>{user.displayName}</span>
+                              <span className="text-xs text-slate-500 capitalize">({user.role})</span>
+                            </span>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="_no_users" disabled>
+                          No users available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-slate-500">
+                    {formData.quoteType === "quick" 
+                      ? "Service quotes can be assigned to admin or owner users" 
+                      : "Install quotes can be assigned to sales, admin, or owner users"}
+                  </p>
+                </div>
               </div>
             )}
 
@@ -1000,6 +1058,14 @@ export default function CrmQuoteCreate() {
                           <span className="font-medium">{formData.description}</span>
                         </div>
                       )}
+                      <div>
+                        <span className="text-slate-500">Assigned To:</span>{" "}
+                        <span className="font-medium" data-testid="review-assigned-to">
+                          {formData.assignedToId 
+                            ? assignableUsers?.find(u => u.id === formData.assignedToId)?.displayName || "—"
+                            : "Not assigned"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div className="p-4 bg-slate-50 rounded-lg">

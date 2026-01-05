@@ -13858,7 +13858,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assigned_to_id as "assignedToId", internal_notes as "internalNotes",
           customer_notes as "customerNotes", property_id as "propertyId",
           accepted_by as "acceptedBy", decline_reason as "declineReason", created_by as "createdBy",
-          ai_generated_quote as "aiGeneratedQuote", quote_mode as "quoteMode"
+          ai_generated_quote as "aiGeneratedQuote", quote_mode as "quoteMode",
+          quote_type as "quoteType"
         FROM crm_quotes 
         WHERE id = ${req.params.id}
         LIMIT 1
@@ -13907,12 +13908,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         project = projQuery.rows[0] || null;
       }
       
+      let assignedTo = null;
+      if (quote.assignedToId) {
+        const assignedQuery = await db.execute(sql`
+          SELECT id, display_name as "displayName", role FROM crm_users WHERE id = ${quote.assignedToId} LIMIT 1
+        `);
+        assignedTo = assignedQuery.rows[0] || null;
+      }
+      
       return res.json({
         ...quote,
         lineItems,
         customer,
         workOrder,
         project,
+        assignedTo,
       });
     } catch (error) {
       console.error("Error fetching CRM quote:", error);
@@ -14361,7 +14371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { customerId, title, description, notes, lineItems, workOrderId, propertyId, projectId } = req.body;
+      const { customerId, title, description, notes, lineItems, workOrderId, propertyId, projectId, assignedToId } = req.body;
 
       if (!customerId) {
         return res.status(400).json({ message: "Customer is required" });
@@ -14408,6 +14418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         total: total.toFixed(2),
         createdBy: user.id,
         quoteType: "quick",
+        assignedToId: assignedToId || null,
       }).returning();
 
       // Create line items
@@ -14463,13 +14474,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Quote not found" });
       }
 
-      // Only draft quotes can be edited (status changes use dedicated endpoints)
-      if (existing.status !== 'draft') {
-        return res.status(400).json({ message: "Only draft quotes can be edited. Use status endpoints for sent/accepted/declined quotes." });
+      // Don't allow changing scope/workOrderId/projectId after creation
+      const { scope, workOrderId, projectId, status, assignedToId, ...updateData } = req.body;
+
+      // assignedToId can be updated regardless of status
+      if (assignedToId !== undefined) {
+        await db.update(crmQuotes)
+          .set({ assignedToId, updatedAt: new Date() })
+          .where(eq(crmQuotes.id, req.params.id));
       }
 
-      // Don't allow changing scope/workOrderId/projectId after creation
-      const { scope, workOrderId, projectId, status, ...updateData } = req.body;
+      // Only draft quotes can be edited for other fields (status changes use dedicated endpoints)
+      if (existing.status !== 'draft' && Object.keys(updateData).length > 0) {
+        // If only assignedToId was being updated, that's already done
+        if (assignedToId !== undefined) {
+          const [updated] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+          return res.json(updated);
+        }
+        return res.status(400).json({ message: "Only draft quotes can be edited. Use status endpoints for sent/accepted/declined quotes." });
+      }
       
       if (scope || workOrderId || projectId) {
         return res.status(400).json({ message: "Cannot change scope, workOrderId, or projectId after quote creation" });
