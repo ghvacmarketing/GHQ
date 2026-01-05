@@ -40,6 +40,10 @@ export interface CrmQuoteEmailResult {
   success: boolean;
   error?: string;
   messageId?: string;
+  htmlContent?: string;
+  textContent?: string;
+  fromEmail?: string;
+  subject?: string;
 }
 
 export interface CrmQuoteEmailOptions {
@@ -111,7 +115,14 @@ export async function sendCrmQuoteEmail(
     }
 
     console.log("CRM Quote email sent successfully:", data?.id);
-    return { success: true, messageId: data?.id };
+    return { 
+      success: true, 
+      messageId: data?.id,
+      htmlContent: html,
+      textContent: text,
+      fromEmail,
+      subject,
+    };
   } catch (err) {
     console.error("Error sending CRM quote email:", err);
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };

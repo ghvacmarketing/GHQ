@@ -14929,14 +14929,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [emailLog] = await db.insert(quoteEmailLogs).values({
         quoteId: quote.id,
+        direction: "outgoing",
+        fromEmail: result.fromEmail || user.email,
         recipientEmail: emailTo,
         recipientName: quote.customerName,
-        subject,
+        subject: result.subject || subject,
+        htmlContent: result.htmlContent || null,
+        textContent: result.textContent || null,
         status: result.success ? "sent" : "failed",
         errorMessage: result.error || null,
         sentBy: user.id,
         personalMessage: personalMessage || null,
         isManual: false,
+        resendMessageId: result.messageId || null,
       }).returning();
 
       if (result.success) {
@@ -16653,6 +16658,79 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error signing quote:", error);
       return res.status(500).json({ message: "Failed to accept quote" });
+    }
+  });
+
+  // ============================================
+  // RESEND INBOUND EMAIL WEBHOOK
+  // ============================================
+
+  // POST /api/webhooks/resend/inbound - Receive incoming email replies from Resend
+  app.post("/api/webhooks/resend/inbound", async (req, res) => {
+    try {
+      // Validate webhook secret if configured
+      const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
+      const authHeader = req.headers["x-webhook-secret"] || req.headers["authorization"];
+      
+      if (webhookSecret && authHeader !== webhookSecret && authHeader !== `Bearer ${webhookSecret}`) {
+        console.log("[Resend Inbound] Unauthorized webhook request - invalid secret");
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const payload = req.body;
+      console.log("[Resend Inbound] Received webhook:", JSON.stringify(payload, null, 2));
+
+      // Resend inbound email webhook payload structure
+      const { from, to, subject, html, text, headers } = payload;
+
+      if (!from || !subject) {
+        console.log("[Resend Inbound] Missing required fields");
+        return res.status(200).json({ received: true, processed: false, reason: "Missing fields" });
+      }
+
+      // Try to find the quote from the subject line (format: "Re: Your Quote from Giesbrecht HVAC - Q-YYYYMMDD-XXX")
+      const quoteNumberMatch = subject.match(/Q-\d{8}-\d{3}/i);
+      if (!quoteNumberMatch) {
+        console.log("[Resend Inbound] Could not extract quote number from subject:", subject);
+        return res.status(200).json({ received: true, processed: false, reason: "No quote number found" });
+      }
+
+      const quoteNumber = quoteNumberMatch[0].toUpperCase();
+      console.log("[Resend Inbound] Found quote number:", quoteNumber);
+
+      // Find the quote
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.quoteNumber, quoteNumber)).limit(1);
+      if (!quote) {
+        console.log("[Resend Inbound] Quote not found:", quoteNumber);
+        return res.status(200).json({ received: true, processed: false, reason: "Quote not found" });
+      }
+
+      // Extract sender email from the "from" field (could be "Name <email>" or just "email")
+      const fromEmailMatch = from.match(/<([^>]+)>/) || [null, from];
+      const senderEmail = fromEmailMatch[1] || from;
+      const senderNameMatch = from.match(/^([^<]+)</);
+      const senderName = senderNameMatch ? senderNameMatch[1].trim() : null;
+
+      // Store the incoming email in quote_email_logs
+      await db.insert(quoteEmailLogs).values({
+        quoteId: quote.id,
+        direction: "incoming",
+        fromEmail: senderEmail,
+        recipientEmail: Array.isArray(to) ? to[0] : to,
+        recipientName: null,
+        subject: subject,
+        htmlContent: html || null,
+        textContent: text || null,
+        status: "received",
+        sentAt: new Date(),
+      });
+
+      console.log("[Resend Inbound] Stored incoming email for quote:", quoteNumber);
+
+      return res.status(200).json({ received: true, processed: true, quoteNumber });
+    } catch (error) {
+      console.error("[Resend Inbound] Error processing webhook:", error);
+      return res.status(200).json({ received: true, processed: false, error: "Processing error" });
     }
   });
 

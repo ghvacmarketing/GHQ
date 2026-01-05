@@ -56,6 +56,11 @@ import {
   Check,
   AlertCircle,
   MoreHorizontal,
+  ChevronDown,
+  ChevronUp,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Inbox,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -148,6 +153,7 @@ export default function CrmQuoteDetail() {
   const [showSendQuoteDialog, setShowSendQuoteDialog] = useState(false);
   const [sendEmailRecipient, setSendEmailRecipient] = useState("");
   const [sendEmailMessage, setSendEmailMessage] = useState("");
+  const [expandedEmailIds, setExpandedEmailIds] = useState<Set<string>>(new Set());
   const [showMarkAsSentDialog, setShowMarkAsSentDialog] = useState(false);
   const [markSentNote, setMarkSentNote] = useState("");
 
@@ -1426,90 +1432,163 @@ export default function CrmQuoteDetail() {
           </Card>
         )}
 
-        {/* Email History Section */}
+        {/* Email Inbox Section */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              Email History
+              <Inbox className="h-4 w-4" />
+              Email Inbox
             </CardTitle>
           </CardHeader>
           <CardContent>
             {emailLogsLoading ? (
               <div className="space-y-3">
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
               </div>
             ) : emailLogs.length === 0 ? (
               <div className="text-center py-8 text-slate-500">
-                <Mail className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                <p>No emails sent yet</p>
+                <Inbox className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                <p>No email conversation yet</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {emailLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className={`p-3 rounded-lg border ${
-                      log.status === "sent"
-                        ? "bg-green-50 border-green-200"
-                        : log.status === "failed"
-                        ? "bg-red-50 border-red-200"
-                        : "bg-slate-50 border-slate-200"
-                    }`}
-                    data-testid={`email-log-${log.id}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          {log.status === "sent" ? (
-                            <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
-                          ) : log.status === "failed" ? (
-                            <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-                          ) : (
-                            <Clock className="h-4 w-4 text-slate-500 flex-shrink-0" />
-                          )}
-                          <span className="font-medium text-sm truncate">{log.recipientEmail}</span>
-                          {log.isManual && (
-                            <Badge variant="outline" className="text-xs bg-slate-100">Manual</Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          <Clock className="h-3 w-3" />
-                          <span>
-                            {log.sentAt
-                              ? format(new Date(log.sentAt), "MMM d, yyyy 'at' h:mm a")
-                              : "—"}
-                          </span>
-                        </div>
-                        {log.personalMessage && (
-                          <p className="mt-2 text-xs text-slate-600 bg-white p-2 rounded border">
-                            {log.personalMessage.length > 100
-                              ? `${log.personalMessage.substring(0, 100)}...`
-                              : log.personalMessage}
-                          </p>
-                        )}
-                        {log.status === "failed" && log.errorMessage && (
-                          <p className="mt-2 text-xs text-red-600">
-                            Error: {log.errorMessage}
-                          </p>
-                        )}
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={
-                          log.status === "sent"
-                            ? "bg-green-100 text-green-700 border-green-300"
+                {emailLogs.map((log) => {
+                  const isOutgoing = log.direction === "outgoing" || !log.direction;
+                  const isExpanded = expandedEmailIds.has(log.id);
+                  const hasContent = log.htmlContent || log.textContent;
+                  
+                  const toggleExpanded = () => {
+                    setExpandedEmailIds(prev => {
+                      const newSet = new Set(prev);
+                      if (newSet.has(log.id)) {
+                        newSet.delete(log.id);
+                      } else {
+                        newSet.add(log.id);
+                      }
+                      return newSet;
+                    });
+                  };
+                  
+                  return (
+                    <div
+                      key={log.id}
+                      className={`rounded-lg border overflow-hidden ${
+                        isOutgoing
+                          ? log.status === "sent"
+                            ? "bg-blue-50 border-blue-200"
                             : log.status === "failed"
-                            ? "bg-red-100 text-red-700 border-red-300"
-                            : "bg-slate-100 text-slate-700 border-slate-300"
-                        }
+                            ? "bg-red-50 border-red-200"
+                            : "bg-slate-50 border-slate-200"
+                          : "bg-green-50 border-green-200"
+                      }`}
+                      data-testid={`email-log-${log.id}`}
+                    >
+                      {/* Email Header - Always Visible */}
+                      <div 
+                        className={`p-3 ${hasContent ? "cursor-pointer hover:bg-black/5" : ""}`}
+                        onClick={hasContent ? toggleExpanded : undefined}
                       >
-                        {log.status === "sent" ? "Sent" : log.status === "failed" ? "Failed" : log.status}
-                      </Badge>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              {isOutgoing ? (
+                                <ArrowUpRight className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                              ) : (
+                                <ArrowDownLeft className="h-4 w-4 text-green-600 flex-shrink-0" />
+                              )}
+                              <span className="font-medium text-sm">
+                                {isOutgoing ? "To:" : "From:"}
+                              </span>
+                              <span className="text-sm truncate">
+                                {isOutgoing ? log.recipientEmail : log.fromEmail || "Customer"}
+                              </span>
+                              {log.isManual && (
+                                <Badge variant="outline" className="text-xs bg-slate-100">Manual</Badge>
+                              )}
+                            </div>
+                            
+                            {log.subject && (
+                              <p className="text-sm font-medium text-slate-700 truncate mb-1">
+                                {log.subject}
+                              </p>
+                            )}
+                            
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                              <Clock className="h-3 w-3" />
+                              <span>
+                                {log.sentAt
+                                  ? format(new Date(log.sentAt), "MMM d, yyyy 'at' h:mm a")
+                                  : "—"}
+                              </span>
+                              {hasContent && (
+                                <>
+                                  <span className="text-slate-300">|</span>
+                                  <span className="flex items-center gap-1 text-blue-600">
+                                    {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                    {isExpanded ? "Hide content" : "View content"}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                            
+                            {!isExpanded && log.personalMessage && (
+                              <p className="mt-2 text-xs text-slate-600 bg-white/50 p-2 rounded border border-slate-200">
+                                {log.personalMessage.length > 100
+                                  ? `${log.personalMessage.substring(0, 100)}...`
+                                  : log.personalMessage}
+                              </p>
+                            )}
+                            
+                            {log.status === "failed" && log.errorMessage && (
+                              <p className="mt-2 text-xs text-red-600">
+                                Error: {log.errorMessage}
+                              </p>
+                            )}
+                          </div>
+                          
+                          <Badge
+                            variant="outline"
+                            className={
+                              isOutgoing
+                                ? log.status === "sent"
+                                  ? "bg-blue-100 text-blue-700 border-blue-300"
+                                  : log.status === "failed"
+                                  ? "bg-red-100 text-red-700 border-red-300"
+                                  : "bg-slate-100 text-slate-700 border-slate-300"
+                                : "bg-green-100 text-green-700 border-green-300"
+                            }
+                          >
+                            {isOutgoing 
+                              ? (log.status === "sent" ? "Sent" : log.status === "failed" ? "Failed" : log.status)
+                              : "Received"
+                            }
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      {/* Email Content - Expandable */}
+                      {isExpanded && hasContent && (
+                        <div className="border-t bg-white p-4">
+                          {isOutgoing && log.htmlContent ? (
+                            <div 
+                              className="prose prose-sm max-w-none text-slate-700"
+                              dangerouslySetInnerHTML={{ __html: log.htmlContent }}
+                            />
+                          ) : log.textContent ? (
+                            <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans">
+                              {log.textContent}
+                            </pre>
+                          ) : !isOutgoing && log.htmlContent ? (
+                            <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans">
+                              {log.htmlContent.replace(/<[^>]*>/g, '')}
+                            </pre>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
