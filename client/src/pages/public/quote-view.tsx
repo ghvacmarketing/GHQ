@@ -691,20 +691,23 @@ export default function PublicQuoteView() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-lg mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg">Terms & Conditions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-slate-600">
-            <p>1. All work will be performed by licensed and insured technicians.</p>
-            <p>2. Payment is due upon completion of work unless otherwise agreed.</p>
-            <p>3. A 50% deposit may be required for equipment orders.</p>
-            <p>4. Warranty terms vary by equipment and are provided separately.</p>
-            <p>5. Additional charges may apply for unforeseen conditions discovered during work.</p>
-            <p>6. Customer is responsible for providing reasonable access to work areas.</p>
-            <p>7. This quote is valid for 30 days from the date issued unless otherwise specified.</p>
-          </CardContent>
-        </Card>
+        {/* Only show Terms & Conditions for install quotes (proposal and custom_install) */}
+        {quote.quoteType !== "quick" && quote.quoteType !== "custom_service" && (
+          <Card className="shadow-lg mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Terms & Conditions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-slate-600">
+              <p>1. All work will be performed by licensed and insured technicians.</p>
+              <p>2. Payment is due upon completion of work unless otherwise agreed.</p>
+              <p>3. A 50% deposit may be required for equipment orders.</p>
+              <p>4. Warranty terms vary by equipment and are provided separately.</p>
+              <p>5. Additional charges may apply for unforeseen conditions discovered during work.</p>
+              <p>6. Customer is responsible for providing reasonable access to work areas.</p>
+              <p>7. This quote is valid for 30 days from the date issued unless otherwise specified.</p>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="shadow-lg">
           <CardHeader style={{ backgroundColor: BRAND_COLOR }}>
@@ -733,7 +736,10 @@ export default function PublicQuoteView() {
                 data-testid="checkbox-agree-terms"
               />
               <label htmlFor="terms" className="text-sm text-slate-600 cursor-pointer leading-relaxed">
-                I have read and agree to the terms and conditions above. By signing this document, I authorize {BRAND_NAME} to perform the work described in this quote.
+                {quote.quoteType === "quick" || quote.quoteType === "custom_service" 
+                  ? `By signing this document, I authorize ${BRAND_NAME} to perform the work described in this quote.`
+                  : `I have read and agree to the terms and conditions above. By signing this document, I authorize ${BRAND_NAME} to perform the work described in this quote.`
+                }
               </label>
             </div>
 
