@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -16477,6 +16477,395 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error fetching my performance:", error);
       res.status(500).json({ message: "Failed to fetch performance data" });
+    }
+  });
+
+  // ============================================
+  // CUSTOMER PORTAL ROUTES
+  // ============================================
+
+  const PORTAL_SESSION_COOKIE = "portal_session";
+
+  // Middleware to authenticate customer portal users via session cookie
+  async function requireCustomerPortalAuth(req: any, res: any, next: any) {
+    const sessionToken = req.cookies?.[PORTAL_SESSION_COOKIE];
+    if (!sessionToken) {
+      return res.status(401).json({ message: "Unauthorized - Portal login required" });
+    }
+
+    try {
+      const sessions = await db.select()
+        .from(customerPortalSessions)
+        .where(and(
+          eq(customerPortalSessions.sessionToken, sessionToken),
+          gt(customerPortalSessions.expiresAt, new Date())
+        ))
+        .limit(1);
+
+      if (sessions.length === 0) {
+        res.clearCookie(PORTAL_SESSION_COOKIE);
+        return res.status(401).json({ message: "Session expired or invalid" });
+      }
+
+      const session = sessions[0];
+      const accounts = await db.select()
+        .from(customerPortalAccounts)
+        .where(and(
+          eq(customerPortalAccounts.id, session.accountId),
+          eq(customerPortalAccounts.isActive, true)
+        ))
+        .limit(1);
+
+      if (accounts.length === 0) {
+        return res.status(401).json({ message: "Account not found or inactive" });
+      }
+
+      const account = accounts[0];
+      const customers = await db.select()
+        .from(crmCustomers)
+        .where(eq(crmCustomers.id, account.customerId))
+        .limit(1);
+
+      if (customers.length === 0) {
+        return res.status(401).json({ message: "Customer not found" });
+      }
+
+      req.portalAccount = account;
+      req.portalCustomer = customers[0];
+      next();
+    } catch (error) {
+      console.error("Portal auth error:", error);
+      res.status(500).json({ message: "Authentication error" });
+    }
+  }
+
+  // POST /api/admin/portal/generate-link/:customerId - Generate portal login link for a customer
+  app.post("/api/admin/portal/generate-link/:customerId", requireCrmAuth, async (req, res) => {
+    try {
+      const { customerId } = req.params;
+
+      const customerResult = await db.select()
+        .from(crmCustomers)
+        .where(eq(crmCustomers.id, customerId))
+        .limit(1);
+
+      if (customerResult.length === 0) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      const customer = customerResult[0];
+
+      let account = await db.select()
+        .from(customerPortalAccounts)
+        .where(eq(customerPortalAccounts.customerId, customerId))
+        .limit(1)
+        .then(rows => rows[0]);
+
+      if (!account) {
+        const [newAccount] = await db.insert(customerPortalAccounts)
+          .values({
+            customerId,
+            email: customer.email,
+            phone: customer.phone,
+            isActive: true,
+          })
+          .returning();
+        account = newAccount;
+      }
+
+      const token = randomUUID();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await db.insert(customerPortalLoginTokens)
+        .values({
+          accountId: account.id,
+          token,
+          expiresAt,
+        });
+
+      const loginUrl = `/portal/login?token=${token}`;
+
+      res.json({
+        success: true,
+        loginUrl,
+        expiresAt: expiresAt.toISOString(),
+        customerName: customer.name,
+      });
+    } catch (error) {
+      console.error("Error generating portal link:", error);
+      res.status(500).json({ message: "Failed to generate portal link" });
+    }
+  });
+
+  // GET /api/portal/auth/validate-token - Validate login token and create session
+  app.get("/api/portal/auth/validate-token", async (req, res) => {
+    try {
+      const { token } = req.query;
+
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Token required" });
+      }
+
+      const tokenResult = await db.select()
+        .from(customerPortalLoginTokens)
+        .where(and(
+          eq(customerPortalLoginTokens.token, token),
+          isNull(customerPortalLoginTokens.usedAt),
+          gt(customerPortalLoginTokens.expiresAt, new Date())
+        ))
+        .limit(1);
+
+      if (tokenResult.length === 0) {
+        return res.status(401).json({ message: "Invalid or expired token" });
+      }
+
+      const loginToken = tokenResult[0];
+
+      await db.update(customerPortalLoginTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(customerPortalLoginTokens.id, loginToken.id));
+
+      const account = await db.select()
+        .from(customerPortalAccounts)
+        .where(and(
+          eq(customerPortalAccounts.id, loginToken.accountId),
+          eq(customerPortalAccounts.isActive, true)
+        ))
+        .limit(1)
+        .then(rows => rows[0]);
+
+      if (!account) {
+        return res.status(401).json({ message: "Account not found or inactive" });
+      }
+
+      const customer = await db.select()
+        .from(crmCustomers)
+        .where(eq(crmCustomers.id, account.customerId))
+        .limit(1)
+        .then(rows => rows[0]);
+
+      if (!customer) {
+        return res.status(401).json({ message: "Customer not found" });
+      }
+
+      const sessionToken = randomUUID();
+      const sessionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await db.insert(customerPortalSessions)
+        .values({
+          accountId: account.id,
+          sessionToken,
+          expiresAt: sessionExpiresAt,
+        });
+
+      await db.update(customerPortalAccounts)
+        .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+        .where(eq(customerPortalAccounts.id, account.id));
+
+      res.cookie(PORTAL_SESSION_COOKIE, sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      res.json({
+        success: true,
+        customer: {
+          id: customer.id,
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+        },
+      });
+    } catch (error) {
+      console.error("Error validating portal token:", error);
+      res.status(500).json({ message: "Failed to validate token" });
+    }
+  });
+
+  // GET /api/portal/auth/me - Get current logged-in customer info
+  app.get("/api/portal/auth/me", requireCustomerPortalAuth, async (req: any, res) => {
+    const customer = req.portalCustomer;
+    res.json({
+      customer: {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+      },
+    });
+  });
+
+  // POST /api/portal/auth/logout - Destroy session
+  app.post("/api/portal/auth/logout", async (req, res) => {
+    const sessionToken = req.cookies?.[PORTAL_SESSION_COOKIE];
+
+    if (sessionToken) {
+      await db.delete(customerPortalSessions)
+        .where(eq(customerPortalSessions.sessionToken, sessionToken))
+        .catch(console.error);
+    }
+
+    res.clearCookie(PORTAL_SESSION_COOKIE);
+    res.json({ success: true });
+  });
+
+  // GET /api/portal/dashboard - Returns customer's dashboard data
+  app.get("/api/portal/dashboard", requireCustomerPortalAuth, async (req: any, res) => {
+    try {
+      const customerId = req.portalCustomer.id;
+      const customer = req.portalCustomer;
+
+      const recentInvoices = await db.select({
+        id: crmInvoices.id,
+        invoiceNumber: crmInvoices.invoiceNumber,
+        total: crmInvoices.total,
+        status: crmInvoices.status,
+        invoiceDate: crmInvoices.invoiceDate,
+      })
+        .from(crmInvoices)
+        .where(eq(crmInvoices.customerId, customerId))
+        .orderBy(desc(crmInvoices.invoiceDate))
+        .limit(5);
+
+      const agreements = await db.select({
+        id: crmAgreements.id,
+        agreementNumber: crmAgreements.agreementNumber,
+        type: crmAgreements.type,
+        status: crmAgreements.status,
+        startDate: crmAgreements.startDate,
+        endDate: crmAgreements.endDate,
+      })
+        .from(crmAgreements)
+        .where(eq(crmAgreements.customerId, customerId));
+
+      const activeAgreements = agreements.filter(a => a.status === "active").length;
+      const totalAgreements = agreements.length;
+
+      res.json({
+        customer: {
+          id: customer.id,
+          name: customer.name,
+        },
+        recentInvoices,
+        agreementsSummary: {
+          active: activeAgreements,
+          total: totalAgreements,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching portal dashboard:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard data" });
+    }
+  });
+
+  // GET /api/portal/invoices - Returns customer's invoices
+  app.get("/api/portal/invoices", requireCustomerPortalAuth, async (req: any, res) => {
+    try {
+      const customerId = req.portalCustomer.id;
+
+      const invoices = await db.select({
+        id: crmInvoices.id,
+        invoiceNumber: crmInvoices.invoiceNumber,
+        total: crmInvoices.total,
+        subtotal: crmInvoices.subtotal,
+        tax: crmInvoices.tax,
+        status: crmInvoices.status,
+        invoiceDate: crmInvoices.invoiceDate,
+        dueDate: crmInvoices.dueDate,
+        paidDate: crmInvoices.paidDate,
+      })
+        .from(crmInvoices)
+        .where(eq(crmInvoices.customerId, customerId))
+        .orderBy(desc(crmInvoices.invoiceDate));
+
+      res.json({ invoices });
+    } catch (error) {
+      console.error("Error fetching portal invoices:", error);
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  // GET /api/portal/quotes - Returns customer's quotes
+  app.get("/api/portal/quotes", requireCustomerPortalAuth, async (req: any, res) => {
+    try {
+      const customerId = req.portalCustomer.id;
+
+      const quotesResult = await db.select({
+        id: crmQuotes.id,
+        quoteNumber: crmQuotes.quoteNumber,
+        total: crmQuotes.total,
+        subtotal: crmQuotes.subtotal,
+        status: crmQuotes.status,
+        quoteDate: crmQuotes.quoteDate,
+        validUntil: crmQuotes.validUntil,
+        title: crmQuotes.title,
+      })
+        .from(crmQuotes)
+        .where(eq(crmQuotes.customerId, customerId))
+        .orderBy(desc(crmQuotes.quoteDate));
+
+      res.json({ quotes: quotesResult });
+    } catch (error) {
+      console.error("Error fetching portal quotes:", error);
+      res.status(500).json({ message: "Failed to fetch quotes" });
+    }
+  });
+
+  // GET /api/portal/agreements - Returns customer's maintenance agreements
+  app.get("/api/portal/agreements", requireCustomerPortalAuth, async (req: any, res) => {
+    try {
+      const customerId = req.portalCustomer.id;
+
+      const agreementsResult = await db.select({
+        id: crmAgreements.id,
+        agreementNumber: crmAgreements.agreementNumber,
+        type: crmAgreements.type,
+        status: crmAgreements.status,
+        startDate: crmAgreements.startDate,
+        endDate: crmAgreements.endDate,
+        annualPrice: crmAgreements.annualPrice,
+        description: crmAgreements.description,
+      })
+        .from(crmAgreements)
+        .where(eq(crmAgreements.customerId, customerId))
+        .orderBy(desc(crmAgreements.startDate));
+
+      res.json({ agreements: agreementsResult });
+    } catch (error) {
+      console.error("Error fetching portal agreements:", error);
+      res.status(500).json({ message: "Failed to fetch agreements" });
+    }
+  });
+
+  // GET /api/portal/service-history - Returns customer's completed work orders
+  app.get("/api/portal/service-history", requireCustomerPortalAuth, async (req: any, res) => {
+    try {
+      const customerId = req.portalCustomer.id;
+
+      const workOrders = await db.select({
+        id: crmWorkOrders.id,
+        orderNumber: crmWorkOrders.orderNumber,
+        title: crmWorkOrders.title,
+        status: crmWorkOrders.status,
+        visitType: crmWorkOrders.visitType,
+        scheduledStart: crmWorkOrders.scheduledStart,
+        scheduledEnd: crmWorkOrders.scheduledEnd,
+        completedAt: crmWorkOrders.completedAt,
+        summary: crmWorkOrders.summary,
+      })
+        .from(crmWorkOrders)
+        .where(and(
+          eq(crmWorkOrders.customerId, customerId),
+          eq(crmWorkOrders.status, "completed")
+        ))
+        .orderBy(desc(crmWorkOrders.completedAt));
+
+      res.json({ serviceHistory: workOrders });
+    } catch (error) {
+      console.error("Error fetching portal service history:", error);
+      res.status(500).json({ message: "Failed to fetch service history" });
     }
   });
 
