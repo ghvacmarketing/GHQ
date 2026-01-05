@@ -14295,6 +14295,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Recalculate totals from all line items to ensure accuracy
+      const allLineItems = await db.select().from(crmQuoteLineItems)
+        .where(eq(crmQuoteLineItems.quoteId, newQuote.id));
+      
+      const recalculatedSubtotal = allLineItems.reduce((sum, item) => {
+        return sum + parseFloat(item.lineTotal || "0");
+      }, 0);
+      
+      // Apply the markup/overhead calculation from the worksheet for the final total
+      // The discounted sell price already includes proper markups
+      const recalculatedTotal = calcs.discountedSellPrice;
+      
+      // Update the quote with accurate totals
+      await db.update(crmQuotes)
+        .set({
+          subtotal: recalculatedSubtotal.toString(),
+          total: recalculatedTotal.toString(),
+          updatedAt: new Date(),
+        })
+        .where(eq(crmQuotes.id, newQuote.id));
+
       await logCrmAudit(
         user.id,
         "quote.created",
