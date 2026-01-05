@@ -971,7 +971,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                   <SelectContent>
                     {adminUsers?.map((user) => (
                       <SelectItem key={user.id} value={user.id}>
-                        {user.fullName || user.email}
+                        {user.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

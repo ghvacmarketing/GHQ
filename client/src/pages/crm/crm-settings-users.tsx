@@ -125,6 +125,8 @@ export default function CrmSettingsUsers() {
   const { data: users, isLoading: usersLoading } = useQuery<CrmUserListItem[]>({
     queryKey: ["/api/crm/users"],
     enabled: !!currentUser && (currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "sales"),
+    staleTime: 0, // Always refetch to show latest user list
+    refetchOnMount: "always",
   });
 
   useEffect(() => {
