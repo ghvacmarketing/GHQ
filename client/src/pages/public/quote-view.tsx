@@ -120,6 +120,28 @@ function EquipmentImageGrid({ images }: { images: EquipmentImages }) {
   );
 }
 
+interface WhatsIncludedItem {
+  category: string;
+  items: string[];
+}
+
+function getWhatsIncludedForOption(
+  optionTag: string, 
+  whatsIncluded: WhatsIncludedItem[] | undefined
+): string[] {
+  if (!whatsIncluded || !Array.isArray(whatsIncluded)) return [];
+  
+  const normalizedTag = optionTag.toLowerCase().trim();
+  
+  const match = whatsIncluded.find(item => {
+    const normalizedCategory = item.category.toLowerCase();
+    return normalizedCategory.includes(normalizedTag) || 
+           normalizedCategory.startsWith(normalizedTag);
+  });
+  
+  return match?.items || [];
+}
+
 function SignaturePad({ onSignatureChange }: { onSignatureChange: (dataUrl: string) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -476,6 +498,10 @@ export default function PublicQuoteView() {
                   <p className="text-sm text-slate-500">Click on an option to select it</p>
                   {groupLineItemsByOption(lineItems).map((option) => {
                     const isSelected = selectedOption === option.tag;
+                    const whatsIncluded = getWhatsIncludedForOption(
+                      option.tag, 
+                      quote.aiGeneratedQuote?.whats_included as WhatsIncludedItem[] | undefined
+                    );
                     return (
                       <div 
                         key={option.tag} 
@@ -528,6 +554,20 @@ export default function PublicQuoteView() {
                               </div>
                             );
                           })}
+                          
+                          {whatsIncluded.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-slate-200">
+                              <p className="text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">What's Included:</p>
+                              <ul className="space-y-1">
+                                {whatsIncluded.map((item, idx) => (
+                                  <li key={idx} className="flex items-start gap-2 text-sm text-slate-600">
+                                    <span className="text-[#711419] mt-0.5">•</span>
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
