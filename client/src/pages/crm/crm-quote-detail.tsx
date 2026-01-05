@@ -180,6 +180,7 @@ export default function CrmQuoteDetail() {
       return res.json();
     },
     enabled: !!quoteId && !!currentUser,
+    staleTime: 0, // Always consider data stale to enable refetching
     refetchInterval: 10000, // Auto-refresh every 10 seconds to catch status updates
   });
 
