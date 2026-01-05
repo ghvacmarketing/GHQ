@@ -71,6 +71,12 @@ export async function sendCrmQuoteEmail(
 
   // Use sender's email if provided and domain is verified, otherwise fall back to default
   let fromEmail = fallbackEmail;
+  console.log("[CRM Email] Options received:", { 
+    senderEmail: options?.senderEmail, 
+    senderName: options?.senderName,
+    fallbackEmail 
+  });
+  
   if (options?.senderEmail) {
     // Format: "Name <email@domain.com>" for better email display
     if (options.senderName) {
@@ -79,6 +85,8 @@ export async function sendCrmQuoteEmail(
       fromEmail = options.senderEmail;
     }
   }
+  
+  console.log("[CRM Email] Sending quote email FROM:", fromEmail, "TO:", recipientEmail);
 
   const subject = `Your Quote from ${brandName} - ${quote.quoteNumber}`;
   const html = buildHtmlBody(quote, lineItems, personalMessage, sentBy, options?.quoteViewUrl);
