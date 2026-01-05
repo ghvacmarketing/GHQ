@@ -55,6 +55,7 @@ import type {
   CrmUser,
 } from "@shared/schema";
 import { formatDistanceToNow, format } from "date-fns";
+import { CrmLayout } from "@/components/crm/crm-layout";
 
 type ConversationWithCustomer = CrmMessagingConversation & {
   customer?: CrmCustomer | null;
@@ -242,8 +243,8 @@ export default function CrmMessaging() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50">
-      <div className="flex-1 flex overflow-hidden">
+    <CrmLayout currentUser={currentUser} disableScroll>
+      <div className="h-full flex overflow-hidden">
         <div className={`w-full md:w-80 lg:w-96 border-r bg-white flex flex-col ${showMobileThread ? "hidden md:flex" : "flex"}`}>
           <div className="p-4 border-b space-y-3">
             <div className="flex items-center justify-between">
@@ -611,6 +612,6 @@ export default function CrmMessaging() {
           )}
         </div>
       </div>
-    </div>
+    </CrmLayout>
   );
 }
