@@ -1090,6 +1090,10 @@ export type CrmQuoteScope = typeof crmQuoteScopeEnum[number];
 export const crmQuoteTypeEnum = ["quick", "proposal", "custom_install", "custom_service"] as const;
 export type CrmQuoteType = typeof crmQuoteTypeEnum[number];
 
+// Quote Category for email routing (install = sales assigned, service = admin assigned)
+export const quoteCategoryEnum = ["install", "service"] as const;
+export type QuoteCategory = typeof quoteCategoryEnum[number];
+
 // CRM Quotes (proposals attached to either a Work Order or Project)
 export const crmQuotes = pgTable("crm_quotes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1149,6 +1153,8 @@ export const crmQuotes = pgTable("crm_quotes", {
   signerName: text("signer_name"),
   signerIp: text("signer_ip"),
   signedAt: timestamp("signed_at"),
+  // Email routing fields
+  quoteCategory: text("quote_category").$type<QuoteCategory>(),
 });
 
 // CRM Quote Line Items
@@ -1195,6 +1201,7 @@ export const quoteEmailLogs = pgTable("quote_email_logs", {
   personalMessage: text("personal_message"),
   isManual: boolean("is_manual").default(false),
   resendMessageId: text("resend_message_id"),
+  replyToEmail: text("reply_to_email"),
 });
 
 export const insertQuoteEmailLogSchema = createInsertSchema(quoteEmailLogs).omit({
