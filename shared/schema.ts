@@ -1172,6 +1172,7 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   isDiscountLine: boolean("is_discount_line").default(false),
   discountKind: text("discount_kind").$type<DiscountKind>(),
   optionTag: text("option_tag"),
+  imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

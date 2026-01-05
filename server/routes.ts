@@ -16925,11 +16925,13 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         id: item.id,
         lineType: item.lineType,
         description: item.description,
+        partNumber: item.partNumber,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         lineTotal: item.lineTotal,
         sortOrder: item.sortOrder,
         optionTag: item.optionTag,
+        imageUrl: item.imageUrl,
       }));
 
       return res.json({ quote: publicQuote, lineItems: publicLineItems });
@@ -16943,7 +16945,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   app.post("/api/public/quotes/:token/sign", async (req, res) => {
     try {
       const { token } = req.params;
-      const { signatureImage, signerName } = req.body;
+      const { signatureImage, signerName, selectedOption } = req.body;
 
       if (!token || typeof token !== "string") {
         return res.status(400).json({ message: "Invalid token" });
@@ -16991,6 +16993,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           signerIp,
           signedAt: now,
           updatedAt: now,
+          ...(selectedOption && typeof selectedOption === "string" ? { selectedOption } : {}),
         })
         .where(eq(crmQuotes.id, quote.id))
         .returning();
