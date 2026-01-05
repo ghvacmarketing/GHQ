@@ -10423,36 +10423,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(eq(crmAgreements.id, effectiveAgreementId));
           }
         } else {
-          // Fallback: If no agreementId on work order, try to find by workOrderId (legacy behavior)
+          // Fallback: If no agreementId on work order, try to find by customer/property
+          // First, check if there are visits already linked to this work order
           const linkedVisits = await db.select()
             .from(maintenanceVisits)
             .where(eq(maintenanceVisits.workOrderId, req.params.id));
           
-          for (const visit of linkedVisits) {
-            await db.update(maintenanceVisits)
-              .set({ 
-                status: "completed", 
-                completedAt: new Date(),
-                updatedAt: new Date() 
-              })
-              .where(eq(maintenanceVisits.id, visit.id));
+          if (linkedVisits.length > 0) {
+            // Process pre-linked visits
+            for (const visit of linkedVisits) {
+              await db.update(maintenanceVisits)
+                .set({ 
+                  status: "completed", 
+                  completedAt: new Date(),
+                  updatedAt: new Date() 
+                })
+                .where(eq(maintenanceVisits.id, visit.id));
+              
+              if (visit.agreementId) {
+                const [nextVisit] = await db.select()
+                  .from(maintenanceVisits)
+                  .where(and(
+                    eq(maintenanceVisits.agreementId, visit.agreementId),
+                    eq(maintenanceVisits.status, "pending")
+                  ))
+                  .orderBy(asc(maintenanceVisits.targetDate))
+                  .limit(1);
+                
+                await db.update(crmAgreements)
+                  .set({ 
+                    nextServiceDate: nextVisit ? nextVisit.targetDate : null, 
+                    updatedAt: new Date() 
+                  })
+                  .where(eq(crmAgreements.id, visit.agreementId));
+              }
+            }
+          } else if (workOrder?.customerId) {
+            // No pre-linked visits - try to find an active agreement for this customer/property
+            const agreementConditions = [
+              eq(crmAgreements.customerId, workOrder.customerId),
+              eq(crmAgreements.status, "active")
+            ];
             
-            if (visit.agreementId) {
-              const [nextVisit] = await db.select()
+            // If property is specified, match by property too for more precision
+            if (workOrder.propertyId) {
+              agreementConditions.push(eq(crmAgreements.propertyId, workOrder.propertyId));
+            }
+            
+            const [matchingAgreement] = await db.select()
+              .from(crmAgreements)
+              .where(and(...agreementConditions))
+              .limit(1);
+            
+            if (matchingAgreement) {
+              // Find the first pending visit for this agreement
+              const [pendingVisit] = await db.select()
                 .from(maintenanceVisits)
                 .where(and(
-                  eq(maintenanceVisits.agreementId, visit.agreementId),
+                  eq(maintenanceVisits.agreementId, matchingAgreement.id),
                   eq(maintenanceVisits.status, "pending")
                 ))
                 .orderBy(asc(maintenanceVisits.targetDate))
                 .limit(1);
               
-              await db.update(crmAgreements)
-                .set({ 
-                  nextServiceDate: nextVisit ? nextVisit.targetDate : null, 
-                  updatedAt: new Date() 
-                })
-                .where(eq(crmAgreements.id, visit.agreementId));
+              if (pendingVisit) {
+                // Mark the pending visit as completed and link it to this work order
+                await db.update(maintenanceVisits)
+                  .set({ 
+                    status: "completed", 
+                    completedAt: new Date(),
+                    workOrderId: req.params.id,
+                    updatedAt: new Date() 
+                  })
+                  .where(eq(maintenanceVisits.id, pendingVisit.id));
+                
+                // Also update the work order to link it to the agreement
+                await db.update(crmWorkOrders)
+                  .set({ agreementId: matchingAgreement.id })
+                  .where(eq(crmWorkOrders.id, req.params.id));
+                
+                // Find the next pending visit for this agreement
+                const [nextVisit] = await db.select()
+                  .from(maintenanceVisits)
+                  .where(and(
+                    eq(maintenanceVisits.agreementId, matchingAgreement.id),
+                    eq(maintenanceVisits.status, "pending")
+                  ))
+                  .orderBy(asc(maintenanceVisits.targetDate))
+                  .limit(1);
+                
+                // Update the agreement's next service date
+                await db.update(crmAgreements)
+                  .set({ 
+                    nextServiceDate: nextVisit ? nextVisit.targetDate : null, 
+                    updatedAt: new Date() 
+                  })
+                  .where(eq(crmAgreements.id, matchingAgreement.id));
+              }
             }
           }
         }
