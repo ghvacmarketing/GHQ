@@ -14035,7 +14035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { customerId, newCustomer, installSubtype, inputs, lines } = req.body;
+      const { customerId, newCustomer, installSubtype, inputs, lines, assignedToId } = req.body;
 
       if (!lines || !Array.isArray(lines) || lines.length === 0) {
         return res.status(400).json({ message: "At least one line item is required" });
@@ -14090,6 +14090,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       const calcs = calcWorksheet(inputs, worksheetLines);
 
+      // Validate assignedToId if provided
+      if (assignedToId) {
+        const [assignedUser] = await db.select().from(crmUsers).where(eq(crmUsers.id, assignedToId));
+        if (!assignedUser) {
+          return res.status(400).json({ message: "Assigned user not found" });
+        }
+        const validRoles = ["owner", "admin", "sales"];
+        if (!validRoles.includes(assignedUser.role)) {
+          return res.status(400).json({ message: "Assigned user must have sales role or above for install quotes" });
+        }
+      }
+
       // Create the quote
       const [newQuote] = await db.insert(crmQuotes).values({
         quoteNumber,
@@ -14106,6 +14118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         total: calcs.discountedSellPrice.toString(),
         createdBy: user.id,
         quoteType: "custom_install",
+        assignedToId: assignedToId || null,
       }).returning();
 
       // Create line items from worksheet lines
@@ -14279,15 +14292,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Customer not found" });
       }
 
-      // Validate assignedToId if provided (must be sales role or above)
+      // Validate assignedToId if provided
+      // Service quotes (quick, custom_service) require admin+ role
+      // Install quotes (proposal, custom_install) require sales+ role
       if (assignedToId) {
         const [assignedUser] = await db.select().from(crmUsers).where(eq(crmUsers.id, assignedToId));
         if (!assignedUser) {
           return res.status(400).json({ message: "Assigned user not found" });
         }
-        const validRoles = ["owner", "admin", "sales"];
+        const isServiceQuote = quoteType === "quick" || quoteType === "custom_service";
+        const validRoles = isServiceQuote ? ["owner", "admin"] : ["owner", "admin", "sales"];
         if (!validRoles.includes(assignedUser.role)) {
-          return res.status(400).json({ message: "Assigned user must have sales role or above for install quotes" });
+          const roleMsg = isServiceQuote 
+            ? "Assigned user must have admin role or above for service quotes" 
+            : "Assigned user must have sales role or above for install quotes";
+          return res.status(400).json({ message: roleMsg });
         }
       }
 

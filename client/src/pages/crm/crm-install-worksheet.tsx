@@ -39,6 +39,13 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { calcWorksheet, type WorksheetInputs, type WorksheetLine } from "@shared/calcWorksheet";
 import type { CrmUser, CrmCustomer, QuotePart } from "@shared/schema";
+
+type AssignableUser = {
+  id: string;
+  displayName: string;
+  email: string;
+  role: string;
+};
 import PartsSelection from "@/components/parts-selection";
 import SelectedParts from "@/components/selected-parts";
 import WarrantySection from "@/components/warranty-section";
@@ -106,6 +113,7 @@ export default function CrmInstallWorksheet() {
   const [serviceValidationErrors, setServiceValidationErrors] = useState<string[]>([]);
   const [isCustomPartModalOpen, setIsCustomPartModalOpen] = useState(false);
   const [customPartPrefillData, setCustomPartPrefillData] = useState<any>(null);
+  const [assignedToId, setAssignedToId] = useState<string | null>(null);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -132,6 +140,19 @@ export default function CrmInstallWorksheet() {
     enabled: showCustomerModal && customerSearch.length >= 2,
   });
 
+  // Fetch assignable users based on pricing mode
+  // Install quotes need sales+ role, service quotes need admin+ role
+  const minRoleForQuoteType = pricingMode === "service" ? "admin" : "sales";
+  const { data: assignableUsers, isLoading: isLoadingUsers } = useQuery<AssignableUser[]>({
+    queryKey: ["/api/crm/users/by-role", minRoleForQuoteType],
+    queryFn: async () => {
+      const response = await fetch(`/api/crm/users/by-role?minRole=${minRoleForQuoteType}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch users");
+      return response.json();
+    },
+    enabled: showCustomerModal,
+  });
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       navigate("/crm/login");
@@ -144,6 +165,7 @@ export default function CrmInstallWorksheet() {
       installSubtype: string;
       inputs: WorksheetInputs;
       lines: Array<{ category: string; description: string; cost: number }>;
+      assignedToId?: string | null;
     }) => {
       const res = await apiRequest("POST", "/api/crm/quotes/from-worksheet", data);
       return res.json();
@@ -175,6 +197,7 @@ export default function CrmInstallWorksheet() {
       status?: string;
       quoteType: string;
       serviceQuoteData?: object;
+      assignedToId?: string | null;
     }) => {
       const res = await apiRequest("POST", "/api/crm/quotes/from-proposal", data);
       return res.json();
@@ -422,6 +445,7 @@ export default function CrmInstallWorksheet() {
         jobNotes: serviceJobNotes,
         totals: calculateServiceTotals,
       },
+      assignedToId: assignedToId || undefined,
     });
   };
 
@@ -464,6 +488,7 @@ export default function CrmInstallWorksheet() {
         description: l.description,
         cost: l.cost,
       })),
+      assignedToId: assignedToId || undefined,
     });
   };
 
@@ -1143,6 +1168,42 @@ export default function CrmInstallWorksheet() {
                 Type at least 2 characters to search
               </p>
             )}
+
+            {/* Assign To dropdown */}
+            <div className="space-y-2 pt-2 border-t">
+              <Label htmlFor="assignedTo">
+                Assign To ({pricingMode === "service" ? "Admin Team" : "Sales Team"})
+              </Label>
+              <Select
+                value={assignedToId || ""}
+                onValueChange={(value) => setAssignedToId(value || null)}
+              >
+                <SelectTrigger id="assignedTo" data-testid="select-assigned-to">
+                  <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select team member..."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignableUsers && assignableUsers.length > 0 ? (
+                    assignableUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id} data-testid={`assignee-option-${user.id}`}>
+                        <span className="flex items-center gap-2">
+                          <span>{user.displayName}</span>
+                          <span className="text-xs text-slate-500 capitalize">({user.role})</span>
+                        </span>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="_no_users" disabled>
+                      No users available
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500">
+                {pricingMode === "service" 
+                  ? "Service quotes can be assigned to admin or owner users" 
+                  : "Install quotes can be assigned to sales, admin, or owner users"}
+              </p>
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 mt-4">
