@@ -768,7 +768,7 @@ export default function PublicQuoteView() {
 
         <footer className="text-center mt-8 text-sm text-slate-500">
           <p>{BRAND_NAME} • Professional HVAC Service Solutions</p>
-          <p>(830) 626-0408 • quotes@ghvac.work</p>
+          <p>(706) 826-0644 • quotes@ghvac.work</p>
         </footer>
       </div>
     </div>
