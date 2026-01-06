@@ -17,7 +17,8 @@ import {
   Eye,
   CheckCircle,
   XCircle,
-  Mail
+  Mail,
+  Monitor
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -516,6 +517,19 @@ export default function MobileQuoteDetail() {
           <p className="text-xs text-slate-400 text-center" data-testid="created-date">
             Created {format(new Date(quote.createdAt), "MMM d, yyyy 'at' h:mm a")}
           </p>
+        )}
+
+        {/* Present to Client button - available for draft, sent, viewed quotes */}
+        {(quote.status === "draft" || quote.status === "sent" || quote.status === "viewed") && (
+          <Button
+            className="w-full min-h-[48px]"
+            style={{ backgroundColor: '#711419' }}
+            onClick={() => navigate(`/mobile/quotes/${id}/present`)}
+            data-testid="button-present-quote"
+          >
+            <Monitor className="h-4 w-4 mr-2" />
+            Present to Client
+          </Button>
         )}
 
         {quote.status === "draft" && (
