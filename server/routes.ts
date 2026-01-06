@@ -18382,6 +18382,107 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // GET /api/crm/time-breakdown - Get time breakdown (idle/drive/work) per employee
+  app.get("/api/crm/time-breakdown", requireCrmAdmin, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      if (!startDate || !endDate || typeof startDate !== "string" || typeof endDate !== "string") {
+        return res.status(400).json({ message: "startDate and endDate are required" });
+      }
+
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999); // Include the full end date
+
+      // Get all time entries in the date range
+      const timeEntries = await storage.getTimeEntries({ startDate: start, endDate: end });
+
+      // Get all completed work orders with timing data in the date range
+      const workOrders = await db.select()
+        .from(crmWorkOrders)
+        .where(
+          and(
+            isNotNull(crmWorkOrders.dispatchedAt),
+            isNotNull(crmWorkOrders.onSiteAt),
+            isNotNull(crmWorkOrders.completedAt),
+            gte(crmWorkOrders.dispatchedAt, start),
+            lte(crmWorkOrders.dispatchedAt, end)
+          )
+        );
+
+      // Get all users (technicians)
+      const users = await storage.getCrmUsers();
+      const techUsers = users.filter(u => ["tech", "supervisor", "sales"].includes(u.role || ""));
+
+      // Calculate breakdown for each technician
+      const breakdowns = techUsers.map(tech => {
+        // Get time entries for this tech
+        const techTimeEntries = timeEntries.filter(e => e.technicianId === tech.id);
+        
+        // Calculate total clocked time in minutes
+        let totalClockedMinutes = 0;
+        for (const entry of techTimeEntries) {
+          if (entry.durationMinutes) {
+            totalClockedMinutes += entry.durationMinutes;
+          } else if (entry.clockOutAt) {
+            totalClockedMinutes += Math.floor((entry.clockOutAt.getTime() - entry.clockInAt.getTime()) / 60000);
+          }
+        }
+
+        // Get work orders for this tech
+        const techWorkOrders = workOrders.filter(wo => wo.assignedTechId === tech.id);
+
+        // Calculate drive time (dispatchedAt to onSiteAt) in minutes
+        let driveTimeMinutes = 0;
+        for (const wo of techWorkOrders) {
+          if (wo.dispatchedAt && wo.onSiteAt) {
+            driveTimeMinutes += Math.floor((wo.onSiteAt.getTime() - wo.dispatchedAt.getTime()) / 60000);
+          }
+        }
+
+        // Calculate work time (onSiteAt to completedAt) in minutes
+        let workTimeMinutes = 0;
+        for (const wo of techWorkOrders) {
+          if (wo.onSiteAt && wo.completedAt) {
+            workTimeMinutes += Math.floor((wo.completedAt.getTime() - wo.onSiteAt.getTime()) / 60000);
+          }
+        }
+
+        // Idle time = total clocked time - drive time - work time
+        const idleTimeMinutes = Math.max(0, totalClockedMinutes - driveTimeMinutes - workTimeMinutes);
+
+        return {
+          technicianId: tech.id,
+          technicianName: tech.name,
+          role: tech.role,
+          totalClockedMinutes,
+          driveTimeMinutes,
+          workTimeMinutes,
+          idleTimeMinutes,
+          workOrdersCompleted: techWorkOrders.length,
+          // Also include daily breakdown
+          entries: techTimeEntries.map(e => ({
+            id: e.id,
+            date: e.clockInAt.toISOString().split('T')[0],
+            clockInAt: e.clockInAt,
+            clockOutAt: e.clockOutAt,
+            durationMinutes: e.durationMinutes || (e.clockOutAt ? Math.floor((e.clockOutAt.getTime() - e.clockInAt.getTime()) / 60000) : 0),
+          })),
+        };
+      });
+
+      return res.json({
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+        breakdowns: breakdowns.filter(b => b.totalClockedMinutes > 0 || b.workOrdersCompleted > 0),
+      });
+    } catch (error) {
+      console.error("Error calculating time breakdown:", error);
+      return res.status(500).json({ message: "Failed to calculate time breakdown" });
+    }
+  });
+
   // ============================================
   // MOBILE MESSAGING ENDPOINTS
   // ============================================
