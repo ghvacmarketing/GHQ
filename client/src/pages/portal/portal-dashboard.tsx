@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, ClipboardCheck, Wrench, ArrowRight, DollarSign } from "lucide-react";
+import { FileText, ClipboardCheck, Wrench, ArrowRight, DollarSign, Receipt } from "lucide-react";
 import { PortalLayout } from "./portal-layout";
 
 interface PortalCustomer {
@@ -26,6 +26,11 @@ interface PortalDashboardData {
   agreementsSummary: {
     active: number;
     total: number;
+  };
+  quotesSummary: {
+    pendingCount: number;
+    pendingTotal: string;
+    totalCount: number;
   };
   recentService: {
     title: string;
@@ -98,7 +103,7 @@ export default function PortalDashboard() {
           <p className="text-slate-500 mt-1">View your account information and history</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="shadow-sm hover:shadow-md transition-shadow" data-testid="card-open-invoices">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
@@ -149,6 +154,31 @@ export default function PortalDashboard() {
             </CardContent>
           </Card>
 
+          <Card className="shadow-sm hover:shadow-md transition-shadow" data-testid="card-quotes">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-slate-500">Pending Quotes</CardTitle>
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Receipt className="h-5 w-5 text-purple-600" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {dashboardLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <>
+                  <p className="text-2xl font-bold text-slate-900" data-testid="text-pending-quotes-count">
+                    {dashboardData?.quotesSummary?.pendingCount || 0}
+                  </p>
+                  <p className="text-sm text-slate-500" data-testid="text-pending-quotes-total">
+                    {formatCurrency(parseFloat(dashboardData?.quotesSummary?.pendingTotal || "0"))} pending
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
           <Card className="shadow-sm hover:shadow-md transition-shadow" data-testid="card-recent-service">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
@@ -179,7 +209,7 @@ export default function PortalDashboard() {
 
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-slate-800">Quick Links</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Link href="/portal/invoices">
               <Button
                 variant="outline"
@@ -189,6 +219,19 @@ export default function PortalDashboard() {
                 <span className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   View Invoices
+                </span>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Link href="/portal/quotes">
+              <Button
+                variant="outline"
+                className="w-full justify-between h-auto py-4 border-slate-200 hover:border-[#711419] hover:text-[#711419]"
+                data-testid="button-view-quotes"
+              >
+                <span className="flex items-center gap-2">
+                  <Receipt className="h-4 w-4" />
+                  View Quotes
                 </span>
                 <ArrowRight className="h-4 w-4" />
               </Button>

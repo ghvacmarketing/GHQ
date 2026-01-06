@@ -1142,18 +1142,11 @@ export default function CrmWorkOrders() {
                                   </Badge>
                                 </div>
                                 
-                                {(wo.title || wo.description) && (
-                                  <p className="text-xs text-slate-600 truncate mb-2">
-                                    {wo.title || wo.description}
-                                  </p>
-                                )}
+                                <p className="text-xs text-slate-600 truncate mb-2">
+                                  {wo.customer?.name || "—"}
+                                </p>
 
                                 <div className="space-y-1 text-xs">
-                                  <div className="flex items-center gap-1.5 text-slate-600">
-                                    <User className="h-3 w-3 shrink-0" />
-                                    <span className="truncate">{wo.customer?.name || "—"}</span>
-                                  </div>
-
                                   <div className="flex items-center gap-1.5 text-slate-600">
                                     <CalendarIcon className="h-3 w-3 shrink-0" />
                                     <span>
@@ -1166,6 +1159,11 @@ export default function CrmWorkOrders() {
                                   <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`}>
                                     {visitTypeLabels[wo.visitType || "SERVICE"]}
                                   </Badge>
+                                  {wo.workSubtype && wo.workSubtype !== "Other" && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {wo.workSubtype}
+                                    </Badge>
+                                  )}
                                   {wo.priority && wo.priority !== "normal" && (
                                     <Badge className="bg-orange-100 text-orange-700 text-xs">
                                       {wo.priority.charAt(0).toUpperCase() + wo.priority.slice(1)}
@@ -1209,11 +1207,9 @@ export default function CrmWorkOrders() {
                       </Badge>
                     </div>
 
-                    {(wo.title || wo.description) && (
-                      <p className="text-xs text-slate-600 truncate mb-2" data-testid={`text-wo-title-${wo.id}`}>
-                        {wo.title || wo.description}
-                      </p>
-                    )}
+                    <p className="text-xs text-slate-600 truncate mb-2" data-testid={`text-wo-customer-${wo.id}`}>
+                      {wo.customer?.name || "—"}
+                    </p>
 
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`} data-testid={`badge-visit-type-${wo.id}`}>

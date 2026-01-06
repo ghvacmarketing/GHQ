@@ -17885,6 +17885,18 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         .orderBy(desc(crmWorkOrders.completedAt))
         .limit(1);
 
+      // Get quotes summary for the customer
+      const allQuotes = await db.select({
+        id: crmQuotes.id,
+        status: crmQuotes.status,
+        total: crmQuotes.total,
+      })
+        .from(crmQuotes)
+        .where(eq(crmQuotes.customerId, customerId));
+
+      const pendingQuotes = allQuotes.filter(q => q.status === "sent" || q.status === "draft");
+      const pendingQuotesTotal = pendingQuotes.reduce((sum, q) => sum + parseFloat(q.total || "0"), 0);
+
       res.json({
         customer: {
           id: customer.id,
@@ -17898,6 +17910,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         agreementsSummary: {
           active: activeAgreements,
           total: totalAgreements,
+        },
+        quotesSummary: {
+          pendingCount: pendingQuotes.length,
+          pendingTotal: pendingQuotesTotal.toFixed(2),
+          totalCount: allQuotes.length,
         },
         recentService: recentService.length > 0 ? {
           title: recentService[0].title,
@@ -17952,6 +17969,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         quoteDate: crmQuotes.quoteDate,
         validUntil: crmQuotes.validUntil,
         title: crmQuotes.title,
+        publicToken: crmQuotes.publicToken,
       })
         .from(crmQuotes)
         .where(eq(crmQuotes.customerId, customerId))

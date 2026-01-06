@@ -81,6 +81,7 @@ const MobileMessages = lazy(() => import("@/pages/mobile/mobile-messages"));
 const PortalLogin = lazy(() => import("@/pages/portal/portal-login"));
 const PortalDashboard = lazy(() => import("@/pages/portal/portal-dashboard"));
 const PortalInvoices = lazy(() => import("@/pages/portal/portal-invoices"));
+const PortalQuotes = lazy(() => import("@/pages/portal/portal-quotes"));
 const PortalAgreements = lazy(() => import("@/pages/portal/portal-agreements"));
 const PortalServiceHistory = lazy(() => import("@/pages/portal/portal-service-history"));
 
@@ -281,6 +282,7 @@ function Router() {
       <Route path="/portal/login">{() => <PortalWrapper><PortalLogin /></PortalWrapper>}</Route>
       <Route path="/portal/dashboard">{() => <PortalWrapper><PortalDashboard /></PortalWrapper>}</Route>
       <Route path="/portal/invoices">{() => <PortalWrapper><PortalInvoices /></PortalWrapper>}</Route>
+      <Route path="/portal/quotes">{() => <PortalWrapper><PortalQuotes /></PortalWrapper>}</Route>
       <Route path="/portal/agreements">{() => <PortalWrapper><PortalAgreements /></PortalWrapper>}</Route>
       <Route path="/portal/service-history">{() => <PortalWrapper><PortalServiceHistory /></PortalWrapper>}</Route>
       <Route path="/quote/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicQuoteView /></Suspense>}</Route>
