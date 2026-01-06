@@ -9,18 +9,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, FileText, AlertCircle, Loader2 } from "lucide-react";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
-import redlogo from "@assets/redlogo.webp";
+import ghvacLogo from "@assets/ghvac-logo.png";
 
 const BRAND_COLOR = "#711419";
 const BRAND_NAME = "Giesbrecht HVAC";
 
-function BrandEmblem() {
+function BrandLogo() {
   return (
     <div className="flex justify-center mb-4 bg-white py-4">
       <img 
-        src={redlogo} 
+        src={ghvacLogo} 
         alt="Giesbrecht HVAC" 
-        className="h-12 sm:h-16 w-auto object-contain"
+        className="h-16 sm:h-20 w-auto object-contain"
       />
     </div>
   );
@@ -288,10 +288,7 @@ function QuoteAlreadyAccepted({ quote }: { quote: CrmQuote }) {
     <div className="min-h-screen bg-slate-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
-          <BrandEmblem />
-          <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR }}>
-            {BRAND_NAME}
-          </h1>
+          <BrandLogo />
         </div>
 
         <Card className="shadow-lg">
@@ -305,7 +302,7 @@ function QuoteAlreadyAccepted({ quote }: { quote: CrmQuote }) {
               {quote.signerName && ` by ${quote.signerName}`}.
             </p>
             <p className="text-sm text-slate-500">
-              If you have questions about your quote, please contact us at (830) 626-0408.
+              If you have questions about your quote, please contact us at (706) 826-0644.
             </p>
           </CardContent>
         </Card>
@@ -319,10 +316,7 @@ function QuoteSuccess({ quote }: { quote: CrmQuote }) {
     <div className="min-h-screen bg-slate-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
-          <BrandEmblem />
-          <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR }}>
-            {BRAND_NAME}
-          </h1>
+          <BrandLogo />
         </div>
 
         <Card className="shadow-lg">
@@ -335,7 +329,7 @@ function QuoteSuccess({ quote }: { quote: CrmQuote }) {
               Thank you for accepting quote #{quote.quoteNumber}. We'll be in touch shortly to schedule your service.
             </p>
             <p className="text-sm text-slate-500">
-              If you have any questions, please contact us at (830) 626-0408.
+              If you have any questions, please contact us at (706) 826-0644.
             </p>
           </CardContent>
         </Card>
@@ -433,10 +427,7 @@ export default function PublicQuoteView() {
       <div className="min-h-screen bg-slate-50 py-8 px-4">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
-            <BrandEmblem />
-            <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR }}>
-              {BRAND_NAME}
-            </h1>
+            <BrandLogo />
           </div>
 
           <Card className="shadow-lg">
@@ -449,7 +440,7 @@ export default function PublicQuoteView() {
                 {error?.message || "This quote link is invalid or has expired."}
               </p>
               <p className="text-sm text-slate-500 mt-4">
-                Please contact us at (830) 626-0408 for assistance.
+                Please contact us at (706) 826-0644 for assistance.
               </p>
             </CardContent>
           </Card>
@@ -472,10 +463,7 @@ export default function PublicQuoteView() {
     <div className="min-h-screen bg-slate-50 py-4 sm:py-8 px-3 sm:px-4">
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-8">
-          <BrandEmblem />
-          <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR }}>
-            {BRAND_NAME}
-          </h1>
+          <BrandLogo />
           <p className="text-slate-500">Professional HVAC Solutions</p>
         </div>
 
