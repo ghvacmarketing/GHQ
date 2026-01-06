@@ -402,6 +402,30 @@ export default function CrmWorkOrders() {
 
   const projects = projectsResponse?.projects || [];
 
+  // Query for active maintenance agreements when customer is selected
+  interface ActiveAgreement {
+    id: string;
+    agreementType: string | null;
+    status: string;
+    frequency: string | null;
+    visitsPerPeriod: number | null;
+    nextServiceDate: string | null;
+    displayName: string;
+  }
+
+  const { data: activeAgreements = [] } = useQuery<ActiveAgreement[]>({
+    queryKey: ["/api/crm/customers", selectedCustomer?.id, "active-agreements"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${selectedCustomer!.id}/active-agreements`, {
+        credentials: "include",
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data.agreements ?? []);
+    },
+    enabled: !!selectedCustomer?.id && createDialogOpen,
+  });
+
   // Query for linking projects in the detail sheet (different from create dialog)
   // Fetch immediately when sheet opens so user can see project options
   const { data: linkableProjectsResponse, isLoading: linkableProjectsLoading } = useQuery<{ projects: CrmProject[]; pagination: any }>({
@@ -1239,7 +1263,12 @@ export default function CrmWorkOrders() {
                           Change
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[350px] p-0" align="end">
+                      <PopoverContent 
+                        className="w-[350px] p-0 z-[100]" 
+                        align="end"
+                        sideOffset={4}
+                        style={{ maxHeight: "300px", overflowY: "auto" }}
+                      >
                         <Command shouldFilter={false}>
                           <CommandInput
                             placeholder="Search customers..."
@@ -1247,7 +1276,7 @@ export default function CrmWorkOrders() {
                             onValueChange={setReassignCustomerSearch}
                             data-testid="input-reassign-customer-search"
                           />
-                          <CommandList>
+                          <CommandList className="max-h-[250px]">
                             {reassignCustomersLoading ? (
                               <div className="p-4 text-center text-sm text-slate-500">
                                 Loading...
@@ -1633,7 +1662,12 @@ export default function CrmWorkOrders() {
                       {selectedCustomer ? selectedCustomer.name : "Search for a customer..."}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[350px] p-0" align="start">
+                  <PopoverContent 
+                    className="w-[var(--radix-popover-trigger-width)] min-w-[350px] p-0 z-[100]" 
+                    align="start"
+                    sideOffset={4}
+                    style={{ maxHeight: "300px", overflowY: "auto" }}
+                  >
                     <Command shouldFilter={false}>
                       <CommandInput
                         placeholder="Type to search customers..."
@@ -1641,7 +1675,7 @@ export default function CrmWorkOrders() {
                         onValueChange={setCustomerSearch}
                         data-testid="input-customer-search"
                       />
-                      <CommandList>
+                      <CommandList className="max-h-[250px]">
                         {customersLoading ? (
                           <div className="p-4 text-center text-sm text-slate-500">
                             Loading...
@@ -1678,6 +1712,28 @@ export default function CrmWorkOrders() {
                   </PopoverContent>
                 </Popover>
               </div>
+
+              {/* Maintenance Agreement Info Display */}
+              {selectedCustomer && activeAgreements.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="h-4 w-4 text-amber-600" />
+                    <span className="text-sm font-medium text-amber-800">Active Maintenance Agreement</span>
+                  </div>
+                  {activeAgreements.map((agreement) => (
+                    <div key={agreement.id} className="text-sm text-amber-700">
+                      <p className="font-medium">{agreement.displayName}</p>
+                      <div className="flex flex-wrap gap-3 text-xs mt-1">
+                        {agreement.frequency && <span>Billing: {agreement.frequency}</span>}
+                        {agreement.visitsPerPeriod && <span>Visits: {agreement.visitsPerPeriod}/period</span>}
+                        {agreement.nextServiceDate && (
+                          <span>Next Service: {new Date(agreement.nextServiceDate).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {selectedCustomer && (
                 <div className="space-y-2">
