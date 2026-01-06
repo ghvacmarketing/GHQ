@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -103,6 +104,7 @@ const statusColors: Record<CrmInvoiceStatus, string> = {
 };
 
 export default function CrmInvoiceDetail() {
+  usePageTitle("Invoice Detail");
   const [, navigate] = useLocation();
   const [, params] = useRoute("/crm/invoices/:id");
   const invoiceId = params?.id;

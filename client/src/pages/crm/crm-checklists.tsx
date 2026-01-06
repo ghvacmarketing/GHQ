@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -136,6 +137,7 @@ const QUESTION_TYPE_ICONS: Record<ChecklistQuestionType, React.ReactNode> = {
 };
 
 export default function CrmChecklists() {
+  usePageTitle("Checklists");
   const [, navigate] = useLocation();
   const { toast } = useToast();
 

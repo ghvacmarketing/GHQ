@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -546,6 +547,7 @@ function ProspectKanbanColumn({ stage, prospects, onCardClick }: ProspectKanbanC
 }
 
 export default function CrmProspectFunnel() {
+  usePageTitle("Sales Funnel");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -123,6 +124,7 @@ type QuoteWithItems = CrmQuote & {
 };
 
 export default function CrmInvoiceCreate() {
+  usePageTitle("Create Invoice");
   const [, navigate] = useLocation();
   const [currentStep, setCurrentStep] = useState<FormStep>(1);
   const [formData, setFormData] = useState<FormData>(initialFormData);

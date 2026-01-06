@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -68,6 +69,7 @@ function formatPropertyAddress(property: CrmProperty): string {
 }
 
 export default function CrmAgreementCreate() {
+  usePageTitle("Create Agreement");
   const [, navigate] = useLocation();
   const searchString = useSearch();
   const { toast } = useToast();

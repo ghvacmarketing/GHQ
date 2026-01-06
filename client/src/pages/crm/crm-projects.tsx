@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -168,6 +169,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export default function CrmProjects() {
+  usePageTitle("Projects");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [searchInput, setSearchInput] = useState("");

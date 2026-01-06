@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
@@ -54,6 +55,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export default function CrmCustomers() {
+  usePageTitle("Customers");
   const [, navigate] = useLocation();
   const [searchInput, setSearchInput] = useState("");
   const [customerType, setCustomerType] = useState("all");

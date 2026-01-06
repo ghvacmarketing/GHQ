@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
@@ -19,6 +20,7 @@ import {
 import type { CrmUser } from "@shared/schema";
 
 export default function CrmMarketing() {
+  usePageTitle("Marketing");
   const [, navigate] = useLocation();
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({

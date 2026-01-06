@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -13,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { CrmUser } from "@shared/schema";
 
 export default function CrmSettingsPayments() {
+  usePageTitle("Payment Settings");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [depositPercentage, setDepositPercentage] = useState<number>(50);

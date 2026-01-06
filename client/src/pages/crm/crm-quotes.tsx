@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -126,6 +127,7 @@ const quoteTypeFilters = [
 ];
 
 export default function CrmQuotes() {
+  usePageTitle("Quotes");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [searchInput, setSearchInput] = useState("");

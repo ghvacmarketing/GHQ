@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download, Save, X, MapPin, Cog, Shield, Plus, FileEdit } from "lucide-react";
@@ -725,6 +726,7 @@ function loadCustomerFromStorage(): { name: string; address: string; notes: stri
 }
 
 export default function CrmProposalBuilder() {
+  usePageTitle("Proposal Builder");
   const { toast } = useToast();
   
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser>({

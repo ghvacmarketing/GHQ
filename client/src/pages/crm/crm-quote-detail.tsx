@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -140,6 +141,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function CrmQuoteDetail() {
+  usePageTitle("Quote Detail");
   const [, navigate] = useLocation();
   const [, params] = useRoute("/crm/quotes/:id");
   const quoteId = params?.id;

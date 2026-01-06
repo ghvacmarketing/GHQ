@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
@@ -49,6 +50,7 @@ const settingsItems: SettingsItem[] = [
 ];
 
 export default function CrmSettings() {
+  usePageTitle("Settings");
   const [, navigate] = useLocation();
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({

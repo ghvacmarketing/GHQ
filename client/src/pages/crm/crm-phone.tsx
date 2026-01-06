@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect, type ReactNode } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -2668,6 +2669,7 @@ function CrmPhoneContent() {
 }
 
 export default function CrmPhonePage() {
+  usePageTitle("Phone");
   const { data: currentUser, isLoading: userLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),

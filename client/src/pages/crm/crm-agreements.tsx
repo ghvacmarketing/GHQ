@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -132,6 +133,7 @@ function formatCustomerName(name: string | null | undefined): string {
 }
 
 export default function CrmAgreements() {
+  usePageTitle("Agreements");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [searchInput, setSearchInput] = useState("");

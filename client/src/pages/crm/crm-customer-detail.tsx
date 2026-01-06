@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -2239,6 +2240,7 @@ function CustomerTabbedView({
 }
 
 export default function CrmCustomerDetail() {
+  usePageTitle("Customer Detail");
   const [, navigate] = useLocation();
   const params = useParams<{ id: string }>();
   const customerId = params.id;

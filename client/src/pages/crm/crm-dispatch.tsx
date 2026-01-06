@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -1688,6 +1689,7 @@ function formatWeekRange(dates: Date[]): string {
 }
 
 export default function CrmDispatch() {
+  usePageTitle("Dispatch Board");
   const [, navigate] = useLocation();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("day");

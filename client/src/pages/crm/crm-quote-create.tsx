@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -115,6 +116,7 @@ type AssignableUser = {
 };
 
 export default function CrmQuoteCreate() {
+  usePageTitle("Create Quote");
   const [, navigate] = useLocation();
   const [currentStep, setCurrentStep] = useState<FormStep>(1);
   const [formData, setFormData] = useState<FormData>(initialFormData);

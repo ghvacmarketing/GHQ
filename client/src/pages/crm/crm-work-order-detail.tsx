@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -305,6 +306,7 @@ function getPropertyAddress(property: CrmProperty | null): string {
 }
 
 export default function CrmWorkOrderDetail() {
+  usePageTitle("Work Order Detail");
   const [, navigate] = useLocation();
   const params = useParams<{ id: string }>();
   const workOrderId = params.id;

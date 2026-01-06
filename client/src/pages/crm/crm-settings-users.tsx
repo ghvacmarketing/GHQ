@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -100,6 +101,7 @@ const roleConfig: Record<CrmUserRole, { label: string; icon: typeof Shield; colo
 };
 
 export default function CrmSettingsUsers() {
+  usePageTitle("User Settings");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   

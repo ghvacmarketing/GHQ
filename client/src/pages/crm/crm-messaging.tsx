@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -108,6 +109,7 @@ function formatMessageTime(date: Date | string | null): string {
 }
 
 export default function CrmMessaging() {
+  usePageTitle("Messaging");
   const { toast } = useToast();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");

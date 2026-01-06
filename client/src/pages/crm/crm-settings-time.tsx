@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -23,6 +24,7 @@ interface TimeEntryWithTech extends CrmTimeEntry {
 }
 
 export default function CrmSettingsTime() {
+  usePageTitle("Time Logs");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [selectedTechId, setSelectedTechId] = useState<string>("all");
