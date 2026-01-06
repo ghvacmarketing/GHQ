@@ -1693,6 +1693,7 @@ export default function CrmDispatch() {
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
+  const [dispatchNote, setDispatchNote] = useState("");
   const { toast } = useToast();
   
   const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
@@ -2201,6 +2202,27 @@ export default function CrmDispatch() {
       }
     });
   }, [selectedWorkOrderId, newNote, localWorkOrders, updateWorkOrderMutation, toast]);
+
+  const handleSaveDispatchNotes = useCallback(() => {
+    if (!selectedWorkOrderId || !dispatchNote.trim()) return;
+    const currentWO = localWorkOrders.find(wo => wo.id === selectedWorkOrderId);
+    const updatedNotes = currentWO?.dispatchNotes 
+      ? `${currentWO.dispatchNotes}\n\n---\n${new Date().toLocaleDateString()}: ${dispatchNote.trim()}`
+      : dispatchNote.trim();
+    
+    updateWorkOrderMutation.mutate({
+      workOrderId: selectedWorkOrderId,
+      updates: { dispatchNotes: updatedNotes },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Dispatch notes saved", description: "Notes for callback/reference have been updated" });
+        setLocalWorkOrders(prev => prev.map(wo => 
+          wo.id === selectedWorkOrderId ? { ...wo, dispatchNotes: updatedNotes } : wo
+        ));
+        setDispatchNote("");
+      }
+    });
+  }, [selectedWorkOrderId, dispatchNote, localWorkOrders, updateWorkOrderMutation, toast]);
 
   const handleQuickAssign = useCallback((workOrderId: string, techId: string) => {
     const newTech = technicians.find(t => t.id === techId);
@@ -3149,8 +3171,48 @@ export default function CrmDispatch() {
                 <Separator />
 
                 <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    Dispatch Notes
+                  </h3>
+                  <p className="text-xs text-slate-500">For client callbacks or technician reference. These notes will be visible to technicians in the mobile app.</p>
+                  {selectedWorkOrder.dispatchNotes && (
+                    <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm whitespace-pre-wrap" data-testid="dispatch-notes-display">
+                      {selectedWorkOrder.dispatchNotes}
+                    </div>
+                  )}
+                  <Textarea
+                    placeholder="Add dispatch notes (e.g., client called back, special instructions)..."
+                    value={dispatchNote}
+                    onChange={(e) => setDispatchNote(e.target.value)}
+                    className="min-h-[80px]"
+                    data-testid="textarea-dispatch-notes"
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={handleSaveDispatchNotes}
+                    disabled={!dispatchNote.trim() || updateWorkOrderMutation.isPending}
+                    data-testid="button-save-dispatch-notes"
+                  >
+                    Save Dispatch Notes
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-slate-900">Actions</h3>
                   <div className="flex flex-wrap gap-2">
+                    <Link href={`/crm/work-orders/${selectedWorkOrder.id}`}>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        data-testid="button-view-full-details"
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        View Full Details
+                      </Button>
+                    </Link>
                     {selectedWorkOrder.assignedTechId && (
                       <Button
                         size="sm"

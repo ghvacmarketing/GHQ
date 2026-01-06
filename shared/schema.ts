@@ -1072,6 +1072,7 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   photos: json("photos").$type<{ id: string; url: string; objectPath: string; filename: string; uploadedAt: string }[]>(),
   billingDisposition: text("billing_disposition").$type<BillingDisposition>(),
   billingNotes: text("billing_notes"),
+  dispatchNotes: text("dispatch_notes"),
   invoiceId: varchar("invoice_id"),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),

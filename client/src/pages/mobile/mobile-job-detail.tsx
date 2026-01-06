@@ -218,6 +218,22 @@ function OverviewTab({
         </Card>
       )}
 
+      {workOrder.dispatchNotes && (
+        <Card className="border-amber-200 bg-amber-50/50" data-testid="card-dispatch-notes">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Phone className="h-4 w-4 text-amber-600" />
+              Dispatch Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-dispatch-notes">
+              {workOrder.dispatchNotes}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card data-testid="status-update-card">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Job Status</CardTitle>

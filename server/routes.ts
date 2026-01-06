@@ -10273,6 +10273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dispatchQueueStage: true,
         customerId: true,
         propertyId: true,
+        dispatchNotes: true,
       }).extend({
         scheduledStart: z.union([z.string(), z.date(), z.null()]).optional(),
         scheduledEnd: z.union([z.string(), z.date(), z.null()]).optional(),
@@ -10290,7 +10291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, completionSummary, checklist, partsUsed, startedAt, completedAt, projectId, agreementId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer } = result.data;
+      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, completionSummary, checklist, partsUsed, startedAt, completedAt, projectId, agreementId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer, dispatchNotes } = result.data;
 
       // If projectId is provided (not null), verify it exists
       if (projectId !== undefined && projectId !== null) {
@@ -10368,6 +10369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (dispatchQueueStage !== undefined) updateData.dispatchQueueStage = dispatchQueueStage;
       if (customerId !== undefined) updateData.customerId = customerId;
       if (propertyId !== undefined) updateData.propertyId = propertyId;
+      if (dispatchNotes !== undefined) updateData.dispatchNotes = dispatchNotes;
 
       // If customer is being changed and there's a linked project, update project too
       if (customerId !== undefined && customerId !== existingWorkOrder.customerId && updateProjectCustomer) {
