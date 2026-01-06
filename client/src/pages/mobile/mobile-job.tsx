@@ -1,12 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import MobileShell from "./mobile-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2, Circle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2, Circle, Plus, Search, Loader2, AlertTriangle } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { CrmWorkOrder, CrmCustomer, CrmUser, CrmProperty } from "@shared/schema";
 
 interface WorkOrderWithDetails extends CrmWorkOrder {
@@ -57,9 +64,24 @@ function formatSubtype(subtype: string | null | undefined): string {
 
 export default function MobileJob() {
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const today = new Date();
   const todayStart = getLocalStartOfDay(today).toISOString();
   const todayEnd = getLocalEndOfDay(today).toISOString();
+
+  // Create Work Order Dialog State
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomer | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<CrmProperty | null>(null);
+  const [woTitle, setWoTitle] = useState("");
+  const [woDescription, setWoDescription] = useState("");
+  const [visitType, setVisitType] = useState<string>("SERVICE");
+  const [workSubtype, setWorkSubtype] = useState<string>("");
+  const [priority, setPriority] = useState<string>("normal");
+  const [scheduledStart, setScheduledStart] = useState("");
+  const [scheduledEnd, setScheduledEnd] = useState("");
+  const [conflictError, setConflictError] = useState<string | null>(null);
 
   const { data: currentUser, isLoading: userLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -69,6 +91,8 @@ export default function MobileJob() {
       return res.json();
     },
   });
+
+  const isSupervisor = currentUser?.role === 'supervisor';
 
   const { data: workOrders = [], isLoading: ordersLoading } = useQuery<WorkOrderWithDetails[]>({
     queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: (currentUser?.role === 'tech' || currentUser?.role === 'sales') ? currentUser?.id : undefined }],
@@ -87,6 +111,124 @@ export default function MobileJob() {
     },
     enabled: !!currentUser,
   });
+
+  // Search customers for work order creation
+  const { data: searchedCustomers = [] } = useQuery<CrmCustomer[]>({
+    queryKey: ["/api/crm/customers", { search: customerSearch }],
+    queryFn: async () => {
+      if (!customerSearch.trim()) return [];
+      const res = await fetch(`/api/crm/customers?search=${encodeURIComponent(customerSearch)}`, { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.customers || [];
+    },
+    enabled: customerSearch.length >= 2,
+    staleTime: 30 * 1000,
+  });
+
+  // Fetch properties for selected customer
+  const { data: customerProperties = [] } = useQuery<CrmProperty[]>({
+    queryKey: ["/api/crm/properties", { customerId: selectedCustomer?.id }],
+    queryFn: async () => {
+      if (!selectedCustomer?.id) return [];
+      const res = await fetch(`/api/crm/properties?customerId=${selectedCustomer.id}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedCustomer?.id,
+  });
+
+  // Work subtypes based on visit type
+  const workSubtypes: Record<string, string[]> = {
+    SERVICE: ["NO_AC", "NO_HEAT", "WATER_LEAK", "ELECTRICAL", "THERMOSTAT", "NOISE", "ODOR", "MAINTENANCE", "OTHER"],
+    INSTALL: ["NEW_SYSTEM", "REPLACEMENT", "UPGRADE", "DUCTWORK", "OTHER"],
+    MAINTENANCE: ["PM_VISIT", "FILTER_CHANGE", "INSPECTION", "CLEANING", "OTHER"],
+    SALES: ["ESTIMATE", "CONSULTATION", "FOLLOW_UP", "OTHER"],
+  };
+
+  // Create work order mutation
+  const createWorkOrderMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedCustomer || !selectedProperty || !currentUser) {
+        throw new Error("Missing required fields");
+      }
+      const res = await apiRequest("POST", "/api/crm/work-orders", {
+        customerId: selectedCustomer.id,
+        propertyId: selectedProperty.id,
+        title: woTitle.trim(),
+        description: woDescription.trim(),
+        visitType,
+        workSubtype: workSubtype || null,
+        priority,
+        assignedTechId: currentUser.id, // Self-assign
+        scheduledStart: scheduledStart || null,
+        scheduledEnd: scheduledEnd || null,
+        status: "scheduled",
+      });
+      return res.json();
+    },
+    onSuccess: (data: { id?: string }) => {
+      setShowCreateDialog(false);
+      resetCreateForm();
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      toast({ title: "Work order created", description: "The job has been scheduled to you" });
+      if (data?.id) {
+        navigate(`/mobile/job/${data.id}`);
+      }
+    },
+    onError: (error: any) => {
+      // Check for scheduling conflict from backend 409 response
+      const isConflict = 
+        error?.data?.error === "SCHEDULING_CONFLICT" ||
+        error?.message?.includes("SCHEDULING_CONFLICT") ||
+        error?.message?.includes("Scheduling conflict") ||
+        error?.status === 409;
+      
+      if (isConflict) {
+        setConflictError("You already have a job scheduled at this time. Please choose a different time slot.");
+      } else {
+        toast({ 
+          title: "Failed to create work order", 
+          description: error?.data?.message || error?.message || "Please try again",
+          variant: "destructive" 
+        });
+      }
+    },
+  });
+
+  const resetCreateForm = () => {
+    setCustomerSearch("");
+    setSelectedCustomer(null);
+    setSelectedProperty(null);
+    setWoTitle("");
+    setWoDescription("");
+    setVisitType("SERVICE");
+    setWorkSubtype("");
+    setPriority("normal");
+    setScheduledStart("");
+    setScheduledEnd("");
+    setConflictError(null);
+  };
+
+  // Auto-select property if customer only has one
+  useEffect(() => {
+    if (customerProperties.length === 1 && !selectedProperty) {
+      setSelectedProperty(customerProperties[0]);
+    }
+  }, [customerProperties, selectedProperty]);
+
+  const handleCreateSubmit = () => {
+    if (!selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim()) {
+      toast({ title: "Please fill all required fields", variant: "destructive" });
+      return;
+    }
+    if (!scheduledStart || !scheduledEnd) {
+      toast({ title: "Please select a date and time", variant: "destructive" });
+      return;
+    }
+    setConflictError(null);
+    createWorkOrderMutation.mutate();
+  };
 
   const activeJob = useMemo(() => {
     return workOrders.find(wo => 
@@ -151,9 +293,21 @@ export default function MobileJob() {
   return (
     <MobileShell>
       <div className="p-4 space-y-4" data-testid="mobile-job-page">
-        <div className="flex items-center gap-2 mb-4">
-          <Wrench className="h-6 w-6 text-[#711419]" />
-          <h1 className="text-xl font-semibold text-slate-800">Today's Jobs</h1>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Wrench className="h-6 w-6 text-[#711419]" />
+            <h1 className="text-xl font-semibold text-slate-800">Today's Jobs</h1>
+          </div>
+          {isSupervisor && (
+            <Button 
+              onClick={() => setShowCreateDialog(true)}
+              className="bg-[#711419] hover:bg-[#5a1014]"
+              data-testid="button-create-work-order"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Job
+            </Button>
+          )}
         </div>
 
         {todaysJobs.length === 0 ? (
@@ -257,6 +411,249 @@ export default function MobileJob() {
           </div>
         )}
       </div>
+
+      {/* Create Work Order Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={(open) => { 
+        setShowCreateDialog(open); 
+        if (!open) resetCreateForm(); 
+      }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Job</DialogTitle>
+            <DialogDescription>
+              Create a work order and schedule it for yourself
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Customer Search */}
+            <div className="space-y-2">
+              <Label>Customer *</Label>
+              {selectedCustomer ? (
+                <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div>
+                    <p className="font-medium text-slate-800">{selectedCustomer.name}</p>
+                    {selectedCustomer.phone && (
+                      <p className="text-sm text-slate-500">{selectedCustomer.phone}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCustomer(null);
+                      setSelectedProperty(null);
+                      setCustomerSearch("");
+                    }}
+                    data-testid="button-change-customer"
+                  >
+                    Change
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Search customers..."
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-customer-search"
+                    />
+                  </div>
+                  {searchedCustomers.length > 0 && (
+                    <div className="border rounded-lg max-h-40 overflow-y-auto">
+                      {searchedCustomers.map((customer) => (
+                        <button
+                          key={customer.id}
+                          onClick={() => {
+                            setSelectedCustomer(customer);
+                            setCustomerSearch("");
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-100 border-b last:border-b-0"
+                          data-testid={`customer-option-${customer.id}`}
+                        >
+                          <p className="font-medium text-sm">{customer.name}</p>
+                          {customer.phone && (
+                            <p className="text-xs text-slate-500">{customer.phone}</p>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Property Selection */}
+            {selectedCustomer && (
+              <div className="space-y-2">
+                <Label>Property *</Label>
+                {customerProperties.length === 0 ? (
+                  <p className="text-sm text-slate-500">No properties found for this customer</p>
+                ) : customerProperties.length === 1 ? (
+                  <div className="p-3 bg-slate-50 border rounded-lg">
+                    <p className="font-medium text-sm">{customerProperties[0].address1}</p>
+                    <p className="text-xs text-slate-500">
+                      {[customerProperties[0].city, customerProperties[0].state, customerProperties[0].zip].filter(Boolean).join(", ")}
+                    </p>
+                  </div>
+                ) : (
+                  <Select
+                    value={selectedProperty?.id || ""}
+                    onValueChange={(val) => {
+                      const prop = customerProperties.find(p => p.id === val);
+                      setSelectedProperty(prop || null);
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-property">
+                      <SelectValue placeholder="Select a property" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customerProperties.map((prop) => (
+                        <SelectItem key={prop.id} value={prop.id}>
+                          {prop.address1} - {prop.city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
+
+            {/* Title */}
+            <div className="space-y-2">
+              <Label>Title *</Label>
+              <Input
+                placeholder="Brief job title..."
+                value={woTitle}
+                onChange={(e) => setWoTitle(e.target.value)}
+                data-testid="input-wo-title"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label>Description *</Label>
+              <Textarea
+                placeholder="What needs to be done..."
+                value={woDescription}
+                onChange={(e) => setWoDescription(e.target.value)}
+                rows={3}
+                data-testid="input-wo-description"
+              />
+            </div>
+
+            {/* Visit Type */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={visitType} onValueChange={(val) => { setVisitType(val); setWorkSubtype(""); }}>
+                  <SelectTrigger data-testid="select-visit-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SERVICE">Service</SelectItem>
+                    <SelectItem value="INSTALL">Install</SelectItem>
+                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                    <SelectItem value="SALES">Sales</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Subtype</Label>
+                <Select value={workSubtype} onValueChange={setWorkSubtype}>
+                  <SelectTrigger data-testid="select-work-subtype">
+                    <SelectValue placeholder="Optional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workSubtypes[visitType]?.map((st) => (
+                      <SelectItem key={st} value={st}>
+                        {formatSubtype(st)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Priority */}
+            <div className="space-y-2">
+              <Label>Priority</Label>
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger data-testid="select-priority">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Schedule */}
+            <div className="space-y-2">
+              <Label>Schedule *</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs text-slate-500">Start</Label>
+                  <Input
+                    type="datetime-local"
+                    value={scheduledStart}
+                    onChange={(e) => setScheduledStart(e.target.value)}
+                    data-testid="input-scheduled-start"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">End</Label>
+                  <Input
+                    type="datetime-local"
+                    value={scheduledEnd}
+                    onChange={(e) => setScheduledEnd(e.target.value)}
+                    data-testid="input-scheduled-end"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Conflict Error */}
+            {conflictError && (
+              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                <p className="text-sm">{conflictError}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateDialog(false)}
+              data-testid="button-cancel-create"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateSubmit}
+              disabled={createWorkOrderMutation.isPending || !selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim() || !scheduledStart || !scheduledEnd}
+              className="bg-[#711419] hover:bg-[#5a1014]"
+              data-testid="button-submit-create"
+            >
+              {createWorkOrderMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  Creating...
+                </>
+              ) : (
+                "Create & Schedule"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MobileShell>
   );
 }
