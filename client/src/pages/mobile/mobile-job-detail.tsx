@@ -30,8 +30,12 @@ import {
   Tag,
   Package,
   CreditCard,
-  Mail
+  Mail,
+  UserPlus,
+  Pencil
 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2850,6 +2854,103 @@ export default function MobileJobDetail() {
     enabled: !!params.id,
   });
 
+  const { data: currentUser } = useQuery<CrmUser>({
+    queryKey: ["/api/crm/auth/me"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/auth/me", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch current user");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const [showEditDialog, setShowEditDialog] = useState(false);
+
+  const isSupervisor = currentUser?.role === "supervisor";
+  const isAssignedToMe = workOrder?.assignedTechId === currentUser?.id;
+
+  type EditWorkOrderFormData = {
+    scheduledStart: string;
+    scheduledEnd: string;
+    priority: string;
+    title: string;
+    description: string;
+    dispatchNotes: string;
+    techNotes: string;
+  };
+
+  const editForm = useForm<EditWorkOrderFormData>({
+    defaultValues: {
+      scheduledStart: "",
+      scheduledEnd: "",
+      priority: "normal",
+      title: "",
+      description: "",
+      dispatchNotes: "",
+      techNotes: "",
+    },
+  });
+
+  useEffect(() => {
+    if (workOrder && showEditDialog) {
+      editForm.reset({
+        scheduledStart: workOrder.scheduledStart 
+          ? format(new Date(workOrder.scheduledStart), "yyyy-MM-dd'T'HH:mm") 
+          : "",
+        scheduledEnd: workOrder.scheduledEnd 
+          ? format(new Date(workOrder.scheduledEnd), "yyyy-MM-dd'T'HH:mm") 
+          : "",
+        priority: workOrder.priority || "normal",
+        title: workOrder.title || "",
+        description: workOrder.description || "",
+        dispatchNotes: workOrder.dispatchNotes || "",
+        techNotes: workOrder.techNotes || "",
+      });
+    }
+  }, [workOrder, showEditDialog, editForm]);
+
+  const assignToMeMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/mobile/work-orders/${params.id}/assign-to-me`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      toast({ title: "Work order assigned to you" });
+    },
+    onError: () => {
+      toast({ title: "Failed to assign work order", variant: "destructive" });
+    },
+  });
+
+  const editWorkOrderMutation = useMutation({
+    mutationFn: async (data: EditWorkOrderFormData) => {
+      // Send datetime strings directly - backend handles timezone conversion
+      await apiRequest("PATCH", `/api/mobile/work-orders/${params.id}`, {
+        scheduledStart: data.scheduledStart || null,
+        scheduledEnd: data.scheduledEnd || null,
+        priority: data.priority,
+        title: data.title,
+        description: data.description,
+        dispatchNotes: data.dispatchNotes,
+        techNotes: data.techNotes,
+      });
+    },
+    onSuccess: () => {
+      setShowEditDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      toast({ title: "Work order updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update work order", variant: "destructive" });
+    },
+  });
+
+  const handleEditSubmit = (data: EditWorkOrderFormData) => {
+    editWorkOrderMutation.mutate(data);
+  };
+
   const updateStatusMutation = useMutation({
     mutationFn: async ({ newStatus, summary }: { newStatus: WorkOrderStatus; summary?: string }) => {
       setOptimisticStatus(newStatus);
@@ -2980,20 +3081,51 @@ export default function MobileJobDetail() {
       <OfflineIndicator />
       <div className="flex flex-col h-full">
         <div className="flex-shrink-0 p-4 pb-2">
-          <button
-            onClick={() => {
-              if (activeTab !== "overview") {
-                setActiveTab("overview");
-              } else {
-                navigate("/mobile");
-              }
-            }}
-            className="flex items-center text-slate-600 hover:text-slate-800 min-h-[44px] min-w-[44px]"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-5 w-5 mr-1" />
-            <span>Back</span>
-          </button>
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => {
+                if (activeTab !== "overview") {
+                  setActiveTab("overview");
+                } else {
+                  navigate("/mobile");
+                }
+              }}
+              className="flex items-center text-slate-600 hover:text-slate-800 min-h-[44px] min-w-[44px]"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-5 w-5 mr-1" />
+              <span>Back</span>
+            </button>
+            
+            <div className="flex items-center gap-2">
+              {isSupervisor && !isAssignedToMe && (
+                <Button
+                  onClick={() => assignToMeMutation.mutate()}
+                  disabled={assignToMeMutation.isPending}
+                  className="bg-[#711419] hover:bg-[#5a1014] min-h-[44px]"
+                  data-testid="button-assign-to-me"
+                >
+                  {assignToMeMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <UserPlus className="h-4 w-4 mr-1" />
+                  )}
+                  Assign to Me
+                </Button>
+              )}
+              {isSupervisor && isAssignedToMe && (
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowEditDialog(true)}
+                  className="min-h-[44px]"
+                  data-testid="button-edit-work-order"
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Edit
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto px-4 pb-24" data-testid="mobile-job-detail">
@@ -3093,6 +3225,188 @@ export default function MobileJobDetail() {
               Complete Job
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="edit-work-order-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-slate-600" />
+              Edit Work Order
+            </DialogTitle>
+            <DialogDescription>
+              Update work order details below.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Work order title..." 
+                        className="min-h-[44px]"
+                        data-testid="input-edit-title"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={editForm.control}
+                  name="scheduledStart"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Scheduled Start</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="datetime-local" 
+                          className="min-h-[44px]"
+                          data-testid="input-edit-scheduled-start"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="scheduledEnd"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Scheduled End</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="datetime-local" 
+                          className="min-h-[44px]"
+                          data-testid="input-edit-scheduled-end"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={editForm.control}
+                name="priority"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Priority</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="min-h-[44px]" data-testid="select-edit-priority">
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="normal">Normal</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="emergency">Emergency</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Work order description..."
+                        className="min-h-[80px]"
+                        data-testid="input-edit-description"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="dispatchNotes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dispatch Notes</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Notes for dispatch..."
+                        className="min-h-[80px]"
+                        data-testid="input-edit-dispatch-notes"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="techNotes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tech Notes</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Technical notes..."
+                        className="min-h-[80px]"
+                        data-testid="input-edit-tech-notes"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter className="flex gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowEditDialog(false)}
+                  disabled={editWorkOrderMutation.isPending}
+                  className="min-h-[44px]"
+                  data-testid="button-cancel-edit"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={editWorkOrderMutation.isPending}
+                  className="bg-[#711419] hover:bg-[#5a1014] min-h-[44px]"
+                  data-testid="button-save-edit"
+                >
+                  {editWorkOrderMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Check className="h-4 w-4 mr-2" />
+                  )}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </MobileShell>

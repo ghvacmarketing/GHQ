@@ -18552,6 +18552,146 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // POST /api/mobile/work-orders/:id/assign-to-me - Supervisor self-assign work order
+  app.post("/api/mobile/work-orders/:id/assign-to-me", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Only supervisors can self-assign from mobile
+      if (!isSupervisor(user.role)) {
+        return res.status(403).json({ message: "Only supervisors can assign work orders to themselves" });
+      }
+
+      const workOrder = await storage.getWorkOrder(req.params.id);
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+
+      // Update the work order to assign to the supervisor
+      const updatedWorkOrder = await storage.updateWorkOrder(workOrder.id, {
+        assignedTechId: user.id,
+      });
+
+      await logCrmAudit(
+        user.id,
+        "work_order.self_assigned",
+        "work_order",
+        workOrder.id,
+        { previousTechId: workOrder.assignedTechId, newTechId: user.id },
+        req.ip
+      );
+
+      return res.json(updatedWorkOrder);
+    } catch (error) {
+      console.error("Error self-assigning work order:", error);
+      return res.status(500).json({ message: "Failed to assign work order" });
+    }
+  });
+
+  // PATCH /api/mobile/work-orders/:id - Supervisor edit their assigned work order
+  app.patch("/api/mobile/work-orders/:id", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const workOrder = await storage.getWorkOrder(req.params.id);
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+
+      // Only supervisors can edit work orders from mobile, and only their assigned ones
+      if (!isSupervisor(user.role)) {
+        return res.status(403).json({ message: "Only supervisors can edit work orders from mobile" });
+      }
+
+      if (workOrder.assignedTechId !== user.id) {
+        return res.status(403).json({ message: "You can only edit work orders assigned to you" });
+      }
+
+      // Define allowed fields for supervisor mobile editing
+      const allowedFieldsSchema = z.object({
+        scheduledStart: z.union([z.string(), z.date(), z.null()]).optional(),
+        scheduledEnd: z.union([z.string(), z.date(), z.null()]).optional(),
+        priority: z.enum(["low", "normal", "high", "emergency"]).optional(),
+        dispatchNotes: z.string().optional(),
+        techNotes: z.string().optional(),
+        visitType: z.string().optional(),
+        workSubtype: z.string().optional(),
+        title: z.string().optional(),
+        description: z.string().optional(),
+      });
+
+      const result = allowedFieldsSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid request body", 
+          errors: result.error.flatten().fieldErrors 
+        });
+      }
+
+      const updateData: Partial<InsertCrmWorkOrder> = {};
+      
+      // Handle datetime fields - convert local timezone strings to proper UTC dates
+      if (result.data.scheduledStart !== undefined) {
+        if (result.data.scheduledStart) {
+          // Input is in local time format (e.g., "2026-01-06T10:00"), convert to UTC
+          updateData.scheduledStart = fromZonedTime(result.data.scheduledStart, APP_TIMEZONE);
+        } else {
+          updateData.scheduledStart = null;
+        }
+      }
+      if (result.data.scheduledEnd !== undefined) {
+        if (result.data.scheduledEnd) {
+          updateData.scheduledEnd = fromZonedTime(result.data.scheduledEnd, APP_TIMEZONE);
+        } else {
+          updateData.scheduledEnd = null;
+        }
+      }
+      if (result.data.priority !== undefined) {
+        updateData.priority = result.data.priority;
+      }
+      if (result.data.dispatchNotes !== undefined) {
+        updateData.dispatchNotes = result.data.dispatchNotes;
+      }
+      if (result.data.techNotes !== undefined) {
+        updateData.techNotes = result.data.techNotes;
+      }
+      if (result.data.visitType !== undefined) {
+        updateData.visitType = result.data.visitType;
+      }
+      if (result.data.workSubtype !== undefined) {
+        updateData.workSubtype = result.data.workSubtype;
+      }
+      if (result.data.title !== undefined) {
+        updateData.title = result.data.title;
+      }
+      if (result.data.description !== undefined) {
+        updateData.description = result.data.description;
+      }
+
+      const updatedWorkOrder = await storage.updateWorkOrder(workOrder.id, updateData);
+
+      await logCrmAudit(
+        user.id,
+        "work_order.mobile_edited",
+        "work_order",
+        workOrder.id,
+        { fields: Object.keys(updateData) },
+        req.ip
+      );
+
+      return res.json(updatedWorkOrder);
+    } catch (error) {
+      console.error("Error editing work order from mobile:", error);
+      return res.status(500).json({ message: "Failed to update work order" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)
