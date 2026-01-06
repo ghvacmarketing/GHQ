@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, type CrmTimeEntry, type InsertCrmTimeEntry, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers, crmTimeEntries } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc, isNull } from "drizzle-orm";
@@ -256,6 +256,13 @@ export interface IStorage {
   getConversationTags(conversationId: string): Promise<CrmMessagingConversationTag[]>;
   addConversationTag(conversationId: string, tag: string): Promise<CrmMessagingConversationTag>;
   removeConversationTag(conversationId: string, tag: string): Promise<void>;
+
+  // Time Entry operations
+  getActiveTimeEntry(technicianId: string): Promise<CrmTimeEntry | null>;
+  clockIn(technicianId: string, workOrderId?: string, source?: string): Promise<CrmTimeEntry>;
+  clockOut(entryId: string): Promise<CrmTimeEntry>;
+  getTimeEntries(filters: { technicianId?: string; startDate?: Date; endDate?: Date }): Promise<CrmTimeEntry[]>;
+  updateTimeEntry(id: string, data: Partial<InsertCrmTimeEntry>): Promise<CrmTimeEntry>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -1949,6 +1956,89 @@ export class DatabaseStorage implements IStorage {
         eq(crmMessagingConversationTags.conversationId, conversationId),
         eq(crmMessagingConversationTags.tag, tag)
       ));
+  }
+
+  // Time Entry operations
+  async getActiveTimeEntry(technicianId: string): Promise<CrmTimeEntry | null> {
+    const [entry] = await db.select().from(crmTimeEntries)
+      .where(and(
+        eq(crmTimeEntries.technicianId, technicianId),
+        isNull(crmTimeEntries.clockOutAt)
+      ))
+      .limit(1);
+    return entry || null;
+  }
+
+  async clockIn(technicianId: string, workOrderId?: string, source?: string): Promise<CrmTimeEntry> {
+    const now = new Date();
+    const [entry] = await db.insert(crmTimeEntries)
+      .values({
+        technicianId,
+        workOrderId: workOrderId || null,
+        clockInAt: now,
+        source: (source as any) || "mobile",
+        createdById: technicianId,
+      })
+      .returning();
+    return entry;
+  }
+
+  async clockOut(entryId: string): Promise<CrmTimeEntry> {
+    const [existing] = await db.select().from(crmTimeEntries)
+      .where(eq(crmTimeEntries.id, entryId))
+      .limit(1);
+    
+    if (!existing) {
+      throw new Error("Time entry not found");
+    }
+
+    const now = new Date();
+    const clockInTime = new Date(existing.clockInAt);
+    const durationMinutes = Math.round((now.getTime() - clockInTime.getTime()) / (1000 * 60));
+
+    const [updated] = await db.update(crmTimeEntries)
+      .set({
+        clockOutAt: now,
+        durationMinutes,
+        updatedAt: now,
+      })
+      .where(eq(crmTimeEntries.id, entryId))
+      .returning();
+    return updated;
+  }
+
+  async getTimeEntries(filters: { technicianId?: string; startDate?: Date; endDate?: Date }): Promise<CrmTimeEntry[]> {
+    const conditions = [];
+    
+    if (filters.technicianId) {
+      conditions.push(eq(crmTimeEntries.technicianId, filters.technicianId));
+    }
+    if (filters.startDate) {
+      conditions.push(gte(crmTimeEntries.clockInAt, filters.startDate));
+    }
+    if (filters.endDate) {
+      conditions.push(lte(crmTimeEntries.clockInAt, filters.endDate));
+    }
+
+    if (conditions.length === 0) {
+      return await db.select().from(crmTimeEntries).orderBy(desc(crmTimeEntries.clockInAt));
+    }
+    
+    return await db.select().from(crmTimeEntries)
+      .where(and(...conditions))
+      .orderBy(desc(crmTimeEntries.clockInAt));
+  }
+
+  async updateTimeEntry(id: string, data: Partial<InsertCrmTimeEntry>): Promise<CrmTimeEntry> {
+    const [updated] = await db.update(crmTimeEntries)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(eq(crmTimeEntries.id, id))
+      .returning();
+    
+    if (!updated) {
+      throw new Error("Time entry not found");
+    }
+    return updated;
   }
 
   // Initialize default data if needed

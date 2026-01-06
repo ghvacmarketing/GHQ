@@ -17869,6 +17869,143 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // ============================================
+  // MOBILE TIME TRACKING ENDPOINTS
+  // ============================================
+
+  // GET /api/mobile/time/current - Get active time entry for logged-in tech
+  app.get("/api/mobile/time/current", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const activeEntry = await storage.getActiveTimeEntry(user.id);
+      return res.json({ entry: activeEntry });
+    } catch (error) {
+      console.error("Error fetching active time entry:", error);
+      return res.status(500).json({ message: "Failed to fetch active time entry" });
+    }
+  });
+
+  // POST /api/mobile/time/clock-in - Clock in (optional body: { workOrderId })
+  app.post("/api/mobile/time/clock-in", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const existingEntry = await storage.getActiveTimeEntry(user.id);
+      if (existingEntry) {
+        return res.status(400).json({ message: "Already clocked in" });
+      }
+
+      const { workOrderId } = req.body || {};
+      const entry = await storage.clockIn(user.id, workOrderId, "mobile");
+      return res.status(201).json(entry);
+    } catch (error) {
+      console.error("Error clocking in:", error);
+      return res.status(500).json({ message: "Failed to clock in" });
+    }
+  });
+
+  // POST /api/mobile/time/clock-out - Clock out current entry
+  app.post("/api/mobile/time/clock-out", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const activeEntry = await storage.getActiveTimeEntry(user.id);
+      if (!activeEntry) {
+        return res.status(400).json({ message: "Not currently clocked in" });
+      }
+
+      const entry = await storage.clockOut(activeEntry.id);
+      return res.json(entry);
+    } catch (error) {
+      console.error("Error clocking out:", error);
+      return res.status(500).json({ message: "Failed to clock out" });
+    }
+  });
+
+  // GET /api/mobile/time/history - Get recent time entries for logged-in tech (last 30 days)
+  app.get("/api/mobile/time/history", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const entries = await storage.getTimeEntries({
+        technicianId: user.id,
+        startDate: thirtyDaysAgo,
+      });
+      return res.json(entries);
+    } catch (error) {
+      console.error("Error fetching time history:", error);
+      return res.status(500).json({ message: "Failed to fetch time history" });
+    }
+  });
+
+  // ============================================
+  // CRM ADMIN TIME TRACKING ENDPOINTS
+  // ============================================
+
+  // GET /api/crm/time-entries - Get all time entries with filters
+  app.get("/api/crm/time-entries", requireCrmAdmin, async (req, res) => {
+    try {
+      const { technicianId, startDate, endDate } = req.query;
+
+      const filters: { technicianId?: string; startDate?: Date; endDate?: Date } = {};
+      if (technicianId && typeof technicianId === "string") {
+        filters.technicianId = technicianId;
+      }
+      if (startDate && typeof startDate === "string") {
+        filters.startDate = new Date(startDate);
+      }
+      if (endDate && typeof endDate === "string") {
+        filters.endDate = new Date(endDate);
+      }
+
+      const entries = await storage.getTimeEntries(filters);
+      return res.json(entries);
+    } catch (error) {
+      console.error("Error fetching time entries:", error);
+      return res.status(500).json({ message: "Failed to fetch time entries" });
+    }
+  });
+
+  // PATCH /api/crm/time-entries/:id - Update a time entry (for admin adjustments)
+  app.patch("/api/crm/time-entries/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { clockInAt, clockOutAt, durationMinutes, notes, workOrderId } = req.body;
+
+      const updates: Record<string, any> = {};
+      if (clockInAt !== undefined) updates.clockInAt = new Date(clockInAt);
+      if (clockOutAt !== undefined) updates.clockOutAt = clockOutAt ? new Date(clockOutAt) : null;
+      if (durationMinutes !== undefined) updates.durationMinutes = durationMinutes;
+      if (notes !== undefined) updates.notes = notes;
+      if (workOrderId !== undefined) updates.workOrderId = workOrderId || null;
+
+      const entry = await storage.updateTimeEntry(id, updates);
+      return res.json(entry);
+    } catch (error: any) {
+      console.error("Error updating time entry:", error);
+      if (error.message === "Time entry not found") {
+        return res.status(404).json({ message: "Time entry not found" });
+      }
+      return res.status(500).json({ message: "Failed to update time entry" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)

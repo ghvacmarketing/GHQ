@@ -2403,3 +2403,30 @@ export type InsertCrmMessagingMessage = z.infer<typeof insertCrmMessagingMessage
 export type CrmMessagingMessage = typeof crmMessagingMessages.$inferSelect;
 export type InsertCrmMessagingConversationTag = z.infer<typeof insertCrmMessagingConversationTagSchema>;
 export type CrmMessagingConversationTag = typeof crmMessagingConversationTags.$inferSelect;
+
+// Time Entry Source Types
+export type TimeEntrySource = "mobile" | "manual" | "system";
+
+// CRM Time Entries (tech clock in/out)
+export const crmTimeEntries = pgTable("crm_time_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  technicianId: varchar("technician_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id, { onDelete: "set null" }),
+  clockInAt: timestamp("clock_in_at").notNull(),
+  clockOutAt: timestamp("clock_out_at"),
+  durationMinutes: integer("duration_minutes"),
+  notes: text("notes"),
+  source: text("source").$type<TimeEntrySource>().default("mobile"),
+  createdById: varchar("created_by_id").references(() => crmUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCrmTimeEntrySchema = createInsertSchema(crmTimeEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCrmTimeEntry = z.infer<typeof insertCrmTimeEntrySchema>;
+export type CrmTimeEntry = typeof crmTimeEntries.$inferSelect;
