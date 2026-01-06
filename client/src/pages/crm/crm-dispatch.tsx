@@ -1824,6 +1824,30 @@ export default function CrmDispatch() {
 
   const projects = projectsResponse?.projects || [];
 
+  // Query for active maintenance agreements when customer is selected
+  interface ActiveAgreement {
+    id: string;
+    agreementType: string | null;
+    status: string;
+    frequency: string | null;
+    visitsPerPeriod: number | null;
+    nextServiceDate: string | null;
+    displayName: string;
+  }
+
+  const { data: activeAgreements = [] } = useQuery<ActiveAgreement[]>({
+    queryKey: ["/api/crm/customers", selectedCustomer?.id, "active-agreements"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${selectedCustomer!.id}/active-agreements`, {
+        credentials: "include",
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data.agreements ?? []);
+    },
+    enabled: !!selectedCustomer?.id && createDialogOpen,
+  });
+
   // Query to fetch work order subtypes dynamically
   const { data: workOrderSubtypes = [] } = useQuery<WorkOrderSubtype[]>({
     queryKey: ["/api/crm/work-order-subtypes", { activeOnly: "true" }],
@@ -3291,14 +3315,14 @@ export default function CrmDispatch() {
                     <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0">
-                  <Command>
+                <PopoverContent className="w-[400px] p-0 z-[100]" sideOffset={4}>
+                  <Command shouldFilter={false}>
                     <CommandInput 
                       placeholder="Search customers..." 
                       value={customerSearch}
                       onValueChange={setCustomerSearch}
                     />
-                    <CommandList>
+                    <CommandList className="max-h-[300px]">
                       <CommandEmpty>
                         {customersLoading ? "Searching..." : "No customers found."}
                       </CommandEmpty>
@@ -3327,9 +3351,31 @@ export default function CrmDispatch() {
               </Popover>
             </div>
 
+            {/* Maintenance Agreement Info Display */}
+            {selectedCustomer && activeAgreements.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-medium text-amber-800">Active Maintenance Agreement</span>
+                </div>
+                {activeAgreements.map((agreement) => (
+                  <div key={agreement.id} className="text-sm text-amber-700">
+                    <p className="font-medium">{agreement.displayName}</p>
+                    <div className="flex flex-wrap gap-3 text-xs mt-1">
+                      {agreement.frequency && <span>Billing: {agreement.frequency}</span>}
+                      {agreement.visitsPerPeriod && <span>Visits: {agreement.visitsPerPeriod}/period</span>}
+                      {agreement.nextServiceDate && (
+                        <span>Next Service: {new Date(agreement.nextServiceDate).toLocaleDateString()}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {selectedCustomer && (
               <div className="space-y-2">
-                <Label>Property *</Label>
+                <Label>Location *</Label>
                 <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select property..." />
