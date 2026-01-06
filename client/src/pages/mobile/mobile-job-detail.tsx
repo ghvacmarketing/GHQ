@@ -32,7 +32,8 @@ import {
   CreditCard,
   Mail,
   UserPlus,
-  Pencil
+  Pencil,
+  CalendarIcon
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
@@ -48,6 +49,8 @@ import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
@@ -86,6 +89,13 @@ type ChecklistResponseData = {
 };
 
 type TabType = "overview" | "work" | "quote" | "invoice";
+
+interface TimeSlot {
+  start: string;
+  end: string;
+  label: string;
+  available: boolean;
+}
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   scheduled: { label: "Scheduled", className: "bg-slate-100 text-slate-700 border-slate-300" },
@@ -2865,6 +2875,8 @@ export default function MobileJobDetail() {
   });
 
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editSelectedDate, setEditSelectedDate] = useState<Date | undefined>(undefined);
+  const [editSelectedSlot, setEditSelectedSlot] = useState<{ start: string; end: string } | null>(null);
 
   const isSupervisor = currentUser?.role === "supervisor";
   const isAssignedToMe = workOrder?.assignedTechId === currentUser?.id;
@@ -2906,8 +2918,33 @@ export default function MobileJobDetail() {
         dispatchNotes: workOrder.dispatchNotes || "",
         techNotes: workOrder.techNotes || "",
       });
+      if (workOrder.scheduledStart) {
+        setEditSelectedDate(new Date(workOrder.scheduledStart));
+        if (workOrder.scheduledEnd) {
+          setEditSelectedSlot({
+            start: new Date(workOrder.scheduledStart).toISOString(),
+            end: new Date(workOrder.scheduledEnd).toISOString(),
+          });
+        }
+      } else {
+        setEditSelectedDate(undefined);
+        setEditSelectedSlot(null);
+      }
     }
   }, [workOrder, showEditDialog, editForm]);
+
+  const { data: editAvailableSlots = [], isLoading: editSlotsLoading } = useQuery<TimeSlot[]>({
+    queryKey: ["/api/mobile/work-orders/available-slots", { date: editSelectedDate ? format(editSelectedDate, "yyyy-MM-dd") : null, techId: currentUser?.id }],
+    queryFn: async () => {
+      if (!editSelectedDate || !currentUser?.id) return [];
+      const dateStr = format(editSelectedDate, "yyyy-MM-dd");
+      const res = await fetch(`/api/mobile/work-orders/available-slots?date=${dateStr}&techId=${currentUser.id}`, { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.slots || [];
+    },
+    enabled: !!editSelectedDate && showEditDialog && !!currentUser?.id,
+  });
 
   const assignToMeMutation = useMutation({
     mutationFn: async () => {
@@ -2925,10 +2962,9 @@ export default function MobileJobDetail() {
 
   const editWorkOrderMutation = useMutation({
     mutationFn: async (data: EditWorkOrderFormData) => {
-      // Send datetime strings directly - backend handles timezone conversion
       await apiRequest("PATCH", `/api/mobile/work-orders/${params.id}`, {
-        scheduledStart: data.scheduledStart || null,
-        scheduledEnd: data.scheduledEnd || null,
+        scheduledStart: editSelectedSlot?.start || null,
+        scheduledEnd: editSelectedSlot?.end || null,
         priority: data.priority,
         title: data.title,
         description: data.description,
@@ -2938,6 +2974,8 @@ export default function MobileJobDetail() {
     },
     onSuccess: () => {
       setShowEditDialog(false);
+      setEditSelectedDate(undefined);
+      setEditSelectedSlot(null);
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
       toast({ title: "Work order updated" });
@@ -3228,7 +3266,13 @@ export default function MobileJobDetail() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+      <Dialog open={showEditDialog} onOpenChange={(open) => {
+        setShowEditDialog(open);
+        if (!open) {
+          setEditSelectedDate(undefined);
+          setEditSelectedSlot(null);
+        }
+      }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="edit-work-order-modal">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -3260,43 +3304,82 @@ export default function MobileJobDetail() {
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-3">
-                <FormField
-                  control={editForm.control}
-                  name="scheduledStart"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Scheduled Start</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="datetime-local" 
-                          className="min-h-[44px]"
-                          data-testid="input-edit-scheduled-start"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="scheduledEnd"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Scheduled End</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="datetime-local" 
-                          className="min-h-[44px]"
-                          data-testid="input-edit-scheduled-end"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <div className="space-y-3">
+                <Label>Schedule</Label>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal min-h-[44px]"
+                      data-testid="button-edit-date-picker"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editSelectedDate ? format(editSelectedDate, "EEEE, MMMM d, yyyy") : "Select a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={editSelectedDate}
+                      onSelect={(date) => {
+                        setEditSelectedDate(date);
+                        setEditSelectedSlot(null);
+                      }}
+                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                {editSelectedDate && (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-500">Available Time Slots</Label>
+                    {editSlotsLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                        <span className="ml-2 text-sm text-slate-500">Loading slots...</span>
+                      </div>
+                    ) : editAvailableSlots.length === 0 ? (
+                      <p className="text-sm text-slate-500 py-2">No time slots available for this date</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        {editAvailableSlots.map((slot, idx) => {
+                          const isSelected = editSelectedSlot?.start === slot.start && editSelectedSlot?.end === slot.end;
+                          return (
+                            <Button
+                              key={idx}
+                              type="button"
+                              variant={isSelected ? "default" : "outline"}
+                              size="sm"
+                              disabled={!slot.available}
+                              onClick={() => setEditSelectedSlot({ start: slot.start, end: slot.end })}
+                              className={`text-xs ${
+                                isSelected
+                                  ? "bg-[#711419] hover:bg-[#5a1014] text-white"
+                                  : slot.available
+                                  ? "hover:bg-slate-100"
+                                  : "opacity-50 cursor-not-allowed bg-slate-100 text-slate-400"
+                              }`}
+                              data-testid={`edit-time-slot-${idx}`}
+                            >
+                              {slot.label}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {editSelectedSlot && (
+                  <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+                    <Clock className="h-4 w-4" />
+                    <span>
+                      {format(new Date(editSelectedSlot.start), "h:mm a")} - {format(new Date(editSelectedSlot.end), "h:mm a")}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <FormField

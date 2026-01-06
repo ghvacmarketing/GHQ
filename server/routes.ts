@@ -22,7 +22,7 @@ import { sendCrmQuoteEmail } from "./services/crmQuoteEmail";
 import { sendCrmInvoiceEmail } from "./services/crmInvoiceEmail";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
-import { eq, inArray, desc, sql, and, or, ilike, asc, count, isNull, lt, gt, ne, isNotNull } from "drizzle-orm";
+import { eq, inArray, desc, sql, and, or, ilike, asc, count, isNull, lt, gt, gte, lte, ne, isNotNull } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
