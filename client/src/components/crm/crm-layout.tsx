@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { clearCrmToken } from "@/lib/crmAuth";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -137,6 +138,7 @@ function SidebarContent({
       await apiRequest("POST", "/api/crm/auth/logout");
     },
     onSuccess: () => {
+      clearCrmToken();
       queryClient.clear();
       sessionStorage.removeItem("crm_gate_passed");
       window.location.href = "/crm/login";
