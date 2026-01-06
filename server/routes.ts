@@ -5010,6 +5010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({
         message: "Login successful",
         user: userWithoutPassword,
+        token: session.sessionToken,
       });
     } catch (error) {
       console.error("CRM login error:", error);
