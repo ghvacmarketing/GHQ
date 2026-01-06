@@ -78,7 +78,15 @@ const LAST_SEEN_THROTTLE_MS = 60000; // Only update lastSeenAt once per minute
 
 export async function requireCrmAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
-  const sessionToken = authHeader?.replace("Bearer ", "") || req.cookies?.crm_session;
+  const cookieToken = req.cookies?.crm_session;
+  const sessionToken = authHeader?.replace("Bearer ", "") || cookieToken;
+
+  // Debug logging
+  console.log("[CRM Auth Debug]", {
+    hasAuthHeader: !!authHeader,
+    hasCookieToken: !!cookieToken,
+    tokenFound: !!sessionToken,
+  });
 
   if (!sessionToken) {
     return res.status(401).json({ message: "Unauthorized - No session token" });
