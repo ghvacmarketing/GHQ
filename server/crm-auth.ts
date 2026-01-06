@@ -112,7 +112,7 @@ export async function createCrmUser(data: {
   name: string;
   email: string;
   password: string;
-  role?: "owner" | "admin" | "sales" | "tech";
+  role?: "owner" | "admin" | "supervisor" | "sales" | "tech";
   phone?: string;
 }): Promise<CrmUser> {
   const passwordHash = await hashPassword(data.password);
@@ -250,13 +250,18 @@ export function requireCrmRole(...allowedRoles: string[]) {
 
 // Role access groups
 // Admin roles have full CRM management access
-const ADMIN_ROLES = ["owner", "admin"];
+const ADMIN_ROLES = ["owner", "admin", "supervisor"];
 // Sales roles have manager-level features (desktop + mobile)
-const SALES_ROLES = ["owner", "admin", "sales"];
+const SALES_ROLES = ["owner", "admin", "supervisor", "sales"];
 // Tech roles can create invoices and quotes (all CRM users)
-const TECH_ROLES = ["owner", "admin", "sales", "tech"];
+const TECH_ROLES = ["owner", "admin", "supervisor", "sales", "tech"];
 // Mobile roles can access the mobile app
-const MOBILE_ROLES = ["owner", "sales", "tech"];
+const MOBILE_ROLES = ["owner", "supervisor", "sales", "tech"];
+
+// Helper to check if user is a supervisor (enhanced mobile view)
+export function isSupervisor(role: string): boolean {
+  return role === "supervisor";
+}
 
 export function isAdmin(role: string): boolean {
   return ADMIN_ROLES.includes(role);

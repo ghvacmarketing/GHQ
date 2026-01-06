@@ -57,6 +57,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 const roleLabels: Record<string, { label: string; className: string }> = {
   owner: { label: "Owner", className: "bg-purple-100 text-purple-700" },
   admin: { label: "Admin", className: "bg-blue-100 text-blue-700" },
+  supervisor: { label: "Supervisor", className: "bg-indigo-100 text-indigo-700" },
   sales: { label: "Sales", className: "bg-green-100 text-green-700" },
   tech: { label: "Technician", className: "bg-orange-100 text-orange-700" },
 };
@@ -450,6 +451,8 @@ export default function MobileAgenda() {
   const todayEnd = getLocalEndOfDay(today).toISOString();
   const { isOnline } = useOnlineStatus();
   const [isFromCache, setIsFromCache] = useState(false);
+  // Supervisors can toggle between viewing all techs or just their own work orders
+  const [supervisorViewAll, setSupervisorViewAll] = useState(true);
 
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -462,15 +465,21 @@ export default function MobileAgenda() {
     gcTime: 24 * 60 * 60 * 1000,
   });
 
+  const isSupervisor = currentUser?.role === 'supervisor';
+  // Determine if we should filter by tech ID
+  const shouldFilterByTech = (currentUser?.role === 'tech' || currentUser?.role === 'sales') || 
+                              (isSupervisor && !supervisorViewAll);
+
   const { data: workOrders, isLoading: isLoadingOrders, error, isError } = useQuery<WorkOrderWithDetails[]>({
-    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: (currentUser?.role === 'tech' || currentUser?.role === 'sales') ? currentUser?.id : undefined }],
+    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: shouldFilterByTech ? currentUser?.id : undefined }],
     queryFn: async () => {
       const params = new URLSearchParams({
         dateFrom: todayStart,
         dateTo: todayEnd,
       });
-      // Both tech and sales users see only their assigned work orders on mobile
-      if ((currentUser?.role === 'tech' || currentUser?.role === 'sales') && currentUser?.id) {
+      // Tech and sales users see only their assigned work orders on mobile
+      // Supervisors can toggle between all or their own
+      if (shouldFilterByTech && currentUser?.id) {
         params.set('techId', currentUser.id);
       }
       const res = await fetch(`/api/crm/work-orders?${params}`);
@@ -545,6 +554,35 @@ export default function MobileAgenda() {
           <p className="text-slate-500 dark:text-slate-400">
             {formatLocal(today, "MMMM d, yyyy")}
           </p>
+          
+          {isSupervisor && (
+            <div className="mt-3 flex items-center justify-center gap-2" data-testid="supervisor-view-toggle">
+              <button
+                onClick={() => setSupervisorViewAll(true)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-l-full transition-colors ${
+                  supervisorViewAll 
+                    ? "bg-[#711419] text-white" 
+                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300"
+                }`}
+                data-testid="btn-view-all-techs"
+              >
+                <Users className="h-3 w-3 inline mr-1" />
+                All Techs
+              </button>
+              <button
+                onClick={() => setSupervisorViewAll(false)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-r-full transition-colors ${
+                  !supervisorViewAll 
+                    ? "bg-[#711419] text-white" 
+                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300"
+                }`}
+                data-testid="btn-view-my-orders"
+              >
+                <User className="h-3 w-3 inline mr-1" />
+                My Jobs
+              </button>
+            </div>
+          )}
           
           {showCacheWarning && workOrders && workOrders.length > 0 && (
             <div 

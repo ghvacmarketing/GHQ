@@ -780,8 +780,9 @@ export type EmployeeDocument = typeof employeeDocuments.$inferSelect;
 // owner: Full access to everything (desktop CRM + mobile)
 // admin: Desktop CRM access only
 // sales: Desktop CRM + mobile access (manager-level features)
+// supervisor: Desktop CRM (admin-level) + enhanced mobile (view all techs, self-assign, edit own)
 // tech: Mobile access only
-export const crmUserRoleEnum = ["owner", "admin", "sales", "tech"] as const;
+export const crmUserRoleEnum = ["owner", "admin", "supervisor", "sales", "tech"] as const;
 export type CrmUserRole = typeof crmUserRoleEnum[number];
 
 // CRM Users
