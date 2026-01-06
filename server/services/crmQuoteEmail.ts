@@ -270,6 +270,16 @@ function buildHtmlBody(
             </td>
           </tr>
 
+          <!-- Prepared For -->
+          <tr>
+            <td class="px-24" style="padding:0 20px 16px 20px;">
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;">
+                <p style="margin:0 0 4px 0;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Prepared For</p>
+                <p style="margin:0;color:#1e293b;font-size:16px;font-weight:600;">${esc(quote.customerName || "Valued Customer")}</p>
+              </div>
+            </td>
+          </tr>
+
           ${personalMessageHtml}
 
           <!-- View Quote Button -->
