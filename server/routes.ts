@@ -5151,24 +5151,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 1. Company Overview KPIs
-      const quotesInRange = await db
+      // For multi-option quotes, only count the "Best" option total (highest price option)
+      // Single-mode quotes use their total as-is
+      const allQuotesInRange = await db
         .select({
-          total: sql<string>`COALESCE(SUM(CAST(${crmQuotes.total} AS DECIMAL(10,2))), 0)`,
-          count: sql<number>`COUNT(*)`,
+          id: crmQuotes.id,
+          total: crmQuotes.total,
+          quoteMode: crmQuotes.quoteMode,
+          status: crmQuotes.status,
         })
         .from(crmQuotes)
         .where(sql`${crmQuotes.createdAt} >= ${rangeStart}`);
 
-      const acceptedQuotesInRange = await db
-        .select({
-          total: sql<string>`COALESCE(SUM(CAST(${crmQuotes.total} AS DECIMAL(10,2))), 0)`,
-          count: sql<number>`COUNT(*)`,
-        })
-        .from(crmQuotes)
-        .where(and(
-          sql`${crmQuotes.createdAt} >= ${rangeStart}`,
-          eq(crmQuotes.status, "accepted")
-        ));
+      // Get IDs of multi-option quotes
+      const optionQuoteIds = allQuotesInRange
+        .filter(q => q.quoteMode === "options")
+        .map(q => q.id);
+
+      // Fetch all line items for multi-option quotes in a single query
+      const optionLineItems = optionQuoteIds.length > 0
+        ? await db
+            .select({
+              quoteId: crmQuoteLineItems.quoteId,
+              optionTag: crmQuoteLineItems.optionTag,
+              lineTotal: crmQuoteLineItems.lineTotal,
+            })
+            .from(crmQuoteLineItems)
+            .where(sql`${crmQuoteLineItems.quoteId} IN ${optionQuoteIds}`)
+        : [];
+
+      // Build a nested map: quoteId -> optionTag -> cost (lineTotal stores costs)
+      const optionQuoteCosts = new Map<string, Map<string, number>>();
+      const quoteAllOptionsCost = new Map<string, number>(); // Total cost of all options per quote
+      
+      for (const item of optionLineItems) {
+        const quoteId = item.quoteId;
+        const tag = item.optionTag || "default";
+        const lineTotal = parseFloat(item.lineTotal || "0");
+
+        if (!optionQuoteCosts.has(quoteId)) {
+          optionQuoteCosts.set(quoteId, new Map<string, number>());
+        }
+        const optionMap = optionQuoteCosts.get(quoteId)!;
+        optionMap.set(tag, (optionMap.get(tag) || 0) + lineTotal);
+        quoteAllOptionsCost.set(quoteId, (quoteAllOptionsCost.get(quoteId) || 0) + lineTotal);
+      }
+
+      // For multi-option quotes, calculate the highest option's sell price
+      // Using proportional approach: (highestOptionCost / allOptionsCost) * quote.total
+      // This preserves the markup ratio from the original quote
+      const highestOptionSellPrices = new Map<string, number>();
+      for (const quote of allQuotesInRange.filter(q => q.quoteMode === "options")) {
+        const optionMap = optionQuoteCosts.get(quote.id);
+        const allCost = quoteAllOptionsCost.get(quote.id) || 0;
+        const quoteSellPrice = parseFloat(quote.total || "0");
+        
+        if (optionMap && allCost > 0) {
+          // Find the highest cost option
+          let highestCost = 0;
+          for (const cost of optionMap.values()) {
+            if (cost > highestCost) highestCost = cost;
+          }
+          // Calculate proportional sell price for the highest option
+          const highestOptionSellPrice = (highestCost / allCost) * quoteSellPrice;
+          highestOptionSellPrices.set(quote.id, highestOptionSellPrice);
+        }
+      }
+
+      // Calculate totals using precomputed highest option sell prices
+      let totalQuotedCalc = 0;
+      let totalQuotesCount = 0;
+      let totalSoldCalc = 0;
+      let acceptedQuotesCount = 0;
+
+      for (const quote of allQuotesInRange) {
+        totalQuotesCount++;
+        let effectiveTotal = parseFloat(quote.total || "0");
+
+        // For multi-option quotes, use precomputed highest option sell price
+        if (quote.quoteMode === "options" && highestOptionSellPrices.has(quote.id)) {
+          effectiveTotal = highestOptionSellPrices.get(quote.id) || effectiveTotal;
+        }
+
+        totalQuotedCalc += effectiveTotal;
+
+        if (quote.status === "accepted") {
+          acceptedQuotesCount++;
+          totalSoldCalc += effectiveTotal;
+        }
+      }
+
+      const totalQuoted = totalQuotedCalc;
+      const totalSold = totalSoldCalc;
 
       const rolling12Invoices = await db
         .select({
@@ -5180,10 +5254,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(crmInvoices.status, "paid")
         ));
 
-      const totalQuoted = parseFloat(quotesInRange[0]?.total || "0");
-      const totalSold = parseFloat(acceptedQuotesInRange[0]?.total || "0");
-      const totalQuotesCount = quotesInRange[0]?.count || 0;
-      const acceptedQuotesCount = acceptedQuotesInRange[0]?.count || 0;
       const closeRate = totalQuotesCount > 0 ? (acceptedQuotesCount / totalQuotesCount) * 100 : 0;
       
       // Calculate dynamic company goal based on range and budgeted monthly sales from Excel
