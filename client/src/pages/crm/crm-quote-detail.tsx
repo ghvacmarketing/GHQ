@@ -2751,7 +2751,7 @@ export default function CrmQuoteDetail() {
                             <div 
                               key={option.tag} 
                               onClick={() => setPresentationSelectedOption(option.tag)}
-                              className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
+                              className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all bg-slate-50 ${
                                 isSelected 
                                   ? "border-[#711419] ring-2 ring-[#711419]/20 shadow-md" 
                                   : "border-slate-200 hover:border-slate-400"
@@ -2769,7 +2769,7 @@ export default function CrmQuoteDetail() {
                                 </div>
                                 <span className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatPresentationCurrency(option.total)}</span>
                               </div>
-                              <div className="p-3 sm:p-4">
+                              <div className="p-3 sm:p-4 bg-slate-50">
                                 {/* Show AI-generated category title if available */}
                                 {whatsIncluded.categoryTitle && (
                                   <div className="mb-3 pb-2 border-b border-slate-200">
