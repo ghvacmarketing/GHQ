@@ -5177,7 +5177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               lineTotal: crmQuoteLineItems.lineTotal,
             })
             .from(crmQuoteLineItems)
-            .where(sql`${crmQuoteLineItems.quoteId} IN ${optionQuoteIds}`)
+            .where(inArray(crmQuoteLineItems.quoteId, optionQuoteIds))
         : [];
 
       // Build a nested map: quoteId -> optionTag -> cost (lineTotal stores costs)
