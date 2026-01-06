@@ -46,7 +46,6 @@ import {
   Calendar,
   DollarSign,
   Printer,
-  Eye,
   X,
   Trash2,
   Receipt,
@@ -335,7 +334,6 @@ export default function CrmQuoteDetail() {
   const [, params] = useRoute("/crm/quotes/:id");
   const quoteId = params?.id;
   const { toast } = useToast();
-  const [showPreview, setShowPreview] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showOptionSelection, setShowOptionSelection] = useState(false);
   const [showAcceptOptionSelection, setShowAcceptOptionSelection] = useState(false);
@@ -1516,13 +1514,14 @@ export default function CrmQuoteDetail() {
               </Badge>
             </div>
             <Button
-              onClick={() => setShowPreview(true)}
+              onClick={() => setShowPresentation(true)}
               variant="ghost"
               size="icon"
               className="text-slate-500 hover:text-[#711419]"
-              data-testid="button-preview"
+              title="Present to Client"
+              data-testid="button-present"
             >
-              <Eye className="h-5 w-5" />
+              <Monitor className="h-5 w-5" />
             </Button>
           </div>
           
@@ -1534,26 +1533,15 @@ export default function CrmQuoteDetail() {
             
             <div className="flex items-center gap-2">
               {["draft", "sent", "viewed"].includes(status) && (
-                <>
-                  <Button
-                    onClick={handleOpenSendDialog}
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    data-testid="button-send-quote"
-                  >
-                    <Mail className="h-4 w-4 mr-2" />
-                    Send Quote
-                  </Button>
-                  <Button
-                    onClick={() => setShowPresentation(true)}
-                    size="sm"
-                    className="bg-teal-600 hover:bg-teal-700 text-white"
-                    data-testid="button-present-to-client"
-                  >
-                    <Monitor className="h-4 w-4 mr-2" />
-                    Present to Client
-                  </Button>
-                </>
+                <Button
+                  onClick={handleOpenSendDialog}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  data-testid="button-send-quote"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Quote
+                </Button>
               )}
               {status === "sent" && (
                 <>
@@ -2267,230 +2255,6 @@ export default function CrmQuoteDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 overflow-hidden">
-          <div className="h-full overflow-y-auto bg-white">
-            <div className="sticky top-0 z-10 bg-white border-b px-6 py-3 flex items-center justify-between">
-              <h2 className="font-semibold text-slate-900">Quote Preview</h2>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleDownloadPDF}
-                  variant="outline"
-                  size="sm"
-                  className="border-blue-500 text-blue-600"
-                >
-                  <Printer className="h-4 w-4 mr-1" />
-                  PDF
-                </Button>
-                <Button
-                  onClick={() => setShowPreview(false)}
-                  variant="ghost"
-                  size="sm"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="p-8 print:p-0" id="quote-preview-content">
-              <div className="bg-[#711419] text-white p-6 rounded-lg mb-6 print:rounded-none">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h1 className="text-3xl font-bold">{COMPANY_INFO.name}</h1>
-                    <p className="text-white/80 mt-1">{COMPANY_INFO.address}</p>
-                  </div>
-                  <div className="text-right text-sm text-white/90">
-                    <p>{COMPANY_INFO.phone}</p>
-                    <p>{COMPANY_INFO.email}</p>
-                    <p>{COMPANY_INFO.website}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-slate-900">QUOTE</h2>
-                  <p className="text-slate-500">{quote.quoteNumber}</p>
-                </div>
-                <Badge variant="outline" className={`${statusColors[status]} text-sm`}>
-                  {statusLabels[status] || status}
-                </Badge>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-slate-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Bill To
-                  </h3>
-                  <p className="font-medium">{quote.customer?.name || quote.customerName || "—"}</p>
-                  {(quote.customer?.email || quote.customerEmail) && (
-                    <p className="text-sm text-slate-600">{quote.customer?.email || quote.customerEmail}</p>
-                  )}
-                  {(quote.customer?.phone || quote.customerPhone) && (
-                    <p className="text-sm text-slate-600">{quote.customer?.phone || quote.customerPhone}</p>
-                  )}
-                  {quote.serviceAddress && (
-                    <p className="text-sm text-slate-600 mt-1">{quote.serviceAddress}</p>
-                  )}
-                </div>
-                <div className="bg-slate-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Quote Details
-                  </h3>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Date:</span>
-                      <span>{formatDate(quote.createdAt)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Valid Until:</span>
-                      <span>{quote.validUntil ? formatDate(quote.validUntil) : "30 days"}</span>
-                    </div>
-                    {quote.title && (
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Title:</span>
-                        <span>{quote.title}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Show AI-generated proposal if available, otherwise show line items */}
-              {quote.aiGeneratedQuote ? (
-                <div className="space-y-6 mb-8">
-                  {/* AI Quote Title & Description */}
-                  <div className="border-l-4 border-[#711419] pl-4">
-                    <h3 className="text-xl font-bold text-slate-900">
-                      {quote.aiGeneratedQuote.quote_title || quote.title}
-                    </h3>
-                    {quote.aiGeneratedQuote.package_description && (
-                      <p className="text-slate-600 mt-2">{quote.aiGeneratedQuote.package_description}</p>
-                    )}
-                  </div>
-
-                  {/* Best For */}
-                  {quote.aiGeneratedQuote.best_for && (
-                    <p className="text-sm italic text-slate-500 bg-slate-50 p-3 rounded-lg">
-                      <span className="font-medium not-italic">Best For:</span> {quote.aiGeneratedQuote.best_for}
-                    </p>
-                  )}
-
-                  {/* What's Included */}
-                  {quote.aiGeneratedQuote.whats_included && quote.aiGeneratedQuote.whats_included.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">What's Included</h4>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {quote.aiGeneratedQuote.whats_included.map((category: { category: string; items: string[] }, idx: number) => (
-                          <div key={idx} className="bg-slate-50 p-4 rounded-lg border">
-                            <p className="font-semibold text-slate-800 mb-2">{category.category}</p>
-                            <ul className="text-sm text-slate-600 space-y-1">
-                              {category.items.map((item: string, i: number) => (
-                                <li key={i} className="flex items-start gap-2">
-                                  <span className="text-[#711419] mt-0.5">•</span>
-                                  <span>{item}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Warranties & Terms */}
-                  {quote.aiGeneratedQuote.warranties_and_terms && quote.aiGeneratedQuote.warranties_and_terms.length > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                      <h4 className="text-sm font-semibold text-amber-900 uppercase mb-2">Warranties & Terms</h4>
-                      <ul className="text-sm text-amber-800 space-y-1">
-                        {quote.aiGeneratedQuote.warranties_and_terms.map((term: string, idx: number) => (
-                          <li key={idx}>• {term}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Financing */}
-                  {quote.aiGeneratedQuote.financing_text && (
-                    <p className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      {quote.aiGeneratedQuote.financing_text}
-                    </p>
-                  )}
-
-                </div>
-              ) : (
-                <>
-                  <div className="border rounded-lg overflow-hidden mb-6">
-                    <div className="bg-[#d3b07d] text-white px-4 py-3">
-                      <h3 className="font-semibold">Line Items</h3>
-                    </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-slate-50">
-                          <TableHead className="font-semibold">Description</TableHead>
-                          <TableHead className="text-center font-semibold">Qty</TableHead>
-                          <TableHead className="text-right font-semibold">Unit Price</TableHead>
-                          <TableHead className="text-right font-semibold">Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(() => {
-                          // Filter out labor/internal line items from print preview (client-facing)
-                          const clientVisibleItems = (quote.lineItems || []).filter(item => 
-                            item.lineType !== "labor" && item.lineType !== "other"
-                          );
-                          // For single line item quotes, show sell price instead of actual cost
-                          const isSingleItem = clientVisibleItems.length === 1;
-                          
-                          return clientVisibleItems.length > 0 ? (
-                            clientVisibleItems.map((item, idx) => {
-                              // Use sell price for single item quotes in client-facing print preview
-                              const displayPrice = isSingleItem ? quote.total : item.unitPrice;
-                              const displayTotal = isSingleItem ? quote.total : item.lineTotal;
-                              return (
-                                <TableRow key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
-                                  <TableCell className="font-medium">{item.description}</TableCell>
-                                  <TableCell className="text-center">{item.quantity}</TableCell>
-                                  <TableCell className="text-right">{formatCurrency(displayPrice)}</TableCell>
-                                  <TableCell className="text-right font-medium">{formatCurrency(displayTotal)}</TableCell>
-                                </TableRow>
-                              );
-                            })
-                          ) : (
-                            <TableRow>
-                              <TableCell colSpan={4} className="text-center text-slate-500 py-8">
-                                No line items
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })()}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  <div className="flex justify-end mb-8">
-                    <div className="w-72 bg-slate-50 rounded-lg p-4 space-y-2">
-                      <div className="flex justify-between text-lg font-bold">
-                        <span>Total</span>
-                        <span className="text-[#711419]">{formatCurrency(quote.total)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <div className="border-t pt-6 text-center text-sm text-slate-500">
-                <p className="font-medium text-slate-700">Thank you for choosing {COMPANY_INFO.name}!</p>
-                <p className="mt-1">Terms: Payment due upon completion. Prices valid for 30 days.</p>
-                <p className="mt-2">{COMPANY_INFO.phone} | {COMPANY_INFO.email} | {COMPANY_INFO.website}</p>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>

@@ -14193,7 +14193,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           part_number as "partNumber", quantity, unit_price as "unitPrice",
           line_total as "lineTotal", sort_order as "sortOrder",
           item_id as "itemId", is_discount_line as "isDiscountLine",
-          discount_kind as "discountKind", created_at as "createdAt"
+          discount_kind as "discountKind", option_tag as "optionTag",
+          image_url as "imageUrl", created_at as "createdAt"
         FROM crm_quote_line_items
         WHERE quote_id = ${req.params.id}
         ORDER BY sort_order ASC
