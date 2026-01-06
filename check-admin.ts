@@ -1,5 +1,5 @@
-import { db } from "./db";
-import { crmUsers } from "@shared/schema";
+import { db } from "./server/db";
+import { crmUsers } from "./shared/schema";
 import { eq } from "drizzle-orm";
 
 async function checkAdmin() {
