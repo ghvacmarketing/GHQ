@@ -1,12 +1,23 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, ClipboardCheck, Calendar, RefreshCw } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, Calendar, RefreshCw, CheckCircle, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { PortalLayout } from "./portal-layout";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
+
+interface MaintenanceVisit {
+  id: string;
+  visitNumber: number;
+  cycleYear: number;
+  targetDate: string;
+  completedAt: string | null;
+  status: "pending" | "scheduled" | "completed" | "cancelled";
+}
 
 interface PortalAgreement {
   id: string;
@@ -19,6 +30,10 @@ interface PortalAgreement {
   frequency: string;
   visitsPerPeriod: number;
   nextServiceDate: string | null;
+  visits: MaintenanceVisit[];
+  completedVisits: number;
+  totalVisits: number;
+  remainingVisits: number;
 }
 
 interface AgreementsResponse {
@@ -32,8 +47,16 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   cancelled: { label: "Cancelled", className: "bg-red-100 text-red-700 border-red-200" },
 };
 
+const visitStatusConfig: Record<string, { label: string; className: string }> = {
+  completed: { label: "Completed", className: "bg-green-100 text-green-700" },
+  scheduled: { label: "Scheduled", className: "bg-blue-100 text-blue-700" },
+  pending: { label: "Pending", className: "bg-amber-100 text-amber-700" },
+  cancelled: { label: "Cancelled", className: "bg-slate-100 text-slate-500" },
+};
+
 export default function PortalAgreements() {
   const [, setLocation] = useLocation();
+  const [expandedAgreements, setExpandedAgreements] = useState<Set<string>>(new Set());
 
   const { data: customer, error: customerError } = useQuery<{ id: string; name: string }>({
     queryKey: ["/api/portal/auth/me"],
@@ -53,6 +76,18 @@ export default function PortalAgreements() {
       setLocation("/portal/login");
     }
   }, [customerError, setLocation]);
+
+  const toggleAgreement = (id: string) => {
+    setExpandedAgreements(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const formatCurrency = (amount: string) => {
     return new Intl.NumberFormat("en-US", {
@@ -115,6 +150,11 @@ export default function PortalAgreements() {
           <div className="grid gap-4">
             {agreements.map((agreement) => {
               const status = statusConfig[agreement.status] || statusConfig.pending;
+              const isExpanded = expandedAgreements.has(agreement.id);
+              const progressPercent = agreement.totalVisits > 0 
+                ? (agreement.completedVisits / agreement.totalVisits) * 100 
+                : 0;
+              
               return (
                 <Card key={agreement.id} className="shadow-sm hover:shadow-md transition-shadow" data-testid={`card-agreement-${agreement.id}`}>
                   <CardHeader className="pb-2">
@@ -137,7 +177,7 @@ export default function PortalAgreements() {
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="text-slate-500 mb-1">Billing</p>
@@ -166,6 +206,79 @@ export default function PortalAgreements() {
                         </p>
                       </div>
                     </div>
+
+                    {/* Visit Tracking Summary */}
+                    {agreement.totalVisits > 0 && (
+                      <div className="pt-2 border-t border-slate-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <span className="font-medium text-sm" data-testid={`text-completed-visits-${agreement.id}`}>
+                              {agreement.completedVisits} of {agreement.totalVisits} visits completed
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-slate-500">
+                            <Clock className="h-4 w-4" />
+                            <span data-testid={`text-remaining-visits-${agreement.id}`}>
+                              {agreement.remainingVisits} remaining
+                            </span>
+                          </div>
+                        </div>
+                        <Progress value={progressPercent} className="h-2" />
+                      </div>
+                    )}
+
+                    {/* Expandable Visit History */}
+                    {agreement.visits.length > 0 && (
+                      <Collapsible open={isExpanded} onOpenChange={() => toggleAgreement(agreement.id)}>
+                        <CollapsibleTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="w-full justify-between text-slate-600 hover:bg-slate-50"
+                            data-testid={`button-toggle-visits-${agreement.id}`}
+                          >
+                            <span>View Visit History</span>
+                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="pt-2">
+                          <div className="space-y-2 bg-slate-50 rounded-lg p-3">
+                            {agreement.visits.map((visit) => {
+                              const visitStatus = visitStatusConfig[visit.status] || visitStatusConfig.pending;
+                              return (
+                                <div 
+                                  key={visit.id} 
+                                  className="flex items-center justify-between bg-white p-3 rounded-md border border-slate-100"
+                                  data-testid={`visit-row-${visit.id}`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    {visit.status === "completed" ? (
+                                      <CheckCircle className="h-4 w-4 text-green-600" />
+                                    ) : (
+                                      <Clock className="h-4 w-4 text-slate-400" />
+                                    )}
+                                    <div>
+                                      <p className="font-medium text-sm" data-testid={`text-visit-number-${visit.id}`}>
+                                        Visit #{visit.visitNumber}
+                                      </p>
+                                      <p className="text-xs text-slate-500">
+                                        {visit.status === "completed" && visit.completedAt
+                                          ? `Completed ${formatDate(visit.completedAt)}`
+                                          : `Scheduled for ${formatDate(visit.targetDate)}`}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Badge variant="secondary" className={`text-xs ${visitStatus.className}`}>
+                                    {visitStatus.label}
+                                  </Badge>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
                   </CardContent>
                 </Card>
               );

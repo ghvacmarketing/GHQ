@@ -17811,7 +17811,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  // GET /api/portal/agreements - Returns customer's maintenance agreements
+  // GET /api/portal/agreements - Returns customer's maintenance agreements with visit tracking
   app.get("/api/portal/agreements", requireCustomerPortalAuth, async (req: any, res) => {
     try {
       const customerId = req.portalCustomer.id;
@@ -17832,7 +17832,36 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         .where(eq(crmAgreements.customerId, customerId))
         .orderBy(desc(crmAgreements.startDate));
 
-      res.json({ agreements: agreementsResult });
+      // For each agreement, get the maintenance visits
+      const agreementsWithVisits = await Promise.all(
+        agreementsResult.map(async (agreement) => {
+          const visits = await db.select({
+            id: maintenanceVisits.id,
+            visitNumber: maintenanceVisits.visitNumber,
+            cycleYear: maintenanceVisits.cycleYear,
+            targetDate: maintenanceVisits.targetDate,
+            completedAt: maintenanceVisits.completedAt,
+            status: maintenanceVisits.status,
+          })
+            .from(maintenanceVisits)
+            .where(eq(maintenanceVisits.agreementId, agreement.id))
+            .orderBy(maintenanceVisits.targetDate);
+          
+          const completedVisits = visits.filter(v => v.status === "completed").length;
+          const totalVisits = visits.length;
+          const remainingVisits = totalVisits - completedVisits;
+          
+          return {
+            ...agreement,
+            visits,
+            completedVisits,
+            totalVisits,
+            remainingVisits,
+          };
+        })
+      );
+
+      res.json({ agreements: agreementsWithVisits });
     } catch (error) {
       console.error("Error fetching portal agreements:", error);
       res.status(500).json({ message: "Failed to fetch agreements" });
@@ -17862,7 +17891,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         ))
         .orderBy(desc(crmWorkOrders.completedAt));
 
-      res.json({ serviceHistory: workOrders });
+      res.json({ workOrders });
     } catch (error) {
       console.error("Error fetching portal service history:", error);
       res.status(500).json({ message: "Failed to fetch service history" });
