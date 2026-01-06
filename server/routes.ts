@@ -5344,10 +5344,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // 3. Technician Performance
+      // Include tech and supervisor roles for dashboard tech performance
       const techs = await db
         .select()
         .from(crmUsers)
-        .where(and(eq(crmUsers.role, "tech"), eq(crmUsers.isActive, true)));
+        .where(and(sql`${crmUsers.role} IN ('tech', 'supervisor')`, eq(crmUsers.isActive, true)));
 
       const techPerformance = await Promise.all(
         techs.map(async (tech) => {
@@ -6672,10 +6673,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/technicians - List field workers for dispatch (techs and sales who do field work)
+  // GET /api/crm/technicians - List field workers for dispatch (techs, sales, and supervisors who do field work)
   app.get("/api/crm/technicians", requireCrmAuth, async (req, res) => {
     try {
-      // Include tech and sales roles only - owner and admin are office roles
+      // Include tech, sales, and supervisor roles - they all do field work
       const technicians = await db.select({
         id: crmUsers.id,
         name: crmUsers.name,
@@ -6683,7 +6684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: crmUsers.role,
       }).from(crmUsers)
         .where(and(
-          sql`${crmUsers.role} IN ('tech', 'sales')`,
+          sql`${crmUsers.role} IN ('tech', 'sales', 'supervisor')`,
           eq(crmUsers.isActive, true)
         ))
         .orderBy(crmUsers.name);
@@ -16824,11 +16825,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         percentComplete: mtdGoal > 0 ? Math.round((mtdActual / mtdGoal) * 100) : 0,
       });
       
-      // Get all technicians
+      // Get all technicians (including supervisors who function as techs)
       const techs = await db.select({
         id: crmUsers.id,
         name: crmUsers.name,
-      }).from(crmUsers).where(eq(crmUsers.role, "tech"));
+      }).from(crmUsers).where(sql`${crmUsers.role} IN ('tech', 'supervisor')`);
       
       const techCount = techs.length || 1; // Avoid division by zero
       
@@ -16964,12 +16965,13 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           eq(monthlyGoals.month, month)
         ));
 
-      if (user.role === "tech") {
+      if (user.role === "tech" || user.role === "supervisor") {
         // Tech performance data - invoice-payment-driven attribution
         // Revenue counts as soon as invoice is paid, regardless of work order status
+        // Count both techs and supervisors for goal division
         const techCount = await db.select({ count: count() })
           .from(crmUsers)
-          .where(and(eq(crmUsers.role, "tech"), eq(crmUsers.isActive, true)));
+          .where(and(sql`${crmUsers.role} IN ('tech', 'supervisor')`, eq(crmUsers.isActive, true)));
         const numTechs = Number(techCount[0]?.count) || 1;
 
         // Get all work orders assigned to this tech (any status)
