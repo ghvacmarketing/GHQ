@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useEffect } from "react";
 import { Loader2, ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { crmFetch } from "@/lib/crmAuth";
 import type { CrmUser } from "@shared/schema";
 
 interface CrmRouteGuardProps {
@@ -15,9 +16,10 @@ export default function CrmRouteGuard({ children }: CrmRouteGuardProps) {
   const { data: currentUser, isLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: async () => {
-      const res = await fetch("/api/crm/auth/me", { credentials: "include" });
+      const res = await crmFetch("/api/crm/auth/me");
       if (!res.ok) return null;
-      return res.json();
+      const data = await res.json();
+      return data.user || data;
     },
     staleTime: 5 * 60 * 1000,
   });

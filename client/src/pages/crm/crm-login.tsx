@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { setCrmToken, crmFetch } from "@/lib/crmAuth";
 import { ArrowLeft, Building2, Lock, Mail, Loader2, Home } from "lucide-react";
 import { Link } from "wouter";
 import type { CrmUser } from "@shared/schema";
@@ -27,7 +28,12 @@ export default function CrmLogin() {
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryFn: async () => {
+      const res = await crmFetch("/api/crm/auth/me");
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.user || data;
+    },
   });
 
   useEffect(() => {
@@ -51,11 +57,19 @@ export default function CrmLogin() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
-      const res = await apiRequest("POST", "/api/crm/auth/login", data);
+      const res = await fetch("/api/crm/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Invalid credentials");
       return res.json();
     },
     onSuccess: (data) => {
+      if (data.token) {
+        setCrmToken(data.token);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/crm/auth/me"] });
       // Technicians go directly to mobile app, others go to CRM
       if (data.user?.role === "tech") {
