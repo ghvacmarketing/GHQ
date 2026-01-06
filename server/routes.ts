@@ -13505,7 +13505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/crm/invoices/:id/send-email - Send invoice via email
+  // POST /api/crm/invoices/:id/send-email - Send invoice via email (supports multiple recipients)
   app.post("/api/crm/invoices/:id/send-email", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -13521,19 +13521,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get customer info
-      let customerEmail = recipientEmail;
       let customerName = "Customer";
+      let defaultEmail = "";
       
       if (invoice.customerId) {
         const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, invoice.customerId)).limit(1);
         if (customer) {
-          customerEmail = recipientEmail || customer.email;
+          defaultEmail = customer.email || "";
           customerName = customer.name || "Customer";
         }
       }
 
-      if (!customerEmail) {
+      // Parse multiple emails (comma, semicolon, or space separated)
+      const emailInput = recipientEmail || defaultEmail;
+      if (!emailInput) {
         return res.status(400).json({ message: "No recipient email provided and customer has no email" });
+      }
+      
+      const emailList = emailInput
+        .split(/[,;\s]+/)
+        .map((e: string) => e.trim().toLowerCase())
+        .filter((e: string) => e && e.includes("@"));
+      
+      if (emailList.length === 0) {
+        return res.status(400).json({ message: "No valid email addresses provided" });
       }
 
       const lineItems = await db.select().from(crmInvoiceLineItems)
@@ -13542,53 +13553,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const sentByName = user.displayName || user.name || user.email;
       const subject = `Your Invoice from Giesbrecht HVAC - ${invoice.invoiceNumber}`;
-
-      // Use the sender's email as Reply-To so customer replies go directly to them
       const replyToEmail = user.email;
       
-      console.log("[Invoice Email] Reply-To:", replyToEmail, "(sender's email)");
+      console.log("[Invoice Email] Sending to multiple recipients:", emailList);
 
-      const result = await sendCrmInvoiceEmail(
-        invoice,
-        lineItems,
-        customerEmail,
-        customerName,
-        personalMessage,
-        sentByName,
-        {
-          senderEmail: user.email,
-          senderName: sentByName,
+      // Send to all recipients
+      const results: { email: string; success: boolean; error?: string; messageId?: string }[] = [];
+      
+      for (const email of emailList) {
+        const result = await sendCrmInvoiceEmail(
+          invoice,
+          lineItems,
+          email,
+          customerName,
+          personalMessage,
+          sentByName,
+          {
+            senderEmail: user.email,
+            senderName: sentByName,
+            replyToEmail,
+          }
+        );
+
+        await db.insert(invoiceEmailLogs).values({
+          invoiceId: invoice.id,
+          direction: "outgoing",
+          fromEmail: result.fromEmail || "invoices@ghvacinc.com",
+          recipientEmail: email,
+          recipientName: customerName,
+          subject,
+          htmlContent: result.htmlContent || null,
+          textContent: result.textContent || null,
+          status: result.success ? "sent" : "failed",
+          errorMessage: result.error || null,
+          sentBy: user.id,
+          personalMessage: personalMessage || null,
+          isManual: false,
+          resendMessageId: result.messageId || null,
           replyToEmail,
-        }
-      );
-
-      const [emailLog] = await db.insert(invoiceEmailLogs).values({
-        invoiceId: invoice.id,
-        direction: "outgoing",
-        fromEmail: result.fromEmail || "invoices@ghvacinc.com",
-        recipientEmail: customerEmail,
-        recipientName: customerName,
-        subject,
-        htmlContent: result.htmlContent || null,
-        textContent: result.textContent || null,
-        status: result.success ? "sent" : "failed",
-        errorMessage: result.error || null,
-        sentBy: user.id,
-        personalMessage: personalMessage || null,
-        isManual: false,
-        resendMessageId: result.messageId || null,
-        replyToEmail,
-      }).returning();
-
-      if (!result.success) {
-        return res.status(500).json({ 
-          message: result.error || "Failed to send invoice email",
-          emailLogId: emailLog.id
         });
+
+        results.push({ email, success: result.success, error: result.error, messageId: result.messageId });
       }
 
-      // Update invoice status to sent if it was draft
-      if (invoice.status === "draft") {
+      const successCount = results.filter(r => r.success).length;
+      const allSucceeded = successCount === emailList.length;
+
+      // Update invoice status to sent if it was draft and at least one email succeeded
+      if (successCount > 0 && invoice.status === "draft") {
         await db.update(crmInvoices)
           .set({ 
             status: "sent" as const,
@@ -13603,14 +13615,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "invoice.email_sent",
         "invoice",
         invoice.id,
-        { invoiceNumber: invoice.invoiceNumber, recipientEmail: customerEmail },
+        { invoiceNumber: invoice.invoiceNumber, recipients: emailList, successCount },
         req.ip
       );
 
       return res.json({ 
-        success: true, 
-        messageId: result.messageId,
-        emailLogId: emailLog.id
+        success: allSucceeded, 
+        successCount,
+        totalCount: emailList.length,
+        results,
       });
     } catch (error) {
       console.error("Error sending invoice email:", error);
@@ -15247,7 +15260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/crm/quotes/:id/send-email - Send quote via email
+  // POST /api/crm/quotes/:id/send-email - Send quote via email (supports multiple recipients)
   app.post("/api/crm/quotes/:id/send-email", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -15262,9 +15275,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Quote not found" });
       }
 
-      const emailTo = recipientEmail || quote.customerEmail;
-      if (!emailTo) {
+      // Parse multiple emails (comma, semicolon, or space separated)
+      const emailInput = recipientEmail || quote.customerEmail || "";
+      if (!emailInput) {
         return res.status(400).json({ message: "No recipient email provided and quote has no customer email" });
+      }
+      
+      const emailList = emailInput
+        .split(/[,;\s]+/)
+        .map((e: string) => e.trim().toLowerCase())
+        .filter((e: string) => e && e.includes("@"));
+      
+      if (emailList.length === 0) {
+        return res.status(400).json({ message: "No valid email addresses provided" });
       }
 
       // Generate viewToken if one doesn't exist
@@ -15300,35 +15323,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      console.log("[Quote Email] Reply-To:", replyToEmail, "(assigned user's email)");
+      console.log("[Quote Email] Sending to multiple recipients:", emailList);
 
-      // Pass sender's email and quote view URL
-      const result = await sendCrmQuoteEmail(quote, lineItems, emailTo, personalMessage, sentByName, {
-        senderEmail: user.email,
-        senderName: sentByName,
-        quoteViewUrl,
-        replyToEmail,
-      });
+      // Send to all recipients
+      const results: { email: string; success: boolean; error?: string; messageId?: string }[] = [];
+      
+      for (const email of emailList) {
+        const result = await sendCrmQuoteEmail(quote, lineItems, email, personalMessage, sentByName, {
+          senderEmail: user.email,
+          senderName: sentByName,
+          quoteViewUrl,
+          replyToEmail,
+        });
 
-      const [emailLog] = await db.insert(quoteEmailLogs).values({
-        quoteId: quote.id,
-        direction: "outgoing",
-        fromEmail: result.fromEmail || "quotes@ghvacinc.com",
-        recipientEmail: emailTo,
-        recipientName: quote.customerName,
-        subject: result.subject || subject,
-        htmlContent: result.htmlContent || null,
-        textContent: result.textContent || null,
-        status: result.success ? "sent" : "failed",
-        errorMessage: result.error || null,
-        sentBy: user.id,
-        personalMessage: personalMessage || null,
-        isManual: false,
-        resendMessageId: result.messageId || null,
-        replyToEmail: result.replyToEmail || null,
-      }).returning();
+        await db.insert(quoteEmailLogs).values({
+          quoteId: quote.id,
+          direction: "outgoing",
+          fromEmail: result.fromEmail || "quotes@ghvacinc.com",
+          recipientEmail: email,
+          recipientName: quote.customerName,
+          subject: result.subject || subject,
+          htmlContent: result.htmlContent || null,
+          textContent: result.textContent || null,
+          status: result.success ? "sent" : "failed",
+          errorMessage: result.error || null,
+          sentBy: user.id,
+          personalMessage: personalMessage || null,
+          isManual: false,
+          resendMessageId: result.messageId || null,
+          replyToEmail: result.replyToEmail || null,
+        });
 
-      if (result.success) {
+        results.push({ email, success: result.success, error: result.error, messageId: result.messageId });
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const allSucceeded = successCount === emailList.length;
+
+      // Update quote status to sent if at least one email succeeded
+      if (successCount > 0) {
         await db.update(crmQuotes)
           .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
           .where(eq(crmQuotes.id, quote.id));
@@ -15338,15 +15371,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "quote.email_sent",
           "crm_quote",
           quote.id,
-          { quoteNumber: quote.quoteNumber, recipientEmail: emailTo, emailLogId: emailLog.id },
+          { quoteNumber: quote.quoteNumber, recipients: emailList, successCount },
           req.ip
         );
       }
 
       return res.json({
-        success: result.success,
-        error: result.error,
-        emailLogId: emailLog.id,
+        success: allSucceeded,
+        successCount,
+        totalCount: emailList.length,
+        results,
       });
     } catch (error) {
       console.error("Error sending quote email:", error);

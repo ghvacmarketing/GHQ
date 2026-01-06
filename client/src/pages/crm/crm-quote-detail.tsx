@@ -253,9 +253,9 @@ export default function CrmQuoteDetail() {
       if (!res.ok || !result.success) {
         throw new Error(result.error || result.message || "Failed to send email");
       }
-      return result;
+      return result as { success: boolean; successCount: number; totalCount: number };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId, "email-logs"] });
@@ -263,7 +263,10 @@ export default function CrmQuoteDetail() {
       setShowSendQuoteDialog(false);
       setSendEmailRecipient("");
       setSendEmailMessage("");
-      toast({ title: "Quote sent!", description: "The quote has been emailed to the customer." });
+      const description = data.totalCount > 1 
+        ? `Quote sent to ${data.successCount} of ${data.totalCount} recipients.`
+        : "The quote has been emailed to the customer.";
+      toast({ title: "Quote sent!", description });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to send email", description: error.message, variant: "destructive" });
@@ -1898,20 +1901,21 @@ export default function CrmQuoteDetail() {
               Send Quote via Email
             </DialogTitle>
             <DialogDescription>
-              Send this quote to the customer via email. They will receive a PDF attachment.
+              Send this quote to the customer via email. They will receive a link to view it.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="recipient-email">Recipient Email</Label>
+              <Label htmlFor="recipient-email">Recipient Email(s)</Label>
               <Input
                 id="recipient-email"
-                type="email"
-                placeholder="customer@example.com"
+                type="text"
+                placeholder="email1@example.com, email2@example.com"
                 value={sendEmailRecipient}
                 onChange={(e) => setSendEmailRecipient(e.target.value)}
                 data-testid="input-recipient-email"
               />
+              <p className="text-xs text-slate-500">Separate multiple emails with commas</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="personal-message">Personal Message (optional)</Label>

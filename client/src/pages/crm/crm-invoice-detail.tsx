@@ -267,9 +267,9 @@ export default function CrmInvoiceDetail() {
         throw new Error(data.message || "Failed to send email");
       }
       const result = await res.json();
-      return result;
+      return result as { success: boolean; successCount: number; totalCount: number };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", invoiceId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", invoiceId, "email-logs"] });
@@ -277,7 +277,10 @@ export default function CrmInvoiceDetail() {
       setShowSendEmailDialog(false);
       setSendEmailRecipient("");
       setSendEmailMessage("");
-      toast({ title: "Invoice sent!", description: "The invoice has been emailed to the customer." });
+      const description = data.totalCount > 1 
+        ? `Invoice sent to ${data.successCount} of ${data.totalCount} recipients.`
+        : "The invoice has been emailed to the customer.";
+      toast({ title: "Invoice sent!", description });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to send email", description: error.message, variant: "destructive" });
@@ -964,15 +967,16 @@ export default function CrmInvoiceDetail() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="recipientEmail">Recipient Email</Label>
+              <Label htmlFor="recipientEmail">Recipient Email(s)</Label>
               <Input
                 id="recipientEmail"
-                type="email"
+                type="text"
                 value={sendEmailRecipient}
                 onChange={(e) => setSendEmailRecipient(e.target.value)}
-                placeholder="customer@example.com"
+                placeholder="email1@example.com, email2@example.com"
                 data-testid="input-recipient-email"
               />
+              <p className="text-xs text-slate-500">Separate multiple emails with commas</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="personalMessage">Personal Message (optional)</Label>
