@@ -5425,7 +5425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(crmWorkOrders)
         .where(and(
           eq(crmWorkOrders.status, "completed"),
-          sql`${crmWorkOrders.completedAt} >= ${thirtyDaysAgo}`
+          sql`COALESCE(${crmWorkOrders.completedAt}, ${crmWorkOrders.updatedAt}) >= ${thirtyDaysAgo}`
         ));
       
       const recentWorkOrders = await db
