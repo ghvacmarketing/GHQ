@@ -2508,7 +2508,7 @@ function WeatherImpactTab() {
       
       <div className="flex items-center justify-between flex-wrap gap-2">
         <Select value={range} onValueChange={setRange}>
-          <SelectTrigger className="w-[140px]" data-testid="crm-phone-select-weather-range">
+          <SelectTrigger className="w-auto h-8 px-3 text-xs border-0 bg-transparent hover:bg-muted/50 focus:ring-0 gap-1" data-testid="crm-phone-select-weather-range">
             <SelectValue placeholder="Select range" />
           </SelectTrigger>
           <SelectContent>
