@@ -77,6 +77,7 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmJob, CrmInvoice, CrmInvoiceLineItem, CrmInvoiceStatus, CrmPayment, InvoiceEmailLog } from "@shared/schema";
+import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
 
 type InvoiceDetailWithItems = CrmInvoice & {
   customer: CrmCustomer | null;
@@ -609,6 +610,16 @@ export default function CrmInvoiceDetail() {
                   <Mail className="h-4 w-4 mr-2" />
                   Send Email
                 </Button>
+              )}
+              
+              {/* Payment Link button for invoices with balance due */}
+              {!isVoid && balanceDue > 0 && (
+                <PaymentLinkButton
+                  type="invoice"
+                  id={invoice.id}
+                  total={balanceDue}
+                  customerPhone={invoice.customer?.phone}
+                />
               )}
               
               <DropdownMenu>

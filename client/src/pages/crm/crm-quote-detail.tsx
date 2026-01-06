@@ -83,6 +83,7 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { CrmUser, CrmQuote, CrmQuoteLineItem, QuoteEmailLog } from "@shared/schema";
+import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
 
 const COMPANY_INFO = {
   name: "Giesbrecht HVAC",
@@ -1310,6 +1311,15 @@ export default function CrmQuoteDetail() {
                   Create Invoice
                 </Button>
               )}
+              
+              {/* Payment Link button - only for install quotes */}
+              <PaymentLinkButton
+                type="quote"
+                id={quote.id}
+                quoteCategory={quote.quoteCategory}
+                total={parseFloat(quote.total?.toString() || "0")}
+                customerPhone={quote.customer?.phone || quote.customerPhone}
+              />
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

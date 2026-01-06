@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, ClipboardList, ChevronRight, Tags, Clock } from "lucide-react";
+import { Shield, Users, ClipboardList, ChevronRight, Tags, Clock, CreditCard } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser } from "@shared/schema";
 
@@ -39,6 +39,12 @@ const settingsItems: SettingsItem[] = [
     description: "View and manage technician clock in/out records",
     href: "/crm/settings/time-logs",
     icon: Clock,
+  },
+  {
+    title: "Payment Settings",
+    description: "Configure default deposit percentage for payment links",
+    href: "/crm/settings/payments",
+    icon: CreditCard,
   },
 ];
 

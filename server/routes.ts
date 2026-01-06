@@ -35,6 +35,7 @@ import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, ha
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword } from "./crm-auth";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import stripePaymentsRouter from "./stripe-payments";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -307,6 +308,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register object storage routes for App Storage file uploads
   registerObjectStorageRoutes(app);
+
+  // Register Stripe payment routes
+  app.use(stripePaymentsRouter);
 
   // Ensure CRM users exist with correct roles
   ensureTechniciansExist().catch(console.error);

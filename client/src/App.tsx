@@ -62,6 +62,7 @@ const CrmSettings = lazy(() => import("@/pages/crm/crm-settings"));
 const CrmSettingsUsers = lazy(() => import("@/pages/crm/crm-settings-users"));
 const CrmSettingsSubtypes = lazy(() => import("@/pages/crm/crm-settings-subtypes"));
 const CrmSettingsTime = lazy(() => import("@/pages/crm/crm-settings-time"));
+const CrmSettingsPayments = lazy(() => import("@/pages/crm/crm-settings-payments"));
 const CrmBusinessDashboard = lazy(() => import("@/pages/crm/crm-business-dashboard"));
 const CrmGoalsTracker = lazy(() => import("@/pages/crm/crm-goals-tracker"));
 const CrmMessaging = lazy(() => import("@/pages/crm/crm-messaging"));
@@ -263,6 +264,7 @@ function Router() {
       <Route path="/crm/settings/users">{() => <ProtectedCrmWrapper><CrmSettingsUsers /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/subtypes">{() => <ProtectedCrmWrapper><CrmSettingsSubtypes /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/time-logs">{() => <ProtectedCrmWrapper><CrmSettingsTime /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/payments">{() => <ProtectedCrmWrapper><CrmSettingsPayments /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings">{() => <ProtectedCrmWrapper><CrmSettings /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/dashboard">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/reports">{() => <ProtectedCrmWrapper><CrmGoalsTracker /></ProtectedCrmWrapper>}</Route>

@@ -107,6 +107,8 @@
     "recharts": "^2.15.2",
     "remark-gfm": "^4.0.1",
     "resend": "^6.0.2",
+    "stripe": "^20.0.0",
+    "stripe-replit-sync": "^1.0.0",
     "svix": "^1.84.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",

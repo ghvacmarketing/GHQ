@@ -1,13 +1,85 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { runMigrations } from 'stripe-replit-sync';
+import { getStripeSync } from "./stripeClient";
+import { WebhookHandlers } from "./webhookHandlers";
 
 const app = express();
+
+// Initialize Stripe schema and sync on startup (runs in background)
+async function initStripe() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    console.log('DATABASE_URL not set - skipping Stripe initialization');
+    return;
+  }
+
+  try {
+    console.log('Initializing Stripe schema...');
+    await runMigrations({ databaseUrl, schema: 'stripe' });
+    console.log('Stripe schema ready');
+
+    const stripeSync = await getStripeSync();
+
+    // Set up managed webhook if REPLIT_DOMAINS is available
+    const replitDomains = process.env.REPLIT_DOMAINS;
+    if (replitDomains) {
+      const webhookBaseUrl = `https://${replitDomains.split(',')[0]}`;
+      const webhookUrl = `${webhookBaseUrl}/api/stripe/webhook`;
+      try {
+        const result = await stripeSync.findOrCreateManagedWebhook(webhookUrl);
+        console.log('Stripe webhook configured:', result?.webhook?.url || webhookUrl);
+      } catch (webhookError) {
+        console.log('Stripe webhook setup skipped (may already exist):', webhookUrl);
+      }
+    } else {
+      console.log('REPLIT_DOMAINS not set - skipping webhook configuration');
+    }
+
+    // Sync in background so server starts immediately
+    stripeSync.syncBackfill()
+      .then(() => console.log('Stripe data synced'))
+      .catch((err: any) => console.error('Error syncing Stripe data:', err));
+  } catch (error) {
+    console.error('Failed to initialize Stripe:', error);
+  }
+}
+
+// Initialize Stripe (don't await - let server start)
+initStripe();
 
 // Immediate health check endpoint - must be first to pass Cloud Run health checks
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+// Stripe webhook route - MUST be before express.json() middleware
+app.post(
+  '/api/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const signature = req.headers['stripe-signature'];
+    if (!signature) {
+      return res.status(400).json({ error: 'Missing stripe-signature' });
+    }
+
+    try {
+      const sig = Array.isArray(signature) ? signature[0] : signature;
+      if (!Buffer.isBuffer(req.body)) {
+        console.error('Stripe webhook: req.body is not a Buffer');
+        return res.status(500).json({ error: 'Webhook processing error' });
+      }
+
+      await WebhookHandlers.processWebhook(req.body as Buffer, sig);
+      res.status(200).json({ received: true });
+    } catch (error: any) {
+      console.error('Stripe webhook error:', error.message);
+      res.status(400).json({ error: 'Webhook processing error' });
+    }
+  }
+);
+
 // Conditional JSON parsing - skip for PDF upload route and webhook routes that need raw body
 app.use((req, res, next) => {
   if (req.path === '/api/price-book/upload') {
