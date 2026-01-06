@@ -14347,7 +14347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scope: "project",
         status: "draft",
         title: `Install - ${installSubtype.charAt(0).toUpperCase() + installSubtype.slice(1)}`,
-        description: `Generated from Install Pricing Worksheet.\nInstall Type: ${installSubtype}\nHours: ${inputs.hoursToInstall}\nCrew Days: ${calcs.crewDays.toFixed(2)}`,
+        description: "",
         subtotal: calcs.linesTotal.toString(),
         total: calcs.discountedSellPrice.toString(),
         createdBy: user.id,

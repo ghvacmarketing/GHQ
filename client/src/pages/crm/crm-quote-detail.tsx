@@ -61,6 +61,7 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Inbox,
+  Edit,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -167,6 +168,8 @@ export default function CrmQuoteDetail() {
   const [markSentNote, setMarkSentNote] = useState("");
   const [isEditingAssignment, setIsEditingAssignment] = useState(false);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState("");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -318,6 +321,31 @@ export default function CrmQuoteDetail() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to update assignment", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateDescriptionMutation = useMutation({
+    mutationFn: async (description: string) => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ description }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to update description");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setIsEditingDescription(false);
+      toast({ title: "Description updated", description: "The quote description has been saved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update description", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1111,23 +1139,6 @@ export default function CrmQuoteDetail() {
           y += 28;
         }
 
-        if (quote.description) {
-          checkPageBreak(25);
-          doc.setFillColor(254, 252, 232);
-          doc.setDrawColor(253, 230, 138);
-          doc.roundedRect(margin, y, contentWidth, 20, 2, 2, 'FD');
-          doc.setFontSize(9);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(120, 53, 15);
-          doc.text("Notes", margin + 5, y + 7);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(146, 64, 14);
-          const noteLines = doc.splitTextToSize(quote.description, contentWidth - 10);
-          noteLines.slice(0, 2).forEach((line: string, idx: number) => {
-            doc.text(line, margin + 5, y + 13 + (idx * 4));
-          });
-          y += 25;
-        }
       }
 
       const footerY = pageHeight - 18;
@@ -1519,13 +1530,60 @@ export default function CrmQuoteDetail() {
           </CardContent>
         </Card>
 
-        {quote.description && (
+        {/* Editable Description for custom install quotes */}
+        {quote.quoteType === "custom_install" && (
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Notes</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base">Description</CardTitle>
+              {!isEditingDescription && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditedDescription(quote.description || "");
+                    setIsEditingDescription(true);
+                  }}
+                  data-testid="button-edit-description"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-slate-600 whitespace-pre-wrap">{quote.description}</p>
+              {isEditingDescription ? (
+                <div className="space-y-3">
+                  <Textarea
+                    value={editedDescription}
+                    onChange={(e) => setEditedDescription(e.target.value)}
+                    placeholder="Add a description for this custom install quote..."
+                    className="min-h-[100px]"
+                    data-testid="textarea-quote-description"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => updateDescriptionMutation.mutate(editedDescription)}
+                      disabled={updateDescriptionMutation.isPending}
+                      data-testid="button-save-description"
+                    >
+                      {updateDescriptionMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditingDescription(false)}
+                      data-testid="button-cancel-description"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : quote.description ? (
+                <p className="text-sm text-slate-600 whitespace-pre-wrap">{quote.description}</p>
+              ) : (
+                <p className="text-sm text-slate-400 italic">No description added. Click Edit to add one.</p>
+              )}
             </CardContent>
           </Card>
         )}
@@ -2134,13 +2192,6 @@ export default function CrmQuoteDetail() {
                     </div>
                   </div>
                 </>
-              )}
-
-              {quote.description && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                  <h3 className="font-semibold text-amber-900 mb-2">Notes</h3>
-                  <p className="text-sm text-amber-800 whitespace-pre-wrap">{quote.description}</p>
-                </div>
               )}
 
               <div className="border-t pt-6 text-center text-sm text-slate-500">
