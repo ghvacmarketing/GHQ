@@ -69,13 +69,22 @@ export default function CrmLogin() {
     onSuccess: (data) => {
       if (data.token) {
         setCrmToken(data.token);
-      }
-      // Navigate directly - the route guard will verify auth
-      // Technicians go directly to mobile app, others go to CRM
-      if (data.user?.role === "tech") {
-        window.location.href = "/mobile";
+        // Small delay to ensure localStorage is flushed before navigation
+        setTimeout(() => {
+          // Technicians go directly to mobile app, others go to CRM
+          if (data.user?.role === "tech") {
+            window.location.href = "/mobile";
+          } else {
+            window.location.href = "/crm";
+          }
+        }, 100);
       } else {
-        window.location.href = "/crm";
+        // Fallback if no token returned
+        if (data.user?.role === "tech") {
+          window.location.href = "/mobile";
+        } else {
+          window.location.href = "/crm";
+        }
       }
     },
     onError: () => {
