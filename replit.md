@@ -32,10 +32,11 @@ Preferred communication style: Simple, everyday language.
 -   **Service Call Checklists**: Dynamic, service type-mapped intake questionnaires for work orders with AI summarization (OpenAI GPT-3.5) and required question enforcement. Admin UI for template management.
 -   **Customer Portal**: Self-service portal for customers to view invoices, agreements, and service history via magic link login.
 -   **User Roles**: Granular CRM roles (Owner, Admin, Sales, Tech) with distinct access levels for desktop and mobile applications.
--   **Mobile Technician PWA**: Offline-first architecture for field technicians with daily agenda, job details, photo capture, and background sync for offline changes.
+-   **Mobile Technician PWA**: Offline-first architecture for field technicians with daily agenda, job details, photo capture, background sync for offline changes, time tracking clock in/out, and messaging with customer search.
 -   **Security**: Environment variable-based secrets (`SESSION_SECRET`, `ADMIN_API_KEY`, `GLOBAL_PASSWORD`), httpOnly cookies, and strict customer-scoped data filtering.
 -   **Vector Store Knowledge Base**: Optional OpenAI vector store integration for enhanced AI quote generation from uploaded sales documents.
--   **Messaging Dashboard**: Textline-style three-panel messaging interface for customer communications. Left panel shows conversation inbox with filters/search, center panel displays message thread with chat bubbles and composer, right panel shows contact sidebar with assignment, tags, and quick actions. Built with adapter pattern for future Textline integration via webhooks.
+-   **Messaging Dashboard**: Textline-style three-panel messaging interface for customer communications. Left panel shows conversation inbox with filters/search, center panel displays message thread with chat bubbles and composer, right panel shows contact sidebar with assignment, tags, and quick actions. Built with adapter pattern for future Textline integration via webhooks. Mobile techs can also access messaging via `/mobile/messages` with contact search.
+-   **Time Tracking System**: Technicians clock in/out from mobile app (`/mobile/time`). Entries stored in `crm_time_entries` table with tech ID, timestamps, optional work order link, and notes. Admins view/edit all entries via CRM Settings > Time Logs (`/crm/settings/time-logs`) with filters, CSV export, and adjustment capabilities.
 
 ## External Dependencies
 -   **Google Sheets API**: Parts pricing, application settings, customer data sync.
