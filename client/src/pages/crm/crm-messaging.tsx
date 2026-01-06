@@ -245,7 +245,7 @@ export default function CrmMessaging() {
   return (
     <CrmLayout currentUser={currentUser} disableScroll>
       <div className="h-full flex overflow-hidden">
-        <div className={`w-full md:w-80 lg:w-96 border-r bg-white flex flex-col ${showMobileThread ? "hidden md:flex" : "flex"}`}>
+        <div className={`w-full md:w-64 lg:w-72 xl:w-80 border-r bg-white flex-shrink-0 flex flex-col ${showMobileThread ? "hidden md:flex" : "flex"}`}>
           <div className="p-4 border-b space-y-3">
             <div className="flex items-center justify-between">
               <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
@@ -471,7 +471,7 @@ export default function CrmMessaging() {
           )}
         </div>
 
-        <div className="hidden lg:flex w-80 border-l bg-white flex-col">
+        <div className="hidden xl:flex w-64 2xl:w-72 border-l bg-white flex-shrink-0 flex-col">
           {selectedConversationId && conversationDetail ? (
             <ScrollArea className="flex-1">
               <div className="p-4 space-y-6">
