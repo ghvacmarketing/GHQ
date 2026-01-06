@@ -4,7 +4,6 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { clearCrmToken } from "@/lib/crmAuth";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -181,7 +180,7 @@ function SidebarContent({
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-3 py-4">
+      <div className="flex-1 px-3 py-4 overflow-y-auto">
         <div className="space-y-6">
           {navSections.map((section) => (
             <div key={section.title}>
@@ -201,7 +200,7 @@ function SidebarContent({
             </div>
           ))}
         </div>
-      </ScrollArea>
+      </div>
 
       <div className="p-3 border-t border-slate-700">
         {currentUser?.role !== "tech" && (
@@ -321,10 +320,8 @@ export function CrmLayout({ children, currentUser, disableScroll = false }: CrmL
             <div className="h-full p-4 lg:p-6 overflow-hidden">{children}</div>
           </div>
         ) : (
-          <div className="min-h-screen pt-16 lg:pt-0">
-            <ScrollArea className="h-[calc(100vh-4rem)] lg:h-screen">
-              <div className="p-4 lg:p-6">{children}</div>
-            </ScrollArea>
+          <div className="h-screen pt-16 lg:pt-0 overflow-y-auto">
+            <div className="p-4 lg:p-6">{children}</div>
           </div>
         )}
       </main>
