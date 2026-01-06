@@ -95,13 +95,14 @@ export default function MobileJob() {
   const isSupervisor = currentUser?.role === 'supervisor';
 
   const { data: workOrders = [], isLoading: ordersLoading } = useQuery<WorkOrderWithDetails[]>({
-    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: (currentUser?.role === 'tech' || currentUser?.role === 'sales') ? currentUser?.id : undefined }],
+    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: (currentUser?.role === 'tech' || currentUser?.role === 'sales' || currentUser?.role === 'supervisor') ? currentUser?.id : undefined }],
     queryFn: async () => {
       const params = new URLSearchParams({
         dateFrom: todayStart,
         dateTo: todayEnd,
       });
-      if ((currentUser?.role === 'tech' || currentUser?.role === 'sales') && currentUser?.id) {
+      // Tech, sales, and supervisor roles only see their own jobs on the Jobs tab
+      if ((currentUser?.role === 'tech' || currentUser?.role === 'sales' || currentUser?.role === 'supervisor') && currentUser?.id) {
         params.set('techId', currentUser.id);
       }
       const res = await fetch(`/api/crm/work-orders?${params}`, { credentials: "include" });
