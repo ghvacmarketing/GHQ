@@ -1820,7 +1820,9 @@ export default function CrmDispatch() {
       const res = await fetch("/api/crm/work-order-subtypes?activeOnly=true", {
         credentials: "include",
       });
-      return res.json();
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
     },
     enabled: !!currentUser,
   });
