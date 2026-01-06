@@ -2681,7 +2681,7 @@ export default function CrmQuoteDetail() {
         }}
       >
         <DialogContent className="max-w-full w-full h-full max-h-screen m-0 p-0 rounded-none overflow-auto">
-          <div className="min-h-screen bg-slate-50">
+          <div className="min-h-screen bg-white">
             {/* Exit button */}
             <div className="fixed top-4 right-4 z-50">
               <Button
@@ -2710,7 +2710,7 @@ export default function CrmQuoteDetail() {
               </div>
 
               {/* Quote Header Card */}
-              <Card className="shadow-lg mb-6 bg-slate-50 border-0">
+              <Card className="shadow-lg mb-6 bg-white border-0">
                 <CardHeader className="border-b" style={{ backgroundColor: BRAND_COLOR }}>
                   <div className="flex items-center justify-between text-white">
                     <div className="flex items-center gap-2">
@@ -2720,9 +2720,9 @@ export default function CrmQuoteDetail() {
                     <span className="text-sm opacity-90">{formatPresentationDate(quote.createdAt)}</span>
                   </div>
                 </CardHeader>
-                <CardContent className="py-6 space-y-6 bg-slate-50">
+                <CardContent className="py-6 space-y-6 bg-white">
                   {/* Customer Info */}
-                  <div className="bg-slate-50 rounded-lg p-4">
+                  <div className="bg-white rounded-lg p-4">
                     <h3 className="font-semibold text-slate-700 mb-2">Prepared For</h3>
                     <p className="font-medium text-slate-900">{quote.customerName || quote.customer?.name}</p>
                     {quote.serviceAddress && (
@@ -2751,14 +2751,14 @@ export default function CrmQuoteDetail() {
                             <div 
                               key={option.tag} 
                               onClick={() => setPresentationSelectedOption(option.tag)}
-                              className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all bg-slate-50 ${
+                              className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all bg-white ${
                                 isSelected 
                                   ? "border-[#711419] ring-2 ring-[#711419]/20 shadow-md" 
                                   : "border-slate-200 hover:border-slate-400"
                               }`}
                               data-testid={`presentation-option-${option.tag.toLowerCase().replace(/\s+/g, "-")}`}
                             >
-                              <div className={`px-3 sm:px-4 py-4 flex justify-between items-center ${isSelected ? "bg-[#711419]/10" : "bg-slate-100"}`}>
+                              <div className={`px-3 sm:px-4 py-4 flex justify-between items-center ${isSelected ? "bg-blue-50" : "bg-gray-50"}`}>
                                 <div className="flex items-center gap-2 sm:gap-3">
                                   <div className={`w-6 h-6 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                                     isSelected ? "border-[#711419] bg-[#711419]" : "border-slate-400"
@@ -2769,7 +2769,7 @@ export default function CrmQuoteDetail() {
                                 </div>
                                 <span className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatPresentationCurrency(option.total)}</span>
                               </div>
-                              <div className="p-3 sm:p-4 bg-slate-50">
+                              <div className="p-3 sm:p-4 bg-white">
                                 {/* Show AI-generated category title if available */}
                                 {whatsIncluded.categoryTitle && (
                                   <div className="mb-3 pb-2 border-b border-slate-200">
@@ -2895,8 +2895,8 @@ export default function CrmQuoteDetail() {
 
               {/* Signature Section or Already Approved Message */}
               {quote.status === "accepted" ? (
-                <Card className="shadow-lg bg-slate-50 border-0">
-                  <CardContent className="py-12 text-center bg-slate-50">
+                <Card className="shadow-lg bg-white border-0">
+                  <CardContent className="py-12 text-center bg-white">
                     <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
                       <CheckCircle className="h-10 w-10 text-green-600" />
                     </div>
@@ -2911,11 +2911,11 @@ export default function CrmQuoteDetail() {
                   </CardContent>
                 </Card>
               ) : (
-                <Card className="shadow-lg bg-slate-50 border-0">
-                  <CardHeader className="bg-slate-50">
+                <Card className="shadow-lg bg-white border-0">
+                  <CardHeader className="bg-white">
                     <CardTitle className="text-lg">Accept Quote</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-6 bg-slate-50">
+                  <CardContent className="space-y-6 bg-white">
                     <PresentationSignaturePad onSignatureChange={setPresentationSignature} />
 
                     <div className="space-y-2">
