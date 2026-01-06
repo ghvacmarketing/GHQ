@@ -1075,6 +1075,8 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   billingNotes: text("billing_notes"),
   dispatchNotes: text("dispatch_notes"),
   invoiceId: varchar("invoice_id"),
+  dispatchedAt: timestamp("dispatched_at"),
+  onSiteAt: timestamp("on_site_at"),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   finalizedAt: timestamp("finalized_at"),

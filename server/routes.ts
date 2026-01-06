@@ -10434,6 +10434,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updateData: Partial<InsertCrmWorkOrder> = {};
       if (status !== undefined) updateData.status = status;
+      
+      // Record status change timestamps for time tracking
+      if (status === "dispatched" && existingWorkOrder.status !== "dispatched") {
+        updateData.dispatchedAt = new Date();
+      }
+      if (status === "on_site" && existingWorkOrder.status !== "on_site") {
+        updateData.onSiteAt = new Date();
+      }
+      
       if (assignedTechId !== undefined) updateData.assignedTechId = assignedTechId;
       if (scheduledStart !== undefined) updateData.scheduledStart = scheduledStart ? new Date(scheduledStart) : null;
       if (scheduledEnd !== undefined) updateData.scheduledEnd = scheduledEnd ? new Date(scheduledEnd) : null;
