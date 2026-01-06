@@ -4999,10 +4999,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ipAddress = req.ip || req.socket.remoteAddress;
       const session = await createCrmSession(user.id, userAgent, ipAddress);
 
-      res.cookie(CRM_SESSION_COOKIE, session.sessionToken, {
+      res.cookie("crm_session", session.sessionToken, {
         httpOnly: true,
-        secure: true,
-        sameSite: "none",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         maxAge: 8 * 60 * 60 * 1000, // 8 hours
       });
 
@@ -5020,11 +5020,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/crm/auth/logout - Destroy session
   app.post("/api/crm/auth/logout", async (req, res) => {
     try {
-      const sessionToken = req.cookies?.[CRM_SESSION_COOKIE];
+      const sessionToken = req.cookies?.crm_session;
       if (sessionToken) {
         await destroyCrmSession(sessionToken);
       }
-      res.clearCookie(CRM_SESSION_COOKIE);
+      res.clearCookie("crm_session");
       return res.json({ message: "Logged out successfully" });
     } catch (error) {
       console.error("CRM logout error:", error);
