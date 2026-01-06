@@ -1043,7 +1043,10 @@ export default function CrmQuoteDetail() {
 
         addTableHeader();
 
-        const lineItems = quote.lineItems || [];
+        // Filter out labor/internal line items from PDF export (client-facing)
+        const lineItems = (quote.lineItems || []).filter(item => 
+          item.lineType !== "labor" && item.lineType !== "other"
+        );
         let rowIndex = 0;
         lineItems.forEach((item) => {
           doc.setFontSize(9);
@@ -1098,20 +1101,12 @@ export default function CrmQuoteDetail() {
           doc.setFontSize(9);
           doc.setFont("helvetica", "normal");
           doc.setTextColor(...mutedColor);
-          doc.text("Subtotal", totalsX + 5, y + 7);
-          doc.setTextColor(...textColor);
-          doc.text(formatCurrency(quote.subtotal), pageWidth - margin - 5, y + 7, { align: 'right' });
-          
-          doc.setDrawColor(...goldColor);
-          doc.setLineWidth(0.5);
-          doc.line(totalsX + 5, y + 11, pageWidth - margin - 5, y + 11);
-          
           doc.setFontSize(11);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(...textColor);
-          doc.text("Total", totalsX + 5, y + 17);
+          doc.text("Total", totalsX + 5, y + 10);
           doc.setTextColor(...brandColor);
-          doc.text(formatCurrency(quote.subtotal), pageWidth - margin - 5, y + 17, { align: 'right' });
+          doc.text(formatCurrency(quote.total), pageWidth - margin - 5, y + 10, { align: 'right' });
 
           y += 28;
         }
@@ -1511,13 +1506,13 @@ export default function CrmQuoteDetail() {
             {quote.quoteMode !== "options" && (
               <div className="mt-6 border-t pt-4 space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Subtotal</span>
+                  <span className="text-slate-600">Equipment & Labor</span>
                   <span>{formatCurrency(quote.subtotal)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-semibold">
-                  <span>Total</span>
-                  <span className="text-[#d3b07d]">{formatCurrency(quote.subtotal)}</span>
+                  <span>Sell Price</span>
+                  <span className="text-[#d3b07d]">{formatCurrency(quote.total)}</span>
                 </div>
               </div>
             )}
@@ -2104,36 +2099,37 @@ export default function CrmQuoteDetail() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {quote.lineItems && quote.lineItems.length > 0 ? (
-                          quote.lineItems.map((item, idx) => (
-                            <TableRow key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
-                              <TableCell className="font-medium">{item.description}</TableCell>
-                              <TableCell className="text-center">{item.quantity}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
-                              <TableCell className="text-right font-medium">{formatCurrency(item.lineTotal)}</TableCell>
+                        {(() => {
+                          // Filter out labor/internal line items from print preview (client-facing)
+                          const clientVisibleItems = (quote.lineItems || []).filter(item => 
+                            item.lineType !== "labor" && item.lineType !== "other"
+                          );
+                          return clientVisibleItems.length > 0 ? (
+                            clientVisibleItems.map((item, idx) => (
+                              <TableRow key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
+                                <TableCell className="font-medium">{item.description}</TableCell>
+                                <TableCell className="text-center">{item.quantity}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+                                <TableCell className="text-right font-medium">{formatCurrency(item.lineTotal)}</TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center text-slate-500 py-8">
+                                No line items
+                              </TableCell>
                             </TableRow>
-                          ))
-                        ) : (
-                          <TableRow>
-                            <TableCell colSpan={4} className="text-center text-slate-500 py-8">
-                              No line items
-                            </TableCell>
-                          </TableRow>
-                        )}
+                          );
+                        })()}
                       </TableBody>
                     </Table>
                   </div>
 
                   <div className="flex justify-end mb-8">
                     <div className="w-72 bg-slate-50 rounded-lg p-4 space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Subtotal</span>
-                        <span>{formatCurrency(quote.subtotal)}</span>
-                      </div>
-                      <Separator className="my-2" />
                       <div className="flex justify-between text-lg font-bold">
                         <span>Total</span>
-                        <span className="text-[#711419]">{formatCurrency(quote.subtotal)}</span>
+                        <span className="text-[#711419]">{formatCurrency(quote.total)}</span>
                       </div>
                     </div>
                   </div>

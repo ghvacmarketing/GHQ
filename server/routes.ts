@@ -14355,7 +14355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedToId: assignedToId || null,
       }).returning();
 
-      // Create line items from worksheet lines (equipment only - labor/warranty used for pricing calculation only)
+      // Create line items from worksheet lines
       let sortOrder = 0;
       let equipmentSubtotal = 0;
       for (const line of lines) {
@@ -14372,13 +14372,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Note: Labor and warranty reserve are factored into the final selling price calculation
-      // but are NOT shown as separate line items on the quote
+      // Add labor line item (visible internally, hidden from client-facing views)
+      // This includes labor payroll + labor benefits
+      const laborTotal = calcs.laborPayroll + calcs.laborBenefits;
+      if (laborTotal > 0) {
+        await db.insert(crmQuoteLineItems).values({
+          quoteId: newQuote.id,
+          lineType: "labor",
+          description: `Installation Labor (${inputs.hoursToInstall} hrs)`,
+          unitPrice: laborTotal.toString(),
+          quantity: "1",
+          lineTotal: laborTotal.toString(),
+          sortOrder: sortOrder++,
+        });
+      }
 
-      // Update the quote with the equipment subtotal and calculated selling price
+      // Add warranty reserve if applicable (use lineType 'other' for internal tracking)
+      if (inputs.warrantyReserveDollar > 0) {
+        await db.insert(crmQuoteLineItems).values({
+          quoteId: newQuote.id,
+          lineType: "other",
+          description: "Warranty Reserve",
+          unitPrice: inputs.warrantyReserveDollar.toString(),
+          quantity: "1",
+          lineTotal: inputs.warrantyReserveDollar.toString(),
+          sortOrder: sortOrder++,
+        });
+      }
+
+      // Calculate the actual subtotal (equipment + labor + warranty for internal tracking)
+      const internalSubtotal = equipmentSubtotal + laborTotal + inputs.warrantyReserveDollar;
+
+      // Update the quote with the calculated selling price as the total
       await db.update(crmQuotes)
         .set({
-          subtotal: equipmentSubtotal.toString(),
+          subtotal: internalSubtotal.toString(),
+          laborTotal: laborTotal.toString(),
           total: calcs.discountedSellPrice.toString(),
           updatedAt: new Date(),
         })

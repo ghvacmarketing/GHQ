@@ -101,9 +101,14 @@ export async function sendCrmQuoteEmail(
   
   console.log("[CRM Email] Sending quote email FROM:", standardFromEmail, "REPLY-TO:", replyToEmail, "TO:", recipientEmail);
 
+  // Filter out labor/internal line items from client-facing email
+  const clientVisibleItems = lineItems.filter(item => 
+    item.lineType !== "labor" && item.lineType !== "other"
+  );
+
   const subject = `Your Quote from ${brandName} - ${quote.quoteNumber}`;
-  const html = buildHtmlBody(quote, lineItems, personalMessage, sentBy, options?.quoteViewUrl);
-  const text = buildTextBody(quote, lineItems, personalMessage, sentBy, options?.quoteViewUrl);
+  const html = buildHtmlBody(quote, clientVisibleItems, personalMessage, sentBy, options?.quoteViewUrl);
+  const text = buildTextBody(quote, clientVisibleItems, personalMessage, sentBy, options?.quoteViewUrl);
 
   try {
     const { data, error } = await resend.emails.send({
@@ -241,10 +246,6 @@ function buildTextBody(
     }
     lines.push("");
 
-    lines.push(`Subtotal: ${asCurrency(quote.subtotal)}`);
-    if (quote.laborTotal && parseFloat(quote.laborTotal) > 0) {
-      lines.push(`Labor: ${asCurrency(quote.laborTotal)}`);
-    }
     lines.push(`TOTAL: ${asCurrency(quote.total)}`);
     lines.push("");
   }

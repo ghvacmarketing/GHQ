@@ -614,8 +614,13 @@ export default function PublicQuoteView() {
                         </tr>
                       </thead>
                       <tbody>
-                        {lineItems.length > 0 ? (
-                          lineItems.map((item, idx) => {
+                        {(() => {
+                          // Filter out labor/internal line items from client view
+                          const clientVisibleItems = lineItems.filter(item => 
+                            item.lineType !== "labor" && item.lineType !== "other"
+                          );
+                          return clientVisibleItems.length > 0 ? (
+                          clientVisibleItems.map((item, idx) => {
                             const equipmentImages = parseEquipmentImages(item.imageUrl);
                             return (
                               <tr key={item.id} className={idx % 2 === 1 ? "bg-slate-50" : ""}>
@@ -645,24 +650,15 @@ export default function PublicQuoteView() {
                               No items listed
                             </td>
                           </tr>
-                        )}
+                        );
+                        })()}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
                 <div className="bg-slate-50 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Subtotal</span>
-                    <span>{formatCurrency(quote.subtotal)}</span>
-                  </div>
-                  {quote.laborTotal && parseFloat(quote.laborTotal) > 0 && (
-                    <div className="flex justify-between text-slate-600">
-                      <span>Labor</span>
-                      <span>{formatCurrency(quote.laborTotal)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-xl font-bold border-t pt-2" style={{ color: BRAND_COLOR }}>
+                  <div className="flex justify-between text-xl font-bold" style={{ color: BRAND_COLOR }}>
                     <span>Total</span>
                     <span data-testid="text-quote-total">{formatCurrency(quote.total)}</span>
                   </div>
