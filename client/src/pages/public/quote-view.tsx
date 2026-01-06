@@ -589,7 +589,7 @@ export default function PublicQuoteView() {
                 ) : (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
                     <p className="text-amber-800 font-medium">
-                      Please select one option above. Contact us at (830) 626-0408 to discuss which option is right for you.
+                      Please select one option above. Contact us at (706) 826-0644 to discuss which option is right for you.
                     </p>
                   </div>
                 )}

@@ -257,7 +257,7 @@ function buildTextBody(
     lines.push("");
   }
 
-  lines.push("To accept this quote or ask questions, please contact us at (830) 626-0408.");
+  lines.push("To accept this quote or ask questions, please contact us at (706) 826-0644.");
   lines.push("");
   lines.push("Thank you for choosing Giesbrecht HVAC!");
   if (sentBy) {
@@ -426,7 +426,7 @@ function buildHtmlBody(
           <tr>
             <td class="px-24" style="padding:0 20px 20px 20px;">
               <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;text-align:center;">
-                <p style="margin:0;color:#92400e;font-weight:600;">Please select one option. Contact us at (830) 626-0408 to discuss which option is right for you.</p>
+                <p style="margin:0;color:#92400e;font-weight:600;">Please select one option. Contact us at (706) 826-0644 to discuss which option is right for you.</p>
               </div>
             </td>
           </tr>
@@ -487,10 +487,10 @@ function buildHtmlBody(
               ${quoteViewUrl ? `
               <p style="margin:0 0 16px 0;font-size:14px;color:#4b5563;">Ready to move forward? Click below to view the full quote and sign electronically to accept.</p>
               <a href="${esc(quoteViewUrl)}" style="display:inline-block;background:${brandColor};color:#ffffff;padding:16px 40px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;margin-bottom:12px;">View & Sign Quote</a>
-              <p style="margin:16px 0 0 0;font-size:13px;color:#6b7280;">Or call us: <a href="tel:+18306260408" style="color:${brandColor};font-weight:600;text-decoration:none;">(830) 626-0408</a></p>
+              <p style="margin:16px 0 0 0;font-size:13px;color:#6b7280;">Or call us: <a href="tel:+17068260644" style="color:${brandColor};font-weight:600;text-decoration:none;">(706) 826-0644</a></p>
               ` : `
               <p style="margin:0 0 16px 0;font-size:14px;color:#4b5563;">Ready to move forward? Contact us to accept this quote or if you have any questions.</p>
-              <a href="tel:+18306260408" style="display:inline-block;background:${brandColor};color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">Call Us: (830) 626-0408</a>
+              <a href="tel:+17068260644" style="display:inline-block;background:${brandColor};color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">Call Us: (706) 826-0644</a>
               `}
             </td>
           </tr>
