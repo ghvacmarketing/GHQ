@@ -16,7 +16,7 @@ const BRAND_NAME = "Giesbrecht HVAC";
 
 function BrandLogo() {
   return (
-    <div className="flex justify-center mb-6 bg-white py-6">
+    <div className="flex justify-center mb-6 py-6">
       <img 
         src={ghvacLogo} 
         alt="Giesbrecht HVAC" 
