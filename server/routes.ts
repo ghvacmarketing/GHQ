@@ -18554,6 +18554,107 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // GET /api/mobile/work-orders/available-slots - Get available time slots for a given date
+  app.get("/api/mobile/work-orders/available-slots", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { date, techId, durationMinutes = "60" } = req.query as Record<string, string | undefined>;
+      
+      if (!date) {
+        return res.status(400).json({ message: "Date is required" });
+      }
+
+      // Use provided techId or default to current user
+      const targetTechId = techId || user.id;
+      const duration = parseInt(durationMinutes) || 60;
+      const slotsNeeded = Math.ceil(duration / 30); // How many 30-min slots needed
+
+      // Constants matching dispatch board
+      const START_HOUR = 8;
+      const END_HOUR = 20;
+      const STEP_MINUTES = 30;
+
+      // Parse the date and get start/end of day in local timezone
+      const targetDate = new Date(date);
+      const dayStart = new Date(targetDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(targetDate);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      // Get existing work orders for this tech on this date
+      const existingOrders = await db.select({
+        scheduledStart: crmWorkOrders.scheduledStart,
+        scheduledEnd: crmWorkOrders.scheduledEnd,
+      })
+      .from(crmWorkOrders)
+      .where(and(
+        eq(crmWorkOrders.assignedTechId, targetTechId),
+        isNotNull(crmWorkOrders.scheduledStart),
+        isNotNull(crmWorkOrders.scheduledEnd),
+        gte(crmWorkOrders.scheduledStart, dayStart),
+        lte(crmWorkOrders.scheduledStart, dayEnd),
+        sql`${crmWorkOrders.status} NOT IN ('cancelled', 'completed')`
+      ));
+
+      // Build time slots
+      const slots: Array<{ 
+        start: string; 
+        end: string; 
+        label: string;
+        available: boolean;
+      }> = [];
+
+      for (let hour = START_HOUR; hour < END_HOUR; hour++) {
+        for (let minute = 0; minute < 60; minute += STEP_MINUTES) {
+          const slotStart = new Date(targetDate);
+          slotStart.setHours(hour, minute, 0, 0);
+          
+          const slotEnd = new Date(slotStart);
+          slotEnd.setMinutes(slotEnd.getMinutes() + duration);
+
+          // Don't show slots that would extend past business hours
+          if (slotEnd.getHours() > END_HOUR || (slotEnd.getHours() === END_HOUR && slotEnd.getMinutes() > 0)) {
+            continue;
+          }
+
+          // Check if this slot conflicts with any existing orders
+          const hasConflict = existingOrders.some(order => {
+            if (!order.scheduledStart || !order.scheduledEnd) return false;
+            const orderStart = new Date(order.scheduledStart);
+            const orderEnd = new Date(order.scheduledEnd);
+            // Overlap: slotStart < orderEnd AND slotEnd > orderStart
+            return slotStart < orderEnd && slotEnd > orderStart;
+          });
+
+          // Format time for display
+          const formatTime = (d: Date) => {
+            const h = d.getHours();
+            const m = d.getMinutes();
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+            return m === 0 ? `${displayHour} ${ampm}` : `${displayHour}:${m.toString().padStart(2, '0')} ${ampm}`;
+          };
+
+          slots.push({
+            start: slotStart.toISOString(),
+            end: slotEnd.toISOString(),
+            label: `${formatTime(slotStart)} - ${formatTime(slotEnd)}`,
+            available: !hasConflict,
+          });
+        }
+      }
+
+      return res.json({ slots, date: targetDate.toISOString().split('T')[0] });
+    } catch (error) {
+      console.error("Error fetching available slots:", error);
+      return res.status(500).json({ message: "Failed to fetch available slots" });
+    }
+  });
+
   // POST /api/mobile/work-orders/:id/assign-to-me - Supervisor self-assign work order
   app.post("/api/mobile/work-orders/:id/assign-to-me", requireCrmTechOrAbove, async (req, res) => {
     try {

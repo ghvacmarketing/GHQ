@@ -9,7 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2, Circle, Plus, Search, Loader2, AlertTriangle } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2, Circle, Plus, Search, Loader2, AlertTriangle, CalendarIcon } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
 import { useToast } from "@/hooks/use-toast";
@@ -79,8 +81,8 @@ export default function MobileJob() {
   const [visitType, setVisitType] = useState<string>("SERVICE");
   const [workSubtype, setWorkSubtype] = useState<string>("");
   const [priority, setPriority] = useState<string>("normal");
-  const [scheduledStart, setScheduledStart] = useState("");
-  const [scheduledEnd, setScheduledEnd] = useState("");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedSlot, setSelectedSlot] = useState<{ start: string; end: string } | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
 
   const { data: currentUser, isLoading: userLoading } = useQuery<CrmUser | null>({
@@ -139,6 +141,27 @@ export default function MobileJob() {
     enabled: !!selectedCustomer?.id,
   });
 
+  // Fetch available time slots when date is selected
+  interface TimeSlot {
+    start: string;
+    end: string;
+    label: string;
+    available: boolean;
+  }
+  
+  const { data: availableSlots = [], isLoading: slotsLoading } = useQuery<TimeSlot[]>({
+    queryKey: ["/api/mobile/work-orders/available-slots", { date: selectedDate ? format(selectedDate, "yyyy-MM-dd") : null }],
+    queryFn: async () => {
+      if (!selectedDate) return [];
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const res = await fetch(`/api/mobile/work-orders/available-slots?date=${dateStr}`, { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.slots || [];
+    },
+    enabled: !!selectedDate,
+  });
+
   // Work subtypes based on visit type
   const workSubtypes: Record<string, string[]> = {
     SERVICE: ["NO_AC", "NO_HEAT", "WATER_LEAK", "ELECTRICAL", "THERMOSTAT", "NOISE", "ODOR", "MAINTENANCE", "OTHER"],
@@ -162,8 +185,8 @@ export default function MobileJob() {
         workSubtype: workSubtype || null,
         priority,
         assignedTechId: currentUser.id, // Self-assign
-        scheduledStart: scheduledStart || null,
-        scheduledEnd: scheduledEnd || null,
+        scheduledStart: selectedSlot?.start || null,
+        scheduledEnd: selectedSlot?.end || null,
         status: "scheduled",
       });
       return res.json();
@@ -206,8 +229,8 @@ export default function MobileJob() {
     setVisitType("SERVICE");
     setWorkSubtype("");
     setPriority("normal");
-    setScheduledStart("");
-    setScheduledEnd("");
+    setSelectedDate(undefined);
+    setSelectedSlot(null);
     setConflictError(null);
   };
 
@@ -223,8 +246,8 @@ export default function MobileJob() {
       toast({ title: "Please fill all required fields", variant: "destructive" });
       return;
     }
-    if (!scheduledStart || !scheduledEnd) {
-      toast({ title: "Please select a date and time", variant: "destructive" });
+    if (!selectedSlot) {
+      toast({ title: "Please select a date and time slot", variant: "destructive" });
       return;
     }
     setConflictError(null);
@@ -595,29 +618,86 @@ export default function MobileJob() {
               </Select>
             </div>
 
-            {/* Schedule */}
-            <div className="space-y-2">
+            {/* Schedule - Date Picker and Time Slots */}
+            <div className="space-y-3">
               <Label>Schedule *</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-xs text-slate-500">Start</Label>
-                  <Input
-                    type="datetime-local"
-                    value={scheduledStart}
-                    onChange={(e) => setScheduledStart(e.target.value)}
-                    data-testid="input-scheduled-start"
+              
+              {/* Date Picker */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                    data-testid="button-date-picker"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDate ? format(selectedDate, "EEEE, MMMM d, yyyy") : "Select a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => {
+                      setSelectedDate(date);
+                      setSelectedSlot(null);
+                    }}
+                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                    initialFocus
                   />
+                </PopoverContent>
+              </Popover>
+
+              {/* Time Slots Grid */}
+              {selectedDate && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-slate-500">Available Time Slots</Label>
+                  {slotsLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                      <span className="ml-2 text-sm text-slate-500">Loading slots...</span>
+                    </div>
+                  ) : availableSlots.length === 0 ? (
+                    <p className="text-sm text-slate-500 py-2">No time slots available for this date</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {availableSlots.map((slot, idx) => {
+                        const isSelected = selectedSlot?.start === slot.start && selectedSlot?.end === slot.end;
+                        return (
+                          <Button
+                            key={idx}
+                            type="button"
+                            variant={isSelected ? "default" : "outline"}
+                            size="sm"
+                            disabled={!slot.available}
+                            onClick={() => setSelectedSlot({ start: slot.start, end: slot.end })}
+                            className={`text-xs ${
+                              isSelected
+                                ? "bg-[#711419] hover:bg-[#5a1014] text-white"
+                                : slot.available
+                                ? "hover:bg-slate-100"
+                                : "opacity-50 cursor-not-allowed bg-slate-100 text-slate-400"
+                            }`}
+                            data-testid={`time-slot-${idx}`}
+                          >
+                            {slot.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <Label className="text-xs text-slate-500">End</Label>
-                  <Input
-                    type="datetime-local"
-                    value={scheduledEnd}
-                    onChange={(e) => setScheduledEnd(e.target.value)}
-                    data-testid="input-scheduled-end"
-                  />
+              )}
+
+              {/* Selected Time Display */}
+              {selectedSlot && (
+                <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+                  <Clock className="h-4 w-4" />
+                  <span>
+                    {format(new Date(selectedSlot.start), "h:mm a")} - {format(new Date(selectedSlot.end), "h:mm a")}
+                  </span>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Conflict Error */}
@@ -639,7 +719,7 @@ export default function MobileJob() {
             </Button>
             <Button
               onClick={handleCreateSubmit}
-              disabled={createWorkOrderMutation.isPending || !selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim() || !scheduledStart || !scheduledEnd}
+              disabled={createWorkOrderMutation.isPending || !selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim() || !selectedSlot}
               className="bg-[#711419] hover:bg-[#5a1014]"
               data-testid="button-submit-create"
             >
