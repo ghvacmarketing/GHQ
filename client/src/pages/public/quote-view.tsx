@@ -16,11 +16,11 @@ const BRAND_NAME = "Giesbrecht HVAC";
 
 function BrandLogo() {
   return (
-    <div className="flex justify-center mb-4 bg-white py-4">
+    <div className="flex justify-center mb-6 bg-white py-6">
       <img 
         src={ghvacLogo} 
         alt="Giesbrecht HVAC" 
-        className="h-16 sm:h-20 w-auto object-contain"
+        className="h-20 sm:h-24 w-auto object-contain"
       />
     </div>
   );
@@ -464,7 +464,6 @@ export default function PublicQuoteView() {
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-8">
           <BrandLogo />
-          <p className="text-slate-500">Professional HVAC Solutions</p>
         </div>
 
         <Card className="shadow-lg mb-6">
