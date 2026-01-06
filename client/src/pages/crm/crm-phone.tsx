@@ -38,7 +38,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { GripVertical, Phone, Calendar, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, Cloud, Sun, CloudRain, CloudSnow, Wind, AlertTriangle, BarChart3, ClipboardList, Send } from "lucide-react";
+import { GripVertical, Phone, Calendar, CalendarDays, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, Cloud, Sun, CloudRain, CloudSnow, Wind, AlertTriangle, BarChart3, ClipboardList, Send } from "lucide-react";
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
@@ -931,6 +931,149 @@ function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRe
 
 interface SearchResult extends CallLog {
   date: string;
+}
+
+interface YearlyCallCalendarProps {
+  days: { id: string; date: string; count: number }[];
+}
+
+function YearlyCallCalendar({ days }: YearlyCallCalendarProps) {
+  const currentYear = new Date().getFullYear();
+  const todayStr = formatLocal(new Date(), "yyyy-MM-dd");
+  
+  const dayCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    days.forEach((d) => {
+      if (d.date.startsWith(String(currentYear))) {
+        map.set(d.date, d.count);
+      }
+    });
+    return map;
+  }, [days, currentYear]);
+
+  const months = useMemo(() => {
+    const result: { name: string; days: { date: string; day: number; count: number; isToday: boolean }[] }[] = [];
+    
+    for (let month = 0; month < 12; month++) {
+      const monthDate = new Date(currentYear, month, 1);
+      const monthName = format(monthDate, "MMMM");
+      const daysInMonth = new Date(currentYear, month + 1, 0).getDate();
+      const firstDayOfWeek = monthDate.getDay();
+      
+      const monthDays: { date: string; day: number; count: number; isToday: boolean }[] = [];
+      
+      for (let i = 0; i < firstDayOfWeek; i++) {
+        monthDays.push({ date: "", day: 0, count: 0, isToday: false });
+      }
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${currentYear}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const count = dayCountMap.get(dateStr) || 0;
+        monthDays.push({
+          date: dateStr,
+          day,
+          count,
+          isToday: dateStr === todayStr,
+        });
+      }
+      
+      result.push({ name: monthName, days: monthDays });
+    }
+    
+    return result;
+  }, [currentYear, dayCountMap, todayStr]);
+
+  const totalYearCalls = useMemo(() => {
+    return Array.from(dayCountMap.values()).reduce((sum, count) => sum + count, 0);
+  }, [dayCountMap]);
+
+  const getCountColor = (count: number, isToday: boolean) => {
+    if (isToday) return "bg-primary text-primary-foreground";
+    if (count === 0) return "bg-muted/30 text-muted-foreground/50";
+    if (count <= 2) return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    if (count <= 5) return "bg-green-200 text-green-900 dark:bg-green-800/40 dark:text-green-200";
+    if (count <= 10) return "bg-green-300 text-green-900 dark:bg-green-700/50 dark:text-green-100";
+    return "bg-green-500 text-white dark:bg-green-600";
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">{currentYear} Call Calendar</h2>
+        <Badge variant="secondary" className="text-sm font-semibold">
+          {totalYearCalls} calls this year
+        </Badge>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {months.map((month) => (
+          <Card key={month.name} className="p-3">
+            <h3 className="text-sm font-semibold mb-2 text-center">{month.name}</h3>
+            <div className="grid grid-cols-7 gap-0.5 text-center">
+              {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                <div key={i} className="text-[10px] font-medium text-muted-foreground py-0.5">
+                  {d}
+                </div>
+              ))}
+              {month.days.map((day, i) => (
+                <div key={i} className="aspect-square flex items-center justify-center">
+                  {day.day > 0 ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={cn(
+                            "w-full h-full flex items-center justify-center rounded text-[10px] font-medium cursor-default transition-colors",
+                            getCountColor(day.count, day.isToday)
+                          )}
+                          data-testid={`calendar-day-${day.date}`}
+                        >
+                          {day.day}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        <p className="font-medium">{format(parseISO(day.date), "MMM d, yyyy")}</p>
+                        <p>{day.count} {day.count === 1 ? "call" : "calls"}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <div className="w-full h-full" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+      
+      <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground">
+        <span>Less</span>
+        <div className="flex gap-1">
+          <div className="w-4 h-4 rounded bg-muted/30" />
+          <div className="w-4 h-4 rounded bg-green-100 dark:bg-green-900/30" />
+          <div className="w-4 h-4 rounded bg-green-200 dark:bg-green-800/40" />
+          <div className="w-4 h-4 rounded bg-green-300 dark:bg-green-700/50" />
+          <div className="w-4 h-4 rounded bg-green-500 dark:bg-green-600" />
+        </div>
+        <span>More</span>
+      </div>
+    </div>
+  );
+}
+
+function YearlyCalendarTab() {
+  const { data: days = [], isLoading } = useQuery<{ id: string; date: string; count: number }[]>({
+    queryKey: ["/api/call-logs/days"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-muted-foreground">Loading calendar...</div>
+      </div>
+    );
+  }
+
+  return <YearlyCallCalendar days={days} />;
 }
 
 interface WeeklyStatsProps {
@@ -2642,6 +2785,10 @@ function CrmPhoneContent() {
             <ClipboardList className="h-3.5 w-3.5 mr-1.5" />
             Screening
           </TabsTrigger>
+          <TabsTrigger value="calendar" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="crm-phone-tab-calendar">
+            <CalendarDays className="h-3.5 w-3.5 mr-1.5" />
+            Calendar
+          </TabsTrigger>
           <TabsTrigger value="weather" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="crm-phone-tab-weather">
             <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
             Weather
@@ -2654,6 +2801,10 @@ function CrmPhoneContent() {
 
         <TabsContent value="call-logs" className="mt-0">
           <DailyCallLog />
+        </TabsContent>
+
+        <TabsContent value="calendar" className="mt-0">
+          <YearlyCalendarTab />
         </TabsContent>
 
         <TabsContent value="screening" className="mt-0">
