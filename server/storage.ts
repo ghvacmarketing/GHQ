@@ -256,6 +256,8 @@ export interface IStorage {
   getConversationTags(conversationId: string): Promise<CrmMessagingConversationTag[]>;
   addConversationTag(conversationId: string, tag: string): Promise<CrmMessagingConversationTag>;
   removeConversationTag(conversationId: string, tag: string): Promise<void>;
+  getMobileConversations(userId: string, filters?: { status?: string; search?: string }): Promise<(CrmMessagingConversation & { customer: { id: string; name: string; phone: string | null } | null })[]>;
+  searchCrmCustomers(search: string, limit?: number): Promise<{ id: string; name: string; phone: string | null; email: string | null }[]>;
 
   // Time Entry operations
   getActiveTimeEntry(technicianId: string): Promise<CrmTimeEntry | null>;
@@ -1956,6 +1958,67 @@ export class DatabaseStorage implements IStorage {
         eq(crmMessagingConversationTags.conversationId, conversationId),
         eq(crmMessagingConversationTags.tag, tag)
       ));
+  }
+
+  async getMobileConversations(userId: string, filters?: { status?: string; search?: string }): Promise<(CrmMessagingConversation & { customer: { id: string; name: string; phone: string | null } | null })[]> {
+    const conditions: any[] = [eq(crmMessagingConversations.assignedToId, userId)];
+    
+    if (filters?.status) {
+      conditions.push(sql`${crmMessagingConversations.status} = ${filters.status}`);
+    }
+
+    const query = db.select({
+      conversation: crmMessagingConversations,
+      customer: {
+        id: crmCustomers.id,
+        name: crmCustomers.name,
+        phone: crmCustomers.phone,
+      }
+    })
+    .from(crmMessagingConversations)
+    .leftJoin(crmCustomers, eq(crmMessagingConversations.customerId, crmCustomers.id));
+
+    let results;
+    if (filters?.search) {
+      const searchTerm = `%${filters.search}%`;
+      results = await query
+        .where(and(...conditions, or(
+          ilike(crmCustomers.name, searchTerm),
+          ilike(crmCustomers.phone, searchTerm)
+        )))
+        .orderBy(desc(crmMessagingConversations.lastMessageAt));
+    } else {
+      results = await query
+        .where(and(...conditions))
+        .orderBy(desc(crmMessagingConversations.lastMessageAt));
+    }
+
+    return results.map(r => ({
+      ...r.conversation,
+      customer: r.customer || null
+    }));
+  }
+
+  async searchCrmCustomers(search: string, limit: number = 20): Promise<{ id: string; name: string; phone: string | null; email: string | null }[]> {
+    if (!search || search.trim().length < 2) {
+      return [];
+    }
+    const searchTerm = `%${search.trim()}%`;
+    
+    const results = await db.select({
+      id: crmCustomers.id,
+      name: crmCustomers.name,
+      phone: crmCustomers.phone,
+      email: crmCustomers.email,
+    })
+    .from(crmCustomers)
+    .where(or(
+      ilike(crmCustomers.name, searchTerm),
+      ilike(crmCustomers.phone, searchTerm)
+    ))
+    .limit(limit);
+
+    return results;
   }
 
   // Time Entry operations

@@ -18006,6 +18006,173 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // ============================================
+  // MOBILE MESSAGING ENDPOINTS
+  // ============================================
+
+  // GET /api/mobile/messaging/conversations - List conversations for logged-in tech
+  app.get("/api/mobile/messaging/conversations", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { status, search } = req.query;
+      const filters: { status?: string; search?: string } = {};
+      if (status && typeof status === "string") filters.status = status;
+      if (search && typeof search === "string") filters.search = search;
+
+      const conversations = await storage.getMobileConversations(user.id, filters);
+      return res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching mobile conversations:", error);
+      return res.status(500).json({ message: "Failed to fetch conversations" });
+    }
+  });
+
+  // GET /api/mobile/messaging/conversations/:id - Get single conversation with messages
+  app.get("/api/mobile/messaging/conversations/:id", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const conversation = await storage.getMessagingConversationById(id);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      if (conversation.assignedToId !== user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const messages = await storage.getMessagesForConversation(id);
+      
+      let customer = null;
+      if (conversation.customerId) {
+        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, conversation.customerId));
+        customer = cust || null;
+      }
+
+      return res.json({ conversation, messages, customer });
+    } catch (error) {
+      console.error("Error fetching mobile conversation details:", error);
+      return res.status(500).json({ message: "Failed to fetch conversation" });
+    }
+  });
+
+  // POST /api/mobile/messaging/conversations - Create new conversation for a customer
+  app.post("/api/mobile/messaging/conversations", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { customerId, initialMessage } = req.body;
+      
+      if (!customerId) {
+        return res.status(400).json({ message: "customerId is required" });
+      }
+
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      const conversationData = {
+        customerId,
+        assignedToId: user.id,
+        status: "open" as const,
+        lastMessageAt: new Date(),
+      };
+
+      const conversation = await storage.createMessagingConversation(conversationData);
+
+      if (initialMessage && typeof initialMessage === "string" && initialMessage.trim()) {
+        const messageData = {
+          conversationId: conversation.id,
+          body: initialMessage.trim(),
+          channel: "sms" as const,
+          direction: "outbound" as const,
+          status: "sent" as const,
+          authorUserId: user.id,
+          sentAt: new Date(),
+        };
+        await storage.createMessage(messageData);
+      }
+
+      return res.status(201).json(conversation);
+    } catch (error) {
+      console.error("Error creating mobile conversation:", error);
+      return res.status(500).json({ message: "Failed to create conversation" });
+    }
+  });
+
+  // POST /api/mobile/messaging/conversations/:id/messages - Send a new message
+  app.post("/api/mobile/messaging/conversations/:id/messages", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const conversation = await storage.getMessagingConversationById(id);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      if (conversation.assignedToId !== user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { body, channel } = req.body;
+      
+      if (!body || typeof body !== "string" || !body.trim()) {
+        return res.status(400).json({ message: "Message body is required" });
+      }
+
+      const messageData = {
+        conversationId: id,
+        body: body.trim(),
+        channel: channel || "sms",
+        direction: "outbound" as const,
+        status: "sent" as const,
+        authorUserId: user.id,
+        sentAt: new Date(),
+      };
+
+      const message = await storage.createMessage(messageData);
+      return res.status(201).json(message);
+    } catch (error) {
+      console.error("Error sending mobile message:", error);
+      return res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  // GET /api/mobile/messaging/contacts - Search customers for new conversations
+  app.get("/api/mobile/messaging/contacts", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { search } = req.query;
+      
+      if (!search || typeof search !== "string") {
+        return res.json([]);
+      }
+
+      const customers = await storage.searchCrmCustomers(search, 20);
+      return res.json(customers);
+    } catch (error) {
+      console.error("Error searching mobile contacts:", error);
+      return res.status(500).json({ message: "Failed to search contacts" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)
