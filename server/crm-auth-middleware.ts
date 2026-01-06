@@ -81,13 +81,6 @@ export async function requireCrmAuth(req: Request, res: Response, next: NextFunc
   const cookieToken = req.cookies?.crm_session;
   const sessionToken = authHeader?.replace("Bearer ", "") || cookieToken;
 
-  // Debug logging
-  console.log("[CRM Auth Debug]", {
-    hasAuthHeader: !!authHeader,
-    hasCookieToken: !!cookieToken,
-    tokenFound: !!sessionToken,
-  });
-
   if (!sessionToken) {
     return res.status(401).json({ message: "Unauthorized - No session token" });
   }

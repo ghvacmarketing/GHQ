@@ -189,6 +189,12 @@ declare global {
 }
 
 export function getCrmSessionToken(req: Request): string | null {
+  // Check Authorization header first (for localStorage-based auth)
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.replace("Bearer ", "");
+  }
+  // Fall back to cookie
   return req.cookies?.[CRM_SESSION_COOKIE] || null;
 }
 
