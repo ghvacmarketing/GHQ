@@ -16907,11 +16907,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         // Sales performance data
         const installGoal = parseFloat(goals?.monthlyInstallGoal || "0");
         
-        // Count salespeople (sales, owner, admin roles) to divide goal similar to tech goal
+        // Count only users with 'sales' role to divide goal
         const salesCount = await db.select({ count: count() })
           .from(crmUsers)
           .where(and(
-            sql`${crmUsers.role} IN ('sales', 'owner', 'admin')`,
+            eq(crmUsers.role, "sales"),
             eq(crmUsers.isActive, true)
           ));
         const numSalespeople = Number(salesCount[0]?.count) || 1;
