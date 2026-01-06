@@ -1075,6 +1075,9 @@ export default function CrmQuoteDetail() {
         const lineItems = (quote.lineItems || []).filter(item => 
           item.lineType !== "labor" && item.lineType !== "other"
         );
+        // For single line item quotes, show sell price instead of actual cost
+        const isSingleItem = lineItems.length === 1;
+        
         let rowIndex = 0;
         lineItems.forEach((item) => {
           doc.setFontSize(9);
@@ -1096,10 +1099,14 @@ export default function CrmQuoteDetail() {
             doc.text(line, margin + 5, textY + (idx * 4));
           });
           
+          // Use sell price for single item quotes in client-facing PDF
+          const displayPrice = isSingleItem ? quote.total : item.unitPrice;
+          const displayTotal = isSingleItem ? quote.total : item.lineTotal;
+          
           doc.text(String(item.quantity || 1), margin + contentWidth * 0.52, y + 5.5, { align: 'center' });
-          doc.text(formatCurrency(item.unitPrice), margin + contentWidth * 0.70, y + 5.5, { align: 'center' });
+          doc.text(formatCurrency(displayPrice), margin + contentWidth * 0.70, y + 5.5, { align: 'center' });
           doc.setFont("helvetica", "bold");
-          doc.text(formatCurrency(item.lineTotal), pageWidth - margin - 5, y + 5.5, { align: 'right' });
+          doc.text(formatCurrency(displayTotal), pageWidth - margin - 5, y + 5.5, { align: 'right' });
           doc.setFont("helvetica", "normal");
           y += rowHeight;
           rowIndex++;
@@ -2162,15 +2169,23 @@ export default function CrmQuoteDetail() {
                           const clientVisibleItems = (quote.lineItems || []).filter(item => 
                             item.lineType !== "labor" && item.lineType !== "other"
                           );
+                          // For single line item quotes, show sell price instead of actual cost
+                          const isSingleItem = clientVisibleItems.length === 1;
+                          
                           return clientVisibleItems.length > 0 ? (
-                            clientVisibleItems.map((item, idx) => (
-                              <TableRow key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
-                                <TableCell className="font-medium">{item.description}</TableCell>
-                                <TableCell className="text-center">{item.quantity}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
-                                <TableCell className="text-right font-medium">{formatCurrency(item.lineTotal)}</TableCell>
-                              </TableRow>
-                            ))
+                            clientVisibleItems.map((item, idx) => {
+                              // Use sell price for single item quotes in client-facing print preview
+                              const displayPrice = isSingleItem ? quote.total : item.unitPrice;
+                              const displayTotal = isSingleItem ? quote.total : item.lineTotal;
+                              return (
+                                <TableRow key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
+                                  <TableCell className="font-medium">{item.description}</TableCell>
+                                  <TableCell className="text-center">{item.quantity}</TableCell>
+                                  <TableCell className="text-right">{formatCurrency(displayPrice)}</TableCell>
+                                  <TableCell className="text-right font-medium">{formatCurrency(displayTotal)}</TableCell>
+                                </TableRow>
+                              );
+                            })
                           ) : (
                             <TableRow>
                               <TableCell colSpan={4} className="text-center text-slate-500 py-8">

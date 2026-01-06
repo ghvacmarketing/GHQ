@@ -14355,12 +14355,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedToId: assignedToId || null,
       }).returning();
 
-      // Create line items from worksheet lines
-      // When there's only one visible line item, set its price to the sell price so it matches the quote total
+      // Create line items from worksheet lines - store actual costs internally
       let sortOrder = 0;
       let equipmentSubtotal = 0;
-      const visibleLines = lines.filter((l: any) => l.cost > 0);
-      const isSingleLineItem = visibleLines.length === 1;
       
       for (const line of lines) {
         const cost = line.cost || 0;
@@ -14368,16 +14365,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         equipmentSubtotal += cost;
         
-        // For single line item quotes, show the sell price so it matches the total
-        const displayPrice = isSingleLineItem ? calcs.discountedSellPrice : cost;
-        
         await db.insert(crmQuoteLineItems).values({
           quoteId: newQuote.id,
           lineType: "part",
           description: line.description || line.category,
-          unitPrice: displayPrice.toString(),
+          unitPrice: cost.toString(),
           quantity: "1",
-          lineTotal: displayPrice.toString(),
+          lineTotal: cost.toString(),
           sortOrder: sortOrder++,
         });
       }

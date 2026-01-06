@@ -619,9 +619,14 @@ export default function PublicQuoteView() {
                           const clientVisibleItems = lineItems.filter(item => 
                             item.lineType !== "labor" && item.lineType !== "other"
                           );
+                          // For single line item quotes, display the sell price (quote.total) instead of actual cost
+                          const isSingleItem = clientVisibleItems.length === 1;
+                          
                           return clientVisibleItems.length > 0 ? (
                           clientVisibleItems.map((item, idx) => {
                             const equipmentImages = parseEquipmentImages(item.imageUrl);
+                            // Use quote.total for single item quotes to show sell price
+                            const displayPrice = isSingleItem ? quote.total : item.lineTotal;
                             return (
                               <tr key={item.id} className={idx % 2 === 1 ? "bg-slate-50" : ""}>
                                 <td className="px-4 py-3">
@@ -640,7 +645,7 @@ export default function PublicQuoteView() {
                                   </div>
                                 </td>
                                 <td className="text-center px-4 py-3 text-slate-600">{parseFloat(item.quantity || "1")}</td>
-                                <td className="text-right px-4 py-3 font-medium text-slate-900">{formatCurrency(item.lineTotal)}</td>
+                                <td className="text-right px-4 py-3 font-medium text-slate-900">{formatCurrency(displayPrice)}</td>
                               </tr>
                             );
                           })
