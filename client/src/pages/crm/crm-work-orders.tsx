@@ -1160,11 +1160,10 @@ export default function CrmWorkOrders() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredWorkOrders.map((wo) => {
               const statusStyle = statusColors[wo.status] || statusColors.scheduled;
               const visitStyle = visitTypeColors[wo.visitType || "SERVICE"] || visitTypeColors.SERVICE;
-              const prioStyle = priorityColors[wo.priority || "normal"] || priorityColors.normal;
               
               return (
                 <Card
@@ -1173,70 +1172,32 @@ export default function CrmWorkOrders() {
                   onClick={() => handleOpenDetail(wo)}
                   data-testid={`card-work-order-${wo.id}`}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-900 truncate" data-testid={`text-wo-number-${wo.id}`}>
-                          WO-{wo.workOrderNumber}
-                        </p>
-                        {(wo.title || wo.description) && (
-                          <p className="text-sm text-slate-600 truncate mt-0.5" data-testid={`text-wo-title-${wo.id}`}>
-                            {wo.title || wo.description}
-                          </p>
-                        )}
-                      </div>
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <p className="font-semibold text-slate-900 text-sm" data-testid={`text-wo-number-${wo.id}`}>
+                        WO-{wo.workOrderNumber}
+                      </p>
                       <Badge 
-                        className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} shrink-0`}
+                        className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} text-xs shrink-0`}
                         data-testid={`badge-status-${wo.id}`}
                       >
                         {statusLabels[wo.status]}
                       </Badge>
                     </div>
 
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-slate-600" data-testid={`text-customer-${wo.id}`}>
-                        <User className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{wo.customer?.name || "—"}</span>
-                      </div>
+                    {(wo.title || wo.description) && (
+                      <p className="text-xs text-slate-600 truncate mb-2" data-testid={`text-wo-title-${wo.id}`}>
+                        {wo.title || wo.description}
+                      </p>
+                    )}
 
-                      <div className="flex items-center gap-2 text-slate-600" data-testid={`text-scheduled-${wo.id}`}>
-                        <CalendarIcon className="h-4 w-4 shrink-0" />
-                        <span>
-                          {formatDate(wo.scheduledStart)}
-                          {wo.scheduledStart && (
-                            <span className="text-slate-400 ml-1">
-                              {formatTime(wo.scheduledStart)} - {formatTime(wo.scheduledEnd)}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-slate-600" data-testid={`text-tech-${wo.id}`}>
-                        <UserCheck className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{wo.tech?.name || "Unassigned"}</span>
-                      </div>
-
-                      {wo.property && (
-                        <div className="flex items-center gap-2 text-slate-500 text-xs" data-testid={`text-address-${wo.id}`}>
-                          <MapPin className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">{getPropertyAddress(wo.property)}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`} data-testid={`badge-visit-type-${wo.id}`}>
                         {visitTypeLabels[wo.visitType || "SERVICE"]}
                       </Badge>
-                      {wo.priority && wo.priority !== "normal" && (
-                        <Badge className={`${prioStyle.bg} ${prioStyle.text} text-xs`} data-testid={`badge-priority-${wo.id}`}>
-                          {wo.priority.charAt(0).toUpperCase() + wo.priority.slice(1)}
-                        </Badge>
-                      )}
-                      {wo.project && (
-                        <Badge variant="outline" className="text-xs" data-testid={`badge-project-${wo.id}`}>
-                          <FolderOpen className="h-3 w-3 mr-1" />
-                          {wo.project.title}
+                      {wo.workSubtype && wo.workSubtype !== "Other" && (
+                        <Badge variant="outline" className="text-xs" data-testid={`badge-subtype-${wo.id}`}>
+                          {wo.workSubtype}
                         </Badge>
                       )}
                     </div>
