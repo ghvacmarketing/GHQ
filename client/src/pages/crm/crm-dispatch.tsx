@@ -1880,6 +1880,32 @@ export default function CrmDispatch() {
     refetchInterval: 10000,
   });
 
+  // Time breakdown data for the selected date
+  interface TimeBreakdown {
+    technicianId: string;
+    technicianName: string;
+    role: string;
+    totalClockedMinutes: number;
+    driveTimeMinutes: number;
+    workTimeMinutes: number;
+    idleTimeMinutes: number;
+    workOrdersCompleted: number;
+  }
+  interface TimeBreakdownResponse {
+    breakdowns: TimeBreakdown[];
+  }
+  const { data: timeBreakdownData } = useQuery<TimeBreakdownResponse>({
+    queryKey: ["/api/crm/time-breakdown", dateString],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/time-breakdown?startDate=${dateString}&endDate=${dateString}`, { credentials: "include" });
+      if (!res.ok) return { breakdowns: [] };
+      return res.json();
+    },
+    enabled: !!currentUser,
+    staleTime: 60000,
+  });
+  const [showTimeBreakdown, setShowTimeBreakdown] = useState(false);
+
   useEffect(() => {
     if (workOrdersData) {
       setLocalWorkOrders(workOrdersData.map(enrichWorkOrder));
@@ -2977,6 +3003,68 @@ export default function CrmDispatch() {
             </Button>
           </div>
           </div>
+
+          {/* Time Breakdown Summary Panel */}
+          <Collapsible open={showTimeBreakdown} onOpenChange={setShowTimeBreakdown}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full flex justify-between items-center py-2 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg" data-testid="toggle-time-breakdown">
+                <div className="flex items-center gap-2">
+                  <Timer className="h-4 w-4 text-slate-600" />
+                  <span className="font-medium text-slate-700">Time Breakdown</span>
+                  {timeBreakdownData?.breakdowns && timeBreakdownData.breakdowns.length > 0 && (
+                    <span className="text-xs text-slate-500">
+                      ({timeBreakdownData.breakdowns.length} techs clocked in)
+                    </span>
+                  )}
+                </div>
+                <ChevronDown className={cn("h-4 w-4 text-slate-500 transition-transform", showTimeBreakdown && "rotate-180")} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {timeBreakdownData?.breakdowns && timeBreakdownData.breakdowns.length > 0 ? (
+                  timeBreakdownData.breakdowns.map(tech => {
+                    const total = tech.totalClockedMinutes || 0;
+                    const idle = tech.idleTimeMinutes || 0;
+                    const drive = tech.driveTimeMinutes || 0;
+                    const work = tech.workTimeMinutes || 0;
+                    const idlePct = total > 0 ? Math.round((idle / total) * 100) : 0;
+                    const drivePct = total > 0 ? Math.round((drive / total) * 100) : 0;
+                    const workPct = total > 0 ? Math.round((work / total) * 100) : 0;
+                    const formatMins = (mins: number) => {
+                      const m = mins || 0;
+                      const h = Math.floor(m / 60);
+                      const remainder = m % 60;
+                      return h > 0 ? `${h}h ${remainder}m` : `${remainder}m`;
+                    };
+                    return (
+                      <Card key={tech.technicianId} className="p-3 bg-white" data-testid={`time-card-${tech.technicianId}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-sm text-slate-800 truncate">{tech.technicianName}</span>
+                          <span className="text-xs text-slate-500">{formatMins(total)}</span>
+                        </div>
+                        {/* Stacked Progress Bar */}
+                        <div className="w-full h-3 rounded-full overflow-hidden flex bg-slate-100">
+                          {idlePct > 0 && <div className="bg-gray-400" style={{ width: `${idlePct}%` }} title={`Idle: ${formatMins(idle)}`} />}
+                          {drivePct > 0 && <div className="bg-blue-500" style={{ width: `${drivePct}%` }} title={`Drive: ${formatMins(drive)}`} />}
+                          {workPct > 0 && <div className="bg-green-500" style={{ width: `${workPct}%` }} title={`Work: ${formatMins(work)}`} />}
+                        </div>
+                        <div className="flex justify-between mt-2 text-xs text-slate-500">
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-400" />Idle {idlePct}%</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />Drive {drivePct}%</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />Work {workPct}%</span>
+                        </div>
+                      </Card>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-full text-center py-4 text-sm text-slate-500">
+                    No technicians clocked in for this date
+                  </div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
 
         {/* Main Content Area - Scrollable Schedule + Fixed Queue */}

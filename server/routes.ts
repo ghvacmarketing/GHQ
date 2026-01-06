@@ -18383,7 +18383,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   });
 
   // GET /api/crm/time-breakdown - Get time breakdown (idle/drive/work) per employee
-  app.get("/api/crm/time-breakdown", requireCrmAdmin, async (req, res) => {
+  // Available to all CRM users (tech and above) who can view dispatch board
+  app.get("/api/crm/time-breakdown", requireCrmTechOrAbove, async (req, res) => {
     try {
       const { startDate, endDate } = req.query;
 
