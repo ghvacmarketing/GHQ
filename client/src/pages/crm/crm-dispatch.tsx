@@ -638,6 +638,9 @@ function QueueCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</p>
+          {workOrder.propertyAddress && (
+            <p className="text-xs text-slate-500 truncate">{workOrder.propertyAddress}</p>
+          )}
         </div>
         {workOrder.priority && workOrder.priority !== "normal" && (
           <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}>
@@ -1097,9 +1100,9 @@ function DraggableScheduleCard({
       
       <div className="flex items-center gap-1.5">
         {workOrder.status === "completed" && <CheckSquare className="h-3 w-3 flex-shrink-0 text-green-600" />}
-        <p className="text-xs font-medium truncate">{workOrder.title || workOrder.description || workOrder.customerName}</p>
+        <p className="text-xs font-medium truncate">{workOrder.customerName}</p>
       </div>
-      <p className="text-[10px] text-slate-600 truncate">{workOrder.customerName}</p>
+      <p className="text-[10px] text-slate-600 truncate">{workOrder.propertyAddress || "No address"}</p>
     </div>
   );
 }
@@ -1454,7 +1457,7 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
         }}
       >
         <div className="flex items-center gap-1">
-          <p className="text-xs font-medium truncate flex-1">{workOrder.title || workOrder.description || workOrder.customerName}</p>
+          <p className="text-xs font-medium truncate flex-1">{workOrder.customerName}</p>
           {workOrder.status !== "scheduled" && (
             <span 
               className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
@@ -1470,7 +1473,7 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
             </span>
           )}
         </div>
-        <p className="text-xs truncate opacity-70">{workOrder.customerName}</p>
+        <p className="text-xs truncate opacity-70">{workOrder.propertyAddress || "No address"}</p>
       </div>
     </div>
   );
@@ -1498,7 +1501,7 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
         </div>
       )}
       <div className="flex items-center gap-1">
-        <p className="text-xs font-medium truncate flex-1">{workOrder.title || workOrder.description || workOrder.customerName}</p>
+        <p className="text-xs font-medium truncate flex-1">{workOrder.customerName}</p>
         {workOrder.status !== "scheduled" && (
           <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
             workOrder.status === 'dispatched' ? 'bg-purple-600 text-white' :
@@ -1511,7 +1514,7 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
           </span>
         )}
       </div>
-      <p className="text-xs truncate opacity-70">{workOrder.customerName}</p>
+      <p className="text-xs truncate opacity-70">{workOrder.propertyAddress || "No address"}</p>
     </div>
   );
 }
@@ -1597,7 +1600,7 @@ function MobileWorkOrderCard({ workOrder, technician, onClick }: { workOrder: Di
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className={`font-semibold text-sm ${jobColors.text}`}>{workOrder.customerName}</p>
-            <p className={`text-xs ${jobColors.text} opacity-80`}>{workOrder.jobType} #{workOrder.workOrderNumber}</p>
+            <p className={`text-xs ${jobColors.text} opacity-80`}>{workOrder.propertyAddress || "No address"}</p>
           </div>
           <Badge 
             className={`text-xs font-bold ${workOrder.priority && workOrder.priority !== "normal" ? 'mr-12' : ''} ${
@@ -1635,11 +1638,16 @@ interface DispatchData {
 }
 
 function enrichWorkOrder(wo: any): DispatchWorkOrder {
+  const property = wo.property;
+  const propertyAddress = property
+    ? [property.address1, property.city, property.state].filter(Boolean).join(", ")
+    : wo.customer?.address1 || null;
+  
   return {
     ...wo,
     customerName: wo.customer?.name || "Unknown Customer",
     customerPhone: wo.customer?.phone || null,
-    propertyAddress: wo.customer?.address1 || null,
+    propertyAddress,
     jobType: wo.job?.jobType || "Service",
     priority: wo.job?.priority || "normal",
     description: wo.job?.description || null,
