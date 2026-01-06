@@ -16802,6 +16802,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       } else if (user.role === "sales" || user.role === "owner" || user.role === "admin") {
         // Sales performance data
         const installGoal = parseFloat(goals?.monthlyInstallGoal || "0");
+        
+        // Count salespeople (sales, owner, admin roles) to divide goal similar to tech goal
+        const salesCount = await db.select({ count: count() })
+          .from(crmUsers)
+          .where(and(
+            sql`${crmUsers.role} IN ('sales', 'owner', 'admin')`,
+            eq(crmUsers.isActive, true)
+          ));
+        const numSalespeople = Number(salesCount[0]?.count) || 1;
+        const individualInstallGoal = numSalespeople > 0 ? installGoal / numSalespeople : installGoal;
 
         // Get quotes created/assigned to this user
         const salesQuotes = await db.select({
@@ -16878,7 +16888,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           lostCount,
           sold: acceptedQuotesTotal,
           quoted: sentQuotesTotal,
-          goal: installGoal,
+          goal: individualInstallGoal, // Divided by number of salespeople like tech goal
         });
       } else {
         res.json({ role: user.role, message: "No performance data for this role" });
