@@ -77,6 +77,8 @@ const MobileQuoteDetail = lazy(() => import("@/pages/mobile/mobile-quote-detail"
 const MobileQuotePresent = lazy(() => import("@/pages/mobile/mobile-quote-present"));
 const MobileInvoiceDetail = lazy(() => import("@/pages/mobile/mobile-invoice-detail"));
 const MobileMessages = lazy(() => import("@/pages/mobile/mobile-messages"));
+const MobileCustomers = lazy(() => import("@/pages/mobile/mobile-customers"));
+const MobileCustomerDetail = lazy(() => import("@/pages/mobile/mobile-customer-detail"));
 
 // Lazy-load Customer Portal pages
 const PortalLogin = lazy(() => import("@/pages/portal/portal-login"));
@@ -279,6 +281,8 @@ function Router() {
       <Route path="/mobile/invoices/:id">{() => <MobileWrapper><MobileInvoiceDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/time">{() => <MobileWrapper><MobileTime /></MobileWrapper>}</Route>
       <Route path="/mobile/messages">{() => <MobileWrapper><MobileMessages /></MobileWrapper>}</Route>
+      <Route path="/mobile/customers/:id">{() => <MobileWrapper><MobileCustomerDetail /></MobileWrapper>}</Route>
+      <Route path="/mobile/customers">{() => <MobileWrapper><MobileCustomers /></MobileWrapper>}</Route>
       <Route path="/mobile/profile">{() => <MobileWrapper><MobileProfile /></MobileWrapper>}</Route>
       <Route path="/mobile">{() => <MobileWrapper><MobileAgenda /></MobileWrapper>}</Route>
       <Route path="/portal/login">{() => <PortalWrapper><PortalLogin /></PortalWrapper>}</Route>
