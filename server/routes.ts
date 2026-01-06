@@ -18640,9 +18640,19 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             return m === 0 ? `${displayHour} ${ampm}` : `${displayHour}:${m.toString().padStart(2, '0')} ${ampm}`;
           };
 
+          // Format as local time string (without Z suffix) so frontend interprets correctly
+          const formatLocalISO = (d: Date) => {
+            const yr = d.getFullYear();
+            const mo = String(d.getMonth() + 1).padStart(2, '0');
+            const dy = String(d.getDate()).padStart(2, '0');
+            const hr = String(d.getHours()).padStart(2, '0');
+            const mi = String(d.getMinutes()).padStart(2, '0');
+            return `${yr}-${mo}-${dy}T${hr}:${mi}:00`;
+          };
+
           slots.push({
-            start: slotStart.toISOString(),
-            end: slotEnd.toISOString(),
+            start: formatLocalISO(slotStart),
+            end: formatLocalISO(slotEnd),
             label: `${formatTime(slotStart)} - ${formatTime(slotEnd)}`,
             available: !hasConflict,
           });

@@ -70,6 +70,11 @@ export default function MobileJob() {
   const today = new Date();
   const todayStart = getLocalStartOfDay(today).toISOString();
   const todayEnd = getLocalEndOfDay(today).toISOString();
+  
+  // For supervisor future jobs view - show next 30 days
+  const futureEnd = new Date();
+  futureEnd.setDate(futureEnd.getDate() + 30);
+  const futureEndStr = getLocalEndOfDay(futureEnd).toISOString();
 
   // Create Work Order Dialog State
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -96,12 +101,15 @@ export default function MobileJob() {
 
   const isSupervisor = currentUser?.role === 'supervisor';
 
+  // Supervisors see future jobs (next 30 days), others see today only
+  const queryDateEnd = isSupervisor ? futureEndStr : todayEnd;
+  
   const { data: workOrders = [], isLoading: ordersLoading } = useQuery<WorkOrderWithDetails[]>({
-    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: (currentUser?.role === 'tech' || currentUser?.role === 'sales' || currentUser?.role === 'supervisor') ? currentUser?.id : undefined }],
+    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: queryDateEnd, techId: (currentUser?.role === 'tech' || currentUser?.role === 'sales' || currentUser?.role === 'supervisor') ? currentUser?.id : undefined }],
     queryFn: async () => {
       const params = new URLSearchParams({
         dateFrom: todayStart,
-        dateTo: todayEnd,
+        dateTo: queryDateEnd,
       });
       // Tech, sales, and supervisor roles only see their own jobs on the Jobs tab
       if ((currentUser?.role === 'tech' || currentUser?.role === 'sales' || currentUser?.role === 'supervisor') && currentUser?.id) {
@@ -260,12 +268,17 @@ export default function MobileJob() {
     );
   }, [workOrders]);
 
-  const todaysJobs = useMemo(() => {
+  // For supervisors: show all jobs (today + future), for others: only today
+  const displayedJobs = useMemo(() => {
     return workOrders
       .filter(wo => {
         if (!wo.scheduledStart) return false;
-        const localStart = toLocalTime(wo.scheduledStart);
-        return isToday(localStart);
+        // For non-supervisors, filter to today only
+        if (!isSupervisor) {
+          const localStart = toLocalTime(wo.scheduledStart);
+          return isToday(localStart);
+        }
+        return true; // Supervisors see all fetched jobs (today + next 30 days)
       })
       .sort((a, b) => {
         const statusOrder: Record<string, number> = { on_site: 0, en_route: 1, dispatched: 2, scheduled: 3, completed: 4 };
@@ -276,7 +289,7 @@ export default function MobileJob() {
         const bStart = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
         return aStart - bStart;
       });
-  }, [workOrders]);
+  }, [workOrders, isSupervisor]);
 
   useEffect(() => {
     if (activeJob) {
@@ -320,7 +333,9 @@ export default function MobileJob() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Wrench className="h-6 w-6 text-[#711419]" />
-            <h1 className="text-xl font-semibold text-slate-800">Today's Jobs</h1>
+            <h1 className="text-xl font-semibold text-slate-800">
+              {isSupervisor ? "My Jobs" : "Today's Jobs"}
+            </h1>
           </div>
           {isSupervisor && (
             <Button 
@@ -334,7 +349,7 @@ export default function MobileJob() {
           )}
         </div>
 
-        {todaysJobs.length === 0 ? (
+        {displayedJobs.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center">
               <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
@@ -352,7 +367,7 @@ export default function MobileJob() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {todaysJobs.map((job) => {
+            {displayedJobs.map((job) => {
               const colors = statusColors[job.status] || statusColors.scheduled;
               const jobTypeStyle = getJobTypeColor(job.visitType);
               const address = job.property?.address1 || "";
@@ -401,8 +416,12 @@ export default function MobileJob() {
                           <div className="flex items-center gap-1.5 text-sm text-slate-600">
                             <Clock className="h-4 w-4 text-slate-400" />
                             <span>
-                              {format(new Date(job.scheduledStart), "h:mm a")}
-                              {job.scheduledEnd && ` - ${format(new Date(job.scheduledEnd), "h:mm a")}`}
+                              {/* Show date for future jobs (supervisors) */}
+                              {isSupervisor && !isToday(toLocalTime(job.scheduledStart)) && (
+                                <>{format(toLocalTime(job.scheduledStart), "EEE, MMM d")} - </>
+                              )}
+                              {format(toLocalTime(job.scheduledStart), "h:mm a")}
+                              {job.scheduledEnd && ` - ${format(toLocalTime(job.scheduledEnd), "h:mm a")}`}
                             </span>
                           </div>
                         )}
