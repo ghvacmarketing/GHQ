@@ -18573,17 +18573,18 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const duration = parseInt(durationMinutes) || 60;
       const slotsNeeded = Math.ceil(duration / 30); // How many 30-min slots needed
 
-      // Constants matching dispatch board
+      // Constants matching dispatch board (8am to 8pm)
       const START_HOUR = 8;
       const END_HOUR = 20;
       const STEP_MINUTES = 30;
 
-      // Parse the date and get start/end of day in local timezone
-      const targetDate = new Date(date);
-      const dayStart = new Date(targetDate);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(targetDate);
-      dayEnd.setHours(23, 59, 59, 999);
+      // Parse the date properly - add T00:00:00 to avoid UTC interpretation
+      // date comes in as "2026-01-09", we need to treat it as local time
+      const [year, month, day] = date.split('-').map(Number);
+      const targetDate = new Date(year, month - 1, day); // month is 0-indexed
+      
+      const dayStart = new Date(year, month - 1, day, 0, 0, 0, 0);
+      const dayEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
 
       // Get existing work orders for this tech on this date
       const existingOrders = await db.select({
