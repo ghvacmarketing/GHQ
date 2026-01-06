@@ -45,9 +45,11 @@ export function PaymentLinkButton({
   const [isSendingText, setIsSendingText] = useState(false);
 
   const isQuote = type === "quote";
-  const isInstallQuote = isQuote && quoteCategory === "install";
+  // Allow payment links for these quote categories
+  const paymentLinkCategories = ["custom install", "proposal builder", "custom service", "install"];
+  const hasPaymentLinkCategory = isQuote && paymentLinkCategories.includes(quoteCategory || "");
 
-  if (isQuote && !isInstallQuote) {
+  if (isQuote && !hasPaymentLinkCategory) {
     return null;
   }
 

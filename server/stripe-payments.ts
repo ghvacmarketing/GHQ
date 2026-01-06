@@ -22,7 +22,10 @@ async function getDepositPercentage(): Promise<number> {
   return DEFAULT_DEPOSIT_PERCENTAGE;
 }
 
-// Generate a payment link for a quote (install quotes only, with deposit)
+// Quote categories that allow payment links
+const PAYMENT_LINK_CATEGORIES = ["custom install", "proposal builder", "custom service", "install"];
+
+// Generate a payment link for a quote (specific categories only, with deposit)
 router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
   try {
     const { quoteId } = req.params;
@@ -34,10 +37,10 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
       return res.status(404).json({ error: "Quote not found" });
     }
 
-    // Only allow payment links for install quotes
-    if (quote.quoteCategory !== 'install') {
+    // Only allow payment links for specific quote categories
+    if (!PAYMENT_LINK_CATEGORIES.includes(quote.quoteCategory || '')) {
       return res.status(400).json({ 
-        error: "Payment links are only available for install quotes",
+        error: "Payment links are only available for custom install, proposal builder, and custom service quotes",
         quoteCategory: quote.quoteCategory 
       });
     }
