@@ -141,11 +141,16 @@ interface WhatsIncludedItem {
   items: string[];
 }
 
+interface WhatsIncludedResult {
+  categoryTitle: string;
+  items: string[];
+}
+
 function getWhatsIncludedForOption(
   optionTag: string, 
   whatsIncluded: WhatsIncludedItem[] | undefined
-): string[] {
-  if (!whatsIncluded || !Array.isArray(whatsIncluded)) return [];
+): WhatsIncludedResult {
+  if (!whatsIncluded || !Array.isArray(whatsIncluded)) return { categoryTitle: "", items: [] };
   
   const normalizedTag = optionTag.toLowerCase().trim();
   
@@ -155,7 +160,10 @@ function getWhatsIncludedForOption(
            normalizedCategory.startsWith(normalizedTag);
   });
   
-  return match?.items || [];
+  return {
+    categoryTitle: match?.category || "",
+    items: match?.items || []
+  };
 }
 
 function SignaturePad({ onSignatureChange }: { onSignatureChange: (dataUrl: string) => void }) {
@@ -526,6 +534,13 @@ export default function PublicQuoteView() {
                           <span className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</span>
                         </div>
                         <div className="p-3 sm:p-4">
+                          {/* Show AI-generated category title if available */}
+                          {whatsIncluded.categoryTitle && (
+                            <div className="mb-3 pb-2 border-b border-slate-200">
+                              <p className="font-semibold text-slate-800 text-sm sm:text-base">{whatsIncluded.categoryTitle}</p>
+                            </div>
+                          )}
+                          
                           {option.items.map((item) => {
                             const equipmentImages = parseEquipmentImages(item.imageUrl);
                             return (
@@ -546,7 +561,10 @@ export default function PublicQuoteView() {
                                     </div>
                                   )}
                                   <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-slate-800 text-sm sm:text-base">{item.description}</div>
+                                    {/* Only show line item description if no AI category title */}
+                                    {!whatsIncluded.categoryTitle && (
+                                      <div className="font-medium text-slate-800 text-sm sm:text-base">{item.description}</div>
+                                    )}
                                     {item.partNumber && (
                                       <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
                                     )}
@@ -560,11 +578,11 @@ export default function PublicQuoteView() {
                             );
                           })}
                           
-                          {whatsIncluded.length > 0 && (
+                          {whatsIncluded.items.length > 0 && (
                             <div className="mt-3 pt-3 border-t border-slate-200">
                               <p className="text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">What's Included:</p>
                               <ul className="space-y-1">
-                                {whatsIncluded.map((item, idx) => (
+                                {whatsIncluded.items.map((item, idx) => (
                                   <li key={idx} className="flex items-start gap-2 text-sm text-slate-600">
                                     <span className="text-[#711419] mt-0.5">•</span>
                                     <span>{item}</span>
