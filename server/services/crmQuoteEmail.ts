@@ -4,7 +4,6 @@ import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 const brandDefaults = {
   name: "Giesbrecht HVAC",
   color: "#711419",
-  logoUrl: "https://images.squarespace-cdn.com/content/v1/65b2790c0b83175df7337294/93a31506-d2ae-4e07-958b-c86d0c49f7cd/GHVAC-icons.png?format=200w",
 };
 
 function asCurrency(v: string | number, locale = "en-US", currency = "USD") {
@@ -66,7 +65,6 @@ export async function sendCrmQuoteEmail(
   const fallbackEmail = process.env.FROM_EMAIL || "quotes@ghvac.work";
   const brandName = brandDefaults.name;
   const brandColor = brandDefaults.color;
-  const logoUrl = brandDefaults.logoUrl;
 
   // Debug: log first 15 chars of API key to verify correct key is loaded
   console.log("[CRM Email] API Key prefix:", apiKey ? apiKey.substring(0, 15) + "..." : "NOT SET");
@@ -220,12 +218,11 @@ function buildHtmlBody(
 ): string {
   const brandName = brandDefaults.name;
   const brandColor = brandDefaults.color;
-  const logoUrl = brandDefaults.logoUrl;
 
   const personalMessageHtml = personalMessage
     ? `
       <tr>
-        <td class="px-24" style="padding:24px 20px;">
+        <td class="px-24" style="padding:0 20px 16px 20px;">
           <div style="font-size:15px;color:#374151;font-family:Arial,sans-serif;line-height:1.6;">${esc(personalMessage)}</div>
         </td>
       </tr>`
@@ -255,10 +252,21 @@ function buildHtmlBody(
       <td align="center" style="padding:20px 0;">
         <table role="presentation" cellpadding="0" cellspacing="0" class="container" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(16,24,40,0.08);">
 
-          <!-- Header -->
+          <!-- Header with text branding -->
           <tr>
-            <td style="background:${brandColor};padding:24px 20px;text-align:center;">
-              <img src="${esc(logoUrl)}" alt="${esc(brandName)}" width="120" style="height:auto;border:0;display:inline-block;"/>
+            <td style="background:${brandColor};padding:28px 20px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:0.5px;">${esc(brandName)}</h1>
+              <p style="margin:6px 0 0 0;color:rgba(255,255,255,0.85);font-size:13px;">Professional Heating & Cooling Solutions</p>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td class="px-24" style="padding:24px 20px 16px 20px;">
+              <h2 style="margin:0;color:#111827;font-size:20px;font-weight:600;">Your Quote is Ready!</h2>
+              <p style="margin:10px 0 0 0;color:#6b7280;font-size:14px;line-height:1.5;">
+                Thank you for considering ${esc(brandName)} for your HVAC needs. We've prepared a detailed quote for you to review.
+              </p>
             </td>
           </tr>
 
@@ -266,21 +274,33 @@ function buildHtmlBody(
 
           <!-- View Quote Button -->
           <tr>
-            <td class="px-24" style="padding:${personalMessage ? '0' : '24px'} 20px 24px 20px;text-align:center;">
+            <td class="px-24" style="padding:8px 20px 24px 20px;text-align:center;">
               ${quoteViewUrl ? `
-              <a href="${esc(quoteViewUrl)}" style="display:inline-block;background:${brandColor};color:#ffffff;padding:16px 40px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;">View Quote</a>
+              <a href="${esc(quoteViewUrl)}" style="display:inline-block;background:${brandColor};color:#ffffff;padding:16px 48px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;box-shadow:0 2px 4px rgba(113,20,25,0.3);">View Your Quote</a>
               ` : `
               <a href="tel:+17068260644" style="display:inline-block;background:${brandColor};color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">Call Us: (706) 826-0644</a>
               `}
             </td>
           </tr>
 
+          <!-- Info section -->
+          <tr>
+            <td class="px-24" style="padding:0 20px 24px 20px;">
+              <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:16px;">
+                <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5;">
+                  <strong>Questions?</strong> We're here to help! Call us at <a href="tel:+17068260644" style="color:#92400e;font-weight:600;">(706) 826-0644</a> or reply to this email.
+                </p>
+              </div>
+            </td>
+          </tr>
+
           <!-- Footer -->
           <tr>
-            <td style="background:#f3f4f6;padding:20px;text-align:center;">
-              <p style="margin:0;font-weight:700;color:#111827;font-size:14px;">${esc(brandName)}</p>
-              <p style="margin:6px 0 0 0;font-size:12px;color:#6b7280;">(706) 826-0644</p>
-              <p style="margin:6px 0 0 0;font-size:12px;color:#6b7280;">Professional HVAC Service Solutions</p>
+            <td style="background:#f3f4f6;padding:24px 20px;text-align:center;border-top:1px solid #e5e7eb;">
+              <p style="margin:0;font-weight:700;color:#111827;font-size:15px;">${esc(brandName)}</p>
+              <p style="margin:8px 0 0 0;font-size:13px;color:#6b7280;">(706) 826-0644</p>
+              <p style="margin:4px 0 0 0;font-size:12px;color:#9ca3af;">Serving Augusta, GA and surrounding areas</p>
+              <p style="margin:12px 0 0 0;font-size:11px;color:#9ca3af;">Licensed &amp; Insured | Quality Service Since Day One</p>
             </td>
           </tr>
 
