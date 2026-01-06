@@ -9,18 +9,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, FileText, AlertCircle, Loader2 } from "lucide-react";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
-import ghvacLogo from "@assets/ghvac-logo.png";
+import redlogo from "@assets/redlogo.webp";
 
 const BRAND_COLOR = "#711419";
 const BRAND_NAME = "Giesbrecht HVAC";
 
 function BrandEmblem() {
   return (
-    <div className="flex justify-center mb-4">
+    <div className="flex justify-center mb-4 bg-white py-4">
       <img 
-        src={ghvacLogo} 
+        src={redlogo} 
         alt="Giesbrecht HVAC" 
-        className="h-16 sm:h-20 w-auto object-contain"
+        className="h-12 sm:h-16 w-auto object-contain"
       />
     </div>
   );
