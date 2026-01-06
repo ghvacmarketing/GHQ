@@ -18,9 +18,9 @@ const navTabs = [
   { path: "/mobile/profile", label: "Profile", icon: User },
 ];
 
-// Roles that can access mobile app: owner, sales, tech
+// Roles that can access mobile app: owner, supervisor, sales, tech
 // Admin role is desktop-only
-const MOBILE_ALLOWED_ROLES = ["owner", "sales", "tech"];
+const MOBILE_ALLOWED_ROLES = ["owner", "supervisor", "sales", "tech"];
 
 export default function MobileShell({ children }: MobileShellProps) {
   const [location] = useLocation();
