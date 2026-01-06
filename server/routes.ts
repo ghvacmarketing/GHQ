@@ -17975,7 +17975,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       const entries = await storage.getTimeEntries(filters);
-      return res.json(entries);
+      
+      // Enrich with technician names
+      const users = await storage.getCrmUsers();
+      const userMap = new Map(users.map((u) => [u.id, u.name]));
+      const enrichedEntries = entries.map((entry) => ({
+        ...entry,
+        technicianName: userMap.get(entry.technicianId) || "Unknown",
+      }));
+      
+      return res.json(enrichedEntries);
     } catch (error) {
       console.error("Error fetching time entries:", error);
       return res.status(500).json({ message: "Failed to fetch time entries" });
