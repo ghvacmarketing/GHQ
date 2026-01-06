@@ -2710,7 +2710,7 @@ export default function CrmQuoteDetail() {
               </div>
 
               {/* Quote Header Card */}
-              <Card className="shadow-lg mb-6">
+              <Card className="shadow-lg mb-6 bg-slate-50 border-0">
                 <CardHeader className="border-b" style={{ backgroundColor: BRAND_COLOR }}>
                   <div className="flex items-center justify-between text-white">
                     <div className="flex items-center gap-2">
@@ -2720,7 +2720,7 @@ export default function CrmQuoteDetail() {
                     <span className="text-sm opacity-90">{formatPresentationDate(quote.createdAt)}</span>
                   </div>
                 </CardHeader>
-                <CardContent className="py-6 space-y-6">
+                <CardContent className="py-6 space-y-6 bg-slate-50">
                   {/* Customer Info */}
                   <div className="bg-slate-50 rounded-lg p-4">
                     <h3 className="font-semibold text-slate-700 mb-2">Prepared For</h3>
@@ -2894,11 +2894,11 @@ export default function CrmQuoteDetail() {
               </Card>
 
               {/* Signature Section */}
-              <Card className="shadow-lg">
-                <CardHeader>
+              <Card className="shadow-lg bg-slate-50 border-0">
+                <CardHeader className="bg-slate-50">
                   <CardTitle className="text-lg">Accept Quote</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-6 bg-slate-50">
                   <PresentationSignaturePad onSignatureChange={setPresentationSignature} />
 
                   <div className="space-y-2">
