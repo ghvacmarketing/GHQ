@@ -14356,18 +14356,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).returning();
 
       // Create line items from worksheet lines
+      // When there's only one visible line item, set its price to the sell price so it matches the quote total
       let sortOrder = 0;
       let equipmentSubtotal = 0;
+      const visibleLines = lines.filter((l: any) => l.cost > 0);
+      const isSingleLineItem = visibleLines.length === 1;
+      
       for (const line of lines) {
         const cost = line.cost || 0;
+        if (cost === 0) continue; // Skip zero-cost items
+        
         equipmentSubtotal += cost;
+        
+        // For single line item quotes, show the sell price so it matches the total
+        const displayPrice = isSingleLineItem ? calcs.discountedSellPrice : cost;
+        
         await db.insert(crmQuoteLineItems).values({
           quoteId: newQuote.id,
           lineType: "part",
           description: line.description || line.category,
-          unitPrice: cost.toString(),
+          unitPrice: displayPrice.toString(),
           quantity: "1",
-          lineTotal: cost.toString(),
+          lineTotal: displayPrice.toString(),
           sortOrder: sortOrder++,
         });
       }
