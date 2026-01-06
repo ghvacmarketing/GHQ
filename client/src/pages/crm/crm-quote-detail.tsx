@@ -63,6 +63,7 @@ import {
   ArrowDownLeft,
   Inbox,
   Edit,
+  Monitor,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -86,6 +87,9 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { CrmUser, CrmQuote, CrmQuoteLineItem, QuoteEmailLog } from "@shared/schema";
 import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useRef, useCallback } from "react";
+import ghvacLogo from "@assets/ghvac-logo.png";
 
 const COMPANY_INFO = {
   name: "Giesbrecht HVAC",
@@ -140,6 +144,191 @@ const statusColors: Record<string, string> = {
   expired: "bg-orange-100 text-orange-700 border-orange-200",
 };
 
+const BRAND_COLOR = "#711419";
+
+interface OptionGroup {
+  tag: string;
+  items: CrmQuoteLineItem[];
+  total: number;
+}
+
+const PACKAGE_LEVEL_ORDER = ["Best", "Better", "Good", "Budget"];
+
+function getOptionSortOrder(tag: string): number {
+  const lowerTag = tag.toLowerCase();
+  for (let i = 0; i < PACKAGE_LEVEL_ORDER.length; i++) {
+    const level = PACKAGE_LEVEL_ORDER[i].toLowerCase();
+    if (lowerTag === level || lowerTag.startsWith(level)) {
+      return i;
+    }
+  }
+  return PACKAGE_LEVEL_ORDER.length;
+}
+
+function groupLineItemsByOption(lineItems: CrmQuoteLineItem[]): OptionGroup[] {
+  const groups = new Map<string, CrmQuoteLineItem[]>();
+  
+  lineItems.forEach(item => {
+    const tag = item.optionTag;
+    if (!tag) return;
+    if (!groups.has(tag)) {
+      groups.set(tag, []);
+    }
+    groups.get(tag)!.push(item);
+  });
+  
+  return Array.from(groups.entries())
+    .map(([tag, items]) => ({
+      tag,
+      items,
+      total: items.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0),
+    }))
+    .sort((a, b) => getOptionSortOrder(a.tag) - getOptionSortOrder(b.tag));
+}
+
+function formatPresentationCurrency(value: string | number): string {
+  const num = typeof value === "string" ? parseFloat(value.replace(/[^0-9.-]/g, "")) : value;
+  if (isNaN(num)) return String(value);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num);
+}
+
+function formatPresentationDate(dateString: string | Date | null | undefined): string {
+  if (!dateString) return "N/A";
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(date);
+}
+
+function PresentationSignaturePad({ onSignatureChange }: { onSignatureChange: (dataUrl: string) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [hasSignature, setHasSignature] = useState(false);
+
+  const startDrawing = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    setIsDrawing(true);
+    const rect = canvas.getBoundingClientRect();
+    let clientX: number, clientY: number;
+
+    if ("touches" in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+  }, []);
+
+  const draw = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    let clientX: number, clientY: number;
+
+    if ("touches" in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+      e.preventDefault();
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+    setHasSignature(true);
+  }, [isDrawing]);
+
+  const stopDrawing = useCallback(() => {
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (canvas && hasSignature) {
+      onSignatureChange(canvas.toDataURL("image/png"));
+    }
+  }, [hasSignature, onSignatureChange]);
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    setHasSignature(false);
+    onSignatureChange("");
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
+
+  return (
+    <div className="space-y-2">
+      <div className="text-sm font-medium text-slate-700">Signature</div>
+      <p className="text-xs text-slate-500">Draw your signature below using your finger or mouse</p>
+      <div className="border-2 border-dashed border-slate-300 rounded-lg p-1 bg-white">
+        <canvas
+          ref={canvasRef}
+          width={400}
+          height={150}
+          className="w-full h-[120px] sm:h-[150px] cursor-crosshair touch-none"
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={stopDrawing}
+          data-testid="canvas-presentation-signature"
+        />
+      </div>
+      <div className="flex justify-between items-center">
+        <span className="text-xs text-slate-500">Sign above with your mouse or finger</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={clearSignature}
+          className="text-slate-500 hover:text-slate-700"
+          data-testid="button-clear-presentation-signature"
+        >
+          Clear
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function CrmQuoteDetail() {
   usePageTitle("Quote Detail");
   const [, navigate] = useLocation();
@@ -172,6 +361,11 @@ export default function CrmQuoteDetail() {
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState("");
+  const [showPresentation, setShowPresentation] = useState(false);
+  const [presentationSignature, setPresentationSignature] = useState("");
+  const [presentationName, setPresentationName] = useState("");
+  const [presentationAgreed, setPresentationAgreed] = useState(false);
+  const [presentationSelectedOption, setPresentationSelectedOption] = useState<string | null>(null);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -353,6 +547,68 @@ export default function CrmQuoteDetail() {
       toast({ title: "Failed to update description", description: error.message, variant: "destructive" });
     },
   });
+
+  const acceptInPersonMutation = useMutation({
+    mutationFn: async (data: { signatureImage: string; signerName: string; selectedOption?: string | null }) => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}/accept-in-person`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to accept quote");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId, "email-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      setShowPresentation(false);
+      setPresentationSignature("");
+      setPresentationName("");
+      setPresentationAgreed(false);
+      setPresentationSelectedOption(null);
+      toast({ title: "Quote accepted!", description: "The client has accepted the quote in person." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to accept quote", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handlePresentationAccept = () => {
+    if (!presentationSignature) {
+      toast({ title: "Signature required", description: "Please have the client sign above.", variant: "destructive" });
+      return;
+    }
+    if (!presentationName.trim()) {
+      toast({ title: "Name required", description: "Please enter the client's printed name.", variant: "destructive" });
+      return;
+    }
+    if (!presentationAgreed) {
+      toast({ title: "Terms required", description: "Please agree to the terms and conditions.", variant: "destructive" });
+      return;
+    }
+    if (quote?.quoteMode === "options" && !presentationSelectedOption) {
+      toast({ title: "Selection required", description: "Please select one of the available options.", variant: "destructive" });
+      return;
+    }
+    acceptInPersonMutation.mutate({
+      signatureImage: presentationSignature,
+      signerName: presentationName.trim(),
+      selectedOption: presentationSelectedOption,
+    });
+  };
+
+  const resetPresentationState = () => {
+    setPresentationSignature("");
+    setPresentationName("");
+    setPresentationAgreed(false);
+    setPresentationSelectedOption(null);
+  };
 
   const acceptMutation = useMutation({
     mutationFn: async (params: { selectedOption?: string } = {}) => {
@@ -1278,15 +1534,26 @@ export default function CrmQuoteDetail() {
             
             <div className="flex items-center gap-2">
               {["draft", "sent", "viewed"].includes(status) && (
-                <Button
-                  onClick={handleOpenSendDialog}
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  data-testid="button-send-quote"
-                >
-                  <Mail className="h-4 w-4 mr-2" />
-                  Send Quote
-                </Button>
+                <>
+                  <Button
+                    onClick={handleOpenSendDialog}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    data-testid="button-send-quote"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Send Quote
+                  </Button>
+                  <Button
+                    onClick={() => setShowPresentation(true)}
+                    size="sm"
+                    className="bg-teal-600 hover:bg-teal-700 text-white"
+                    data-testid="button-present-to-client"
+                  >
+                    <Monitor className="h-4 w-4 mr-2" />
+                    Present to Client
+                  </Button>
+                </>
               )}
               {status === "sent" && (
                 <>
@@ -2561,6 +2828,240 @@ export default function CrmQuoteDetail() {
           )}
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Present to Client Dialog - Fullscreen */}
+      <Dialog 
+        open={showPresentation} 
+        onOpenChange={(open) => {
+          if (!open) {
+            resetPresentationState();
+          }
+          setShowPresentation(open);
+        }}
+      >
+        <DialogContent className="max-w-full w-full h-full max-h-screen m-0 p-0 rounded-none overflow-auto">
+          <div className="min-h-screen bg-slate-50">
+            {/* Exit button */}
+            <div className="fixed top-4 right-4 z-50">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  resetPresentationState();
+                  setShowPresentation(false);
+                }}
+                className="bg-white shadow-lg"
+                data-testid="button-exit-presentation"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Exit Presentation
+              </Button>
+            </div>
+
+            <div className="py-8 px-4 max-w-3xl mx-auto">
+              {/* Company Logo */}
+              <div className="flex justify-center mb-6 py-6">
+                <img 
+                  src={ghvacLogo} 
+                  alt="Giesbrecht HVAC" 
+                  className="h-20 sm:h-24 w-auto object-contain"
+                />
+              </div>
+
+              {/* Quote Header Card */}
+              <Card className="shadow-lg mb-6">
+                <CardHeader className="border-b" style={{ backgroundColor: BRAND_COLOR }}>
+                  <div className="flex items-center justify-between text-white">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      <CardTitle className="text-xl">Quote #{quote.quoteNumber}</CardTitle>
+                    </div>
+                    <span className="text-sm opacity-90">{formatPresentationDate(quote.createdAt)}</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="py-6 space-y-6">
+                  {/* Customer Info */}
+                  <div className="bg-slate-50 rounded-lg p-4">
+                    <h3 className="font-semibold text-slate-700 mb-2">Prepared For</h3>
+                    <p className="font-medium text-slate-900">{quote.customerName || quote.customer?.name}</p>
+                    {quote.serviceAddress && (
+                      <p className="text-slate-600 text-sm">{quote.serviceAddress}</p>
+                    )}
+                  </div>
+
+                  {/* Quote Content - Options Mode */}
+                  {quote.quoteMode === "options" && quote.lineItems ? (
+                    <>
+                      <div>
+                        <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2">Your Home Comfort Options</h3>
+                        <p className="text-sm sm:text-base text-slate-600">
+                          Please review the options below and select the one that best fits your needs.
+                        </p>
+                      </div>
+
+                      <div className="space-y-3 sm:space-y-4">
+                        {groupLineItemsByOption(quote.lineItems).map((option) => {
+                          const isSelected = presentationSelectedOption === option.tag;
+                          return (
+                            <div 
+                              key={option.tag} 
+                              onClick={() => setPresentationSelectedOption(option.tag)}
+                              className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
+                                isSelected 
+                                  ? "border-[#711419] ring-2 ring-[#711419]/20 shadow-md" 
+                                  : "border-slate-200 hover:border-slate-400"
+                              }`}
+                              data-testid={`presentation-option-${option.tag.toLowerCase().replace(/\s+/g, "-")}`}
+                            >
+                              <div className={`px-3 sm:px-4 py-4 flex justify-between items-center ${isSelected ? "bg-[#711419]/10" : "bg-slate-100"}`}>
+                                <div className="flex items-center gap-2 sm:gap-3">
+                                  <div className={`w-6 h-6 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                                    isSelected ? "border-[#711419] bg-[#711419]" : "border-slate-400"
+                                  }`}>
+                                    {isSelected && <div className="w-2.5 h-2.5 sm:w-2 sm:h-2 rounded-full bg-white" />}
+                                  </div>
+                                  <span className="font-semibold text-slate-900 text-base sm:text-lg">{option.tag}</span>
+                                </div>
+                                <span className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatPresentationCurrency(option.total)}</span>
+                              </div>
+                              <div className="p-3 sm:p-4">
+                                {option.items.map((item) => (
+                                  <div key={item.id} className="py-2 border-b border-slate-100 last:border-0">
+                                    <div className="flex justify-between items-center">
+                                      <div className="font-medium text-slate-800 text-sm sm:text-base">{item.description}</div>
+                                      <span className="font-medium text-slate-800">{formatPresentationCurrency(item.lineTotal)}</span>
+                                    </div>
+                                    {item.partNumber && (
+                                      <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {presentationSelectedOption ? (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                          <p className="text-green-800 font-medium">
+                            Selected: <strong>{presentationSelectedOption}</strong>
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                          <p className="text-amber-800 font-medium">
+                            Please select one of the options above to continue.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* Single Quote Mode - Line Items Table */
+                    <>
+                      <div>
+                        <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-4">Quote Details</h3>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Description</TableHead>
+                              <TableHead className="text-right">Qty</TableHead>
+                              <TableHead className="text-right">Price</TableHead>
+                              <TableHead className="text-right">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {quote.lineItems && quote.lineItems.length > 0 ? (
+                              quote.lineItems.map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell>{item.description}</TableCell>
+                                  <TableCell className="text-right">{item.quantity}</TableCell>
+                                  <TableCell className="text-right">{formatPresentationCurrency(item.unitPrice)}</TableCell>
+                                  <TableCell className="text-right">{formatPresentationCurrency(item.lineTotal)}</TableCell>
+                                </TableRow>
+                              ))
+                            ) : (
+                              <TableRow>
+                                <TableCell colSpan={4} className="text-center text-slate-500 py-8">
+                                  No line items
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+
+                        <div className="mt-6 border-t pt-4">
+                          <div className="flex justify-between text-lg font-semibold">
+                            <span>Total</span>
+                            <span style={{ color: BRAND_COLOR }}>{formatPresentationCurrency(quote.total)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Signature Section */}
+              <Card className="shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg">Accept Quote</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <PresentationSignaturePad onSignatureChange={setPresentationSignature} />
+
+                  <div className="space-y-2">
+                    <Label htmlFor="presentation-name">Printed Name</Label>
+                    <Input
+                      id="presentation-name"
+                      value={presentationName}
+                      onChange={(e) => setPresentationName(e.target.value)}
+                      placeholder="Enter your full name"
+                      data-testid="input-presentation-name"
+                    />
+                  </div>
+
+                  <div className="flex items-start space-x-3">
+                    <Checkbox 
+                      id="presentation-terms" 
+                      checked={presentationAgreed}
+                      onCheckedChange={(checked) => setPresentationAgreed(checked === true)}
+                      data-testid="checkbox-presentation-terms"
+                    />
+                    <label 
+                      htmlFor="presentation-terms" 
+                      className="text-sm text-slate-600 leading-tight cursor-pointer"
+                    >
+                      I agree to the terms and conditions of this quote. I authorize the work described above to be performed 
+                      and agree to pay the total amount upon completion of the work.
+                    </label>
+                  </div>
+
+                  <Button
+                    onClick={handlePresentationAccept}
+                    disabled={acceptInPersonMutation.isPending}
+                    className="w-full py-6 text-lg"
+                    style={{ backgroundColor: BRAND_COLOR }}
+                    data-testid="button-presentation-accept"
+                  >
+                    {acceptInPersonMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-5 w-5 mr-2" />
+                        Accept Quote
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </CrmLayout>
   );
 }

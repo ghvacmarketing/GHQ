@@ -15285,6 +15285,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/crm/quotes/:id/accept-in-person - Accept quote with in-person signature
+  app.post("/api/crm/quotes/:id/accept-in-person", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { signatureImage, signerName, selectedOption } = req.body;
+
+      if (!signatureImage || typeof signatureImage !== "string") {
+        return res.status(400).json({ message: "Signature is required" });
+      }
+
+      if (!signerName || typeof signerName !== "string" || signerName.trim().length === 0) {
+        return res.status(400).json({ message: "Signer name is required" });
+      }
+
+      const [existing] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      if (existing.status === "accepted") {
+        return res.status(400).json({ message: "This quote has already been accepted" });
+      }
+
+      if (existing.status === "declined") {
+        return res.status(400).json({ message: "This quote has been declined" });
+      }
+
+      if (existing.status === "expired") {
+        return res.status(400).json({ message: "This quote has expired" });
+      }
+
+      // For multi-option quotes, validate option selection
+      if (existing.quoteMode === 'options') {
+        const lineItems = await db.select().from(crmQuoteLineItems)
+          .where(eq(crmQuoteLineItems.quoteId, req.params.id));
+        
+        const availableOptions = [...new Set(
+          lineItems
+            .map(item => item.optionTag)
+            .filter((tag): tag is string => !!tag)
+        )];
+
+        if (availableOptions.length > 0 && !selectedOption) {
+          return res.status(400).json({
+            message: "Please select which option the customer chose.",
+          });
+        }
+
+        if (selectedOption && availableOptions.length > 0 && !availableOptions.includes(selectedOption)) {
+          return res.status(400).json({
+            message: `Invalid option selected. Available options: ${availableOptions.join(', ')}`,
+          });
+        }
+      }
+
+      const now = new Date();
+
+      const [updated] = await db.update(crmQuotes)
+        .set({
+          status: "accepted",
+          acceptedAt: now,
+          acceptedBy: signerName.trim(),
+          signatureImage,
+          signerName: signerName.trim(),
+          signerIp: "in-person",
+          signedAt: now,
+          updatedAt: now,
+          ...(selectedOption && typeof selectedOption === "string" ? { selectedOption } : {}),
+        })
+        .where(eq(crmQuotes.id, req.params.id))
+        .returning();
+
+      await logCrmAudit(
+        user.id,
+        "quote.accepted_in_person",
+        "crm_quote",
+        req.params.id,
+        { 
+          quoteNumber: existing.quoteNumber, 
+          signerName: signerName.trim(), 
+          selectedOption: selectedOption || null,
+          presentedBy: user.name || user.email,
+        },
+        req.ip
+      );
+
+      // Add system email log entry for in-person acceptance
+      await db.insert(quoteEmailLogs).values({
+        quoteId: existing.id,
+        direction: "system",
+        fromEmail: "system",
+        recipientEmail: existing.customerEmail || "",
+        recipientName: signerName.trim(),
+        subject: `Quote ${existing.quoteNumber} - Accepted In Person`,
+        textContent: `Quote was accepted in person by ${signerName.trim()}, presented by ${user.name || user.email} at ${now.toLocaleString()}`,
+        status: "sent",
+        isManual: false,
+        personalMessage: JSON.stringify({
+          eventType: "quote_accepted_in_person",
+          signerName: signerName.trim(),
+          presentedBy: user.name || user.email,
+          signedAt: now.toISOString(),
+          selectedOption: selectedOption || null,
+        }),
+      });
+
+      // Log activity to projectActivities if quote has a projectId
+      if (existing.projectId) {
+        await db.insert(projectActivities).values({
+          projectId: existing.projectId,
+          type: "approval",
+          title: "Quote Accepted In Person",
+          notes: `Quote ${existing.quoteNumber} was accepted in person by ${signerName.trim()}${selectedOption ? ` (Option: ${selectedOption})` : ''}. Presented by ${user.name || user.email}.`,
+          metadata: JSON.stringify({
+            subType: "quote_accepted_in_person",
+            quoteId: existing.id,
+            quoteNumber: existing.quoteNumber,
+            signerName: signerName.trim(),
+            selectedOption: selectedOption || null,
+            presentedBy: user.name || user.email,
+          }),
+          createdBy: user.id,
+        });
+      }
+
+      console.log(`Quote ${existing.quoteNumber} accepted in person by ${signerName.trim()}, presented by ${user.name || user.email}`);
+
+      return res.json({ 
+        success: true, 
+        message: "Quote accepted successfully",
+        quote: updated,
+      });
+    } catch (error) {
+      console.error("Error accepting quote in person:", error);
+      return res.status(500).json({ message: "Failed to accept quote" });
+    }
+  });
+
   // POST /api/crm/quotes/:id/decline - Mark quote as declined
   app.post("/api/crm/quotes/:id/decline", requireCrmSalesOrAbove, async (req, res) => {
     try {
