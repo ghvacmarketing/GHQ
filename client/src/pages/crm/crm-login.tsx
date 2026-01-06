@@ -70,7 +70,7 @@ export default function CrmLogin() {
       if (data.token) {
         setCrmToken(data.token);
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/auth/me"] });
+      // Navigate directly - the route guard will verify auth
       // Technicians go directly to mobile app, others go to CRM
       if (data.user?.role === "tech") {
         window.location.href = "/mobile";
