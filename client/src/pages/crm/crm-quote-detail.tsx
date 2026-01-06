@@ -63,6 +63,7 @@ import {
   Inbox,
   Edit,
   Monitor,
+  Pencil,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -187,6 +188,8 @@ export default function CrmQuoteDetail() {
   const [presentationName, setPresentationName] = useState("");
   const [presentationAgreed, setPresentationAgreed] = useState(false);
   const [presentationSelectedOption, setPresentationSelectedOption] = useState<string | null>(null);
+  const [showWhatsIncludedDialog, setShowWhatsIncludedDialog] = useState(false);
+  const [editingWhatsIncluded, setEditingWhatsIncluded] = useState<Array<{ category: string; items: string[] }>>([]);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -368,6 +371,97 @@ export default function CrmQuoteDetail() {
       toast({ title: "Failed to update description", description: error.message, variant: "destructive" });
     },
   });
+
+  const updateWhatsIncludedMutation = useMutation({
+    mutationFn: async (whatsIncluded: Array<{ category: string; items: string[] }>) => {
+      const updatedAiGeneratedQuote = {
+        ...quote?.aiGeneratedQuote,
+        whats_included: whatsIncluded,
+      };
+      const res = await fetch(`/api/crm/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ aiGeneratedQuote: updatedAiGeneratedQuote }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to update What's Included");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setShowWhatsIncludedDialog(false);
+      toast({ title: "What's Included updated", description: "The What's Included section has been saved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update What's Included", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleOpenWhatsIncludedDialog = () => {
+    if (quote?.aiGeneratedQuote?.whats_included) {
+      setEditingWhatsIncluded(JSON.parse(JSON.stringify(quote.aiGeneratedQuote.whats_included)));
+    } else {
+      setEditingWhatsIncluded([]);
+    }
+    setShowWhatsIncludedDialog(true);
+  };
+
+  const handleWhatsIncludedItemChange = (categoryIndex: number, itemIndex: number, value: string) => {
+    setEditingWhatsIncluded(prev => {
+      const updated = [...prev];
+      updated[categoryIndex] = {
+        ...updated[categoryIndex],
+        items: [...updated[categoryIndex].items],
+      };
+      updated[categoryIndex].items[itemIndex] = value;
+      return updated;
+    });
+  };
+
+  const handleAddWhatsIncludedItem = (categoryIndex: number) => {
+    setEditingWhatsIncluded(prev => {
+      const updated = [...prev];
+      updated[categoryIndex] = {
+        ...updated[categoryIndex],
+        items: [...updated[categoryIndex].items, ""],
+      };
+      return updated;
+    });
+  };
+
+  const handleRemoveWhatsIncludedItem = (categoryIndex: number, itemIndex: number) => {
+    setEditingWhatsIncluded(prev => {
+      const updated = [...prev];
+      updated[categoryIndex] = {
+        ...updated[categoryIndex],
+        items: updated[categoryIndex].items.filter((_, i) => i !== itemIndex),
+      };
+      return updated;
+    });
+  };
+
+  const handleSaveWhatsIncluded = () => {
+    // Guard against saving if quote status has changed from draft
+    if (quote?.status !== "draft") {
+      toast({
+        title: "Cannot Save Changes",
+        description: "This quote is no longer a draft. Changes cannot be saved.",
+        variant: "destructive",
+      });
+      setShowWhatsIncludedDialog(false);
+      return;
+    }
+    
+    const cleanedData = editingWhatsIncluded.map(cat => ({
+      category: cat.category,
+      items: cat.items.filter(item => item.trim() !== ""),
+    }));
+    updateWhatsIncludedMutation.mutate(cleanedData);
+  };
 
   const acceptInPersonMutation = useMutation({
     mutationFn: async (data: { signatureImage: string; signerName: string; selectedOption?: string | null }) => {
@@ -1710,7 +1804,21 @@ export default function CrmQuoteDetail() {
               
               {quote.aiGeneratedQuote.whats_included && quote.aiGeneratedQuote.whats_included.length > 0 && (
                 <div className="space-y-3">
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase">What's Included</h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase">What's Included</h4>
+                    {quote.status === "draft" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        onClick={handleOpenWhatsIncludedDialog}
+                        data-testid="btn-edit-whats-included"
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    )}
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {quote.aiGeneratedQuote.whats_included.map((category: { category: string; items: string[] }, idx: number) => (
                       <div key={idx} className="bg-white p-3 rounded-lg border">
@@ -2715,6 +2823,87 @@ export default function CrmQuoteDetail() {
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showWhatsIncludedDialog} onOpenChange={setShowWhatsIncludedDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-800">
+              <Pencil className="h-4 w-4" />
+              Edit What's Included
+            </DialogTitle>
+            <DialogDescription>
+              Edit the items included in each package option. Empty items will be removed when saving.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {editingWhatsIncluded.map((category, categoryIndex) => (
+              <div key={categoryIndex} className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="font-semibold text-sm text-blue-800 mb-3">{category.category}</h4>
+                <div className="space-y-2">
+                  {category.items.map((item, itemIndex) => (
+                    <div key={itemIndex} className="flex items-center gap-2">
+                      <Input
+                        value={item}
+                        onChange={(e) => handleWhatsIncludedItemChange(categoryIndex, itemIndex, e.target.value)}
+                        placeholder="Enter item..."
+                        className="flex-1 bg-white"
+                        data-testid={`input-whats-included-${categoryIndex}-${itemIndex}`}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleRemoveWhatsIncludedItem(categoryIndex, itemIndex)}
+                        data-testid={`btn-remove-item-${categoryIndex}-${itemIndex}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+                    onClick={() => handleAddWhatsIncludedItem(categoryIndex)}
+                    data-testid={`btn-add-item-${categoryIndex}`}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Item
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowWhatsIncludedDialog(false)}
+              data-testid="btn-cancel-whats-included"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveWhatsIncluded}
+              disabled={updateWhatsIncludedMutation.isPending || quote?.status !== "draft"}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="btn-save-whats-included"
+            >
+              {updateWhatsIncludedMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : quote?.status !== "draft" ? (
+                "Quote No Longer Editable"
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </CrmLayout>
