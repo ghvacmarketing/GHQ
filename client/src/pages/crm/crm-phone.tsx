@@ -39,7 +39,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { GripVertical, Phone, Calendar, CalendarDays, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, Cloud, Sun, CloudRain, CloudSnow, Wind, AlertTriangle, BarChart3, ClipboardList, Send } from "lucide-react";
-import { ScatterChart, Scatter, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -2542,104 +2542,158 @@ function WeatherImpactTab() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card data-testid="crm-phone-chart-hot-index">
+          <div className="grid grid-cols-1 gap-4">
+            <Card data-testid="crm-phone-chart-calls-temp">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Hot Index vs Calls</CardTitle>
+                <CardTitle className="text-sm font-medium">Calls & Temperature Trend</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
+                    <LineChart 
+                      data={data.data.sort((a, b) => a.date.localeCompare(b.date))} 
+                      margin={{ top: 10, right: 30, bottom: 20, left: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                       <XAxis 
-                        type="number" 
-                        dataKey="hotIndex" 
-                        name="Hot Index (CDD)" 
-                        tick={{ fontSize: 12 }}
-                        label={{ value: "CDD", position: "bottom", fontSize: 12 }}
+                        dataKey="date" 
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(value) => format(parseISO(value), "M/d")}
+                        interval="preserveStartEnd"
                       />
                       <YAxis 
-                        type="number" 
-                        dataKey="calls" 
-                        name="Calls" 
-                        tick={{ fontSize: 12 }}
-                        label={{ value: "Calls", angle: -90, position: "left", fontSize: 12 }}
+                        yAxisId="left"
+                        tick={{ fontSize: 11 }}
+                        label={{ value: "Calls", angle: -90, position: "insideLeft", fontSize: 11, fill: "#711419" }}
+                      />
+                      <YAxis 
+                        yAxisId="right"
+                        orientation="right"
+                        tick={{ fontSize: 11 }}
+                        label={{ value: "Temp (°F)", angle: 90, position: "insideRight", fontSize: 11, fill: "#3b82f6" }}
                       />
                       <RechartsTooltip 
-                        cursor={{ strokeDasharray: "3 3" }}
-                        content={({ active, payload }) => {
+                        content={({ active, payload, label }) => {
                           if (active && payload?.length) {
-                            const point = payload[0].payload as WeatherImpactDataPoint;
                             return (
                               <div className="bg-popover border rounded-md p-2 text-xs shadow-md">
-                                <p className="font-medium">{point.date}</p>
-                                <p>Calls: {point.calls}</p>
-                                <p>Hot Index: {point.hotIndex.toFixed(1)}</p>
-                                <p>Avg Temp: {point.avgTempF.toFixed(1)}°F</p>
+                                <p className="font-medium">{format(parseISO(label), "MMM d, yyyy")}</p>
+                                {payload.map((p, i) => (
+                                  <p key={i} style={{ color: p.color }}>
+                                    {p.name}: {typeof p.value === 'number' ? p.value.toFixed(1) : p.value}
+                                  </p>
+                                ))}
                               </div>
                             );
                           }
                           return null;
                         }}
                       />
-                      <Scatter 
-                        data={data.data.filter(d => d.hotIndex > 0)} 
-                        fill="#ef4444" 
-                        fillOpacity={0.6}
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Line 
+                        yAxisId="left"
+                        type="monotone" 
+                        dataKey="calls" 
+                        name="Calls"
+                        stroke="#711419" 
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
                       />
-                    </ScatterChart>
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="avgTempF" 
+                        name="Avg Temp"
+                        stroke="#3b82f6" 
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
 
-            <Card data-testid="crm-phone-chart-cold-index">
+            <Card data-testid="crm-phone-chart-weather-index">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Cold Index vs Calls</CardTitle>
+                <CardTitle className="text-sm font-medium">Weather Index Trend</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
+                    <LineChart 
+                      data={data.data.sort((a, b) => a.date.localeCompare(b.date))} 
+                      margin={{ top: 10, right: 30, bottom: 20, left: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                       <XAxis 
-                        type="number" 
-                        dataKey="coldIndex" 
-                        name="Cold Index (HDD)" 
-                        tick={{ fontSize: 12 }}
-                        label={{ value: "HDD", position: "bottom", fontSize: 12 }}
+                        dataKey="date" 
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(value) => format(parseISO(value), "M/d")}
+                        interval="preserveStartEnd"
                       />
                       <YAxis 
-                        type="number" 
-                        dataKey="calls" 
-                        name="Calls" 
-                        tick={{ fontSize: 12 }}
-                        label={{ value: "Calls", angle: -90, position: "left", fontSize: 12 }}
+                        yAxisId="left"
+                        tick={{ fontSize: 11 }}
+                        label={{ value: "Calls", angle: -90, position: "insideLeft", fontSize: 11, fill: "#711419" }}
+                      />
+                      <YAxis 
+                        yAxisId="right"
+                        orientation="right"
+                        tick={{ fontSize: 11 }}
+                        label={{ value: "Index", angle: 90, position: "insideRight", fontSize: 11, fill: "#64748b" }}
                       />
                       <RechartsTooltip 
-                        cursor={{ strokeDasharray: "3 3" }}
-                        content={({ active, payload }) => {
+                        content={({ active, payload, label }) => {
                           if (active && payload?.length) {
-                            const point = payload[0].payload as WeatherImpactDataPoint;
                             return (
                               <div className="bg-popover border rounded-md p-2 text-xs shadow-md">
-                                <p className="font-medium">{point.date}</p>
-                                <p>Calls: {point.calls}</p>
-                                <p>Cold Index: {point.coldIndex.toFixed(1)}</p>
-                                <p>Avg Temp: {point.avgTempF.toFixed(1)}°F</p>
+                                <p className="font-medium">{format(parseISO(label), "MMM d, yyyy")}</p>
+                                {payload.map((p, i) => (
+                                  <p key={i} style={{ color: p.color }}>
+                                    {p.name}: {typeof p.value === 'number' ? p.value.toFixed(1) : p.value}
+                                  </p>
+                                ))}
                               </div>
                             );
                           }
                           return null;
                         }}
                       />
-                      <Scatter 
-                        data={data.data.filter(d => d.coldIndex > 0)} 
-                        fill="#3b82f6" 
-                        fillOpacity={0.6}
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Line 
+                        yAxisId="left"
+                        type="monotone" 
+                        dataKey="calls" 
+                        name="Calls"
+                        stroke="#711419" 
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
                       />
-                    </ScatterChart>
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="hotIndex" 
+                        name="Hot Index (CDD)"
+                        stroke="#ef4444" 
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="coldIndex" 
+                        name="Cold Index (HDD)"
+                        stroke="#3b82f6" 
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
@@ -2647,7 +2701,7 @@ function WeatherImpactTab() {
           </div>
 
           <p className="text-xs text-muted-foreground text-center" data-testid="crm-phone-weather-impact-note">
-            Hot Index = CDD base 65°F, Cold Index = HDD base 65°F
+            Hot Index (CDD) = Cooling Degree Days above 65°F, Cold Index (HDD) = Heating Degree Days below 65°F
           </p>
         </>
       )}
