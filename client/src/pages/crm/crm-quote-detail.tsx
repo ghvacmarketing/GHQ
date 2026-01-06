@@ -2893,62 +2893,80 @@ export default function CrmQuoteDetail() {
                 </CardContent>
               </Card>
 
-              {/* Signature Section */}
-              <Card className="shadow-lg bg-slate-50 border-0">
-                <CardHeader className="bg-slate-50">
-                  <CardTitle className="text-lg">Accept Quote</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6 bg-slate-50">
-                  <PresentationSignaturePad onSignatureChange={setPresentationSignature} />
+              {/* Signature Section or Already Approved Message */}
+              {quote.status === "accepted" ? (
+                <Card className="shadow-lg bg-slate-50 border-0">
+                  <CardContent className="py-12 text-center bg-slate-50">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+                      <CheckCircle className="h-10 w-10 text-green-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Quote Already Approved</h2>
+                    <p className="text-slate-600 mb-4">
+                      Quote #{quote.quoteNumber} was accepted on {quote.acceptedAt ? format(new Date(quote.acceptedAt), "MMMM d, yyyy 'at' h:mm a") : "a previous date"}
+                      {quote.signerName && ` by ${quote.signerName}`}.
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      This quote has already been approved and cannot be signed again.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="shadow-lg bg-slate-50 border-0">
+                  <CardHeader className="bg-slate-50">
+                    <CardTitle className="text-lg">Accept Quote</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6 bg-slate-50">
+                    <PresentationSignaturePad onSignatureChange={setPresentationSignature} />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="presentation-name">Printed Name</Label>
-                    <Input
-                      id="presentation-name"
-                      value={presentationName}
-                      onChange={(e) => setPresentationName(e.target.value)}
-                      placeholder="Enter your full name"
-                      data-testid="input-presentation-name"
-                    />
-                  </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="presentation-name">Printed Name</Label>
+                      <Input
+                        id="presentation-name"
+                        value={presentationName}
+                        onChange={(e) => setPresentationName(e.target.value)}
+                        placeholder="Enter your full name"
+                        data-testid="input-presentation-name"
+                      />
+                    </div>
 
-                  <div className="flex items-start space-x-3">
-                    <Checkbox 
-                      id="presentation-terms" 
-                      checked={presentationAgreed}
-                      onCheckedChange={(checked) => setPresentationAgreed(checked === true)}
-                      data-testid="checkbox-presentation-terms"
-                    />
-                    <label 
-                      htmlFor="presentation-terms" 
-                      className="text-sm text-slate-600 leading-tight cursor-pointer"
+                    <div className="flex items-start space-x-3">
+                      <Checkbox 
+                        id="presentation-terms" 
+                        checked={presentationAgreed}
+                        onCheckedChange={(checked) => setPresentationAgreed(checked === true)}
+                        data-testid="checkbox-presentation-terms"
+                      />
+                      <label 
+                        htmlFor="presentation-terms" 
+                        className="text-sm text-slate-600 leading-tight cursor-pointer"
+                      >
+                        I agree to the terms and conditions of this quote. I authorize the work described above to be performed 
+                        and agree to pay the total amount upon completion of the work.
+                      </label>
+                    </div>
+
+                    <Button
+                      onClick={handlePresentationAccept}
+                      disabled={acceptInPersonMutation.isPending}
+                      className="w-full py-6 text-lg"
+                      style={{ backgroundColor: BRAND_COLOR }}
+                      data-testid="button-presentation-accept"
                     >
-                      I agree to the terms and conditions of this quote. I authorize the work described above to be performed 
-                      and agree to pay the total amount upon completion of the work.
-                    </label>
-                  </div>
-
-                  <Button
-                    onClick={handlePresentationAccept}
-                    disabled={acceptInPersonMutation.isPending}
-                    className="w-full py-6 text-lg"
-                    style={{ backgroundColor: BRAND_COLOR }}
-                    data-testid="button-presentation-accept"
-                  >
-                    {acceptInPersonMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-5 w-5 mr-2" />
-                        Accept Quote
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
+                      {acceptInPersonMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-5 w-5 mr-2" />
+                          Accept Quote
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </DialogContent>
