@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Search, Phone, MapPin, ChevronRight, Users } from "lucide-react";
+import { Search, Phone, MapPin, ChevronRight, Users, LogIn } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -99,19 +100,28 @@ export default function MobileCustomers() {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  const { data: customers, isLoading } = useQuery<CrmCustomer[]>({
-    queryKey: ["/api/crm/customers", { search: debouncedSearch, limit: 20 }],
+  const { data: customers, isLoading, error, isError } = useQuery<CrmCustomer[]>({
+    queryKey: ["/api/mobile/customers", { search: debouncedSearch, limit: 20 }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (debouncedSearch) params.set("search", debouncedSearch);
       params.set("limit", "20");
-      const res = await fetch(`/api/crm/customers?${params.toString()}`, {
+      const res = await fetch(`/api/mobile/customers?${params.toString()}`, {
         credentials: "include",
       });
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("AUTH_REQUIRED");
+      }
       if (!res.ok) throw new Error("Failed to fetch customers");
       return res.json();
     },
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.message === "AUTH_REQUIRED") return false;
+      return failureCount < 2;
+    },
   });
+  
+  const needsAuth = isError && error instanceof Error && error.message === "AUTH_REQUIRED";
 
   return (
     <MobileShell>
@@ -135,7 +145,25 @@ export default function MobileCustomers() {
         </div>
 
         <div className="space-y-3">
-          {isLoading ? (
+          {needsAuth ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center" data-testid="auth-required-state">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
+                style={{ backgroundColor: `${BRAND_COLOR}15` }}
+              >
+                <LogIn className="h-8 w-8" style={{ color: BRAND_COLOR }} />
+              </div>
+              <h3 className="text-lg font-medium text-slate-800 mb-1">Login Required</h3>
+              <p className="text-sm text-slate-500 mb-4">
+                Please log in to access customer lookup
+              </p>
+              <Link href="/crm/login">
+                <Button style={{ backgroundColor: BRAND_COLOR }} data-testid="btn-login">
+                  Go to Login
+                </Button>
+              </Link>
+            </div>
+          ) : isLoading ? (
             <>
               <CustomerCardSkeleton />
               <CustomerCardSkeleton />

@@ -18525,6 +18525,26 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // GET /api/mobile/customers - Mobile customer lookup (for field technicians)
+  app.get("/api/mobile/customers", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { search, limit = "20" } = req.query as Record<string, string | undefined>;
+      const limitNum = Math.min(50, Math.max(1, parseInt(limit || "20") || 20));
+      const searchTerm = search?.trim() || "";
+      
+      // If no search term, return empty (don't load all customers)
+      if (!searchTerm) {
+        return res.json([]);
+      }
+
+      const customers = await storage.searchCrmCustomers(searchTerm, limitNum);
+      return res.json(customers);
+    } catch (error) {
+      console.error("Error fetching mobile customers:", error);
+      return res.status(500).json({ message: "Failed to fetch customers" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)
