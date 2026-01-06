@@ -10435,11 +10435,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData: Partial<InsertCrmWorkOrder> = {};
       if (status !== undefined) updateData.status = status;
       
-      // Record status change timestamps for time tracking
-      if (status === "dispatched" && existingWorkOrder.status !== "dispatched") {
+      // Record status change timestamps for time tracking (only if not already set)
+      if (status === "dispatched" && existingWorkOrder.status !== "dispatched" && !existingWorkOrder.dispatchedAt) {
         updateData.dispatchedAt = new Date();
       }
-      if (status === "on_site" && existingWorkOrder.status !== "on_site") {
+      if (status === "on_site" && existingWorkOrder.status !== "on_site" && !existingWorkOrder.onSiteAt) {
         updateData.onSiteAt = new Date();
       }
       
@@ -18398,16 +18398,30 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       // Get all time entries in the date range
       const timeEntries = await storage.getTimeEntries({ startDate: start, endDate: end });
 
-      // Get all completed work orders with timing data in the date range
+      // Get work orders with timing data that overlap the date range
+      // Include work orders where any timing window (dispatch/onsite/complete) intersects range
       const workOrders = await db.select()
         .from(crmWorkOrders)
         .where(
-          and(
-            isNotNull(crmWorkOrders.dispatchedAt),
-            isNotNull(crmWorkOrders.onSiteAt),
-            isNotNull(crmWorkOrders.completedAt),
-            gte(crmWorkOrders.dispatchedAt, start),
-            lte(crmWorkOrders.dispatchedAt, end)
+          or(
+            // Dispatched within range
+            and(
+              isNotNull(crmWorkOrders.dispatchedAt),
+              gte(crmWorkOrders.dispatchedAt, start),
+              lte(crmWorkOrders.dispatchedAt, end)
+            ),
+            // On-site within range
+            and(
+              isNotNull(crmWorkOrders.onSiteAt),
+              gte(crmWorkOrders.onSiteAt, start),
+              lte(crmWorkOrders.onSiteAt, end)
+            ),
+            // Completed within range
+            and(
+              isNotNull(crmWorkOrders.completedAt),
+              gte(crmWorkOrders.completedAt, start),
+              lte(crmWorkOrders.completedAt, end)
+            )
           )
         );
 
@@ -18420,34 +18434,56 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         // Get time entries for this tech
         const techTimeEntries = timeEntries.filter(e => e.technicianId === tech.id);
         
-        // Calculate total clocked time in minutes
+        // Calculate total clocked time in minutes (skip entries without clock-out)
         let totalClockedMinutes = 0;
         for (const entry of techTimeEntries) {
           if (entry.durationMinutes) {
             totalClockedMinutes += entry.durationMinutes;
           } else if (entry.clockOutAt) {
-            totalClockedMinutes += Math.floor((entry.clockOutAt.getTime() - entry.clockInAt.getTime()) / 60000);
+            const duration = Math.floor((entry.clockOutAt.getTime() - entry.clockInAt.getTime()) / 60000);
+            if (duration > 0) totalClockedMinutes += duration;
           }
+          // Skip entries without clock-out (still in progress)
         }
 
         // Get work orders for this tech
         const techWorkOrders = workOrders.filter(wo => wo.assignedTechId === tech.id);
 
         // Calculate drive time (dispatchedAt to onSiteAt) in minutes
-        let driveTimeMinutes = 0;
+        let rawDriveTimeMinutes = 0;
         for (const wo of techWorkOrders) {
           if (wo.dispatchedAt && wo.onSiteAt) {
-            driveTimeMinutes += Math.floor((wo.onSiteAt.getTime() - wo.dispatchedAt.getTime()) / 60000);
+            const duration = Math.floor((wo.onSiteAt.getTime() - wo.dispatchedAt.getTime()) / 60000);
+            if (duration > 0) rawDriveTimeMinutes += duration;
           }
         }
 
         // Calculate work time (onSiteAt to completedAt) in minutes
-        let workTimeMinutes = 0;
+        let rawWorkTimeMinutes = 0;
         for (const wo of techWorkOrders) {
           if (wo.onSiteAt && wo.completedAt) {
-            workTimeMinutes += Math.floor((wo.completedAt.getTime() - wo.onSiteAt.getTime()) / 60000);
+            const duration = Math.floor((wo.completedAt.getTime() - wo.onSiteAt.getTime()) / 60000);
+            if (duration > 0) rawWorkTimeMinutes += duration;
           }
         }
+
+        // Clamp drive + work time to not exceed total clocked time
+        let driveTimeMinutes = 0;
+        let workTimeMinutes = 0;
+        
+        if (totalClockedMinutes > 0) {
+          const totalActiveMinutes = rawDriveTimeMinutes + rawWorkTimeMinutes;
+          if (totalActiveMinutes > totalClockedMinutes) {
+            // Scale down proportionally if active time exceeds clocked time
+            const ratio = totalClockedMinutes / totalActiveMinutes;
+            driveTimeMinutes = Math.floor(rawDriveTimeMinutes * ratio);
+            workTimeMinutes = Math.floor(rawWorkTimeMinutes * ratio);
+          } else {
+            driveTimeMinutes = rawDriveTimeMinutes;
+            workTimeMinutes = rawWorkTimeMinutes;
+          }
+        }
+        // If no clock data, drive/work stay at 0
 
         // Idle time = total clocked time - drive time - work time
         const idleTimeMinutes = Math.max(0, totalClockedMinutes - driveTimeMinutes - workTimeMinutes);
@@ -18460,14 +18496,14 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           driveTimeMinutes,
           workTimeMinutes,
           idleTimeMinutes,
-          workOrdersCompleted: techWorkOrders.length,
+          workOrdersCompleted: techWorkOrders.filter(wo => wo.status === "completed").length,
           // Also include daily breakdown
           entries: techTimeEntries.map(e => ({
             id: e.id,
             date: e.clockInAt.toISOString().split('T')[0],
             clockInAt: e.clockInAt,
             clockOutAt: e.clockOutAt,
-            durationMinutes: e.durationMinutes || (e.clockOutAt ? Math.floor((e.clockOutAt.getTime() - e.clockInAt.getTime()) / 60000) : 0),
+            durationMinutes: e.durationMinutes || (e.clockOutAt ? Math.max(0, Math.floor((e.clockOutAt.getTime() - e.clockInAt.getTime()) / 60000)) : 0),
           })),
         };
       });
