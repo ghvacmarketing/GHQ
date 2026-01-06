@@ -201,6 +201,83 @@ function formatPresentationDate(dateString: string | Date | null | undefined): s
   }).format(date);
 }
 
+interface EquipmentImages {
+  outdoor?: string;
+  coil?: string;
+  furnace?: string;
+  thermostat?: string;
+}
+
+function parseEquipmentImages(imageUrl: string | null | undefined): EquipmentImages | null {
+  if (!imageUrl) return null;
+  try {
+    const parsed = JSON.parse(imageUrl);
+    if (typeof parsed === 'object' && parsed !== null) {
+      return parsed as EquipmentImages;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function PresentationEquipmentImageGrid({ images }: { images: EquipmentImages }) {
+  const imageItems = [
+    { key: 'outdoor', url: images.outdoor, label: 'Outdoor' },
+    { key: 'coil', url: images.coil, label: 'Coil' },
+    { key: 'furnace', url: images.furnace, label: 'Indoor' },
+    { key: 'thermostat', url: images.thermostat, label: 'T-stat' },
+  ].filter(item => item.url);
+
+  if (imageItems.length === 0) return null;
+
+  return (
+    <div className={`grid ${imageItems.length <= 2 ? 'grid-cols-2' : 'grid-cols-4'} gap-1`}>
+      {imageItems.map(item => (
+        <div key={item.key} className="flex flex-col items-center">
+          <img
+            src={item.url}
+            alt={item.label}
+            className="w-12 h-12 object-contain border border-slate-200 rounded bg-white"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+          <span className="text-[10px] text-slate-500 mt-0.5">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface WhatsIncludedItem {
+  category: string;
+  items: string[];
+}
+
+interface WhatsIncludedResult {
+  categoryTitle: string;
+  items: string[];
+}
+
+function getWhatsIncludedForOption(
+  optionTag: string, 
+  whatsIncluded: WhatsIncludedItem[] | undefined
+): WhatsIncludedResult {
+  if (!whatsIncluded || !Array.isArray(whatsIncluded)) return { categoryTitle: "", items: [] };
+  
+  const normalizedTag = optionTag.toLowerCase().trim();
+  
+  const match = whatsIncluded.find(item => {
+    const normalizedCategory = item.category.toLowerCase();
+    return normalizedCategory.includes(normalizedTag) || 
+           normalizedCategory.startsWith(normalizedTag);
+  });
+  
+  return {
+    categoryTitle: match?.category || "",
+    items: match?.items || []
+  };
+}
+
 function PresentationSignaturePad({ onSignatureChange }: { onSignatureChange: (dataUrl: string) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -2666,6 +2743,10 @@ export default function CrmQuoteDetail() {
                       <div className="space-y-3 sm:space-y-4">
                         {groupLineItemsByOption(quote.lineItems).map((option) => {
                           const isSelected = presentationSelectedOption === option.tag;
+                          const whatsIncluded = getWhatsIncludedForOption(
+                            option.tag, 
+                            quote.aiGeneratedQuote?.whats_included as WhatsIncludedItem[] | undefined
+                          );
                           return (
                             <div 
                               key={option.tag} 
@@ -2689,17 +2770,63 @@ export default function CrmQuoteDetail() {
                                 <span className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatPresentationCurrency(option.total)}</span>
                               </div>
                               <div className="p-3 sm:p-4">
-                                {option.items.map((item) => (
-                                  <div key={item.id} className="py-2 border-b border-slate-100 last:border-0">
-                                    <div className="flex justify-between items-center">
-                                      <div className="font-medium text-slate-800 text-sm sm:text-base">{item.description}</div>
-                                      <span className="font-medium text-slate-800">{formatPresentationCurrency(item.lineTotal)}</span>
-                                    </div>
-                                    {item.partNumber && (
-                                      <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
-                                    )}
+                                {/* Show AI-generated category title if available */}
+                                {whatsIncluded.categoryTitle && (
+                                  <div className="mb-3 pb-2 border-b border-slate-200">
+                                    <p className="font-semibold text-slate-800 text-sm sm:text-base">{whatsIncluded.categoryTitle}</p>
                                   </div>
-                                ))}
+                                )}
+                                
+                                {option.items.map((item) => {
+                                  const equipmentImages = parseEquipmentImages(item.imageUrl);
+                                  return (
+                                    <div key={item.id} className="py-2 border-b border-slate-100 last:border-0">
+                                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                                        {equipmentImages ? (
+                                          <div className="flex-shrink-0">
+                                            <PresentationEquipmentImageGrid images={equipmentImages} />
+                                          </div>
+                                        ) : item.imageUrl && !item.imageUrl.startsWith('{') && (
+                                          <div className="flex-shrink-0">
+                                            <img 
+                                              src={item.imageUrl} 
+                                              alt={item.description}
+                                              className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-slate-200"
+                                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                            />
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          {/* Only show line item description if no AI category title */}
+                                          {!whatsIncluded.categoryTitle && (
+                                            <div className="font-medium text-slate-800 text-sm sm:text-base">{item.description}</div>
+                                          )}
+                                          {item.partNumber && (
+                                            <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
+                                          )}
+                                          <div className="flex justify-between items-center mt-1 text-sm text-slate-600">
+                                            <span>Qty: {parseFloat(item.quantity || "1")}</span>
+                                            <span className="font-medium text-slate-800">{formatPresentationCurrency(item.lineTotal)}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                
+                                {whatsIncluded.items.length > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-slate-200">
+                                    <p className="text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">What's Included:</p>
+                                    <ul className="space-y-1">
+                                      {whatsIncluded.items.map((incItem, idx) => (
+                                        <li key={idx} className="flex items-start gap-2 text-sm text-slate-600">
+                                          <span className="text-[#711419] mt-0.5">•</span>
+                                          <span>{incItem}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
