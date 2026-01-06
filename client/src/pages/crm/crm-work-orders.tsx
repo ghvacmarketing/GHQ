@@ -1137,35 +1137,23 @@ export default function CrmWorkOrders() {
                               <CardContent className="p-3">
                                 <div className="flex items-start justify-between gap-2 mb-2">
                                   <p className="font-semibold text-slate-900 text-sm truncate flex-1">
-                                    WO-{wo.workOrderNumber}
+                                    {wo.customer?.name || "—"}
                                   </p>
                                   <Badge className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} text-xs shrink-0`}>
                                     {statusLabels[wo.status]}
                                   </Badge>
                                 </div>
                                 
-                                <p className="text-xs text-slate-600 truncate mb-2">
-                                  {wo.customer?.name || "—"}
-                                </p>
-
-                                <div className="space-y-1 text-xs">
-                                  <div className="flex items-center gap-1.5 text-slate-600">
-                                    <CalendarIcon className="h-3 w-3 shrink-0" />
-                                    <span>
-                                      {wo.scheduledStart ? formatDate(wo.scheduledStart) : "Not scheduled"}
-                                    </span>
-                                  </div>
-                                </div>
+                                {wo.workSubtype && wo.workSubtype !== "Other" && (
+                                  <p className="text-xs text-slate-600 truncate mb-2">
+                                    {wo.workSubtype}
+                                  </p>
+                                )}
 
                                 <div className="flex items-center gap-1.5 mt-2 pt-2 border-t">
                                   <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`}>
                                     {visitTypeLabels[wo.visitType || "SERVICE"]}
                                   </Badge>
-                                  {wo.workSubtype && wo.workSubtype !== "Other" && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {wo.workSubtype}
-                                    </Badge>
-                                  )}
                                   {wo.priority && wo.priority !== "normal" && (
                                     <Badge className="bg-orange-100 text-orange-700 text-xs">
                                       {wo.priority.charAt(0).toUpperCase() + wo.priority.slice(1)}
@@ -1198,8 +1186,8 @@ export default function CrmWorkOrders() {
                 >
                   <CardContent className="p-3">
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <p className="font-semibold text-slate-900 text-sm" data-testid={`text-wo-number-${wo.id}`}>
-                        WO-{wo.workOrderNumber}
+                      <p className="font-semibold text-slate-900 text-sm truncate flex-1" data-testid={`text-wo-customer-${wo.id}`}>
+                        {wo.customer?.name || "—"}
                       </p>
                       <Badge 
                         className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} text-xs shrink-0`}
@@ -1209,19 +1197,16 @@ export default function CrmWorkOrders() {
                       </Badge>
                     </div>
 
-                    <p className="text-xs text-slate-600 truncate mb-2" data-testid={`text-wo-customer-${wo.id}`}>
-                      {wo.customer?.name || "—"}
-                    </p>
+                    {wo.workSubtype && wo.workSubtype !== "Other" && (
+                      <p className="text-xs text-slate-600 truncate mb-2" data-testid={`text-wo-subtype-${wo.id}`}>
+                        {wo.workSubtype}
+                      </p>
+                    )}
 
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`} data-testid={`badge-visit-type-${wo.id}`}>
                         {visitTypeLabels[wo.visitType || "SERVICE"]}
                       </Badge>
-                      {wo.workSubtype && wo.workSubtype !== "Other" && (
-                        <Badge variant="outline" className="text-xs" data-testid={`badge-subtype-${wo.id}`}>
-                          {wo.workSubtype}
-                        </Badge>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
