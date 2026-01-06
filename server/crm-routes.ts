@@ -84,6 +84,7 @@ router.post("/auth/login", async (req: Request, res: Response) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
+      path: "/",
       maxAge: 8 * 60 * 60 * 1000,
     });
 
@@ -107,7 +108,7 @@ router.post("/auth/logout", requireCrmAuth, async (req: Request, res: Response) 
 
     await logCrmAudit(req.crmUser?.id || null, "logout", "user", req.crmUser?.id || null, {}, req.ip);
 
-    res.clearCookie("crm_session");
+    res.clearCookie("crm_session", { path: "/" });
     return res.json({ message: "Logged out successfully" });
   } catch (error) {
     console.error("Logout error:", error);
