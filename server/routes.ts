@@ -10229,10 +10229,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Convert date strings to Date objects before validation
+      // Use fromZonedTime to properly convert local time strings to UTC
+      // (the client sends times in EST without timezone suffix)
       const bodyWithDates = {
         ...req.body,
-        scheduledStart: req.body.scheduledStart ? new Date(req.body.scheduledStart) : undefined,
-        scheduledEnd: req.body.scheduledEnd ? new Date(req.body.scheduledEnd) : undefined,
+        scheduledStart: req.body.scheduledStart 
+          ? fromZonedTime(new Date(req.body.scheduledStart), APP_TIMEZONE)
+          : undefined,
+        scheduledEnd: req.body.scheduledEnd 
+          ? fromZonedTime(new Date(req.body.scheduledEnd), APP_TIMEZONE)
+          : undefined,
         startedAt: req.body.startedAt ? new Date(req.body.startedAt) : undefined,
         completedAt: req.body.completedAt ? new Date(req.body.completedAt) : undefined,
       };
