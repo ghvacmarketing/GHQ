@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { ArrowLeft, X, FileText, CheckCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, X, FileText, CheckCircle, Loader2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,6 +51,10 @@ export default function MobileQuotePresent() {
   const [signature, setSignature] = useState("");
   const [printedName, setPrintedName] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [paymentLinkLoading, setPaymentLinkLoading] = useState(false);
+
+  // Quote types that require 50% deposit payment
+  const DEPOSIT_QUOTE_TYPES = ["custom_install", "proposal", "custom_service"];
 
   const { data: quote, isLoading, error } = useQuery<QuoteWithLineItems>({
     queryKey: ["/api/crm/quotes", id],
@@ -125,6 +129,59 @@ export default function MobileQuotePresent() {
     navigate(`/mobile/quotes/${id}`);
   };
 
+  const handlePayDeposit = async () => {
+    if (!quote?.id) return;
+    
+    // Validate signature and name before proceeding to payment
+    if (!signature) {
+      toast({ title: "Signature Required", description: "Please have the client sign above.", variant: "destructive" });
+      return;
+    }
+    if (!printedName.trim()) {
+      toast({ title: "Name Required", description: "Please enter the client's printed name.", variant: "destructive" });
+      return;
+    }
+    if (!agreedToTerms) {
+      toast({ title: "Terms Required", description: "Please agree to the terms and conditions.", variant: "destructive" });
+      return;
+    }
+    if (quote?.quoteMode === "options" && !selectedOption) {
+      toast({ title: "Selection Required", description: "Please select one of the available options.", variant: "destructive" });
+      return;
+    }
+    
+    setPaymentLinkLoading(true);
+    try {
+      const response = await fetch(`/api/stripe/quote/${quote.id}/payment-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ 
+          selectedOption,
+          signatureImage: signature,
+          signerName: printedName.trim(),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create payment link");
+      }
+      
+      // Redirect to Stripe payment page
+      if (data.paymentLinkUrl) {
+        window.location.href = data.paymentLinkUrl;
+      }
+    } catch (error: any) {
+      toast({ 
+        title: "Payment Error", 
+        description: error.message || "Failed to generate payment link", 
+        variant: "destructive" 
+      });
+    } finally {
+      setPaymentLinkLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <MobileShell>
@@ -156,6 +213,7 @@ export default function MobileQuotePresent() {
   }
 
   const isAlreadyAccepted = quote.status === "accepted";
+  const isDepositQuote = DEPOSIT_QUOTE_TYPES.includes(quote.quoteType?.toLowerCase() || "");
 
   return (
     <MobileShell>
@@ -430,25 +488,51 @@ export default function MobileQuotePresent() {
                   </label>
                 </div>
 
-                <Button
-                  onClick={handleAcceptQuote}
-                  disabled={acceptInPersonMutation.isPending}
-                  className="w-full min-h-[56px] text-lg"
-                  style={{ backgroundColor: BRAND_COLOR }}
-                  data-testid="button-accept-quote"
-                >
-                  {acceptInPersonMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-5 w-5 mr-2" />
-                      Accept Quote
-                    </>
-                  )}
-                </Button>
+                {isDepositQuote ? (
+                  <div className="space-y-3">
+                    <Button
+                      onClick={handlePayDeposit}
+                      disabled={paymentLinkLoading || (quote.quoteMode === "options" && !selectedOption)}
+                      className="w-full min-h-[56px] text-lg bg-green-600 hover:bg-green-700"
+                      data-testid="button-pay-deposit"
+                    >
+                      {paymentLinkLoading ? (
+                        <>
+                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                          Generating Payment Link...
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="h-5 w-5 mr-2" />
+                          Pay 50% Deposit Now
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-center text-amber-600">
+                      Secure payment powered by Stripe. Remaining balance due upon completion.
+                    </p>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={handleAcceptQuote}
+                    disabled={acceptInPersonMutation.isPending}
+                    className="w-full min-h-[56px] text-lg"
+                    style={{ backgroundColor: BRAND_COLOR }}
+                    data-testid="button-accept-quote"
+                  >
+                    {acceptInPersonMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-5 w-5 mr-2" />
+                        Accept Quote
+                      </>
+                    )}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
