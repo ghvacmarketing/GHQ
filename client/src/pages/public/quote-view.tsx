@@ -412,6 +412,7 @@ export default function PublicQuoteView() {
       const response = await fetch(`/api/stripe/quote/${quote.id}/payment-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selectedOption }),
       });
       if (response.ok) {
         const result = await response.json();
@@ -796,29 +797,34 @@ export default function PublicQuoteView() {
               </label>
             </div>
 
-            <Button
-              onClick={handleSubmit}
-              disabled={signMutation.isPending || !signatureData || !printedName.trim() || !agreedToTerms || (quoteData.quoteMode === "options" && !selectedOption)}
-              className="w-full py-6 text-lg font-semibold"
-              style={{ backgroundColor: BRAND_COLOR }}
-              data-testid="button-accept-quote"
-            >
-              {signMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                "Accept Quote"
-              )}
-            </Button>
+            {/* Accept Quote button - only shown when terms are agreed */}
+            {agreedToTerms && (
+              <>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={signMutation.isPending || !signatureData || !printedName.trim() || (quoteData.quoteMode === "options" && !selectedOption)}
+                  className="w-full py-6 text-lg font-semibold"
+                  style={{ backgroundColor: BRAND_COLOR }}
+                  data-testid="button-accept-quote"
+                >
+                  {signMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Accept Quote"
+                  )}
+                </Button>
 
-            <p className="text-xs text-center text-slate-500">
-              By clicking "Accept Quote", you are electronically signing this agreement.
-            </p>
+                <p className="text-xs text-center text-slate-500">
+                  By clicking "Accept Quote", you are electronically signing this agreement.
+                </p>
+              </>
+            )}
 
-            {/* 50% Deposit Payment Link for Install Quotes */}
-            {isInstallQuote && (
+            {/* 50% Deposit Payment Link for Install Quotes - only shown when terms are agreed */}
+            {isInstallQuote && agreedToTerms && (
               <div className="mt-4 pt-4 border-t border-slate-200">
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
@@ -830,8 +836,8 @@ export default function PublicQuoteView() {
                   </p>
                   <Button
                     onClick={handlePayDeposit}
-                    disabled={paymentLinkLoading}
-                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-semibold"
+                    disabled={paymentLinkLoading || (quoteData.quoteMode === "options" && !selectedOption)}
+                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-semibold disabled:bg-slate-300"
                     data-testid="button-pay-deposit"
                   >
                     {paymentLinkLoading ? (

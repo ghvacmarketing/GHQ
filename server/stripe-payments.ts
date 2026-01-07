@@ -2,7 +2,7 @@ import { Router } from "express";
 import { getUncachableStripeClient } from "./stripeClient";
 import { storage } from "./storage";
 import { db } from "./db";
-import { crmQuotes, crmInvoices } from "@shared/schema";
+import { crmQuotes, crmInvoices, crmQuoteLineItems } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -29,7 +29,7 @@ const PAYMENT_LINK_TYPES = ["custom_install", "proposal", "custom_service"];
 router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
   try {
     const { quoteId } = req.params;
-    const { depositOverride } = req.body; // Optional override for deposit percentage
+    const { depositOverride, selectedOption } = req.body; // Optional override for deposit percentage and selected option
 
     // Get the quote
     const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, quoteId));
@@ -45,7 +45,22 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
       });
     }
 
-    const total = parseFloat(quote.total?.toString() || "0");
+    // Determine the total to use for deposit calculation
+    let total = parseFloat(quote.total?.toString() || "0");
+    let optionDescription = quote.title || 'HVAC Installation';
+    
+    // If a selectedOption is provided, calculate deposit from that option's total only
+    if (selectedOption) {
+      const lineItems = await db.select().from(crmQuoteLineItems).where(eq(crmQuoteLineItems.quoteId, quoteId));
+      const optionItems = lineItems.filter(item => item.optionTag === selectedOption);
+      
+      if (optionItems.length > 0) {
+        // Sum the line totals for the selected option
+        total = optionItems.reduce((sum, item) => sum + parseFloat(item.lineTotal?.toString() || "0"), 0);
+        optionDescription = `${selectedOption} - ${quote.title || 'HVAC Installation'}`;
+      }
+    }
+
     if (total <= 0) {
       return res.status(400).json({ error: "Quote total must be greater than 0" });
     }
@@ -64,7 +79,7 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
             currency: 'usd',
             product_data: {
               name: `Deposit for Quote #${quote.quoteNumber}`,
-              description: `${depositPct}% deposit for ${quote.title || 'HVAC Installation'}`,
+              description: `${depositPct}% deposit for ${optionDescription}`,
             },
             unit_amount: depositAmount,
           },
@@ -76,6 +91,7 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
         quoteNumber: quote.quoteNumber,
         type: 'quote_deposit',
         depositPercentage: depositPct.toString(),
+        selectedOption: selectedOption || '',
       },
       after_completion: {
         type: 'redirect',
