@@ -47,7 +47,7 @@ async function generateInvoiceNumber(): Promise<string> {
   return `INV-${year}-${String(count).padStart(5, "0")}`;
 }
 
-async function processAgreementRenewal(agreement: CrmAgreement): Promise<RenewalResult> {
+export async function processSingleAgreementRenewal(agreement: CrmAgreement): Promise<RenewalResult> {
   const result: RenewalResult = {
     agreementId: agreement.id,
     agreementNumber: agreement.agreementNumber,
@@ -203,7 +203,7 @@ export async function processAgreementRenewals(): Promise<DailyRenewalSummary> {
     console.log(`[AgreementRenewal] Found ${dueAgreements.length} agreements due for renewal`);
 
     for (const agreement of dueAgreements) {
-      const result = await processAgreementRenewal(agreement);
+      const result = await processSingleAgreementRenewal(agreement);
       summary.results.push(result);
       summary.agreementsProcessed++;
       

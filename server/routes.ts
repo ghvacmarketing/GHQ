@@ -11432,36 +11432,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/crm/agreements/process-renewals - Manually trigger agreement renewal processing
-  app.post("/api/crm/agreements/process-renewals", requireCrmSalesOrAbove, async (req, res) => {
+  // POST /api/crm/agreements/:id/send-invoice - Send renewal invoice for a single agreement
+  app.post("/api/crm/agreements/:id/send-invoice", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      console.log(`[AgreementRenewal] Manual trigger by ${user.email}`);
+      const agreementId = req.params.id;
       
-      const summary = await processAgreementRenewals();
+      const [agreement] = await db
+        .select()
+        .from(crmAgreements)
+        .where(eq(crmAgreements.id, agreementId));
+
+      if (!agreement) {
+        return res.status(404).json({ message: "Agreement not found" });
+      }
+
+      console.log(`[AgreementRenewal] Manual invoice send for agreement ${agreement.agreementNumber} by ${user.email}`);
+      
+      const { processSingleAgreementRenewal } = await import("./services/agreementRenewalService");
+      const result = await processSingleAgreementRenewal(agreement);
       
       await logCrmAudit(
         user.id,
-        "agreement.renewal_processed",
-        "system",
-        null,
+        "agreement.invoice_sent",
+        "agreement",
+        agreementId,
         { 
-          agreementsProcessed: summary.agreementsProcessed,
-          invoicesCreated: summary.invoicesCreated,
-          emailsSent: summary.emailsSent,
-          errors: summary.errors
+          agreementNumber: agreement.agreementNumber,
+          invoiceNumber: result.invoiceNumber,
+          emailSent: result.emailSent,
+          error: result.error
         },
         req.ip
       );
 
-      return res.json(summary);
+      if (result.error) {
+        return res.status(500).json({ message: result.error, result });
+      }
+
+      return res.json(result);
     } catch (error) {
-      console.error("Error processing agreement renewals:", error);
-      return res.status(500).json({ message: "Failed to process agreement renewals" });
+      console.error("Error sending agreement invoice:", error);
+      return res.status(500).json({ message: "Failed to send agreement invoice" });
     }
   });
 

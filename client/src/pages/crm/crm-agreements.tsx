@@ -242,7 +242,7 @@ export default function CrmAgreements() {
 
   const canManageTypes = currentUser?.role === "admin" || currentUser?.role === "owner" || currentUser?.role === "sales";
   const isAdminOrOwner = currentUser?.role === "admin" || currentUser?.role === "owner";
-  const canProcessRenewals = ["owner", "admin", "supervisor", "sales"].includes(currentUser?.role || "");
+  const canSendInvoice = ["owner", "admin", "supervisor", "sales"].includes(currentUser?.role || "");
 
   const { data: customAgreementTypes = [], isLoading: typesLoading } = useQuery<CustomAgreementType[]>({
     queryKey: ["/api/crm/custom-agreement-types"],
@@ -301,21 +301,22 @@ export default function CrmAgreements() {
     },
   });
 
-  const processRenewalsMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/crm/agreements/process-renewals");
+  const sendInvoiceMutation = useMutation({
+    mutationFn: async (agreementId: string) => {
+      const res = await apiRequest("POST", `/api/crm/agreements/${agreementId}/send-invoice`);
       return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
-      const msg = data.agreementsProcessed === 0
-        ? "No agreements due for renewal today"
-        : `Processed ${data.agreementsProcessed} agreement(s): ${data.invoicesCreated} invoice(s) created, ${data.emailsSent} email(s) sent`;
-      toast({ title: "Renewal Processing Complete", description: msg });
+      const msg = data.emailSent 
+        ? `Invoice ${data.invoiceNumber} created and emailed to customer`
+        : `Invoice ${data.invoiceNumber} created (no email on file)`;
+      toast({ title: "Invoice Sent", description: msg });
+      setSelectedAgreement(null);
     },
     onError: () => {
-      toast({ title: "Failed to process renewals", variant: "destructive" });
+      toast({ title: "Failed to send invoice", variant: "destructive" });
     },
   });
 
@@ -670,19 +671,6 @@ export default function CrmAgreements() {
               >
                 <RotateCcw className="h-3 w-3 mr-1" />
                 Reset
-              </Button>
-            )}
-            {canProcessRenewals && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => processRenewalsMutation.mutate()}
-                disabled={processRenewalsMutation.isPending}
-                className="h-8 text-xs"
-                data-testid="button-process-renewals"
-              >
-                <RefreshCw className={`h-3 w-3 mr-1 ${processRenewalsMutation.isPending ? "animate-spin" : ""}`} />
-                {processRenewalsMutation.isPending ? "Processing..." : "Process Renewals"}
               </Button>
             )}
             <Button
@@ -1312,6 +1300,23 @@ export default function CrmAgreements() {
                     </div>
                   )}
                   <div className="flex justify-end gap-2 pt-4 border-t">
+                    {canSendInvoice && selectedAgreement.status === "active" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm(`Send a renewal invoice to ${selectedAgreement.customerName} for $${selectedAgreement.price || "0"}?`)) {
+                            sendInvoiceMutation.mutate(selectedAgreement.id);
+                          }
+                        }}
+                        disabled={sendInvoiceMutation.isPending}
+                        data-testid="button-send-invoice"
+                        className="text-[#711419] border-[#711419] hover:bg-[#711419]/10"
+                      >
+                        <FileCheck className="h-4 w-4 mr-1" />
+                        {sendInvoiceMutation.isPending ? "Sending..." : "Send Invoice"}
+                      </Button>
+                    )}
                     <Button
                       variant="destructive"
                       size="sm"
