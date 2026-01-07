@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, FileText, AlertCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard } from "lucide-react";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 import ghvacLogo from "@assets/ghvac-logo.png";
 
@@ -354,6 +354,9 @@ export default function PublicQuoteView() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isAccepted, setIsAccepted] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [paymentLinkUrl, setPaymentLinkUrl] = useState<string | null>(null);
+  const [paymentLinkLoading, setPaymentLinkLoading] = useState(false);
+  const [depositAmount, setDepositAmount] = useState<number>(0);
 
   const { data, isLoading, error } = useQuery<PublicQuoteData>({
     queryKey: ["/api/public/quotes", token],
@@ -458,6 +461,35 @@ export default function PublicQuoteView() {
   }
 
   const { quote, lineItems } = data;
+
+  // Fetch payment link for install quotes - must match backend PAYMENT_LINK_CATEGORIES
+  const paymentLinkCategories = ["custom install", "proposal builder", "custom service", "install"];
+  const isInstallQuote = paymentLinkCategories.includes(quote.quoteCategory?.toLowerCase() || "");
+  
+  useEffect(() => {
+    if (!isInstallQuote || !quote.id || quote.status === "accepted") return;
+    
+    const fetchPaymentLink = async () => {
+      setPaymentLinkLoading(true);
+      try {
+        const response = await fetch(`/api/stripe/quote/${quote.id}/payment-link`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (response.ok) {
+          const result = await response.json();
+          setPaymentLinkUrl(result.paymentLinkUrl);
+          setDepositAmount(result.depositAmount);
+        }
+      } catch (err) {
+        console.error("Failed to fetch payment link:", err);
+      } finally {
+        setPaymentLinkLoading(false);
+      }
+    };
+    
+    fetchPaymentLink();
+  }, [isInstallQuote, quote.id, quote.status]);
 
   if (quote.status === "accepted") {
     return <QuoteAlreadyAccepted quote={quote} />;
@@ -769,6 +801,47 @@ export default function PublicQuoteView() {
             <p className="text-xs text-center text-slate-500">
               By clicking "Accept Quote", you are electronically signing this agreement.
             </p>
+
+            {/* 50% Deposit Payment Link for Install Quotes */}
+            {isInstallQuote && (
+              <div className="mt-4 pt-4 border-t border-slate-200">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <CreditCard className="h-5 w-5 text-green-700" />
+                    <h4 className="font-semibold text-green-800">50% Deposit Payment</h4>
+                  </div>
+                  <p className="text-sm text-green-700 mb-3">
+                    A 50% deposit is required to schedule your installation.
+                  </p>
+                  {paymentLinkLoading ? (
+                    <Button disabled className="w-full sm:w-auto">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading Payment Link...
+                    </Button>
+                  ) : paymentLinkUrl ? (
+                    <a
+                      href={paymentLinkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block"
+                    >
+                      <Button
+                        className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-semibold"
+                        data-testid="button-pay-deposit"
+                      >
+                        <CreditCard className="mr-2 h-5 w-5" />
+                        Pay {formatCurrency(depositAmount)} Deposit
+                      </Button>
+                    </a>
+                  ) : (
+                    <p className="text-sm text-slate-500">
+                      Payment link will be available after signing. Contact us at (706) 826-0644 for payment options.
+                    </p>
+                  )}
+                  <p className="text-xs text-green-600 mt-2">Secure payment powered by Stripe</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
