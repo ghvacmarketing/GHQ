@@ -10301,6 +10301,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid work order data", errors: result.error.flatten() });
       }
 
+      // For MAINTENANCE visit types, verify property has an active maintenance agreement
+      if (result.data.visitType === "MAINTENANCE") {
+        const activeAgreement = await db.select()
+          .from(crmAgreements)
+          .where(and(
+            eq(crmAgreements.propertyId, propertyId),
+            or(
+              eq(crmAgreements.status, "active"),
+              eq(crmAgreements.status, "pending"),
+              eq(crmAgreements.status, "grace_period")
+            )
+          ))
+          .limit(1);
+        
+        if (activeAgreement.length === 0) {
+          return res.status(400).json({ 
+            message: "Cannot schedule maintenance work order",
+            error: "NO_MAINTENANCE_AGREEMENT",
+            details: "This property does not have an active maintenance agreement. Please create a maintenance agreement first or select a different visit type."
+          });
+        }
+      }
+
       // Check for scheduling conflicts
       const { assignedTechId, scheduledStart, scheduledEnd } = result.data;
       if (assignedTechId && scheduledStart && scheduledEnd) {

@@ -252,8 +252,19 @@ export default function MobileJob() {
         error?.message?.includes("Scheduling conflict") ||
         error?.status === 409;
       
+      // Check for no maintenance agreement error
+      const noAgreement = 
+        error?.data?.error === "NO_MAINTENANCE_AGREEMENT" ||
+        error?.message?.includes("NO_MAINTENANCE_AGREEMENT");
+      
       if (isConflict) {
         setConflictError("You already have a job scheduled at this time. Please choose a different time slot.");
+      } else if (noAgreement) {
+        toast({ 
+          title: "No Maintenance Agreement", 
+          description: error?.data?.details || "This property does not have an active maintenance agreement. Please select a different visit type.",
+          variant: "destructive" 
+        });
       } else {
         toast({ 
           title: "Failed to create work order", 

@@ -2197,7 +2197,7 @@ export default function CrmDispatch() {
       setCreateDialogOpen(false);
       resetCreateForm();
     },
-    onError: (error: Error & { error?: string; conflictingOrder?: { title?: string; scheduledStart?: string } }) => {
+    onError: (error: Error & { error?: string; details?: string; conflictingOrder?: { title?: string; scheduledStart?: string } }) => {
       // Handle scheduling conflict errors specifically
       if (error?.error === 'SCHEDULING_CONFLICT' || error?.message === 'Scheduling conflict') {
         const conflictInfo = error?.conflictingOrder;
@@ -2207,6 +2207,12 @@ export default function CrmDispatch() {
         toast({ 
           title: "Scheduling Conflict",
           description: `This technician already has "${conflictInfo?.title || 'a work order'}" scheduled at ${startTime}. You cannot schedule overlapping appointments.`,
+          variant: "destructive" 
+        });
+      } else if (error?.error === 'NO_MAINTENANCE_AGREEMENT') {
+        toast({ 
+          title: "No Maintenance Agreement",
+          description: error?.details || "This property does not have an active maintenance agreement. Please create one first or select a different visit type.",
           variant: "destructive" 
         });
       } else {
