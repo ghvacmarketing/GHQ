@@ -3002,6 +3002,7 @@ export default function MobileJobDetail() {
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionSummary, setCompletionSummary] = useState("");
   const [showInvoiceReminder, setShowInvoiceReminder] = useState(false);
+  const [invoiceReminderType, setInvoiceReminderType] = useState<"activation" | "renewal">("activation");
 
   const { data: workOrder, isLoading } = useQuery<WorkOrderDetail>({
     queryKey: ["/api/crm/work-orders", params.id],
@@ -3241,14 +3242,27 @@ export default function MobileJobDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
       toast({ title: "Status updated" });
       
-      // Show invoice reminder for first visit of pay-on-visit pending agreements
+      // Show invoice/renewal reminder for pay-on-visit agreements
+      const visitInfo = renewalInfo?.visitInfo;
+      const agreementInfo = renewalInfo?.agreementInfo;
       if (
-        variables.newStatus === "completed" &&
-        renewalInfo?.agreementInfo?.billingPreference === "pay_on_visit" &&
-        renewalInfo?.visitInfo?.visitNumber === 1 &&
-        renewalInfo?.agreementInfo?.status === "pending"
+        variables.newStatus === "completed" && 
+        visitInfo && 
+        agreementInfo?.billingPreference === "pay_on_visit"
       ) {
-        setShowInvoiceReminder(true);
+        // First visit of pending agreement - activation reminder
+        if (visitInfo.visitNumber === 1 && agreementInfo.status === "pending") {
+          setInvoiceReminderType("activation");
+          setShowInvoiceReminder(true);
+        }
+        // Last visit of cycle for active agreement - renewal reminder
+        else if (
+          visitInfo.visitNumber === visitInfo.totalVisitsInCycle &&
+          agreementInfo.status === "active"
+        ) {
+          setInvoiceReminderType("renewal");
+          setShowInvoiceReminder(true);
+        }
       }
     },
     onError: (error, variables) => {
@@ -3868,13 +3882,13 @@ export default function MobileJobDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Invoice Reminder Dialog for Pay-on-Visit First Visits */}
+      {/* Invoice/Renewal Reminder Dialog for Pay-on-Visit Agreements */}
       <Dialog open={showInvoiceReminder} onOpenChange={setShowInvoiceReminder}>
         <DialogContent className="sm:max-w-md" data-testid="invoice-reminder-dialog">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-amber-600" />
-              Invoice Reminder
+              {invoiceReminderType === "activation" ? "Invoice Reminder" : "Renewal Reminder"}
             </DialogTitle>
             <DialogDescription>
               This maintenance visit has been completed.
@@ -3883,7 +3897,9 @@ export default function MobileJobDetail() {
           <div className="py-4">
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
               <p className="text-sm text-amber-800 font-medium">
-                Don't forget to invoice the customer for their maintenance agreement!
+                {invoiceReminderType === "activation" 
+                  ? "Don't forget to invoice the customer for their maintenance agreement!" 
+                  : "This was the final visit of the cycle. Ask the customer if they'd like to renew their agreement."}
               </p>
               {renewalInfo?.agreementInfo && (
                 <div className="text-sm text-amber-700 space-y-1">
@@ -3893,15 +3909,51 @@ export default function MobileJobDetail() {
               )}
             </div>
           </div>
-          <DialogFooter>
-            <Button
-              onClick={() => setShowInvoiceReminder(false)}
-              className="min-h-[44px] w-full"
-              data-testid="button-dismiss-invoice-reminder"
-            >
-              <Check className="h-4 w-4 mr-2" />
-              Got it
-            </Button>
+          <DialogFooter className={invoiceReminderType === "renewal" ? "flex-col gap-2 sm:flex-col" : ""}>
+            {invoiceReminderType === "activation" ? (
+              <Button
+                onClick={() => setShowInvoiceReminder(false)}
+                className="min-h-[44px] w-full"
+                data-testid="button-dismiss-invoice-reminder"
+              >
+                <Check className="h-4 w-4 mr-2" />
+                Got it
+              </Button>
+            ) : (
+              <>
+                <Button
+                  onClick={() => {
+                    setShowInvoiceReminder(false);
+                    setShowCollectRenewalDialog(true);
+                  }}
+                  className="min-h-[44px] w-full bg-green-600 hover:bg-green-700"
+                  data-testid="button-invoice-renewal"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Invoice Renewal
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setShowInvoiceReminder(false);
+                    setShowDeclineRenewalDialog(true);
+                  }}
+                  className="min-h-[44px] w-full"
+                  data-testid="button-customer-declined"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Customer Declined
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowInvoiceReminder(false)}
+                  className="min-h-[44px] w-full"
+                  data-testid="button-dismiss-renewal-reminder"
+                >
+                  Remind Me Later
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
