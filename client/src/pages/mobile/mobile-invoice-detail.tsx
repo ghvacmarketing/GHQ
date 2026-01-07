@@ -94,6 +94,7 @@ export default function MobileInvoiceDetail() {
   const [paymentReference, setPaymentReference] = useState("");
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("");
+  const [isGeneratingPaymentLink, setIsGeneratingPaymentLink] = useState(false);
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -235,6 +236,44 @@ export default function MobileInvoiceDetail() {
   const confirmVoid = () => {
     voidMutation.mutate();
     setShowVoidConfirm(false);
+  };
+
+  const handleTakePayment = async () => {
+    if (!invoice || !id) return;
+    
+    const balanceDue = parseFloat(invoice.balanceDue || invoice.total || "0");
+    if (balanceDue <= 0) {
+      toast({ title: "No Balance Due", description: "This invoice has already been paid.", variant: "destructive" });
+      return;
+    }
+    
+    setIsGeneratingPaymentLink(true);
+    try {
+      const response = await fetch(`/api/stripe/invoice/${id}/payment-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to create payment link");
+      }
+      
+      if (result.paymentLinkUrl) {
+        window.location.href = result.paymentLinkUrl;
+      } else {
+        throw new Error("No payment link received");
+      }
+    } catch (error: any) {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to create payment link", 
+        variant: "destructive" 
+      });
+      setIsGeneratingPaymentLink(false);
+    }
   };
 
   const handleDownloadPDF = () => {
@@ -704,14 +743,29 @@ export default function MobileInvoiceDetail() {
           )}
 
           {canRecordPayment && (
-            <Button
-              className="w-full min-h-[48px] bg-green-600 hover:bg-green-700"
-              onClick={openPaymentDialog}
-              data-testid="button-record-payment"
-            >
-              <CreditCard className="h-4 w-4 mr-2" />
-              Record Payment
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 min-h-[48px] bg-green-600 hover:bg-green-700"
+                onClick={openPaymentDialog}
+                data-testid="button-record-payment"
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Record Cash/Check
+              </Button>
+              <Button
+                className="flex-1 min-h-[48px] bg-blue-600 hover:bg-blue-700"
+                onClick={handleTakePayment}
+                disabled={isGeneratingPaymentLink}
+                data-testid="button-take-payment"
+              >
+                {isGeneratingPaymentLink ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <CreditCard className="h-4 w-4 mr-2" />
+                )}
+                Take Payment
+              </Button>
+            </div>
           )}
 
           {canVoid && (
