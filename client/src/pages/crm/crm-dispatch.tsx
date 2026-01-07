@@ -1827,12 +1827,31 @@ export default function CrmDispatch() {
   // Query for active maintenance agreements when customer is selected
   interface ActiveAgreement {
     id: string;
+    agreementNumber: string | null;
+    agreementPlan: string | null;
     agreementType: string | null;
     status: string;
+    numberOfSystems: number | null;
+    agreementValue: string | null;
+    displayPrice: string;
     frequency: string | null;
     visitsPerPeriod: number | null;
     nextServiceDate: string | null;
+    nextInvoiceDate: string | null;
+    billingPreference: "auto_invoice" | "pay_on_visit" | null;
+    autoRenew: boolean | null;
+    contractDate: string | null;
+    endDate: string | null;
+    isInitialCycle: boolean | null;
+    notes: string | null;
     displayName: string;
+    visitProgress: {
+      completed: number;
+      scheduled: number;
+      total: number;
+      remaining: number;
+      lastVisitDate: string | null;
+    };
   }
 
   const { data: activeAgreements = [] } = useQuery<ActiveAgreement[]>({
@@ -3439,23 +3458,141 @@ export default function CrmDispatch() {
               </Popover>
             </div>
 
-            {/* Maintenance Agreement Info Display */}
+            {/* Maintenance Agreement Info Display - Enhanced */}
             {selectedCustomer && activeAgreements.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <FileText className="h-4 w-4 text-amber-600" />
-                  <span className="text-sm font-medium text-amber-800">Active Maintenance Agreement</span>
-                </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
                 {activeAgreements.map((agreement) => (
-                  <div key={agreement.id} className="text-sm text-amber-700">
-                    <p className="font-medium">{agreement.displayName}</p>
-                    <div className="flex flex-wrap gap-3 text-xs mt-1">
-                      {agreement.frequency && <span>Billing: {agreement.frequency}</span>}
-                      {agreement.visitsPerPeriod && <span>Visits: {agreement.visitsPerPeriod}/period</span>}
-                      {agreement.nextServiceDate && (
-                        <span>Next Service: {new Date(agreement.nextServiceDate).toLocaleDateString()}</span>
+                  <div key={agreement.id} className="p-3">
+                    {/* Header with status badge */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-amber-600" />
+                        <span className="text-sm font-semibold text-amber-800">Active Maintenance Agreement</span>
+                      </div>
+                      {agreement.billingPreference === "pay_on_visit" && (
+                        <span className="text-[10px] bg-orange-500 text-white px-2 py-0.5 rounded-full font-medium">
+                          Pay on Visit
+                        </span>
                       )}
                     </div>
+                    
+                    {/* Plan name and agreement number */}
+                    <div className="mb-3">
+                      <p className="font-semibold text-amber-900">{agreement.displayName}</p>
+                      {agreement.agreementNumber && (
+                        <p className="text-xs text-amber-600">{agreement.agreementNumber}</p>
+                      )}
+                    </div>
+
+                    {/* Two column layout */}
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      {/* Left column - Service Schedule */}
+                      <div className="space-y-1.5">
+                        <p className="font-semibold text-amber-800 text-[11px] uppercase tracking-wide">Service</p>
+                        
+                        {agreement.numberOfSystems && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Systems:</span>
+                            <span className="font-medium text-amber-800">{agreement.numberOfSystems}</span>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-between">
+                          <span className="text-amber-600">Visit Progress:</span>
+                          <span className="font-medium text-amber-800">
+                            {agreement.visitProgress.completed}/{agreement.visitProgress.total}
+                          </span>
+                        </div>
+                        
+                        {agreement.visitProgress.remaining > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Remaining:</span>
+                            <span className="font-medium text-amber-800">{agreement.visitProgress.remaining} visits</span>
+                          </div>
+                        )}
+                        
+                        {agreement.nextServiceDate && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Next Service:</span>
+                            <span className="font-medium text-amber-800">
+                              {new Date(agreement.nextServiceDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {agreement.visitProgress.lastVisitDate && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Last Visit:</span>
+                            <span className="font-medium text-amber-800">
+                              {new Date(agreement.visitProgress.lastVisitDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right column - Billing & Terms */}
+                      <div className="space-y-1.5">
+                        <p className="font-semibold text-amber-800 text-[11px] uppercase tracking-wide">Billing</p>
+                        
+                        <div className="flex justify-between">
+                          <span className="text-amber-600">Value:</span>
+                          <span className="font-medium text-amber-800">${parseFloat(agreement.displayPrice).toFixed(2)}</span>
+                        </div>
+                        
+                        {agreement.frequency && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Frequency:</span>
+                            <span className="font-medium text-amber-800 capitalize">{agreement.frequency}</span>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-between">
+                          <span className="text-amber-600">Billing:</span>
+                          <span className="font-medium text-amber-800">
+                            {agreement.billingPreference === "pay_on_visit" ? "On Visit" : "Auto Invoice"}
+                          </span>
+                        </div>
+                        
+                        {agreement.autoRenew !== null && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Auto Renew:</span>
+                            <span className="font-medium text-amber-800">{agreement.autoRenew ? "Yes" : "No"}</span>
+                          </div>
+                        )}
+                        
+                        {agreement.endDate && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Expires:</span>
+                            <span className="font-medium text-amber-800">
+                              {new Date(agreement.endDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Alerts section */}
+                    {agreement.billingPreference === "pay_on_visit" && agreement.visitProgress.completed === 0 && (
+                      <div className="mt-3 bg-orange-100 border border-orange-300 rounded p-2 text-xs text-orange-800">
+                        <span className="font-semibold">First Visit:</span> Collect ${parseFloat(agreement.displayPrice).toFixed(2)} payment on-site to activate agreement
+                      </div>
+                    )}
+                    
+                    {agreement.billingPreference === "pay_on_visit" && 
+                     agreement.visitProgress.remaining === 1 && 
+                     agreement.visitProgress.completed > 0 && (
+                      <div className="mt-3 bg-blue-100 border border-blue-300 rounded p-2 text-xs text-blue-800">
+                        <span className="font-semibold">Renewal Visit:</span> Last visit of cycle - collect renewal payment
+                      </div>
+                    )}
+                    
+                    {/* Notes (collapsible) */}
+                    {agreement.notes && (
+                      <div className="mt-3 pt-2 border-t border-amber-200">
+                        <p className="text-[10px] text-amber-600 uppercase font-medium mb-1">Notes</p>
+                        <p className="text-xs text-amber-700">{agreement.notes}</p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

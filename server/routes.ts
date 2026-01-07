@@ -9501,18 +9501,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const customerId = req.params.id;
       
-      // Get only active agreements for this customer
+      // Get only active agreements for this customer with full details
       const agreements = await db.select({
         id: crmAgreements.id,
+        agreementNumber: crmAgreements.agreementNumber,
+        agreementPlan: crmAgreements.agreementPlan,
         agreementType: crmAgreements.agreementType,
         customAgreementTypeId: crmAgreements.customAgreementTypeId,
         status: crmAgreements.status,
+        numberOfSystems: crmAgreements.numberOfSystems,
+        agreementValue: crmAgreements.agreementValue,
         startDate: crmAgreements.startDate,
         endDate: crmAgreements.endDate,
+        contractDate: crmAgreements.contractDate,
         price: crmAgreements.price,
         frequency: crmAgreements.frequency,
         visitsPerPeriod: crmAgreements.visitsPerPeriod,
         nextServiceDate: crmAgreements.nextServiceDate,
+        nextInvoiceDate: crmAgreements.nextInvoiceDate,
+        billingPreference: crmAgreements.billingPreference,
+        autoRenew: crmAgreements.autoRenew,
+        isInitialCycle: crmAgreements.isInitialCycle,
+        isActive: crmAgreements.isActive,
+        activationDate: crmAgreements.activationDate,
+        notes: crmAgreements.notes,
+        propertyId: crmAgreements.propertyId,
       })
         .from(crmAgreements)
         .where(and(
@@ -9521,10 +9534,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ))
         .orderBy(desc(crmAgreements.createdAt));
       
-      // For each agreement, get custom agreement type name if applicable
-      const agreementsWithNames = await Promise.all(
+      // For each agreement, get custom agreement type name and visit counts
+      const agreementsWithDetails = await Promise.all(
         agreements.map(async (agreement) => {
-          let displayName = agreement.agreementType || "Agreement";
+          let displayName = agreement.agreementPlan || agreement.agreementType || "Agreement";
           
           if (agreement.customAgreementTypeId) {
             const [customType] = await db.select({ name: customAgreementTypes.name })
@@ -9535,14 +9548,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
+          // Get visit counts for this agreement
+          const visits = await db.select({
+            id: maintenanceVisits.id,
+            status: maintenanceVisits.status,
+            visitNumber: maintenanceVisits.visitNumber,
+            scheduledDate: maintenanceVisits.scheduledDate,
+            completedDate: maintenanceVisits.completedDate,
+            cycleYear: maintenanceVisits.cycleYear,
+          })
+            .from(maintenanceVisits)
+            .where(eq(maintenanceVisits.agreementId, agreement.id));
+          
+          const currentYear = new Date().getFullYear();
+          const currentCycleVisits = visits.filter(v => v.cycleYear === currentYear);
+          const completedVisits = currentCycleVisits.filter(v => v.status === "completed").length;
+          const scheduledVisits = currentCycleVisits.filter(v => v.status === "scheduled" || v.status === "pending").length;
+          const totalVisits = agreement.visitsPerPeriod || 2;
+          
+          // Get last completed visit date
+          const completedVisitsSorted = visits
+            .filter(v => v.status === "completed" && v.completedDate)
+            .sort((a, b) => new Date(b.completedDate!).getTime() - new Date(a.completedDate!).getTime());
+          const lastVisitDate = completedVisitsSorted.length > 0 ? completedVisitsSorted[0].completedDate : null;
+          
+          // Calculate price to display (agreementValue or price field)
+          const displayPrice = agreement.agreementValue || agreement.price || "0.00";
+          
           return {
             ...agreement,
             displayName,
+            displayPrice,
+            visitProgress: {
+              completed: completedVisits,
+              scheduled: scheduledVisits,
+              total: totalVisits,
+              remaining: Math.max(0, totalVisits - completedVisits),
+              lastVisitDate,
+            },
           };
         })
       );
       
-      return res.json(agreementsWithNames);
+      return res.json(agreementsWithDetails);
     } catch (error) {
       console.error("Error fetching customer active agreements:", error);
       return res.status(500).json({ message: "Failed to fetch active agreements" });
