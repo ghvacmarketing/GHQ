@@ -478,12 +478,26 @@ export default function PublicQuoteView() {
   const handlePayDeposit = async () => {
     if (!quote?.id) return;
     
+    // Validate signature and name before proceeding to payment
+    if (!signatureData) {
+      toast({ variant: "destructive", title: "Signature Required", description: "Please provide your signature before making payment." });
+      return;
+    }
+    if (!printedName.trim()) {
+      toast({ variant: "destructive", title: "Name Required", description: "Please enter your printed name before making payment." });
+      return;
+    }
+    
     setPaymentLinkLoading(true);
     try {
       const response = await fetch(`/api/stripe/quote/${quote.id}/payment-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selectedOption }),
+        body: JSON.stringify({ 
+          selectedOption,
+          signatureImage: signatureData,
+          signerName: printedName.trim(),
+        }),
       });
       if (response.ok) {
         const result = await response.json();
@@ -882,7 +896,7 @@ export default function PublicQuoteView() {
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-center justify-center gap-2 mb-3">
                       <CheckCircle2 className="h-6 w-6 text-green-700" />
-                      <h4 className="font-semibold text-green-800 text-lg">Payment Confirmed!</h4>
+                      <h4 className="font-semibold text-green-800 text-lg">Quote Accepted!</h4>
                     </div>
                     <div className="bg-white rounded-lg p-4 border border-green-200 mb-3">
                       <p className="text-green-800 font-medium text-center mb-2">
@@ -903,7 +917,10 @@ export default function PublicQuoteView() {
                       </p>
                     </div>
                     <p className="text-sm text-green-700 text-center">
-                      You can now accept the quote below to finalize your order.
+                      Thank you! Your quote has been accepted and we will contact you shortly to schedule the work.
+                    </p>
+                    <p className="text-xs text-slate-500 text-center mt-2">
+                      The remaining balance will be due upon completion of the installation.
                     </p>
                   </div>
                 ) : (
@@ -939,8 +956,8 @@ export default function PublicQuoteView() {
               </div>
             )}
 
-            {/* Accept Quote button - shown when terms are agreed AND (not install quote OR deposit is paid) */}
-            {agreedToTerms && (!isInstallQuote || depositPaidAt) && (
+            {/* Accept Quote button - shown for non-install quotes only (install quotes auto-accept on deposit payment) */}
+            {agreedToTerms && !isInstallQuote && (
               <>
                 <Button
                   onClick={handleSubmit}

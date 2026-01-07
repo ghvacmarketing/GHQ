@@ -29,13 +29,37 @@ const PAYMENT_LINK_TYPES = ["custom_install", "proposal", "custom_service"];
 router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
   try {
     const { quoteId } = req.params;
-    const { depositOverride, selectedOption } = req.body; // Optional override for deposit percentage and selected option
+    const { depositOverride, selectedOption, signatureImage, signerName } = req.body;
+
+    // Validate signature is provided - required before generating payment link
+    if (!signatureImage || !signerName?.trim()) {
+      return res.status(400).json({ 
+        error: "Signature and name are required before proceeding to payment",
+        requiresSignature: true
+      });
+    }
 
     // Get the quote
     const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, quoteId));
     if (!quote) {
       return res.status(404).json({ error: "Quote not found" });
     }
+
+    // Get client IP for signature tracking
+    const signerIp = req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0] || 'unknown';
+    const now = new Date();
+
+    // Store signature data but don't set signedAt yet - that will be set when payment succeeds
+    // This prevents abandoned payments from appearing as "signed" in audit logs
+    await db.update(crmQuotes)
+      .set({
+        signatureImage,
+        signerName: signerName.trim(),
+        signerIp,
+        updatedAt: now,
+        ...(selectedOption ? { selectedOption } : {}),
+      })
+      .where(eq(crmQuotes.id, quoteId));
 
     // Only allow payment links for specific quote types
     if (!PAYMENT_LINK_TYPES.includes(quote.quoteType?.toLowerCase() || '')) {

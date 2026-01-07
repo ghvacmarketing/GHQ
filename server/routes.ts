@@ -13247,6 +13247,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subtotal += parseFloat(item.lineTotal || "0");
       }
 
+      // Calculate balance due (subtract any deposit already paid)
+      const depositPaid = parseFloat(quote.depositAmount || "0");
+      const balanceDue = Math.max(0, subtotal - depositPaid);
+
+      // Build notes to include deposit info if applicable
+      let invoiceNotes = quote.notes || "";
+      if (depositPaid > 0) {
+        const depositNote = `Deposit received: $${depositPaid.toFixed(2)} (paid ${quote.depositPaidAt ? new Date(quote.depositPaidAt).toLocaleDateString() : 'previously'})`;
+        invoiceNotes = invoiceNotes ? `${invoiceNotes}\n\n${depositNote}` : depositNote;
+      }
+
       // Create the invoice
       const invoiceData = {
         invoiceNumber,
@@ -13258,8 +13269,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subtotal: String(subtotal),
         laborTotal: "0",
         total: String(subtotal),
-        balanceDue: String(subtotal),
-        notes: quote.notes || undefined,
+        amountPaid: depositPaid > 0 ? String(depositPaid) : undefined,
+        balanceDue: String(balanceDue),
+        notes: invoiceNotes || undefined,
         createdBy: user.id,
       };
 

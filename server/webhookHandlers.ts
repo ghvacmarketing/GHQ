@@ -95,15 +95,29 @@ export class WebhookHandlers {
             const depositAmount = session.amount_total ? session.amount_total / 100 : 0;
             const now = new Date();
 
+            // Auto-accept the quote when deposit is paid (signature was captured before payment)
+            // Only auto-accept if quote has a signature (means they signed before paying)
+            const shouldAutoAccept = quote.signatureImage && quote.signerName && quote.status !== 'accepted';
+
             await db.update(crmQuotes)
               .set({
                 depositAmount: depositAmount.toFixed(2),
                 depositPaidAt: now,
                 selectedOption: selectedOption || quote.selectedOption,
+                // Auto-accept if signature was already captured - set signedAt and acceptedAt now
+                ...(shouldAutoAccept ? { 
+                  status: 'accepted' as const,
+                  signedAt: now,
+                  acceptedAt: now,
+                } : {}),
               })
               .where(eq(crmQuotes.id, quoteId));
 
-            console.log(`[Webhook] Quote ${quote.quoteNumber} deposit recorded - amount: $${depositAmount}, option: ${selectedOption}`);
+            if (shouldAutoAccept) {
+              console.log(`[Webhook] Quote ${quote.quoteNumber} auto-accepted after deposit payment - amount: $${depositAmount}, option: ${selectedOption}`);
+            } else {
+              console.log(`[Webhook] Quote ${quote.quoteNumber} deposit recorded - amount: $${depositAmount}, option: ${selectedOption}`);
+            }
           } else {
             console.log(`[Webhook] Quote ${quoteId} not found`);
           }
