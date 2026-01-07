@@ -1772,6 +1772,28 @@ function InvoiceTab({
 
   const quotes = quotesData?.quotes || [];
   const acceptedQuotes = quotes.filter(q => q.status === "accepted");
+  
+  // Fetch ALL quotes for this customer (to allow creating invoice from any customer quote)
+  const { data: customerQuotesData, isLoading: customerQuotesLoading } = useQuery<{ quotes: (CrmQuote & { lineItems?: CrmQuoteLineItem[] })[] }>({
+    queryKey: ["/api/crm/quotes", "customer", workOrder.customerId],
+    queryFn: async () => {
+      if (!workOrder.customerId) return { quotes: [] };
+      const res = await fetch(`/api/crm/quotes?customerId=${workOrder.customerId}`, { credentials: "include" });
+      if (!res.ok) return { quotes: [] };
+      return res.json();
+    },
+    enabled: !!workOrder.customerId,
+  });
+
+  const customerQuotes = customerQuotesData?.quotes || [];
+  // Get accepted customer quotes that are NOT attached to this work order (deduplicate by ID)
+  const workOrderQuoteIds = new Set(acceptedQuotes.map(q => q.id));
+  const otherCustomerAcceptedQuotes = customerQuotes.filter(
+    q => q.status === "accepted" && !workOrderQuoteIds.has(q.id)
+  );
+  
+  // Combined: all accepted quotes available for invoice creation (already deduplicated)
+  const allAvailableQuotes = [...acceptedQuotes, ...otherCustomerAcceptedQuotes];
 
   // Fetch CRM items (for both catalog and discounts)
   const { data: crmItemsData, isLoading: itemsLoading } = useQuery<CrmItem[]>({
@@ -1882,6 +1904,8 @@ function InvoiceTab({
       toast({ title: "Invoice Created", description: "Your invoice has been created as a draft." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      // Also invalidate customer quotes in case quote status changes
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", "customer", workOrder.customerId] });
       setShowCreateForm(false);
       setLineItems([]);
     },
@@ -2496,7 +2520,7 @@ function InvoiceTab({
                   <Plus className="h-4 w-4 mr-2" />
                   Create Invoice
                 </Button>
-                {acceptedQuotes.length > 0 && (
+                {allAvailableQuotes.length > 0 && (
                   <Button
                     variant="outline"
                     className="w-full min-h-[48px] border-green-200 text-green-700 hover:bg-green-50"
@@ -2504,7 +2528,7 @@ function InvoiceTab({
                     data-testid="button-create-invoice-from-quote"
                   >
                     <FileText className="h-4 w-4 mr-2" />
-                    Create from Quote ({acceptedQuotes.length})
+                    Create from Quote ({allAvailableQuotes.length})
                   </Button>
                 )}
               </div>
@@ -2953,37 +2977,83 @@ function InvoiceTab({
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
-            {isLoadingQuote ? (
+          <div className="flex-1 overflow-y-auto max-h-[400px] space-y-4">
+            {(isLoadingQuote || customerQuotesLoading) ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-green-600" />
-                <span className="ml-2 text-sm text-slate-600">Loading quote...</span>
+                <span className="ml-2 text-sm text-slate-600">Loading quotes...</span>
               </div>
-            ) : acceptedQuotes.length === 0 ? (
+            ) : allAvailableQuotes.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-4">
-                No accepted quotes available for this work order.
+                No accepted quotes available.
               </p>
             ) : (
-              acceptedQuotes.map((quote) => (
-                <div
-                  key={quote.id}
-                  className="border rounded-lg p-3 hover:bg-green-50 cursor-pointer transition-colors"
-                  onClick={() => createFromQuote(quote)}
-                  data-testid={`quote-selection-${quote.id}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">{quote.quoteNumber}</p>
-                      <p className="text-xs text-slate-500">
-                        Accepted: {quote.acceptedAt ? format(new Date(quote.acceptedAt), "MMM d, yyyy") : "Unknown"}
-                      </p>
+              <>
+                {/* Work Order Quotes Section */}
+                {acceptedQuotes.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      This Work Order
+                    </p>
+                    <div className="space-y-2">
+                      {acceptedQuotes.map((quote) => (
+                        <div
+                          key={quote.id}
+                          className="border rounded-lg p-3 hover:bg-green-50 cursor-pointer transition-colors"
+                          onClick={() => createFromQuote(quote)}
+                          data-testid={`quote-selection-${quote.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium">{quote.quoteNumber}</p>
+                              <p className="text-xs text-slate-500">
+                                Accepted: {quote.acceptedAt ? format(new Date(quote.acceptedAt), "MMM d, yyyy") : "Unknown"}
+                              </p>
+                            </div>
+                            <span className="text-sm font-semibold text-green-700 ml-2">
+                              {formatCurrency(parseFloat(quote.total || "0"))}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <span className="text-sm font-semibold text-green-700 ml-2">
-                      {formatCurrency(parseFloat(quote.total || "0"))}
-                    </span>
                   </div>
-                </div>
-              ))
+                )}
+                
+                {/* Other Customer Quotes Section */}
+                {otherCustomerAcceptedQuotes.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      Other Customer Quotes
+                    </p>
+                    <div className="space-y-2">
+                      {otherCustomerAcceptedQuotes.map((quote) => (
+                        <div
+                          key={quote.id}
+                          className="border border-blue-200 rounded-lg p-3 hover:bg-blue-50 cursor-pointer transition-colors"
+                          onClick={() => createFromQuote(quote)}
+                          data-testid={`quote-selection-customer-${quote.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium">{quote.quoteNumber}</p>
+                              <p className="text-xs text-slate-500">
+                                Accepted: {quote.acceptedAt ? format(new Date(quote.acceptedAt), "MMM d, yyyy") : "Unknown"}
+                              </p>
+                              {quote.title && (
+                                <p className="text-xs text-blue-600 truncate">{quote.title}</p>
+                              )}
+                            </div>
+                            <span className="text-sm font-semibold text-blue-700 ml-2">
+                              {formatCurrency(parseFloat(quote.total || "0"))}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
           
