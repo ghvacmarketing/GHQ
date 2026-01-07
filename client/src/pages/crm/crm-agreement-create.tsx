@@ -697,22 +697,6 @@ export default function CrmAgreementCreate() {
                     </div>
 
                     <div>
-                      <Label htmlFor="region" className="text-sm font-medium">Region</Label>
-                      <Select value={regionId} onValueChange={setRegionId}>
-                        <SelectTrigger className="mt-1" data-testid="select-region">
-                          <SelectValue placeholder="Select region..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {regions.map((region) => (
-                            <SelectItem key={region.id} value={region.id}>
-                              {region.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
                       <Label htmlFor="price" className="text-sm font-medium">Agreement Price</Label>
                       <div className="flex items-center gap-1 mt-1">
                         <span className="text-sm text-slate-500">$</span>
