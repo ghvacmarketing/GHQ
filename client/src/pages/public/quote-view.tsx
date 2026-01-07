@@ -27,7 +27,7 @@ function BrandLogo() {
 }
 
 interface PublicQuoteData {
-  quote: CrmQuote;
+  quote: CrmQuote & { depositPercentage?: number };
   lineItems: CrmQuoteLineItem[];
 }
 
@@ -621,6 +621,9 @@ export default function PublicQuoteView() {
   const { lineItems } = data;
   // Use the quote variable defined above (now guaranteed to exist since we passed the !data check)
   const quoteData = quote!;
+  
+  // Get deposit percentage from API response (default to 50 if not provided)
+  const depositPercentage = (quoteData as any).depositPercentage ?? 50;
 
   if (quoteData.status === "accepted") {
     return <QuoteAlreadyAccepted quote={quoteData} />;
@@ -869,7 +872,7 @@ export default function PublicQuoteView() {
             <CardContent className="space-y-3 text-sm text-slate-600">
               <p>1. All work will be performed by licensed and insured technicians.</p>
               <p>2. Payment is due upon completion of work unless otherwise agreed.</p>
-              <p>3. A 50% deposit may be required for equipment orders.</p>
+              <p>3. A {depositPercentage}% deposit may be required for equipment orders.</p>
               <p>4. Warranty terms vary by equipment and are provided separately.</p>
               <p>5. Additional charges may apply for unforeseen conditions discovered during work.</p>
               <p>6. Customer is responsible for providing reasonable access to work areas.</p>
@@ -912,7 +915,7 @@ export default function PublicQuoteView() {
               </label>
             </div>
 
-            {/* 50% Deposit Payment Section for Install Quotes - REQUIRED before accepting */}
+            {/* Deposit Payment Section for Install Quotes - REQUIRED before accepting */}
             {isInstallQuote && agreedToTerms && (
               <div className="border-t border-slate-200 pt-4">
                 {depositVerifying ? (
@@ -957,10 +960,10 @@ export default function PublicQuoteView() {
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <CreditCard className="h-5 w-5 text-amber-700" />
-                      <h4 className="font-semibold text-amber-800">50% Deposit Required</h4>
+                      <h4 className="font-semibold text-amber-800">{depositPercentage}% Deposit Required</h4>
                     </div>
                     <p className="text-sm text-amber-700 mb-3">
-                      A 50% deposit is required before accepting this quote.
+                      A {depositPercentage}% deposit is required before accepting this quote.
                     </p>
                     <Button
                       onClick={handlePayDeposit}
@@ -976,7 +979,7 @@ export default function PublicQuoteView() {
                       ) : (
                         <>
                           <CreditCard className="mr-2 h-5 w-5" />
-                          Pay 50% Deposit Now
+                          Pay {depositPercentage}% Deposit Now
                         </>
                       )}
                     </Button>

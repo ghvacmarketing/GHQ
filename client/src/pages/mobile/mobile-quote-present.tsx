@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { ArrowLeft, X, FileText, CheckCircle, Loader2, CreditCard } from "lucide-react";
+import { ArrowLeft, X, FileText, CheckCircle, Loader2, CreditCard, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -52,8 +52,11 @@ export default function MobileQuotePresent() {
   const [printedName, setPrintedName] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [paymentLinkLoading, setPaymentLinkLoading] = useState(false);
+  const [depositAmount, setDepositAmount] = useState<number>(0);
+  const [depositPaidAt, setDepositPaidAt] = useState<Date | null>(null);
+  const [depositVerifying, setDepositVerifying] = useState(false);
 
-  // Quote types that require 50% deposit payment
+  // Quote types that require deposit payment
   const DEPOSIT_QUOTE_TYPES = ["custom_install", "proposal", "custom_service"];
 
   const { data: quote, isLoading, error } = useQuery<QuoteWithLineItems>({
@@ -65,6 +68,85 @@ export default function MobileQuotePresent() {
     },
     enabled: !!id,
   });
+
+  // Get deposit percentage from quote data (already fetched with CRM quote API)
+  const depositPercentage = (quote as any)?.depositPercentage ?? 50;
+
+  // Check if quote already has deposit paid when loaded
+  useEffect(() => {
+    if (quote?.depositPaidAt) {
+      setDepositPaidAt(new Date(quote.depositPaidAt));
+      if (quote.depositAmount) {
+        setDepositAmount(parseFloat(String(quote.depositAmount)));
+      }
+    }
+    // Auto-select option if quote already has one selected
+    if (quote?.selectedOption && !selectedOption) {
+      setSelectedOption(quote.selectedOption);
+    }
+  }, [quote?.depositPaidAt, quote?.depositAmount, quote?.selectedOption, selectedOption]);
+
+  // Verify deposit payment - runs on redirect from Stripe AND when page loads with pending payment link
+  const isDepositQuote = DEPOSIT_QUOTE_TYPES.includes(quote?.quoteType?.toLowerCase() || "");
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentSuccess = params.get('payment');
+    
+    // Don't verify if already accepted or deposit already recorded
+    const shouldVerify = quote?.id && quote?.status !== 'accepted' && !depositPaidAt && !depositVerifying && 
+      (paymentSuccess === 'success' || (quote?.stripePaymentLinkId && isDepositQuote));
+    
+    if (shouldVerify) {
+      setDepositVerifying(true);
+      
+      fetch(`/api/stripe/quote/${quote.id}/verify-deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+        .then(res => res.json())
+        .then(result => {
+          if (result.success && result.depositPaidAt) {
+            setDepositPaidAt(new Date(result.depositPaidAt));
+            setDepositAmount(result.depositAmount || 0);
+            if (result.selectedOption) {
+              setSelectedOption(result.selectedOption);
+            }
+            if (paymentSuccess === 'success') {
+              toast({
+                title: "Payment Successful!",
+                description: "Deposit has been received. Quote has been accepted.",
+              });
+            }
+            // Clean up URL parameter if present
+            if (paymentSuccess) {
+              window.history.replaceState({}, '', window.location.pathname);
+            }
+            // Refresh quote data to show updated status
+            queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", id] });
+          } else if (paymentSuccess === 'success') {
+            toast({
+              variant: "destructive",
+              title: "Payment Verification",
+              description: result.success ? "Payment processing - please refresh in a moment." : "We couldn't verify the payment. Please try again.",
+            });
+          }
+        })
+        .catch(err => {
+          console.error('Deposit verification error:', err);
+          if (paymentSuccess === 'success') {
+            toast({
+              variant: "destructive",
+              title: "Verification Error",
+              description: "Failed to verify payment. Please refresh the page.",
+            });
+          }
+        })
+        .finally(() => {
+          setDepositVerifying(false);
+        });
+    }
+  }, [quote?.id, quote?.stripePaymentLinkId, depositPaidAt, depositVerifying, isDepositQuote, toast, id]);
 
   const acceptInPersonMutation = useMutation({
     mutationFn: async (data: { signatureImage: string; signerName: string; selectedOption?: string | null }) => {
@@ -213,7 +295,6 @@ export default function MobileQuotePresent() {
   }
 
   const isAlreadyAccepted = quote.status === "accepted";
-  const isDepositQuote = DEPOSIT_QUOTE_TYPES.includes(quote.quoteType?.toLowerCase() || "");
 
   return (
     <MobileShell>
@@ -488,31 +569,75 @@ export default function MobileQuotePresent() {
                   </label>
                 </div>
 
-                {isDepositQuote ? (
-                  <div className="space-y-3">
-                    <Button
-                      onClick={handlePayDeposit}
-                      disabled={paymentLinkLoading || (quote.quoteMode === "options" && !selectedOption)}
-                      className="w-full min-h-[56px] text-lg bg-green-600 hover:bg-green-700"
-                      data-testid="button-pay-deposit"
-                    >
-                      {paymentLinkLoading ? (
-                        <>
-                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                          Generating Payment Link...
-                        </>
-                      ) : (
-                        <>
-                          <CreditCard className="h-5 w-5 mr-2" />
-                          Pay 50% Deposit Now
-                        </>
-                      )}
-                    </Button>
-                    <p className="text-xs text-center text-amber-600">
-                      Secure payment powered by Stripe. Remaining balance due upon completion.
-                    </p>
+                {isDepositQuote && agreedToTerms ? (
+                  <div className="border-t border-slate-200 pt-4 mt-4">
+                    {depositVerifying ? (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader2 className="h-5 w-5 text-blue-700 animate-spin" />
+                          <span className="text-blue-800 font-medium">Verifying payment...</span>
+                        </div>
+                      </div>
+                    ) : depositPaidAt ? (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-center justify-center gap-2 mb-3">
+                          <CheckCircle2 className="h-6 w-6 text-green-700" />
+                          <h4 className="font-semibold text-green-800 text-lg">Quote Accepted!</h4>
+                        </div>
+                        <div className="bg-white rounded-lg p-4 border border-green-200 mb-3">
+                          <p className="text-green-800 font-medium text-center mb-2">
+                            Your {formatPresentationCurrency(depositAmount)} deposit has been received.
+                          </p>
+                          {(quote?.selectedOption || selectedOption) && (
+                            <div className="border-t border-green-100 pt-3 mt-3">
+                              <p className="text-sm text-slate-600 text-center">
+                                Selected Package:
+                              </p>
+                              <p className="font-bold text-slate-800 text-center text-lg">
+                                {quote?.selectedOption || selectedOption}
+                              </p>
+                            </div>
+                          )}
+                          <p className="text-xs text-slate-500 text-center mt-3">
+                            Payment received on {depositPaidAt ? formatPresentationDate(depositPaidAt.toISOString()) : ''}
+                          </p>
+                        </div>
+                        <p className="text-sm text-green-700 text-center">
+                          The quote has been accepted. The remaining balance will be due upon completion.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                          <CreditCard className="h-5 w-5 text-amber-700" />
+                          <h4 className="font-semibold text-amber-800">{depositPercentage}% Deposit Required</h4>
+                        </div>
+                        <p className="text-sm text-amber-700 mb-3">
+                          A {depositPercentage}% deposit is required before accepting this quote.
+                        </p>
+                        <Button
+                          onClick={handlePayDeposit}
+                          disabled={paymentLinkLoading || (quote.quoteMode === "options" && !selectedOption)}
+                          className="w-full min-h-[56px] text-lg bg-green-600 hover:bg-green-700"
+                          data-testid="button-pay-deposit"
+                        >
+                          {paymentLinkLoading ? (
+                            <>
+                              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                              Generating Payment Link...
+                            </>
+                          ) : (
+                            <>
+                              <CreditCard className="h-5 w-5 mr-2" />
+                              Pay {depositPercentage}% Deposit Now
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-amber-600 mt-2">Secure payment powered by Stripe</p>
+                      </div>
+                    )}
                   </div>
-                ) : (
+                ) : isDepositQuote ? null : (
                   <Button
                     onClick={handleAcceptQuote}
                     disabled={acceptInPersonMutation.isPending}

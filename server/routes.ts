@@ -14676,7 +14676,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customer_notes as "customerNotes", property_id as "propertyId",
           accepted_by as "acceptedBy", decline_reason as "declineReason", created_by as "createdBy",
           ai_generated_quote as "aiGeneratedQuote", quote_mode as "quoteMode",
-          quote_type as "quoteType"
+          quote_type as "quoteType", selected_option as "selectedOption",
+          signed_at as "signedAt", signer_name as "signerName",
+          deposit_paid_at as "depositPaidAt", deposit_amount as "depositAmount",
+          stripe_payment_link_id as "stripePaymentLinkId"
         FROM crm_quotes 
         WHERE id = ${req.params.id}
         LIMIT 1
@@ -14685,6 +14688,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!quote) {
         return res.status(404).json({ message: "Quote not found" });
       }
+      
+      // Fetch deposit percentage from settings
+      let depositPercentage = 50; // default
+      const depositSetting = await storage.getSetting('stripe_deposit_percentage');
+      if (depositSetting) {
+        const parsed = parseInt(depositSetting.value, 10);
+        if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
+          depositPercentage = parsed;
+        }
+      }
+      quote.depositPercentage = depositPercentage;
       
       // Use raw SQL for line items too
       const lineItemsQuery = await db.execute(sql`
@@ -17896,6 +17910,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         .where(eq(crmQuoteLineItems.quoteId, quote.id))
         .orderBy(crmQuoteLineItems.sortOrder);
 
+      // Fetch deposit percentage from settings
+      let depositPercentage = 50; // default
+      const depositSetting = await storage.getSetting('stripe_deposit_percentage');
+      if (depositSetting) {
+        const parsed = parseInt(depositSetting.value, 10);
+        if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
+          depositPercentage = parsed;
+        }
+      }
+
       // Return only public-safe fields, exclude internal data
       const publicQuote = {
         id: quote.id,
@@ -17913,11 +17937,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         acceptedAt: quote.acceptedAt,
         acceptedBy: quote.acceptedBy,
         signedAt: quote.signedAt,
+        signerName: quote.signerName,
         customerNotes: quote.customerNotes,
         aiGeneratedQuote: quote.aiGeneratedQuote,
         quoteMode: quote.quoteMode,
         selectedOption: quote.selectedOption,
         quoteType: quote.quoteType,
+        depositPaidAt: quote.depositPaidAt,
+        depositAmount: quote.depositAmount,
+        stripePaymentLinkId: quote.stripePaymentLinkId,
+        depositPercentage,
       };
 
       const publicLineItems = lineItems.map((item) => ({
