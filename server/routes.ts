@@ -18865,7 +18865,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         filters.startDate = new Date(startDate);
       }
       if (endDate && typeof endDate === "string") {
-        filters.endDate = new Date(endDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999); // Include the full end date
+        filters.endDate = end;
       }
 
       const entries = await storage.getTimeEntries(filters);
@@ -19039,7 +19041,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       return res.json({
         startDate: start.toISOString(),
         endDate: end.toISOString(),
-        breakdowns: breakdowns.filter(b => b.totalClockedMinutes > 0 || b.workOrdersCompleted > 0),
+        breakdowns: breakdowns.filter(b => b.totalClockedMinutes > 0 || b.workOrdersCompleted > 0 || b.entries.length > 0),
       });
     } catch (error) {
       console.error("Error calculating time breakdown:", error);
