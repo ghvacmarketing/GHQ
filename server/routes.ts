@@ -11054,9 +11054,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Apply tab-based filtering (server-side filtering before pagination)
       // Status is stored directly in the status field: pending, active, grace_period, expired, cancelled
       if (tab === "all") {
-        // All Active = active + grace_period only (excludes pending, expired, cancelled)
+        // All = everything except expired and cancelled
         conditions.push(
           or(
+            eq(crmAgreements.status, "pending"),
             eq(crmAgreements.status, "active"),
             eq(crmAgreements.status, "grace_period")
           )
@@ -11156,7 +11157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         grace_period: Number(gracePeriodCount?.count || 0),
         expired: Number(expiredCount?.count || 0),
         upcoming_service: Number(upcomingServiceCount?.count || 0),
-        all_active: Number(activeCount?.count || 0) + Number(gracePeriodCount?.count || 0),
+        all_active: Number(pendingCount?.count || 0) + Number(activeCount?.count || 0) + Number(gracePeriodCount?.count || 0),
       };
 
       return res.json({
