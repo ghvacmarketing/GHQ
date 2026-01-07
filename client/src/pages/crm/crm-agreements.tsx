@@ -1258,9 +1258,7 @@ export default function CrmAgreements() {
                     <div>
                       <Label className="text-slate-500 text-xs">Billing Type</Label>
                       <p className="font-medium">
-                        {selectedAgreement.billingPreference === "pay_on_visit" ? "Pay Per Visit" :
-                         selectedAgreement.billingPreference === "auto_invoice" ? "Auto Invoice" :
-                         selectedAgreement.billingPreference === "prepaid" ? "Prepaid" : "Auto Invoice"}
+                        {selectedAgreement.billingPreference === "pay_on_visit" ? "Pay Per Visit" : "Auto Invoice"}
                       </p>
                     </div>
                     <div>

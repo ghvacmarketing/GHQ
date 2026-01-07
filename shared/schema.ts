@@ -1472,7 +1472,7 @@ export const crmAgreementStatusEnum = ["pending", "active", "grace_period", "exp
 export type CrmAgreementStatus = typeof crmAgreementStatusEnum[number];
 
 // Billing Preference Enum (how customer wants to be billed)
-export const billingPreferenceEnum = ["auto_invoice", "pay_on_visit", "prepaid"] as const;
+export const billingPreferenceEnum = ["auto_invoice", "pay_on_visit"] as const;
 export type BillingPreference = typeof billingPreferenceEnum[number];
 
 // Agreement Type Enum (standard HVAC maintenance vs custom agreement types)

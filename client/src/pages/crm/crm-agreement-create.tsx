@@ -110,7 +110,7 @@ export default function CrmAgreementCreate() {
   const [endDate, setEndDate] = useState(format(addYears(new Date(), 1), "yyyy-MM-dd"));
   const [regionId, setRegionId] = useState("");
   const [autoRenew, setAutoRenew] = useState(true);
-  const [billingPreference, setBillingPreference] = useState<"auto_invoice" | "pay_on_visit" | "prepaid">("auto_invoice");
+  const [billingPreference, setBillingPreference] = useState<"auto_invoice" | "pay_on_visit">("auto_invoice");
   const [notes, setNotes] = useState("");
   const [price, setPrice] = useState("229.00");
   const [frequency, setFrequency] = useState<"weekly" | "monthly" | "annual">("annual");
@@ -737,7 +737,7 @@ export default function CrmAgreementCreate() {
                       <Label className="text-sm font-medium">Billing Preference</Label>
                       <Select
                         value={billingPreference}
-                        onValueChange={(v) => setBillingPreference(v as "auto_invoice" | "pay_on_visit" | "prepaid")}
+                        onValueChange={(v) => setBillingPreference(v as "auto_invoice" | "pay_on_visit")}
                       >
                         <SelectTrigger className="mt-1" data-testid="select-billing-preference">
                           <SelectValue />
@@ -745,13 +745,11 @@ export default function CrmAgreementCreate() {
                         <SelectContent>
                           <SelectItem value="auto_invoice">Auto-Invoice (email invoices)</SelectItem>
                           <SelectItem value="pay_on_visit">Pay on Visit (tech collects)</SelectItem>
-                          <SelectItem value="prepaid">Prepaid (already paid)</SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-slate-500 mt-1">
                         {billingPreference === "auto_invoice" && "System sends invoice emails automatically"}
                         {billingPreference === "pay_on_visit" && "Tech collects payment, no auto-emails"}
-                        {billingPreference === "prepaid" && "Customer pays upfront before service"}
                       </p>
                     </div>
 

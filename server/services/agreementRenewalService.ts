@@ -258,8 +258,7 @@ export async function processAgreementRenewals(): Promise<DailyRenewalSummary> {
     const today = format(toZonedTime(new Date(), APP_TIMEZONE), "yyyy-MM-dd");
     console.log(`[AgreementRenewal] Processing renewals for date: ${today}`);
 
-    // Both auto_invoice and prepaid get automatic renewal invoices
-    // (prepaid = paid upfront, but still gets renewal notices when term ends)
+    // auto_invoice agreements get automatic renewal invoices
     const dueAgreements = await db
       .select()
       .from(crmAgreements)
@@ -268,7 +267,7 @@ export async function processAgreementRenewals(): Promise<DailyRenewalSummary> {
           eq(crmAgreements.status, "active"),
           eq(crmAgreements.autoRenew, true),
           eq(crmAgreements.isInitialCycle, false),
-          sql`${crmAgreements.billingPreference} IN ('auto_invoice', 'prepaid')`,
+          eq(crmAgreements.billingPreference, "auto_invoice"),
           isNotNull(crmAgreements.nextInvoiceDate),
           lte(crmAgreements.nextInvoiceDate, today)
         )

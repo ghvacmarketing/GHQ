@@ -11289,12 +11289,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // For prepaid agreements, start as active immediately (already paid upfront)
       // For pay-on-visit agreements, start as pending (awaiting first visit payment from tech)
       // For auto-invoice, start as pending (awaiting first invoice payment)
-      const isPrepaid = result.data.billingPreference === "prepaid";
-      const initialStatus = isPrepaid ? "active" : "pending";
-      const activationDate = isPrepaid ? new Date().toISOString().split('T')[0] : undefined;
+      const initialStatus = "pending";
+      const activationDate = undefined;
       
       const [agreement] = await db
         .insert(crmAgreements)
