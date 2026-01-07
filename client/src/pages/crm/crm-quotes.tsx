@@ -246,12 +246,16 @@ export default function CrmQuotes() {
       if (isNaN(amount) || amount < 0) {
         throw new Error("Please enter a valid amount");
       }
+      const serviceAddress = selectedProperty 
+        ? [selectedProperty.address1, selectedProperty.city, selectedProperty.state, selectedProperty.zip].filter(Boolean).join(", ")
+        : undefined;
       const res = await apiRequest("POST", "/api/crm/quotes/quick", {
         customerId: selectedCustomer.id,
         customerName: selectedCustomer.name || "Unknown Customer",
         customerEmail: selectedCustomer.email || null,
         customerPhone: selectedCustomer.phone || null,
         propertyId: selectedProperty?.id || undefined,
+        serviceAddress,
         title: createForm.title || "Quick Quote",
         description: createForm.description || undefined,
         lineItems: [
@@ -422,6 +426,10 @@ export default function CrmQuotes() {
     e.preventDefault();
     if (!selectedCustomer) {
       toast({ title: "Please select a customer", variant: "destructive" });
+      return;
+    }
+    if (customerProperties.length > 0 && !selectedProperty) {
+      toast({ title: "Please select a property location", variant: "destructive" });
       return;
     }
     if (!createForm.title.trim()) {
@@ -1041,7 +1049,7 @@ export default function CrmQuotes() {
               <Button 
                 type="submit" 
                 className="bg-[#711419] hover:bg-[#5a1014]"
-                disabled={createQuoteMutation.isPending || !selectedCustomer}
+                disabled={createQuoteMutation.isPending || !selectedCustomer || (customerProperties.length > 0 && !selectedProperty)}
                 data-testid="button-submit-create"
               >
                 {createQuoteMutation.isPending ? "Creating..." : "Create Quote"}
