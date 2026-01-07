@@ -19361,19 +19361,141 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       const workOrderId = req.params.id;
       
-      // Check if this work order is linked to a maintenance visit
-      const [visit] = await db.select()
-        .from(maintenanceVisits)
-        .where(eq(maintenanceVisits.workOrderId, workOrderId))
+      // Get work order details first
+      const [workOrder] = await db.select()
+        .from(crmWorkOrders)
+        .where(eq(crmWorkOrders.id, workOrderId))
         .limit(1);
       
-      if (!visit) {
+      if (!workOrder) {
         return res.json({
           isRenewalVisit: false,
           paymentType: null,
           renewalStatus: "none",
           agreementInfo: null,
           visitInfo: null
+        });
+      }
+      
+      // Check if this work order is linked to a maintenance visit
+      const [visit] = await db.select()
+        .from(maintenanceVisits)
+        .where(eq(maintenanceVisits.workOrderId, workOrderId))
+        .limit(1);
+      
+      // If no direct visit link, check if this is a MAINTENANCE type work order
+      // and find an agreement by matching propertyId
+      if (!visit) {
+        // Only check for agreements if work order is maintenance type
+        if (workOrder.visitType !== "MAINTENANCE") {
+          return res.json({
+            isRenewalVisit: false,
+            paymentType: null,
+            renewalStatus: "none",
+            agreementInfo: null,
+            visitInfo: null
+          });
+        }
+        
+        // Find pay-on-visit agreements for this property
+        const [agreementByProperty] = await db.select()
+          .from(crmAgreements)
+          .where(
+            and(
+              eq(crmAgreements.propertyId, workOrder.propertyId!),
+              eq(crmAgreements.billingPreference, "pay_on_visit"),
+              or(
+                eq(crmAgreements.status, "pending"),
+                eq(crmAgreements.status, "active")
+              )
+            )
+          )
+          .orderBy(desc(crmAgreements.createdAt))
+          .limit(1);
+        
+        if (!agreementByProperty) {
+          return res.json({
+            isRenewalVisit: false,
+            paymentType: null,
+            renewalStatus: "none",
+            agreementInfo: null,
+            visitInfo: null
+          });
+        }
+        
+        // Calculate visit info based on agreement settings
+        const totalVisits = agreementByProperty.visitsPerPeriod || 2;
+        
+        // For pending agreements, it's always the first visit (activation)
+        // For active agreements, count completed MAINTENANCE work orders for this property
+        // since the agreement was activated to determine current visit number
+        let currentVisitNumber = 1;
+        let isLastVisit = false;
+        
+        if (agreementByProperty.status === "active") {
+          // Count ALL maintenance work orders for this property (including in-progress)
+          // This represents how many visits have been done/are being done
+          const startDate = agreementByProperty.activationDate 
+            ? new Date(agreementByProperty.activationDate) 
+            : new Date(agreementByProperty.startDate || agreementByProperty.createdAt || '2020-01-01');
+          
+          // Count maintenance work orders that are completed OR in progress (not just completed)
+          const maintenanceOrders = await db.select({ count: count() })
+            .from(crmWorkOrders)
+            .where(
+              and(
+                eq(crmWorkOrders.propertyId, workOrder.propertyId!),
+                eq(crmWorkOrders.visitType, "MAINTENANCE"),
+                or(
+                  eq(crmWorkOrders.status, "completed"),
+                  eq(crmWorkOrders.status, "on_site"),
+                  eq(crmWorkOrders.status, "en_route"),
+                  eq(crmWorkOrders.status, "dispatched"),
+                  eq(crmWorkOrders.status, "scheduled")
+                ),
+                gte(crmWorkOrders.createdAt, startDate)
+              )
+            );
+          
+          const orderCount = Number(maintenanceOrders[0]?.count || 0);
+          // Current visit number: cycle through 1, 2, 1, 2, etc.
+          // Use modulo and OR to handle the wrap-around: (2 % 2) = 0, but we want 2
+          currentVisitNumber = (orderCount % totalVisits) || totalVisits;
+          isLastVisit = currentVisitNumber === totalVisits;
+          console.log(`[RenewalInfo] Property ${workOrder.propertyId}: orderCount=${orderCount}, currentVisitNumber=${currentVisitNumber}, totalVisits=${totalVisits}, isLastVisit=${isLastVisit}, agreementStatus=${agreementByProperty.status}`);
+        }
+        
+        // Determine payment type
+        let paymentType: "initial" | "renewal" | null = null;
+        let renewalStatus = "none";
+        
+        if (agreementByProperty.status === "pending" && agreementByProperty.isInitialCycle) {
+          paymentType = "initial";
+          renewalStatus = "pending";
+        } else if (agreementByProperty.status === "active" && isLastVisit) {
+          paymentType = "renewal";
+          renewalStatus = "pending";
+        }
+        
+        return res.json({
+          isRenewalVisit: paymentType !== null,
+          paymentType,
+          renewalStatus,
+          agreementInfo: {
+            id: agreementByProperty.id,
+            agreementNumber: agreementByProperty.agreementNumber,
+            price: agreementByProperty.price,
+            customerName: agreementByProperty.customerName,
+            billingPreference: agreementByProperty.billingPreference,
+            status: agreementByProperty.status,
+            agreementPlan: agreementByProperty.agreementPlan
+          },
+          visitInfo: {
+            visitNumber: currentVisitNumber,
+            totalVisitsInCycle: totalVisits,
+            targetDate: null,
+            isRenewalTrigger: isLastVisit
+          }
         });
       }
       
