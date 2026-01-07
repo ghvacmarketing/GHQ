@@ -1564,17 +1564,30 @@ export const insertCrmAgreementSchema = createInsertSchema(crmAgreements).omit({
   updatedAt: true,
 });
 
+// Renewal status for pay-on-visit agreement visits
+// none = not a renewal visit or renewal not applicable
+// pending = renewal due, technician needs to collect payment
+// pending_payment = invoice created, awaiting payment
+// collected = payment received, agreement renewed
+// declined = customer declined renewal, agreement will expire
+export const visitRenewalStatusEnum = ["none", "pending", "pending_payment", "collected", "declined"] as const;
+export type VisitRenewalStatus = typeof visitRenewalStatusEnum[number];
+
 // Maintenance Visits (track the 2 visits per year for each agreement)
 export const maintenanceVisits = pgTable("maintenance_visits", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   agreementId: varchar("agreement_id").notNull().references(() => crmAgreements.id, { onDelete: "cascade" }),
   visitNumber: integer("visit_number").notNull(),
+  totalVisitsInCycle: integer("total_visits_in_cycle").notNull().default(2),
   cycleYear: integer("cycle_year").notNull(),
   targetDate: date("target_date").notNull(),
   reminderSentAt: timestamp("reminder_sent_at"),
   workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id),
   completedAt: timestamp("completed_at"),
   status: text("status").$type<"pending" | "scheduled" | "completed" | "cancelled">().notNull().default("pending"),
+  isRenewalTrigger: boolean("is_renewal_trigger").notNull().default(false),
+  renewalStatus: text("renewal_status").$type<VisitRenewalStatus>().notNull().default("none"),
+  renewalInvoiceId: varchar("renewal_invoice_id").references(() => crmInvoices.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

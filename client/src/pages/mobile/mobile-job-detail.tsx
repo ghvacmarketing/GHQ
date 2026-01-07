@@ -33,7 +33,9 @@ import {
   Mail,
   UserPlus,
   Pencil,
-  CalendarIcon
+  CalendarIcon,
+  AlertTriangle,
+  RefreshCw
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
@@ -97,6 +99,17 @@ interface TimeSlot {
   available: boolean;
 }
 
+interface RenewalInfo {
+  isRenewalVisit: boolean;
+  renewalStatus: "none" | "pending" | "pending_payment" | "collected" | "declined";
+  agreementInfo: {
+    id: string;
+    agreementNumber: string;
+    price: number;
+    customerName: string;
+  } | null;
+}
+
 const statusConfig: Record<string, { label: string; className: string }> = {
   scheduled: { label: "Scheduled", className: "bg-slate-100 text-slate-700 border-slate-300" },
   dispatched: { label: "Dispatched", className: "bg-blue-100 text-blue-700 border-blue-300" },
@@ -140,12 +153,18 @@ function OverviewTab({
   optimisticStatus,
   updateStatusMutation,
   handleStatusChange,
+  renewalInfo,
+  onCollectRenewal,
+  onDeclineRenewal,
 }: {
   workOrder: WorkOrderDetail;
   checklistResponse: ChecklistResponseData | null | undefined;
   optimisticStatus: WorkOrderStatus | null;
   updateStatusMutation: any;
   handleStatusChange: (status: WorkOrderStatus) => void;
+  renewalInfo: RenewalInfo | null | undefined;
+  onCollectRenewal: () => void;
+  onDeclineRenewal: () => void;
 }) {
   const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(false);
   const displayStatus = optimisticStatus || workOrder.status;
@@ -176,6 +195,79 @@ function OverviewTab({
           {optimisticStatus && " (saving...)"}
         </Badge>
       </div>
+
+      {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "pending" && renewalInfo.agreementInfo && (
+        <Card className="border-amber-400 bg-amber-50" data-testid="renewal-banner">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-full bg-amber-100">
+                <RefreshCw className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-800 mb-1">Renewal Due</h3>
+                <p className="text-sm text-amber-700 mb-3">
+                  Collect payment for next service period (${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)})
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 min-h-[44px] flex-1"
+                    onClick={onCollectRenewal}
+                    data-testid="button-collect-renewal"
+                  >
+                    <DollarSign className="h-4 w-4 mr-1" />
+                    Collect Payment
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-red-300 text-red-600 hover:bg-red-50 min-h-[44px] flex-1"
+                    onClick={onDeclineRenewal}
+                    data-testid="button-decline-renewal"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Customer Declined
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "pending_payment" && (
+        <Card className="border-blue-400 bg-blue-50" data-testid="renewal-pending-payment-banner">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-blue-100">
+                <Clock className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-blue-800">Invoice Created</h3>
+                <p className="text-sm text-blue-700">Awaiting payment confirmation</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "collected" && (
+        <div className="flex justify-center">
+          <Badge className="bg-green-100 text-green-700 border-green-300 px-4 py-2" data-testid="badge-renewal-collected">
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            Renewal Collected
+          </Badge>
+        </div>
+      )}
+
+      {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "declined" && (
+        <div className="flex justify-center">
+          <Badge className="bg-red-100 text-red-700 border-red-300 px-4 py-2" data-testid="badge-renewal-declined">
+            <X className="h-4 w-4 mr-2" />
+            Renewal Declined
+          </Badge>
+        </div>
+      )}
 
       <Card data-testid="customer-info-card">
         <CardHeader className="pb-2">
@@ -2864,6 +2956,19 @@ export default function MobileJobDetail() {
     enabled: !!params.id,
   });
 
+  const { data: renewalInfo, refetch: refetchRenewalInfo } = useQuery<RenewalInfo>({
+    queryKey: ["/api/mobile/work-orders", params.id, "renewal-info"],
+    queryFn: async () => {
+      const res = await fetch(`/api/mobile/work-orders/${params.id}/renewal-info`, { credentials: "include" });
+      if (!res.ok) {
+        if (res.status === 404) return { isRenewalVisit: false, renewalStatus: "none" as const, agreementInfo: null };
+        throw new Error("Failed to fetch renewal info");
+      }
+      return res.json();
+    },
+    enabled: !!params.id,
+  });
+
   const { data: currentUser } = useQuery<CrmUser>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: async () => {
@@ -2877,6 +2982,55 @@ export default function MobileJobDetail() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editSelectedDate, setEditSelectedDate] = useState<Date | undefined>(undefined);
   const [editSelectedSlot, setEditSelectedSlot] = useState<{ start: string; end: string } | null>(null);
+
+  const [showCollectRenewalDialog, setShowCollectRenewalDialog] = useState(false);
+  const [showDeclineRenewalDialog, setShowDeclineRenewalDialog] = useState(false);
+  const [renewalPaymentMethod, setRenewalPaymentMethod] = useState<"cash" | "check" | "card">("cash");
+
+  const collectRenewalMutation = useMutation({
+    mutationFn: async (paymentMethod: string) => {
+      const res = await apiRequest("POST", `/api/mobile/work-orders/${params.id}/collect-renewal`, {
+        paymentMethod,
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.message || "Failed to collect renewal payment");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Renewal Collected", description: "Payment has been recorded successfully." });
+      setShowCollectRenewalDialog(false);
+      setRenewalPaymentMethod("cash");
+      refetchRenewalInfo();
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/mobile/work-orders", params.id, "renewal-info"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to collect renewal payment", variant: "destructive" });
+    },
+  });
+
+  const declineRenewalMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/mobile/work-orders/${params.id}/decline-renewal`, {});
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.message || "Failed to record renewal decline");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Renewal Declined", description: "Customer decline has been recorded." });
+      setShowDeclineRenewalDialog(false);
+      refetchRenewalInfo();
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/mobile/work-orders", params.id, "renewal-info"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to record renewal decline", variant: "destructive" });
+    },
+  });
 
   const isSupervisor = currentUser?.role === "supervisor";
   const isAssignedToMe = workOrder?.assignedTechId === currentUser?.id;
@@ -3174,6 +3328,9 @@ export default function MobileJobDetail() {
               optimisticStatus={optimisticStatus}
               updateStatusMutation={updateStatusMutation}
               handleStatusChange={handleStatusChange}
+              renewalInfo={renewalInfo}
+              onCollectRenewal={() => setShowCollectRenewalDialog(true)}
+              onDeclineRenewal={() => setShowDeclineRenewalDialog(true)}
             />
           )}
           {activeTab === "work" && (
@@ -3490,6 +3647,126 @@ export default function MobileJobDetail() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCollectRenewalDialog} onOpenChange={setShowCollectRenewalDialog}>
+        <DialogContent className="sm:max-w-md" data-testid="collect-renewal-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              Collect Renewal Payment
+            </DialogTitle>
+            <DialogDescription>
+              Confirm payment collection for the maintenance agreement renewal.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {renewalInfo?.agreementInfo && (
+              <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">Agreement</span>
+                  <span className="text-sm font-medium">{renewalInfo.agreementInfo.agreementNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">Customer</span>
+                  <span className="text-sm font-medium">{renewalInfo.agreementInfo.customerName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">Amount</span>
+                  <span className="text-lg font-bold text-green-600">${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <Select value={renewalPaymentMethod} onValueChange={(value: "cash" | "check" | "card") => setRenewalPaymentMethod(value)}>
+                <SelectTrigger className="min-h-[44px]" data-testid="select-renewal-payment-method">
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="check">Check</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowCollectRenewalDialog(false)}
+              disabled={collectRenewalMutation.isPending}
+              className="min-h-[44px]"
+              data-testid="button-cancel-collect-renewal"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => collectRenewalMutation.mutate(renewalPaymentMethod)}
+              disabled={collectRenewalMutation.isPending}
+              className="bg-green-600 hover:bg-green-700 min-h-[44px]"
+              data-testid="button-confirm-collect-renewal"
+            >
+              {collectRenewalMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+              )}
+              Confirm Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeclineRenewalDialog} onOpenChange={setShowDeclineRenewalDialog}>
+        <DialogContent className="sm:max-w-md" data-testid="decline-renewal-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Customer Declined Renewal
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure the customer has declined to renew their maintenance agreement?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {renewalInfo?.agreementInfo && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
+                <p className="text-sm text-red-700">
+                  <strong>{renewalInfo.agreementInfo.customerName}</strong> is declining to renew agreement <strong>{renewalInfo.agreementInfo.agreementNumber}</strong> (${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)}/year).
+                </p>
+                <p className="text-xs text-red-600">
+                  This action will be recorded. The office will be notified.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeclineRenewalDialog(false)}
+              disabled={declineRenewalMutation.isPending}
+              className="min-h-[44px]"
+              data-testid="button-cancel-decline-renewal"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => declineRenewalMutation.mutate()}
+              disabled={declineRenewalMutation.isPending}
+              className="min-h-[44px]"
+              data-testid="button-confirm-decline-renewal"
+            >
+              {declineRenewalMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <X className="h-4 w-4 mr-2" />
+              )}
+              Confirm Decline
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </MobileShell>

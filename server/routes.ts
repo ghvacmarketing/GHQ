@@ -11232,9 +11232,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // For prepaid agreements, start as active immediately (already paid upfront)
+      // For pay-on-visit agreements, also start as active (payment collected in person)
+      // For auto-invoice, start as pending (awaiting first invoice payment)
+      const skipInitialInvoice = result.data.billingPreference === "prepaid" || result.data.billingPreference === "pay_on_visit";
+      const initialStatus = skipInitialInvoice ? "active" : "pending";
+      const activationDate = skipInitialInvoice ? new Date().toISOString().split('T')[0] : undefined;
+      
       const [agreement] = await db
         .insert(crmAgreements)
-        .values(result.data)
+        .values({
+          ...result.data,
+          status: initialStatus,
+          activationDate: activationDate,
+          // Keep isInitialCycle true for first cycle - it flips to false after first renewal
+          isInitialCycle: true,
+        })
         .returning();
 
       // Auto-generate maintenance visits if appointmentDate is provided
@@ -11275,12 +11288,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
           }
           
+          const isLastVisit = i === visitsPerPeriod - 1;
+          // For pay-on-visit agreements, the last visit is the renewal trigger
+          const isRenewalTrigger = agreement.billingPreference === "pay_on_visit" && isLastVisit;
+          
           visits.push({
             agreementId: agreement.id,
             visitNumber: i + 1,
+            totalVisitsInCycle: visitsPerPeriod,
             cycleYear,
             targetDate: formatDateStr(visitDate),
             status: "pending" as const,
+            isRenewalTrigger,
+            renewalStatus: isRenewalTrigger ? "pending" as const : "none" as const,
           });
         }
         
@@ -13675,6 +13695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const visitsPerPeriod = agreement.visitsPerPeriod || 2;
               const frequency = agreement.frequency || "annual";
               const appointmentDate = new Date(agreement.appointmentDate || todayStr);
+              const isPayOnVisit = agreement.billingPreference === "pay_on_visit";
               
               for (let i = 0; i < visitsPerPeriod; i++) {
                 const visitDate = new Date(appointmentDate);
@@ -13689,29 +13710,157 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
                 }
                 
+                const isLastVisit = i === visitsPerPeriod - 1;
+                const isRenewalTrigger = isPayOnVisit && isLastVisit;
+                
                 await db.insert(maintenanceVisits).values({
                   agreementId: agreement.id,
                   cycleYear: currentYear,
                   visitNumber: i + 1,
+                  totalVisitsInCycle: visitsPerPeriod,
                   targetDate: visitDate.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE }),
                   status: "pending",
+                  isRenewalTrigger,
+                  renewalStatus: isRenewalTrigger ? "pending" as const : "none" as const,
                 });
               }
               
-              // Update agreement back to active (clearing grace period) and clear grace expiry
+              // Calculate new end date by extending by one term based on frequency
+              const currentEndDate = agreement.endDate ? new Date(agreement.endDate) : new Date(todayStr);
+              const newEndDate = new Date(currentEndDate);
+              if (frequency === "weekly") {
+                newEndDate.setDate(newEndDate.getDate() + 7);
+              } else if (frequency === "monthly") {
+                newEndDate.setDate(newEndDate.getDate() + 30);
+              } else {
+                // Annual - add 1 year
+                newEndDate.setFullYear(newEndDate.getFullYear() + 1);
+              }
+              const newEndDateStr = newEndDate.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+              
+              // Calculate next invoice date (same as new end date for next renewal)
+              const newNextInvoiceDate = newEndDateStr;
+              
+              // Update agreement back to active (clearing grace period), extend end date, update next invoice date
               await db.update(crmAgreements)
                 .set({
                   status: "active",
                   graceExpiresAt: null,
+                  endDate: newEndDateStr,
+                  nextInvoiceDate: newNextInvoiceDate,
+                  isInitialCycle: false,
                   updatedAt: new Date(),
                 })
                 .where(eq(crmAgreements.id, agreement.id));
               
-              console.log(`[Invoice] Renewed agreement ${agreement.agreementNumber} - visits reset to 0/${visitsPerPeriod} (Invoice ${invoice.invoiceNumber})`);
+              console.log(`[Invoice] Renewed agreement ${agreement.agreementNumber} - visits reset to 0/${visitsPerPeriod}, end date extended to ${newEndDateStr} (Invoice ${invoice.invoiceNumber})`);
             }
           }
         } catch (agreementError) {
           console.error("Error updating agreement on payment:", agreementError);
+          // Don't fail the payment - just log the error
+        }
+      }
+      
+      // Handle pay-on-visit renewal invoices linked via maintenanceVisits.renewalInvoiceId
+      if (newStatus === "paid") {
+        try {
+          // Check if this invoice is linked as a renewal invoice on any maintenance visit
+          const [renewalVisit] = await db.select()
+            .from(maintenanceVisits)
+            .where(eq(maintenanceVisits.renewalInvoiceId, req.params.id))
+            .limit(1);
+          
+          if (renewalVisit) {
+            // Get the agreement for this visit
+            const [agreement] = await db.select()
+              .from(crmAgreements)
+              .where(eq(crmAgreements.id, renewalVisit.agreementId));
+            
+            if (agreement && agreement.billingPreference === "pay_on_visit") {
+              const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+              const currentYear = new Date().getFullYear();
+              const visitsPerPeriod = agreement.visitsPerPeriod || 2;
+              const frequency = agreement.frequency || "annual";
+              
+              // Mark the renewal visit as collected
+              await db.update(maintenanceVisits)
+                .set({ 
+                  renewalStatus: "collected" as const, 
+                  updatedAt: new Date() 
+                })
+                .where(eq(maintenanceVisits.id, renewalVisit.id));
+              
+              // Cancel any old pending visits for previous cycle
+              await db.update(maintenanceVisits)
+                .set({ status: "cancelled" as const, updatedAt: new Date() })
+                .where(and(
+                  eq(maintenanceVisits.agreementId, agreement.id),
+                  eq(maintenanceVisits.status, "pending"),
+                  ne(maintenanceVisits.id, renewalVisit.id)
+                ));
+              
+              // Calculate new dates based on frequency
+              const currentEndDate = agreement.endDate ? new Date(agreement.endDate) : new Date(todayStr);
+              const newEndDate = new Date(currentEndDate);
+              const appointmentDate = new Date(agreement.appointmentDate || todayStr);
+              
+              // Extend end date by one term
+              if (frequency === "weekly") {
+                newEndDate.setDate(newEndDate.getDate() + 7);
+              } else if (frequency === "monthly") {
+                newEndDate.setDate(newEndDate.getDate() + 30);
+              } else {
+                // Annual - add 1 year
+                newEndDate.setFullYear(newEndDate.getFullYear() + 1);
+              }
+              const newEndDateStr = newEndDate.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+              
+              // Create new visits for the next cycle
+              for (let i = 0; i < visitsPerPeriod; i++) {
+                const visitDate = new Date(appointmentDate);
+                if (frequency === "weekly") {
+                  const daysApart = Math.max(1, Math.round(7 / visitsPerPeriod));
+                  visitDate.setDate(visitDate.getDate() + (i * daysApart));
+                } else if (frequency === "monthly") {
+                  const daysApart = Math.max(1, Math.round(30 / visitsPerPeriod));
+                  visitDate.setDate(visitDate.getDate() + (i * daysApart));
+                } else {
+                  const monthsApart = Math.max(1, Math.round(12 / visitsPerPeriod));
+                  visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
+                }
+                
+                const isLastVisit = i === visitsPerPeriod - 1;
+                
+                await db.insert(maintenanceVisits).values({
+                  agreementId: agreement.id,
+                  cycleYear: currentYear,
+                  visitNumber: i + 1,
+                  totalVisitsInCycle: visitsPerPeriod,
+                  targetDate: visitDate.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE }),
+                  status: "pending",
+                  isRenewalTrigger: isLastVisit,
+                  renewalStatus: isLastVisit ? "pending" as const : "none" as const,
+                });
+              }
+              
+              // Update agreement: extend end date, update next invoice date, ensure active status
+              await db.update(crmAgreements)
+                .set({
+                  status: "active",
+                  graceExpiresAt: null,
+                  endDate: newEndDateStr,
+                  nextInvoiceDate: newEndDateStr,
+                  isInitialCycle: false,
+                  updatedAt: new Date(),
+                })
+                .where(eq(crmAgreements.id, agreement.id));
+              
+              console.log(`[Invoice] Pay-on-visit renewal completed for agreement ${agreement.agreementNumber} - end date extended to ${newEndDateStr}, ${visitsPerPeriod} new visits created (Invoice ${invoice.invoiceNumber})`);
+            }
+          }
+        } catch (renewalError) {
+          console.error("Error processing pay-on-visit renewal:", renewalError);
           // Don't fail the payment - just log the error
         }
       }
@@ -19139,6 +19288,246 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error editing work order from mobile:", error);
       return res.status(500).json({ message: "Failed to update work order" });
+    }
+  });
+
+  // ============================================
+  // MOBILE MAINTENANCE RENEWAL ENDPOINTS
+  // ============================================
+
+  // GET /api/mobile/work-orders/:id/renewal-info - Get renewal info for a work order
+  app.get("/api/mobile/work-orders/:id/renewal-info", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const workOrderId = req.params.id;
+      
+      // Check if this work order is linked to a maintenance visit with isRenewalTrigger = true
+      const [visit] = await db.select()
+        .from(maintenanceVisits)
+        .where(and(
+          eq(maintenanceVisits.workOrderId, workOrderId),
+          eq(maintenanceVisits.isRenewalTrigger, true)
+        ))
+        .limit(1);
+      
+      if (!visit) {
+        return res.json({
+          isRenewalVisit: false,
+          renewalStatus: "none",
+          agreementInfo: null
+        });
+      }
+      
+      // Get agreement info
+      const [agreement] = await db.select()
+        .from(crmAgreements)
+        .where(eq(crmAgreements.id, visit.agreementId))
+        .limit(1);
+      
+      if (!agreement) {
+        return res.json({
+          isRenewalVisit: true,
+          renewalStatus: visit.renewalStatus,
+          agreementInfo: null
+        });
+      }
+      
+      return res.json({
+        isRenewalVisit: true,
+        renewalStatus: visit.renewalStatus,
+        agreementInfo: {
+          id: agreement.id,
+          agreementNumber: agreement.agreementNumber,
+          price: agreement.price,
+          customerName: agreement.customerName
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching renewal info:", error);
+      return res.status(500).json({ message: "Failed to fetch renewal info" });
+    }
+  });
+
+  // POST /api/mobile/work-orders/:id/collect-renewal - Collect renewal payment
+  app.post("/api/mobile/work-orders/:id/collect-renewal", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const workOrderId = req.params.id;
+      
+      // Get the work order
+      const [workOrder] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, workOrderId));
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+      
+      // Find the renewal trigger visit for this work order
+      const [visit] = await db.select()
+        .from(maintenanceVisits)
+        .where(and(
+          eq(maintenanceVisits.workOrderId, workOrderId),
+          eq(maintenanceVisits.isRenewalTrigger, true)
+        ))
+        .limit(1);
+      
+      if (!visit) {
+        return res.status(400).json({ message: "This work order is not a renewal visit" });
+      }
+      
+      if (visit.renewalStatus === "collected") {
+        return res.status(400).json({ message: "Renewal payment already collected" });
+      }
+      if (visit.renewalStatus === "declined") {
+        return res.status(400).json({ message: "Renewal was already declined" });
+      }
+      // Prevent duplicate invoice creation - if renewalInvoiceId is set, invoice already created
+      if (visit.renewalInvoiceId) {
+        return res.status(400).json({ message: "Renewal invoice already created. Please complete or void the existing invoice before creating another." });
+      }
+      
+      // Get the agreement
+      const [agreement] = await db.select()
+        .from(crmAgreements)
+        .where(eq(crmAgreements.id, visit.agreementId))
+        .limit(1);
+      
+      if (!agreement) {
+        return res.status(404).json({ message: "Agreement not found" });
+      }
+      
+      // Check if agreement allows renewal
+      if (agreement.autoRenew === false) {
+        return res.status(400).json({ message: "This agreement is not set to auto-renew. Cannot collect renewal payment." });
+      }
+      
+      // Create invoice for renewal amount
+      const invoiceNumber = await generateInvoiceNumber();
+      const renewalAmount = String(agreement.price || "0");
+      
+      const invoiceToCreate = {
+        invoiceNumber,
+        workOrderId: workOrderId,
+        customerId: workOrder.customerId,
+        propertyId: workOrder.propertyId,
+        status: "draft" as const,
+        subtotal: renewalAmount,
+        total: renewalAmount,
+        amountPaid: "0",
+        balanceDue: renewalAmount,
+        createdBy: user.id,
+        notes: `Maintenance Agreement Renewal - ${agreement.agreementNumber}`,
+      };
+      
+      const parseResult = insertCrmInvoiceSchema.safeParse(invoiceToCreate);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Failed to create invoice", 
+          errors: parseResult.error.errors 
+        });
+      }
+      
+      const [invoice] = await db.insert(crmInvoices).values(parseResult.data).returning();
+      
+      // Add line item for the renewal
+      const lineItem = {
+        invoiceId: invoice.id,
+        description: `Maintenance Agreement Renewal - ${agreement.agreementPlan}`,
+        quantity: "1",
+        unitPrice: renewalAmount,
+        lineTotal: renewalAmount,
+      };
+      await db.insert(crmInvoiceLineItems).values(lineItem);
+      
+      // Update the visit with the renewal invoice ID and set status to pending_payment
+      // The invoice-paid handler will flip renewalStatus to "collected" when payment settles
+      await db.update(maintenanceVisits)
+        .set({ renewalInvoiceId: invoice.id, renewalStatus: "pending_payment" as const, updatedAt: new Date() })
+        .where(eq(maintenanceVisits.id, visit.id));
+      
+      await logCrmAudit(
+        user.id,
+        "renewal.invoice_created",
+        "maintenance_visit",
+        visit.id,
+        { invoiceId: invoice.id, agreementId: agreement.id, amount: renewalAmount, status: "pending_payment" },
+        req.ip
+      );
+      
+      return res.status(201).json(invoice);
+    } catch (error) {
+      console.error("Error collecting renewal:", error);
+      return res.status(500).json({ message: "Failed to collect renewal" });
+    }
+  });
+
+  // POST /api/mobile/work-orders/:id/decline-renewal - Decline renewal
+  app.post("/api/mobile/work-orders/:id/decline-renewal", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const workOrderId = req.params.id;
+      
+      // Find the renewal trigger visit for this work order
+      const [visit] = await db.select()
+        .from(maintenanceVisits)
+        .where(and(
+          eq(maintenanceVisits.workOrderId, workOrderId),
+          eq(maintenanceVisits.isRenewalTrigger, true)
+        ))
+        .limit(1);
+      
+      if (!visit) {
+        return res.status(400).json({ message: "This work order is not a renewal visit" });
+      }
+      
+      if (visit.renewalStatus === "collected") {
+        return res.status(400).json({ message: "Renewal has already been collected" });
+      }
+      
+      if (visit.renewalStatus === "declined") {
+        return res.status(400).json({ message: "Renewal has already been declined" });
+      }
+      
+      // Update maintenance visit renewal status to declined
+      await db.update(maintenanceVisits)
+        .set({
+          renewalStatus: "declined",
+          updatedAt: new Date()
+        })
+        .where(eq(maintenanceVisits.id, visit.id));
+      
+      // Update agreement status to expired
+      await db.update(crmAgreements)
+        .set({
+          status: "expired",
+          isActive: false,
+          updatedAt: new Date()
+        })
+        .where(eq(crmAgreements.id, visit.agreementId));
+      
+      await logCrmAudit(
+        user.id,
+        "renewal.declined",
+        "maintenance_visit",
+        visit.id,
+        { agreementId: visit.agreementId },
+        req.ip
+      );
+      
+      return res.json({ success: true, message: "Renewal declined, agreement expired" });
+    } catch (error) {
+      console.error("Error declining renewal:", error);
+      return res.status(500).json({ message: "Failed to decline renewal" });
     }
   });
 
