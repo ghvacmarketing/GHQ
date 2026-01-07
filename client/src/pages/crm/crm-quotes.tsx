@@ -55,12 +55,16 @@ import {
   RotateCcw,
   Trash2,
   Send,
+  Loader2,
+  User,
+  MapPin,
+  X,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
-import type { CrmUser, CrmQuote, CrmQuoteLineItem } from "@shared/schema";
+import type { CrmUser, CrmQuote, CrmQuoteLineItem, CrmCustomer, CrmProperty } from "@shared/schema";
 
 type QuotesResponse = {
   quotes: CrmQuote[];
@@ -145,13 +149,16 @@ export default function CrmQuotes() {
 
   // Create form state
   const [createForm, setCreateForm] = useState({
-    customerName: "",
-    customerEmail: "",
-    customerPhone: "",
-    serviceAddress: "",
     title: "",
     description: "",
+    amount: "",
   });
+
+  // Customer search and property selection state
+  const [customerSearchInput, setCustomerSearchInput] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomer | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<CrmProperty | null>(null);
+  const debouncedCustomerSearch = useDebounce(customerSearchInput, 300);
 
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -188,23 +195,81 @@ export default function CrmQuotes() {
     enabled: !!currentUser,
   });
 
+  // Customer search query
+  const { data: customerSearchResults = [], isLoading: isSearchingCustomers } = useQuery<CrmCustomer[]>({
+    queryKey: ["/api/crm/customers", "search", debouncedCustomerSearch],
+    queryFn: async () => {
+      if (!debouncedCustomerSearch.trim()) return [];
+      const res = await fetch(`/api/crm/customers?search=${encodeURIComponent(debouncedCustomerSearch)}`, { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.customers || [];
+    },
+    enabled: debouncedCustomerSearch.trim().length >= 2,
+  });
+
+  // Fetch properties for selected customer
+  const { data: customerProperties = [] } = useQuery<CrmProperty[]>({
+    queryKey: ["/api/crm/properties", { customerId: selectedCustomer?.id }],
+    queryFn: async () => {
+      if (!selectedCustomer?.id) return [];
+      const res = await fetch(`/api/crm/properties?customerId=${selectedCustomer.id}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedCustomer?.id,
+  });
+
+  // Auto-select property if customer only has one
+  useEffect(() => {
+    if (customerProperties.length === 1 && !selectedProperty) {
+      setSelectedProperty(customerProperties[0]);
+    } else if (customerProperties.length === 0) {
+      setSelectedProperty(null);
+    }
+  }, [customerProperties, selectedProperty]);
+
+  const resetCreateForm = () => {
+    setCreateForm({ title: "", description: "", amount: "" });
+    setSelectedCustomer(null);
+    setSelectedProperty(null);
+    setCustomerSearchInput("");
+  };
+
   const createQuoteMutation = useMutation({
-    mutationFn: async (data: typeof createForm) => {
-      const res = await apiRequest("POST", "/api/crm/quotes", data);
+    mutationFn: async () => {
+      if (!selectedCustomer?.id) {
+        throw new Error("Customer is required");
+      }
+      const amountStr = createForm.amount?.trim();
+      const amount = amountStr ? parseFloat(amountStr) : 0;
+      if (isNaN(amount) || amount < 0) {
+        throw new Error("Please enter a valid amount");
+      }
+      const res = await apiRequest("POST", "/api/crm/quotes/quick", {
+        customerId: selectedCustomer.id,
+        customerName: selectedCustomer.name || "Unknown Customer",
+        customerEmail: selectedCustomer.email || null,
+        customerPhone: selectedCustomer.phone || null,
+        propertyId: selectedProperty?.id || undefined,
+        title: createForm.title || "Quick Quote",
+        description: createForm.description || undefined,
+        lineItems: [
+          {
+            description: createForm.title || "Quick Quote Item",
+            quantity: 1,
+            unitPrice: amount,
+            taxable: true,
+          },
+        ],
+      });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setShowCreateDialog(false);
-      setCreateForm({
-        customerName: "",
-        customerEmail: "",
-        customerPhone: "",
-        serviceAddress: "",
-        title: "",
-        description: "",
-      });
+      resetCreateForm();
       toast({ title: "Quote created successfully" });
     },
     onError: () => {
@@ -355,17 +420,19 @@ export default function CrmQuotes() {
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.customerName.trim()) {
-      toast({ title: "Customer name is required", variant: "destructive" });
+    if (!selectedCustomer) {
+      toast({ title: "Please select a customer", variant: "destructive" });
       return;
     }
-    const hasPhoneError = createForm.customerPhone && !validatePhone(createForm.customerPhone);
-    const hasEmailError = createForm.customerEmail && !validateEmail(createForm.customerEmail);
-    if (hasPhoneError || hasEmailError) {
-      toast({ title: "Please fix validation errors", variant: "destructive" });
+    if (!createForm.title.trim()) {
+      toast({ title: "Quote title is required", variant: "destructive" });
       return;
     }
-    createQuoteMutation.mutate(createForm);
+    if (!createForm.amount || parseFloat(createForm.amount) <= 0) {
+      toast({ title: "Please enter a valid amount", variant: "destructive" });
+      return;
+    }
+    createQuoteMutation.mutate();
   };
 
   if (authLoading) {
@@ -801,82 +868,136 @@ export default function CrmQuotes() {
       <Dialog open={showCreateDialog} onOpenChange={(open) => {
         setShowCreateDialog(open);
         if (!open) {
-          setCreateForm({
-            customerName: "",
-            customerEmail: "",
-            customerPhone: "",
-            serviceAddress: "",
-            title: "",
-            description: "",
-          });
+          resetCreateForm();
         }
       }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Create New Quote</DialogTitle>
+            <DialogTitle>Create Quick Quote</DialogTitle>
             <DialogDescription>
-              Enter customer information to create a new CRM quote.
+              Select a customer and enter quote details.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateSubmit} className="space-y-4">
+            {/* Customer Selection */}
             <div className="space-y-2">
-              <Label htmlFor="customerName">Customer Name *</Label>
-              <Input
-                id="customerName"
-                value={createForm.customerName}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, customerName: e.target.value }))}
-                placeholder="Enter customer name"
-                data-testid="input-customer-name"
-              />
+              <Label>Customer *</Label>
+              {selectedCustomer ? (
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-slate-500" />
+                    <div>
+                      <p className="font-medium text-sm">{selectedCustomer.name}</p>
+                      {selectedCustomer.email && (
+                        <p className="text-xs text-slate-500">{selectedCustomer.email}</p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCustomer(null);
+                      setSelectedProperty(null);
+                      setCustomerSearchInput("");
+                    }}
+                    data-testid="button-clear-customer"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search customers..."
+                    value={customerSearchInput}
+                    onChange={(e) => setCustomerSearchInput(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-customer-search"
+                  />
+                  {isSearchingCustomers && (
+                    <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-slate-400" />
+                  )}
+                  {customerSearchResults.length > 0 && customerSearchInput.length >= 2 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {customerSearchResults.map((customer) => (
+                        <button
+                          key={customer.id}
+                          type="button"
+                          className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2"
+                          onClick={() => {
+                            setSelectedCustomer(customer);
+                            setCustomerSearchInput("");
+                            setSelectedProperty(null);
+                          }}
+                          data-testid={`customer-option-${customer.id}`}
+                        >
+                          <User className="h-4 w-4 text-slate-400" />
+                          <div>
+                            <p className="font-medium text-sm">{customer.name}</p>
+                            {customer.email && (
+                              <p className="text-xs text-slate-500">{customer.email}</p>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            {/* Property Selection - shown when customer has multiple properties */}
+            {selectedCustomer && customerProperties.length > 1 && (
               <div className="space-y-2">
-                <Label htmlFor="customerEmail">Email</Label>
-                <Input
-                  id="customerEmail"
-                  type="email"
-                  value={createForm.customerEmail}
-                  onChange={(e) => {
-                    setCreateForm(prev => ({ ...prev, customerEmail: e.target.value }));
+                <Label>Property *</Label>
+                <Select
+                  value={selectedProperty?.id || ""}
+                  onValueChange={(value) => {
+                    const property = customerProperties.find((p) => p.id === value);
+                    setSelectedProperty(property || null);
                   }}
-                  placeholder="email@example.com"
-                  className={createForm.customerEmail && !validateEmail(createForm.customerEmail) ? "border-red-500" : ""}
-                  data-testid="input-customer-email"
-                />
-                {createForm.customerEmail && !validateEmail(createForm.customerEmail) && (
-                  <p className="text-sm text-red-500">Please enter a valid email</p>
-                )}
+                >
+                  <SelectTrigger data-testid="select-property">
+                    <SelectValue placeholder="Select a property">
+                      {selectedProperty && (
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-slate-400" />
+                          <span>{selectedProperty.address1}{selectedProperty.city ? `, ${selectedProperty.city}` : ""}</span>
+                        </div>
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    {customerProperties.map((property) => (
+                      <SelectItem key={property.id} value={property.id}>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-slate-400" />
+                          <span>{property.address1}{property.city ? `, ${property.city}` : ""}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+            )}
+
+            {/* Show selected property info when auto-selected */}
+            {selectedCustomer && customerProperties.length === 1 && selectedProperty && (
               <div className="space-y-2">
-                <Label htmlFor="customerPhone">Phone</Label>
-                <Input
-                  id="customerPhone"
-                  value={createForm.customerPhone}
-                  onChange={(e) => {
-                    const formatted = formatPhoneNumber(e.target.value);
-                    setCreateForm(prev => ({ ...prev, customerPhone: formatted }));
-                  }}
-                  placeholder="(555) 123-4567"
-                  className={createForm.customerPhone && !validatePhone(createForm.customerPhone) ? "border-red-500" : ""}
-                  data-testid="input-customer-phone"
-                />
-                {createForm.customerPhone && !validatePhone(createForm.customerPhone) && (
-                  <p className="text-sm text-red-500">Please enter a valid phone number</p>
-                )}
+                <Label>Property</Label>
+                <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border">
+                  <MapPin className="h-4 w-4 text-slate-500" />
+                  <span className="text-sm">{selectedProperty.address1}{selectedProperty.city ? `, ${selectedProperty.city}` : ""}</span>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Quote Details */}
             <div className="space-y-2">
-              <Label htmlFor="serviceAddress">Service Address</Label>
-              <Input
-                id="serviceAddress"
-                value={createForm.serviceAddress}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, serviceAddress: e.target.value }))}
-                placeholder="123 Main St, City, State"
-                data-testid="input-service-address"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="title">Quote Title</Label>
+              <Label htmlFor="title">Quote Title *</Label>
               <Input
                 id="title"
                 value={createForm.title}
@@ -884,6 +1005,23 @@ export default function CrmQuotes() {
                 placeholder="e.g., AC Unit Replacement"
                 data-testid="input-title"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="amount">Amount *</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500">$</span>
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={createForm.amount}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, amount: e.target.value }))}
+                  placeholder="0.00"
+                  className="pl-7"
+                  data-testid="input-amount"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
@@ -903,7 +1041,7 @@ export default function CrmQuotes() {
               <Button 
                 type="submit" 
                 className="bg-[#711419] hover:bg-[#5a1014]"
-                disabled={createQuoteMutation.isPending}
+                disabled={createQuoteMutation.isPending || !selectedCustomer}
                 data-testid="button-submit-create"
               >
                 {createQuoteMutation.isPending ? "Creating..." : "Create Quote"}

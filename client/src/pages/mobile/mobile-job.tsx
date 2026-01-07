@@ -88,6 +88,8 @@ export default function MobileJob() {
   const [priority, setPriority] = useState<string>("normal");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSlot, setSelectedSlot] = useState<{ start: string; end: string } | null>(null);
+  const [selectedStartTime, setSelectedStartTime] = useState<string>("");
+  const [selectedEndTime, setSelectedEndTime] = useState<string>("");
   const [conflictError, setConflictError] = useState<string | null>(null);
 
   const { data: currentUser, isLoading: userLoading } = useQuery<CrmUser | null>({
@@ -149,26 +151,60 @@ export default function MobileJob() {
     enabled: !!selectedCustomer?.id,
   });
 
-  // Fetch available time slots when date is selected
-  interface TimeSlot {
-    start: string;
-    end: string;
-    label: string;
-    available: boolean;
-  }
-  
-  const { data: availableSlots = [], isLoading: slotsLoading } = useQuery<TimeSlot[]>({
-    queryKey: ["/api/mobile/work-orders/available-slots", { date: selectedDate ? format(selectedDate, "yyyy-MM-dd") : null }],
-    queryFn: async () => {
-      if (!selectedDate) return [];
+  // Generate time options for dropdowns (8:00 AM to 8:00 PM in 30-minute increments)
+  const startTimeOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = [];
+    for (let hour = 8; hour <= 19; hour++) {
+      for (let min = 0; min < 60; min += 30) {
+        const h24 = hour.toString().padStart(2, '0');
+        const m = min.toString().padStart(2, '0');
+        const value = `${h24}:${m}`;
+        const h12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const label = `${h12}:${m.padStart(2, '0')} ${ampm}`;
+        options.push({ value, label });
+      }
+    }
+    return options;
+  }, []);
+
+  const endTimeOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = [];
+    for (let hour = 8; hour <= 20; hour++) {
+      for (let min = 0; min < 60; min += 30) {
+        if (hour === 8 && min === 0) continue; // Start at 8:30 AM for end time
+        if (hour === 20 && min === 30) continue; // Stop at 8:00 PM
+        const h24 = hour.toString().padStart(2, '0');
+        const m = min.toString().padStart(2, '0');
+        const value = `${h24}:${m}`;
+        const h12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const label = `${h12}:${m.padStart(2, '0')} ${ampm}`;
+        options.push({ value, label });
+      }
+    }
+    return options;
+  }, []);
+
+  const filteredEndTimeOptions = useMemo(() => {
+    if (!selectedStartTime) return endTimeOptions;
+    return endTimeOptions.filter(opt => opt.value > selectedStartTime);
+  }, [endTimeOptions, selectedStartTime]);
+
+  // Update selectedSlot when date and times are selected, and clear any conflict error
+  useEffect(() => {
+    // Clear conflict error when user changes time selection
+    setConflictError(null);
+    
+    if (selectedDate && selectedStartTime && selectedEndTime) {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      const res = await fetch(`/api/mobile/work-orders/available-slots?date=${dateStr}`, { credentials: "include" });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.slots || [];
-    },
-    enabled: !!selectedDate,
-  });
+      const startISO = new Date(`${dateStr}T${selectedStartTime}:00`).toISOString();
+      const endISO = new Date(`${dateStr}T${selectedEndTime}:00`).toISOString();
+      setSelectedSlot({ start: startISO, end: endISO });
+    } else {
+      setSelectedSlot(null);
+    }
+  }, [selectedDate, selectedStartTime, selectedEndTime]);
 
   // Work subtypes based on visit type
   const workSubtypes: Record<string, string[]> = {
@@ -239,6 +275,8 @@ export default function MobileJob() {
     setPriority("normal");
     setSelectedDate(undefined);
     setSelectedSlot(null);
+    setSelectedStartTime("");
+    setSelectedEndTime("");
     setConflictError(null);
   };
 
@@ -790,7 +828,8 @@ export default function MobileJob() {
                     selected={selectedDate}
                     onSelect={(date) => {
                       setSelectedDate(date);
-                      setSelectedSlot(null);
+                      setSelectedStartTime("");
+                      setSelectedEndTime("");
                     }}
                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                     initialFocus
@@ -798,44 +837,53 @@ export default function MobileJob() {
                 </PopoverContent>
               </Popover>
 
-              {/* Time Slots Grid */}
+              {/* Time Selection Dropdowns */}
               {selectedDate && (
-                <div className="space-y-2">
-                  <Label className="text-xs text-slate-500">Available Time Slots</Label>
-                  {slotsLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-                      <span className="ml-2 text-sm text-slate-500">Loading slots...</span>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500">Start Time</Label>
+                      <Select 
+                        value={selectedStartTime} 
+                        onValueChange={(val) => {
+                          setSelectedStartTime(val);
+                          if (selectedEndTime && val >= selectedEndTime) {
+                            setSelectedEndTime("");
+                          }
+                        }}
+                      >
+                        <SelectTrigger data-testid="select-start-time">
+                          <SelectValue placeholder="Select start" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {startTimeOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  ) : availableSlots.length === 0 ? (
-                    <p className="text-sm text-slate-500 py-2">No time slots available for this date</p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      {availableSlots.map((slot, idx) => {
-                        const isSelected = selectedSlot?.start === slot.start && selectedSlot?.end === slot.end;
-                        return (
-                          <Button
-                            key={idx}
-                            type="button"
-                            variant={isSelected ? "default" : "outline"}
-                            size="sm"
-                            disabled={!slot.available}
-                            onClick={() => setSelectedSlot({ start: slot.start, end: slot.end })}
-                            className={`text-xs ${
-                              isSelected
-                                ? "bg-[#711419] hover:bg-[#5a1014] text-white"
-                                : slot.available
-                                ? "hover:bg-slate-100"
-                                : "opacity-50 cursor-not-allowed bg-slate-100 text-slate-400"
-                            }`}
-                            data-testid={`time-slot-${idx}`}
-                          >
-                            {slot.label}
-                          </Button>
-                        );
-                      })}
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500">End Time</Label>
+                      <Select 
+                        value={selectedEndTime} 
+                        onValueChange={setSelectedEndTime}
+                        disabled={!selectedStartTime}
+                      >
+                        <SelectTrigger data-testid="select-end-time">
+                          <SelectValue placeholder="Select end" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredEndTimeOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
 
