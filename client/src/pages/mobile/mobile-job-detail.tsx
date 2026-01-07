@@ -3001,6 +3001,7 @@ export default function MobileJobDetail() {
   const [optimisticStatus, setOptimisticStatus] = useState<WorkOrderStatus | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionSummary, setCompletionSummary] = useState("");
+  const [showInvoiceReminder, setShowInvoiceReminder] = useState(false);
 
   const { data: workOrder, isLoading } = useQuery<WorkOrderDetail>({
     queryKey: ["/api/crm/work-orders", params.id],
@@ -3232,13 +3233,23 @@ export default function MobileJobDetail() {
       }
       await apiRequest("PATCH", `/api/crm/work-orders/${params.id}`, payload);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       setOptimisticStatus(null);
       setShowCompletionModal(false);
       setCompletionSummary("");
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
       toast({ title: "Status updated" });
+      
+      // Show invoice reminder for first visit of pay-on-visit pending agreements
+      if (
+        variables.newStatus === "completed" &&
+        renewalInfo?.agreementInfo?.billingPreference === "pay_on_visit" &&
+        renewalInfo?.visitInfo?.visitNumber === 1 &&
+        renewalInfo?.agreementInfo?.status === "pending"
+      ) {
+        setShowInvoiceReminder(true);
+      }
     },
     onError: (error, variables) => {
       if (isNetworkError(error)) {
@@ -3852,6 +3863,44 @@ export default function MobileJobDetail() {
                 <X className="h-4 w-4 mr-2" />
               )}
               Confirm Decline
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invoice Reminder Dialog for Pay-on-Visit First Visits */}
+      <Dialog open={showInvoiceReminder} onOpenChange={setShowInvoiceReminder}>
+        <DialogContent className="sm:max-w-md" data-testid="invoice-reminder-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-amber-600" />
+              Invoice Reminder
+            </DialogTitle>
+            <DialogDescription>
+              This maintenance visit has been completed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+              <p className="text-sm text-amber-800 font-medium">
+                Don't forget to invoice the customer for their maintenance agreement!
+              </p>
+              {renewalInfo?.agreementInfo && (
+                <div className="text-sm text-amber-700 space-y-1">
+                  <p>Agreement: <strong>{renewalInfo.agreementInfo.agreementNumber}</strong></p>
+                  <p>Amount: <strong>${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)}</strong></p>
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => setShowInvoiceReminder(false)}
+              className="min-h-[44px] w-full"
+              data-testid="button-dismiss-invoice-reminder"
+            >
+              <Check className="h-4 w-4 mr-2" />
+              Got it
             </Button>
           </DialogFooter>
         </DialogContent>

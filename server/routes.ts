@@ -11360,36 +11360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (visits.length > 0) {
-          const insertedVisits = await db.insert(maintenanceVisits).values(visits).returning();
-          
-          // Get the customer's existing work order count to calculate starting number
-          const existingWorkOrders = await storage.getWorkOrdersByCustomerId(agreement.customerId!);
-          const startingWoNumber = existingWorkOrders.length + 1;
-          
-          // Prepare all work orders for batch insert
-          const workOrdersToInsert = insertedVisits.map((visit, index) => ({
-            customerId: agreement.customerId,
-            propertyId: agreement.propertyId,
-            agreementId: agreement.id,
-            workOrderNumber: startingWoNumber + index,
-            title: `${agreement.agreementPlan || "Maintenance"} - Visit ${visit.visitNumber}/${visit.totalVisitsInCycle}`,
-            visitType: "MAINTENANCE" as const,
-            workSubtype: agreement.agreementPlan || "Preventative Maintenance",
-            description: `Scheduled maintenance visit for ${agreement.agreementNumber}`,
-            status: "scheduled" as const,
-            scheduledStart: new Date(visit.targetDate + "T09:00:00"),
-            scheduledEnd: new Date(visit.targetDate + "T11:00:00"),
-          }));
-          
-          // Batch insert all work orders
-          const insertedWorkOrders = await db.insert(crmWorkOrders).values(workOrdersToInsert).returning();
-          
-          // Batch update visits with their corresponding work order IDs
-          for (let i = 0; i < insertedVisits.length; i++) {
-            await db.update(maintenanceVisits)
-              .set({ workOrderId: insertedWorkOrders[i].id })
-              .where(eq(maintenanceVisits.id, insertedVisits[i].id));
-          }
+          await db.insert(maintenanceVisits).values(visits);
         }
       }
 
