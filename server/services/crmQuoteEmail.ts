@@ -189,6 +189,28 @@ function buildTextBody(
 ): string {
   const lines: string[] = [];
   lines.push(`${brandDefaults.name}`);
+  lines.push("Professional Heating & Cooling Solutions");
+  lines.push("");
+  lines.push("----------------------------------------");
+  lines.push("");
+  lines.push(`Quote Number: ${quote.quoteNumber || ""}`);
+  lines.push(`Date Prepared: ${formatDate(quote.createdAt)}`);
+  lines.push(`Service Type: ${formatQuoteType(quote.quoteType)}`);
+  if (quote.validUntil) {
+    lines.push(`Valid Until: ${formatDate(quote.validUntil)}`);
+  }
+  lines.push("");
+  lines.push("----------------------------------------");
+  lines.push("");
+  lines.push("YOUR QUOTE IS READY!");
+  lines.push("");
+  lines.push(`Prepared For: ${quote.customerName || "Valued Customer"}`);
+  if (quote.serviceAddress) {
+    lines.push(`Service Location: ${quote.serviceAddress}`);
+  }
+  lines.push("");
+  lines.push("Thank you for considering Giesbrecht HVAC for your HVAC needs.");
+  lines.push("We've prepared a detailed quote for you to review.");
   lines.push("");
 
   if (personalMessage) {
@@ -202,11 +224,29 @@ function buildTextBody(
     lines.push("");
   }
 
-  lines.push("Questions? Contact us at (706) 826-0644.");
+  lines.push("----------------------------------------");
   lines.push("");
-  lines.push("Thank you for choosing Giesbrecht HVAC!");
+  lines.push("Questions? Contact us at (706) 826-0644 or reply to this email.");
+  lines.push("");
+  lines.push("Giesbrecht HVAC");
+  lines.push("(706) 826-0644");
+  lines.push("3914 Mike Padgett Hwy");
+  lines.push("Augusta, GA 30906");
+  lines.push("");
+  lines.push("Licensed & Insured | Serving Augusta, GA and surrounding areas");
 
   return lines.join("\n");
+}
+
+function formatQuoteType(quoteType?: string | null): string {
+  if (!quoteType) return "HVAC Service";
+  switch (quoteType.toLowerCase()) {
+    case "quick": return "Service Quote";
+    case "proposal": return "Installation Proposal";
+    case "custom_install": return "Custom Installation";
+    case "custom_service": return "Custom Service";
+    default: return "HVAC Service";
+  }
 }
 
 function buildHtmlBody(
@@ -227,6 +267,11 @@ function buildHtmlBody(
         </td>
       </tr>`
     : "";
+
+  const serviceType = formatQuoteType(quote.quoteType);
+  const quoteDate = formatDate(quote.createdAt);
+  const validUntilDate = quote.validUntil ? formatDate(quote.validUntil) : null;
+  const serviceAddress = quote.serviceAddress;
 
   const headCss = `
     :root { color-scheme: light only; }
@@ -260,9 +305,47 @@ function buildHtmlBody(
             </td>
           </tr>
 
+          <!-- Quote Reference Header -->
+          <tr>
+            <td class="px-24" style="padding:20px 20px 0 20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;border-radius:8px;padding:16px;">
+                <tr>
+                  <td style="padding:16px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="width:50%;vertical-align:top;">
+                          <p style="margin:0 0 4px 0;color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Quote Number</p>
+                          <p style="margin:0;color:#1e293b;font-size:15px;font-weight:700;">${esc(quote.quoteNumber || "")}</p>
+                        </td>
+                        <td style="width:50%;vertical-align:top;text-align:right;">
+                          <p style="margin:0 0 4px 0;color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Date Prepared</p>
+                          <p style="margin:0;color:#1e293b;font-size:14px;font-weight:600;">${esc(quoteDate)}</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="padding-top:12px;">
+                          <p style="margin:0 0 4px 0;color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Service Type</p>
+                          <p style="margin:0;color:#1e293b;font-size:14px;font-weight:600;">${esc(serviceType)}</p>
+                        </td>
+                      </tr>
+                      ${validUntilDate ? `
+                      <tr>
+                        <td colspan="2" style="padding-top:12px;">
+                          <p style="margin:0 0 4px 0;color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Valid Until</p>
+                          <p style="margin:0;color:#1e293b;font-size:14px;font-weight:600;">${esc(validUntilDate)}</p>
+                        </td>
+                      </tr>
+                      ` : ""}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
           <!-- Greeting -->
           <tr>
-            <td class="px-24" style="padding:24px 20px 16px 20px;">
+            <td class="px-24" style="padding:20px 20px 16px 20px;">
               <h2 style="margin:0;color:#111827;font-size:20px;font-weight:600;">Your Quote is Ready!</h2>
               <p style="margin:10px 0 0 0;color:#6b7280;font-size:14px;line-height:1.5;">
                 Thank you for considering ${esc(brandName)} for your HVAC needs. We've prepared a detailed quote for you to review.
@@ -270,13 +353,27 @@ function buildHtmlBody(
             </td>
           </tr>
 
-          <!-- Prepared For -->
+          <!-- Customer and Service Location -->
           <tr>
             <td class="px-24" style="padding:0 20px 16px 20px;">
-              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;">
-                <p style="margin:0 0 4px 0;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Prepared For</p>
-                <p style="margin:0;color:#1e293b;font-size:16px;font-weight:600;">${esc(quote.customerName || "Valued Customer")}</p>
-              </div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width:${serviceAddress ? '50%' : '100%'};vertical-align:top;padding-right:${serviceAddress ? '8px' : '0'};">
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;height:100%;">
+                      <p style="margin:0 0 4px 0;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Prepared For</p>
+                      <p style="margin:0;color:#1e293b;font-size:16px;font-weight:600;">${esc(quote.customerName || "Valued Customer")}</p>
+                    </div>
+                  </td>
+                  ${serviceAddress ? `
+                  <td style="width:50%;vertical-align:top;padding-left:8px;">
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;height:100%;">
+                      <p style="margin:0 0 4px 0;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Service Location</p>
+                      <p style="margin:0;color:#1e293b;font-size:14px;font-weight:500;line-height:1.4;">${esc(serviceAddress)}</p>
+                    </div>
+                  </td>
+                  ` : ""}
+                </tr>
+              </table>
             </td>
           </tr>
 
@@ -309,8 +406,9 @@ function buildHtmlBody(
             <td style="background:#f3f4f6;padding:24px 20px;text-align:center;border-top:1px solid #e5e7eb;">
               <p style="margin:0;font-weight:700;color:#111827;font-size:15px;">${esc(brandName)}</p>
               <p style="margin:8px 0 0 0;font-size:13px;color:#6b7280;">(706) 826-0644</p>
-              <p style="margin:4px 0 0 0;font-size:12px;color:#9ca3af;">Serving Augusta, GA and surrounding areas</p>
-              <p style="margin:12px 0 0 0;font-size:11px;color:#9ca3af;">Licensed &amp; Insured | Quality Service Since Day One</p>
+              <p style="margin:8px 0 0 0;font-size:12px;color:#6b7280;">3914 Mike Padgett Hwy</p>
+              <p style="margin:2px 0 0 0;font-size:12px;color:#6b7280;">Augusta, GA 30906</p>
+              <p style="margin:12px 0 0 0;font-size:11px;color:#9ca3af;">Licensed &amp; Insured | Serving Augusta, GA and surrounding areas</p>
             </td>
           </tr>
 
