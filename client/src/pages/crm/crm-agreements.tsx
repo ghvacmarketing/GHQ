@@ -242,6 +242,7 @@ export default function CrmAgreements() {
 
   const canManageTypes = currentUser?.role === "admin" || currentUser?.role === "owner" || currentUser?.role === "sales";
   const isAdminOrOwner = currentUser?.role === "admin" || currentUser?.role === "owner";
+  const canProcessRenewals = ["owner", "admin", "supervisor", "sales"].includes(currentUser?.role || "");
 
   const { data: customAgreementTypes = [], isLoading: typesLoading } = useQuery<CustomAgreementType[]>({
     queryKey: ["/api/crm/custom-agreement-types"],
@@ -671,7 +672,7 @@ export default function CrmAgreements() {
                 Reset
               </Button>
             )}
-            {isAdminOrOwner && (
+            {canProcessRenewals && (
               <Button
                 variant="outline"
                 size="sm"

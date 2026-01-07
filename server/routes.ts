@@ -11432,8 +11432,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/crm/agreements/process-renewals - Manually trigger agreement renewal processing (Admin only)
-  app.post("/api/crm/agreements/process-renewals", requireCrmAdmin, async (req, res) => {
+  // POST /api/crm/agreements/process-renewals - Manually trigger agreement renewal processing
+  app.post("/api/crm/agreements/process-renewals", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
       if (!user) {
