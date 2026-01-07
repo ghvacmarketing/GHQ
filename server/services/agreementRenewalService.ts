@@ -93,7 +93,8 @@ export async function processSingleAgreementRenewal(agreement: CrmAgreement): Pr
     result.invoiceId = invoice.id;
     result.invoiceNumber = invoice.invoiceNumber;
 
-    const lineItemDescription = `${agreement.agreementPlan} - Annual Renewal (${agreement.numberOfSystems} system${agreement.numberOfSystems > 1 ? "s" : ""})`;
+    const systemCount = agreement.numberOfSystems || 1;
+    const lineItemDescription = `${agreement.agreementPlan || "Service Agreement"} - Renewal (${systemCount} system${systemCount > 1 ? "s" : ""})`;
     
     await db.insert(crmInvoiceLineItems).values({
       invoiceId: invoice.id,
@@ -127,7 +128,7 @@ export async function processSingleAgreementRenewal(agreement: CrmAgreement): Pr
         lineItems,
         customerEmail,
         agreement.customerName,
-        `Your ${agreement.agreementPlan} agreement is due for renewal. This invoice covers your continued service for the next year.`,
+        `Your ${agreement.agreementPlan || "service"} agreement is due for renewal. This invoice covers your continued service.`,
         "System (Auto-Renewal)"
       );
 
@@ -155,7 +156,7 @@ export async function processSingleAgreementRenewal(agreement: CrmAgreement): Pr
     }
 
     const currentNextInvoiceDate = agreement.nextInvoiceDate ? new Date(agreement.nextInvoiceDate) : new Date();
-    const newNextInvoiceDate = getNextInvoiceDate(currentNextInvoiceDate, agreement.frequency);
+    const newNextInvoiceDate = getNextInvoiceDate(currentNextInvoiceDate, agreement.frequency || "annual");
     
     await db.update(crmAgreements)
       .set({
