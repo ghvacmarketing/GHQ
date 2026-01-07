@@ -190,6 +190,7 @@ export default function CrmQuoteDetail() {
   const [presentationSelectedOption, setPresentationSelectedOption] = useState<string | null>(null);
   const [showWhatsIncludedDialog, setShowWhatsIncludedDialog] = useState(false);
   const [editingWhatsIncluded, setEditingWhatsIncluded] = useState<Array<{ category: string; items: string[] }>>([]);
+  const [isVerifyingDeposit, setIsVerifyingDeposit] = useState(false);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -817,6 +818,43 @@ export default function CrmQuoteDetail() {
   const confirmDelete = () => {
     deleteMutation.mutate();
     setShowDeleteConfirm(false);
+  };
+
+  const handleVerifyDeposit = async () => {
+    if (!quote) return;
+    setIsVerifyingDeposit(true);
+    try {
+      const res = await fetch(`/api/stripe/quote/${quote.id}/verify-deposit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const result = await res.json();
+      if (result.success) {
+        toast({
+          title: "Deposit Verified",
+          description: result.alreadyPaid 
+            ? "Deposit was already recorded."
+            : `Deposit of $${result.depositAmount?.toFixed(2)} has been verified and recorded.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "No Deposit Found",
+          description: result.message || "No successful payment found for this quote.",
+        });
+      }
+    } catch (err) {
+      console.error("Error verifying deposit:", err);
+      toast({
+        variant: "destructive",
+        title: "Verification Error",
+        description: "Failed to verify deposit. Please try again.",
+      });
+    } finally {
+      setIsVerifyingDeposit(false);
+    }
   };
 
   const handleDownloadPDF = () => {
@@ -1510,6 +1548,33 @@ export default function CrmQuoteDetail() {
                 total={parseFloat(quote.total?.toString() || "0")}
                 customerPhone={quote.customer?.phone || quote.customerPhone}
               />
+              
+              {/* Verify Deposit button - for install quotes with payment link */}
+              {quote.stripePaymentLinkId && !quote.depositPaidAt && (
+                <Button
+                  onClick={handleVerifyDeposit}
+                  size="sm"
+                  variant="outline"
+                  className="border-green-600 text-green-600 hover:bg-green-50"
+                  disabled={isVerifyingDeposit}
+                  data-testid="button-verify-deposit"
+                >
+                  {isVerifyingDeposit ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Verify Deposit
+                </Button>
+              )}
+              
+              {/* Show deposit status if paid */}
+              {quote.depositPaidAt && (
+                <Badge className="bg-green-100 text-green-800 border-green-200">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Deposit Paid: ${parseFloat(quote.depositAmount || "0").toFixed(2)}
+                </Badge>
+              )}
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

@@ -1163,6 +1163,7 @@ export const crmQuotes = pgTable("crm_quotes", {
   depositPaidAt: timestamp("deposit_paid_at"),
   depositAmount: decimal("deposit_amount", { precision: 10, scale: 2 }),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripePaymentLinkId: text("stripe_payment_link_id"),
 });
 
 // CRM Quote Line Items

@@ -101,6 +101,11 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
       },
     });
 
+    // Store the payment link ID on the quote for later verification
+    await db.update(crmQuotes)
+      .set({ stripePaymentLinkId: paymentLink.id })
+      .where(eq(crmQuotes.id, quoteId));
+
     res.json({
       paymentLinkUrl: paymentLink.url,
       paymentLinkId: paymentLink.id,
@@ -210,77 +215,127 @@ router.post("/api/stripe/quote/:quoteId/verify-deposit", async (req, res) => {
       return res.json({ 
         success: true, 
         depositPaidAt: quote.depositPaidAt,
-        depositAmount: quote.depositAmount,
+        depositAmount: parseFloat(quote.depositAmount || "0"),
         alreadyPaid: true 
       });
     }
 
     const stripe = await getUncachableStripeClient();
+    const now = new Date();
 
-    // Search for successful payment intents with this quote's metadata
-    const paymentIntents = await stripe.paymentIntents.list({
-      limit: 10,
-    });
-
-    // Find a successful payment for this quote
-    const successfulPayment = paymentIntents.data.find(pi => 
-      pi.status === 'succeeded' && 
-      pi.metadata?.quoteId === quoteId &&
-      pi.metadata?.type === 'quote_deposit'
-    );
-
-    if (successfulPayment) {
-      // Update the quote with deposit payment info
-      const depositAmount = (successfulPayment.amount / 100).toFixed(2);
-      await db.update(crmQuotes)
-        .set({
-          depositPaidAt: new Date(),
-          depositAmount: depositAmount,
-          stripePaymentIntentId: successfulPayment.id,
-        })
-        .where(eq(crmQuotes.id, quoteId));
-
-      return res.json({
-        success: true,
-        depositPaidAt: new Date(),
-        depositAmount: parseFloat(depositAmount),
-        stripePaymentIntentId: successfulPayment.id,
+    // Use the stored Payment Link ID if available for direct lookup
+    const paymentLinkId = quote.stripePaymentLinkId;
+    
+    if (paymentLinkId) {
+      // Find Checkout Sessions created from this specific Payment Link
+      // The payment_link filter returns only sessions from this specific link
+      const checkoutSessions = await stripe.checkout.sessions.list({
+        payment_link: paymentLinkId,
+        limit: 100, // Max allowed, typically only 1 session per link
       });
+
+      // Find a valid paid session (check status and payment status)
+      for (const session of checkoutSessions.data) {
+        // Only accept sessions that are complete and paid
+        if (session.payment_status === 'paid' && session.status === 'complete') {
+          const paymentIntentId = typeof session.payment_intent === 'string' 
+            ? session.payment_intent 
+            : session.payment_intent?.id || null;
+          
+          // Verify the PaymentIntent hasn't been refunded
+          if (paymentIntentId) {
+            const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+              expand: ['charges.data'],
+            });
+            
+            // Check if the payment is valid and cleared
+            if (paymentIntent.status !== 'succeeded' || (paymentIntent.amount_received ?? 0) <= 0) {
+              continue; // Not a cleared payment
+            }
+            
+            // Check for refunds - examine both intent-level and charge-level refunds
+            const wasRefunded =
+              (paymentIntent.amount_refunded ?? 0) > 0 ||
+              paymentIntent.charges?.data?.some((charge) =>
+                charge.refunded || (charge.amount_refunded ?? 0) > 0 || charge.status !== 'succeeded'
+              );
+            
+            if (wasRefunded) {
+              continue; // Deposit was reversed (partial or full)
+            }
+            
+            const depositAmountNum = (paymentIntent.amount_received ?? session.amount_total ?? 0) / 100;
+            
+            await db.update(crmQuotes)
+              .set({
+                depositPaidAt: now,
+                depositAmount: depositAmountNum.toFixed(2),
+                stripePaymentIntentId: paymentIntentId,
+              })
+              .where(eq(crmQuotes.id, quoteId));
+
+            return res.json({
+              success: true,
+              depositPaidAt: now,
+              depositAmount: depositAmountNum,
+              stripePaymentIntentId: paymentIntentId,
+            });
+          }
+        }
+      }
     }
 
-    // Also check checkout sessions for payment link completions
-    const checkoutSessions = await stripe.checkout.sessions.list({
+    // Fallback: Check if there's a PaymentIntent with matching metadata (for older quotes)
+    // Only used when stripePaymentLinkId is not set
+    const paymentIntents = await stripe.paymentIntents.list({
       limit: 20,
+      expand: ['data.charges.data'],
     });
 
-    const successfulSession = checkoutSessions.data.find(session =>
-      session.payment_status === 'paid' &&
-      session.metadata?.quoteId === quoteId &&
-      session.metadata?.type === 'quote_deposit'
-    );
-
-    if (successfulSession) {
-      const depositAmount = ((successfulSession.amount_total || 0) / 100).toFixed(2);
+    // Find a valid payment that hasn't been refunded
+    for (const pi of paymentIntents.data) {
+      // Check metadata match first
+      if (pi.metadata?.quoteId !== quoteId || pi.metadata?.type !== 'quote_deposit') {
+        continue;
+      }
+      
+      // Check if payment is valid and cleared
+      if (pi.status !== 'succeeded' || (pi.amount_received ?? 0) <= 0) {
+        continue;
+      }
+      
+      // Check for refunds - same logic as primary path
+      const wasRefunded =
+        (pi.amount_refunded ?? 0) > 0 ||
+        pi.charges?.data?.some((charge) =>
+          charge.refunded || (charge.amount_refunded ?? 0) > 0 || charge.status !== 'succeeded'
+        );
+      
+      if (wasRefunded) {
+        continue; // Deposit was reversed, skip
+      }
+      
+      const depositAmountNum = (pi.amount_received ?? pi.amount) / 100;
       await db.update(crmQuotes)
         .set({
-          depositPaidAt: new Date(),
-          depositAmount: depositAmount,
-          stripePaymentIntentId: successfulSession.payment_intent as string,
+          depositPaidAt: now,
+          depositAmount: depositAmountNum.toFixed(2),
+          stripePaymentIntentId: pi.id,
         })
         .where(eq(crmQuotes.id, quoteId));
 
       return res.json({
         success: true,
-        depositPaidAt: new Date(),
-        depositAmount: parseFloat(depositAmount),
-        stripePaymentIntentId: successfulSession.payment_intent,
+        depositPaidAt: now,
+        depositAmount: depositAmountNum,
+        stripePaymentIntentId: pi.id,
       });
     }
 
     // No payment found
     res.json({ 
       success: false, 
-      message: "No successful payment found for this quote" 
+      message: "No successful payment found for this quote. Payment may still be processing." 
     });
   } catch (error: any) {
     console.error("Error verifying quote deposit:", error);

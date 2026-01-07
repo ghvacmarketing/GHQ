@@ -356,6 +356,8 @@ export default function PublicQuoteView() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [paymentLinkLoading, setPaymentLinkLoading] = useState(false);
   const [depositAmount, setDepositAmount] = useState<number>(0);
+  const [depositPaidAt, setDepositPaidAt] = useState<Date | null>(null);
+  const [depositVerifying, setDepositVerifying] = useState(false);
 
   const { data, isLoading, error } = useQuery<PublicQuoteData>({
     queryKey: ["/api/public/quotes", token],
@@ -402,6 +404,72 @@ export default function PublicQuoteView() {
   // Handle both database format (custom_install) and display format (Custom Install)
   const quoteTypeNormalized = quote?.quoteType?.toLowerCase().replace(/\s+/g, '_') || "";
   const isInstallQuote = ["custom_install", "proposal", "custom_service"].includes(quoteTypeNormalized);
+  
+  // Check if quote already has deposit paid when loaded
+  useEffect(() => {
+    if (quote?.depositPaidAt) {
+      setDepositPaidAt(new Date(quote.depositPaidAt));
+      if (quote.depositAmount) {
+        setDepositAmount(parseFloat(quote.depositAmount));
+      }
+    }
+  }, [quote?.depositPaidAt, quote?.depositAmount]);
+
+  // Verify deposit payment - runs on redirect from Stripe AND when page loads with pending payment link
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentSuccess = params.get('payment');
+    
+    // Verify if: (1) redirected from Stripe with success, OR (2) quote has payment link but no deposit recorded yet
+    const shouldVerify = quote?.id && !depositPaidAt && !depositVerifying && 
+      (paymentSuccess === 'success' || (quote?.stripePaymentLinkId && isInstallQuote));
+    
+    if (shouldVerify) {
+      setDepositVerifying(true);
+      
+      fetch(`/api/stripe/quote/${quote.id}/verify-deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) {
+            setDepositPaidAt(new Date(result.depositPaidAt));
+            setDepositAmount(result.depositAmount || 0);
+            if (paymentSuccess === 'success') {
+              toast({
+                title: "Payment Successful!",
+                description: "Your deposit has been received. You can now accept the quote.",
+              });
+            }
+            // Clean up URL parameter if present
+            if (paymentSuccess) {
+              window.history.replaceState({}, '', window.location.pathname);
+            }
+          } else if (paymentSuccess === 'success') {
+            // Only show error toast if user explicitly came back from payment
+            toast({
+              variant: "destructive",
+              title: "Payment Verification",
+              description: "We couldn't verify your payment. Please try again or contact us.",
+            });
+          }
+        })
+        .catch(err => {
+          console.error('Deposit verification error:', err);
+          if (paymentSuccess === 'success') {
+            toast({
+              variant: "destructive",
+              title: "Verification Error",
+              description: "Failed to verify payment. Please refresh the page.",
+            });
+          }
+        })
+        .finally(() => {
+          setDepositVerifying(false);
+        });
+    }
+  }, [quote?.id, quote?.stripePaymentLinkId, depositPaidAt, depositVerifying, isInstallQuote, toast]);
   
   // Handle deposit payment button click - fetch payment link and redirect
   const handlePayDeposit = async () => {
@@ -797,8 +865,64 @@ export default function PublicQuoteView() {
               </label>
             </div>
 
-            {/* Accept Quote button - only shown when terms are agreed */}
-            {agreedToTerms && (
+            {/* 50% Deposit Payment Section for Install Quotes - REQUIRED before accepting */}
+            {isInstallQuote && agreedToTerms && (
+              <div className="border-t border-slate-200 pt-4">
+                {depositVerifying ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-5 w-5 text-blue-700 animate-spin" />
+                      <span className="text-blue-800 font-medium">Verifying payment...</span>
+                    </div>
+                  </div>
+                ) : depositPaidAt ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-700" />
+                      <h4 className="font-semibold text-green-800">Deposit Paid</h4>
+                    </div>
+                    <p className="text-sm text-green-700">
+                      Your {formatCurrency(depositAmount)} deposit has been received.
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">
+                      Paid on {formatDate(depositPaidAt)}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <CreditCard className="h-5 w-5 text-amber-700" />
+                      <h4 className="font-semibold text-amber-800">50% Deposit Required</h4>
+                    </div>
+                    <p className="text-sm text-amber-700 mb-3">
+                      A 50% deposit is required before accepting this quote.
+                    </p>
+                    <Button
+                      onClick={handlePayDeposit}
+                      disabled={paymentLinkLoading || (quoteData.quoteMode === "options" && !selectedOption)}
+                      className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-semibold disabled:bg-slate-300"
+                      data-testid="button-pay-deposit"
+                    >
+                      {paymentLinkLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Generating Payment Link...
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="mr-2 h-5 w-5" />
+                          Pay 50% Deposit Now
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-amber-600 mt-2">Secure payment powered by Stripe</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Accept Quote button - shown when terms are agreed AND (not install quote OR deposit is paid) */}
+            {agreedToTerms && (!isInstallQuote || depositPaidAt) && (
               <>
                 <Button
                   onClick={handleSubmit}
@@ -821,40 +945,6 @@ export default function PublicQuoteView() {
                   By clicking "Accept Quote", you are electronically signing this agreement.
                 </p>
               </>
-            )}
-
-            {/* 50% Deposit Payment Link for Install Quotes - only shown when terms are agreed */}
-            {isInstallQuote && agreedToTerms && (
-              <div className="mt-4 pt-4 border-t border-slate-200">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <CreditCard className="h-5 w-5 text-green-700" />
-                    <h4 className="font-semibold text-green-800">50% Deposit Payment</h4>
-                  </div>
-                  <p className="text-sm text-green-700 mb-3">
-                    A 50% deposit is required to schedule your installation.
-                  </p>
-                  <Button
-                    onClick={handlePayDeposit}
-                    disabled={paymentLinkLoading || (quoteData.quoteMode === "options" && !selectedOption)}
-                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-semibold disabled:bg-slate-300"
-                    data-testid="button-pay-deposit"
-                  >
-                    {paymentLinkLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Generating Payment Link...
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="mr-2 h-5 w-5" />
-                        Pay 50% Deposit Now
-                      </>
-                    )}
-                  </Button>
-                  <p className="text-xs text-green-600 mt-2">Secure payment powered by Stripe</p>
-                </div>
-              </div>
             )}
           </CardContent>
         </Card>
