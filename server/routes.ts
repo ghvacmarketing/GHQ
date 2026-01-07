@@ -18588,6 +18588,67 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // GET /api/portal/invoice/:id - Returns single invoice details (public for payment redirects)
+  app.get("/api/portal/invoice/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const [invoice] = await db.select()
+        .from(crmInvoices)
+        .where(eq(crmInvoices.id, id));
+
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Get line items
+      const lineItems = await db.select()
+        .from(crmInvoiceLineItems)
+        .where(eq(crmInvoiceLineItems.invoiceId, id))
+        .orderBy(crmInvoiceLineItems.sortOrder);
+
+      // Get customer info if available
+      let customerName = "Customer";
+      let customerEmail = null;
+      let customerPhone = null;
+      if (invoice.customerId) {
+        const [customer] = await db.select()
+          .from(crmCustomers)
+          .where(eq(crmCustomers.id, invoice.customerId));
+        if (customer) {
+          customerName = customer.name;
+          customerEmail = customer.email;
+          customerPhone = customer.phone;
+        }
+      }
+
+      // Get property info if available  
+      let serviceAddress = null;
+      if (invoice.propertyId) {
+        const [property] = await db.select()
+          .from(crmProperties)
+          .where(eq(crmProperties.id, invoice.propertyId));
+        if (property) {
+          serviceAddress = [property.address1, property.city, property.state, property.zip].filter(Boolean).join(", ");
+        }
+      }
+
+      res.json({ 
+        invoice: {
+          ...invoice,
+          customerName,
+          customerEmail,
+          customerPhone,
+          serviceAddress,
+        },
+        lineItems,
+      });
+    } catch (error) {
+      console.error("Error fetching portal invoice:", error);
+      res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+
   // GET /api/portal/quotes - Returns customer's quotes
   app.get("/api/portal/quotes", requireCustomerPortalAuth, async (req: any, res) => {
     try {
