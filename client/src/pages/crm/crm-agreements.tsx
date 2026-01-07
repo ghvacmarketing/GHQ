@@ -88,6 +88,7 @@ type AgreementsResponse = {
     hasPrevPage: boolean;
   };
   statusCounts?: {
+    pending: number;
     active: number;
     grace_period: number;
     expired: number;
@@ -111,6 +112,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 const statusLabels: Record<string, string> = {
+  pending: "Pending Payment",
   active: "Active",
   grace_period: "Grace Period",
   expired: "Expired",
@@ -118,6 +120,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
+  pending: "bg-blue-100 text-blue-700 border-blue-200",
   active: "bg-green-100 text-green-700 border-green-200",
   grace_period: "bg-amber-100 text-amber-700 border-amber-200",
   expired: "bg-red-100 text-red-700 border-red-200",
@@ -126,6 +129,7 @@ const statusColors: Record<string, string> = {
 
 const tabFilters = [
   { key: "all", label: "All Active" },
+  { key: "pending", label: "Pending" },
   { key: "active", label: "Active" },
   { key: "upcoming_service", label: "Upcoming Service" },
   { key: "grace_period", label: "Grace Period" },
@@ -756,6 +760,7 @@ export default function CrmAgreements() {
           <div className="flex overflow-x-auto">
             {tabFilters.map((tab) => {
               const count = tab.key === "all" ? statusCounts.all_active
+                : tab.key === "pending" ? statusCounts.pending
                 : tab.key === "active" ? statusCounts.active
                 : tab.key === "upcoming_service" ? statusCounts.upcoming_service
                 : tab.key === "grace_period" ? statusCounts.grace_period
@@ -1300,12 +1305,15 @@ export default function CrmAgreements() {
                     </div>
                   )}
                   <div className="flex justify-end gap-2 pt-4 border-t">
-                    {canSendInvoice && selectedAgreement.status === "active" && (
+                    {canSendInvoice && (selectedAgreement.status === "pending" || selectedAgreement.status === "active" || selectedAgreement.status === "grace_period") && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          if (confirm(`Send a renewal invoice to ${selectedAgreement.customerName} for $${selectedAgreement.price || "0"}?`)) {
+                          const msg = selectedAgreement.status === "pending" 
+                            ? `Create and send first invoice to ${selectedAgreement.customerName} for $${selectedAgreement.price || "0"}?`
+                            : `Send a renewal invoice to ${selectedAgreement.customerName} for $${selectedAgreement.price || "0"}?`;
+                          if (confirm(msg)) {
                             sendInvoiceMutation.mutate(selectedAgreement.id);
                           }
                         }}
@@ -1314,7 +1322,7 @@ export default function CrmAgreements() {
                         className="text-[#711419] border-[#711419] hover:bg-[#711419]/10"
                       >
                         <FileCheck className="h-4 w-4 mr-1" />
-                        {sendInvoiceMutation.isPending ? "Sending..." : "Send Invoice"}
+                        {sendInvoiceMutation.isPending ? "Sending..." : selectedAgreement.status === "pending" ? "Send First Invoice" : "Send Invoice"}
                       </Button>
                     )}
                     <Button

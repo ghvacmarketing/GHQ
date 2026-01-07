@@ -158,20 +158,68 @@ export async function processSingleAgreementRenewal(agreement: CrmAgreement): Pr
     const currentNextInvoiceDate = agreement.nextInvoiceDate ? new Date(agreement.nextInvoiceDate) : new Date();
     const newNextInvoiceDate = getNextInvoiceDate(currentNextInvoiceDate, agreement.frequency || "annual");
     
+    // Set grace period - 30 days to pay the renewal invoice
+    const graceExpiresAt = new Date();
+    graceExpiresAt.setDate(graceExpiresAt.getDate() + 30);
+    
     await db.update(crmAgreements)
       .set({
+        status: "grace_period",
+        graceExpiresAt: format(graceExpiresAt, "yyyy-MM-dd"),
         nextInvoiceDate: format(newNextInvoiceDate, "yyyy-MM-dd"),
         updatedAt: new Date(),
       })
       .where(eq(crmAgreements.id, agreement.id));
 
-    console.log(`[AgreementRenewal] Processed agreement ${agreement.agreementNumber}: Invoice ${invoiceNumber} created, next invoice date: ${format(newNextInvoiceDate, "yyyy-MM-dd")}`);
+    console.log(`[AgreementRenewal] Processed agreement ${agreement.agreementNumber}: Invoice ${invoiceNumber} created, grace period until ${format(graceExpiresAt, "yyyy-MM-dd")}, next invoice date: ${format(newNextInvoiceDate, "yyyy-MM-dd")}`);
     
     return result;
   } catch (err) {
     result.error = err instanceof Error ? err.message : "Unknown error";
     console.error(`[AgreementRenewal] Error processing agreement ${agreement.agreementNumber}:`, err);
     return result;
+  }
+}
+
+async function checkExpiredGracePeriods(): Promise<number> {
+  try {
+    const today = format(toZonedTime(new Date(), APP_TIMEZONE), "yyyy-MM-dd");
+    
+    // Find agreements in grace_period where graceExpiresAt has passed
+    const expiredAgreements = await db
+      .select()
+      .from(crmAgreements)
+      .where(
+        and(
+          eq(crmAgreements.status, "grace_period"),
+          isNotNull(crmAgreements.graceExpiresAt),
+          lte(crmAgreements.graceExpiresAt, today)
+        )
+      );
+    
+    if (expiredAgreements.length === 0) {
+      return 0;
+    }
+    
+    console.log(`[AgreementRenewal] Found ${expiredAgreements.length} agreements with expired grace periods`);
+    
+    // Mark them as expired
+    for (const agreement of expiredAgreements) {
+      await db.update(crmAgreements)
+        .set({
+          status: "expired",
+          autoRenew: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(crmAgreements.id, agreement.id));
+      
+      console.log(`[AgreementRenewal] Agreement ${agreement.agreementNumber} marked as expired (grace period ended)`);
+    }
+    
+    return expiredAgreements.length;
+  } catch (err) {
+    console.error("[AgreementRenewal] Error checking expired grace periods:", err);
+    return 0;
   }
 }
 
@@ -186,6 +234,12 @@ export async function processAgreementRenewals(): Promise<DailyRenewalSummary> {
   };
 
   try {
+    // First, check for expired grace periods and mark those agreements as expired
+    const expiredCount = await checkExpiredGracePeriods();
+    if (expiredCount > 0) {
+      console.log(`[AgreementRenewal] Marked ${expiredCount} agreements as expired due to unpaid grace periods`);
+    }
+    
     const today = format(toZonedTime(new Date(), APP_TIMEZONE), "yyyy-MM-dd");
     console.log(`[AgreementRenewal] Processing renewals for date: ${today}`);
 
@@ -196,6 +250,8 @@ export async function processAgreementRenewals(): Promise<DailyRenewalSummary> {
         and(
           eq(crmAgreements.status, "active"),
           eq(crmAgreements.autoRenew, true),
+          eq(crmAgreements.isInitialCycle, false),
+          eq(crmAgreements.billingPreference, "auto_invoice"),
           isNotNull(crmAgreements.nextInvoiceDate),
           lte(crmAgreements.nextInvoiceDate, today)
         )

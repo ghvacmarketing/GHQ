@@ -110,6 +110,7 @@ export default function CrmAgreementCreate() {
   const [endDate, setEndDate] = useState(format(addYears(new Date(), 1), "yyyy-MM-dd"));
   const [regionId, setRegionId] = useState("");
   const [autoRenew, setAutoRenew] = useState(true);
+  const [billingPreference, setBillingPreference] = useState<"auto_invoice" | "pay_on_visit" | "prepaid">("auto_invoice");
   const [notes, setNotes] = useState("");
   const [price, setPrice] = useState("229.00");
   const [frequency, setFrequency] = useState<"weekly" | "monthly" | "annual">("annual");
@@ -299,11 +300,13 @@ export default function CrmAgreementCreate() {
         regionId: regionId || null,
         propertyId: propertyId || null,
         numberOfSystems,
-        autoRenew,
+        autoRenew: billingPreference === "auto_invoice" ? autoRenew : false,
         notes,
-        status: "active" as const,
+        status: "pending" as const,
         frequency,
         visitsPerPeriod,
+        billingPreference,
+        isInitialCycle: true,
       };
 
       const res = await apiRequest("POST", "/api/crm/agreements", agreementData);
@@ -730,17 +733,41 @@ export default function CrmAgreementCreate() {
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-lg">
-                      <div>
-                        <Label className="text-sm font-medium">Auto-Renew</Label>
-                        <p className="text-xs text-slate-500">Automatically renew when it expires</p>
-                      </div>
-                      <Switch
-                        checked={autoRenew}
-                        onCheckedChange={setAutoRenew}
-                        data-testid="switch-auto-renew"
-                      />
+                    <div>
+                      <Label className="text-sm font-medium">Billing Preference</Label>
+                      <Select
+                        value={billingPreference}
+                        onValueChange={(v) => setBillingPreference(v as "auto_invoice" | "pay_on_visit" | "prepaid")}
+                      >
+                        <SelectTrigger className="mt-1" data-testid="select-billing-preference">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto_invoice">Auto-Invoice (email invoices)</SelectItem>
+                          <SelectItem value="pay_on_visit">Pay on Visit (tech collects)</SelectItem>
+                          <SelectItem value="prepaid">Prepaid (already paid)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {billingPreference === "auto_invoice" && "System sends invoice emails automatically"}
+                        {billingPreference === "pay_on_visit" && "Tech collects payment, no auto-emails"}
+                        {billingPreference === "prepaid" && "Customer pays upfront before service"}
+                      </p>
                     </div>
+
+                    {billingPreference === "auto_invoice" && (
+                      <div className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-lg">
+                        <div>
+                          <Label className="text-sm font-medium">Auto-Renew</Label>
+                          <p className="text-xs text-slate-500">Automatically renew when it expires</p>
+                        </div>
+                        <Switch
+                          checked={autoRenew}
+                          onCheckedChange={setAutoRenew}
+                          data-testid="switch-auto-renew"
+                        />
+                      </div>
+                    )}
 
                     <div className="col-span-2">
                       <Label htmlFor="notes" className="text-sm font-medium">Notes</Label>

@@ -11137,47 +11137,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .offset(offset);
 
       // Compute status counts for ALL agreements (ignoring search/pagination)
-      // Status is computed dynamically based on endDate:
-      // - active: endDate is in the future or null
-      // - grace_period: 0-30 days after endDate
-      // - expired: more than 30 days after endDate
-      // (Reusing todayStr, thirtyDaysAgoStr, fifteenDaysFromNowStr from above)
+      // Status is now stored directly as: pending, active, grace_period, expired, cancelled
 
-      // Count active: status='active' AND (end_date IS NULL OR end_date > today)
+      // Count pending: status='pending'
+      const [pendingCount] = await db
+        .select({ count: count() })
+        .from(crmAgreements)
+        .where(eq(crmAgreements.status, "pending"));
+
+      // Count active: status='active'
       const [activeCount] = await db
         .select({ count: count() })
         .from(crmAgreements)
-        .where(and(
-          eq(crmAgreements.status, "active"),
-          or(
-            isNull(crmAgreements.endDate),
-            sql`${crmAgreements.endDate} > ${todayStr}`
-          )
-        ));
+        .where(eq(crmAgreements.status, "active"));
 
-      // Count grace_period: status='active' AND end_date between (today - 30 days) and today
+      // Count grace_period: status='grace_period'
       const [gracePeriodCount] = await db
         .select({ count: count() })
         .from(crmAgreements)
-        .where(and(
-          eq(crmAgreements.status, "active"),
-          sql`${crmAgreements.endDate} IS NOT NULL`,
-          sql`${crmAgreements.endDate} <= ${todayStr}`,
-          sql`${crmAgreements.endDate} > ${thirtyDaysAgoStr}`
-        ));
+        .where(eq(crmAgreements.status, "grace_period"));
 
-      // Count expired: status='active' AND end_date <= (today - 30 days), OR status='expired'
+      // Count expired: status='expired'
       const [expiredCount] = await db
         .select({ count: count() })
         .from(crmAgreements)
-        .where(or(
-          eq(crmAgreements.status, "expired"),
-          and(
-            eq(crmAgreements.status, "active"),
-            sql`${crmAgreements.endDate} IS NOT NULL`,
-            sql`${crmAgreements.endDate} <= ${thirtyDaysAgoStr}`
-          )
-        ));
+        .where(eq(crmAgreements.status, "expired"));
 
       // Count upcoming_service: nextServiceDate is 0-15 days from now
       const [upcomingServiceCount] = await db
@@ -11190,11 +11174,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ));
 
       const statusCounts = {
+        pending: Number(pendingCount?.count || 0),
         active: Number(activeCount?.count || 0),
         grace_period: Number(gracePeriodCount?.count || 0),
         expired: Number(expiredCount?.count || 0),
         upcoming_service: Number(upcomingServiceCount?.count || 0),
-        all_active: Number(activeCount?.count || 0) + Number(gracePeriodCount?.count || 0),
+        all_active: Number(pendingCount?.count || 0) + Number(activeCount?.count || 0) + Number(gracePeriodCount?.count || 0),
       };
 
       return res.json({
@@ -13668,6 +13653,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (agreementError) {
           console.error("Error auto-creating maintenance agreement:", agreementError);
+          // Don't fail the payment - just log the error
+        }
+      }
+      
+      // Handle agreement activation and visit resets when an agreement-linked invoice is paid
+      if (newStatus === "paid" && invoice.agreementId) {
+        try {
+          const [agreement] = await db.select().from(crmAgreements)
+            .where(eq(crmAgreements.id, invoice.agreementId));
+          
+          if (agreement) {
+            const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+            
+            // If agreement is pending and this is the initial cycle, activate it
+            if (agreement.status === "pending" && agreement.isInitialCycle) {
+              await db.update(crmAgreements)
+                .set({
+                  status: "active",
+                  activationDate: todayStr,
+                  isInitialCycle: false,
+                  graceExpiresAt: null,
+                  updatedAt: new Date(),
+                })
+                .where(eq(crmAgreements.id, agreement.id));
+              
+              console.log(`[Invoice] Activated agreement ${agreement.agreementNumber} after first payment (Invoice ${invoice.invoiceNumber})`);
+            } 
+            // If agreement is active/grace_period and not initial cycle, this is a renewal payment - reset visits
+            else if ((agreement.status === "active" || agreement.status === "grace_period") && !agreement.isInitialCycle) {
+              // Reset all visits for this agreement to pending for the new cycle
+              const currentYear = new Date().getFullYear();
+              
+              // Mark old visits as cancelled and create new pending visits
+              await db.update(maintenanceVisits)
+                .set({ status: "cancelled" as const, updatedAt: new Date() })
+                .where(and(
+                  eq(maintenanceVisits.agreementId, agreement.id),
+                  eq(maintenanceVisits.status, "pending")
+                ));
+              
+              // Create new visits for the new cycle
+              const visitsPerPeriod = agreement.visitsPerPeriod || 2;
+              const frequency = agreement.frequency || "annual";
+              const appointmentDate = new Date(agreement.appointmentDate || todayStr);
+              
+              for (let i = 0; i < visitsPerPeriod; i++) {
+                const visitDate = new Date(appointmentDate);
+                if (frequency === "weekly") {
+                  const daysApart = Math.max(1, Math.round(7 / visitsPerPeriod));
+                  visitDate.setDate(visitDate.getDate() + (i * daysApart));
+                } else if (frequency === "monthly") {
+                  const daysApart = Math.max(1, Math.round(30 / visitsPerPeriod));
+                  visitDate.setDate(visitDate.getDate() + (i * daysApart));
+                } else {
+                  const monthsApart = Math.max(1, Math.round(12 / visitsPerPeriod));
+                  visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
+                }
+                
+                await db.insert(maintenanceVisits).values({
+                  agreementId: agreement.id,
+                  cycleYear: currentYear,
+                  visitNumber: i + 1,
+                  targetDate: visitDate.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE }),
+                  status: "pending",
+                });
+              }
+              
+              // Update agreement back to active (clearing grace period) and clear grace expiry
+              await db.update(crmAgreements)
+                .set({
+                  status: "active",
+                  graceExpiresAt: null,
+                  updatedAt: new Date(),
+                })
+                .where(eq(crmAgreements.id, agreement.id));
+              
+              console.log(`[Invoice] Renewed agreement ${agreement.agreementNumber} - visits reset to 0/${visitsPerPeriod} (Invoice ${invoice.invoiceNumber})`);
+            }
+          }
+        } catch (agreementError) {
+          console.error("Error updating agreement on payment:", agreementError);
           // Don't fail the payment - just log the error
         }
       }
