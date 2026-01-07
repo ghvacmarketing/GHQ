@@ -19353,6 +19353,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // ============================================
 
   // GET /api/mobile/work-orders/:id/renewal-info - Get renewal info for a work order
+  // Also detects pay-on-visit agreements needing initial payment
   app.get("/api/mobile/work-orders/:id/renewal-info", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -19361,6 +19362,42 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       const workOrderId = req.params.id;
+      
+      // First, check if this is a pay-on-visit agreement that needs initial payment
+      // This happens when the work order is linked to a maintenance visit for a pending pay-on-visit agreement
+      const [anyVisit] = await db.select()
+        .from(maintenanceVisits)
+        .where(eq(maintenanceVisits.workOrderId, workOrderId))
+        .limit(1);
+      
+      if (anyVisit) {
+        const [agreement] = await db.select()
+          .from(crmAgreements)
+          .where(eq(crmAgreements.id, anyVisit.agreementId))
+          .limit(1);
+        
+        // Check if this is a pay-on-visit agreement in pending status (needs initial payment)
+        if (agreement && 
+            agreement.billingPreference === "pay_on_visit" && 
+            agreement.status === "pending" && 
+            agreement.isInitialCycle) {
+          // For initial payments, check if invoice was already created (pending_payment) or if collected/declined
+          // If renewalStatus is "none" (default), treat as "pending" so the UI shows the payment prompt
+          const effectiveStatus = anyVisit.renewalStatus === "none" ? "pending" : anyVisit.renewalStatus;
+          return res.json({
+            isRenewalVisit: true,
+            paymentType: "initial",
+            renewalStatus: effectiveStatus,
+            agreementInfo: {
+              id: agreement.id,
+              agreementNumber: agreement.agreementNumber,
+              price: agreement.price,
+              customerName: agreement.customerName,
+              billingPreference: agreement.billingPreference
+            }
+          });
+        }
+      }
       
       // Check if this work order is linked to a maintenance visit with isRenewalTrigger = true
       const [visit] = await db.select()
@@ -19374,6 +19411,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       if (!visit) {
         return res.json({
           isRenewalVisit: false,
+          paymentType: null,
           renewalStatus: "none",
           agreementInfo: null
         });
@@ -19388,6 +19426,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       if (!agreement) {
         return res.json({
           isRenewalVisit: true,
+          paymentType: "renewal",
           renewalStatus: visit.renewalStatus,
           agreementInfo: null
         });
@@ -19395,12 +19434,14 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       
       return res.json({
         isRenewalVisit: true,
+        paymentType: "renewal",
         renewalStatus: visit.renewalStatus,
         agreementInfo: {
           id: agreement.id,
           agreementNumber: agreement.agreementNumber,
           price: agreement.price,
-          customerName: agreement.customerName
+          customerName: agreement.customerName,
+          billingPreference: agreement.billingPreference
         }
       });
     } catch (error) {
@@ -19409,7 +19450,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  // POST /api/mobile/work-orders/:id/collect-renewal - Collect renewal payment
+  // POST /api/mobile/work-orders/:id/collect-renewal - Collect renewal or initial payment
+  // Handles both renewal payments (isRenewalTrigger visits) and initial payments (pay-on-visit pending agreements)
   app.post("/api/mobile/work-orders/:id/collect-renewal", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -19418,6 +19460,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       const workOrderId = req.params.id;
+      const { paymentType } = req.body; // "initial" or "renewal"
       
       // Get the work order
       const [workOrder] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, workOrderId));
@@ -19425,7 +19468,90 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Work order not found" });
       }
       
-      // Find the renewal trigger visit for this work order
+      // First check if this is an initial payment for a pay-on-visit agreement
+      const [anyVisit] = await db.select()
+        .from(maintenanceVisits)
+        .where(eq(maintenanceVisits.workOrderId, workOrderId))
+        .limit(1);
+      
+      if (anyVisit && paymentType === "initial") {
+        const [agreement] = await db.select()
+          .from(crmAgreements)
+          .where(eq(crmAgreements.id, anyVisit.agreementId))
+          .limit(1);
+        
+        if (agreement && 
+            agreement.billingPreference === "pay_on_visit" && 
+            agreement.status === "pending" && 
+            agreement.isInitialCycle) {
+          
+          // Check if invoice already created for this visit
+          if (anyVisit.renewalInvoiceId) {
+            return res.status(400).json({ message: "Invoice already created for this visit. Please complete or void the existing invoice." });
+          }
+          
+          // Create invoice for initial payment
+          const invoiceNumber = await generateInvoiceNumber();
+          const paymentAmount = String(agreement.price || "0");
+          
+          const invoiceToCreate = {
+            invoiceNumber,
+            workOrderId: workOrderId,
+            customerId: workOrder.customerId,
+            propertyId: workOrder.propertyId,
+            agreementId: agreement.id,
+            status: "draft" as const,
+            subtotal: paymentAmount,
+            total: paymentAmount,
+            amountPaid: "0",
+            balanceDue: paymentAmount,
+            createdBy: user.id,
+            notes: `Maintenance Agreement Initial Payment - ${agreement.agreementNumber}`,
+          };
+          
+          const parseResult = insertCrmInvoiceSchema.safeParse(invoiceToCreate);
+          if (!parseResult.success) {
+            return res.status(400).json({ 
+              message: "Failed to create invoice", 
+              errors: parseResult.error.errors 
+            });
+          }
+          
+          const [invoice] = await db.insert(crmInvoices).values(parseResult.data).returning();
+          
+          // Add line item
+          const lineItem = {
+            invoiceId: invoice.id,
+            description: `Maintenance Agreement - ${agreement.agreementPlan || "Service Plan"} (Year 1)`,
+            quantity: "1",
+            unitPrice: paymentAmount,
+            lineTotal: paymentAmount,
+          };
+          await db.insert(crmInvoiceLineItems).values(lineItem);
+          
+          // Update the visit with the invoice ID and pending_payment status
+          await db.update(maintenanceVisits)
+            .set({ 
+              renewalInvoiceId: invoice.id, 
+              renewalStatus: "pending_payment" as const, 
+              updatedAt: new Date() 
+            })
+            .where(eq(maintenanceVisits.id, anyVisit.id));
+          
+          await logCrmAudit(
+            user.id,
+            "agreement.initial_payment_invoice_created",
+            "maintenance_visit",
+            anyVisit.id,
+            { invoiceId: invoice.id, agreementId: agreement.id, amount: paymentAmount },
+            req.ip
+          );
+          
+          return res.status(201).json({ ...invoice, paymentType: "initial" });
+        }
+      }
+      
+      // Fall back to renewal trigger visit logic
       const [visit] = await db.select()
         .from(maintenanceVisits)
         .where(and(
@@ -19473,6 +19599,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         workOrderId: workOrderId,
         customerId: workOrder.customerId,
         propertyId: workOrder.propertyId,
+        agreementId: agreement.id,
         status: "draft" as const,
         subtotal: renewalAmount,
         total: renewalAmount,
@@ -19517,7 +19644,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         req.ip
       );
       
-      return res.status(201).json(invoice);
+      return res.status(201).json({ ...invoice, paymentType: "renewal" });
     } catch (error) {
       console.error("Error collecting renewal:", error);
       return res.status(500).json({ message: "Failed to collect renewal" });

@@ -101,12 +101,14 @@ interface TimeSlot {
 
 interface RenewalInfo {
   isRenewalVisit: boolean;
+  paymentType: "initial" | "renewal" | null;
   renewalStatus: "none" | "pending" | "pending_payment" | "collected" | "declined";
   agreementInfo: {
     id: string;
     agreementNumber: string;
     price: number;
     customerName: string;
+    billingPreference?: string;
   } | null;
 }
 
@@ -197,16 +199,27 @@ function OverviewTab({
       </div>
 
       {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "pending" && renewalInfo.agreementInfo && (
-        <Card className="border-amber-400 bg-amber-50" data-testid="renewal-banner">
+        <Card className={renewalInfo.paymentType === "initial" ? "border-green-400 bg-green-50" : "border-amber-400 bg-amber-50"} data-testid="renewal-banner">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-full bg-amber-100">
-                <RefreshCw className="h-5 w-5 text-amber-600" />
+              <div className={`p-2 rounded-full ${renewalInfo.paymentType === "initial" ? "bg-green-100" : "bg-amber-100"}`}>
+                {renewalInfo.paymentType === "initial" ? (
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                ) : (
+                  <RefreshCw className="h-5 w-5 text-amber-600" />
+                )}
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-amber-800 mb-1">Renewal Due</h3>
-                <p className="text-sm text-amber-700 mb-3">
-                  Collect payment for next service period (${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)})
+                <h3 className={`font-semibold mb-1 ${renewalInfo.paymentType === "initial" ? "text-green-800" : "text-amber-800"}`}>
+                  {renewalInfo.paymentType === "initial" ? "First Visit - Collect Payment" : "Renewal Due"}
+                </h3>
+                <p className={`text-sm mb-2 ${renewalInfo.paymentType === "initial" ? "text-green-700" : "text-amber-700"}`}>
+                  {renewalInfo.paymentType === "initial" 
+                    ? `Collect first year payment to activate agreement (${renewalInfo.agreementInfo.agreementNumber})`
+                    : `Collect payment for next service period`}
+                </p>
+                <p className={`text-lg font-bold mb-3 ${renewalInfo.paymentType === "initial" ? "text-green-700" : "text-amber-700"}`}>
+                  ${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)}
                 </p>
                 <div className="flex gap-2">
                   <Button
@@ -218,16 +231,18 @@ function OverviewTab({
                     <DollarSign className="h-4 w-4 mr-1" />
                     Collect Payment
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-red-300 text-red-600 hover:bg-red-50 min-h-[44px] flex-1"
-                    onClick={onDeclineRenewal}
-                    data-testid="button-decline-renewal"
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Customer Declined
-                  </Button>
+                  {renewalInfo.paymentType !== "initial" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-300 text-red-600 hover:bg-red-50 min-h-[44px] flex-1"
+                      onClick={onDeclineRenewal}
+                      data-testid="button-decline-renewal"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Customer Declined
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -2961,7 +2976,7 @@ export default function MobileJobDetail() {
     queryFn: async () => {
       const res = await fetch(`/api/mobile/work-orders/${params.id}/renewal-info`, { credentials: "include" });
       if (!res.ok) {
-        if (res.status === 404) return { isRenewalVisit: false, renewalStatus: "none" as const, agreementInfo: null };
+        if (res.status === 404) return { isRenewalVisit: false, paymentType: null, renewalStatus: "none" as const, agreementInfo: null };
         throw new Error("Failed to fetch renewal info");
       }
       return res.json();
@@ -2988,26 +3003,34 @@ export default function MobileJobDetail() {
   const [renewalPaymentMethod, setRenewalPaymentMethod] = useState<"cash" | "check" | "card">("cash");
 
   const collectRenewalMutation = useMutation({
-    mutationFn: async (paymentMethod: string) => {
+    mutationFn: async ({ paymentMethod, paymentType }: { paymentMethod: string; paymentType: "initial" | "renewal" | null }) => {
       const res = await apiRequest("POST", `/api/mobile/work-orders/${params.id}/collect-renewal`, {
         paymentMethod,
+        paymentType,
       });
       if (!res.ok) {
         const error = await res.json().catch(() => ({}));
-        throw new Error(error.message || "Failed to collect renewal payment");
+        throw new Error(error.message || "Failed to collect payment");
       }
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: "Renewal Collected", description: "Payment has been recorded successfully." });
+    onSuccess: (data) => {
+      const isInitial = data?.paymentType === "initial";
+      toast({ 
+        title: isInitial ? "Payment Collected" : "Renewal Collected", 
+        description: isInitial 
+          ? "Agreement has been activated. Invoice created for payment." 
+          : "Payment has been recorded successfully." 
+      });
       setShowCollectRenewalDialog(false);
       setRenewalPaymentMethod("cash");
       refetchRenewalInfo();
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/mobile/work-orders", params.id, "renewal-info"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message || "Failed to collect renewal payment", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to collect payment", variant: "destructive" });
     },
   });
 
@@ -3655,15 +3678,17 @@ export default function MobileJobDetail() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-green-600" />
-              Collect Renewal Payment
+              {renewalInfo?.paymentType === "initial" ? "Collect First Year Payment" : "Collect Renewal Payment"}
             </DialogTitle>
             <DialogDescription>
-              Confirm payment collection for the maintenance agreement renewal.
+              {renewalInfo?.paymentType === "initial" 
+                ? "Collect payment to activate this maintenance agreement."
+                : "Confirm payment collection for the maintenance agreement renewal."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {renewalInfo?.agreementInfo && (
-              <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+              <div className={`rounded-lg p-4 space-y-2 ${renewalInfo.paymentType === "initial" ? "bg-green-50" : "bg-slate-50"}`}>
                 <div className="flex justify-between">
                   <span className="text-sm text-slate-500">Agreement</span>
                   <span className="text-sm font-medium">{renewalInfo.agreementInfo.agreementNumber}</span>
@@ -3676,6 +3701,11 @@ export default function MobileJobDetail() {
                   <span className="text-sm text-slate-500">Amount</span>
                   <span className="text-lg font-bold text-green-600">${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)}</span>
                 </div>
+                {renewalInfo.paymentType === "initial" && (
+                  <p className="text-xs text-green-700 mt-2 pt-2 border-t border-green-200">
+                    This is the first payment. Agreement will be activated after payment is recorded.
+                  </p>
+                )}
               </div>
             )}
             <div className="space-y-2">
@@ -3703,7 +3733,7 @@ export default function MobileJobDetail() {
               Cancel
             </Button>
             <Button
-              onClick={() => collectRenewalMutation.mutate(renewalPaymentMethod)}
+              onClick={() => collectRenewalMutation.mutate({ paymentMethod: renewalPaymentMethod, paymentType: renewalInfo?.paymentType || null })}
               disabled={collectRenewalMutation.isPending}
               className="bg-green-600 hover:bg-green-700 min-h-[44px]"
               data-testid="button-confirm-collect-renewal"
@@ -3713,7 +3743,7 @@ export default function MobileJobDetail() {
               ) : (
                 <CheckCircle2 className="h-4 w-4 mr-2" />
               )}
-              Confirm Payment
+              {renewalInfo?.paymentType === "initial" ? "Collect & Activate" : "Confirm Payment"}
             </Button>
           </DialogFooter>
         </DialogContent>
