@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
-import { format } from "date-fns";
+import { format, addYears, addMonths } from "date-fns";
 import { 
   ArrowLeft, 
   Phone, 
@@ -36,7 +36,8 @@ import {
   CalendarIcon,
   AlertTriangle,
   RefreshCw,
-  FileCheck
+  FileCheck,
+  Minus
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
@@ -52,6 +53,7 @@ import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
@@ -1713,6 +1715,28 @@ function InvoiceTab({
   const [showInvoiceEmailDialog, setShowInvoiceEmailDialog] = useState(false);
   const [invoiceEmailRecipient, setInvoiceEmailRecipient] = useState("");
   const [emailInvoiceId, setEmailInvoiceId] = useState<string | null>(null);
+  
+  // Agreement creation dialog state
+  const [showAgreementDialog, setShowAgreementDialog] = useState(false);
+  const [agreementNumberOfSystems, setAgreementNumberOfSystems] = useState(1);
+  const [agreementContractDate, setAgreementContractDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [agreementStartDate, setAgreementStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [agreementBillingPreference, setAgreementBillingPreference] = useState<"pay_on_visit" | "auto_invoice">("auto_invoice");
+  const [agreementAutoRenew, setAgreementAutoRenew] = useState(true);
+  const [agreementNotes, setAgreementNotes] = useState("");
+  const [agreementPayingNow, setAgreementPayingNow] = useState(false);
+  const [pendingCatalogItem, setPendingCatalogItem] = useState<CrmItem | null>(null);
+
+  // Calculate maintenance price based on number of systems
+  const calculateMaintenancePrice = (numSystems: number): number => {
+    let total = 0;
+    for (let i = 0; i < numSystems; i++) {
+      total += 229 - (10 * i);
+    }
+    return total;
+  };
+
+  const agreementPrice = calculateMaintenancePrice(agreementNumberOfSystems);
 
   const { data: invoicesData, isLoading: invoicesLoading, error: invoicesError } = useQuery<{ invoices: CrmInvoice[] }>({
     queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }],
@@ -1936,6 +1960,65 @@ function InvoiceTab({
     },
   });
 
+  // Create agreement mutation
+  const createAgreementMutation = useMutation({
+    mutationFn: async (data: {
+      numberOfSystems: number;
+      contractDate: string;
+      startDate: string;
+      billingPreference: "pay_on_visit" | "auto_invoice";
+      autoRenew: boolean;
+      notes: string;
+      payingNow: boolean;
+    }) => {
+      const response = await apiRequest("POST", `/api/mobile/work-orders/${workOrder.id}/create-agreement`, data);
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || "Failed to create agreement");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.payingNow) {
+        toast({ title: "Agreement Created", description: "Maintenance agreement has been created and payment recorded." });
+      } else {
+        toast({ title: "Agreement Created", description: "Maintenance agreement has been created. Line item added to invoice." });
+        // Add the maintenance line item to the current invoice form
+        if (data.lineItemData) {
+          setLineItems([...lineItems, {
+            id: Date.now().toString(),
+            description: data.lineItemData.description,
+            quantity: 1,
+            unitPrice: parseFloat(data.lineItemData.unitPrice),
+            lineType: "maintenance",
+            fromCatalog: true,
+            isMaintenanceItem: true
+          }]);
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      setShowAgreementDialog(false);
+      setPendingCatalogItem(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to create agreement", variant: "destructive" });
+    },
+  });
+
+  const handleCreateAgreement = () => {
+    createAgreementMutation.mutate({
+      numberOfSystems: agreementNumberOfSystems,
+      contractDate: agreementContractDate,
+      startDate: agreementStartDate,
+      billingPreference: agreementBillingPreference,
+      autoRenew: agreementAutoRenew,
+      notes: agreementNotes,
+      payingNow: agreementPayingNow,
+    });
+  };
+
   const openPaymentDialog = (invoice: CrmInvoice) => {
     setPaymentInvoiceId(invoice.id);
     const balanceDue = parseFloat(invoice.balanceDue || invoice.total || "0");
@@ -1973,13 +2056,26 @@ function InvoiceTab({
     const isPreventativeMaintenance = isMaintenance && 
       (item.name?.toLowerCase().includes("preventative") || item.name?.toLowerCase().includes("preventive"));
     
+    // If Preventative Maintenance is selected, open agreement creation dialog
     if (isPreventativeMaintenance) {
-      const existingMaintenanceCount = lineItems.filter(li => li.isMaintenanceItem).length;
-      // Base price $229, each additional system -$10
-      price = 229 - (existingMaintenanceCount * 10);
-      if (price < 0) price = 0;
+      setPendingCatalogItem(item);
+      setAgreementNumberOfSystems(1);
+      setAgreementContractDate(format(new Date(), "yyyy-MM-dd"));
+      setAgreementStartDate(format(new Date(), "yyyy-MM-dd"));
+      setAgreementBillingPreference("auto_invoice");
+      setAgreementAutoRenew(true);
+      setAgreementNotes("");
+      setAgreementPayingNow(false);
+      setShowCatalog(false);
+      setCatalogSearch("");
+      setShowAgreementDialog(true);
+      return;
     }
-    // For custom maintenance items, use the catalog price (already set above)
+    
+    if (isMaintenance) {
+      // Use catalog price for non-PM maintenance items
+      price = parseFloat(item.rate || "0") || 0;
+    }
     
     // Map category to lineType
     const getLineType = (): InvoiceLineItem["lineType"] => {
@@ -1988,8 +2084,6 @@ function InvoiceTab({
       return "part";
     };
     
-    const discountApplied = isPreventativeMaintenance && price < 229;
-    
     setLineItems([...lineItems, { 
       id: Date.now().toString(), 
       description: item.name, 
@@ -1997,12 +2091,12 @@ function InvoiceTab({
       unitPrice: price,
       lineType: getLineType(),
       fromCatalog: true,
-      isMaintenanceItem: isPreventativeMaintenance // Only standard PM gets tiered pricing
+      isMaintenanceItem: false
     }]);
     setShowCatalog(false);
     setCatalogSearch("");
     setCatalogCategoryFilter("all");
-    toast({ title: "Item Added", description: item.name + (discountApplied ? ` (Multi-system discount: $${price})` : "") });
+    toast({ title: "Item Added", description: item.name });
   };
 
   // Add discount from catalogue
@@ -3040,6 +3134,201 @@ function InvoiceTab({
                 <>
                   <Mail className="h-4 w-4 mr-2" />
                   Send Email
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Agreement Dialog */}
+      <Dialog open={showAgreementDialog} onOpenChange={(open) => { 
+        if (!open) { 
+          setShowAgreementDialog(false); 
+          setPendingCatalogItem(null);
+        } 
+      }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileCheck className="h-5 w-5 text-[#711419]" />
+              Create Maintenance Agreement
+            </DialogTitle>
+            <DialogDescription>
+              Set up a preventative maintenance agreement for this customer.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            {/* Customer Info (Auto-filled) */}
+            <div className="bg-slate-50 rounded-lg p-3 border">
+              <p className="text-xs text-slate-500 mb-1">Customer</p>
+              <p className="font-medium text-sm">{workOrder.customer?.name || "Unknown Customer"}</p>
+              {workOrder.property && (
+                <>
+                  <p className="text-xs text-slate-500 mt-2 mb-1">Property</p>
+                  <p className="text-sm text-slate-700">
+                    {[workOrder.property.address1, workOrder.property.city, workOrder.property.state, workOrder.property.zip].filter(Boolean).join(", ")}
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Number of Systems */}
+            <div>
+              <Label className="text-sm font-medium">Number of Systems</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10"
+                  onClick={() => setAgreementNumberOfSystems(prev => Math.max(1, prev - 1))}
+                  disabled={agreementNumberOfSystems <= 1}
+                  data-testid="button-decrease-agreement-systems"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Input
+                  type="number"
+                  min="1"
+                  value={agreementNumberOfSystems}
+                  onChange={(e) => setAgreementNumberOfSystems(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-20 text-center min-h-[44px]"
+                  data-testid="input-agreement-systems"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10"
+                  onClick={() => setAgreementNumberOfSystems(prev => prev + 1)}
+                  data-testid="button-increase-agreement-systems"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                $229 first system, $10 discount per additional
+              </p>
+            </div>
+
+            {/* Price Display */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-green-800">Annual Agreement Price</span>
+                <span className="text-xl font-bold text-green-700">${agreementPrice.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Contract Date */}
+            <div>
+              <Label className="text-sm font-medium">Contract Date</Label>
+              <Input
+                type="date"
+                value={agreementContractDate}
+                onChange={(e) => setAgreementContractDate(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-agreement-contract-date"
+              />
+            </div>
+
+            {/* Start Date */}
+            <div>
+              <Label className="text-sm font-medium">Start Date</Label>
+              <Input
+                type="date"
+                value={agreementStartDate}
+                onChange={(e) => setAgreementStartDate(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-agreement-start-date"
+              />
+            </div>
+
+            {/* Billing Preference */}
+            <div>
+              <Label className="text-sm font-medium">Billing Preference</Label>
+              <Select value={agreementBillingPreference} onValueChange={(v: "pay_on_visit" | "auto_invoice") => setAgreementBillingPreference(v)}>
+                <SelectTrigger className="min-h-[44px] mt-1" data-testid="select-agreement-billing">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto_invoice">Auto Invoice (Bill Immediately)</SelectItem>
+                  <SelectItem value="pay_on_visit">Pay on Visit</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500 mt-1">
+                {agreementBillingPreference === "auto_invoice" 
+                  ? "Customer will be invoiced when agreement is created" 
+                  : "Customer will pay when technician arrives for first visit"}
+              </p>
+            </div>
+
+            {/* Auto Renew */}
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label className="text-sm font-medium">Auto Renew</Label>
+                <p className="text-xs text-slate-500">Automatically renew agreement each year</p>
+              </div>
+              <Switch
+                checked={agreementAutoRenew}
+                onCheckedChange={setAgreementAutoRenew}
+                data-testid="switch-agreement-auto-renew"
+              />
+            </div>
+
+            {/* Customer Paying Now Toggle */}
+            <div className="flex items-center justify-between py-2 border-t pt-4">
+              <div>
+                <Label className="text-sm font-medium">Customer Paying Now?</Label>
+                <p className="text-xs text-slate-500">Collect payment immediately and activate agreement</p>
+              </div>
+              <Switch
+                checked={agreementPayingNow}
+                onCheckedChange={setAgreementPayingNow}
+                data-testid="switch-agreement-paying-now"
+              />
+            </div>
+
+            {/* Notes */}
+            <div>
+              <Label className="text-sm font-medium">Notes (Optional)</Label>
+              <Textarea
+                value={agreementNotes}
+                onChange={(e) => setAgreementNotes(e.target.value)}
+                placeholder="Any additional notes about this agreement..."
+                className="min-h-[80px] mt-1"
+                data-testid="textarea-agreement-notes"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => { 
+                setShowAgreementDialog(false); 
+                setPendingCatalogItem(null);
+              }}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="bg-[#711419] hover:bg-[#5a1014] min-h-[44px]"
+              onClick={handleCreateAgreement}
+              disabled={createAgreementMutation.isPending}
+              data-testid="button-create-agreement"
+            >
+              {createAgreementMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <FileCheck className="h-4 w-4 mr-2" />
+                  Create Agreement
                 </>
               )}
             </Button>

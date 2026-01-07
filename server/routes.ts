@@ -19954,6 +19954,196 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // POST /api/mobile/work-orders/:workOrderId/create-agreement - Create maintenance agreement from mobile invoice tab
+  app.post("/api/mobile/work-orders/:workOrderId/create-agreement", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const workOrderId = req.params.workOrderId;
+      const { numberOfSystems, contractDate, startDate, billingPreference, autoRenew, notes, payingNow } = req.body;
+
+      // Validate required fields
+      if (!numberOfSystems || !contractDate || !startDate || !billingPreference) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Get the work order with customer and property info
+      const [workOrder] = await db.select()
+        .from(crmWorkOrders)
+        .where(eq(crmWorkOrders.id, workOrderId))
+        .limit(1);
+
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+
+      // Calculate price: $229 for first system, -$10 for each additional
+      let totalPrice = 0;
+      for (let i = 0; i < numberOfSystems; i++) {
+        totalPrice += 229 - (10 * i);
+      }
+
+      // Parse dates
+      const parsedStartDate = new Date(startDate);
+      const parsedContractDate = new Date(contractDate);
+      const endDate = new Date(parsedStartDate);
+      endDate.setFullYear(endDate.getFullYear() + 1);
+      const nextServiceDate = new Date(parsedStartDate);
+      nextServiceDate.setMonth(nextServiceDate.getMonth() + 1);
+
+      // Generate agreement number
+      const agreementNumber = `AGR-${Date.now()}`;
+
+      // Create the agreement
+      const agreementId = nanoid();
+      const agreementData = {
+        id: agreementId,
+        agreementNumber,
+        customerId: workOrder.customerId,
+        propertyId: workOrder.propertyId,
+        agreementPlan: "Preventative Maintenance",
+        numberOfSystems,
+        agreementValue: totalPrice.toFixed(2),
+        frequency: "annual",
+        visitsPerPeriod: 2,
+        billingPreference,
+        contractDate: parsedContractDate,
+        startDate: parsedStartDate,
+        endDate,
+        nextServiceDate,
+        nextInvoiceDate: parsedStartDate,
+        autoRenew: autoRenew ?? true,
+        status: payingNow ? "active" : "pending",
+        isActive: payingNow ?? false,
+        activationDate: payingNow ? new Date() : null,
+        isInitialCycle: !payingNow,
+        notes: notes || null,
+        sourceWorkOrderId: workOrderId,
+        createdBy: user.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      await db.insert(crmAgreements).values(agreementData);
+
+      // Log agreement creation
+      await logCrmAudit(
+        user.id,
+        "agreement.created",
+        "crm_agreement",
+        agreementId,
+        { workOrderId, numberOfSystems, price: totalPrice, payingNow, billingPreference },
+        req.ip
+      );
+
+      // If paying now, create invoice and mark as paid
+      if (payingNow) {
+        // Get customer and property info for invoice
+        const [customer] = await db.select()
+          .from(crmCustomers)
+          .where(eq(crmCustomers.id, workOrder.customerId))
+          .limit(1);
+
+        const [property] = workOrder.propertyId ? await db.select()
+          .from(crmProperties)
+          .where(eq(crmProperties.id, workOrder.propertyId))
+          .limit(1) : [null];
+
+        const invoiceNumber = `INV-${Date.now()}`;
+        const invoiceId = nanoid();
+        
+        // Create invoice
+        const invoice = {
+          id: invoiceId,
+          invoiceNumber,
+          workOrderId,
+          customerId: workOrder.customerId,
+          propertyId: workOrder.propertyId,
+          customerName: customer?.name || "Unknown Customer",
+          customerEmail: customer?.email || null,
+          customerPhone: customer?.phone || null,
+          serviceAddress: property ? [property.address1, property.city, property.state, property.zip].filter(Boolean).join(", ") : null,
+          subtotal: totalPrice.toFixed(2),
+          laborTotal: "0.00",
+          taxTotal: "0.00",
+          total: totalPrice.toFixed(2),
+          amountPaid: totalPrice.toFixed(2),
+          balanceDue: "0.00",
+          status: "paid",
+          paidDate: new Date(),
+          createdBy: user.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        await db.insert(crmInvoices).values(invoice);
+
+        // Create line item for the invoice
+        const lineItemId = nanoid();
+        const lineItem = {
+          id: lineItemId,
+          invoiceId,
+          description: `Preventative Maintenance Agreement (${numberOfSystems} system${numberOfSystems > 1 ? 's' : ''})`,
+          quantity: 1,
+          unitPrice: totalPrice.toFixed(2),
+          total: totalPrice.toFixed(2),
+          lineType: "maintenance" as const,
+          sortOrder: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        await db.insert(crmInvoiceLineItems).values(lineItem);
+
+        // Update agreement to mark as activated
+        await db.update(crmAgreements)
+          .set({
+            isInitialCycle: false,
+            activationDate: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(crmAgreements.id, agreementId));
+
+        await logCrmAudit(
+          user.id,
+          "agreement.activated",
+          "crm_agreement",
+          agreementId,
+          { invoiceId, amount: totalPrice },
+          req.ip
+        );
+
+        return res.status(201).json({
+          success: true,
+          payingNow: true,
+          agreement: agreementData,
+          invoice,
+        });
+      } else {
+        // Not paying now - return line item data for frontend to add to invoice
+        const lineItemData = {
+          description: `Preventative Maintenance Agreement (${numberOfSystems} system${numberOfSystems > 1 ? 's' : ''})`,
+          unitPrice: totalPrice.toFixed(2),
+          quantity: 1,
+          lineType: "maintenance",
+        };
+
+        return res.status(201).json({
+          success: true,
+          payingNow: false,
+          agreement: agreementData,
+          lineItemData,
+        });
+      }
+    } catch (error) {
+      console.error("Error creating agreement:", error);
+      return res.status(500).json({ message: "Failed to create agreement" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)

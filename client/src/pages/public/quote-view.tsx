@@ -397,6 +397,36 @@ export default function PublicQuoteView() {
     },
   });
 
+  // Fetch payment link for install quotes - moved before conditional returns to satisfy React hooks rules
+  const paymentLinkCategories = ["custom install", "proposal builder", "custom service", "install"];
+  const quote = data?.quote;
+  const isInstallQuote = paymentLinkCategories.includes(quote?.quoteCategory?.toLowerCase() || "");
+  
+  useEffect(() => {
+    if (!isInstallQuote || !quote?.id || quote?.status === "accepted") return;
+    
+    const fetchPaymentLink = async () => {
+      setPaymentLinkLoading(true);
+      try {
+        const response = await fetch(`/api/stripe/quote/${quote.id}/payment-link`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (response.ok) {
+          const result = await response.json();
+          setPaymentLinkUrl(result.paymentLinkUrl);
+          setDepositAmount(result.depositAmount);
+        }
+      } catch (err) {
+        console.error("Failed to fetch payment link:", err);
+      } finally {
+        setPaymentLinkLoading(false);
+      }
+    };
+    
+    fetchPaymentLink();
+  }, [isInstallQuote, quote?.id, quote?.status]);
+
   const handleSubmit = () => {
     if (!signatureData) {
       toast({ variant: "destructive", title: "Signature Required", description: "Please provide your signature." });
@@ -460,43 +490,17 @@ export default function PublicQuoteView() {
     );
   }
 
-  const { quote, lineItems } = data;
+  // quote is already defined above for the useEffect, just get lineItems
+  const { lineItems } = data;
+  // Use the quote variable defined above (now guaranteed to exist since we passed the !data check)
+  const quoteData = quote!;
 
-  // Fetch payment link for install quotes - must match backend PAYMENT_LINK_CATEGORIES
-  const paymentLinkCategories = ["custom install", "proposal builder", "custom service", "install"];
-  const isInstallQuote = paymentLinkCategories.includes(quote.quoteCategory?.toLowerCase() || "");
-  
-  useEffect(() => {
-    if (!isInstallQuote || !quote.id || quote.status === "accepted") return;
-    
-    const fetchPaymentLink = async () => {
-      setPaymentLinkLoading(true);
-      try {
-        const response = await fetch(`/api/stripe/quote/${quote.id}/payment-link`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        });
-        if (response.ok) {
-          const result = await response.json();
-          setPaymentLinkUrl(result.paymentLinkUrl);
-          setDepositAmount(result.depositAmount);
-        }
-      } catch (err) {
-        console.error("Failed to fetch payment link:", err);
-      } finally {
-        setPaymentLinkLoading(false);
-      }
-    };
-    
-    fetchPaymentLink();
-  }, [isInstallQuote, quote.id, quote.status]);
-
-  if (quote.status === "accepted") {
-    return <QuoteAlreadyAccepted quote={quote} />;
+  if (quoteData.status === "accepted") {
+    return <QuoteAlreadyAccepted quote={quoteData} />;
   }
 
   if (isAccepted) {
-    return <QuoteSuccess quote={quote} />;
+    return <QuoteSuccess quote={quoteData} />;
   }
 
   return (
@@ -511,22 +515,22 @@ export default function PublicQuoteView() {
             <div className="flex items-center justify-between text-white">
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                <CardTitle className="text-xl">Quote #{quote.quoteNumber}</CardTitle>
+                <CardTitle className="text-xl">Quote #{quoteData.quoteNumber}</CardTitle>
               </div>
-              <span className="text-sm opacity-90">{formatDate(quote.createdAt)}</span>
+              <span className="text-sm opacity-90">{formatDate(quoteData.createdAt)}</span>
             </div>
           </CardHeader>
           <CardContent className="py-6 space-y-6">
             <div className="bg-slate-50 rounded-lg p-4">
               <h3 className="font-semibold text-slate-700 mb-2">Prepared For</h3>
-              <p className="font-medium text-slate-900" data-testid="text-customer-name">{quote.customerName}</p>
-              {quote.serviceAddress && (
-                <p className="text-slate-600 text-sm" data-testid="text-service-address">{quote.serviceAddress}</p>
+              <p className="font-medium text-slate-900" data-testid="text-customer-name">{quoteData.customerName}</p>
+              {quoteData.serviceAddress && (
+                <p className="text-slate-600 text-sm" data-testid="text-service-address">{quoteData.serviceAddress}</p>
               )}
             </div>
 
             {/* Option-based quotes: show intro explaining this is a multi-option proposal */}
-            {quote.quoteMode === "options" ? (
+            {quoteData.quoteMode === "options" ? (
               <>
                 <div>
                   <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2">Your Home Comfort Options</h3>
@@ -541,7 +545,7 @@ export default function PublicQuoteView() {
                     const isSelected = selectedOption === option.tag;
                     const whatsIncluded = getWhatsIncludedForOption(
                       option.tag, 
-                      quote.aiGeneratedQuote?.whats_included as WhatsIncludedItem[] | undefined
+                      quoteData.aiGeneratedQuote?.whats_included as WhatsIncludedItem[] | undefined
                     );
                     return (
                       <div 
@@ -645,10 +649,10 @@ export default function PublicQuoteView() {
               </>
             ) : (
               <>
-                {(quote.title || quote.description) && (
+                {(quoteData.title || quoteData.description) && (
                   <div>
-                    {quote.title && <h3 className="text-lg font-semibold text-slate-900 mb-1">{quote.title}</h3>}
-                    {quote.description && <p className="text-slate-600">{quote.description}</p>}
+                    {quoteData.title && <h3 className="text-lg font-semibold text-slate-900 mb-1">{quoteData.title}</h3>}
+                    {quoteData.description && <p className="text-slate-600">{quoteData.description}</p>}
                   </div>
                 )}
 
@@ -669,14 +673,14 @@ export default function PublicQuoteView() {
                           const clientVisibleItems = lineItems.filter(item => 
                             item.lineType !== "labor" && item.lineType !== "other"
                           );
-                          // For single line item quotes, display the sell price (quote.total) instead of actual cost
+                          // For single line item quotes, display the sell price (quoteData.total) instead of actual cost
                           const isSingleItem = clientVisibleItems.length === 1;
                           
                           return clientVisibleItems.length > 0 ? (
                           clientVisibleItems.map((item, idx) => {
                             const equipmentImages = parseEquipmentImages(item.imageUrl);
-                            // Use quote.total for single item quotes to show sell price
-                            const displayPrice = isSingleItem ? quote.total : item.lineTotal;
+                            // Use quoteData.total for single item quotes to show sell price
+                            const displayPrice = isSingleItem ? quoteData.total : item.lineTotal;
                             return (
                               <tr key={item.id} className={idx % 2 === 1 ? "bg-slate-50" : ""}>
                                 <td className="px-4 py-3">
@@ -715,22 +719,22 @@ export default function PublicQuoteView() {
                 <div className="bg-slate-50 rounded-lg p-4 space-y-2">
                   <div className="flex justify-between text-xl font-bold" style={{ color: BRAND_COLOR }}>
                     <span>Total</span>
-                    <span data-testid="text-quote-total">{formatCurrency(quote.total)}</span>
+                    <span data-testid="text-quote-total">{formatCurrency(quoteData.total)}</span>
                   </div>
                 </div>
               </>
             )}
 
-            {quote.validUntil && (
+            {quoteData.validUntil && (
               <p className="text-sm text-slate-500 text-center">
-                This quote is valid until {formatDate(quote.validUntil)}.
+                This quote is valid until {formatDate(quoteData.validUntil)}.
               </p>
             )}
           </CardContent>
         </Card>
 
         {/* Only show Terms & Conditions for install quotes (proposal and custom_install) */}
-        {quote.quoteType !== "quick" && quote.quoteType !== "custom_service" && (
+        {quoteData.quoteType !== "quick" && quoteData.quoteType !== "custom_service" && (
           <Card className="shadow-lg mb-6">
             <CardHeader>
               <CardTitle className="text-lg">Terms & Conditions</CardTitle>
@@ -774,7 +778,7 @@ export default function PublicQuoteView() {
                 data-testid="checkbox-agree-terms"
               />
               <label htmlFor="terms" className="text-sm text-slate-600 cursor-pointer leading-relaxed">
-                {quote.quoteType === "quick" || quote.quoteType === "custom_service" 
+                {quoteData.quoteType === "quick" || quoteData.quoteType === "custom_service" 
                   ? `By signing this document, I authorize ${BRAND_NAME} to perform the work described in this quote.`
                   : `I have read and agree to the terms and conditions above. By signing this document, I authorize ${BRAND_NAME} to perform the work described in this quote.`
                 }
@@ -783,7 +787,7 @@ export default function PublicQuoteView() {
 
             <Button
               onClick={handleSubmit}
-              disabled={signMutation.isPending || !signatureData || !printedName.trim() || !agreedToTerms || (quote.quoteMode === "options" && !selectedOption)}
+              disabled={signMutation.isPending || !signatureData || !printedName.trim() || !agreedToTerms || (quoteData.quoteMode === "options" && !selectedOption)}
               className="w-full py-6 text-lg font-semibold"
               style={{ backgroundColor: BRAND_COLOR }}
               data-testid="button-accept-quote"
