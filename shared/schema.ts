@@ -1468,8 +1468,12 @@ export type ApprovalMetadata = z.infer<typeof approvalMetadataSchema>;
 
 
 // CRM Agreements Status Enum
-export const crmAgreementStatusEnum = ["active", "expiring", "expired", "cancelled"] as const;
+export const crmAgreementStatusEnum = ["pending", "active", "grace_period", "expired", "cancelled"] as const;
 export type CrmAgreementStatus = typeof crmAgreementStatusEnum[number];
+
+// Billing Preference Enum (how customer wants to be billed)
+export const billingPreferenceEnum = ["auto_invoice", "pay_on_visit", "prepaid"] as const;
+export type BillingPreference = typeof billingPreferenceEnum[number];
 
 // Agreement Type Enum (standard HVAC maintenance vs custom agreement types)
 export const agreementTypeEnum = ["standard", "custom"] as const;
@@ -1546,6 +1550,10 @@ export const crmAgreements = pgTable("crm_agreements", {
   regionId: varchar("region_id").references(() => maintenanceRegions.id),
   agreementType: text("agreement_type").$type<AgreementType>().notNull().default("standard"),
   customAgreementTypeId: varchar("custom_agreement_type_id").references(() => customAgreementTypes.id),
+  billingPreference: text("billing_preference").$type<BillingPreference>().notNull().default("auto_invoice"),
+  activationDate: date("activation_date"),
+  graceExpiresAt: date("grace_expires_at"),
+  isInitialCycle: boolean("is_initial_cycle").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
