@@ -1159,6 +1159,10 @@ export const crmQuotes = pgTable("crm_quotes", {
   signedAt: timestamp("signed_at"),
   // Email routing fields
   quoteCategory: text("quote_category").$type<QuoteCategory>(),
+  // Deposit payment tracking
+  depositPaidAt: timestamp("deposit_paid_at"),
+  depositAmount: decimal("deposit_amount", { precision: 10, scale: 2 }),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
 });
 
 // CRM Quote Line Items
