@@ -11360,7 +11360,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (visits.length > 0) {
-          await db.insert(maintenanceVisits).values(visits);
+          const insertedVisits = await db.insert(maintenanceVisits).values(visits).returning();
+          
+          // Get the customer's existing work order count to calculate starting number
+          const existingWorkOrders = await storage.getWorkOrdersByCustomerId(agreement.customerId!);
+          const startingWoNumber = existingWorkOrders.length + 1;
+          
+          // Prepare all work orders for batch insert
+          const workOrdersToInsert = insertedVisits.map((visit, index) => ({
+            customerId: agreement.customerId,
+            propertyId: agreement.propertyId,
+            agreementId: agreement.id,
+            workOrderNumber: startingWoNumber + index,
+            title: `${agreement.agreementPlan || "Maintenance"} - Visit ${visit.visitNumber}/${visit.totalVisitsInCycle}`,
+            visitType: "MAINTENANCE" as const,
+            workSubtype: agreement.agreementPlan || "Preventative Maintenance",
+            description: `Scheduled maintenance visit for ${agreement.agreementNumber}`,
+            status: "scheduled" as const,
+            scheduledStart: new Date(visit.targetDate + "T09:00:00"),
+            scheduledEnd: new Date(visit.targetDate + "T11:00:00"),
+          }));
+          
+          // Batch insert all work orders
+          const insertedWorkOrders = await db.insert(crmWorkOrders).values(workOrdersToInsert).returning();
+          
+          // Batch update visits with their corresponding work order IDs
+          for (let i = 0; i < insertedVisits.length; i++) {
+            await db.update(maintenanceVisits)
+              .set({ workOrderId: insertedWorkOrders[i].id })
+              .where(eq(maintenanceVisits.id, insertedVisits[i].id));
+          }
         }
       }
 
@@ -19361,49 +19390,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       const workOrderId = req.params.id;
       
-      // First, check if this is a pay-on-visit agreement that needs initial payment
-      // This happens when the work order is linked to a maintenance visit for a pending pay-on-visit agreement
-      const [anyVisit] = await db.select()
-        .from(maintenanceVisits)
-        .where(eq(maintenanceVisits.workOrderId, workOrderId))
-        .limit(1);
-      
-      if (anyVisit) {
-        const [agreement] = await db.select()
-          .from(crmAgreements)
-          .where(eq(crmAgreements.id, anyVisit.agreementId))
-          .limit(1);
-        
-        // Check if this is a pay-on-visit agreement in pending status (needs initial payment)
-        if (agreement && 
-            agreement.billingPreference === "pay_on_visit" && 
-            agreement.status === "pending" && 
-            agreement.isInitialCycle) {
-          // For initial payments, check if invoice was already created (pending_payment) or if collected/declined
-          // If renewalStatus is "none" (default), treat as "pending" so the UI shows the payment prompt
-          const effectiveStatus = anyVisit.renewalStatus === "none" ? "pending" : anyVisit.renewalStatus;
-          return res.json({
-            isRenewalVisit: true,
-            paymentType: "initial",
-            renewalStatus: effectiveStatus,
-            agreementInfo: {
-              id: agreement.id,
-              agreementNumber: agreement.agreementNumber,
-              price: agreement.price,
-              customerName: agreement.customerName,
-              billingPreference: agreement.billingPreference
-            }
-          });
-        }
-      }
-      
-      // Check if this work order is linked to a maintenance visit with isRenewalTrigger = true
+      // Check if this work order is linked to a maintenance visit
       const [visit] = await db.select()
         .from(maintenanceVisits)
-        .where(and(
-          eq(maintenanceVisits.workOrderId, workOrderId),
-          eq(maintenanceVisits.isRenewalTrigger, true)
-        ))
+        .where(eq(maintenanceVisits.workOrderId, workOrderId))
         .limit(1);
       
       if (!visit) {
@@ -19411,7 +19401,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           isRenewalVisit: false,
           paymentType: null,
           renewalStatus: "none",
-          agreementInfo: null
+          agreementInfo: null,
+          visitInfo: null
         });
       }
       
@@ -19423,23 +19414,56 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       
       if (!agreement) {
         return res.json({
-          isRenewalVisit: true,
-          paymentType: "renewal",
-          renewalStatus: visit.renewalStatus,
-          agreementInfo: null
+          isRenewalVisit: false,
+          paymentType: null,
+          renewalStatus: "none",
+          agreementInfo: null,
+          visitInfo: {
+            visitNumber: visit.visitNumber,
+            totalVisitsInCycle: visit.totalVisitsInCycle,
+            targetDate: visit.targetDate
+          }
         });
       }
       
+      // Determine if payment is needed
+      let isRenewalVisit = false;
+      let paymentType: "initial" | "renewal" | null = null;
+      let renewalStatus = visit.renewalStatus || "none";
+      
+      // Check if this is a pay-on-visit agreement in pending status (needs initial payment)
+      if (agreement.billingPreference === "pay_on_visit" && 
+          agreement.status === "pending" && 
+          agreement.isInitialCycle) {
+        isRenewalVisit = true;
+        paymentType = "initial";
+        // If renewalStatus is "none" (default), treat as "pending" so the UI shows the payment prompt
+        renewalStatus = visit.renewalStatus === "none" ? "pending" : visit.renewalStatus;
+      }
+      // Check if this is a renewal trigger visit for pay-on-visit
+      else if (visit.isRenewalTrigger && agreement.billingPreference === "pay_on_visit") {
+        isRenewalVisit = true;
+        paymentType = "renewal";
+      }
+      
       return res.json({
-        isRenewalVisit: true,
-        paymentType: "renewal",
-        renewalStatus: visit.renewalStatus,
+        isRenewalVisit,
+        paymentType,
+        renewalStatus,
         agreementInfo: {
           id: agreement.id,
           agreementNumber: agreement.agreementNumber,
           price: agreement.price,
           customerName: agreement.customerName,
-          billingPreference: agreement.billingPreference
+          billingPreference: agreement.billingPreference,
+          status: agreement.status,
+          agreementPlan: agreement.agreementPlan
+        },
+        visitInfo: {
+          visitNumber: visit.visitNumber,
+          totalVisitsInCycle: visit.totalVisitsInCycle,
+          targetDate: visit.targetDate,
+          isRenewalTrigger: visit.isRenewalTrigger
         }
       });
     } catch (error) {

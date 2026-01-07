@@ -35,7 +35,8 @@ import {
   Pencil,
   CalendarIcon,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  FileCheck
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
@@ -109,6 +110,14 @@ interface RenewalInfo {
     price: number;
     customerName: string;
     billingPreference?: string;
+    status?: string;
+    agreementPlan?: string;
+  } | null;
+  visitInfo?: {
+    visitNumber: number;
+    totalVisitsInCycle: number;
+    targetDate: string;
+    isRenewalTrigger?: boolean;
   } | null;
 }
 
@@ -322,6 +331,54 @@ function OverviewTab({
           )}
         </CardContent>
       </Card>
+
+      {/* Maintenance Agreement Info Card */}
+      {renewalInfo?.visitInfo && renewalInfo.agreementInfo && (
+        <Card className="border-purple-200 bg-purple-50/50" data-testid="card-maintenance-info">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base text-purple-800">
+              <FileCheck className="h-4 w-4" />
+              Maintenance Agreement
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Agreement</span>
+              <span className="font-medium text-sm">{renewalInfo.agreementInfo.agreementNumber}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Visit Progress</span>
+              <span className="font-bold text-purple-700">
+                Visit {renewalInfo.visitInfo.visitNumber} of {renewalInfo.visitInfo.totalVisitsInCycle}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Billing</span>
+              <Badge variant="outline" className="text-xs">
+                {renewalInfo.agreementInfo.billingPreference === "pay_on_visit" ? "Pay on Visit" : "Auto Invoice"}
+              </Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Status</span>
+              <Badge variant="outline" className={`text-xs ${
+                renewalInfo.agreementInfo.status === "active" ? "bg-green-100 text-green-700 border-green-300" :
+                renewalInfo.agreementInfo.status === "pending" ? "bg-amber-100 text-amber-700 border-amber-300" :
+                "bg-slate-100 text-slate-700 border-slate-300"
+              }`}>
+                {renewalInfo.agreementInfo.status === "active" ? "Active" : 
+                 renewalInfo.agreementInfo.status === "pending" ? "Pending Activation" :
+                 renewalInfo.agreementInfo.status || "Unknown"}
+              </Badge>
+            </div>
+            {renewalInfo.agreementInfo.agreementPlan && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-600">Plan</span>
+                <span className="text-sm font-medium">{renewalInfo.agreementInfo.agreementPlan}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {checklistResponse && checklistResponse.checklist && checklistResponse.summary && (
         <Card className="border-amber-200 bg-amber-50/30" data-testid="card-checklist-summary">
@@ -2976,7 +3033,7 @@ export default function MobileJobDetail() {
     queryFn: async () => {
       const res = await fetch(`/api/mobile/work-orders/${params.id}/renewal-info`, { credentials: "include" });
       if (!res.ok) {
-        if (res.status === 404) return { isRenewalVisit: false, paymentType: null, renewalStatus: "none" as const, agreementInfo: null };
+        if (res.status === 404) return { isRenewalVisit: false, paymentType: null, renewalStatus: "none" as const, agreementInfo: null, visitInfo: null };
         throw new Error("Failed to fetch renewal info");
       }
       return res.json();
