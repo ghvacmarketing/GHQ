@@ -795,7 +795,7 @@ export default function CrmProposalBuilder() {
   const [preloadedPropertyId, setPreloadedPropertyId] = useState<string | null>(null);
   
   // Customer properties for site selection
-  const [customerProperties, setCustomerProperties] = useState<Array<{ id: string; address: string; city?: string; state?: string }>>([]);
+  const [customerProperties, setCustomerProperties] = useState<Array<{ id: string; address1: string; address2?: string; city: string; state: string; zip: string }>>([]);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [isLoadingProperties, setIsLoadingProperties] = useState(false);
   
@@ -5098,7 +5098,7 @@ export default function CrmProposalBuilder() {
                     <option value="">-- Select a property --</option>
                     {customerProperties.map((prop) => (
                       <option key={prop.id} value={prop.id}>
-                        {prop.address}{prop.city ? `, ${prop.city}` : ''}{prop.state ? `, ${prop.state}` : ''}
+                        {prop.address1}{prop.address2 ? ` ${prop.address2}` : ''}, {prop.city}, {prop.state} {prop.zip}
                       </option>
                     ))}
                   </select>
@@ -5113,7 +5113,7 @@ export default function CrmProposalBuilder() {
               {selectedCustomer && customerProperties.length === 1 && (
                 <div className="mt-2 text-sm text-muted-foreground flex items-center gap-2">
                   <MapPin className="h-3 w-3" />
-                  {customerProperties[0].address}
+                  {customerProperties[0].address1}, {customerProperties[0].city}, {customerProperties[0].state} {customerProperties[0].zip}
                 </div>
               )}
               
