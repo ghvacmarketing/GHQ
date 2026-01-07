@@ -1680,7 +1680,17 @@ const invoiceStatusConfig: Record<string, { label: string; className: string }> 
   partial: { label: "Partial", className: "bg-amber-100 text-amber-700 border-amber-300" },
 };
 
-function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
+function InvoiceTab({ 
+  workOrder, 
+  renewalInfo, 
+  onCollectRenewal, 
+  onDeclineRenewal 
+}: { 
+  workOrder: WorkOrderDetail; 
+  renewalInfo?: RenewalInfo | null;
+  onCollectRenewal?: () => void;
+  onDeclineRenewal?: () => void;
+}) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -2116,6 +2126,69 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
 
   return (
     <div className="space-y-4">
+      {/* Pay-on-Visit Agreement Collect Payment Card */}
+      {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "pending" && renewalInfo.agreementInfo && (
+        <Card className={renewalInfo.paymentType === "initial" ? "border-green-400 bg-green-50" : "border-amber-400 bg-amber-50"} data-testid="invoice-tab-renewal-banner">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className={`p-2 rounded-full ${renewalInfo.paymentType === "initial" ? "bg-green-100" : "bg-amber-100"}`}>
+                {renewalInfo.paymentType === "initial" ? (
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                ) : (
+                  <RefreshCw className="h-5 w-5 text-amber-600" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-semibold mb-1 ${renewalInfo.paymentType === "initial" ? "text-green-800" : "text-amber-800"}`}>
+                  {renewalInfo.paymentType === "initial" ? "First Visit - Collect Payment" : "Renewal Due"}
+                </h3>
+                <p className={`text-sm mb-2 ${renewalInfo.paymentType === "initial" ? "text-green-700" : "text-amber-700"}`}>
+                  {renewalInfo.paymentType === "initial" 
+                    ? `Collect first year payment to activate agreement (${renewalInfo.agreementInfo.agreementNumber})`
+                    : `Collect renewal payment for agreement (${renewalInfo.agreementInfo.agreementNumber})`}
+                </p>
+                <p className={`text-lg font-bold mb-3 ${renewalInfo.paymentType === "initial" ? "text-green-700" : "text-amber-700"}`}>
+                  ${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)}
+                </p>
+                <Button
+                  className="w-full min-h-[44px] bg-green-600 hover:bg-green-700"
+                  onClick={onCollectRenewal}
+                  data-testid="button-invoice-tab-collect-payment"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Collect Payment
+                </Button>
+                {renewalInfo.paymentType !== "initial" && onDeclineRenewal && (
+                  <Button
+                    variant="outline"
+                    className="w-full mt-2 min-h-[44px] border-red-300 text-red-600 hover:bg-red-50"
+                    onClick={onDeclineRenewal}
+                    data-testid="button-invoice-tab-decline-renewal"
+                  >
+                    Customer Declined
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Invoice Already Created Banner */}
+      {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "pending_payment" && (
+        <Card className="border-blue-400 bg-blue-50" data-testid="invoice-tab-pending-payment-banner">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Receipt className="h-5 w-5 text-blue-600" />
+              <div>
+                <h3 className="font-semibold text-blue-800">Invoice Created</h3>
+                <p className="text-sm text-blue-700">A renewal invoice has been generated and is awaiting payment.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Existing Invoices List */}
       <Card data-testid="existing-invoices-card">
         <CardHeader className="pb-2">
@@ -3445,7 +3518,12 @@ export default function MobileJobDetail() {
             <QuoteTab workOrder={workOrder} />
           )}
           {activeTab === "invoice" && (
-            <InvoiceTab workOrder={workOrder} />
+            <InvoiceTab 
+              workOrder={workOrder} 
+              renewalInfo={renewalInfo}
+              onCollectRenewal={() => setShowCollectRenewalDialog(true)}
+              onDeclineRenewal={() => setShowDeclineRenewalDialog(true)}
+            />
           )}
         </div>
 
