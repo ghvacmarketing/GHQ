@@ -20033,6 +20033,22 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Work order not found" });
       }
 
+      // Fetch customer info for required fields
+      const [customer] = await db.select()
+        .from(crmCustomers)
+        .where(eq(crmCustomers.id, workOrder.customerId))
+        .limit(1);
+
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      // Fetch property info if available
+      const [property] = workOrder.propertyId ? await db.select()
+        .from(crmProperties)
+        .where(eq(crmProperties.id, workOrder.propertyId))
+        .limit(1) : [null];
+
       // Calculate price: $229 for first system, -$10 for each additional
       let totalPrice = 0;
       for (let i = 0; i < numberOfSystems; i++) {
@@ -20050,12 +20066,19 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       // Generate agreement number
       const agreementNumber = `AGR-${Date.now()}`;
 
+      // Build service address from property
+      const serviceAddress = property 
+        ? [property.address1, property.city, property.state, property.zip].filter(Boolean).join(", ") 
+        : null;
+
       // Create the agreement
       const agreementId = nanoid();
       const agreementData = {
         id: agreementId,
         agreementNumber,
         customerId: workOrder.customerId,
+        customerName: customer.name,
+        serviceAddress,
         propertyId: workOrder.propertyId,
         agreementPlan: "Preventative Maintenance",
         numberOfSystems,
@@ -20094,17 +20117,6 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       // If paying now, create invoice and mark as paid
       if (payingNow) {
-        // Get customer and property info for invoice
-        const [customer] = await db.select()
-          .from(crmCustomers)
-          .where(eq(crmCustomers.id, workOrder.customerId))
-          .limit(1);
-
-        const [property] = workOrder.propertyId ? await db.select()
-          .from(crmProperties)
-          .where(eq(crmProperties.id, workOrder.propertyId))
-          .limit(1) : [null];
-
         const invoiceNumber = `INV-${Date.now()}`;
         const invoiceId = nanoid();
         
