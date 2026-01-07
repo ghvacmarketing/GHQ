@@ -152,6 +152,7 @@ export default function CrmQuotes() {
     title: "",
     description: "",
     amount: "",
+    assignedToId: "",
   });
 
   // Customer search and property selection state
@@ -229,8 +230,14 @@ export default function CrmQuotes() {
     }
   }, [customerProperties, selectedProperty]);
 
+  // Fetch CRM users for assignment
+  const { data: crmUsers = [] } = useQuery<CrmUser[]>({
+    queryKey: ["/api/crm/users"],
+    enabled: !!currentUser,
+  });
+
   const resetCreateForm = () => {
-    setCreateForm({ title: "", description: "", amount: "" });
+    setCreateForm({ title: "", description: "", amount: "", assignedToId: "" });
     setSelectedCustomer(null);
     setSelectedProperty(null);
     setCustomerSearchInput("");
@@ -258,6 +265,7 @@ export default function CrmQuotes() {
         serviceAddress,
         title: createForm.title || "Quick Quote",
         description: createForm.description || undefined,
+        assignedToId: createForm.assignedToId || undefined,
         lineItems: [
           {
             description: createForm.title || "Quick Quote Item",
@@ -430,6 +438,10 @@ export default function CrmQuotes() {
     }
     if (customerProperties.length > 0 && !selectedProperty) {
       toast({ title: "Please select a property location", variant: "destructive" });
+      return;
+    }
+    if (!createForm.assignedToId) {
+      toast({ title: "Please assign someone to this quote", variant: "destructive" });
       return;
     }
     if (!createForm.title.trim()) {
@@ -1003,6 +1015,32 @@ export default function CrmQuotes() {
               </div>
             )}
 
+            {/* Assign To Selection */}
+            <div className="space-y-2">
+              <Label>Assign To *</Label>
+              <Select
+                value={createForm.assignedToId}
+                onValueChange={(value) => setCreateForm(prev => ({ ...prev, assignedToId: value }))}
+              >
+                <SelectTrigger data-testid="select-assigned-to">
+                  <SelectValue placeholder="Select who to assign">
+                    {createForm.assignedToId && crmUsers.find(u => u.id === createForm.assignedToId)?.name}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  {crmUsers.filter(u => u.isActive !== false).map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-slate-400" />
+                        <span>{user.name}</span>
+                        {user.role && <span className="text-xs text-slate-500">({user.role})</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Quote Details */}
             <div className="space-y-2">
               <Label htmlFor="title">Quote Title *</Label>
@@ -1049,7 +1087,7 @@ export default function CrmQuotes() {
               <Button 
                 type="submit" 
                 className="bg-[#711419] hover:bg-[#5a1014]"
-                disabled={createQuoteMutation.isPending || !selectedCustomer || (customerProperties.length > 0 && !selectedProperty)}
+                disabled={createQuoteMutation.isPending || !selectedCustomer || (customerProperties.length > 0 && !selectedProperty) || !createForm.assignedToId}
                 data-testid="button-submit-create"
               >
                 {createQuoteMutation.isPending ? "Creating..." : "Create Quote"}
