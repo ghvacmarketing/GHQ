@@ -398,8 +398,8 @@ export default function PublicQuoteView() {
   });
 
   // Fetch payment link for install quotes - moved before conditional returns to satisfy React hooks rules
-  // Quote types that should show the 50% deposit payment link (matches database values - use underscores)
-  const paymentLinkTypes = ["custom_install", "proposal_builder", "custom_service"];
+  // Quote types that should show the 50% deposit payment link (matches actual database values)
+  const paymentLinkTypes = ["custom_install", "proposal", "custom_service"];
   const quote = data?.quote;
   const isInstallQuote = paymentLinkTypes.includes(quote?.quoteType?.toLowerCase() || "");
   

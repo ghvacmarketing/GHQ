@@ -22,8 +22,8 @@ async function getDepositPercentage(): Promise<number> {
   return DEFAULT_DEPOSIT_PERCENTAGE;
 }
 
-// Quote types that allow payment links (matches database values - use underscores)
-const PAYMENT_LINK_TYPES = ["custom_install", "proposal_builder", "custom_service"];
+// Quote types that allow payment links (matches actual database values)
+const PAYMENT_LINK_TYPES = ["custom_install", "proposal", "custom_service"];
 
 // Generate a payment link for a quote (specific types only, with deposit)
 router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
