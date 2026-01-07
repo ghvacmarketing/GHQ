@@ -19676,6 +19676,130 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         .limit(1);
       
       if (!visit) {
+        // FALLBACK: For manual MAINTENANCE work orders without a maintenanceVisits link,
+        // try to find a pay-on-visit agreement by property match
+        if (workOrder.propertyId && workOrder.visitType === "MAINTENANCE") {
+          const [agreementByProperty] = await db.select()
+            .from(crmAgreements)
+            .where(and(
+              eq(crmAgreements.propertyId, workOrder.propertyId),
+              eq(crmAgreements.billingPreference, "pay_on_visit"),
+              or(
+                eq(crmAgreements.status, "pending"),
+                eq(crmAgreements.status, "active")
+              )
+            ))
+            .limit(1);
+          
+          if (agreementByProperty) {
+            // Handle initial payment for pending agreements
+            if (agreementByProperty.status === "pending" && paymentType === "initial") {
+              // Create invoice for initial payment
+              const invoiceNumber = await generateInvoiceNumber();
+              const paymentAmount = String(agreementByProperty.price || "0");
+              
+              const invoiceToCreate = {
+                invoiceNumber,
+                workOrderId: workOrderId,
+                customerId: workOrder.customerId,
+                propertyId: workOrder.propertyId,
+                agreementId: agreementByProperty.id,
+                status: "draft" as const,
+                subtotal: paymentAmount,
+                total: paymentAmount,
+                amountPaid: "0",
+                balanceDue: paymentAmount,
+                createdBy: user.id,
+                notes: `Maintenance Agreement Initial Payment - ${agreementByProperty.agreementNumber}`,
+              };
+              
+              const parseResult = insertCrmInvoiceSchema.safeParse(invoiceToCreate);
+              if (!parseResult.success) {
+                return res.status(400).json({ 
+                  message: "Failed to create invoice", 
+                  errors: parseResult.error.errors 
+                });
+              }
+              
+              const [invoice] = await db.insert(crmInvoices).values(parseResult.data).returning();
+              
+              // Add line item
+              const lineItem = {
+                invoiceId: invoice.id,
+                description: `Maintenance Agreement - ${agreementByProperty.agreementPlan || "Service Plan"} (Year 1)`,
+                quantity: "1",
+                unitPrice: paymentAmount,
+                lineTotal: paymentAmount,
+              };
+              await db.insert(crmInvoiceLineItems).values(lineItem);
+              
+              await logCrmAudit(
+                user.id,
+                "agreement.initial_payment_invoice_created_via_property",
+                "agreement",
+                agreementByProperty.id,
+                { invoiceId: invoice.id, workOrderId, amount: paymentAmount },
+                req.ip
+              );
+              
+              return res.status(201).json({ ...invoice, paymentType: "initial" });
+            }
+            
+            // Handle renewal payment for active agreements
+            if (agreementByProperty.status === "active" && paymentType === "renewal") {
+              // Create invoice for renewal amount
+              const invoiceNumber = await generateInvoiceNumber();
+              const renewalAmount = String(agreementByProperty.price || "0");
+              
+              const invoiceToCreate = {
+                invoiceNumber,
+                workOrderId: workOrderId,
+                customerId: workOrder.customerId,
+                propertyId: workOrder.propertyId,
+                agreementId: agreementByProperty.id,
+                status: "draft" as const,
+                subtotal: renewalAmount,
+                total: renewalAmount,
+                amountPaid: "0",
+                balanceDue: renewalAmount,
+                createdBy: user.id,
+                notes: `Maintenance Agreement Renewal - ${agreementByProperty.agreementNumber}`,
+              };
+              
+              const parseResult = insertCrmInvoiceSchema.safeParse(invoiceToCreate);
+              if (!parseResult.success) {
+                return res.status(400).json({ 
+                  message: "Failed to create invoice", 
+                  errors: parseResult.error.errors 
+                });
+              }
+              
+              const [invoice] = await db.insert(crmInvoices).values(parseResult.data).returning();
+              
+              // Add line item for the renewal
+              const lineItem = {
+                invoiceId: invoice.id,
+                description: `Maintenance Agreement Renewal - ${agreementByProperty.agreementPlan || "Service Plan"}`,
+                quantity: "1",
+                unitPrice: renewalAmount,
+                lineTotal: renewalAmount,
+              };
+              await db.insert(crmInvoiceLineItems).values(lineItem);
+              
+              await logCrmAudit(
+                user.id,
+                "agreement.renewal_invoice_created_via_property",
+                "agreement",
+                agreementByProperty.id,
+                { invoiceId: invoice.id, workOrderId, amount: renewalAmount },
+                req.ip
+              );
+              
+              return res.status(201).json({ ...invoice, paymentType: "renewal" });
+            }
+          }
+        }
+        
         return res.status(400).json({ message: "This work order is not a renewal visit" });
       }
       
