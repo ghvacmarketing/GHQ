@@ -1,12 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, FileText, CheckCircle2, MapPin, Calendar, CreditCard } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle2, MapPin, Calendar, CreditCard, Loader2 } from "lucide-react";
 import ghvacLogo from "@assets/ghvac-logo.png";
 
 const BRAND_COLOR = "#711419";
@@ -72,10 +72,13 @@ function formatDate(dateString: string | Date | null | undefined): string {
 export default function PortalInvoiceDetail() {
   const { id } = useParams<{ id: string }>();
   const [location] = useLocation();
+  const queryClient = useQueryClient();
+  const [paymentVerified, setPaymentVerified] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   
   const isPaymentSuccess = location.includes("payment=success");
 
-  const { data, isLoading, error } = useQuery<InvoiceResponse>({
+  const { data, isLoading, error, refetch } = useQuery<InvoiceResponse>({
     queryKey: ["/api/portal/invoice", id],
     queryFn: async () => {
       const res = await fetch(`/api/portal/invoice/${id}`);
@@ -88,6 +91,26 @@ export default function PortalInvoiceDetail() {
   const invoice = data?.invoice;
   const lineItems = data?.lineItems || [];
   const statusInfo = invoice ? statusConfig[invoice.status] || statusConfig.sent : null;
+
+  // Auto-verify payment when redirected from Stripe payment success
+  useEffect(() => {
+    if (isPaymentSuccess && id && invoice && invoice.status !== "paid" && !paymentVerified && !isVerifying) {
+      setIsVerifying(true);
+      fetch(`/api/stripe/invoice/${id}/verify-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) {
+            setPaymentVerified(true);
+            refetch();
+          }
+        })
+        .catch(err => console.error("Payment verification error:", err))
+        .finally(() => setIsVerifying(false));
+    }
+  }, [isPaymentSuccess, id, invoice, paymentVerified, isVerifying, refetch]);
 
   if (isLoading) {
     return (

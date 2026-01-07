@@ -1247,6 +1247,7 @@ export const crmInvoices = pgTable("crm_invoices", {
   voidReason: text("void_reason"),
   paymentMethod: text("payment_method"),
   paymentReference: text("payment_reference"),
+  stripePaymentLinkId: text("stripe_payment_link_id"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => crmUsers.id),
   createdAt: timestamp("created_at").defaultNow(),

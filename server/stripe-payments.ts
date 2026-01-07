@@ -166,6 +166,11 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
       },
     });
 
+    // Store the payment link ID on the invoice for later verification
+    await db.update(crmInvoices)
+      .set({ stripePaymentLinkId: paymentLink.id })
+      .where(eq(crmInvoices.id, invoiceId));
+
     res.json({
       paymentLinkUrl: paymentLink.url,
       paymentLinkId: paymentLink.id,
@@ -175,6 +180,160 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
   } catch (error: any) {
     console.error("Error creating invoice payment link:", error);
     res.status(500).json({ error: error.message || "Failed to create payment link" });
+  }
+});
+
+// Verify and record payment for an invoice
+router.post("/api/stripe/invoice/:invoiceId/verify-payment", async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+
+    // Get the invoice
+    const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, invoiceId));
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+
+    // If already marked as paid, return success
+    if (invoice.status === "paid") {
+      return res.json({
+        success: true,
+        alreadyPaid: true,
+        paidAt: invoice.paidAt,
+        amountPaid: invoice.amountPaid,
+      });
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const now = new Date();
+    const paymentLinkId = (invoice as any).stripePaymentLinkId;
+
+    // Method 1: Check via Payment Link if we have the ID stored
+    if (paymentLinkId) {
+      const sessions = await stripe.checkout.sessions.list({
+        payment_link: paymentLinkId,
+        limit: 10,
+      });
+
+      for (const session of sessions.data) {
+        if (session.payment_status !== 'paid') continue;
+
+        const paymentIntentId = typeof session.payment_intent === 'string' 
+          ? session.payment_intent 
+          : session.payment_intent?.id || null;
+          
+        if (paymentIntentId) {
+          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+            expand: ['charges.data'],
+          });
+          
+          // Check if payment is valid and cleared
+          if (paymentIntent.status !== 'succeeded' || (paymentIntent.amount_received ?? 0) <= 0) {
+            continue;
+          }
+          
+          // Check for refunds
+          const wasRefunded =
+            (paymentIntent.amount_refunded ?? 0) > 0 ||
+            paymentIntent.charges?.data?.some((charge) =>
+              charge.refunded || (charge.amount_refunded ?? 0) > 0 || charge.status !== 'succeeded'
+            );
+          
+          if (wasRefunded) {
+            continue;
+          }
+          
+          const amountPaidNum = (paymentIntent.amount_received ?? session.amount_total ?? 0) / 100;
+          const total = parseFloat(invoice.total?.toString() || "0");
+          const previouslyPaid = parseFloat(invoice.amountPaid?.toString() || "0");
+          const newAmountPaid = previouslyPaid + amountPaidNum;
+          const newBalanceDue = Math.max(0, total - newAmountPaid);
+          const isPaidInFull = newBalanceDue <= 0;
+          
+          await db.update(crmInvoices)
+            .set({
+              status: isPaidInFull ? "paid" : "sent",
+              paidAt: isPaidInFull ? now : null,
+              amountPaid: newAmountPaid.toFixed(2),
+              balanceDue: newBalanceDue.toFixed(2),
+              paymentMethod: "stripe",
+              paymentReference: paymentIntentId,
+            })
+            .where(eq(crmInvoices.id, invoiceId));
+
+          return res.json({
+            success: true,
+            paidAt: isPaidInFull ? now : null,
+            amountPaid: newAmountPaid,
+            balanceDue: newBalanceDue,
+            isPaidInFull,
+            stripePaymentIntentId: paymentIntentId,
+          });
+        }
+      }
+    }
+
+    // Method 2: Fallback - search PaymentIntents by metadata
+    const paymentIntents = await stripe.paymentIntents.list({
+      limit: 20,
+      expand: ['data.charges.data'],
+    });
+
+    for (const pi of paymentIntents.data) {
+      if (pi.metadata?.invoiceId !== invoiceId || pi.metadata?.type !== 'invoice_payment') {
+        continue;
+      }
+      
+      if (pi.status !== 'succeeded' || (pi.amount_received ?? 0) <= 0) {
+        continue;
+      }
+      
+      const wasRefunded =
+        (pi.amount_refunded ?? 0) > 0 ||
+        pi.charges?.data?.some((charge) =>
+          charge.refunded || (charge.amount_refunded ?? 0) > 0 || charge.status !== 'succeeded'
+        );
+      
+      if (wasRefunded) {
+        continue;
+      }
+      
+      const amountPaidNum = (pi.amount_received ?? pi.amount) / 100;
+      const total = parseFloat(invoice.total?.toString() || "0");
+      const previouslyPaid = parseFloat(invoice.amountPaid?.toString() || "0");
+      const newAmountPaid = previouslyPaid + amountPaidNum;
+      const newBalanceDue = Math.max(0, total - newAmountPaid);
+      const isPaidInFull = newBalanceDue <= 0;
+      
+      await db.update(crmInvoices)
+        .set({
+          status: isPaidInFull ? "paid" : "sent",
+          paidAt: isPaidInFull ? now : null,
+          amountPaid: newAmountPaid.toFixed(2),
+          balanceDue: newBalanceDue.toFixed(2),
+          paymentMethod: "stripe",
+          paymentReference: pi.id,
+        })
+        .where(eq(crmInvoices.id, invoiceId));
+
+      return res.json({
+        success: true,
+        paidAt: isPaidInFull ? now : null,
+        amountPaid: newAmountPaid,
+        balanceDue: newBalanceDue,
+        isPaidInFull,
+        stripePaymentIntentId: pi.id,
+      });
+    }
+
+    // No payment found
+    res.json({ 
+      success: false, 
+      message: "No successful payment found for this invoice. Payment may still be processing." 
+    });
+  } catch (error: any) {
+    console.error("Error verifying invoice payment:", error);
+    res.status(500).json({ error: error.message || "Failed to verify payment" });
   }
 });
 
