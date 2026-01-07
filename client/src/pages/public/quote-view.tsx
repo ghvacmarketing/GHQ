@@ -398,9 +398,10 @@ export default function PublicQuoteView() {
   });
 
   // Fetch payment link for install quotes - moved before conditional returns to satisfy React hooks rules
-  const paymentLinkCategories = ["custom install", "proposal builder", "custom service", "install"];
+  // Quote types that should show the 50% deposit payment link (matches the dropdown values)
+  const paymentLinkTypes = ["custom install", "proposal builder", "custom service"];
   const quote = data?.quote;
-  const isInstallQuote = paymentLinkCategories.includes(quote?.quoteCategory?.toLowerCase() || "");
+  const isInstallQuote = paymentLinkTypes.includes(quote?.quoteType?.toLowerCase() || "");
   
   useEffect(() => {
     if (!isInstallQuote || !quote?.id || quote?.status === "accepted") return;
