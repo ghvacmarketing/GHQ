@@ -17879,6 +17879,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         aiGeneratedQuote: quote.aiGeneratedQuote,
         quoteMode: quote.quoteMode,
         selectedOption: quote.selectedOption,
+        quoteType: quote.quoteType,
       };
 
       const publicLineItems = lineItems.map((item) => ({

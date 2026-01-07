@@ -354,7 +354,6 @@ export default function PublicQuoteView() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isAccepted, setIsAccepted] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [paymentLinkUrl, setPaymentLinkUrl] = useState<string | null>(null);
   const [paymentLinkLoading, setPaymentLinkLoading] = useState(false);
   const [depositAmount, setDepositAmount] = useState<number>(0);
 
@@ -397,36 +396,47 @@ export default function PublicQuoteView() {
     },
   });
 
-  // Fetch payment link for install quotes - moved before conditional returns to satisfy React hooks rules
-  // Quote types that should show the 50% deposit payment link (matches actual database values)
-  const paymentLinkTypes = ["custom_install", "proposal", "custom_service"];
+  // Quote types that should show the 50% deposit payment link
   const quote = data?.quote;
-  const isInstallQuote = paymentLinkTypes.includes(quote?.quoteType?.toLowerCase() || "");
+  // Check if this is an install/proposal quote that should show deposit option
+  // Handle both database format (custom_install) and display format (Custom Install)
+  const quoteTypeNormalized = quote?.quoteType?.toLowerCase().replace(/\s+/g, '_') || "";
+  const isInstallQuote = ["custom_install", "proposal", "custom_service"].includes(quoteTypeNormalized);
   
-  useEffect(() => {
-    if (!isInstallQuote || !quote?.id || quote?.status === "accepted") return;
+  // Handle deposit payment button click - fetch payment link and redirect
+  const handlePayDeposit = async () => {
+    if (!quote?.id) return;
     
-    const fetchPaymentLink = async () => {
-      setPaymentLinkLoading(true);
-      try {
-        const response = await fetch(`/api/stripe/quote/${quote.id}/payment-link`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+    setPaymentLinkLoading(true);
+    try {
+      const response = await fetch(`/api/stripe/quote/${quote.id}/payment-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (response.ok) {
+        const result = await response.json();
+        setDepositAmount(result.depositAmount);
+        // Redirect to the Stripe payment link
+        window.location.href = result.paymentLinkUrl;
+      } else {
+        const err = await response.json();
+        toast({
+          variant: "destructive",
+          title: "Payment Error",
+          description: err.error || "Failed to generate payment link. Please try again.",
         });
-        if (response.ok) {
-          const result = await response.json();
-          setPaymentLinkUrl(result.paymentLinkUrl);
-          setDepositAmount(result.depositAmount);
-        }
-      } catch (err) {
-        console.error("Failed to fetch payment link:", err);
-      } finally {
-        setPaymentLinkLoading(false);
       }
-    };
-    
-    fetchPaymentLink();
-  }, [isInstallQuote, quote?.id, quote?.status]);
+    } catch (err) {
+      console.error("Failed to fetch payment link:", err);
+      toast({
+        variant: "destructive",
+        title: "Payment Error",
+        description: "Failed to connect to payment service. Please try again.",
+      });
+    } finally {
+      setPaymentLinkLoading(false);
+    }
+  };
 
   const handleSubmit = () => {
     if (!signatureData) {
@@ -818,31 +828,24 @@ export default function PublicQuoteView() {
                   <p className="text-sm text-green-700 mb-3">
                     A 50% deposit is required to schedule your installation.
                   </p>
-                  {paymentLinkLoading ? (
-                    <Button disabled className="w-full sm:w-auto">
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading Payment Link...
-                    </Button>
-                  ) : paymentLinkUrl ? (
-                    <a
-                      href={paymentLinkUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block"
-                    >
-                      <Button
-                        className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-semibold"
-                        data-testid="button-pay-deposit"
-                      >
+                  <Button
+                    onClick={handlePayDeposit}
+                    disabled={paymentLinkLoading}
+                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-semibold"
+                    data-testid="button-pay-deposit"
+                  >
+                    {paymentLinkLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Generating Payment Link...
+                      </>
+                    ) : (
+                      <>
                         <CreditCard className="mr-2 h-5 w-5" />
-                        Pay {formatCurrency(depositAmount)} Deposit
-                      </Button>
-                    </a>
-                  ) : (
-                    <p className="text-sm text-slate-500">
-                      Payment link will be available after signing. Contact us at (706) 826-0644 for payment options.
-                    </p>
-                  )}
+                        Pay 50% Deposit Now
+                      </>
+                    )}
+                  </Button>
                   <p className="text-xs text-green-600 mt-2">Secure payment powered by Stripe</p>
                 </div>
               </div>
