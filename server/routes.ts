@@ -9496,12 +9496,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/customers/:id/active-agreements - Get only active agreements for dropdown selection
+  // GET /api/crm/customers/:id/active-agreements - Get active and pending agreements for dispatch view
   app.get("/api/crm/customers/:id/active-agreements", requireCrmAuth, async (req, res) => {
     try {
       const customerId = req.params.id;
       
-      // Get only active agreements for this customer with full details
+      // Get active and pending agreements for this customer with full details
       const agreements = await db.select({
         id: crmAgreements.id,
         agreementNumber: crmAgreements.agreementNumber,
@@ -9530,7 +9530,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(crmAgreements)
         .where(and(
           eq(crmAgreements.customerId, customerId),
-          eq(crmAgreements.status, "active")
+          or(
+            eq(crmAgreements.status, "active"),
+            eq(crmAgreements.status, "pending"),
+            eq(crmAgreements.status, "grace_period")
+          )
         ))
         .orderBy(desc(crmAgreements.createdAt));
       

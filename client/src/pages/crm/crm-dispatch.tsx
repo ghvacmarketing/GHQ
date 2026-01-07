@@ -1854,7 +1854,7 @@ export default function CrmDispatch() {
     };
   }
 
-  const { data: activeAgreements = [] } = useQuery<ActiveAgreement[]>({
+  const { data: activeAgreements = [], isLoading: agreementsLoading } = useQuery<ActiveAgreement[]>({
     queryKey: ["/api/crm/customers", selectedCustomer?.id, "active-agreements"],
     queryFn: async () => {
       const res = await fetch(`/api/crm/customers/${selectedCustomer!.id}/active-agreements`, {
@@ -3459,15 +3459,35 @@ export default function CrmDispatch() {
             </div>
 
             {/* Maintenance Agreement Info Display - Enhanced */}
-            {selectedCustomer && activeAgreements.length > 0 && (
+            {selectedCustomer && agreementsLoading && (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+                <span className="text-sm text-slate-600">Checking for maintenance agreements...</span>
+              </div>
+            )}
+            {selectedCustomer && !agreementsLoading && activeAgreements.length > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
                 {activeAgreements.map((agreement) => (
                   <div key={agreement.id} className="p-3">
-                    {/* Header with status badge */}
+                    {/* Header with status badges */}
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-amber-600" />
-                        <span className="text-sm font-semibold text-amber-800">Active Maintenance Agreement</span>
+                        <span className="text-sm font-semibold text-amber-800">
+                          {agreement.status === "active" ? "Active" : 
+                           agreement.status === "pending" ? "Pending" : 
+                           agreement.status === "grace_period" ? "Grace Period" : ""} Maintenance Agreement
+                        </span>
+                        {agreement.status === "pending" && (
+                          <span className="text-[10px] bg-yellow-500 text-white px-2 py-0.5 rounded-full font-medium">
+                            Awaiting Payment
+                          </span>
+                        )}
+                        {agreement.status === "grace_period" && (
+                          <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full font-medium">
+                            Renewal Due
+                          </span>
+                        )}
                       </div>
                       {agreement.billingPreference === "pay_on_visit" && (
                         <span className="text-[10px] bg-orange-500 text-white px-2 py-0.5 rounded-full font-medium">
