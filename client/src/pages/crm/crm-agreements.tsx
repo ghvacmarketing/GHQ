@@ -1256,6 +1256,14 @@ export default function CrmAgreements() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <Label className="text-slate-500 text-xs">Billing Type</Label>
+                      <p className="font-medium">
+                        {selectedAgreement.billingPreference === "pay_on_visit" ? "Pay Per Visit" :
+                         selectedAgreement.billingPreference === "auto_invoice" ? "Auto Invoice" :
+                         selectedAgreement.billingPreference === "prepaid" ? "Prepaid" : "Auto Invoice"}
+                      </p>
+                    </div>
+                    <div>
                       <Label className="text-slate-500 text-xs">Region</Label>
                       <p className="font-medium">
                         {selectedAgreement.regionId ? getSelectedRegion(selectedAgreement.regionId)?.name || "—" : "—"}

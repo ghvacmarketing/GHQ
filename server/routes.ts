@@ -10505,6 +10505,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })
               .where(eq(maintenanceVisits.id, pendingVisit.id));
             
+            // Check if this is a pay-on-visit agreement that needs activation
+            const [agreement] = await db.select()
+              .from(crmAgreements)
+              .where(eq(crmAgreements.id, effectiveAgreementId))
+              .limit(1);
+            
+            if (agreement && agreement.billingPreference === "pay_on_visit" && 
+                agreement.status === "pending" && agreement.isInitialCycle) {
+              // First visit completed for pay-on-visit = initial payment collected, activate agreement
+              const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+              await db.update(crmAgreements)
+                .set({
+                  status: "active",
+                  activationDate: todayStr,
+                  isInitialCycle: false,
+                  updatedAt: new Date(),
+                })
+                .where(eq(crmAgreements.id, effectiveAgreementId));
+              console.log(`[WorkOrder] Activated pay-on-visit agreement ${agreement.agreementNumber} after first visit completion`);
+            }
+            
             // Find the next pending visit for this agreement
             const [nextVisit] = await db.select()
               .from(maintenanceVisits)
@@ -10542,6 +10563,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 .where(eq(maintenanceVisits.id, visit.id));
               
               if (visit.agreementId) {
+                // Check if this is a pay-on-visit agreement that needs activation
+                const [linkedAgreement] = await db.select()
+                  .from(crmAgreements)
+                  .where(eq(crmAgreements.id, visit.agreementId))
+                  .limit(1);
+                
+                if (linkedAgreement && linkedAgreement.billingPreference === "pay_on_visit" && 
+                    linkedAgreement.status === "pending" && linkedAgreement.isInitialCycle) {
+                  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+                  await db.update(crmAgreements)
+                    .set({
+                      status: "active",
+                      activationDate: todayStr,
+                      isInitialCycle: false,
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(crmAgreements.id, visit.agreementId));
+                  console.log(`[WorkOrder] Activated pay-on-visit agreement ${linkedAgreement.agreementNumber} after first visit completion (pre-linked)`);
+                }
+                
                 const [nextVisit] = await db.select()
                   .from(maintenanceVisits)
                   .where(and(
@@ -10560,10 +10601,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
           } else if (workOrder?.customerId) {
-            // No pre-linked visits - try to find an active agreement for this customer/property
+            // No pre-linked visits - try to find an agreement for this customer/property
+            // Check for both active and pending (for pay-on-visit initial activation)
             const agreementConditions = [
               eq(crmAgreements.customerId, workOrder.customerId),
-              eq(crmAgreements.status, "active")
+              or(eq(crmAgreements.status, "active"), eq(crmAgreements.status, "pending"))
             ];
             
             // If property is specified, match by property too for more precision
@@ -10602,6 +10644,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 await db.update(crmWorkOrders)
                   .set({ agreementId: matchingAgreement.id })
                   .where(eq(crmWorkOrders.id, req.params.id));
+                
+                // Check if this is a pay-on-visit agreement that needs activation
+                if (matchingAgreement.billingPreference === "pay_on_visit" && 
+                    matchingAgreement.status === "pending" && matchingAgreement.isInitialCycle) {
+                  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+                  await db.update(crmAgreements)
+                    .set({
+                      status: "active",
+                      activationDate: todayStr,
+                      isInitialCycle: false,
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(crmAgreements.id, matchingAgreement.id));
+                  console.log(`[WorkOrder] Activated pay-on-visit agreement ${matchingAgreement.agreementNumber} after first visit completion (customer/property match)`);
+                }
                 
                 // Find the next pending visit for this agreement
                 const [nextVisit] = await db.select()
@@ -11233,11 +11290,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // For prepaid agreements, start as active immediately (already paid upfront)
-      // For pay-on-visit agreements, also start as active (payment collected in person)
+      // For pay-on-visit agreements, start as pending (awaiting first visit payment from tech)
       // For auto-invoice, start as pending (awaiting first invoice payment)
-      const skipInitialInvoice = result.data.billingPreference === "prepaid" || result.data.billingPreference === "pay_on_visit";
-      const initialStatus = skipInitialInvoice ? "active" : "pending";
-      const activationDate = skipInitialInvoice ? new Date().toISOString().split('T')[0] : undefined;
+      const isPrepaid = result.data.billingPreference === "prepaid";
+      const initialStatus = isPrepaid ? "active" : "pending";
+      const activationDate = isPrepaid ? new Date().toISOString().split('T')[0] : undefined;
       
       const [agreement] = await db
         .insert(crmAgreements)
