@@ -604,6 +604,18 @@ export default function CrmAgreements() {
                 {processRenewalsMutation.isPending ? "Processing..." : "Process Renewals"}
               </Button>
             )}
+            {canManageTypes && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSettingsDialog(true)}
+                className="h-8 px-2"
+                data-testid="button-agreement-settings"
+                title="Manage Custom Agreement Types"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -830,7 +842,7 @@ export default function CrmAgreements() {
                         <Button
                           variant="outline"
                           className="mt-4"
-                          onClick={() => setShowCreateDialog(true)}
+                          onClick={() => navigate("/crm/agreements/new?type=preventative")}
                           data-testid="button-create-first-agreement"
                         >
                           <Plus className="h-4 w-4 mr-2" />

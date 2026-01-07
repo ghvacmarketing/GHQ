@@ -29,7 +29,16 @@ import {
   Plus,
   Minus,
   Building2,
+  Search,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format, addMonths, addYears, addDays, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -79,10 +88,19 @@ export default function CrmAgreementCreate() {
   const customTypeId = queryParams.get("typeId");
 
   const [customerSearch, setCustomerSearch] = useState("");
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
+  const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomer | null>(null);
   const [propertyId, setPropertyId] = useState<string>("");
   const [numberOfSystems, setNumberOfSystems] = useState(1);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCustomerSearch(customerSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
 
   const [agreementPlan, setAgreementPlan] = useState("Preventative Maintenance");
   const [contractDate, setContractDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -143,15 +161,15 @@ export default function CrmAgreementCreate() {
     }
   }, [authLoading, currentUser, navigate]);
 
-  const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
-    queryKey: ["/api/crm/customers", customerSearch],
+  const { data: customersData, isLoading: customersLoading, isFetching: customersFetching } = useQuery<CustomersResponse>({
+    queryKey: ["/api/crm/customers", debouncedCustomerSearch],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: "1",
-        limit: "50",
+        limit: "100",
       });
-      if (customerSearch) {
-        params.set("search", customerSearch);
+      if (debouncedCustomerSearch) {
+        params.set("search", debouncedCustomerSearch);
       }
       const res = await fetch(`/api/crm/customers?${params}`, {
         credentials: "include",
@@ -423,21 +441,101 @@ export default function CrmAgreementCreate() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
                       <Label htmlFor="customer" className="text-sm font-medium">Customer</Label>
-                      <Select
-                        value={selectedCustomerId}
-                        onValueChange={handleCustomerSelect}
-                      >
-                        <SelectTrigger className="mt-1" data-testid="select-customer">
-                          <SelectValue placeholder="Select a customer..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {customersData?.customers.map((customer) => (
-                            <SelectItem key={customer.id} value={customer.id}>
-                              {customer.name} {customer.fullAddress ? `- ${customer.fullAddress}` : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={customerPopoverOpen}
+                            className="w-full justify-between mt-1 font-normal"
+                            data-testid="select-customer"
+                          >
+                            {selectedCustomer ? (
+                              <span className="truncate">
+                                {selectedCustomer.name}
+                                {selectedCustomer.fullAddress && (
+                                  <span className="text-slate-500 ml-1">- {selectedCustomer.fullAddress}</span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">Select a customer...</span>
+                            )}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0" align="start">
+                          <div className="p-2 border-b">
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                              <Input
+                                placeholder="Search customers by name, phone, or address..."
+                                value={customerSearch}
+                                onChange={(e) => setCustomerSearch(e.target.value)}
+                                className="pl-9 h-9"
+                                data-testid="input-customer-search"
+                              />
+                              {customersFetching && (
+                                <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-slate-400" />
+                              )}
+                            </div>
+                          </div>
+                          <ScrollArea className="h-[300px]">
+                            {customersLoading ? (
+                              <div className="p-4 text-center text-slate-500">
+                                <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                                Loading customers...
+                              </div>
+                            ) : !customersData?.customers.length && !selectedCustomer ? (
+                              <div className="p-4 text-center text-slate-500">
+                                {debouncedCustomerSearch ? "No customers found" : "Type to search customers"}
+                              </div>
+                            ) : (
+                              (() => {
+                                const customerList = customersData?.customers || [];
+                                const selectedInList = selectedCustomer && customerList.some(c => c.id === selectedCustomer.id);
+                                const displayList = selectedCustomer && !selectedInList 
+                                  ? [selectedCustomer, ...customerList]
+                                  : customerList;
+                                return displayList.map((customer) => (
+                                <div
+                                  key={customer.id}
+                                  className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-100 ${
+                                    selectedCustomerId === customer.id ? "bg-slate-100" : ""
+                                  }`}
+                                  onClick={() => {
+                                    handleCustomerSelect(customer.id);
+                                    setCustomerPopoverOpen(false);
+                                    setCustomerSearch("");
+                                  }}
+                                  data-testid={`customer-option-${customer.id}`}
+                                >
+                                  <Check
+                                    className={`h-4 w-4 ${
+                                      selectedCustomerId === customer.id ? "opacity-100" : "opacity-0"
+                                    }`}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium truncate">{customer.name}</div>
+                                    {(customer.phone || customer.fullAddress) && (
+                                      <div className="text-xs text-slate-500 truncate">
+                                        {customer.phone && <span>{customer.phone}</span>}
+                                        {customer.phone && customer.fullAddress && <span> • </span>}
+                                        {customer.fullAddress && <span>{customer.fullAddress}</span>}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ));
+                              })()
+                            )}
+                          </ScrollArea>
+                          {customersData && customersData.pagination.total > 100 && (
+                            <div className="p-2 border-t text-xs text-center text-slate-500">
+                              Showing first 100 of {customersData.pagination.total} customers. Use search to find more.
+                            </div>
+                          )}
+                        </PopoverContent>
+                      </Popover>
                     </div>
 
                     {selectedCustomerId && customerProperties.length > 0 && (
