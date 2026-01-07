@@ -1305,7 +1305,7 @@ export default function CrmAgreements() {
                     </div>
                   )}
                   <div className="flex justify-end gap-2 pt-4 border-t">
-                    {canSendInvoice && (selectedAgreement.status === "pending" || selectedAgreement.status === "active" || selectedAgreement.status === "grace_period") && (
+                    {canSendInvoice && (selectedAgreement.status === "pending" || selectedAgreement.status === "active") && (
                       <Button
                         variant="outline"
                         size="sm"

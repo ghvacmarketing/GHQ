@@ -159,20 +159,34 @@ export async function processSingleAgreementRenewal(agreement: CrmAgreement): Pr
     const currentNextInvoiceDate = agreement.nextInvoiceDate ? new Date(agreement.nextInvoiceDate) : new Date();
     const newNextInvoiceDate = getNextInvoiceDate(currentNextInvoiceDate, agreement.frequency || "annual");
     
-    // Set grace period - 30 days to pay the renewal invoice
-    const graceExpiresAt = new Date();
-    graceExpiresAt.setDate(graceExpiresAt.getDate() + 30);
-    
-    await db.update(crmAgreements)
-      .set({
-        status: "grace_period",
-        graceExpiresAt: format(graceExpiresAt, "yyyy-MM-dd"),
-        nextInvoiceDate: format(newNextInvoiceDate, "yyyy-MM-dd"),
-        updatedAt: new Date(),
-      })
-      .where(eq(crmAgreements.id, agreement.id));
-
-    console.log(`[AgreementRenewal] Processed agreement ${agreement.agreementNumber}: Invoice ${invoiceNumber} created, grace period until ${format(graceExpiresAt, "yyyy-MM-dd")}, next invoice date: ${format(newNextInvoiceDate, "yyyy-MM-dd")}`);
+    // For pending/initial-cycle agreements: keep status as pending (first invoice)
+    // For active agreements: move to grace_period (renewal invoice)
+    if (agreement.status === "pending" || agreement.isInitialCycle) {
+      // First invoice - keep status as pending, just update nextInvoiceDate
+      await db.update(crmAgreements)
+        .set({
+          nextInvoiceDate: format(newNextInvoiceDate, "yyyy-MM-dd"),
+          updatedAt: new Date(),
+        })
+        .where(eq(crmAgreements.id, agreement.id));
+      
+      console.log(`[AgreementRenewal] Sent first invoice for pending agreement ${agreement.agreementNumber}: Invoice ${invoiceNumber} created, status remains pending`);
+    } else {
+      // Renewal invoice - set grace period (30 days to pay)
+      const graceExpiresAt = new Date();
+      graceExpiresAt.setDate(graceExpiresAt.getDate() + 30);
+      
+      await db.update(crmAgreements)
+        .set({
+          status: "grace_period",
+          graceExpiresAt: format(graceExpiresAt, "yyyy-MM-dd"),
+          nextInvoiceDate: format(newNextInvoiceDate, "yyyy-MM-dd"),
+          updatedAt: new Date(),
+        })
+        .where(eq(crmAgreements.id, agreement.id));
+      
+      console.log(`[AgreementRenewal] Processed renewal for agreement ${agreement.agreementNumber}: Invoice ${invoiceNumber} created, grace period until ${format(graceExpiresAt, "yyyy-MM-dd")}`);
+    }
     
     return result;
   } catch (err) {
