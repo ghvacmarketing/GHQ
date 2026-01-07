@@ -436,6 +436,9 @@ export default function PublicQuoteView() {
           if (result.success) {
             setDepositPaidAt(new Date(result.depositPaidAt));
             setDepositAmount(result.depositAmount || 0);
+            if (result.selectedOption) {
+              setSelectedOption(result.selectedOption);
+            }
             if (paymentSuccess === 'success') {
               toast({
                 title: "Payment Successful!",

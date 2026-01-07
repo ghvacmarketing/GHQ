@@ -375,6 +375,7 @@ router.post("/api/stripe/quote/:quoteId/verify-deposit", async (req, res) => {
         success: true, 
         depositPaidAt: quote.depositPaidAt,
         depositAmount: parseFloat(quote.depositAmount || "0"),
+        selectedOption: quote.selectedOption || null,
         alreadyPaid: true 
       });
     }
@@ -424,12 +425,14 @@ router.post("/api/stripe/quote/:quoteId/verify-deposit", async (req, res) => {
             }
             
             const depositAmountNum = (paymentIntent.amount_received ?? session.amount_total ?? 0) / 100;
+            const sessionSelectedOption = (session.metadata?.selectedOption as string) || null;
             
             await db.update(crmQuotes)
               .set({
                 depositPaidAt: now,
                 depositAmount: depositAmountNum.toFixed(2),
                 stripePaymentIntentId: paymentIntentId,
+                ...(sessionSelectedOption && { selectedOption: sessionSelectedOption }),
               })
               .where(eq(crmQuotes.id, quoteId));
 
@@ -437,6 +440,7 @@ router.post("/api/stripe/quote/:quoteId/verify-deposit", async (req, res) => {
               success: true,
               depositPaidAt: now,
               depositAmount: depositAmountNum,
+              selectedOption: sessionSelectedOption,
               stripePaymentIntentId: paymentIntentId,
             });
           }
@@ -475,11 +479,14 @@ router.post("/api/stripe/quote/:quoteId/verify-deposit", async (req, res) => {
       }
       
       const depositAmountNum = (pi.amount_received ?? pi.amount) / 100;
+      const piSelectedOption = (pi.metadata?.selectedOption as string) || null;
+      
       await db.update(crmQuotes)
         .set({
           depositPaidAt: now,
           depositAmount: depositAmountNum.toFixed(2),
           stripePaymentIntentId: pi.id,
+          ...(piSelectedOption && { selectedOption: piSelectedOption }),
         })
         .where(eq(crmQuotes.id, quoteId));
 
@@ -487,6 +494,7 @@ router.post("/api/stripe/quote/:quoteId/verify-deposit", async (req, res) => {
         success: true,
         depositPaidAt: now,
         depositAmount: depositAmountNum,
+        selectedOption: piSelectedOption,
         stripePaymentIntentId: pi.id,
       });
     }
