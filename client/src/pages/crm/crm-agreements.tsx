@@ -60,7 +60,17 @@ import {
   FileText,
   Pencil as Edit,
   RefreshCw,
+  Upload,
+  Users,
+  FileSpreadsheet,
+  Loader2,
 } from "lucide-react";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format, addDays, subDays, addMonths, addYears, isAfter, isBefore, startOfDay, differenceInCalendarDays, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -154,6 +164,11 @@ export default function CrmAgreements() {
     defaultPrice: "0.00",
     isActive: true,
   });
+
+  const [settingsTab, setSettingsTab] = useState<"types" | "import">("types");
+  const [importType, setImportType] = useState<"customers" | "agreements">("customers");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const fileInputRef = useState<HTMLInputElement | null>(null);
 
   const [sortField, setSortField] = useState<SortField>("customerName");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -347,6 +362,71 @@ export default function CrmAgreements() {
       toast({ title: "Failed to delete agreement", variant: "destructive" });
     },
   });
+
+  const importCustomersMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/crm/customers/import", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to import customers");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
+      setImportFile(null);
+      toast({
+        title: "Customers imported successfully",
+        description: `Imported ${data.imported || data.count || 0} customer(s)`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to import customers", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const importAgreementsMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/crm/agreements/import", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to import agreements");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
+      setImportFile(null);
+      toast({
+        title: "Agreements imported successfully",
+        description: `Imported ${data.imported || data.count || 0} agreement(s)`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to import agreements", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleImport = () => {
+    if (!importFile) return;
+    if (importType === "customers") {
+      importCustomersMutation.mutate(importFile);
+    } else {
+      importAgreementsMutation.mutate(importFile);
+    }
+  };
 
   const getAgreementStatus = (agreement: CrmAgreement): string => {
     // Honor any explicit non-active status before applying date-based logic
@@ -1251,30 +1331,42 @@ export default function CrmAgreements() {
         </DialogContent>
       </Dialog>
 
-      {/* Custom Agreement Types Settings Dialog */}
+      {/* Settings Dialog with Tabs */}
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Custom Agreement Types</DialogTitle>
+            <DialogTitle>Agreement Settings</DialogTitle>
             <DialogDescription>
-              Manage reusable templates for custom service agreements. These types appear as work subtypes under MAINTENANCE visits.
+              Manage agreement types and import data.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto">
-            <div className="mb-4">
-              <Button
-                size="sm"
-                className="bg-[#711419] hover:bg-[#5a1014]"
-                onClick={() => {
-                  setTypeForm({ name: "", description: "", frequency: "annual", visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
-                  setShowCreateTypeDialog(true);
-                }}
-                data-testid="button-create-type"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Agreement Type
-              </Button>
-            </div>
+          <Tabs value={settingsTab} onValueChange={(v) => setSettingsTab(v as "types" | "import")} className="flex-1 flex flex-col overflow-hidden">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="types" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Agreement Types
+              </TabsTrigger>
+              <TabsTrigger value="import" className="flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                Import Data
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="types" className="flex-1 overflow-y-auto mt-4">
+              <div className="mb-4">
+                <Button
+                  size="sm"
+                  className="bg-[#711419] hover:bg-[#5a1014]"
+                  onClick={() => {
+                    setTypeForm({ name: "", description: "", frequency: "annual", visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
+                    setShowCreateTypeDialog(true);
+                  }}
+                  data-testid="button-create-type"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  New Agreement Type
+                </Button>
+              </div>
 
             {typesLoading ? (
               <div className="space-y-2">
@@ -1360,7 +1452,118 @@ export default function CrmAgreements() {
                 </TableBody>
               </Table>
             )}
-          </div>
+            </TabsContent>
+
+            <TabsContent value="import" className="flex-1 overflow-y-auto mt-4">
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <Label className="text-base font-semibold">What would you like to import?</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                        importType === "customers"
+                          ? "border-[#711419] bg-[#711419]/5"
+                          : "border-slate-200 hover:border-slate-300"
+                      }`}
+                      onClick={() => setImportType("customers")}
+                      data-testid="import-type-customers"
+                    >
+                      <Users className={`h-8 w-8 mb-2 ${importType === "customers" ? "text-[#711419]" : "text-slate-400"}`} />
+                      <div className="font-medium">Customers</div>
+                      <p className="text-xs text-slate-500 mt-1">Import customer contact information</p>
+                    </div>
+                    <div
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                        importType === "agreements"
+                          ? "border-[#711419] bg-[#711419]/5"
+                          : "border-slate-200 hover:border-slate-300"
+                      }`}
+                      onClick={() => setImportType("agreements")}
+                      data-testid="import-type-agreements"
+                    >
+                      <FileSpreadsheet className={`h-8 w-8 mb-2 ${importType === "agreements" ? "text-[#711419]" : "text-slate-400"}`} />
+                      <div className="font-medium">Maintenance Agreements</div>
+                      <p className="text-xs text-slate-500 mt-1">Import service agreements</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">Upload CSV File</Label>
+                  <div
+                    className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-slate-400 transition-colors"
+                    onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.accept = ".csv,.xlsx,.xls";
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (file) setImportFile(file);
+                      };
+                      input.click();
+                    }}
+                    data-testid="import-file-drop"
+                  >
+                    {importFile ? (
+                      <div className="space-y-2">
+                        <FileSpreadsheet className="h-10 w-10 mx-auto text-[#711419]" />
+                        <p className="font-medium">{importFile.name}</p>
+                        <p className="text-xs text-slate-500">{(importFile.size / 1024).toFixed(1)} KB</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setImportFile(null);
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Upload className="h-10 w-10 mx-auto text-slate-400" />
+                        <p className="font-medium text-slate-600">Click to select a file</p>
+                        <p className="text-xs text-slate-500">Supports CSV and Excel files</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <p className="text-sm font-medium mb-2">Expected CSV columns for {importType}:</p>
+                  {importType === "customers" ? (
+                    <p className="text-xs text-slate-600">
+                      name, email, phone, address (street, city, state, zip), notes
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-600">
+                      customer_name, agreement_number, agreement_plan, address, price, start_date, end_date, next_service_date, next_invoice_date, notes
+                    </p>
+                  )}
+                </div>
+
+                <Button
+                  className="w-full bg-[#711419] hover:bg-[#5a1014]"
+                  onClick={handleImport}
+                  disabled={!importFile || importCustomersMutation.isPending || importAgreementsMutation.isPending}
+                  data-testid="button-import"
+                >
+                  {(importCustomersMutation.isPending || importAgreementsMutation.isPending) ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import {importType === "customers" ? "Customers" : "Agreements"}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 

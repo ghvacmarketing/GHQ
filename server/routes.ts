@@ -11465,6 +11465,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/crm/customers/import - Import customers from CSV
+  app.post("/api/crm/customers/import", requireCrmSalesOrAbove, upload.single("file"), async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const csvContent = req.file.buffer.toString("utf-8");
+      const lines = csvContent.split("\n").filter((line) => line.trim());
+
+      if (lines.length < 2) {
+        return res.status(400).json({ message: "CSV file is empty or has no data rows" });
+      }
+
+      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
+      const imported: any[] = [];
+      const errors: string[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        try {
+          const values = parseCSVLine(lines[i]);
+          const row: Record<string, string> = {};
+          headers.forEach((header, index) => {
+            row[header] = values[index] || "";
+          });
+
+          const customerData = {
+            name: row["name"] || row["customer name"] || row["customername"] || row["customer"] || "",
+            email: row["email"] || row["e-mail"] || null,
+            phone: row["phone"] || row["telephone"] || row["tel"] || null,
+            address1: row["address"] || row["street"] || row["address1"] || null,
+            city: row["city"] || null,
+            state: row["state"] || null,
+            zip: row["zip"] || row["zipcode"] || row["postal code"] || null,
+            notes: row["notes"] || row["note"] || null,
+            fullAddress: null as string | null,
+          };
+
+          if (!customerData.name) {
+            errors.push(`Row ${i + 1}: Missing customer name`);
+            continue;
+          }
+
+          // Build full address if components are present
+          if (customerData.address1 || customerData.city) {
+            const addressParts = [customerData.address1, customerData.city, customerData.state, customerData.zip].filter(Boolean);
+            customerData.fullAddress = addressParts.join(", ");
+          }
+
+          const [newCustomer] = await db.insert(crmCustomers).values({
+            id: nanoid(),
+            name: customerData.name,
+            email: customerData.email,
+            phone: customerData.phone,
+            fullAddress: customerData.fullAddress,
+            notes: customerData.notes,
+          }).returning();
+
+          imported.push(newCustomer);
+        } catch (rowError) {
+          errors.push(`Row ${i + 1}: ${rowError instanceof Error ? rowError.message : "Unknown error"}`);
+        }
+      }
+
+      await logCrmAudit(
+        user.id,
+        "customers.imported",
+        "crm_customers",
+        null,
+        { count: imported.length, errors: errors.length },
+        req.ip
+      );
+
+      return res.json({
+        imported: imported.length,
+        errors: errors.length,
+        errorDetails: errors.slice(0, 10),
+      });
+    } catch (error) {
+      console.error("Error importing customers:", error);
+      return res.status(500).json({ message: "Failed to import customers" });
+    }
+  });
+
   // POST /api/crm/agreements/import - Import agreements from CSV
   app.post("/api/crm/agreements/import", requireCrmSalesOrAbove, upload.single("file"), async (req, res) => {
     try {
