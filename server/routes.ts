@@ -31,6 +31,7 @@ import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, t
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook } from "./services/vector-store";
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
+import { scheduleAgreementRenewals, processAgreementRenewals } from "./services/agreementRenewalService";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
 import cookieParser from "cookie-parser";
@@ -11431,6 +11432,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/crm/agreements/process-renewals - Manually trigger agreement renewal processing (Admin only)
+  app.post("/api/crm/agreements/process-renewals", requireCrmAdmin, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      console.log(`[AgreementRenewal] Manual trigger by ${user.email}`);
+      
+      const summary = await processAgreementRenewals();
+      
+      await logCrmAudit(
+        user.id,
+        "agreement.renewal_processed",
+        "system",
+        null,
+        { 
+          agreementsProcessed: summary.agreementsProcessed,
+          invoicesCreated: summary.invoicesCreated,
+          emailsSent: summary.emailsSent,
+          errors: summary.errors
+        },
+        req.ip
+      );
+
+      return res.json(summary);
+    } catch (error) {
+      console.error("Error processing agreement renewals:", error);
+      return res.status(500).json({ message: "Failed to process agreement renewals" });
+    }
+  });
+
   // POST /api/crm/agreements/import - Import agreements from CSV
   app.post("/api/crm/agreements/import", requireCrmSalesOrAbove, upload.single("file"), async (req, res) => {
     try {
@@ -18972,6 +19006,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
     // Start weather impact jobs (refreshes call_daily and weather_daily every 6 hours)
     scheduleWeatherImpactJobs();
+
+    // Start agreement renewal job (runs daily, creates invoices for due agreements)
+    scheduleAgreementRenewals();
 
     // Seed vector store with sales book if empty (async, don't block startup)
     seedVectorStoreWithSalesBook().then(success => {

@@ -59,6 +59,7 @@ import {
   Wrench,
   FileText,
   Pencil as Edit,
+  RefreshCw,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format, addDays, subDays, addMonths, addYears, isAfter, isBefore, startOfDay, differenceInCalendarDays, parseISO } from "date-fns";
@@ -225,6 +226,7 @@ export default function CrmAgreements() {
   });
 
   const canManageTypes = currentUser?.role === "admin" || currentUser?.role === "owner" || currentUser?.role === "sales";
+  const isAdminOrOwner = currentUser?.role === "admin" || currentUser?.role === "owner";
 
   const { data: customAgreementTypes = [], isLoading: typesLoading } = useQuery<CustomAgreementType[]>({
     queryKey: ["/api/crm/custom-agreement-types"],
@@ -280,6 +282,24 @@ export default function CrmAgreements() {
     },
     onError: () => {
       toast({ title: "Failed to delete custom agreement type", variant: "destructive" });
+    },
+  });
+
+  const processRenewalsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/crm/agreements/process-renewals");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      const msg = data.agreementsProcessed === 0
+        ? "No agreements due for renewal today"
+        : `Processed ${data.agreementsProcessed} agreement(s): ${data.invoicesCreated} invoice(s) created, ${data.emailsSent} email(s) sent`;
+      toast({ title: "Renewal Processing Complete", description: msg });
+    },
+    onError: () => {
+      toast({ title: "Failed to process renewals", variant: "destructive" });
     },
   });
 
@@ -569,6 +589,19 @@ export default function CrmAgreements() {
               >
                 <RotateCcw className="h-3 w-3 mr-1" />
                 Reset
+              </Button>
+            )}
+            {isAdminOrOwner && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => processRenewalsMutation.mutate()}
+                disabled={processRenewalsMutation.isPending}
+                className="h-8 text-xs"
+                data-testid="button-process-renewals"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${processRenewalsMutation.isPending ? "animate-spin" : ""}`} />
+                {processRenewalsMutation.isPending ? "Processing..." : "Process Renewals"}
               </Button>
             )}
             <DropdownMenu>
