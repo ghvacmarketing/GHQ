@@ -194,6 +194,100 @@ router.post("/api/stripe/settings/deposit-percentage", async (req, res) => {
   }
 });
 
+// Verify and record deposit payment for a quote
+router.post("/api/stripe/quote/:quoteId/verify-deposit", async (req, res) => {
+  try {
+    const { quoteId } = req.params;
+
+    // Get the quote
+    const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, quoteId));
+    if (!quote) {
+      return res.status(404).json({ error: "Quote not found" });
+    }
+
+    // If already marked as paid, return success
+    if (quote.depositPaidAt) {
+      return res.json({ 
+        success: true, 
+        depositPaidAt: quote.depositPaidAt,
+        depositAmount: quote.depositAmount,
+        alreadyPaid: true 
+      });
+    }
+
+    const stripe = await getUncachableStripeClient();
+
+    // Search for successful payment intents with this quote's metadata
+    const paymentIntents = await stripe.paymentIntents.list({
+      limit: 10,
+    });
+
+    // Find a successful payment for this quote
+    const successfulPayment = paymentIntents.data.find(pi => 
+      pi.status === 'succeeded' && 
+      pi.metadata?.quoteId === quoteId &&
+      pi.metadata?.type === 'quote_deposit'
+    );
+
+    if (successfulPayment) {
+      // Update the quote with deposit payment info
+      const depositAmount = (successfulPayment.amount / 100).toFixed(2);
+      await db.update(crmQuotes)
+        .set({
+          depositPaidAt: new Date(),
+          depositAmount: depositAmount,
+          stripePaymentIntentId: successfulPayment.id,
+        })
+        .where(eq(crmQuotes.id, quoteId));
+
+      return res.json({
+        success: true,
+        depositPaidAt: new Date(),
+        depositAmount: parseFloat(depositAmount),
+        stripePaymentIntentId: successfulPayment.id,
+      });
+    }
+
+    // Also check checkout sessions for payment link completions
+    const checkoutSessions = await stripe.checkout.sessions.list({
+      limit: 20,
+    });
+
+    const successfulSession = checkoutSessions.data.find(session =>
+      session.payment_status === 'paid' &&
+      session.metadata?.quoteId === quoteId &&
+      session.metadata?.type === 'quote_deposit'
+    );
+
+    if (successfulSession) {
+      const depositAmount = ((successfulSession.amount_total || 0) / 100).toFixed(2);
+      await db.update(crmQuotes)
+        .set({
+          depositPaidAt: new Date(),
+          depositAmount: depositAmount,
+          stripePaymentIntentId: successfulSession.payment_intent as string,
+        })
+        .where(eq(crmQuotes.id, quoteId));
+
+      return res.json({
+        success: true,
+        depositPaidAt: new Date(),
+        depositAmount: parseFloat(depositAmount),
+        stripePaymentIntentId: successfulSession.payment_intent,
+      });
+    }
+
+    // No payment found
+    res.json({ 
+      success: false, 
+      message: "No successful payment found for this quote" 
+    });
+  } catch (error: any) {
+    console.error("Error verifying quote deposit:", error);
+    res.status(500).json({ error: error.message || "Failed to verify deposit payment" });
+  }
+});
+
 // Get Stripe publishable key for frontend
 router.get("/api/stripe/config", async (_req, res) => {
   try {
