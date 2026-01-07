@@ -79,6 +79,7 @@ export async function processSingleAgreementRenewal(agreement: CrmAgreement): Pr
       invoiceNumber,
       customerId: agreement.customerId,
       propertyId: agreement.propertyId,
+      agreementId: agreement.id,
       status: "sent",
       subtotal: price,
       laborTotal: "0",

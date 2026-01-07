@@ -11052,50 +11052,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conditions = [];
 
       // Apply tab-based filtering (server-side filtering before pagination)
+      // Status is stored directly in the status field: pending, active, grace_period, expired, cancelled
       if (tab === "all") {
-        // All Active = active + grace_period (excludes expired and cancelled)
-        conditions.push(
-          and(
-            eq(crmAgreements.status, "active"),
-            or(
-              isNull(crmAgreements.endDate),
-              sql`${crmAgreements.endDate} > ${thirtyDaysAgoStr}`
-            )
-          )
-        );
-      } else if (tab === "active") {
-        // Active only = status='active' AND (endDate is null OR endDate > today)
-        conditions.push(
-          and(
-            eq(crmAgreements.status, "active"),
-            or(
-              isNull(crmAgreements.endDate),
-              sql`${crmAgreements.endDate} > ${todayStr}`
-            )
-          )
-        );
-      } else if (tab === "grace_period") {
-        // Grace Period = status='active' AND endDate between (today-30) and today
-        conditions.push(
-          and(
-            eq(crmAgreements.status, "active"),
-            sql`${crmAgreements.endDate} IS NOT NULL`,
-            sql`${crmAgreements.endDate} <= ${todayStr}`,
-            sql`${crmAgreements.endDate} > ${thirtyDaysAgoStr}`
-          )
-        );
-      } else if (tab === "expired") {
-        // Expired = status='expired' OR (status='active' AND endDate <= today-30)
+        // All Active = active + grace_period only (excludes pending, expired, cancelled)
         conditions.push(
           or(
-            eq(crmAgreements.status, "expired"),
-            and(
-              eq(crmAgreements.status, "active"),
-              sql`${crmAgreements.endDate} IS NOT NULL`,
-              sql`${crmAgreements.endDate} <= ${thirtyDaysAgoStr}`
-            )
+            eq(crmAgreements.status, "active"),
+            eq(crmAgreements.status, "grace_period")
           )
         );
+      } else if (tab === "pending") {
+        // Pending = awaiting first invoice payment
+        conditions.push(eq(crmAgreements.status, "pending"));
+      } else if (tab === "active") {
+        // Active = fully operational agreements
+        conditions.push(eq(crmAgreements.status, "active"));
+      } else if (tab === "grace_period") {
+        // Grace Period = renewal invoice sent, awaiting payment
+        conditions.push(eq(crmAgreements.status, "grace_period"));
+      } else if (tab === "expired") {
+        // Expired = grace period passed without payment
+        conditions.push(eq(crmAgreements.status, "expired"));
       } else if (tab === "upcoming_service") {
         // Upcoming Service = nextServiceDate between today and today+15
         conditions.push(
@@ -11179,7 +11156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         grace_period: Number(gracePeriodCount?.count || 0),
         expired: Number(expiredCount?.count || 0),
         upcoming_service: Number(upcomingServiceCount?.count || 0),
-        all_active: Number(pendingCount?.count || 0) + Number(activeCount?.count || 0) + Number(gracePeriodCount?.count || 0),
+        all_active: Number(activeCount?.count || 0) + Number(gracePeriodCount?.count || 0),
       };
 
       return res.json({

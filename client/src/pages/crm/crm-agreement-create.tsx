@@ -886,11 +886,11 @@ export default function CrmAgreementCreate() {
                     <div>
                       <p className="text-xs text-slate-500 uppercase tracking-wide">Expires On</p>
                       <p className="font-medium text-slate-900" data-testid="text-summary-expires">
-                        {endDate ? format(new Date(endDate), "MMM d, yyyy") : "—"}
+                        {endDate ? format(parseISO(endDate), "MMM d, yyyy") : "—"}
                       </p>
                     </div>
 
-                    {autoRenew && (
+                    {billingPreference === "auto_invoice" && autoRenew && (
                       <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg text-sm text-green-700">
                         <Calendar className="h-4 w-4" />
                         Auto-renew enabled
