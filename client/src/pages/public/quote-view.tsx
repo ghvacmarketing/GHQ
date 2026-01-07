@@ -292,6 +292,11 @@ function SignaturePad({ onSignatureChange }: { onSignatureChange: (dataUrl: stri
 }
 
 function QuoteAlreadyAccepted({ quote }: { quote: CrmQuote }) {
+  const depositAmount = quote.depositAmount ? parseFloat(quote.depositAmount.toString()) : 0;
+  const total = quote.total ? parseFloat(quote.total.toString()) : 0;
+  const remainingBalance = !isNaN(total) && !isNaN(depositAmount) ? total - depositAmount : 0;
+  const hasDeposit = !isNaN(depositAmount) && depositAmount > 0 && quote.depositPaidAt;
+  
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
@@ -304,11 +309,36 @@ function QuoteAlreadyAccepted({ quote }: { quote: CrmQuote }) {
             <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle2 className="h-10 w-10 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Quote Already Accepted</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">Quote Approved!</h2>
+            
+            {quote.title && (
+              <p className="text-lg font-medium text-slate-700 mb-2">{quote.title}</p>
+            )}
+            {quote.selectedOption && (
+              <p className="text-slate-600 mb-2">Selected Option: <strong>{quote.selectedOption}</strong></p>
+            )}
+            
             <p className="text-slate-600 mb-4">
-              Quote #{quote.quoteNumber} was accepted on {formatDate(quote.acceptedAt)}
+              Quote #{quote.quoteNumber} was approved on {formatDate(quote.acceptedAt)}
               {quote.signerName && ` by ${quote.signerName}`}.
             </p>
+            
+            {hasDeposit && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-left">
+                <h3 className="font-semibold text-green-800 mb-2">Payment Received</h3>
+                <div className="space-y-1 text-sm text-green-700">
+                  <p>Deposit Paid: <strong>{formatCurrency(depositAmount)}</strong></p>
+                  <p>Payment Date: {formatDate(quote.depositPaidAt)}</p>
+                  {remainingBalance > 0 && (
+                    <p className="pt-2 border-t border-green-200 mt-2">
+                      Remaining Balance Due: <strong>{formatCurrency(remainingBalance)}</strong>
+                      <span className="text-xs block text-green-600">(Due upon completion of work)</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <p className="text-sm text-slate-500">
               If you have questions about your quote, please contact us at (706) 826-0644.
             </p>
