@@ -421,6 +421,45 @@ export default function CrmQuotes() {
     }).format(num);
   };
 
+  // Calculate display amount for options quotes
+  // - For non-options quotes: show the total
+  // - For options quotes (pending/sent): show the highest option price
+  // - For options quotes (approved/converted): show the selected option's price
+  const getDisplayAmount = (quote: CrmQuote) => {
+    if (quote.quoteMode !== "options") {
+      return quote.total;
+    }
+    
+    const lineItems = quote.lineItems as CrmQuoteLineItem[] | undefined;
+    if (!lineItems || lineItems.length === 0) {
+      return quote.total;
+    }
+    
+    // Group line items by optionTag and sum their totals
+    const optionTotals: Record<string, number> = {};
+    for (const item of lineItems) {
+      const tag = item.optionTag || "default";
+      const itemTotal = parseFloat(item.lineTotal?.toString() || "0");
+      optionTotals[tag] = (optionTotals[tag] || 0) + itemTotal;
+    }
+    
+    // If quote is approved/converted and has selectedOption, show that option's total
+    if ((quote.status === "accepted" || quote.status === "converted") && quote.selectedOption) {
+      const selectedTotal = optionTotals[quote.selectedOption];
+      if (selectedTotal !== undefined) {
+        return selectedTotal;
+      }
+    }
+    
+    // Otherwise, show the highest option price
+    const totals = Object.values(optionTotals);
+    if (totals.length > 0) {
+      return Math.max(...totals);
+    }
+    
+    return quote.total;
+  };
+
   const formatDate = (date: Date | string | null) => {
     if (!date) return "—";
     try {
@@ -694,7 +733,7 @@ export default function CrmQuotes() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium text-slate-900">
-                        {formatCurrency(quote.total)}
+                        {formatCurrency(getDisplayAmount(quote))}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
