@@ -128,7 +128,7 @@ const statusColors: Record<string, string> = {
 };
 
 const tabFilters = [
-  { key: "all", label: "All Active" },
+  { key: "all", label: "All" },
   { key: "pending", label: "Pending" },
   { key: "active", label: "Active" },
   { key: "upcoming_service", label: "Upcoming Service" },
