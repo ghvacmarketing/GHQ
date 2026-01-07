@@ -876,16 +876,31 @@ export default function PublicQuoteView() {
                     </div>
                   </div>
                 ) : depositPaidAt ? (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-700" />
-                      <h4 className="font-semibold text-green-800">Deposit Paid</h4>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <CheckCircle2 className="h-6 w-6 text-green-700" />
+                      <h4 className="font-semibold text-green-800 text-lg">Payment Confirmed!</h4>
                     </div>
-                    <p className="text-sm text-green-700">
-                      Your {formatCurrency(depositAmount)} deposit has been received.
-                    </p>
-                    <p className="text-xs text-green-600 mt-1">
-                      Paid on {formatDate(depositPaidAt)}
+                    <div className="bg-white rounded-lg p-4 border border-green-200 mb-3">
+                      <p className="text-green-800 font-medium text-center mb-2">
+                        Your {formatCurrency(depositAmount)} deposit has been received.
+                      </p>
+                      {(quote?.selectedOption || selectedOption) && (
+                        <div className="border-t border-green-100 pt-3 mt-3">
+                          <p className="text-sm text-slate-600 text-center">
+                            Selected Package:
+                          </p>
+                          <p className="font-bold text-slate-800 text-center text-lg">
+                            {quote?.selectedOption || selectedOption}
+                          </p>
+                        </div>
+                      )}
+                      <p className="text-xs text-slate-500 text-center mt-3">
+                        Payment received on {formatDate(depositPaidAt)}
+                      </p>
+                    </div>
+                    <p className="text-sm text-green-700 text-center">
+                      You can now accept the quote below to finalize your order.
                     </p>
                   </div>
                 ) : (

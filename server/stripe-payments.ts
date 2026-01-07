@@ -96,7 +96,7 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
       after_completion: {
         type: 'redirect',
         redirect: {
-          url: `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}/portal/quote/${quote.viewToken}?payment=success`,
+          url: `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}/quote/${quote.viewToken}?payment=success`,
         },
       },
     });

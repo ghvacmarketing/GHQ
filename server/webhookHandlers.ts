@@ -86,7 +86,8 @@ export class WebhookHandlers {
         // Handle quote deposit payments
         if (paymentType === 'quote_deposit' && metadata.quoteId) {
           const quoteId = metadata.quoteId;
-          console.log(`[Webhook] Processing quote deposit for quote ${quoteId}`);
+          const selectedOption = metadata.selectedOption || null;
+          console.log(`[Webhook] Processing quote deposit for quote ${quoteId}, selected option: ${selectedOption}`);
 
           const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, quoteId));
           
@@ -98,10 +99,11 @@ export class WebhookHandlers {
               .set({
                 depositAmount: depositAmount.toFixed(2),
                 depositPaidAt: now,
+                selectedOption: selectedOption || quote.selectedOption,
               })
               .where(eq(crmQuotes.id, quoteId));
 
-            console.log(`[Webhook] Quote ${quote.quoteNumber} deposit recorded - amount: $${depositAmount}`);
+            console.log(`[Webhook] Quote ${quote.quoteNumber} deposit recorded - amount: $${depositAmount}, option: ${selectedOption}`);
           } else {
             console.log(`[Webhook] Quote ${quoteId} not found`);
           }
