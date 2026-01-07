@@ -1202,12 +1202,18 @@ export default function CrmProposalBuilder() {
         if (item.coilImageUrl) equipmentImages.coil = `/assets/${item.coilImageUrl}`;
         if (item.furnaceImageUrl) equipmentImages.furnace = `/assets/${item.furnaceImageUrl}`;
         
+        // For options mode, create unique option tags that include tonnage to distinguish multiple systems
+        // e.g., "Best - 2.5 Ton" instead of just "Best" when there are multiple systems
+        const uniqueOptionTag = quoteMode === "options" 
+          ? `${item.packageLevel} - ${item.extractedTonnage}` 
+          : undefined;
+        
         lineItems.push({
           description: `${item.packageLevel} Package - ${item.extractedTonnage} - ${item.outdoorBrand} ${item.outdoorName}`,
           quantity: item.quantity,
           unitPrice: price,
           taxable: true,
-          optionTag: quoteMode === "options" ? item.packageLevel : undefined,
+          optionTag: uniqueOptionTag,
           imageUrl: Object.keys(equipmentImages).length > 0 ? JSON.stringify(equipmentImages) : undefined,
         });
       } else if (isCrawlspaceItem(item)) {
