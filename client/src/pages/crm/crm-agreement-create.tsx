@@ -108,7 +108,6 @@ export default function CrmAgreementCreate() {
   const [appointmentDate, setAppointmentDate] = useState(format(addMonths(new Date(), 1), "yyyy-MM-dd"));
   const [startDate, setStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [endDate, setEndDate] = useState(format(addYears(new Date(), 1), "yyyy-MM-dd"));
-  const [regionId, setRegionId] = useState("");
   const [autoRenew, setAutoRenew] = useState(true);
   const [billingPreference, setBillingPreference] = useState<"auto_invoice" | "pay_on_visit">("auto_invoice");
   const [notes, setNotes] = useState("");
@@ -266,7 +265,7 @@ export default function CrmAgreementCreate() {
   };
 
   const selectedProperty = customerProperties.find(p => p.id === propertyId);
-  const requiresPropertySelection = customerProperties.length > 1;
+  const requiresPropertySelection = true; // Always require property selection
 
   const createAgreementMutation = useMutation({
     mutationFn: async () => {
@@ -297,7 +296,7 @@ export default function CrmAgreementCreate() {
         nextServiceDate: appointmentDate,
         nextInvoiceDate: invoiceDate,
         price: parseFloat(price).toFixed(2),
-        regionId: regionId || null,
+        regionId: null,
         propertyId: propertyId || null,
         numberOfSystems,
         autoRenew: billingPreference === "auto_invoice" ? autoRenew : false,
