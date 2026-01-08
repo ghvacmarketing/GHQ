@@ -18069,6 +18069,142 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // POST /api/crm/messaging/start-conversation - Start a new conversation with a phone number
+  app.post("/api/crm/messaging/start-conversation", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { phoneNumber, message, customerId, customerName } = req.body;
+
+      if (!phoneNumber || typeof phoneNumber !== "string") {
+        return res.status(400).json({ message: "Phone number is required" });
+      }
+
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      // Normalize phone number (basic cleanup)
+      const cleanPhone = phoneNumber.replace(/[^\d+]/g, "");
+      if (cleanPhone.length < 10) {
+        return res.status(400).json({ message: "Invalid phone number" });
+      }
+
+      // Check if a conversation already exists for this phone number
+      let conversation = await storage.getMessagingConversationByPhone(cleanPhone);
+
+      // Look up customer by phone if customerId not provided
+      let resolvedCustomerId = customerId;
+      let resolvedCustomerName = customerName;
+      if (!resolvedCustomerId) {
+        const customer = await storage.getCrmCustomerByPhone(cleanPhone);
+        if (customer) {
+          resolvedCustomerId = customer.id;
+          resolvedCustomerName = customer.name;
+        }
+      }
+
+      // Send message via Textline (this creates a conversation if needed)
+      if (!textlineClient.isConfigured()) {
+        return res.status(400).json({ message: "Textline API is not configured" });
+      }
+
+      const sendResult = await textlineClient.sendMessage({
+        phoneNumber: cleanPhone,
+        body: message,
+      });
+
+      if (!sendResult.success) {
+        return res.status(500).json({ message: sendResult.errorMessage || "Failed to send message via Textline" });
+      }
+
+      // Create or update local conversation record
+      if (!conversation) {
+        conversation = await storage.createMessagingConversation({
+          customerId: resolvedCustomerId || null,
+          phoneNumber: cleanPhone,
+          customerName: resolvedCustomerName || null,
+          subject: resolvedCustomerName || cleanPhone,
+          externalSource: "textline" as any,
+          externalConversationId: sendResult.conversationUuid || null,
+          status: "open" as any,
+          lastMessageAt: new Date(),
+        });
+      } else {
+        // Update existing conversation with external ID if we didn't have it
+        const updates: Record<string, any> = { 
+          status: "open",
+          lastMessageAt: new Date() 
+        };
+        if (sendResult.conversationUuid && !conversation.externalConversationId) {
+          updates.externalConversationId = sendResult.conversationUuid;
+          updates.externalSource = "textline";
+        }
+        if (resolvedCustomerId && !conversation.customerId) {
+          updates.customerId = resolvedCustomerId;
+        }
+        await storage.updateMessagingConversation(conversation.id, updates);
+      }
+
+      // Create the message record locally
+      await storage.createMessage({
+        conversationId: conversation.id,
+        direction: "outbound" as any,
+        channel: "sms" as any,
+        body: message,
+        externalMessageId: sendResult.messageUuid || null,
+        status: "sent" as any,
+        authorUserId: user.id,
+        sentAt: new Date(),
+      });
+
+      return res.status(201).json({
+        conversationId: conversation.id,
+        message: "Message sent successfully",
+      });
+    } catch (error) {
+      console.error("Error starting conversation:", error);
+      return res.status(500).json({ message: "Failed to start conversation" });
+    }
+  });
+
+  // GET /api/crm/messaging/customers/search - Search customers for new message dialog
+  app.get("/api/crm/messaging/customers/search", requireCrmAuth, async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || typeof q !== "string" || q.length < 2) {
+        return res.json([]);
+      }
+
+      // Search for customers with matching name or phone
+      const results = await db.select({
+        id: crmCustomers.id,
+        name: crmCustomers.name,
+        phone: crmCustomers.phone,
+        email: crmCustomers.email,
+      })
+      .from(crmCustomers)
+      .where(
+        or(
+          ilike(crmCustomers.name, `%${q}%`),
+          ilike(crmCustomers.phone, `%${q}%`)
+        )
+      )
+      .limit(10);
+
+      // Filter out customers without phone numbers
+      const customersWithPhones = results.filter(c => c.phone && c.phone.trim() !== "");
+
+      return res.json(customersWithPhones);
+    } catch (error) {
+      console.error("Error searching customers for messaging:", error);
+      return res.status(500).json({ message: "Failed to search customers" });
+    }
+  });
+
   // ============================================
   // PUBLIC QUOTE VIEW & E-SIGNATURE ROUTES
   // ============================================

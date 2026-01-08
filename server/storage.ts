@@ -259,6 +259,7 @@ export interface IStorage {
   getMobileConversations(userId: string, filters?: { status?: string; search?: string }): Promise<(CrmMessagingConversation & { customer: { id: string; name: string; phone: string | null } | null })[]>;
   searchCrmCustomers(search: string, limit?: number): Promise<{ id: string; name: string; phone: string | null; email: string | null }[]>;
   getMessagingConversationByExternalId(externalConversationId: string, externalSource: string): Promise<CrmMessagingConversation | undefined>;
+  getMessagingConversationByPhone(phoneNumber: string): Promise<CrmMessagingConversation | undefined>;
   getCrmCustomerByPhone(phone: string): Promise<{ id: string; name: string; phone: string | null; email: string | null } | undefined>;
 
   // Time Entry operations
@@ -2029,6 +2030,26 @@ export class DatabaseStorage implements IStorage {
         eq(crmMessagingConversations.externalConversationId, externalConversationId),
         eq(crmMessagingConversations.externalSource, externalSource as any)
       ));
+    return conversation || undefined;
+  }
+
+  async getMessagingConversationByPhone(phoneNumber: string): Promise<CrmMessagingConversation | undefined> {
+    const normalizedPhone = phoneNumber.replace(/\D/g, '');
+    const phoneVariants = [
+      phoneNumber,
+      normalizedPhone,
+      `+${normalizedPhone}`,
+      `+1${normalizedPhone}`,
+      normalizedPhone.slice(-10),
+    ];
+    
+    const [conversation] = await db.select().from(crmMessagingConversations)
+      .where(or(
+        ...phoneVariants.map(p => ilike(crmMessagingConversations.phoneNumber, `%${p}%`))
+      ))
+      .orderBy(desc(crmMessagingConversations.lastMessageAt))
+      .limit(1);
+    
     return conversation || undefined;
   }
 

@@ -36,6 +36,7 @@ interface CrmLayoutProps {
   children: React.ReactNode;
   currentUser: CrmUser;
   disableScroll?: boolean;
+  hideGlobalSearch?: boolean;
 }
 
 type NavItem = {
@@ -265,7 +266,7 @@ function SidebarContent({
   );
 }
 
-export function CrmLayout({ children, currentUser, disableScroll = false }: CrmLayoutProps) {
+export function CrmLayout({ children, currentUser, disableScroll = false, hideGlobalSearch = false }: CrmLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -325,7 +326,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false }: CrmL
           </div>
         )}
       </main>
-      <GhqSearch />
+      {!hideGlobalSearch && <GhqSearch />}
     </div>
   );
 }

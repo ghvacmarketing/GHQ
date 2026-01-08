@@ -10,6 +10,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -32,6 +39,8 @@ import {
   RefreshCw,
   Maximize2,
   Minimize2,
+  Plus,
+  User,
 } from "lucide-react";
 import type {
   CrmMessagingConversation,
@@ -93,6 +102,13 @@ function formatMessageTime(date: Date | string | null): string {
   }
 }
 
+type CustomerSearchResult = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+};
+
 export default function CrmMessaging() {
   usePageTitle("Messaging");
   const { toast } = useToast();
@@ -102,6 +118,12 @@ export default function CrmMessaging() {
   const [showMobileThread, setShowMobileThread] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const [newMessageOpen, setNewMessageOpen] = useState(false);
+  const [newMessagePhone, setNewMessagePhone] = useState("");
+  const [newMessageBody, setNewMessageBody] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -181,10 +203,75 @@ export default function CrmMessaging() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations"] });
     },
     onError: () => {
-      // Silent fail - sync happens automatically in background
       console.log("Textline sync failed");
     },
   });
+
+  const { data: customerSearchResults } = useQuery<CustomerSearchResult[]>({
+    queryKey: ["/api/crm/messaging/customers/search", customerSearch],
+    queryFn: async () => {
+      if (!customerSearch || customerSearch.length < 2) return [];
+      const res = await fetch(`/api/crm/messaging/customers/search?q=${encodeURIComponent(customerSearch)}`, {
+        credentials: "include",
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: customerSearch.length >= 2 && newMessageOpen,
+  });
+
+  const startConversationMutation = useMutation({
+    mutationFn: async (data: { phoneNumber: string; message: string; customerId?: string; customerName?: string }) => {
+      const res = await apiRequest("POST", "/api/crm/messaging/start-conversation", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Message sent successfully" });
+      setNewMessageOpen(false);
+      setNewMessagePhone("");
+      setNewMessageBody("");
+      setCustomerSearch("");
+      setSelectedCustomer(null);
+      syncTextlineMutation.mutate();
+      if (data.conversationId) {
+        setSelectedConversationId(data.conversationId);
+        setShowMobileThread(true);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations"] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to send message", 
+        description: error?.message || "Please try again",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleStartNewConversation = () => {
+    const phone = selectedCustomer?.phone || newMessagePhone;
+    if (!phone?.trim() || !newMessageBody.trim()) {
+      toast({ title: "Phone number and message are required", variant: "destructive" });
+      return;
+    }
+    startConversationMutation.mutate({
+      phoneNumber: phone,
+      message: newMessageBody,
+      customerId: selectedCustomer?.id,
+      customerName: selectedCustomer?.name,
+    });
+  };
+
+  const handleSelectCustomer = (customer: CustomerSearchResult) => {
+    setSelectedCustomer(customer);
+    setNewMessagePhone(customer.phone || "");
+    setCustomerSearch("");
+  };
+
+  const handleClearSelectedCustomer = () => {
+    setSelectedCustomer(null);
+    setNewMessagePhone("");
+  };
 
   // Auto-sync with Textline on page load
   useEffect(() => {
@@ -236,15 +323,26 @@ export default function CrmMessaging() {
                 <RefreshCw className="h-3 w-3 animate-spin text-slate-400" />
               )}
             </h1>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="h-8 w-8 p-0"
-              data-testid="button-toggle-fullscreen"
-            >
-              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setNewMessageOpen(true)}
+                className="h-8 w-8 p-0"
+                data-testid="button-new-message"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="h-8 w-8 p-0"
+                data-testid="button-toggle-fullscreen"
+              >
+                {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -437,13 +535,148 @@ export default function CrmMessaging() {
     </div>
   );
 
+  const newMessageDialog = (
+    <Dialog open={newMessageOpen} onOpenChange={setNewMessageOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Plus className="h-5 w-5 text-[#d3b07d]" />
+            New Message
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          {selectedCustomer ? (
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback className="bg-[#d3b07d] text-white">
+                    {getInitials(selectedCustomer.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium text-sm">{selectedCustomer.name}</p>
+                  <p className="text-xs text-slate-500">{selectedCustomer.phone}</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearSelectedCustomer}
+                className="h-8 w-8 p-0"
+                data-testid="button-clear-customer"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Search Customer or Enter Phone</label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search by name or enter phone number..."
+                  className="pl-8"
+                  value={customerSearch || newMessagePhone}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (/^[\d\s()+\-]*$/.test(val)) {
+                      setNewMessagePhone(val);
+                      setCustomerSearch("");
+                    } else {
+                      setCustomerSearch(val);
+                      setNewMessagePhone("");
+                    }
+                  }}
+                  data-testid="input-customer-search"
+                />
+              </div>
+              {customerSearchResults && customerSearchResults.length > 0 && (
+                <div className="border rounded-lg max-h-40 overflow-y-auto">
+                  {customerSearchResults.map((customer) => (
+                    <button
+                      key={customer.id}
+                      className="w-full text-left p-2 hover:bg-slate-50 flex items-center gap-2 border-b last:border-b-0"
+                      onClick={() => handleSelectCustomer(customer)}
+                      data-testid={`customer-option-${customer.id}`}
+                    >
+                      <User className="h-4 w-4 text-slate-400" />
+                      <div>
+                        <p className="text-sm font-medium">{customer.name}</p>
+                        <p className="text-xs text-slate-500">{customer.phone}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {newMessagePhone && !selectedCustomer && (
+                <p className="text-xs text-slate-500">
+                  Sending to: {newMessagePhone}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Message</label>
+            <Textarea
+              placeholder="Type your message..."
+              value={newMessageBody}
+              onChange={(e) => setNewMessageBody(e.target.value)}
+              rows={3}
+              className="resize-none"
+              data-testid="input-new-message-body"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setNewMessageOpen(false);
+              setNewMessagePhone("");
+              setNewMessageBody("");
+              setCustomerSearch("");
+              setSelectedCustomer(null);
+            }}
+            data-testid="button-cancel-new-message"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleStartNewConversation}
+            disabled={
+              startConversationMutation.isPending || 
+              (!selectedCustomer?.phone && !newMessagePhone.trim()) || 
+              !newMessageBody.trim()
+            }
+            className="bg-[#d3b07d] hover:bg-[#c4a06e]"
+            data-testid="button-send-new-message"
+          >
+            {startConversationMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            Send Message
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (isFullscreen) {
-    return messagingContent;
+    return (
+      <>
+        {messagingContent}
+        {newMessageDialog}
+      </>
+    );
   }
 
   return (
-    <CrmLayout currentUser={currentUser} disableScroll>
+    <CrmLayout currentUser={currentUser} disableScroll hideGlobalSearch>
       {messagingContent}
+      {newMessageDialog}
     </CrmLayout>
   );
 }
