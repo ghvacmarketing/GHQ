@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
-import type { CrmUser, QuickbooksConnection, QuickbooksSyncLog, QuickbooksClass } from "@shared/schema";
+import type { CrmUser, QuickbooksConnection, QuickbooksClass } from "@shared/schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FolderTree, Download, Upload } from "lucide-react";
@@ -107,11 +107,6 @@ export default function CrmSettingsQuickBooks() {
     enabled: !!currentUser,
   });
 
-  const { data: syncLogs, isLoading: logsLoading, refetch: refetchLogs } = useQuery<QuickbooksSyncLog[]>({
-    queryKey: ["/api/quickbooks/sync-logs"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-    enabled: !!currentUser && status?.connected,
-  });
 
   const { data: classes, isLoading: classesLoading, refetch: refetchClasses } = useQuery<QuickbooksClass[]>({
     queryKey: ["/api/quickbooks/classes"],
@@ -584,55 +579,6 @@ export default function CrmSettingsQuickBooks() {
               )}
             </CardContent>
           </Card>
-
-          {status?.connected && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Sync History</CardTitle>
-                <CardDescription>Recent synchronization activity</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {logsLoading ? (
-                  <Skeleton className="h-32 w-full" />
-                ) : syncLogs && syncLogs.length > 0 ? (
-                  <div className="space-y-2">
-                    {syncLogs.map((log) => (
-                      <div 
-                        key={log.id} 
-                        className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          {log.status === "completed" ? (
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                          ) : log.status === "failed" ? (
-                            <AlertCircle className="h-5 w-5 text-red-600" />
-                          ) : (
-                            <Clock className="h-5 w-5 text-amber-600" />
-                          )}
-                          <div>
-                            <p className="font-medium capitalize">
-                              {log.syncType} sync ({log.direction})
-                            </p>
-                            <p className="text-sm text-slate-500">
-                              {log.startedAt && new Date(log.startedAt).toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right text-sm">
-                          <p className="text-green-600">{log.recordsProcessed} synced</p>
-                          {(log.recordsFailed ?? 0) > 0 && (
-                            <p className="text-red-600">{log.recordsFailed} failed</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-slate-500 text-center py-8">No sync history yet</p>
-                )}
-              </CardContent>
-            </Card>
-          )}
 
           {status?.connected && (
             <Card>
