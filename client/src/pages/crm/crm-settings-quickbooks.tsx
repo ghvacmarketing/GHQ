@@ -845,7 +845,7 @@ export default function CrmSettingsQuickBooks() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Name</TableHead>
-                          <TableHead>Type</TableHead>
+                          <TableHead>Account</TableHead>
                           <TableHead>Sub Type</TableHead>
                           <TableHead>Sync Status</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
