@@ -55,12 +55,13 @@ export class TextlineMessagingAdapter implements MessagingAdapter {
   name = "textline";
   
   async sendMessage(request: OutboundMessageRequest): Promise<OutboundMessageResult> {
-    // If we have an external conversation ID (from Textline), use the conversation-specific endpoint
-    if (request.externalConversationId) {
-      const result = await textlineClient.sendMessageToConversation(
-        request.externalConversationId,
-        request.body
-      );
+    // Always prefer phone number-based sending as it's more reliable
+    // The phone number approach finds or creates the conversation automatically
+    if (request.recipientPhone) {
+      const result = await textlineClient.sendMessage({
+        phoneNumber: request.recipientPhone,
+        body: request.body,
+      });
 
       if (!result.success) {
         return {
@@ -78,33 +79,11 @@ export class TextlineMessagingAdapter implements MessagingAdapter {
       };
     }
 
-    // Fall back to phone number-based sending (creates new conversation if needed)
-    if (!request.recipientPhone) {
-      return {
-        success: false,
-        status: "failed",
-        errorMessage: "No recipient phone number or conversation ID provided",
-      };
-    }
-
-    const result = await textlineClient.sendMessage({
-      phoneNumber: request.recipientPhone,
-      body: request.body,
-    });
-
-    if (!result.success) {
-      return {
-        success: false,
-        status: "failed",
-        errorMessage: result.errorMessage,
-      };
-    }
-
+    // No phone number available - cannot send
     return {
-      success: true,
-      status: "sent",
-      externalMessageId: result.messageUuid,
-      externalConversationId: result.conversationUuid,
+      success: false,
+      status: "failed",
+      errorMessage: "No recipient phone number provided",
     };
   }
   

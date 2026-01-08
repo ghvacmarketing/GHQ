@@ -17815,10 +17815,15 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       const { body, channel, attachments: msgAttachments } = req.body;
 
-      let customerPhone: string | null = null;
-      if (existing.customerId) {
+      // Get phone number from conversation directly, or from linked customer
+      let recipientPhone: string | null = existing.phoneNumber || null;
+      if (!recipientPhone && existing.customerId) {
         const [customer] = await db.select({ phone: crmCustomers.phone }).from(crmCustomers).where(eq(crmCustomers.id, existing.customerId));
-        customerPhone = customer?.phone || null;
+        recipientPhone = customer?.phone || null;
+      }
+      
+      if (!recipientPhone) {
+        return res.status(400).json({ message: "No phone number found for this conversation" });
       }
 
       const messageData = {
@@ -17844,7 +17849,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         conversationId: id,
         body: body || "",
         channel: channel || "sms",
-        recipientPhone: customerPhone || undefined,
+        recipientPhone: recipientPhone,
         externalConversationId: existing.externalConversationId || undefined,
       });
 
