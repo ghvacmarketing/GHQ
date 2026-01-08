@@ -621,6 +621,24 @@ export async function syncInvoiceToQuickBooks(
       }
     }
     
+    // Prefetch all active QuickBooks items for this realm for P&L routing via ItemRef
+    const allItems = await db.select()
+      .from(quickbooksItems)
+      .where(and(
+        eq(quickbooksItems.realmId, conn.realmId),
+        eq(quickbooksItems.isActive, true)
+      ));
+    
+    // Build item lookup map: "categoryType:propertyType" -> quickbooksItemId (actual QB Item ID)
+    const itemLookup = new Map<string, string>();
+    for (const qbItem of allItems) {
+      if (qbItem.quickbooksItemId && qbItem.categoryType && qbItem.propertyType) {
+        const key = `${qbItem.categoryType}:${qbItem.propertyType}`;
+        itemLookup.set(key, qbItem.quickbooksItemId);
+      }
+    }
+    console.log(`[QuickBooks Items] Built lookup with ${itemLookup.size} items: ${Array.from(itemLookup.keys()).join(", ")}`);
+    
     // Helper function to get classType from item category
     const categoryToClassType = (category: CrmItemCategory | null): "Service" | "Install" | "Maintenance" | "Discount" | null => {
       if (!category) return null;
@@ -649,7 +667,7 @@ export async function syncInvoiceToQuickBooks(
       return pt === "residential" ? "Residential" : "Commercial";
     };
     
-    // Build line items with ClassRef based on hierarchical class assignment
+    // Build line items with ClassRef and ItemRef for class assignment and P&L routing
     const qbLineItems: any[] = [];
     for (const item of lineItems) {
       const lineItem: any = {
@@ -662,21 +680,44 @@ export async function syncInvoiceToQuickBooks(
         }
       };
       
+      // Determine classType and subType for this line item (used for both ClassRef and ItemRef)
+      let lineClassType: "Service" | "Install" | "Maintenance" | "Discount" | null = null;
+      let lineSubType: "Residential" | "Commercial" | "Promotional" | "Maintenance" | null = null;
+      
       // Priority 1: Explicit quickbooksClassId override on line item
+      // Note: Even with explicit class override, we still determine lineClassType/lineSubType
+      // so ItemRef can be assigned for P&L routing
       if (item.quickbooksClassId) {
         const qbClassId = localIdToQbId.get(item.quickbooksClassId);
         if (qbClassId) {
           lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
-          qbLineItems.push(lineItem);
-          continue;
+          
+          // Still need to determine classType/subType for ItemRef assignment
+          if (item.isDiscountLine) {
+            lineClassType = "Discount";
+            const discountSubType = discountKindToSubType(item.discountKind as DiscountKind | null);
+            lineSubType = discountSubType || propertyTypeToSubType(propertyType);
+          } else if (item.itemId) {
+            const crmItem = itemsById.get(item.itemId);
+            if (crmItem?.category) {
+              lineClassType = categoryToClassType(crmItem.category as CrmItemCategory);
+              lineSubType = propertyTypeToSubType(propertyType);
+            }
+          }
+          // Don't continue - fall through to ItemRef assignment below
         }
       }
       
-      // Priority 2: Calculate class from item category + property type
-      if (item.isDiscountLine) {
+      // Priority 2: Calculate class and item from category + property type
+      // Only run if ClassRef was not already set by Priority 1 (explicit override)
+      const hasExplicitClassRef = !!lineItem.SalesItemLineDetail.ClassRef;
+      
+      if (item.isDiscountLine && !hasExplicitClassRef) {
         // For discount lines, use discountKind to determine subType
         const discountSubType = discountKindToSubType(item.discountKind as DiscountKind | null);
         if (discountSubType) {
+          lineClassType = "Discount";
+          lineSubType = discountSubType;
           const key = `Discount:${discountSubType}`;
           const qbClassId = classLookup.get(key);
           if (qbClassId) {
@@ -687,12 +728,14 @@ export async function syncInvoiceToQuickBooks(
         } else {
           console.log(`[QuickBooks Class] Discount line without discountKind: ${item.description}`);
         }
-      } else if (item.itemId) {
+      } else if (item.itemId && !hasExplicitClassRef) {
         // For regular items, use category + property type
         const crmItem = itemsById.get(item.itemId);
         if (crmItem?.category) {
           const classType = categoryToClassType(crmItem.category as CrmItemCategory);
           const subType = propertyTypeToSubType(propertyType);
+          lineClassType = classType;
+          lineSubType = subType;
           
           if (classType && subType) {
             const key = `${classType}:${subType}`;
@@ -708,7 +751,7 @@ export async function syncInvoiceToQuickBooks(
         } else {
           console.log(`[QuickBooks Class] Item ${item.itemId} has no category set`);
         }
-      } else {
+      } else if (!item.isDiscountLine && !item.itemId && !hasExplicitClassRef) {
         // Priority 3: For line items without itemId (e.g., maintenance agreement renewals),
         // try to infer class type from description
         const description = (item.description || "").toLowerCase();
@@ -721,6 +764,9 @@ export async function syncInvoiceToQuickBooks(
         } else if (description.includes("service") || description.includes("repair") || description.includes("diagnostic")) {
           inferredClassType = "Service";
         }
+        
+        lineClassType = inferredClassType;
+        lineSubType = propertyTypeToSubType(propertyType);
         
         if (inferredClassType && propertyType) {
           const subType = propertyTypeToSubType(propertyType);
@@ -737,6 +783,26 @@ export async function syncInvoiceToQuickBooks(
           console.log(`[QuickBooks Class] No itemId and couldn't infer class from description: "${item.description}"`);
         } else if (!propertyType) {
           console.log(`[QuickBooks Class] No property type for line item: "${item.description}"`);
+        }
+      }
+      
+      // Add ItemRef for P&L routing based on category + property type
+      // This routes revenue to the correct income account in QuickBooks
+      if (lineClassType && lineSubType) {
+        // For discounts, subType might be "Promotional" or "Maintenance" - map to Residential/Commercial if needed
+        const itemSubType = (lineSubType === "Promotional" || lineSubType === "Maintenance") 
+          ? propertyTypeToSubType(propertyType) 
+          : lineSubType;
+        
+        if (itemSubType) {
+          const itemKey = `${lineClassType}:${itemSubType}`;
+          const qbItemId = itemLookup.get(itemKey);
+          if (qbItemId) {
+            lineItem.SalesItemLineDetail.ItemRef = { value: qbItemId };
+            console.log(`[QuickBooks Items] Assigned ItemRef ${qbItemId} for key: ${itemKey}`);
+          } else {
+            console.log(`[QuickBooks Items] No item found for key: ${itemKey} (available: ${Array.from(itemLookup.keys()).join(", ")})`);
+          }
         }
       }
       
