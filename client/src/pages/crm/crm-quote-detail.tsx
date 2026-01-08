@@ -515,8 +515,8 @@ export default function CrmQuoteDetail() {
     }
 
     // Check if this quote requires a deposit payment (install/proposal quotes)
-    const depositCategories = ["custom install", "proposal builder", "custom service", "install"];
-    const requiresDeposit = depositCategories.includes(quote?.quoteType || "");
+    const DEPOSIT_QUOTE_TYPES = ["custom_install", "proposal", "custom_service"];
+    const requiresDeposit = DEPOSIT_QUOTE_TYPES.includes(quote?.quoteType?.toLowerCase() || "");
 
     if (requiresDeposit) {
       // Generate payment link and redirect to Stripe
