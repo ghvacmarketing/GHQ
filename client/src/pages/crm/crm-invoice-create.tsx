@@ -1091,9 +1091,9 @@ export default function CrmInvoiceCreate() {
                         <TableHeader>
                           <TableRow className="bg-slate-50">
                             <TableHead className={showAdvancedOptions ? "w-[30%]" : "w-[40%]"}>Description</TableHead>
-                            <TableHead className="w-[12%]">Type</TableHead>
+                            <TableHead className="w-[12%]">Class</TableHead>
                             {showAdvancedOptions && (
-                              <TableHead className="w-[18%]">QB Class</TableHead>
+                              <TableHead className="w-[18%]">Sub Account</TableHead>
                             )}
                             <TableHead className="w-[8%] text-right">Qty</TableHead>
                             <TableHead className="w-[12%] text-right">Price</TableHead>

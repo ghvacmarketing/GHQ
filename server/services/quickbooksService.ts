@@ -1836,7 +1836,7 @@ export async function deleteInvoiceFromQuickBooks(invoiceId: string): Promise<{ 
           return;
         }
         
-        // Delete the invoice
+        // Try to delete the invoice first (QuickBooks will reject if it has linked payments/credits)
         const deleteInvoiceData = {
           Id: invoice.Id,
           SyncToken: invoice.SyncToken
@@ -1845,12 +1845,51 @@ export async function deleteInvoiceFromQuickBooks(invoiceId: string): Promise<{ 
         // @ts-ignore - deleteInvoice exists in node-quickbooks but not in the type definitions
         qbo.deleteInvoice(deleteInvoiceData, async (deleteErr: any, deleted: any) => {
           if (deleteErr) {
-            console.error("[QuickBooks] Error deleting invoice:", deleteErr);
-            resolve({ success: false, error: deleteErr.message || "Failed to delete invoice" });
+            // Check if delete failed due to linked transactions (payments, credits, refunds)
+            // Common error codes: 6270, 610, 6200 for linked transaction errors
+            const errorCode = deleteErr?.Fault?.Error?.[0]?.code || "";
+            const errorMessage = deleteErr?.Fault?.Error?.[0]?.Message || deleteErr.message || "";
+            const hasLinkedTxn = invoice.LinkedTxn && invoice.LinkedTxn.length > 0;
+            
+            // If delete failed due to linked payments/credits, fall back to void
+            if (hasLinkedTxn || 
+                errorCode === "6270" || errorCode === "610" || errorCode === "6200" ||
+                errorMessage.toLowerCase().includes("linked") ||
+                errorMessage.toLowerCase().includes("payment") ||
+                errorMessage.toLowerCase().includes("delete")) {
+              
+              console.log(`[QuickBooks] Invoice ${invoice.Id} has linked transactions or cannot be deleted, voiding instead...`);
+              
+              const voidInvoiceData = {
+                Id: invoice.Id,
+                SyncToken: invoice.SyncToken,
+                sparse: true
+              };
+              
+              // @ts-ignore - voidInvoice exists in node-quickbooks but not in the type definitions
+              qbo.voidInvoice(voidInvoiceData, async (voidErr: any, voided: any) => {
+                if (voidErr) {
+                  console.error("[QuickBooks] Error voiding invoice:", voidErr);
+                  resolve({ success: false, error: voidErr.message || "Failed to void invoice (delete also failed)" });
+                  return;
+                }
+                
+                // Delete the sync record since invoice is voided
+                await db.delete(quickbooksInvoiceSync)
+                  .where(eq(quickbooksInvoiceSync.id, syncRecord.id));
+                
+                console.log(`[QuickBooks] Voided invoice (QB ID: ${invoice.Id}) - had linked payments/credits`);
+                resolve({ success: true });
+              });
+            } else {
+              // Unknown error - report it
+              console.error("[QuickBooks] Error deleting invoice:", deleteErr);
+              resolve({ success: false, error: errorMessage || "Failed to delete invoice" });
+            }
             return;
           }
           
-          // Delete the sync record entirely since the invoice is gone from both systems
+          // Delete succeeded - clean up sync record
           await db.delete(quickbooksInvoiceSync)
             .where(eq(quickbooksInvoiceSync.id, syncRecord.id));
           

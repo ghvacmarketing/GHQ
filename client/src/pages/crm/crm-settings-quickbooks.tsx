@@ -351,8 +351,8 @@ export default function CrmSettingsQuickBooks() {
       setShowAddDialog(false);
       setFormData({ name: "", classType: "Service", subType: "Residential" });
       toast({
-        title: "Class Created",
-        description: "New class created successfully",
+        title: "Sub Account Created",
+        description: "New sub account created successfully",
       });
     },
     onError: (error: any) => {
@@ -374,8 +374,8 @@ export default function CrmSettingsQuickBooks() {
       setEditingClass(null);
       setFormData({ name: "", classType: "Service", subType: "Residential" });
       toast({
-        title: "Class Updated",
-        description: "Class updated successfully",
+        title: "Sub Account Updated",
+        description: "Sub account updated successfully",
       });
     },
     onError: (error: any) => {
@@ -396,8 +396,8 @@ export default function CrmSettingsQuickBooks() {
       queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/classes"] });
       setDeleteConfirmClass(null);
       toast({
-        title: "Class Deleted",
-        description: "Class has been deactivated",
+        title: "Sub Account Deleted",
+        description: "Sub account has been deactivated",
       });
     },
     onError: (error: any) => {
@@ -826,13 +826,13 @@ export default function CrmSettingsQuickBooks() {
                   <div className="flex items-center gap-3">
                     <FolderTree className="h-6 w-6 text-blue-600" />
                     <div>
-                      <CardTitle>Manage Classes</CardTitle>
-                      <CardDescription>Create and manage QuickBooks classes for invoice tracking</CardDescription>
+                      <CardTitle>Manage Sub Accounts</CardTitle>
+                      <CardDescription>Create and manage QuickBooks sub accounts for invoice tracking</CardDescription>
                     </div>
                   </div>
-                  <Button onClick={handleOpenAddDialog} data-testid="btn-add-class">
+                  <Button onClick={handleOpenAddDialog} data-testid="btn-add-sub-account">
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Class
+                    Add Sub Account
                   </Button>
                 </div>
               </CardHeader>
@@ -1287,9 +1287,9 @@ export default function CrmSettingsQuickBooks() {
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New Class</DialogTitle>
+            <DialogTitle>Add New Sub Account</DialogTitle>
             <DialogDescription>
-              Create a new QuickBooks class for tracking invoices.
+              Create a new QuickBooks sub account for tracking invoices.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1361,9 +1361,9 @@ export default function CrmSettingsQuickBooks() {
       <Dialog open={!!editingClass} onOpenChange={(open) => !open && setEditingClass(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Class</DialogTitle>
+            <DialogTitle>Edit Sub Account</DialogTitle>
             <DialogDescription>
-              Update the class details.
+              Update the sub account details.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1435,9 +1435,9 @@ export default function CrmSettingsQuickBooks() {
       <AlertDialog open={!!deleteConfirmClass} onOpenChange={(open) => !open && setDeleteConfirmClass(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Class</AlertDialogTitle>
+            <AlertDialogTitle>Delete Sub Account</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deleteConfirmClass?.name}"? This will deactivate the class but it can be restored later if needed.
+              Are you sure you want to delete "{deleteConfirmClass?.name}"? This will deactivate the sub account but it can be restored later if needed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
