@@ -495,6 +495,12 @@ export async function syncInvoiceToQuickBooks(
       return { success: false, error: "Invoice has no associated customer" };
     }
     
+    // Don't sync draft invoices - only sync when sent or later
+    if (invoice.status === "draft") {
+      console.log(`[QuickBooks] Skipping draft invoice ${invoice.invoiceNumber}`);
+      return { success: false, error: "Draft invoices are not synced to QuickBooks" };
+    }
+    
     const customerId = invoice.customerId;
     
     // Get customer sync mapping
@@ -630,10 +636,14 @@ export async function syncInvoiceToQuickBooks(
       ));
     
     // Build item lookup map: "categoryType:propertyType" -> quickbooksItemId (actual QB Item ID)
+    // Keys are normalized: categoryType is capitalized (Service, Install, etc), propertyType is capitalized (Residential, Commercial)
     const itemLookup = new Map<string, string>();
     for (const qbItem of allItems) {
       if (qbItem.quickbooksItemId && qbItem.categoryType && qbItem.propertyType) {
-        const key = `${qbItem.categoryType}:${qbItem.propertyType}`;
+        // Normalize the key - ensure proper casing for lookup
+        const normalizedCategory = qbItem.categoryType; // Already stored as capitalized
+        const normalizedProperty = qbItem.propertyType.charAt(0).toUpperCase() + qbItem.propertyType.slice(1).toLowerCase();
+        const key = `${normalizedCategory}:${normalizedProperty}`;
         itemLookup.set(key, qbItem.quickbooksItemId);
       }
     }
