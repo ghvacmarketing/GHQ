@@ -37,7 +37,7 @@ import type { CrmUser, QuickbooksConnection, QuickbooksAccount } from "@shared/s
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Download, Wallet } from "lucide-react";
+import { Download, Wallet, Zap } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -315,6 +315,40 @@ export default function CrmSettingsQuickBooks() {
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const provisionItemsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/quickbooks/items/provision");
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/accounts"] });
+      if (result.provisioned > 0) {
+        toast({
+          title: "Items Provisioned",
+          description: `Created ${result.provisioned} QuickBooks items for your sub-accounts. P&L routing is now active.`,
+        });
+      } else if (result.skipped > 0) {
+        toast({
+          title: "Already Set Up",
+          description: `All ${result.skipped} mapped sub-accounts already have linked items.`,
+        });
+      } else {
+        toast({
+          title: "Nothing to Provision",
+          description: "No mapped sub-accounts found. Set category and property type on sub-accounts first.",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Provision Failed",
+        description: error.message || "Failed to provision items",
         variant: "destructive",
       });
     },
@@ -608,6 +642,28 @@ export default function CrmSettingsQuickBooks() {
                               <div className="text-xs text-slate-500">Fully Mapped</div>
                             </div>
                           </div>
+                          
+                          {mappedSubAccounts.length > 0 && (
+                            <div className="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                              <div>
+                                <p className="font-medium text-amber-900">Activate P&L Routing</p>
+                                <p className="text-sm text-amber-700">Create QuickBooks Items to route invoice income to your sub-accounts</p>
+                              </div>
+                              <Button
+                                onClick={() => provisionItemsMutation.mutate()}
+                                disabled={provisionItemsMutation.isPending}
+                                className="bg-amber-600 hover:bg-amber-700"
+                                data-testid="btn-provision-items"
+                              >
+                                {provisionItemsMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Zap className="h-4 w-4 mr-2" />
+                                )}
+                                Provision Items
+                              </Button>
+                            </div>
+                          )}
                           
                           <Accordion type="multiple" className="w-full" defaultValue={parentAccounts.map(p => p.id)}>
                             {parentAccounts.map((parent) => {
