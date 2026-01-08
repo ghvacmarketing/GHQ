@@ -445,17 +445,22 @@ export default function PublicQuoteView() {
     }
   }, [quote?.depositPaidAt, quote?.depositAmount]);
 
-  // Verify deposit payment - runs on redirect from Stripe AND when page loads with pending payment link
+  // Track if we've already attempted verification to prevent infinite loops
+  const [verificationAttempted, setVerificationAttempted] = useState(false);
+  
+  // Verify deposit payment - runs ONLY on redirect from Stripe with payment=success
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const paymentSuccess = params.get('payment');
     
-    // Verify if: (1) redirected from Stripe with success, OR (2) quote has payment link but no deposit recorded yet
+    // Only verify if explicitly redirected from Stripe with success parameter
+    // AND we haven't already recorded a deposit, AND we're not currently verifying
     const shouldVerify = quote?.id && !depositPaidAt && !depositVerifying && 
-      (paymentSuccess === 'success' || (quote?.stripePaymentLinkId && isInstallQuote));
+      !verificationAttempted && paymentSuccess === 'success';
     
     if (shouldVerify) {
       setDepositVerifying(true);
+      setVerificationAttempted(true);
       
       fetch(`/api/stripe/quote/${quote.id}/verify-deposit`, {
         method: 'POST',
@@ -469,18 +474,13 @@ export default function PublicQuoteView() {
             if (result.selectedOption) {
               setSelectedOption(result.selectedOption);
             }
-            if (paymentSuccess === 'success') {
-              toast({
-                title: "Payment Successful!",
-                description: "Your deposit has been received. You can now accept the quote.",
-              });
-            }
-            // Clean up URL parameter if present
-            if (paymentSuccess) {
-              window.history.replaceState({}, '', window.location.pathname);
-            }
-          } else if (paymentSuccess === 'success') {
-            // Only show error toast if user explicitly came back from payment
+            toast({
+              title: "Payment Successful!",
+              description: "Your deposit has been received. The quote has been accepted.",
+            });
+            // Clean up URL parameter
+            window.history.replaceState({}, '', window.location.pathname);
+          } else {
             toast({
               variant: "destructive",
               title: "Payment Verification",
@@ -490,19 +490,17 @@ export default function PublicQuoteView() {
         })
         .catch(err => {
           console.error('Deposit verification error:', err);
-          if (paymentSuccess === 'success') {
-            toast({
-              variant: "destructive",
-              title: "Verification Error",
-              description: "Failed to verify payment. Please refresh the page.",
-            });
-          }
+          toast({
+            variant: "destructive",
+            title: "Verification Error",
+            description: "Failed to verify payment. Please refresh the page.",
+          });
         })
         .finally(() => {
           setDepositVerifying(false);
         });
     }
-  }, [quote?.id, quote?.stripePaymentLinkId, depositPaidAt, depositVerifying, isInstallQuote, toast]);
+  }, [quote?.id, depositPaidAt, depositVerifying, verificationAttempted, toast]);
   
   // Handle deposit payment button click - fetch payment link and redirect
   const handlePayDeposit = async () => {
