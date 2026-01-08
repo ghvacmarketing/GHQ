@@ -217,9 +217,9 @@ export default function MobileInvoiceDetail() {
   };
 
   const handleRecordPayment = () => {
-    const amount = parseFloat(invoice?.total || "0");
+    const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
-      toast({ title: "Error", description: "Invoice has no valid amount.", variant: "destructive" });
+      toast({ title: "Error", description: "Please enter a valid payment amount.", variant: "destructive" });
       return;
     }
     recordPaymentMutation.mutate({
@@ -528,7 +528,7 @@ export default function MobileInvoiceDetail() {
   const isPaid = invoice.status === "paid";
   const isPartial = invoice.status === "partial";
   const isVoid = invoice.status === "void";
-  const canRecordPayment = invoice.status === "sent" || invoice.status === "partial";
+  const canTakePayment = invoice.status === "draft" || invoice.status === "sent" || invoice.status === "partial";
   const canVoid = currentUser && (currentUser.role === "owner" || currentUser.role === "admin") && !isVoid;
 
   const amountPaid = parseFloat(invoice.total || "0") - parseFloat(invoice.balanceDue || "0");
@@ -742,18 +742,10 @@ export default function MobileInvoiceDetail() {
             </Button>
           )}
 
-          {canRecordPayment && (
-            <div className="flex gap-2">
+          {canTakePayment && (
+            <div className="flex flex-col gap-2">
               <Button
-                className="flex-1 min-h-[48px] bg-green-600 hover:bg-green-700"
-                onClick={openPaymentDialog}
-                data-testid="button-record-payment"
-              >
-                <DollarSign className="h-4 w-4 mr-2" />
-                Record Cash/Check
-              </Button>
-              <Button
-                className="flex-1 min-h-[48px] bg-blue-600 hover:bg-blue-700"
+                className="w-full min-h-[48px] bg-blue-600 hover:bg-blue-700"
                 onClick={handleTakePayment}
                 disabled={isGeneratingPaymentLink}
                 data-testid="button-take-payment"
@@ -763,7 +755,16 @@ export default function MobileInvoiceDetail() {
                 ) : (
                   <CreditCard className="h-4 w-4 mr-2" />
                 )}
-                Take Payment
+                Take Card Payment
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full min-h-[48px]"
+                onClick={openPaymentDialog}
+                data-testid="button-record-payment"
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Record Cash/Check
               </Button>
             </div>
           )}

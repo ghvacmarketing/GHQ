@@ -171,6 +171,26 @@ export default function PortalInvoiceDetail() {
           </Card>
         )}
 
+        {!isPaymentSuccess && invoice.status === "paid" && (
+          <Card className="shadow-lg border-0 border-l-4 border-l-green-500 bg-green-50">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-green-100 rounded-full">
+                  <CheckCircle2 className="h-8 w-8 text-green-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-green-800" data-testid="text-already-paid">
+                    Invoice Already Paid
+                  </h2>
+                  <p className="text-green-700">
+                    This invoice has been paid in full. Thank you for your payment!
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="shadow-lg border-0" data-testid="card-invoice">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">

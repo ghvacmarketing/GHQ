@@ -1713,6 +1713,7 @@ function InvoiceTab({
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "check" | "card">("cash");
   const [paymentReference, setPaymentReference] = useState("");
   const [showInvoiceEmailDialog, setShowInvoiceEmailDialog] = useState(false);
+  const [generatingPaymentLinkForInvoice, setGeneratingPaymentLinkForInvoice] = useState<string | null>(null);
   const [invoiceEmailRecipient, setInvoiceEmailRecipient] = useState("");
   const [emailInvoiceId, setEmailInvoiceId] = useState<string | null>(null);
   
@@ -2050,6 +2051,42 @@ function InvoiceTab({
     setPaymentMethod("cash");
     setPaymentReference("");
     setShowPaymentDialog(true);
+  };
+
+  const handleTakePayment = async (invoice: CrmInvoice) => {
+    const balanceDue = parseFloat(invoice.balanceDue || invoice.total || "0");
+    if (balanceDue <= 0) {
+      toast({ title: "No Balance Due", description: "This invoice has already been paid.", variant: "destructive" });
+      return;
+    }
+    
+    setGeneratingPaymentLinkForInvoice(invoice.id);
+    try {
+      const response = await fetch(`/api/stripe/invoice/${invoice.id}/payment-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to create payment link");
+      }
+      
+      if (result.paymentLinkUrl) {
+        window.location.href = result.paymentLinkUrl;
+      } else {
+        throw new Error("No payment link received");
+      }
+    } catch (error: any) {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to create payment link", 
+        variant: "destructive" 
+      });
+      setGeneratingPaymentLinkForInvoice(null);
+    }
   };
 
   const handleRecordPayment = () => {
@@ -2467,15 +2504,31 @@ function InvoiceTab({
                               Send Email
                             </Button>
                           )}
-                          {(invoice.status === "sent" || invoice.status === "partial") && (
-                            <Button
-                              className="w-full min-h-[44px] bg-green-600 hover:bg-green-700"
-                              onClick={() => openPaymentDialog(invoice)}
-                              data-testid={`button-record-payment-${invoice.id}`}
-                            >
-                              <CreditCard className="h-4 w-4 mr-2" />
-                              Record Payment
-                            </Button>
+                          {(invoice.status === "draft" || invoice.status === "sent" || invoice.status === "partial") && parseFloat(invoice.balanceDue || invoice.total || "0") > 0 && (
+                            <>
+                              <Button
+                                className="w-full min-h-[44px] bg-blue-600 hover:bg-blue-700"
+                                onClick={() => handleTakePayment(invoice)}
+                                disabled={generatingPaymentLinkForInvoice === invoice.id}
+                                data-testid={`button-take-payment-${invoice.id}`}
+                              >
+                                {generatingPaymentLinkForInvoice === invoice.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                  <CreditCard className="h-4 w-4 mr-2" />
+                                )}
+                                Take Card Payment
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="w-full min-h-[44px]"
+                                onClick={() => openPaymentDialog(invoice)}
+                                data-testid={`button-record-payment-${invoice.id}`}
+                              >
+                                <DollarSign className="h-4 w-4 mr-2" />
+                                Record Cash/Check
+                              </Button>
+                            </>
                           )}
                           <Button
                             variant="outline"
